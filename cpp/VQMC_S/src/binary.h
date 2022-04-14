@@ -122,6 +122,16 @@ inline void intToBase(u64 idx, v_1d<int>& vec, int base = 2) {
 	}
 }
 
+inline void intToBase(u64 idx, arma::Col<int>& vec, int base = 2) {
+	u64 temp = idx;
+	const u64 size = vec.size();
+	for (int k = 0; k < size; k++) {
+		vec[size - 1 - k] = temp % base;
+		temp = temp / u64(base);
+	}
+}
+
+
 // ----------------------------------------------------------------------------- base change
 
 /*

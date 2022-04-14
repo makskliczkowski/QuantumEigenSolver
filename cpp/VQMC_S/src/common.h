@@ -1,10 +1,7 @@
 #pragma once
 /// user includes
+#include "str.h"
 #include "../include/random.h"
-#include <string>
-#include <stdlib.h>
-#include <string>
-#include <vector>
 
 // --------------------------------------------------------				ARMA				--------------------------------------------------------
 
@@ -107,13 +104,6 @@ namespace impDef {
 #ifndef COMMON_UTILS_H
 #define COMMON_UTILS_H
 using namespace arma;
-
-template<class T>
-using v_3d = std::vector<std::vector<std::vector<T>>>;				// 3d double vector
-template<class T>
-using v_2d = std::vector<std::vector<T>>;							// 2d double vector
-template<class T>
-using v_1d = std::vector<T>;										// 1d double vector
 
 using vecMat = v_1d<arma::mat>;
 // -----------------------------------------------------------------------------				TIME FUNCTIONS				-----------------------------------------------------------------------------
@@ -499,11 +489,6 @@ std::ostream& operator << (std::ostream& out, const v_2d<T>& v ) {
 }
 //! ----------------------------------------------------------------------------- HELPERS
 
-template <typename T>
-inline T variance(T value, T average, int norm) {
-	return std::sqrt((value / norm - average * average) / norm);
-}
-
 /*
 * check the sign of a value
 * @param val value to be checked
@@ -529,28 +514,4 @@ inline int myModuloEuclidean(int a, int b)
 }
 
 
-//! -------------------------------------------------------- STRING RELATED FUNCTIONS --------------------------------------------------------
-
-
-/*
-* Splits string according to the delimiter
-* @param s a string to be split
-* @param delimiter a delimiter. Default = '\t'
-* <returns></returns>
-*/
-v_1d<std::string> split_str(const std::string& s, std::string delimiter = "\t");
-
-/*
-* We want to handle files so let's make the c-way input a string. This way we will parse the command line arguments
-* @param argc number of main input arguments 
-* @param argv main input arguments 
-* @returns vector of strings with the arguments from command line
-*/
-inline v_1d<std::string> change_input_to_vec_of_str(int argc, char** argv){
-	// -1 because first is the name of the file
-	std::vector<std::string> tmp(argc - 1, "");										
-	for (int i = 0; i < argc - 1; i++)
-		tmp[i] = argv[i + 1];
-	return tmp;
-};
-#endif // COMMON_UTILS_H
+#endif
