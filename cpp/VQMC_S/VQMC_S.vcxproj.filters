@@ -13,5 +13,75 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\src">
+      <UniqueIdentifier>{120bce59-f09f-4183-b537-8c5b3cf089e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\models">
+      <UniqueIdentifier>{81cc70c4-169b-45c4-89fe-65b351a1acf7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\lattices">
+      <UniqueIdentifier>{ece9fe9c-e46d-4af2-82f3-feafd9add054}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Lattices">
+      <UniqueIdentifier>{95abad81-f007-4a50-8e25-9619e508d605}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Hamiltonians">
+      <UniqueIdentifier>{0e843970-642b-44d0-ac89-eab8903f2859}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\random.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rbm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\binary.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\common.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\progress.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\statistical.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\str.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\xoshiro_pp.h">
+      <Filter>Header Files\src</Filter>
+    </ClInclude>
+    <ClInclude Include="include\models\ising.h">
+      <Filter>Header Files\models</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hamil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\lattices\square.h">
+      <Filter>Header Files\lattices</Filter>
+    </ClInclude>
+    <ClInclude Include="include\lattice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rbm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="statistical.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="str.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

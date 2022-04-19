@@ -1,0 +1,1 @@
+C:\University\PHD\CODES\VariationalQMCandML\VarQMCSolver\cpp\VQMC_S\x64\Debug\VQMC_S.exe

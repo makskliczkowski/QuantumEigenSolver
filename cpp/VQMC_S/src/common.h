@@ -5,6 +5,10 @@
 
 // --------------------------------------------------------				ARMA				--------------------------------------------------------
 
+//-- SUPPRESS WARNINGS
+
+
+
 // armadillo flags:
 #define ARMA_64BIT_WORD                                                                     // enabling 64 integers in armadillo obbjects
 #define ARMA_BLAS_LONG_LONG                                                                 // using long long inside LAPACK call
@@ -53,12 +57,15 @@ R"(\)";
 // --------------------------------------------------------				DEFINITIONS				--------------------------------------------------------
 
 #define stout std::cout << std::setprecision(8) << std::fixed				// standard out
+#define stoutc(c) if(c) stout <<  std::setprecision(8) << std::fixed		// standard out conditional
 #define EL std::endl
 #define STR std::to_string
+#define STRP(str,prec) str_p(str, prec)
 #define DIAG arma::diagmat
 #define VEQ(name) valueEquals(#name,(name),2)
 #define VEQP(name,prec) valueEquals(#name,(name),prec)
 #define EYE(X) arma::eye(X,X)
+#define ZEROV(X) arma::zeros(X)
 #define ZEROM(X) arma::zeros(X,X)
 
 
@@ -354,6 +361,17 @@ inline std::string valueEquals(char name[], T value, int prec = 2) {
 }
 
 /*
+* given the char* name it prints its value in a format "name=val" specialization for string
+*@param name name of the variable
+*@param value of the variable
+*@returns "name=val" string
+*/
+inline std::string valueEquals(const char name[], std::string value, int prec) {
+	return std::string(name) + "=" + value;
+}
+
+
+/*
 * printing the separated number of variables using the variadic functions initializer
 *@param output output stream
 *@param elements initializer list of the elements to be printed
@@ -462,10 +480,10 @@ inline void printSeparatedP(std::ostream& output, char separator, arma::u16 widt
 template <typename T>
 std::ostream& operator<< (std::ostream& out, const v_1d<T>& v) {
 	if (!v.empty()) {
-		out << '[';
+		//out << '[';
 		for (int i = 0; i < v.size(); i++)
 			out << v[i] << ", ";
-		out << "\b\b]"; // use two ANSI backspace characters '\b' to overwrite final ", "
+		out << "\b\b"; // use two ANSI backspace characters '\b' to overwrite final ", "
 	}
 	return out;
 }
@@ -511,6 +529,39 @@ inline int myModuloEuclidean(int a, int b)
 	int m = a % b;
 	if (m < 0) m = (b < 0) ? m - b : m + b;
 	return m;
+}
+
+
+// ----------------------------------------------------------------------------- VECTORS HANDLING -----------------------------------------------------------------------------
+
+/// <summary>
+/// Creates a random vector of custom length using the random library and the merson-twister (?) engine
+/// </summary>
+/// <param name="N"> length of the generated random vector </param>
+/// <returns> returns the custom-length random vector </returns>
+inline vec create_random_vec(u64 N, randomGen& gen, double h = 1.0) {
+	vec random_vec(N, fill::zeros);
+	// create random vector from middle to always append new disorder at lattice endpoint
+	for (u64 j = 0; j <= N / 2.; j++) {
+		u64 idx = N / (long)2 - j;
+		random_vec(idx) = gen.randomReal_uni(-h, h);
+		idx += 2 * j;
+		if (idx < N) random_vec(idx) = gen.randomReal_uni(-h, h);
+	}
+	return random_vec;
+}
+
+/// <summary>
+/// Creates a random vector of custom length using the random library and the merson-twister (?) engine
+/// </summary>
+/// <param name="N"> length of the generated random vector </param>
+/// <returns> returns the custom-length random vector </returns>
+inline std::vector<double> create_random_vec_std(u64 N, randomGen& gen, double h = 1.0) {
+	std::vector<double> random_vec(N, 0);
+	for (u64 j = 0; j < N; j++) {
+		random_vec[j] = gen.randomReal_uni(-h, h);
+	}
+	return random_vec;
 }
 
 

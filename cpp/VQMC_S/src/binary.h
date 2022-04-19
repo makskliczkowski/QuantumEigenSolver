@@ -2,7 +2,7 @@
 #define BINARY_H
 
 #pragma once
-#include "common.h"
+#include "./common.h"
 // --------------------------------------------------------				SUPPRESS WARNINGS				--------------------------------------------------------
 #if defined(_MSC_VER)
 	#define DISABLE_WARNING_PUSH           __pragma(warning( push ))
@@ -122,7 +122,7 @@ inline void intToBase(u64 idx, v_1d<int>& vec, int base = 2) {
 	}
 }
 
-inline void intToBase(u64 idx, arma::Col<int>& vec, int base = 2) {
+inline void intToBase(u64 idx, vec& vec, int base = 2) {
 	u64 temp = idx;
 	const u64 size = vec.size();
 	for (int k = 0; k < size; k++) {
@@ -158,7 +158,7 @@ inline u64 baseToInt(const v_1d<int>& vec, int base = 2) {
 *@param base base to covert to
 *@returns unsigned long long integer 
 */
-inline u64 baseToInt(const v_1d<int>& vec, const v_1d<u64>& powers, int base = 2) {
+inline u64 baseToInt(const v_1d<int>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
 	for (int k = 0; k < size; k++)

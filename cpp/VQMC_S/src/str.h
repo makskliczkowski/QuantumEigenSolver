@@ -16,7 +16,7 @@ using v_1d = std::vector<T>;										// 1d double vector
 * @param delimiter a delimiter. Default = '\\t'
 * @return splitted string
 */
-v_1d<std::string> split_str(const std::string& s, std::string delimiter = "\t");
+v_1d<std::string> split_str(const std::string& s, std::string delimiter);
 
 /*
 * We want to handle files so let's make the c-way input a string. This way we will parse the command line arguments
@@ -24,10 +24,10 @@ v_1d<std::string> split_str(const std::string& s, std::string delimiter = "\t");
 * @param argv main input arguments 
 * @returns vector of strings with the arguments from command line
 */
-inline v_1d<std::string> changeInpToVec(int argc, char** argv){
+/*inline v_1d<std::string> changeInpToVec(int argc, char** argv) {
 	// -1 because first is the name of the file
 	v_1d<std::string> tmp(argc - 1, "");										
 	for (int i = 0; i < argc - 1; i++)
 		tmp[i] = argv[i + 1];
 	return tmp;
-};
+};*/
