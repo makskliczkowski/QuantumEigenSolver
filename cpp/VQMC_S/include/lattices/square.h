@@ -1,5 +1,7 @@
 #pragma once
-# include "../lattice.h"
+#ifndef LATTICE_H
+#include "lattice.h"
+#endif // !LATTICE_H
 
 // -------------------------------------------------------- SQUARE LATTICE --------------------------------------------------------
 

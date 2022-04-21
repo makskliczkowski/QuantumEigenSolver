@@ -1,7 +1,6 @@
+#pragma once
 #ifndef BINARY_H
 #define BINARY_H
-
-#pragma once
 #include "./common.h"
 // --------------------------------------------------------				SUPPRESS WARNINGS				--------------------------------------------------------
 #if defined(_MSC_VER)
@@ -122,16 +121,47 @@ inline void intToBase(u64 idx, v_1d<int>& vec, int base = 2) {
 	}
 }
 
-inline void intToBase(u64 idx, vec& vec, int base = 2) {
+/*
+*Conversion to system vector of a given base
+*@param idx numner for conversion
+*@param vec vector containing the binary string
+*@param base base to covert to
+*/
+inline void intToBase(u64 idx, v_1d<int>& vec, const v_1d<u64>& powers) {
 	u64 temp = idx;
 	const u64 size = vec.size();
-	for (int k = 0; k < size; k++) {
-		vec[size - 1 - k] = temp % base;
-		temp = temp / u64(base);
+	for (int k = size - 1; k >= 0; k--) {
+		vec[size - 1 - k] = static_cast<int>(temp / powers[k]);
+		temp -= vec[size - 1 - k] * powers[k];
 	}
 }
 
 
+template<typename T>
+inline void intToBase(u64 idx, Col<T>& vec, int base = 2) {
+	u64 temp = idx;
+	const u64 size = vec.size();
+	for (int k = 0; k < size; k++) {
+		vec(size - 1 - k) = temp % base;
+		temp = temp / u64(base);
+	}
+}
+
+/*
+*Conversion to system vector of a given base
+*@param idx numner for conversion
+*@param vec vector containing the binary string
+*@param base base to covert to
+*/
+template<typename T>
+inline void intToBase(u64 idx, Col<T>& vec, const v_1d<u64>& powers) {
+	u64 temp = idx;
+	const u64 size = vec.size();
+	for (int k = size - 1; k >= 0; k--) {
+		vec[size - 1 - k] = static_cast<int>(temp / powers[k]);
+		temp -= vec[size - 1 - k] * powers[k];
+	}
+}
 // ----------------------------------------------------------------------------- base change
 
 /*
@@ -161,10 +191,101 @@ inline u64 baseToInt(const v_1d<int>& vec, int base = 2) {
 inline u64 baseToInt(const v_1d<int>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
+#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
 		val += static_cast<u64>(vec[size - 1 - k]) * powers[k];
 	return val;
 }
+
+/*
+*Conversion from base vector to an integer
+*@param vec string
+*@param powers precalculated powers vector
+*@param base base to covert to
+*@returns unsigned long long integer
+*/
+template<typename T>
+inline u64 baseToInt(const Col<T>& vec, const v_1d<u64>& powers) {
+	u64 val = 0;
+	const u64 size = vec.size();
+	for (int k = 0; k < size; k++)
+		val += static_cast<u64>(std::real(vec(size - 1 - k))) * powers[k];
+	return val;
+}
+
+// ----------------------------------------------------------------------------- for states operation
+template<typename T1, typename T2>
+inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	T1 acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+	for (auto i = 0; i < lv.size(); i++)
+		acc += std::conj(lv(i)) * rv(i);
+	return acc;
+}
+
+template<typename T>
+inline cpx cdotm(arma::Col<cpx> lv, arma::Col<T> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	double acc_real = 0;
+	double acc_imag = 0;
+#pragma omp parallel for reduction(+ : acc_real, acc_imag)
+	for (auto i = 0; i < lv.size(); i++) {
+		acc_real += std::real(lv(i)) * rv(i);
+		acc_imag -= std::imag(lv(i)) * rv(i);
+	}
+	return cpx(acc_real, acc_imag);
+}
+
+template<>
+inline cpx cdotm(arma::Col<cpx> lv, arma::Col<double> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	double acc_real = 0;
+	double acc_imag = 0;
+#pragma omp parallel for reduction(+ : acc_real, acc_imag)
+	for (auto i = 0; i < lv.size(); i++) {
+		acc_real += std::real(lv(i)) * rv(i);
+		acc_imag -= std::imag(lv(i)) * rv(i);
+	}
+	return cpx(acc_real, acc_imag);
+}
+
+template<typename T1, typename T2>
+inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	T1 acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+	for (auto i = 0; i < lv.size(); i++)
+		acc += (lv(i)) * rv(i);
+	return acc;
+}
+
+template<typename T>
+inline cpx dotm(arma::Col<cpx> lv, arma::Col<T> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	double acc_real = 0;
+	double acc_imag = 0;
+#pragma omp parallel for reduction(+ : acc_real, acc_imag)
+	for (auto i = 0; i < lv.size(); i++) {
+		acc_real += std::real(lv(i)) * rv(i);
+		acc_imag += std::imag(lv(i)) * rv(i);
+	}
+	return cpx(acc_real, acc_imag);
+}
+
+template<>
+inline cpx dotm(arma::Col<cpx> lv, arma::Col<double> rv) {
+	//if (lv.size() != rv.size()) throw "not matching sizes";
+	double acc_real = 0;
+	double acc_imag = 0;
+#pragma omp parallel for reduction(+ : acc_real, acc_imag)
+	for (auto i = 0; i < lv.size(); i++) {
+		acc_real += std::real(lv(i)) * rv(i);
+		acc_imag += std::imag(lv(i)) * rv(i);
+	}
+	return cpx(acc_real, acc_imag);
+}
+
 
 // ----------------------------------------------------------------------------- manipulations
 
@@ -227,7 +348,5 @@ inline u64 reverseBits(u64 n, int L) {
 		(lookup[(n >> 54) & 0xffULL]);						// consider last 8 bits
 	return (rev >> (64 - L));								// get back to the original maximal number
 }
-
-
 
 #endif

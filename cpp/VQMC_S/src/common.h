@@ -13,6 +13,7 @@
 #define ARMA_64BIT_WORD                                                                     // enabling 64 integers in armadillo obbjects
 #define ARMA_BLAS_LONG_LONG                                                                 // using long long inside LAPACK call
 #define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
+#define ARMA_DONT_USE_WRAPPER
 #define ARMA_USE_MKL_ALLOC
 #define ARMA_USE_MKL_TYPES
 #define ARMA_USE_OPENMP
@@ -53,6 +54,8 @@ R"(\)";
 "/";
 #endif
 
+#ifndef COMMON_H
+#define COMMON_H
 
 // --------------------------------------------------------				DEFINITIONS				--------------------------------------------------------
 
@@ -108,10 +111,7 @@ namespace impDef {
 }
 
 // --------------------------------------------------------				COMMON UTILITIES				 --------------------------------------------------------
-#ifndef COMMON_UTILS_H
-#define COMMON_UTILS_H
 using namespace arma;
-
 using vecMat = v_1d<arma::mat>;
 // -----------------------------------------------------------------------------				TIME FUNCTIONS				-----------------------------------------------------------------------------
 /*
@@ -331,7 +331,13 @@ inline void createDirs(const std::string& dir, const _Ty&... dirs) {
 
 
 //? ------------------------------------------------------------------------------ VALUE EQUALS
-
+/*
+* checks if value is equal to some param up to given tolerance
+*/
+template <typename T> 
+inline bool valueEqualsPrec(T value, T eq, T tol) {
+	return std::abs(value - eq) < tol;
+}
 
 
 /*
@@ -348,6 +354,16 @@ inline std::string str_p(const T a_value, const int n = 2) {
 	return out.str();
 }
 
+/*
+* pretty prints the complex number in angular form
+*/
+inline std::string print_cpx(cpx val, int n = 2) {
+	double phase = std::arg(val) / PI;
+	while (phase < 0)
+		phase += 2;
+
+	return str_p(std::abs(val), n) + (!valueEqualsPrec(phase, 0.0, 1e-3) && !valueEqualsPrec(phase, 2.0, 1e-3) ? "*exp(" + str_p(phase, n) + "*pi*i)" : "");
+}
 
 /*
 * given the char* name it prints its value in a format "name=val"
@@ -356,9 +372,10 @@ inline std::string str_p(const T a_value, const int n = 2) {
 *@returns "name=val" string
 */
 template <typename T>
-inline std::string valueEquals(char name[], T value, int prec = 2) {
+inline std::string valueEquals(const char name[], T value, int prec = 2) {
 	return std::string(name)+ "=" + str_p(value, prec);
 }
+
 
 /*
 * given the char* name it prints its value in a format "name=val" specialization for string
@@ -370,7 +387,6 @@ inline std::string valueEquals(const char name[], std::string value, int prec) {
 	return std::string(name) + "=" + value;
 }
 
-
 /*
 * printing the separated number of variables using the variadic functions initializer
 *@param output output stream
@@ -378,7 +394,7 @@ inline std::string valueEquals(const char name[], std::string value, int prec) {
 *@param separator to be used @n default "\\t"
 *@param width of one element column for printing
 *@param endline shall we add endline at the end?
- */
+*/
 template <typename T>
 inline void printSeparated(std::ostream& output, char separtator = '\t', std::initializer_list<T> elements = {}, arma::u16 width = 8, bool endline = true) {
 	for (auto elem : elements) {
@@ -482,8 +498,8 @@ std::ostream& operator<< (std::ostream& out, const v_1d<T>& v) {
 	if (!v.empty()) {
 		//out << '[';
 		for (int i = 0; i < v.size(); i++)
-			out << v[i] << ", ";
-		out << "\b\b"; // use two ANSI backspace characters '\b' to overwrite final ", "
+			out << v[i] << ",";
+		out << "\b"; // use two ANSI backspace characters '\b' to overwrite final ", "
 	}
 	return out;
 }
@@ -534,6 +550,23 @@ inline int myModuloEuclidean(int a, int b)
 
 // ----------------------------------------------------------------------------- VECTORS HANDLING -----------------------------------------------------------------------------
 
+/*
+* 
+*/
+template <typename T>
+T stddev(const v_1d<T>& v)
+{
+	T sum = std::accumulate(v.begin(), v.end(), cpx(0.0));
+	T mean = sum / cpx(v.size());
+
+	std::vector<T> diff(v.size());
+	std::ranges::transform(v.begin(), v.end(), diff.begin(), [mean](T x) { return x - mean; });
+	T sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), cpx(0.0));
+	T stdev = std::sqrt(sq_sum / cpx(v.size()));
+	return stdev;
+}
+
+
 /// <summary>
 /// Creates a random vector of custom length using the random library and the merson-twister (?) engine
 /// </summary>
@@ -564,5 +597,4 @@ inline std::vector<double> create_random_vec_std(u64 N, randomGen& gen, double h
 	return random_vec;
 }
 
-
-#endif
+#endif // !COMMON_H

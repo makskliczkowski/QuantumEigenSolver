@@ -1,6 +1,12 @@
 #pragma once
+#ifndef  BINARY_H
 #include "../src/binary.h"
+#endif // ! BINARY_H
+
+#ifndef LATTICE_H
 #include "lattice.h"
+#endif // !LATTICE_H
+
 
 
 
@@ -21,6 +27,7 @@ public:
 
 	v_1d<u64> mapping;																				// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																		// used for normalization in the symmetry case
+	v_1d<std::tuple<u64, _type>> locEnergies;														// local energies map
 
 	virtual u64 map(u64 index) = 0;																	// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	//virtual ~SpinHamiltonian() = 0;																	// pure virtual destructor
@@ -46,6 +53,7 @@ public:
 	};
 
 	// ---------------------------------- PRINTERS -------------------------------------
+	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);			// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns);								// pretty prints the eigenstate at a given idx
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };			// prints the eigenstate at a given idx
 	auto get_hilbert_size()						const RETURNS(this->N);								// get the Hilbert space size 2^N
@@ -60,9 +68,28 @@ public:
 	// ---------------------------------- GENERAL METHODS ----------------------------------
 	virtual void hamiltonian() = 0;																	// pure virtual Hamiltonian creator
 	virtual v_1d<std::tuple<u64, _type>> locEnergy(u64 _id) = 0;									// returns the local energy for VQMC purposes
+	virtual v_1d<std::tuple<u64, _type>> locEnergy(const Col<_type>& _id) = 0;						// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, double value, u64 new_idx) = 0;							// sets the Hamiltonian elements in a virtual way
 	void diag_h(bool withoutEigenVec = false);														// diagonalize the Hamiltonian
 };
+
+template<typename _type>
+inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol)
+{
+	std::string tmp = "";
+	intToBase(state, base_vector, 2);
+	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
+		stout << str_p(val,3) << "*|" << base_vector << "> + ";
+}
+
+template<>
+inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>& base_vector, double tol)
+{
+	std::string tmp = "";
+	intToBase(state, base_vector, 2);
+	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
+		stout << print_cpx(val, 3) << "*|" << base_vector << "> + ";
+}
 
 /*
 * 
@@ -73,12 +100,8 @@ inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, 
 	auto tmp = state;
 	tmp.clean(0.05);
 	std::vector<int> base_vector(Ns);
-	for (auto k = 0; k < tmp.size(); k++) {
-		intToBase(k, base_vector, 2);
-		if (std::abs(tmp(k)) != 0) {
-			stout << tmp(k) << " * |" << base_vector << "> + ";
-		}
-	}
+	for (auto k = 0; k < tmp.size(); k++)
+		print_base_state(k, tmp(k), base_vector, 1e-3);
 	stout << EL;
 }
 

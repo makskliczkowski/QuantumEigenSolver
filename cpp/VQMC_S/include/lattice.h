@@ -1,6 +1,11 @@
 #pragma once
+#ifndef BINARY_H
 #include "../src/binary.h"
+#endif // !BINARY_H
 
+
+#ifndef LATTICE_H
+#define LATTICE_H
 
 // -------------------------------------------------------- GENERAL LATTICE --------------------------------------------------------
 
@@ -46,7 +51,7 @@ public:
 	virtual void calculate_coordinates() = 0;
 };
 
-void Lattice::calculate_nn() {
+inline void Lattice::calculate_nn() {
 	switch (this->_BC)
 	{
 	case 0:
@@ -61,3 +66,5 @@ void Lattice::calculate_nn() {
 		break;
 	}
 }
+
+#endif // !LATTICE_H

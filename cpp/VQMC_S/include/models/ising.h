@@ -1,6 +1,7 @@
 #pragma once
+#ifndef HAMIL_H
 #include "../hamil.h"
-
+#endif // !HAMIL_H
 
 
 #ifndef ISINGMODEL
@@ -36,13 +37,15 @@ public:
 	// METHODS
 	void hamiltonian() override;
 	v_1d<std::tuple<u64, _type>> locEnergy(u64 _id) override;													// returns the local energy for VQMC purposes
+	v_1d<std::tuple<u64, _type>> locEnergy(const Col<_type>& _id) override;
 	void setHamiltonianElem(u64 k, double value, u64 new_idx) override;
 
-	static std::string set_info(double J, double J0, double g, double g0, double h, double w,
-		const v_1d<std::string>& skip = {}, std::string sep = "_") 
+	static std::string set_info(int Ns, double J, double J0, double g, double g0, double h, double w,
+	const v_1d<std::string>& skip = {}, std::string sep = "_") 
 	{
 		std::string name = sep + \
-			"J=" + STRP(J, 2) + \
+			"Ns=" + STR(Ns) + \
+			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
 			",g=" + STRP(g, 2) + \
 			",g0=" + STRP(g0, 2) + \
@@ -74,15 +77,15 @@ IsingModelDis<_type>::IsingModelDis(double J, double J0, double g, double g0, do
 {
 	this->lattice = lat;
 	this->ran = randomGen();
-
 	auto Ns = this->lattice->get_Ns();
+	this->locEnergies = v_1d<std::tuple<u64, _type>>(Ns + 1);							// set local energies vector
 	this->N = ULLPOW(Ns);
 	this->dh = create_random_vec(Ns, this->ran, this->w);								// creates random disorder vector
 	this->dJ = create_random_vec(Ns, this->ran, this->J0);								// creates random exchange vector
 	this->dg = create_random_vec(Ns, this->ran, this->g0);								// creates random transverse field vector
 
 	//change info
-	this->info = this->set_info(J, J0, g, g0, h, w);
+	this->info = this->set_info(this->lattice->get_Ns(), J, J0, g, g0, h, w);
 
 }
 
@@ -108,10 +111,43 @@ u64 IsingModelDis<_type>::map(u64 index) {
 template <typename _type>
 v_1d<std::tuple<u64,_type>> IsingModelDis<_type>::locEnergy(u64 _id) {
 	auto Ns = this->lattice->get_Ns();
-	v_1d<int> tmp(Ns);
-	intToBase(_id, tmp);
 	const bool print = false;
-	stoutc(print) << "\t->" << VEQ(_id) << ":" << VEQ(tmp) << EL;
+	//stoutc(print) << "\t->" << VEQ(_id) << ":" << VEQ(tmp) << EL;
+
+
+	// sumup the value of non-changed state
+	double localVal = 0;
+#pragma omp parallel for reduction(+ : localVal)
+	for (auto i = 0; i < Ns; i++) {
+		double sj=0;
+		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								// true - spin up, false - spin down
+		//stoutc(print) << "\t\t->" << VEQ(si) << EL;
+		localVal += (this->h + dh(i)) * si;												// diagonal elements setting  perpendicular field
+		// check the Siz Si+1z
+		if(auto nei = this->lattice->get_nn(i, 0); nei >= 0)
+			sj = checkBit(_id, Ns - 1 - nei) ? 1.0 : -1.0;
+			//stoutc(print) << "\t\t->" << VEQ(sj) << EL;
+			localVal += (this->J + this->dJ(i)) * si * sj;								// diagonal elements setting  interaction field
+		// flip with S^x_i
+		u64 new_id = flip(_id, BinaryPowers[Ns - 1 - i], Ns - 1 - i);					// flip to new state
+		//stoutc(print) << "\t\t->" << VEQ(new_id) << EL << EL;
+
+		this->locEnergies[i] = std::make_tuple(new_id, this->g + this->dg(i));			// get the new tuple
+	}
+	locEnergies[Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
+	return this->locEnergies;
+}
+
+
+
+
+
+template<typename _type>
+inline v_1d<std::tuple<u64, _type>> IsingModelDis<_type>::locEnergy(const Col<_type>& state)
+{
+	auto Ns = this->lattice->get_Ns();
+	u64 _id = baseToInt(state, BinaryPowers);
+	const bool print = false;
 
 	v_1d<std::tuple<u64, _type>> elems(Ns + 1);
 	// sumup the value of non-changed state
@@ -122,7 +158,7 @@ v_1d<std::tuple<u64,_type>> IsingModelDis<_type>::locEnergy(u64 _id) {
 		stoutc(print) << "\t\t->" << VEQ(si) << EL;
 		localVal += (this->h + dh(i)) * si;												// diagonal elements setting  perpendicular field
 		// check the Siz Si+1z
-		if(auto nei = this->lattice->get_nn(i, 0); nei >= 0)
+		if (auto nei = this->lattice->get_nn(i, 0); nei >= 0)
 			sj = checkBit(_id, Ns - 1 - nei) ? 1.0 : -1.0;
 		stoutc(print) << "\t\t->" << VEQ(sj) << EL;
 		localVal += (this->J + this->dJ(i)) * si * sj;									// diagonal elements setting  interaction field
@@ -186,4 +222,4 @@ void IsingModelDis<_type>::hamiltonian() {
 }
 
 
-#endif
+#endif // !ISING_H
