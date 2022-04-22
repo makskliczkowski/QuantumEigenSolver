@@ -107,18 +107,41 @@ inline u64 binary_search(const std::vector<double>& arr, u64 l_point, u64 r_poin
 // ----------------------------------------------------------------------------- inlines
 
 /*
+*/
+template<typename T>
+inline void intToBaseBit(u64 idx, Col<T>& vec) {
+	const u64 size = vec.size();
+#ifdef DEBUG_BINARY
+	auto start = std::chrono::high_resolution_clock::now();
+#endif // DEBUG
+#pragma omp parallel for
+	for (int k = 0; k < size; k++)
+		vec(size - 1 - k) = checkBit(idx, size - 1 - k);
+#ifdef DEBUG_BINARY
+	stout << "->\n\t->Check bit binary change time taken: " << tim_mus(start) << "mus" << EL;
+#endif // DEBUG
+}
+
+
+/*
 *Conversion to system vector of a given base
 *@param idx numner for conversion 
 *@param vec vector containing the binary string 
 *@param base base to covert to
 */
 inline void intToBase(u64 idx, v_1d<int>& vec, int base = 2) {
+#ifdef DEBUG_BINARY
+	auto start = std::chrono::high_resolution_clock::now();
+#endif // DEBUG
 	u64 temp = idx;
 	const u64 size = vec.size();
 	for (int k = 0; k < size; k++) {
 		vec[size - 1 - k] = temp % base;
 		temp = temp / u64(base);
 	}
+#ifdef DEBUG_BINARY
+	stout << "->\n\t\t->Standard binary change time taken: " << tim_mus(start) << "mus" << EL;
+#endif // DEBUG
 }
 
 /*
@@ -136,15 +159,22 @@ inline void intToBase(u64 idx, v_1d<int>& vec, const v_1d<u64>& powers) {
 	}
 }
 
-
+/*
+*/
 template<typename T>
 inline void intToBase(u64 idx, Col<T>& vec, int base = 2) {
+#ifdef DEBUG_BINARY
+	auto start = std::chrono::high_resolution_clock::now();
+#endif // DEBUG	
 	u64 temp = idx;
 	const u64 size = vec.size();
 	for (int k = 0; k < size; k++) {
 		vec(size - 1 - k) = temp % base;
 		temp = temp / u64(base);
 	}
+#ifdef DEBUG_BINARY
+	stout << "->\n\t\t->Standard binary change time taken: " << tim_mus(start) << "mus" << EL;
+#endif // DEBUG
 }
 
 /*
@@ -218,36 +248,10 @@ template<typename T1, typename T2>
 inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
 	T1 acc = 0;
-#pragma omp parallel for reduction(+ : acc)
+//#pragma omp parallel for reduction(+ : acc)
 	for (auto i = 0; i < lv.size(); i++)
 		acc += std::conj(lv(i)) * rv(i);
 	return acc;
-}
-
-template<typename T>
-inline cpx cdotm(arma::Col<cpx> lv, arma::Col<T> rv) {
-	//if (lv.size() != rv.size()) throw "not matching sizes";
-	double acc_real = 0;
-	double acc_imag = 0;
-#pragma omp parallel for reduction(+ : acc_real, acc_imag)
-	for (auto i = 0; i < lv.size(); i++) {
-		acc_real += std::real(lv(i)) * rv(i);
-		acc_imag -= std::imag(lv(i)) * rv(i);
-	}
-	return cpx(acc_real, acc_imag);
-}
-
-template<>
-inline cpx cdotm(arma::Col<cpx> lv, arma::Col<double> rv) {
-	//if (lv.size() != rv.size()) throw "not matching sizes";
-	double acc_real = 0;
-	double acc_imag = 0;
-#pragma omp parallel for reduction(+ : acc_real, acc_imag)
-	for (auto i = 0; i < lv.size(); i++) {
-		acc_real += std::real(lv(i)) * rv(i);
-		acc_imag -= std::imag(lv(i)) * rv(i);
-	}
-	return cpx(acc_real, acc_imag);
 }
 
 template<typename T1, typename T2>
@@ -259,33 +263,6 @@ inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
 		acc += (lv(i)) * rv(i);
 	return acc;
 }
-
-template<typename T>
-inline cpx dotm(arma::Col<cpx> lv, arma::Col<T> rv) {
-	//if (lv.size() != rv.size()) throw "not matching sizes";
-	double acc_real = 0;
-	double acc_imag = 0;
-#pragma omp parallel for reduction(+ : acc_real, acc_imag)
-	for (auto i = 0; i < lv.size(); i++) {
-		acc_real += std::real(lv(i)) * rv(i);
-		acc_imag += std::imag(lv(i)) * rv(i);
-	}
-	return cpx(acc_real, acc_imag);
-}
-
-template<>
-inline cpx dotm(arma::Col<cpx> lv, arma::Col<double> rv) {
-	//if (lv.size() != rv.size()) throw "not matching sizes";
-	double acc_real = 0;
-	double acc_imag = 0;
-#pragma omp parallel for reduction(+ : acc_real, acc_imag)
-	for (auto i = 0; i < lv.size(); i++) {
-		acc_real += std::real(lv(i)) * rv(i);
-		acc_imag += std::imag(lv(i)) * rv(i);
-	}
-	return cpx(acc_real, acc_imag);
-}
-
 
 // ----------------------------------------------------------------------------- manipulations
 

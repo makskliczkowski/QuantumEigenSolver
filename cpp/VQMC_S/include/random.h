@@ -26,6 +26,9 @@ public:
 		z = (z ^ (z >> 27)) * 0x94d049bb133111eb;
 		return z ^ (z >> 31);
 	}
+	void seed(std::uint64_t seed) {
+		this->engine = XoshiroCpp::Xoshiro256PlusPlus(this->SeedInit(seed));
+	}
 
 	// WRAPPERS ON RANDOM FUNCTIONS
 	double xavier_uni(int in, int out, double xav = 6.0) {

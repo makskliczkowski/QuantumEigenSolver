@@ -21,6 +21,7 @@ public:
 	vec eigenvalues;																				// eigenvalues vector
 	u64 E_av_idx = -1;																				// average energy
 
+	u64 loc_states_num;																				// local energy states number
 	u64 N;																							// the Hilbert space size
 	std::mutex my_mute_button;																		// thread mutex
 	std::shared_ptr<Lattice> lattice;																// contains all the information about the lattice
@@ -55,6 +56,13 @@ public:
 	// ---------------------------------- PRINTERS -------------------------------------
 	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);			// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns);								// pretty prints the eigenstate at a given idx
+	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };	// returns the constant reference to local energy
+	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef(u64 _id)									// returns the constant reference to local energy
+	{ 
+		this->locEnergy(_id);
+		return this->locEnergies; 
+	};	
+
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };			// prints the eigenstate at a given idx
 	auto get_hilbert_size()						const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()							const RETURNS(this->mapping);						// constant reference to the mapping
@@ -67,10 +75,23 @@ public:
 
 	// ---------------------------------- GENERAL METHODS ----------------------------------
 	virtual void hamiltonian() = 0;																	// pure virtual Hamiltonian creator
-	virtual v_1d<std::tuple<u64, _type>> locEnergy(u64 _id) = 0;									// returns the local energy for VQMC purposes
-	virtual v_1d<std::tuple<u64, _type>> locEnergy(const Col<_type>& _id) = 0;						// returns the local energy for VQMC purposes
+	virtual void locEnergy(u64 _id) = 0;															// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, double value, u64 new_idx) = 0;							// sets the Hamiltonian elements in a virtual way
-	void diag_h(bool withoutEigenVec = false);														// diagonalize the Hamiltonian
+	void diag_h(bool withoutEigenVec = false);// diagonalize the Hamiltonian
+	
+	static std::string set_info(std::string name, const v_1d<std::string>& skip = {}, std::string sep = "_") {
+		auto tmp = split_str(name, ",");
+		std::string tmp_str = "";
+		for (int i = 0; i < tmp.size(); i++) {
+			bool save = true;
+			for (auto& skip_param : skip)
+				// skip the element if we don't want it to be included in the info
+				save = !(split_str(tmp[i], "=")[0] == skip_param);
+			if (save) tmp_str += tmp[i] + ",";
+		}
+		tmp_str.pop_back();
+		return tmp_str;
+	};
 };
 
 template<typename _type>

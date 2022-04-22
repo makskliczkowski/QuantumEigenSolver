@@ -124,8 +124,8 @@ void SquareLattice::calculate_nn_obc()
 		//* One dimension 
 		this->nearest_neighbors = std::vector<std::vector<int>>(Lx, std::vector<int>(2, 0));
 		for (int i = 0; i < Lx; i++) {
-			this->nearest_neighbors[i][0] = i >= Lx ? -1 : i + 1;											// right
-			this->nearest_neighbors[i][1] = i == 0 ? -1 : i - 1;											// left
+			this->nearest_neighbors[i][0] = (i + 1) >= Lx ? -1 : i + 1;										// right
+			this->nearest_neighbors[i][1] = (i - 1) == 0 ? -1 : i - 1;										// left
 		}
 		break;
 	case 2:

@@ -128,7 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-
+*.dat
 *.tlog
 *.ipch
 *.obj
@@ -140,3 +140,4 @@ dmypy.json
 *.filters
 *.suo
 *.db
+*.suo

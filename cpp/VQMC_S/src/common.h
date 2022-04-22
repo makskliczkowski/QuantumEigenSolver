@@ -122,6 +122,26 @@ inline double tim_s(clk::time_point start) {
 	return double(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration(\
 		std::chrono::high_resolution_clock::now() - start)).count()) / 1000.0;
 }
+/*
+*/
+inline double tim_ms(clk::time_point start) {
+	return double(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::duration(\
+		std::chrono::high_resolution_clock::now() - start)).count());
+}
+/*
+*/
+inline double tim_mus(clk::time_point start) {
+	return double(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration(\
+		std::chrono::high_resolution_clock::now() - start)).count());
+}
+
+// debug definitions for compiler
+#ifdef DEBUG
+#define PRT(time_point, cond) stoutc(cond) << #cond << " -> time : " << tim_mus(time_point) << "mus" << EL;
+#else
+#define PRT(time_point, cond)
+#endif
+
 
 // -----------------------------------------------------------------------------				TOOLS				-----------------------------------------------------------------------------
 
