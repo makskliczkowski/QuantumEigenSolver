@@ -1,5 +1,14 @@
 #include <string>
 #include <vector>
+#ifdef __has_include
+#  if __has_include(<format>)
+#    include <format>
+#    define HAS_FORMAT 1
+#	 define strf std::format
+#  else
+#    define HAS_FORMAT 0
+#  endif
+#endif
 
 template<class T>
 using v_3d = std::vector<std::vector<std::vector<T>>>;				// 3d double vector
@@ -27,10 +36,10 @@ v_1d<std::string> split_str(const std::string& s, std::string delimiter);
 * @param argv main input arguments 
 * @returns vector of strings with the arguments from command line
 */
-/*inline v_1d<std::string> changeInpToVec(int argc, char** argv) {
+inline v_1d<std::string> changeInpToVec(int argc, char** argv) {
 	// -1 because first is the name of the file
 	v_1d<std::string> tmp(argc - 1, "");										
 	for (int i = 0; i < argc - 1; i++)
 		tmp[i] = argv[i + 1];
 	return tmp;
-};*/
+};

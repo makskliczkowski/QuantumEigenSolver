@@ -160,6 +160,7 @@
     <ClInclude Include="include\lattices\square.h" />
     <ClInclude Include="include\ml.h" />
     <ClInclude Include="include\models\heisenberg.h" />
+    <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
     <ClInclude Include="include\random.h" />
     <ClInclude Include="include\rbm.h" />

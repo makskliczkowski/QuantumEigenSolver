@@ -59,9 +59,12 @@ R"(\)";
 
 // --------------------------------------------------------				DEFINITIONS				--------------------------------------------------------
 
-#define stout std::cout << std::setprecision(8) << std::fixed				// standard out
-#define stoutc(c) if(c) stout <<  std::setprecision(8) << std::fixed		// standard out conditional
 #define EL std::endl
+#define stout std::cout << std::setprecision(8) << std::fixed											// standard out
+#define stouts(text, start) stout << text << " -> time : " << tim_s(start) << "s" << EL;				// standard out seconds
+#define stoutms(text, start) stout << text << " -> time : " << tim_ms(start) << "ms" << EL;				// standard out miliseconds
+#define stoutmus(text, start) stout << text << " -> time : " << tim_mus(start) << "mus" << EL;			// standard out microseconds
+#define stoutc(c) if(c) stout <<  std::setprecision(8) << std::fixed									// standard out conditional
 #define STR std::to_string
 #define STRP(str,prec) str_p(str, prec)
 #define DIAG arma::diagmat

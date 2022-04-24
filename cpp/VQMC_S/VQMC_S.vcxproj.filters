@@ -72,6 +72,9 @@
     <ClInclude Include="include\models\heisenberg.h">
       <Filter>Header Files\models</Filter>
     </ClInclude>
+    <ClInclude Include="include\models\heisenberg_dots.h">
+      <Filter>Header Files\models</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common.cpp">
