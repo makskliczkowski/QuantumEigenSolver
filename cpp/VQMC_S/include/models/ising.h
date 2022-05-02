@@ -123,12 +123,12 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		}
 
 		// flip with S^x_i with the transverse field
-		u64 new_idx = flip(_id, BinaryPowers[Ns - 1 - i], Ns - 1 - i);
+		u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx,
 			this->g + this->dg(i));
 	}
 	// append unchanged at the very end
-	locEnergies[Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
@@ -170,9 +170,9 @@ void IsingModel<_type>::hamiltonian() {
 	}
 
 	for (long int k = 0; k < this->N; k++) {
-		for (int j = 0; j <= Ns - 1; j++) {
+		for (int j = 0; j <= this->Ns - 1; j++) {
 			// true - spin up, false - spin down
-			double s_i = checkBit(k, Ns - 1 - j) ? 1.0 : -1.0;							
+			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
 			// flip with S^x_i with the transverse field
 			u64 new_idx = flip(k, BinaryPowers[Ns - 1 - j], Ns - 1 - j);

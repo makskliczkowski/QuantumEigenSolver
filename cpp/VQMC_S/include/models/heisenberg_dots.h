@@ -225,7 +225,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 	for (auto k = 0; k < this->N; k++) {
 		// interaction with the dot at left site will be held with single variable as position is sorted
 		int dot_iter = 0;
-		for (int j = 0; j <= Ns - 1; j++) {
+		for (int j = 0; j <= this->Ns - 1; j++) {
 			// true - spin up, false - spin down
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
 
@@ -233,13 +233,13 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			this->H(k, k) += (this->h + dh(j)) * s_i;									
 
 			// transverse field
-			const u64 new_idx = flip(k, BinaryPowers[Ns - 1 - j], Ns - 1 - j);
+			const u64 new_idx = flip(k, BinaryPowers[this->Ns - 1 - j], this->Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// interaction - check if nn exists
 			if (const auto nn = this->lattice->get_nn(j, 0); nn >= 0) {						
 				// Ising-like spin correlation // check the bit on the nn
-				double s_j = checkBit(k, Ns - 1 - nn) ? 1.0 : -1.0;						
+				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 				auto interaction = (this->J + this->dJ(j));
 				
 				// setting the neighbors elements
@@ -253,7 +253,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			if (positions[dot_iter] == j) {
 				const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(s_i, dot_iter);
 				// set sz_int
-				this->H(k, k) += s_z_i * s_i;
+				this->H(k, k) += s_z_i;
 				// set sy_int
 				this->setHamiltonianElem(k, s_y_i, new_idx);
 				// set sx_int 
@@ -277,18 +277,19 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 	int dot_iter = 0;
 //#pragma omp parallel for reduction(+ : localVal)
 	for (auto i = 0; i < this->Ns; i++) {
-		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								// true - spin up, false - spin down
+		// true - spin up, false - spin down
+		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 
 		// perpendicular field
 		localVal += (this->h + this->dh(i)) * si;
 
 		// transverse field
-		u64 new_idx = flip(_id, BinaryPowers[Ns - 1 - i], Ns - 1 - i);
+		const u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
 		_type s_flipped_en = this->g + this->dg(i);
 
 		// check the Siz Si+1z
 		if (auto nei = this->lattice->get_nn(i, 0); nei >= 0) {
-			double sj = checkBit(_id, Ns - 1 - nei) ? 1.0 : -1.0;
+			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 			auto interaction = (this->J + this->dJ(i));
 			// diagonal elements setting  interaction field
 			localVal += interaction * si * sj;

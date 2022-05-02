@@ -100,35 +100,35 @@ u64 Heisenberg<_type>::map(u64 index) {
 */
 template <typename _type>
 void Heisenberg<_type>::locEnergy(u64 _id) {
-	auto Ns = this->lattice->get_Ns();
-
 	// sumup the value of non-changed state
 	double localVal = 0;
 #pragma omp parallel for reduction(+ : localVal)
-	for (auto i = 0; i < Ns; i++) {
-		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								// true - spin up, false - spin down
+	for (auto i = 0; i < this->Ns; i++) {
+		// true - spin up, false - spin down
+		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								
 
 		// perpendicular field
 		localVal += (this->h + dh(i)) * si;
 
 		// transverse field
-		u64 new_idx = flip(_id, BinaryPowers[Ns - 1 - i], Ns - 1 - i);
+		u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
 		// check the Siz Si+1z
-		if (auto nei = this->lattice->get_nn(i, 0); nei >= 0) {
-			double sj = checkBit(_id, Ns - 1 - nei) ? 1.0 : -1.0;
+		if (auto nn = this->lattice->get_nn(i, 0); nn >= 0) {
+			double sj = checkBit(_id, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
+			auto interaction = (this->J + this->dJ(i));
 			// diagonal elements setting  interaction field
-			localVal += (this->J + this->dJ(i)) * si * sj;		
+			localVal +=  interaction * si * sj;		
 
 			// S+S- + S-S+
 			if (si * sj < 0)
-				this->locEnergies[Ns + i] = std::make_tuple(flip(new_idx, BinaryPowers[Ns - 1 - nei], Ns - 1 - nei),
-					0.5 * (this->J + this->dJ(i)));
+				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn),
+					0.5 * interaction);
 		}
 	}
-	locEnergies[2*Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
+	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
@@ -141,7 +141,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 */
 template <typename _type>
 void Heisenberg<_type>::setHamiltonianElem(u64 k, _type value, u64 new_idx) {
-	NO_OVERFLOW(this->H(new_idx, k) += value);
+	this->H(new_idx, k) += value;
 }
 
 /*
@@ -152,7 +152,7 @@ void Heisenberg<_type>::setHamiltonianElem(u64 k, _type value, u64 new_idx) {
 */
 template <>
 void Heisenberg<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
-	NO_OVERFLOW(this->H(new_idx, k) += value);
+	this->H(new_idx, k) += value;
 }
 
 
@@ -162,7 +162,6 @@ void Heisenberg<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
 */
 template <typename _type>
 void Heisenberg<_type>::hamiltonian() {
-	auto Ns = this->lattice->get_Ns();
 	try {
 		this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
 	}
@@ -172,28 +171,27 @@ void Heisenberg<_type>::hamiltonian() {
 	}
 
 	for (auto k = 0; k < this->N; k++) {
-		double s_i = 0;
-		for (int j = 0; j <= Ns - 1; j++) {
-			s_i = checkBit(k, Ns - 1 - j) ? 1.0 : -1.0;									// true - spin up, false - spin down
+		for (int j = 0; j <= this->Ns - 1; j++) {
+			// true - spin up, false - spin down
+			double s_i = checkBit(k, Ns - 1 - j) ? 1.0 : -1.0;
 				
-			// disorder
-			this->H(k, k) += (this->h + dh(j)) * s_i;									// perpendicular magnetic field
+			// disorder // perpendicular magnetic field
+			this->H(k, k) += (this->h + dh(j)) * s_i;									
 
 			// transverse field
-			u64 new_idx = flip(k, BinaryPowers[Ns - 1 - j], Ns - 1 - j);			
+			u64 new_idx = flip(k, BinaryPowers[this->Ns - 1 - j], this->Ns - 1 - j);			
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);	
 
-			// interaction
-			const auto nn = this->lattice->get_nn(j, 0);
-			if (nn >= 0) {						// check if nn exists
-				// Ising-like spin correlation 
-				double s_j = checkBit(k, Ns - 1 - nn) ? 1.0 : -1.0;						// check the bit on the nn
+			// check if nn exists
+			if (const auto nn = this->lattice->get_nn(j, 0); nn >= 0) {
+				// Ising-like spin correlation // check the bit on the nn
+				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;						
 				auto interaction = (this->J + this->dJ(j));
 				this->H(k, k) += interaction * s_i * s_j;				// setting the neighbors elements
 		
 				// S+S- + S-S+ hopping
 				if (s_i * s_j < 0)
-					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, BinaryPowers[Ns - 1 - nn], Ns - 1 - nn));
+					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn));
 
 			}
 		}

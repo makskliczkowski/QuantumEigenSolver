@@ -46,7 +46,7 @@ private:
 	std::string firstPartOfpBar = "\t\t\t\t[";
 	std::string lastPartOfpBar = "]";
 	std::string pBarFiller = "|";
-	std::string pBarUpdater = "/-\\|";
+	std::string pBarUpdater = "|\\/";
 	// --------------------------- PROGRESS
 	clk::time_point timer;														            // inner clock
 	int amountOfFiller = 0;															            // length of filled elements
