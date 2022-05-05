@@ -157,8 +157,10 @@
   <ItemGroup>
     <ClInclude Include="include\hamil.h" />
     <ClInclude Include="include\lattice.h" />
+    <ClInclude Include="include\lattices\hexagonal.h" />
     <ClInclude Include="include\lattices\square.h" />
     <ClInclude Include="include\ml.h" />
+    <ClInclude Include="include\models\heisenberg-kitaev.h" />
     <ClInclude Include="include\models\heisenberg.h" />
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />

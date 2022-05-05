@@ -14,6 +14,7 @@ protected:
 	double J = 1;																								// spin exchange
 	double g = 1;																								// transverse magnetic field
 	double h = 1;																								// perpendicular magnetic field
+	double delta = 0;																							// delta with Sz_i * Sz_ip1
 
 	vec dh;																										// disorder in the system - deviation from a constant h value
 	double w;																									// the distorder strength to set dh in (-disorder_strength, disorder_strength)
@@ -27,7 +28,7 @@ public:
 	// Constructors 
 	~Heisenberg() = default;
 	Heisenberg() = default;
-	Heisenberg(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat);
+	Heisenberg(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat);
 
 	// METHODS
 	void hamiltonian() override;
@@ -61,18 +62,18 @@ public:
 * @param lat general lattice class that informs about the topology of the system lattice
 */
 template <typename _type>
-Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat)
-	: J(J), g(g), h(h), w(w), J0(J0), g0(g0)
+Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat)
+	: J(J), g(g), h(h), w(w), J0(J0), g0(g0), delta(delta)
 {
 	this->lattice = lat;
 	this->ran = randomGen();
-	this-> Ns = this->lattice->get_Ns();
-	this->loc_states_num = 2 * this->Ns + 1;											// number of states after local energy work
-	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num);				// set local energies vector
-	this->N = ULLPOW(this->Ns);															// Hilber space size
-	this->dh = create_random_vec(Ns, this->ran, this->w);								// creates random disorder vector
-	this->dJ = create_random_vec(Ns, this->ran, this->J0);								// creates random exchange vector
-	this->dg = create_random_vec(Ns, this->ran, this->g0);								// creates random transverse field vector
+	this->Ns = this->lattice->get_Ns();
+	this->loc_states_num = 2 * this->Ns + 1;														// number of states after local energy work
+	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num, std::make_tuple(0,0));	// set local energies vector
+	this->N = ULLPOW(this->Ns);																		// Hilber space size
+	this->dh = create_random_vec(Ns, this->ran, this->w);											// creates random disorder vector
+	this->dJ = create_random_vec(Ns, this->ran, this->J0);											// creates random exchange vector
+	this->dg = create_random_vec(Ns, this->ran, this->g0);											// creates random transverse field vector
 
 	//change info
 	this->info = this->inf();
@@ -107,10 +108,10 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 		// true - spin up, false - spin down
 		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								
 
-		// perpendicular field
+		// perpendicular field (SZ)
 		localVal += (this->h + dh(i)) * si;
 
-		// transverse field
+		// transverse field (SX)
 		u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
@@ -120,7 +121,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 
 			auto interaction = (this->J + this->dJ(i));
 			// diagonal elements setting  interaction field
-			localVal +=  interaction * si * sj;		
+			localVal +=  interaction*this->delta * si * sj;		
 
 			// S+S- + S-S+
 			if (si * sj < 0)
@@ -134,7 +135,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 
 /*
-* Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
+* @brief Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
 * @param k index of the basis state acted upon with the Hamiltonian
 * @param value value of the given matrix element to be set
 * @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
@@ -145,7 +146,7 @@ void Heisenberg<_type>::setHamiltonianElem(u64 k, _type value, u64 new_idx) {
 }
 
 /*
-* Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
+* @brief Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
 * @param k index of the basis state acted upon with the Hamiltonian
 * @param value value of the given matrix element to be set
 * @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
@@ -157,7 +158,7 @@ void Heisenberg<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
 
 
 /*
-* Generates the total Hamiltonian of the system. The diagonal part is straightforward,
+* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
 * while the non-diagonal terms need the specialized setHamiltonainElem(...) function
 */
 template <typename _type>
@@ -187,7 +188,9 @@ void Heisenberg<_type>::hamiltonian() {
 				// Ising-like spin correlation // check the bit on the nn
 				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;						
 				auto interaction = (this->J + this->dJ(j));
-				this->H(k, k) += interaction * s_i * s_j;				// setting the neighbors elements
+
+				// setting the neighbors elements
+				this->H(k, k) += interaction * this->delta * s_i * s_j;				
 		
 				// S+S- + S-S+ hopping
 				if (s_i * s_j < 0)

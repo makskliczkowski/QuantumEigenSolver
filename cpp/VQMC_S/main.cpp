@@ -15,8 +15,10 @@
 
 #include "include/rbm.h"
 #include "include/lattices/square.h"
+#include "include/lattices/hexagonal.h"
 #include "include/models/ising.h"
 #include "include/models/heisenberg_dots.h"
+#include "include/models/heisenberg-kitaev.h"
 
 
 template<typename _type, typename _hamtype>
@@ -24,23 +26,31 @@ void testModel() {
 	
 	// define lattice
 	int maxEd = 12;
-	int Lx = 10;
-	int Ly = 1;
+	int Lx = 6;
+	int Ly = 2;
 	int Lz = 1;
+	//int dim = 2;
 	int dim = 1;
 	int _BC = 1;
 	auto lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
+	//auto lat = std::make_shared<HexagonalLattice>(Lx, Ly, Lz, dim, _BC);
 	auto lattice_type = lat->get_type();
 	auto Ns = lat->get_Ns();
 	stout << VEQ(lattice_type) << EL;
 
 	// define model
-	double J = 1.0;
+	double J = -1.0;
 	double J0 = 0;
-	double h = 0.1;
+	double h = 0.0;
 	double w = 0.0;
-	double g = 0.0;
+	double g = 0.1;
 	double g0 = 0.0;
+	double delta = 0.05;
+
+	double Kx = 1;
+	double Ky = 1;
+	double Kz = 1;
+	double K0 = 0.0;
 	// for dots
 	v_1d<int> positions = { 0 , Lx - 1};
 	const auto phis = vec({ 0.1, 0.1});
@@ -49,7 +59,8 @@ void testModel() {
 	double J0_dot = 0.0;
 
 	//auto ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
-	auto ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, lat);
+	//auto ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, std::make_tuple(Kx,Ky,Kz), K0, lat);
+	auto ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
 	//auto ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, lat, positions, J_dot, J0_dot);
 	//ham->set_angles(phis, thetas);
 
@@ -76,9 +87,9 @@ void testModel() {
 	}
 
 	// define rbm state
-	u64 nhidden = Lx * Ly * Lz;
+	u64 nhidden = lat->get_Ns();
 	u64 nvisible = 2 * nhidden;
-	size_t batch = std::pow(2, 8);
+	size_t batch = std::pow(2, 6);
 	size_t thread_num = 16;
 	auto lr = 1e-2;
 
@@ -91,7 +102,7 @@ void testModel() {
 	auto mcSteps = 400;
 	size_t n_blocks = 200;
 	auto n_therm = size_t(0.1 * n_blocks);
-	size_t block_size = 16;//std::pow(2, 3);
+	size_t block_size = 8;//std::pow(2, 3);
 	auto n_flips = 1;
 	auto energies = phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 	//auto energies2 = phi.mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);

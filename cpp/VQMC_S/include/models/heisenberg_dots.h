@@ -25,7 +25,7 @@ private:
 	tuple<u64, double> sz_int;							// tuple to store the value of sz local interaction (no flip)
 public:
 	~Heisenberg_dots() = default;
-	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat,
+	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
 		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
 	// ----------------------------------- SETTERS ---------------------------------
 	void set_angles();
@@ -55,8 +55,8 @@ public:
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
 template<typename _type>
-inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0)
-	: Heisenberg<_type>(J, J0, g, g0, h, w, lat)
+inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0)
+	: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 {
 	this->positions = positions;
 	// sort the postitions vector for building block convinience
@@ -79,7 +79,7 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 
 // ----------------------------------------------------------------------------- INITIAL CONDITIONS -----------------------------------------------------------------------------
 /*
-* sets the angles to random
+* @brief sets the angles to random
 */
 template<typename _type>
 inline void Heisenberg_dots<_type>::set_angles()
@@ -125,7 +125,7 @@ inline void Heisenberg_dots<_type>::set_angles(const vec& phis, const vec& theta
 // ----------------------------------------------------------------------------- DOT INTERACTION -----------------------------------------------------------------------------
 
 /*
-* Gets the interaction with the dots at the given position_elem from positions vector and returns it
+* @brief Gets the interaction with the dots at the given position_elem from positions vector and returns it
 */
 template<typename _type>
 inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(double si, int position_elem)
@@ -179,7 +179,7 @@ inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return
 }
 
 /*
-* Gets the interaction with the dots at the given position_elem from positions vector
+* @brief Gets the interaction with the dots at the given position_elem from positions vector
 */
 template<typename _type>
 inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, int position_elem)
@@ -209,7 +209,7 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, int position_
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 
 /*
-* Generates the total Hamiltonian of the system. The diagonal part is straightforward,
+* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
 * while the non-diagonal terms need the specialized setHamiltonainElem(...) function
 */
 template <typename _type>
@@ -267,7 +267,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 // ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
 
 /*
-* Calculate the local energy end return the corresponding vectors with the value
+* @brief Calculate the local energy end return the corresponding vectors with the value
 * @param _id base state index
 */
 template <typename _type>

@@ -31,7 +31,7 @@ public:
 };
 
 /*
-* Constructor for the square lattice
+* @brief Constructor for the square lattice
 */
 SquareLattice::SquareLattice(int Lx, int Ly, int Lz, int dim, int _BC) 
 	: Lx(Lx), Ly(Ly), Lz(Lz)
@@ -80,7 +80,7 @@ std::tuple<int, int, int> SquareLattice::getSiteDifference(uint i, uint j) const
 }
 
 /*
-* Calculate the nearest neighbors with PBC
+* @brief Calculate the nearest neighbors with PBC
 */
 void SquareLattice::calculate_nn_pbc()
 {
@@ -114,7 +114,7 @@ void SquareLattice::calculate_nn_pbc()
 }
 
 /*
-* Calculate the nearest neighbors with OBC
+* @brief Calculate the nearest neighbors with OBC
 */
 void SquareLattice::calculate_nn_obc()
 {
@@ -148,7 +148,7 @@ void SquareLattice::calculate_nn_obc()
 }
 
 /*
-* Calculate the next nearest neighbors with PBC
+* @brief Calculate the next nearest neighbors with PBC
 */
 void SquareLattice::calculate_nnn_pbc()
 {
@@ -173,7 +173,7 @@ void SquareLattice::calculate_nnn_pbc()
 	}
 }
 /*
-/// Returns real space coordinates from a lattice site number
+* @brief Returns real space coordinates from a lattice site number
 */
 void SquareLattice::calculate_coordinates()
 {

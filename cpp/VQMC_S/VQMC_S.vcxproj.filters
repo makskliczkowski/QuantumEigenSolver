@@ -75,6 +75,12 @@
     <ClInclude Include="include\models\heisenberg_dots.h">
       <Filter>Header Files\models</Filter>
     </ClInclude>
+    <ClInclude Include="include\models\heisenberg-kitaev.h">
+      <Filter>Header Files\models</Filter>
+    </ClInclude>
+    <ClInclude Include="include\lattices\hexagonal.h">
+      <Filter>Header Files\lattices</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common.cpp">

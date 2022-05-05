@@ -443,6 +443,7 @@ void rbmState<typename _type, typename _hamtype>::updVarDeriv(int current_step){
 template<typename _type, typename _hamtype>
 _type rbmState<typename _type, typename _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
+    const auto hilb = this->hamil->get_hilbert_size();
     // get the reference to all local energies and changed states from the model Hamiltonian
     auto energies = this->hamil->get_localEnergyRef(this->current_state);
     _type energy = 0;
@@ -453,6 +454,9 @@ _type rbmState<typename _type, typename _hamtype>::locEn(){
     //for (const auto& [state, value] : energies)
     {
         const auto& [state, value] = energies[i];
+        if (state >= hilb)
+            continue;
+
         _type v = value;
         // changes accordingly not to create data race
         if (state != this->current_state) {
@@ -655,7 +659,6 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
 
     // states to be returned
     std::map<u64, _type> states;
-    std::map<u64, int> states_norm;
 
     _type en = 0;
     for (auto r = 0; r < b_size; r++) {
@@ -674,18 +677,9 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             PRT(sample_time, this->dbg_samp)
 
             // look at the states coefficient
-            if (!states.contains(this->current_state)) {
+            if (!states.contains(this->current_state))
                 // not found
                 states[this->current_state] = this->coeff(this->current_vector);
-                states_norm[this->current_state] = 1;
-            }
-            else {
-                // append
-                auto coeff = states[this->current_state];
-                auto norm = states_norm[this->current_state];
-                states[this->current_state] = coeff + this->coeff(this->current_vector);
-                states_norm[this->current_state] = norm + 1;
-            }
 
             // append local energies
             en += this->locEn();
@@ -695,14 +689,11 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             pbar.printWithTime("-> PROGRESS");
     }
     en /= double(n_samples * b_size);
-    for (const auto& [key, value] : states) {
-        states[key] = value / double(states_norm[key]);
-    }
 
     stouts("->\t\t\tMonte Carlo state search after finding weights ", start);
     stout << "\n------------------------------------------------------------------------" << EL;
     stout << "GROUND STATE RBM:" << EL;
-    this->pretty_print(states, 0.01);
+    this->pretty_print(states, 0.1);
     stout << "\n------------------------------------------------------------------------" << EL;
 
     return states;

@@ -107,7 +107,8 @@ namespace impDef {
 	/// Types of implemented lattice types
 	*/
 	enum class lattice_types {
-		square
+		square,
+		hexagonal
 		//triangle,
 		//hexagonal
 	};
@@ -164,7 +165,7 @@ inline double tim_mus(clk::time_point start) {
 void setSubmatrixFromMatrix(arma::mat& M2Set, const arma::mat& MSet, uint row, uint col, uint Nrows, uint Ncols, bool update = true, bool minus = false);
 
 /*
-* Uses the given matrix MSet (bigger) to set the M2Set (smaller) matrix
+* @brief Uses the given matrix MSet (bigger) to set the M2Set (smaller) matrix
 * @param M2Set (smaller) matrix to find the submatrix in and set it's elements
 * @param MSet (bigger) matrix to be put in the M2Set
 * @param row row of the left upper element (row,col) of MSet
@@ -175,7 +176,7 @@ void setSubmatrixFromMatrix(arma::mat& M2Set, const arma::mat& MSet, uint row, u
 void setMatrixFromSubmatrix(arma::mat& M2Set, const arma::mat& MSet, uint row, uint col, uint Nrows, uint Ncols, bool update = true, bool minus = false);
 
 /*
-* Is used to calculate the equation of the form (U_l * D_l * T_l + U_r * D_r * T_r).
+* @brief Is used to calculate the equation of the form (U_l * D_l * T_l + U_r * D_r * T_r).
 * @details UDT we get from QR decomposition with column pivoting
 * @param Ql
 * @param Rl
@@ -193,9 +194,8 @@ void setMatrixFromSubmatrix(arma::mat& M2Set, const arma::mat& MSet, uint row, u
 arma::mat inv_left_plus_right_qr(arma::mat& Ql, arma::mat& Rl, arma::umat& Pl, arma::mat& Tl, arma::vec& Dl, arma::mat& Qr, arma::mat& Rr, arma::umat& Pr, arma::mat& Tr, arma::vec& Dr, arma::vec& Dtmp);
 
 /*
-* Creates the UDT decomposition using QR decomposition. WITH INVERSION OF R DIAGONAL ALREADY
+* @brief Creates the UDT decomposition using QR decomposition. WITH INVERSION OF R DIAGONAL ALREADY
 * @cite doi:10.1016/j.laa.2010.06.023
-* </summary>
 * @param mat 
 * @param Q unitary Q matrix
 * @param R right triangular matrix
@@ -212,9 +212,8 @@ void inline setUDTDecomp(const arma::mat& mat, arma::mat& Q, arma::mat& R, arma:
 }
 
 /*
-* Creates the UDT decomposition using QR decomposition. WITHOUT D VECTOR
+* @brief Creates the UDT decomposition using QR decomposition. WITHOUT D VECTOR
 * @cite doi:10.1016/j.laa.2010.06.023
-* </summary>
 * @param mat 
 * @param Q unitary Q matrix
 * @param R right triangular matrix
@@ -264,7 +263,7 @@ arma::mat inline stableMultiplication(const arma::mat& left, const arma::mat& ri
 
 
 /*
-* Using ASvQRD - Accurate Solution via QRD with column pivoting to multiply the QR on the right and multiply new matrix mat_to_multiply on the left side.
+* @brief Using ASvQRD - Accurate Solution via QRD with column pivoting to multiply the QR on the right and multiply new matrix mat_to_multiply on the left side.
 * @cite doi:10.1016/j.laa.2010.06.023
 * @param mat_to_multiply (left) matrix to multiply by the QR decomposed stuff (on the right)
 * @param Q unitary Q matrix
@@ -288,7 +287,7 @@ void inline multiplyMatricesSVDFromRight(const arma::mat& mat_to_multiply, arma:
 	V = V * tmpV;
 }
 /*
-* Loh's decomposition to two scales in UDT QR decomposition. One is lower than 0 and second higher. Uses R again to save memory
+* @brief Loh's decomposition to two scales in UDT QR decomposition. One is lower than 0 and second higher. Uses R again to save memory
 * @param R the R matrix from QR decompositon. As it's diagonal is mostly not used anymore it will be used to store (<= 1) elements of previous R
 * @param D vector to store (> 1) elements of previous R -> IT IS ALREADY INVERSE OF R DIAGONAL
 */
@@ -303,7 +302,7 @@ void inline makeTwoScalesFromUDT(arma::mat& R, arma::vec& D) {
 }
 
 /*
-* Loh's decomposition to two scales in UDT QR decomposition. One is lower than 0 and second higher. Uses two new vectors
+* @brief Loh's decomposition to two scales in UDT QR decomposition. One is lower than 0 and second higher. Uses two new vectors
 * @param R the R matrix from QR decompositon. As it's diagonal is mostly not used anymore it will be used to store (<= 1) elements of previous R
 * @param D vector to store (> 1) elements of previous R
 */
@@ -324,7 +323,7 @@ void inline makeTwoScalesFromUDT(const arma::mat& R, arma::vec& Db, arma::vec& D
 
 
 /*
-* Opens a file
+* @brief Opens a file
 * @param filename filename
 * @param mode std::ios_base::openmode
 */
@@ -335,16 +334,16 @@ inline void openFile(T& file, std::string filename, std::ios_base::openmode mode
 }
 
 /*
-* Creates a single directory given a string path
-*@param dir the directory
+* @brief Creates a single directory given a string path
+* @param dir the directory
 */
 inline void createDirs(const std::string& dir) {
 	fs::create_directories(dir);
 }
 
 /*
-* Creates a variadic directory set given a string paths
-*@param dir the directory
+* @brief Creates a variadic directory set given a string paths
+* @param dir the directory
 */
 template <typename... _Ty>
 inline void createDirs(const std::string& dir, const _Ty&... dirs) {
@@ -498,7 +497,7 @@ inline void printSeparated(std::ostream& output, char separator, arma::u16 width
 }
 
 /*
-* printing the separated number of variables using the variadic functions initializer - LAST CALL PRECISION
+*@brief printing the separated number of variables using the variadic functions initializer - LAST CALL PRECISION
 *@param output output stream
 *@param separator to be used
 *@param width of one element column for printing
@@ -528,7 +527,7 @@ std::ostream& operator<< (std::ostream& out, const v_1d<T>& v) {
 }
 
 /*
-* Overwritten standard stream redirection operator for 2D vectors
+* @brief Overwritten standard stream redirection operator for 2D vectors
 * @param out outstream to be used
 * @param v 2D vector
 */
@@ -547,7 +546,7 @@ std::ostream& operator << (std::ostream& out, const v_2d<T>& v ) {
 //! ----------------------------------------------------------------------------- HELPERS
 
 /*
-* check the sign of a value
+* @brief check the sign of a value
 * @param val value to be checked
 * @returns sign of a variable
 */
@@ -557,7 +556,7 @@ inline int sgn(T val) {
 }
 
 /*
-* Defines an euclidean modulo denoting also the negative sign
+* @brief Defines an euclidean modulo denoting also the negative sign
 * @param a left side of modulo
 * @param b right side of modulo
 * @returns euclidean a%b
@@ -601,7 +600,7 @@ inline vec create_random_vec(u64 N, randomGen& gen, double h = 1.0) {
 	for (u64 j = 0; j <= N / 2.; j++) {
 		u64 idx = N / (long)2 - j;
 		random_vec(idx) = gen.randomReal_uni(-h, h);
-		idx += 2 * j;
+		idx += 2 * @brief j;
 		if (idx < N) random_vec(idx) = gen.randomReal_uni(-h, h);
 	}
 	return random_vec;
