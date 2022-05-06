@@ -194,7 +194,7 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, int position_
 		sz_int = make_tuple(state, Jz * si * this->cos_thetas[position_elem]);
 
 		// flip the state 
-		u64 new_state = flip(state, BinaryPowers[this->Ns - 1 - position], this->Ns - 1 - position);
+		u64 new_state = flip(state, this->Ns - 1 - position);
 
 		auto Jy = (this->J_dots(1) + this->J_dot[1]);
 		// set the s_y element 
@@ -233,7 +233,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			this->H(k, k) += (this->h + dh(j)) * s_i;									
 
 			// transverse field
-			const u64 new_idx = flip(k, BinaryPowers[this->Ns - 1 - j], this->Ns - 1 - j);
+			const u64 new_idx = flip(k, this->Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// interaction - check if nn exists
@@ -247,7 +247,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 				// S+S- + S-S+ hopping
 				if (s_i * s_j < 0)
-					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn));
+					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
 			}
 			// handle the dot
 			if (positions[dot_iter] == j) {
@@ -284,7 +284,7 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 		localVal += (this->h + this->dh(i)) * si;
 
 		// transverse field
-		const u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
+		const u64 new_idx = flip(_id, this->Ns - 1 - i);
 		_type s_flipped_en = this->g + this->dg(i);
 
 		// check the Siz Si+1z
@@ -296,7 +296,7 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 
 			// S+S- + S-S+
 			if (si * sj < 0)
-				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, BinaryPowers[this->Ns - 1 - nei], this->Ns - 1 - nei),
+				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nei),
 					0.5 * interaction);
 		}
 		// handle the dot

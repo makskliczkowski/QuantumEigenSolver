@@ -28,6 +28,9 @@
     <Filter Include="Source Files\Hamiltonians">
       <UniqueIdentifier>{0e843970-642b-44d0-ac89-eab8903f2859}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\operators">
+      <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\random.h">
@@ -80,6 +83,9 @@
     </ClInclude>
     <ClInclude Include="include\lattices\hexagonal.h">
       <Filter>Header Files\lattices</Filter>
+    </ClInclude>
+    <ClInclude Include="include\operators\operators.h">
+      <Filter>Header Files\operators</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

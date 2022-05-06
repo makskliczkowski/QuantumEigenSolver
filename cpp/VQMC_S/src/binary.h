@@ -1,7 +1,11 @@
 #pragma once
 #ifndef BINARY_H
 #define BINARY_H
+
+#ifndef COMMON_H
 #include "./common.h"
+#endif
+
 // --------------------------------------------------------				SUPPRESS WARNINGS				--------------------------------------------------------
 #if defined(_MSC_VER)
 	#define DISABLE_WARNING_PUSH           __pragma(warning( push ))
@@ -49,6 +53,20 @@ DISABLE_WARNING_PUSH // include <armadillo> and suppress its warnings, cause dev
 #define REVERSE_BITS R6(0), R6(2), R6(1), R6(3)
 #define ULLPOW(k) 1ULL << k
 #define RETURNS(...) -> decltype((__VA_ARGS__)) { return (__VA_ARGS__); }
+#define SPIN
+
+// use binary representation 0/1 instead of -1/1
+#ifdef USE_BINARY
+	#undef SPIN
+#endif
+
+#ifdef SPIN
+	#define INT_TO_BASE_BIT intToBaseBitSpin
+	#define BASE_TO_INT baseToIntSpin
+#endif // SPIN
+
+
+
 
 // The macro `REVERSE_BITS` generates the table
 const u64 lookup[256] = { REVERSE_BITS };
@@ -299,23 +317,48 @@ inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
 	return acc;
 }
 
-// ----------------------------------------------------------------------------- manipulations
+// ----------------------------------------------------------------------------- manipulations -----------------------------------------------------------------------------
 
+// ---------------------------------- rotate
 /*
-*Rotates the binary representation of the input decimal number by one left shift
-*@param n  number to rotate
-*@param maxPower  maximal power of 2
+*@brief Rotates the binary representation of the input decimal number by one left shift
+*@param n number to rotate
+*@param maxPower maximal power of 2
 *@returns rotated number
 */
 inline u64 rotateLeft(u64 n, int L) {
-	NO_OVERFLOW(u64 maxPower = BinaryPowers[L - int32_t(1)];);
+	u64 maxPower = BinaryPowers[L - int32_t(1)];
 	return (n >= maxPower) ? (((int64_t)n - (int64_t)maxPower) * 2 + 1) : n * 2;
 }
 
 /*
-*Check the k'th bit
+*@brief Rotates the binary representation of the input decimal number by one left shift
+*@param n vector to rotate
+*@returns rotated number
+*/
+template<typename _type>
+inline v_1d<_type>& rotateLeftV(v_1d<_type>& n, int L) {
+	std::ranges::rotate(n.begin(), n.begin() + L, n.end());
+	return v_1d<_type>();
+}
+
+/*
+*@brief Rotates the binary representation of the input decimal number by one left shift
+*@param n vector to rotate
+*@returns rotated number
+*/
+template<typename _type>
+inline v_1d<_type>& rotateLeftV(const v_1d<_type>& n, int L) {
+	auto tmp = n;
+	std::ranges::rotate(tmp.begin(), tmp.begin() + L, tmp.end());
+	return tmp;
+}
+
+// ---------------------------------- check bit
+/*
+*@brief Check the k'th bit
 *@param n Number on which the bit shall be checked
-*@param k Number of bit (from 0 to 63)
+*@param k Number of bit (from 0 to 63) - count from right
 *@returns Bool on if the bit is set or not
 */
 inline bool checkBit(u64 n, int k) {
@@ -323,28 +366,194 @@ inline bool checkBit(u64 n, int k) {
 }
 
 /*
-*Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const v_1d<_type>& n, int L) {
+	return n[L];
+}
+
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const Col<_type>& n, int L) {
+	return n(L);
+}
+// ---------------------------------- flip all bits
+
+/*
+*@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
 *@param n number to be flipped
 *@param maxBinaryNum maximal power of 2 for given bit number(maximal length is 64 for ULL)
 *@returns flipped number
 */
-inline u64 flip(u64 n, int L) {
+inline u64 flipAll(u64 n, int L) {
 	return BinaryPowers[L] - n - 1;
 }
 
 /*
-*Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
-*@param n number to be checked
-*@param kthPower precalculated power of 2 for k'th site
-*@param k k'th site for flip to be checked
-*@returns number with k'th bit from the right flipped
+*@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
+*@param n number to be flipped
+*@param maxBinaryNum maximal power of 2 for given bit number(maximal length is 64 for ULL)
+*@returns flipped number
 */
-inline u64 flip(u64 n, u64 kthPower, int k) {
-	return checkBit(n, k) ? (int64_t(n) - (int64_t)kthPower) : (n + kthPower);
+template<typename _type>
+inline v_1d<_type> flipAllV_copy(const v_1d<_type>& n, int L) {
+	auto tmp = n;
+	for (auto i = 0; i < L; i++) {
+#ifdef SPIN
+		tmp[i] *= -1;
+#else 
+		tmp[i] = tmp[i] == 1 ? 0 : 1;
+#endif // SPIN
+	}
+	return tmp;
+
 }
 
 /*
-* Function that calculates the bit reverse, note that 64 bit representation
+*@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
+*@param n number to be flipped
+*@param maxBinaryNum maximal power of 2 for given bit number(maximal length is 64 for ULL)
+*@returns flipped number
+*/
+template<typename _type>
+inline Col<_type> flipAllV_copy(const Col<_type>& n, int L) {
+	auto tmp = n;
+	for (auto i = 0; i < L; i++) {
+#ifdef SPIN
+		tmp(i) *= -1;
+#else 
+		tmp(i) = tmp(i) == 1 ? 0 : 1;
+#endif // SPIN
+	}
+	return tmp;
+
+}
+
+
+/*
+*@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
+*@param n number to be flipped
+*@param maxBinaryNum maximal power of 2 for given bit number(maximal length is 64 for ULL)
+*@returns flipped number
+*/
+template<typename _type>
+inline void flipAllV(v_1d<_type>& n, int L) {
+	for (auto i = 0; i < L; i++) {
+#ifdef SPIN
+		n[i] *= -1;
+#else 
+		n[i] = n[i] == 1 ? 0 : 1;
+#endif // SPIN
+	}
+}
+
+/*
+*@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
+*@param n number to be flipped
+*@param maxBinaryNum maximal power of 2 for given bit number(maximal length is 64 for ULL)
+*@returns flipped number
+*/
+template<typename _type>
+inline void flipAllV(Col<_type>& n, int L) {
+	for (auto i = 0; i < L; i++) {
+#ifdef SPIN
+		n(i) *= -1;
+#else 
+		n(i) = n(i) == 1 ? 0 : 1;
+#endif // SPIN
+	}
+}
+
+// ---------------------------------- flip single bit
+
+/*
+*@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
+*@param n number to be checked
+*@param k k'th site for flip to be checked
+*@returns number with k'th bit from the right flipped
+*/
+inline u64 flip(u64 n, int k) {
+	return checkBit(n, k) ? (int64_t(n) - (int64_t)BinaryPowers[k]) : (n + BinaryPowers[k]);
+}
+
+/*
+*@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
+*@param n number to be checked
+*@param k k'th site for flip to be checked
+*@returns number with k'th bit from the right flipped
+*/
+template<typename _type>
+inline v_1d<_type> flipV_copy(const v_1d<_type>& n, int k) {
+	auto tmp = n;
+#ifdef SPIN
+	tmp[k] *= -1;
+#else 
+	tmp[k] = tmp[k] == 1 ? 0 : 1;
+#endif // SPIN
+	return tmp;
+}
+
+/*
+*@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
+*@param n number to be checked
+*@param k k'th site for flip to be checked
+*@returns number with k'th bit from the right flipped
+*/
+template<typename _type>
+inline Col<_type> flipV_copy(const Col<_type>& n, int k) {
+	auto tmp = n;
+#ifdef SPIN
+	tmp(k) *= -1;
+#else 
+	tmp(k) = tmp(k) == 1 ? 0 : 1;
+#endif // SPIN
+	return tmp;
+}
+
+
+/*
+*@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
+*@param n number to be checked
+*@param k k'th site for flip to be checked
+*@returns number with k'th bit from the right flipped
+*/
+template<typename _type>
+inline void flipV(v_1d<_type>& n, int k) {
+#ifdef SPIN
+	n[k] *= -1;
+#else 
+	n[k] = n[k] == 1 ? 0 : 1;
+#endif // SPIN
+}
+
+/*
+*@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
+*@param n number to be checked
+*@param k k'th site for flip to be checked
+*@returns number with k'th bit from the right flipped
+*/
+template<typename _type>
+inline void flipV(Col<_type>& n, int k) {
+#ifdef SPIN
+	n(k) *= -1;
+#else 
+	n(k) = n(k) == 1 ? 0 : 1;
+#endif // SPIN
+}
+
+// ---------------------------------- flip single bit
+
+/*
+* @brief Function that calculates the bit reverse, note that 64 bit representation
 * is now taken and one has to be sure that it doesn't exceede it (which it doesn't, we sure)
 *@param L We need to know how many bits does the number really take because the function can take up to 64
 *@returns number with reversed bits moved to be maximally of size L again
@@ -359,6 +568,41 @@ inline u64 reverseBits(u64 n, int L) {
 		(lookup[(n >> 48) & 0xffULL] << 8) |				// consider the next 8 bits
 		(lookup[(n >> 54) & 0xffULL]);						// consider last 8 bits
 	return (rev >> (64 - L));								// get back to the original maximal number
+}
+
+/*
+* @brief Function that calculates the bit reverse, note that 64 bit representation
+* is now taken and one has to be sure that it doesn't exceede it (which it doesn't, we sure)
+*@param L We need to know how many bits does the number really take because the function can take up to 64
+*@returns number with reversed bits moved to be maximally of size L again
+*/
+template<typename _type>
+inline u64 reverseBitsV_copy(const v_1d<_type>& n, int L) {
+	auto tmp = n;
+	std::ranges::reverse(tmp.begin(), tmp.end());
+	return tmp;
+}
+
+/*
+* @brief Function that calculates the bit reverse, note that 64 bit representation
+* is now taken and one has to be sure that it doesn't exceede it (which it doesn't, we sure)
+* @param L We need to know how many bits does the number really take because the function can take up to 64
+* @returns number with reversed bits moved to be maximally of size L again
+*/
+template<typename _type>
+inline void reverseBitsV(v_1d<_type>& n, int L) {
+	std::ranges::reverse(n.begin(), n.end());
+}
+
+/*
+* @brief Function that calculates the bit reverse, note that 64 bit representation
+* is now taken and one has to be sure that it doesn't exceede it (which it doesn't, we sure)
+* @param L We need to know how many bits does the number really take because the function can take up to 64
+* @returns number with reversed bits moved to be maximally of size L again
+*/
+template<typename _type>
+inline Col<_type> reverseBitsV(const Col<_type>& n, int L) {
+	return arma::reverse(n);
 }
 
 #endif

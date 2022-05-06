@@ -112,7 +112,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 		localVal += (this->h + dh(i)) * si;
 
 		// transverse field (SX)
-		u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
+		u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
 		// check the Siz Si+1z
@@ -125,8 +125,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 
 			// S+S- + S-S+
 			if (si * sj < 0)
-				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn),
-					0.5 * interaction);
+				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nn), 0.5 * interaction);
 		}
 	}
 	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
@@ -174,13 +173,13 @@ void Heisenberg<_type>::hamiltonian() {
 	for (auto k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
 			// true - spin up, false - spin down
-			double s_i = checkBit(k, Ns - 1 - j) ? 1.0 : -1.0;
+			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
 				
 			// disorder // perpendicular magnetic field
 			this->H(k, k) += (this->h + dh(j)) * s_i;									
 
 			// transverse field
-			u64 new_idx = flip(k, BinaryPowers[this->Ns - 1 - j], this->Ns - 1 - j);			
+			u64 new_idx = flip(k, this->Ns - 1 - j);			
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);	
 
 			// check if nn exists
@@ -194,7 +193,7 @@ void Heisenberg<_type>::hamiltonian() {
 		
 				// S+S- + S-S+ hopping
 				if (s_i * s_j < 0)
-					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn));
+					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
 
 			}
 		}

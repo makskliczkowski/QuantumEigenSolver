@@ -164,6 +164,7 @@
     <ClInclude Include="include\models\heisenberg.h" />
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
+    <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\random.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="src\binary.h" />

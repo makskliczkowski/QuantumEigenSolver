@@ -600,7 +600,7 @@ inline vec create_random_vec(u64 N, randomGen& gen, double h = 1.0) {
 	for (u64 j = 0; j <= N / 2.; j++) {
 		u64 idx = N / (long)2 - j;
 		random_vec(idx) = gen.randomReal_uni(-h, h);
-		idx += 2 * @brief j;
+		idx += 2 * j;
 		if (idx < N) random_vec(idx) = gen.randomReal_uni(-h, h);
 	}
 	return random_vec;

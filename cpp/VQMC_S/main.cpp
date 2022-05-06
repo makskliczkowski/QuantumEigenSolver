@@ -41,7 +41,7 @@ void testModel() {
 	// define model
 	double J = -1.0;
 	double J0 = 0;
-	double h = 0.0;
+	double h = 0.1;
 	double w = 0.0;
 	double g = 0.1;
 	double g0 = 0.0;
@@ -58,9 +58,9 @@ void testModel() {
 	const vec J_dot = { 1.0,0.0, -1.0 };
 	double J0_dot = 0.0;
 
-	//auto ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+	auto ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
 	//auto ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, std::make_tuple(Kx,Ky,Kz), K0, lat);
-	auto ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+	//auto ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
 	//auto ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, lat, positions, J_dot, J0_dot);
 	//ham->set_angles(phis, thetas);
 
@@ -79,17 +79,18 @@ void testModel() {
 		for (auto i = 0; i < ham->get_hilbert_size(); i++) {
 			auto value = ham->get_eigenStateValue(0, i);
 			if (abs(value) < 1e-7) continue;
-			for (int j = 0; j < lat->get_Ns(); j++) {
-				sz += abs(abs(value) * value) * (checkBit(i, lat->get_Ns() - 1 - j) ? 1.0 : -1.0);
-			}
+			//for (int j = 0; j < lat->get_Ns(); j++) {
+			auto j = 0;
+			sz += abs(abs(value) * value) * (checkBit(i, lat->get_Ns() - 1 - j) ? 1.0 : -1.0);
+			//}
 		}
-		stout << "ED sz: " << VEQ(sz/lat->get_Ns()) << EL;
+		stout << "ED sz: " << VEQ(sz) << EL;
 	}
 
 	// define rbm state
 	u64 nhidden = lat->get_Ns();
 	u64 nvisible = 2 * nhidden;
-	size_t batch = std::pow(2, 6);
+	size_t batch = std::pow(2, 10);
 	size_t thread_num = 16;
 	auto lr = 1e-2;
 
@@ -101,8 +102,8 @@ void testModel() {
 	// monte carlo
 	auto mcSteps = 400;
 	size_t n_blocks = 200;
-	auto n_therm = size_t(0.1 * n_blocks);
-	size_t block_size = 8;//std::pow(2, 3);
+	auto n_therm = size_t(0.2 * n_blocks);
+	size_t block_size = 20;//std::pow(2, 3);
 	auto n_flips = 1;
 	auto energies = phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 	//auto energies2 = phi.mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);

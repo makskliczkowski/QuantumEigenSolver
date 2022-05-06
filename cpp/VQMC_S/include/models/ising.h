@@ -123,7 +123,7 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		}
 
 		// flip with S^x_i with the transverse field
-		u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
+		u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx,
 			this->g + this->dg(i));
 	}
@@ -175,7 +175,7 @@ void IsingModel<_type>::hamiltonian() {
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
 			// flip with S^x_i with the transverse field
-			u64 new_idx = flip(k, BinaryPowers[Ns - 1 - j], Ns - 1 - j);
+			u64 new_idx = flip(k, Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// diagonal elements setting the perpendicular field

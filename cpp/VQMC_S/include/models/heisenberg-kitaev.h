@@ -70,13 +70,13 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 #pragma omp parallel for reduction(+ : localVal)
 	for (auto i = 0; i < this->Ns; i++) {
 		// true - spin up, false - spin down
-		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;
+		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;
 
 		// perpendicular field (SZ) - HEISENBERG
 		localVal += (this->h + this->dh(i)) * si;
 
 		// transverse field (SX) - HEISENBERG
-		const u64 new_idx = flip(_id, BinaryPowers[this->Ns - 1 - i], this->Ns - 1 - i);
+		const u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
 		// check all the neighbors
@@ -96,7 +96,7 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 				auto sisj = si * sj;
 				localVal += interaction * this->delta * sisj;
 				
-				auto flip_idx_nn = flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn);
+				auto flip_idx_nn = flip(new_idx, this->Ns - 1 - nn);
 
 				// S+S- + S-S+
 				if (si * sj < 0)
@@ -142,7 +142,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			this->H(k, k) += (this->h + dh(j)) * si;
 
 			// HEISENBERG
-			const u64 new_idx = flip(k, BinaryPowers[this->Ns - 1 - j], this->Ns - 1 - j);
+			const u64 new_idx = flip(k, this->Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 			
 			
@@ -162,7 +162,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 					// setting the neighbors elements
 					this->H(k, k) += interaction * this->delta * sisj;
 
-					const u64 flip_idx_nn = flip(new_idx, BinaryPowers[this->Ns - 1 - nn], this->Ns - 1 - nn);
+					const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nn);
 
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
