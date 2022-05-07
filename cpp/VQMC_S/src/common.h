@@ -92,7 +92,7 @@ const std::string kPS = std::string(kPSep);
 // --------------------------------------------------------				ALGORITHMS FOR MC				--------------------------------------------------------
 
 /*
-/// Here we will state all the already implemented definitions that will help us building the user interfrace
+@brief Here we will state all the already implemented definitions that will help us building the user interfrace
 */
 namespace impDef {
 	/*
@@ -106,11 +106,18 @@ namespace impDef {
 	/*
 	/// Types of implemented lattice types
 	*/
-	enum class lattice_types {
+	enum lattice_types {
 		square,
 		hexagonal
 		//triangle,
 		//hexagonal
+	};
+
+	enum ham_types {
+		ising,
+		heisenberg,
+		heisenberg_dots,
+		kitaev_heisenberg
 	};
 }
 
@@ -571,6 +578,28 @@ inline int myModuloEuclidean(int a, int b)
 
 
 // ----------------------------------------------------------------------------- VECTORS HANDLING -----------------------------------------------------------------------------
+
+
+/*
+* @brief take real part of a complex vector
+*/
+//v_1d<double> realv(const v_1d<cpx>& v) {
+//	v_1d<double> tmp(v.size(), 0);
+//	for (auto i = 0; i < v.size(); i++)
+//		tmp[i] = real(v[i]);
+//	return tmp;
+//}
+//
+//
+///*
+//* @brief take imaginary part of a complex vector
+//*/
+//v_1d<double> imagv(const v_1d<cpx>& v) {
+//	v_1d<double> tmp(v.size(), 0);
+//	for (auto i = 0; i < v.size(); i++)
+//		tmp[i] = imag(v[i]);
+//	return tmp;
+//}
 
 /*
 * 

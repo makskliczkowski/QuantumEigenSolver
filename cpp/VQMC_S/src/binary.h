@@ -68,10 +68,12 @@ DISABLE_WARNING_PUSH // include <armadillo> and suppress its warnings, cause dev
 
 
 
+
+
 // The macro `REVERSE_BITS` generates the table
 const u64 lookup[256] = { REVERSE_BITS };
 
-// vector containing powers of 2 from 2^0 to 2^(L-1)
+// Vector containing powers of 2 from 2^0 to 2^(L-1) - after 32 lattice sites we need to handle it with vectors
 const v_1d<u64> BinaryPowers = { ULLPOW(0), ULLPOW(1), ULLPOW(2), ULLPOW(3),
 								ULLPOW(4), ULLPOW(5), ULLPOW(6), ULLPOW(7),
 								ULLPOW(8), ULLPOW(9), ULLPOW(10), ULLPOW(11),
@@ -80,10 +82,10 @@ const v_1d<u64> BinaryPowers = { ULLPOW(0), ULLPOW(1), ULLPOW(2), ULLPOW(3),
 								ULLPOW(20), ULLPOW(21), ULLPOW(22), ULLPOW(23),
 								ULLPOW(24), ULLPOW(25), ULLPOW(26), ULLPOW(27),
 								ULLPOW(28), ULLPOW(29), ULLPOW(30), ULLPOW(31) };                   
-// ----------------------------------------------------------------------------- binary search
+// ----------------------------------------------------------------------------- 				  binary search  				 -----------------------------------------------------------------------------
 
 /*
-* Finding index of base vector in mapping to reduced basis
+* @brief Finding index of base vector in mapping to reduced basis
 * @typeparam T 
 * @param arr arary/vector conataing the mapping to the reduced basis 
 * @param l_point left maring for binary search 
@@ -122,9 +124,12 @@ inline u64 binary_search(const std::vector<double>& arr, u64 l_point, u64 r_poin
 	return -1;
 }
 
-// ----------------------------------------------------------------------------- inlines
+// -----------------------------------------------------------------------------  				  transformations   				 -----------------------------------------------------------------------------
 
 /*
+* @brief translates the integer to a vector in a given (binary) base (with bitwise check) (arma)
+* @param idx index (integer) of a state
+* @param vec vector to be transformed onto
 */
 template<typename T>
 inline void intToBaseBit(u64 idx, Col<T>& vec) {
@@ -141,7 +146,29 @@ inline void intToBaseBit(u64 idx, Col<T>& vec) {
 }
 
 /*
-* 
+* @brief translates the integer to a vector in a given (binary) base (with bitwise check)
+* @param idx index (integer) of a state
+* @param vec vector to be transformed onto
+*/
+template<typename T>
+inline void intToBaseBit(u64 idx, v_1d<T>& vec) {
+	const u64 size = vec.size();
+#ifdef DEBUG_BINARY
+	auto start = std::chrono::high_resolution_clock::now();
+#endif // DEBUG
+#pragma omp parallel for
+	for (int k = 0; k < size; k++)
+		vec[k] = checkBit(idx, size - 1 - k);
+#ifdef DEBUG_BINARY
+	stout << "->\n\t->Check bit binary change time taken: " << tim_mus(start) << "mus" << EL;
+#endif // DEBUG
+}
+
+
+/*
+* @brief translates the integer to a vector in a given (binary) base but here we use spin as values in a vector (with bitwise check)
+* @param idx index (integer) of a state
+* @param vec vector to be transformed onto
 */
 template<typename T>
 inline void intToBaseBitSpin(u64 idx, Col<T>& vec) {
@@ -157,11 +184,28 @@ inline void intToBaseBitSpin(u64 idx, Col<T>& vec) {
 #endif // DEBUG
 }
 
-
+/*
+* @brief translates the integer to a vector in a given (binary) base but here we use spin as values in a vector (with bitwise check) (arma)
+* @param idx index (integer) of a state
+* @param vec vector to be transformed onto
+*/
+template<typename T>
+inline void intToBaseBitSpin(u64 idx, v_1d<T>& vec) {
+	const u64 size = vec.size();
+#ifdef DEBUG_BINARY
+	auto start = std::chrono::high_resolution_clock::now();
+#endif // DEBUG
+#pragma omp parallel for
+	for (int k = 0; k < size; k++)
+		vec[k] = checkBit(idx, size - 1 - k) ? 1.0 : -1.0;
+#ifdef DEBUG_BINARY
+	stout << "->\n\t->Check bit binary change time taken: " << tim_mus(start) << "mus" << EL;
+#endif // DEBUG
+}
 
 
 /*
-*Conversion to system vector of a given base
+*@brief Conversion to system vector of a given base (modulo)
 *@param idx numner for conversion 
 *@param vec vector containing the binary string 
 *@param base base to covert to
@@ -182,10 +226,11 @@ inline void intToBase(u64 idx, v_1d<int>& vec, int base = 2) {
 }
 
 /*
-*Conversion to system vector of a given base
+*@brief Conversion to system vector of a given base (modulo)
 *@param idx numner for conversion
 *@param vec vector containing the binary string
 *@param base base to covert to
+*@param powers powers to be used in conversion
 */
 inline void intToBase(u64 idx, v_1d<int>& vec, const v_1d<u64>& powers) {
 	u64 temp = idx;
@@ -197,6 +242,10 @@ inline void intToBase(u64 idx, v_1d<int>& vec, const v_1d<u64>& powers) {
 }
 
 /*
+*@brief Conversion to system vector of a given base (modulo)
+*@param idx numner for conversion
+*@param vec vector (arma) containing the binary string
+*@param base base to covert to
 */
 template<typename T>
 inline void intToBase(u64 idx, Col<T>& vec, int base = 2) {
@@ -215,10 +264,11 @@ inline void intToBase(u64 idx, Col<T>& vec, int base = 2) {
 }
 
 /*
-*Conversion to system vector of a given base
+*Conversion to system vector of a given base (modulo)
 *@param idx numner for conversion
-*@param vec vector containing the binary string
+*@param vec vector (arma) containing the binary string
 *@param base base to covert to
+*@param powers powers to be used in conversion
 */
 template<typename T>
 inline void intToBase(u64 idx, Col<T>& vec, const v_1d<u64>& powers) {
@@ -232,7 +282,7 @@ inline void intToBase(u64 idx, Col<T>& vec, const v_1d<u64>& powers) {
 // ----------------------------------------------------------------------------- base change
 
 /*
-*Conversion from base vector to an integer
+*@brief Conversion from base vector to an integer
 *@param vec string 
 *@param base base to covert to
 *@returns unsigned long long integer 
@@ -249,7 +299,7 @@ inline u64 baseToInt(const v_1d<int>& vec, int base = 2) {
 }
 
 /*
-*Conversion from base vector to an integer
+*@brief Conversion from base vector to an integer
 *@param vec string 
 *@param powers precalculated powers vector
 *@param base base to covert to
@@ -265,7 +315,7 @@ inline u64 baseToInt(const v_1d<int>& vec, const v_1d<u64>& powers) {
 }
 
 /*
-*Conversion from base vector to an integer
+*@brief Conversion from base vector to an integer
 *@param vec string
 *@param powers precalculated powers vector
 *@param base base to covert to
@@ -281,7 +331,7 @@ inline u64 baseToInt(const Col<T>& vec, const v_1d<u64>& powers) {
 }
 
 /*
-*Conversion from base vector to an integer
+*@brief Conversion from base vector to an integer
 *@param vec string
 *@param powers precalculated powers vector
 *@param base base to covert to
@@ -296,7 +346,7 @@ inline u64 baseToIntSpin(const Col<T>& vec, const v_1d<u64>& powers) {
 	return val;
 }
 
-// ----------------------------------------------------------------------------- for states operation
+// -----------------------------------------------------------------------------   				 for states operation   				 -----------------------------------------------------------------------------
 template<typename T1, typename T2>
 inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
@@ -317,9 +367,9 @@ inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
 	return acc;
 }
 
-// ----------------------------------------------------------------------------- manipulations -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------    				 manipulations   				  -----------------------------------------------------------------------------
 
-// ---------------------------------- rotate
+// ---------------------------------- rotate ----------------------------------
 /*
 *@brief Rotates the binary representation of the input decimal number by one left shift
 *@param n number to rotate
@@ -354,7 +404,7 @@ inline v_1d<_type>& rotateLeftV(const v_1d<_type>& n, int L) {
 	return tmp;
 }
 
-// ---------------------------------- check bit
+// ---------------------------------- check bit ----------------------------------
 /*
 *@brief Check the k'th bit
 *@param n Number on which the bit shall be checked
@@ -386,7 +436,7 @@ template<typename _type>
 inline _type checkBitV(const Col<_type>& n, int L) {
 	return n(L);
 }
-// ---------------------------------- flip all bits
+// ---------------------------------- flip all bits ----------------------------------
 
 /*
 *@brief Flip the bits in the number. The flipping is done via substracting the maximal number we can get for a given bitnumber
@@ -473,7 +523,7 @@ inline void flipAllV(Col<_type>& n, int L) {
 	}
 }
 
-// ---------------------------------- flip single bit
+// ---------------------------------- flip single bit ----------------------------------
 
 /*
 *@brief Flip the bit on k'th site and return the number it belongs to. The bit is checked from right to left!
@@ -550,7 +600,7 @@ inline void flipV(Col<_type>& n, int k) {
 #endif // SPIN
 }
 
-// ---------------------------------- flip single bit
+// ---------------------------------- flip single bit ----------------------------------
 
 /*
 * @brief Function that calculates the bit reverse, note that 64 bit representation

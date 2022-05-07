@@ -119,7 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMP>None</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -127,8 +127,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>python39.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -137,7 +137,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -150,8 +150,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>python39.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -167,6 +167,7 @@
     <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\random.h" />
     <ClInclude Include="include\rbm.h" />
+    <ClInclude Include="include\user_interface\user_interface.h" />
     <ClInclude Include="src\binary.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\progress.h" />
@@ -176,10 +177,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common.cpp" />
+    <ClCompile Include="lattices\hexagonal.cpp" />
+    <ClCompile Include="lattices\square.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rbm.cpp" />
     <ClCompile Include="statistical.cpp" />
     <ClCompile Include="str.cpp" />
+    <ClCompile Include="user_interface.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

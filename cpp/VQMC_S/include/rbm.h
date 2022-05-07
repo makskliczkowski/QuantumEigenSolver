@@ -20,10 +20,22 @@
 #endif // !DONT_USE_ADAM
 
 #define RBM_ANGLES_UPD
-#define PINV
+
+//#define PINV
+#define S_REGULAR
 
 #ifdef PINV
     constexpr auto pinv_tol = 1e-7;
+    #ifdef S_REGULAR
+        #undef S_REGULAR
+    #endif
+#elif defined S_REGULAR 
+    constexpr auto lambda_0_reg = 100;
+    constexpr auto b_reg = 0.9;
+    constexpr auto lambda_min_reg = 1e-4;
+    #ifdef PINV
+        #undef PINV
+    #endif
 #endif
 
 
@@ -42,7 +54,7 @@ private:
     bool dbg_blck = false;
 
     // general parameters
-    std::string info;                                           // info about the model
+    string info;                                           // info about the model
     size_t batch;                                               // batch size for stochastic
     size_t n_visible;                                           // visible neurons
     size_t n_hidden;                                            // hidden neurons
@@ -50,6 +62,10 @@ private:
     size_t hilbert_size;                                        // hilbert space size
     size_t thread_num;                                          // thread number
     double lr;                                                  // learning rate
+#ifdef S_REGULAR
+    double current_b_reg = b_reg;                               // parameter for regularisation, changes with Monte Carlo steps
+#endif // S_REGULAR
+
     pBar pbar;                                                  // progress bar
     
     // network weights
@@ -102,12 +118,12 @@ public:
                 this->init();
                 this->set_rand_state();
             };
-    // ------------------------------------------- HELPERS -------------------------------------------
+    // -------------------------------------------				 HELPERS				 -------------------------------------------
     
     // debug checker
     void debug_check() {
 #ifndef DEBUG
-        omp_set_num_threads(this->thread_num);                        // Use threads for all consecutive parallel regions
+        omp_set_num_threads(this->thread_num);                  // Use threads for all consecutive parallel regions
 #else
 #ifdef DEBUG_RBM_SAMP
         this->dbg_samp = true;
@@ -133,11 +149,11 @@ public:
 #endif // !DEBUG
     };
 
-    // ------------------------------------------- PRINTERS -------------------------------------------
+    // ------------------------------------------- 				 PRINTERS				  -------------------------------------------
     // pretty print the state sampled
     void pretty_print(std::map<u64, _type>& sample_states, double tol = 5e-2) const;
 
-    // ------------------------------------------- SETTTERS -------------------------------------------
+    // ------------------------------------------- 				 SETTTERS				  -------------------------------------------
     // sets info
     void set_info()                                                     { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(hilbert_size); };
 
@@ -162,19 +178,19 @@ public:
     // set effective angles
     void set_angles();
     void set_angles(const Col<double>& v);
-    // ------------------------------------------- UPDATERS -----------------------------------------
+    // ------------------------------------------- 				 UPDATERS				  -----------------------------------------
     void update_angles(int flip_place, double flipped_spin);
     void update_angles(const Col<double>& v, int flip_place);
 
-    // ------------------------------------------- GETTERS ------------------------------------------
+    // ------------------------------------------- 				 GETTERS				  ------------------------------------------
     auto get_info()                                                     const RETURNS(this->info);
 
-    // ------------------------------------------- INITIALIZERS ------------------------------------------
+    // ------------------------------------------- 				 INITIALIZERS				  ------------------------------------------
     // allocate the memory for the biases and weights
     void allocate();
     // initialize all
     void init();
-    // ------------------------------------------- AMPLITUDES AND ANSTATZ REPRESENTATION -------------------------------------------
+    // ------------------------------------------- 				 AMPLITUDES AND ANSTATZ REPRESENTATION				  -------------------------------------------
 
     // the hiperbolic cosine of the parameters
     Col<_type> Fs(const Col<double>& v)                                 const { return arma::cosh(this->b_h + this->W * v); };
@@ -195,17 +211,17 @@ public:
 
     // update weights after gradient descent
     void updVarDeriv(int current_step);
-    // ------------------------------------------- SAMPLING -------------------------------------------
+    // ------------------------------------------- 				 SAMPLING				  -------------------------------------------
     // sample block
     void blockSampling(size_t b_size, u64 start_stae, size_t n_flips = 1, bool thermalize = true);
 
     // sample the probabilistic space
-    v_1d<_type> mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
+    Col<_type> mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
     map<u64, _type> avSampling(size_t n_samples, size_t n_therm, size_t b_size, size_t n_flips = 1);
 
 };
 
-// ------------------------------------------------- PRINTERS -------------------------------------------------
+// ------------------------------------------------- 				 PRINTERS				  -------------------------------------------------
 /*
 * @brief Pretty prints the state given the sample_states map
 * @param sample_states the map from u64 state integer to value at the state
@@ -231,7 +247,7 @@ inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u
 
 }
 
-// ------------------------------------------------- INITIALIZERS -------------------------------------------------
+// ------------------------------------------------- 				 INITIALIZERS 				 -------------------------------------------------
 /*
 * allocates memory for arma objects
 */
@@ -256,7 +272,7 @@ void rbmState<typename _type, typename _hamtype>::allocate() {
 }
 
 /*
-* Initialize the weights 
+* @brief Initialize the weights 
 */
 template<typename _type, typename _hamtype>
 void rbmState<typename _type, typename _hamtype>::init() {
@@ -276,7 +292,7 @@ void rbmState<typename _type, typename _hamtype>::init() {
 }
 
 /*
-* Intialize the weights, overwritten for complex weights
+* @brief Intialize the weights, overwritten for complex weights
 */
 template<>
 inline void rbmState<cpx, double>::init() {
@@ -299,7 +315,7 @@ inline void rbmState<cpx, double>::init() {
 }
 
 /*
-* Intialize the weights, overwritten for complex weights and complex Hamiltonian
+* @brief Intialize the weights, overwritten for complex weights and complex Hamiltonian
 */
 template<>
 inline void rbmState<cpx, cpx>::init() {
@@ -320,7 +336,7 @@ inline void rbmState<cpx, cpx>::init() {
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const);
             this->W(i, j) = (this->hamil->ran.random_real_normal() + imn * this->hamil->ran.random_real_normal()) / double(Ns);
 }
-// ------------------------------------------------- UPDATERS ------------------------------------------------
+// ------------------------------------------------- 				 UPDATERS				  ------------------------------------------------
 
 /*
 * @brief update angles with the flipped spin (before the flip - hence -)
@@ -344,19 +360,30 @@ inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int f
     this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
 }
 
-// ------------------------------------------------- SETTERS -------------------------------------------------
+// -------------------------------------------------				  SETTERS				  -------------------------------------------------
+
+/*
+* @brief sets the current state to uniform random
+*/
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::set_rand_state()
 { 
     this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size - 1)); 
 }
 
+/*
+* @brief sets the current angles vector according to arXiv:1606.02318v1
+*/
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::set_angles()
 {
     this->thetas = this->b_h + this->W * this->current_vector;
 }
 
+/*
+* @brief sets the current angles vector according to arXiv:1606.02318v1
+* @param v replaces current vector
+*/
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::set_angles(const Col<double>& v)
 {
@@ -385,7 +412,7 @@ void rbmState<typename _type, typename _hamtype>::set_weights() {
         }
     }
 }
-// ------------------------------------------------- CALCULATORS -------------------------------------------------
+// ------------------------------------------------- 				 CALCULATORS				  -------------------------------------------------
 
 /*
 * @brief calculates the variational derivative analytically
@@ -427,10 +454,15 @@ void rbmState<typename _type, typename _hamtype>::updVarDeriv(int current_step){
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
    
     // update flat vector
-#ifndef PINV
+#ifdef PINV
+    this->grad = ((-this->lr) * (arma::pinv(this->S, pinv_tol)) * this->F);
+#elif defined S_REGULAR 
+    auto lambda_p = lambda_0_reg * this->current_b_reg; 
+    if (lambda_p < lambda_min_reg) lambda_p = lambda_min_reg;
+    this->S.diag() += lambda_p * S.diag();
     this->grad = (-this->lr) * arma::solve(this->S, this->F);
 #else 
-    this->grad = ((-this->lr) * (arma::pinv(this->S, pinv_tol)) * this->F);
+    this->grad = (-this->lr) * arma::solve(this->S, this->F);
 #endif
 
     //this->grad = this->grad % arma::randi(this->full_size, distr_param(0, 1));
@@ -542,7 +574,11 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-v_1d<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+#ifdef S_REGULAR
+    this->current_b_reg = b_reg;
+#endif
+    
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
     // make the pbar!
@@ -558,7 +594,7 @@ v_1d<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_sam
     Col<_type> averageWeights(this->full_size);
     Col<_type> energies(norm, arma::fill::zeros);
 
-    v_1d<_type> meanEnergies(mcsteps, 0.0);
+    Col<_type> meanEnergies(mcsteps, arma::fill::zeros);
     
 
     for(auto i = 0; i < mcsteps; i++){
@@ -627,8 +663,12 @@ v_1d<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_sam
         this->updVarDeriv(i);
         
         // add energy
-        meanEnergies[i] = meanLocEn;
+        meanEnergies(i) = meanLocEn;
         
+        #ifdef S_REGULAR
+            this->current_b_reg = this->current_b_reg * b_reg;
+        #endif // S_REGULAR
+
         // update the progress bar
         if (i % pbar.percentageSteps == 0)
             pbar.printWithTime("-> PROGRESS");
@@ -701,7 +741,7 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     stout << "\n------------------------------------------------------------------------" << EL;
     stout << "GROUND STATE RBM:" << EL;
     this->pretty_print(states, 0.05);
-    stout << VEQ(s_z_rbm ) << EL;
+    stout << VEQP(s_z_rbm,5) << EL;
     stout << "\n------------------------------------------------------------------------" << EL;
 
     return states;

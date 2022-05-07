@@ -1,9 +1,9 @@
 #include "src/str.h"
-
+using namespace std;
 //! -------------------------------------------------------- STRING RELATED HELPERS --------------------------------------------------------
 
 /*
-
+* @brief splits the string with a given delimiter
 */
 v_1d<std::string> split_str(const std::string& s, std::string delimiter) {
 	size_t pos_start = 0, pos_end, delim_len = delimiter.length();

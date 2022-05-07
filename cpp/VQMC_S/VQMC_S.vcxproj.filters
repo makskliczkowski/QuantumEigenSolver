@@ -31,6 +31,9 @@
     <Filter Include="Header Files\operators">
       <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\user_interface">
+      <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\random.h">
@@ -87,6 +90,9 @@
     <ClInclude Include="include\operators\operators.h">
       <Filter>Header Files\operators</Filter>
     </ClInclude>
+    <ClInclude Include="include\user_interface\user_interface.h">
+      <Filter>Header Files\user_interface</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common.cpp">
@@ -103,6 +109,15 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="user_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lattices\hexagonal.cpp">
+      <Filter>Source Files\Lattices</Filter>
+    </ClCompile>
+    <ClCompile Include="lattices\square.cpp">
+      <Filter>Source Files\Lattices</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

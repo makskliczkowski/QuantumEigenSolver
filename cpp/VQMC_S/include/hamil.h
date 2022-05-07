@@ -7,6 +7,9 @@
 #include "lattice.h"
 #endif // !LATTICE_H
 
+#ifndef HAMIL_H
+#define HAMIL_H
+
 using namespace std;
 template <typename _type>
 class SpinHamiltonian {
@@ -32,20 +35,21 @@ public:
 	virtual u64 map(u64 index) = 0;																	// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	// virtual ~SpinHamiltonian() = 0;																	// pure virtual destructor
 	
-	// ---------------------------------- PRINTERS -------------------------------------
+	// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
+	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);							// converts a map to arma column
 	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);			// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);				// pretty prints the eigenstate at a given idx
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };			// prints the eigenstate at a given idx
 	
-	// ---------------------------------- INFO ----------------------------------------
+	// ------------------------------------------- 				  INFO 				  -------------------------------------------
 	/*
 	* @brief sets and gets the information about the model
 	* @param skip vector of elements to be skipped in the info showcase
 	* @returns trimmed information about the model
 	*/
-	virtual std::string inf(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_") const {
+	virtual string inf(string name = "", const v_1d<string>& skip = {}, string sep = "_") const {
 		auto tmp = (name == "") ? split_str(this->info, ",") : split_str(name, ",");
-		std::string tmp_str = "";
+		string tmp_str = "";
 		for (int i = 0; i < tmp.size(); i++) {
 			bool save = true;
 			for (auto& skip_param : skip)
@@ -56,9 +60,9 @@ public:
 		tmp_str.pop_back();
 		return tmp_str;
 	};
-	virtual std::string inf(const v_1d<std::string>& skip = {}, std::string sep = "_") const = 0;
-	
-	// ---------------------------------- CALCULATORS -----------------------------------------------------
+	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+
+	// ------------------------------------------- 				  CALCULATORS  				 -------------------------------------------
 	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
 	Mat<_type> red_dens_mat(u64 state, int A_size) const;																// calculate the reduced density matrix based on eigenstate
 
@@ -67,9 +71,8 @@ public:
 
 	vec entaglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
 	vec entaglement_entropy_sweep(u64 state) const;																		// entanglement entropy sweep over bonds for eigenstate
-	
-	
-	// ---------------------------------- GETTERS ----------------------------------
+	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
+
 	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
 	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef(u64 _id)														// returns the constant reference to local energy
 	{ 
@@ -86,14 +89,63 @@ public:
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
 	auto get_info(const v_1d<string>& skip = {}, string sep = "_")	const RETURNS(this->inf("", skip, sep));			// get the info about the model
 
-	// ---------------------------------- GENERAL METHODS ----------------------------------
+	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																						// pure virtual Hamiltonian creator
 	virtual void locEnergy(u64 _id) = 0;																				// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
+
+	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
+	void set_angles() {};
+	void set_angles(const vec& phis, const vec& thetas) {};
+
+
+	// -------------------------------------------                    OPERATORS						  --------------------------------------------
+	// MATRICES & OPERATORS
+	double av_sigma_z(u64 alfa, u64 beta);																				// check the sigma_z matrix element extensive
+	double av_sigma_z(u64 alfa, u64 beta, int corr_len);																// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_z(u64 alfa, u64 beta, std::vector<int> sites);														// check the matrix element of sigma_z elements sites correlation
+	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta);													// check the sigma_z matrix element extensive
+	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, int corr_len);									// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites);							// check the matrix element of sigma_z elements sites correlation
+
+
+
+	double av_sigma_x(u64 alfa, u64 beta);																				// check the sigma_z matrix element extensive
+	double av_sigma_x(u64 alfa, u64 beta, int corr_len);																// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_x(u64 alfa, u64 beta, std::vector<int> sites);														// check the matrix element of sigma_x elements sites correlation
+	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta);
+	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, int corr_len);
+	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites);
+
+
+	double av_spin_flip(u64 alfa, u64 beta);																			// check the spin flip element extensive
+	double av_spin_flip(u64 alfa, u64 beta, std::vector<int> sites);													// check the spin flip element at input sites (up to 2)
+
+	cpx av_spin_current(u64 alfa, u64 beta);																			// check the extensive spin current
+	cpx av_spin_current(u64 alfa, u64 beta, std::vector<int> sites);													// check the spin current at given sites
+
+
 };
 
-// --------------------------------------------------------------------------------------- PRINTERS ---------------------------------------------------------------------------------------
+// ------------------------------------------------------------  				   PRINTERS 				    ------------------------------------------------------------
+
+/*
+* @brief converts a map to armadillo column
+* @param mp map from state index to a given 
+*/ 
+template<typename _type>
+inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, int N_hilbert)
+{
+	Col<_type> tmp(N_hilbert, arma::fill::zeros);
+	for (auto const& [state, val] : mp)
+	{
+		tmp(state) = val;
+	}
+	tmp = arma::normalise(tmp);
+	return tmp;
+}
+
 
 /*
 * @brief prints the base state in the braket notation
@@ -105,10 +157,10 @@ public:
 template<typename _type>
 inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol)
 {
-	std::string tmp = "";
-	intToBase(state, base_vector, 2);
+	string tmp = "";
+	intToBaseBit(state, base_vector);
 	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
-		stout << str_p(val,3) << "*|" << base_vector << "> + ";
+		stout << str_p(val, 3) << "*|" << base_vector << +">";
 }
 
 /*
@@ -121,10 +173,10 @@ inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<
 template<>
 inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>& base_vector, double tol)
 {
-	std::string tmp = "";
+	string tmp = "";
 	intToBase(state, base_vector, 2);
 	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
-		stout << print_cpx(val, 3) << "*|" << base_vector << "> + ";
+		stout << print_cpx(val, 3) << "*|" << base_vector << +">";
 }
 
 /*
@@ -142,7 +194,7 @@ inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, 
 	stout << EL;
 }
 
-// --------------------------------------------------------------------------------------- HAMILTONIAN ---------------------------------------------------------------------------------------
+// ------------------------------------------------------------  				    HAMILTONIAN  				    ------------------------------------------------------------
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
@@ -169,7 +221,7 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 }
 
 
-// --------------------------------------------------------------------------------------- ENTROPY ---------------------------------------------------------------------------------------
+// ------------------------------------------------------------  				    ENTROPY   				   ------------------------------------------------------------
 
 /*
 * @brief Calculates the reduced density matrix of the system via the mixed density matrix
@@ -306,3 +358,466 @@ inline vec SpinHamiltonian<_type>::entaglement_entropy_sweep(u64 state) const
 		entropy(i) = entanglement_entropy(state, i + 1);
 	return entropy;
 }
+
+
+// ----------------------------------------------------------------------------- PHYSICAL QUANTITES -----------------------------------------------------------------------------
+
+/*
+* @brief Calculates the matrix element for sigma_z Pauli matrix
+* @param sites Sites the matrix works on
+* @param alfa Left state
+* @param beta Right state
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, std::vector<int> sites) {
+	for (auto& site : sites)
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		double S_z = 1;
+		for (auto& site : sites)
+			S_z *= checkBit(k, this->Ns - 1 - site) ? 1.0 : -1.0;
+		value += S_z * conj(state_alfa(k)) * state_beta(k);
+	}
+	return std::real(value);
+}
+
+/*
+* @brief Calculates the matrix element for sigma_z extensive
+* @param alfa Left state
+* @param beta Right state
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta)
+{
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			value += Sz * conj(state_alfa(k)) * state_beta(k);
+		}
+	}
+	return std::real(value / sqrt(this->Ns));
+}
+
+/*
+* @brief Calculates the matrix element for sigma_z extensive correlations
+* @param alfa Left state
+* @param beta Right state
+* @param corr_length correlation length
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, int corr_length)
+{
+	if (corr_length >= L) throw "exceeding correlation length\n";
+
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+	auto neis = get_neigh_vector(this->lattice->_BC, this->Ns, corr_length);
+#pragma omp parallel for reduction (+: value) collapse(2)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = neis[l];
+			if (nei < 0) continue;
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			value += Sz * Sz_corr * conj(state_alfa(k)) * state_beta(k);
+		}
+	}
+	return std::real(value / sqrt(this->L));
+}
+
+/*
+* @brief Calculates the matrix element for sigma_z Pauli matrix
+* @param sites Sites the matrix works on
+* @param alfa Left state
+* @param beta Right state
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites) {
+	for (auto& site : sites)
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		double S_z = 1;
+		for (auto& site : sites)
+			S_z *= checkBit(k, this->Ns - 1 - site) ? 1.0 : -1.0;
+		value += S_z * conj(alfa(k)) * beta(k);
+	}
+	return real(value);
+}
+
+/*
+* @brief Calculates the matrix element for sigma_z extensive
+* @param alfa Left state
+* @param beta Right state
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta)
+{
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			value += Sz * conj(alfa(k)) * beta(k);
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+/*
+* @brief Calculates the matrix element for sigma_z extensive correlations
+* @param alfa Left state
+* @param beta Right state
+* @param corr_length correlation length
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, int corr_length)
+{
+	if (corr_length >= L) throw "exceeding correlation length\n";
+
+	_type value = 0;
+#pragma omp parallel for reduction (+: value) collapse(2)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			if (nei < 0) continue;
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			value += Sz * Sz_corr * conj(alfa(k)) * beta(k);
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+// ------------------------------------ SIGMA_X
+
+/*
+* Calculates the matrix element for sigma_x Pauli matrix
+
+* @param sites Sites the matrix works on
+* @param alfa Left state
+* @param beta Right state
+*  @returnsThe matrix element*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, std::vector<int> sites) {
+	for (auto& site : sites) {
+		if (site < 0 || site >= L) throw "Site index exceeds chain";
+	}
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (auto& site : sites) {
+			NO_OVERFLOW(u64 idx = flip(k, this->Ns - 1 - site);)
+				value += conj(state_alfa(idx)) * state_beta(k);
+		}
+	}
+	return real(value);
+}
+
+/*
+* Calculates the matrix element for sigma_x extensive (sum over the system)
+
+* @param alfa Left state
+* @param beta Right state
+*  @returnsThe matrix element*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta) {
+	_type overlap = 0;
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+#pragma omp parallel for reduction(+: overlap)
+	for (long int k = 0; k < N; k++) {
+		for (int j = 0; j < this->Ns; j++) {
+			NO_OVERFLOW(u64 new_idx = flip(k, this->Ns - 1 - j);)
+				overlap += conj(state_alfa(new_idx)) * state_beta(k);
+		}
+	}
+	return real(overlap) / sqrt(this->Ns);
+}
+
+/*
+* Calculates the matrix element for sigma_x extensive correlations : s^x_i s^x_i+1
+
+* @param alfa Left state
+* @param beta Right state
+* @param corr_length correlation length
+*  @returnsThe matrix element*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, int corr_length)
+{
+	if (corr_length >= L) throw "exceeding correlation length\n";
+
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			if (nei < 0) continue;
+			NO_OVERFLOW(
+				u64 idx = flip(k, this->Ns - 1 - nei);
+			u64 new_idx = flip(idx, this->Ns - 1 - l);
+			);
+			value += conj(state_alfa(new_idx)) * state_beta(k);
+		}
+	}
+	return real(value) / sqrt(this->Ns);
+}
+
+/*
+* Calculates the matrix element for sigma_x Pauli matrix
+
+* @param sites Sites the matrix works on
+* @param alfa Left state
+* @param beta Right state
+* @returnsThe matrix element
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites) {
+	for (auto& site : sites) {
+		if (site < 0 || site >= L) throw "Site index exceeds chain";
+	}
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (auto& site : sites) {
+			NO_OVERFLOW(u64 idx = flip(k, this->Ns - 1 - site);)
+				value += conj(alfa(idx)) * beta(k);
+		}
+	}
+	return real(value);
+}
+
+/*
+* Calculates the matrix element for sigma_x extensive (sum over the system)
+
+* @param alfa Left state
+* @param beta Right state
+*  @returnsThe matrix element*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta) {
+	_type overlap = 0;
+#pragma omp parallel for reduction(+: overlap)
+	for (long int k = 0; k < N; k++) {
+		for (int j = 0; j < this->Ns; j++) {
+			NO_OVERFLOW(u64 new_idx = flip(k, this->Ns - 1 - j);)
+				overlap += conj(alfa(new_idx)) * beta(k);
+		}
+	}
+	return real(overlap) / sqrt(this->Ns);
+}
+
+/*
+* Calculates the matrix element for sigma_x extensive correlations : s^x_i s^x_i+1
+
+* @param alfa Left state
+* @param beta Right state
+* @param corr_length correlation length
+*  @returnsThe matrix element*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, int corr_length)
+{
+	if (corr_length >= L) throw "exceeding correlation length\n";
+
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			if (nei < 0) continue;
+			NO_OVERFLOW(
+				u64 idx = flip(k, this->Ns - 1 - nei);
+			u64 new_idx = flip(idx, this->Ns - 1 - l);
+			);
+			value += conj(alfa(new_idx)) * beta(k);
+		}
+	}
+	return real(value) / sqrt(this->Ns);
+}
+
+
+
+
+
+
+/*
+*
+
+* @param alfa 
+* @param beta 
+* @param sites 
+*  @returns*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_spin_flip(u64 alfa, u64 beta, std::vector<int> sites) {
+	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
+	for (auto& site : sites) {
+		if (site < 0 || site >= L) throw "Site index exceeds chain";
+	}
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+#pragma omp parallel
+	{
+		std::vector<bool> base_vector(L), temp(L);
+#pragma omp for reduction (+: value)
+		for (int k = 0; k < N; k++) {
+			int_to_binary(map(k), base_vector);
+			auto it = sites.begin();
+			auto it2 = it + 1;
+			temp = base_vector;
+			if ((base_vector[*it] == 0 && base_vector[*it2] == 1) || (base_vector[*it] == 1 && base_vector[*it2] == 0)) {
+				temp[*it] = !base_vector[*it];
+				temp[*it2] = !base_vector[*it2];
+				const u64 idx = binary_to_int(temp);
+				value += conj(state_alfa(idx)) * state_beta(k);
+			}
+		}
+	}
+	return 2.0 * value;
+}
+
+/*
+*
+
+* @param alfa 
+* @param beta 
+*  @returns*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_spin_flip(u64 alfa, u64 beta) {
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	_type value = 0;
+#pragma omp parallel
+	{
+		std::vector<bool> base_vector(L), temp(L);
+#pragma omp for reduction (+: value)
+		for (int k = 0; k < N; k++) {
+			int_to_binary(map(k), base_vector);
+			for (int l = 0; l < this->Ns; l++) {
+				temp = base_vector;
+				const int nei = this->nearest_neighbors[l];
+				if (nei < 0) continue;
+				if ((base_vector[l] == 0 && base_vector[nei] == 1) || (base_vector[nei] == 0 && base_vector[l])) {
+					temp[l] = !base_vector[l];
+					temp[nei] = !base_vector[nei];
+					const u64 idx = binary_to_int(temp);
+					value += conj(state_alfa(idx) * state_beta(k);
+				}
+			}
+		}
+	}
+	return 2.0 * value / sqrt(L);
+}
+
+/*
+*
+
+* @param alfa 
+* @param beta 
+* @param sites 
+*  @returns*/
+template<typename _type>
+inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vector<int> sites) {
+	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
+	for (auto& site : sites) {
+		if (site < 0 || site >= L) throw "Site index exceeds chain";
+	}
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	double value_real = 0, value_imag = 0;
+#pragma omp parallel
+	{
+		std::vector<bool> base_vector(L), temp(L);
+#pragma omp for reduction (+: value_real, value_imag)
+		for (int k = 0; k < N; k++) {
+			int_to_binary(map(k), base_vector);
+			auto l = *(sites.begin());
+			auto nei = *(sites.begin() + 1);
+			temp = base_vector;
+			if (nei < 0) continue;
+			cpx value = 0.0;
+			if (base_vector[l] && !base_vector[nei]) {
+				temp[l] = 0;
+				temp[nei] = 1;
+				const u64 idx = binary_to_int(temp);
+				value = conj(state_alfa(idx)) * state_beta(k) * im;
+			}
+			else if (!base_vector[l] && base_vector[nei]) {
+				temp[l] = 1;
+				temp[nei] = 0;
+				const u64 idx = binary_to_int(temp);
+				value = -conj(state_alfa(idx)) * state_beta(k) * im;
+			}
+			value_real += value.real();
+			value_imag += value.imag();
+		}
+	}
+	return 2i * cpx(value_real, value_imag);
+}
+
+/*
+*
+
+* @param alfa 
+* @param beta 
+*  @returns*/
+template<typename _type>
+inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta) {
+	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+	arma::subview_col state_beta = this->eigenvectors.col(beta);
+	double value_real = 0, value_imag = 0;
+#pragma omp parallel
+	{
+		std::vector<bool> base_vector(L), temp(L);
+#pragma omp for reduction (+: value_real, value_imag)
+		for (int k = 0; k < N; k++) {
+			int_to_binary(map(k), base_vector);
+			for (int l = 0; l < this->Ns; l++) {
+				temp = base_vector;
+				const int nei = this->lattice->get_nn(l, 0);
+				if (nei < 0) continue;
+				cpx value = 0.0;
+				if (base_vector[l] && !base_vector[nei]) {
+					temp[l] = 0;
+					temp[nei] = 1;
+					const u64 idx = binary_to_int(temp);
+					value = conj(state_alfa(idx)) * state_beta(k) * im;
+				}
+				else if (!base_vector[l] && base_vector[nei]) {
+					temp[l] = 1;
+					temp[nei] = 0;
+					const u64 idx = binary_to_int(temp);
+					value = -conj(state_alfa(idx)) * state_beta(k) * im;
+				}
+				value_real += value.real();
+				value_imag += value.imag();
+			}
+		}
+	}
+	return 2i * cpx(value_real, value_imag) / sqrt(this->Ns);
+}
+
+
+
+#endif

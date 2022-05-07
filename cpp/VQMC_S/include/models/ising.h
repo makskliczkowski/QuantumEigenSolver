@@ -25,7 +25,7 @@ private:
 	vec dg;																										// disorder in the system - deviation from a constant g0 value
 	double g0 = 0;																								// transverse magnetic field
 public:
-	/* Constructors */
+	// ------------------------------------------- 				 Constructors				  -------------------------------------------
 	~IsingModel() = default;
 	IsingModel() = default;
 	IsingModel(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat);
@@ -39,9 +39,9 @@ public:
 	void locEnergy(u64 _id) override;																			// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
 
-	std::string inf(const v_1d<std::string>& skip = {}, std::string sep = "_") const
+	string inf(const v_1d<string>& skip = {}, string sep = "_") const
 	{
-		std::string name = sep + \
+		string name = sep + \
 			"ising,Ns=" + STR(Ns) + \
 			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
@@ -56,7 +56,7 @@ public:
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
 
 /*
-* Ising disorder constructor
+* @brief Ising disorder constructor
 * @param J interaction between Sz's on the nearest neighbors
 * @param J0 disorder at J interaction from (-J0,J0) added to J
 * @param g transverse magnetic field
@@ -68,7 +68,6 @@ public:
 template <typename _type>
 IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat)
 	: J(J), g(g), h(h), w(w), J0(J0), g0(g0)
-
 {
 	this->lattice = lat;
 	this->ran = randomGen();
@@ -118,14 +117,13 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		
 		// diagonal elements setting the interaction field
 		if (auto nei = this->lattice->get_nn(i, 0);  nei >= 0) {
-			double sj = checkBit(_id, Ns - 1 - nei) ? 1.0 : -1.0;
+			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 			localVal += (this->J + this->dJ(i)) * si * sj;								
 		}
 
 		// flip with S^x_i with the transverse field
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
-		this->locEnergies[i] = std::make_tuple(new_idx,
-			this->g + this->dg(i));
+		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 	}
 	// append unchanged at the very end
 	locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
@@ -151,7 +149,7 @@ void IsingModel<_type>::setHamiltonianElem(u64 k, _type value, u64 new_idx) {
 * @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
 */
 template <>
-void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
 	this->H(new_idx, k) += value;
 }
 
@@ -175,7 +173,7 @@ void IsingModel<_type>::hamiltonian() {
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
 			// flip with S^x_i with the transverse field
-			u64 new_idx = flip(k, Ns - 1 - j);
+			u64 new_idx = flip(k, this->Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// diagonal elements setting the perpendicular field
@@ -183,7 +181,7 @@ void IsingModel<_type>::hamiltonian() {
 
 			if (auto nn = this->lattice->get_nn(j, 0); nn >= 0) {
 				// Ising-like spin correlation
-				double s_j = checkBit(k, Ns - 1 - nn) ? 1.0 : -1.0;
+				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 				// setting the neighbors elements
 				this->H(k, k) += (this->J + this->dJ(j)) * s_i * s_j;		
 			}

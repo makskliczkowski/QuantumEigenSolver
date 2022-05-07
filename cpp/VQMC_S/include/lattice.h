@@ -6,7 +6,7 @@
 
 #ifndef LATTICE_H
 #define LATTICE_H
-
+using namespace std;
 // -------------------------------------------------------- GENERAL LATTICE --------------------------------------------------------
 
 /*
@@ -17,7 +17,7 @@ protected:
 	// ----------------------- LATTICE PARAMETERS
 	unsigned int dim = 1;											// the dimensionality of the lattice 1,2,3
 	unsigned int Ns = 1;											// number of lattice sites
-	std::string type;												// type of the lattice
+	string type;													// type of the lattice
 	int _BC = 0;													// boundary conditions 0 = PBC, 1 = OBC
 	v_2d<int> nearest_neighbors;									// vector of the nearest neighbors
 	v_2d<int> next_nearest_neighbors;								// vector of the next nearest neighbors

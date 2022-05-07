@@ -35,9 +35,9 @@ public:
 	void locEnergy(u64 _id) override;																			// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
-	virtual std::string inf(const v_1d<std::string>& skip = {}, std::string sep = "_") const override
+	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
-		std::string name = sep + \
+		string name = sep + \
 			"heisenberg,Ns=" + STR(Ns) + \
 			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
@@ -52,13 +52,14 @@ public:
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
 
 /*
-* Heisenberg disorder constructor
+* @brief Heisenberg disorder constructor
 * @param J interaction between Sz's on the nearest neighbors
 * @param J0 disorder at J interaction from (-J0,J0) added to J
 * @param g transverse magnetic field
 * @param g0 disorder at g field from (-g0, g0) added to g
 * @param h perpendicular magnetic field
 * @param w disorder at h field from (-w, w) added to h
+* @param delta J*delta stands next to Sz_iSz_ip1
 * @param lat general lattice class that informs about the topology of the system lattice
 */
 template <typename _type>
@@ -67,7 +68,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 {
 	this->lattice = lat;
 	this->ran = randomGen();
-	this->Ns = this->lattice->get_Ns();
+	this->Ns = this->lattice->get_Ns();																// number of lattice sites
 	this->loc_states_num = 2 * this->Ns + 1;														// number of states after local energy work
 	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num, std::make_tuple(0,0));	// set local energies vector
 	this->N = ULLPOW(this->Ns);																		// Hilber space size
@@ -75,7 +76,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 	this->dJ = create_random_vec(Ns, this->ran, this->J0);											// creates random exchange vector
 	this->dg = create_random_vec(Ns, this->ran, this->g0);											// creates random transverse field vector
 
-	//change info
+	// change info
 	this->info = this->inf();
 
 }
@@ -103,10 +104,12 @@ template <typename _type>
 void Heisenberg<_type>::locEnergy(u64 _id) {
 	// sumup the value of non-changed state
 	double localVal = 0;
+#ifndef DEBUG
 #pragma omp parallel for reduction(+ : localVal)
+#endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
 		// true - spin up, false - spin down
-		double si = checkBit(_id, Ns - i - 1) ? 1.0 : -1.0;								
+		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 
 		// perpendicular field (SZ)
 		localVal += (this->h + dh(i)) * si;
@@ -121,17 +124,69 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 
 			auto interaction = (this->J + this->dJ(i));
 			// diagonal elements setting  interaction field
-			localVal +=  interaction*this->delta * si * sj;		
+			localVal += interaction * this->delta * si * sj;
 
 			// S+S- + S-S+
-			if (si * sj < 0)
-				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nn), 0.5 * interaction);
+			if (si * sj < 0) {
+				auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
+				this->locEnergies[this->Ns + i] = std::make_tuple(new_new_idx, 0.5 * interaction);
+			}
+			// change if we don't hit the energy
+			else
+				this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
 		}
 	}
-	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
+	// append unchanged at the very end
+	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
+
+/*
+* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
+* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
+*/
+template <typename _type>
+void Heisenberg<_type>::hamiltonian() {
+	//  hamiltonian memory reservation
+	try {
+		this->H = SpMat<_type>(this->N, this->N);										
+	}
+	catch (const std::bad_alloc& e) {
+		std::cout << "Memory exceeded" << e.what() << "\n";
+		assert(false);
+	}
+
+	for (auto k = 0; k < this->N; k++) {
+		for (auto i = 0; i < this->Ns; i++) {
+			// true - spin up, false - spin down
+			double si = checkBit(k, this->Ns - 1 - i) ? 1.0 : -1.0;
+				
+			// disorder // perpendicular magnetic field
+			this->H(k, k) += (this->h + dh(i)) * si;									
+
+			// transverse field
+			u64 new_idx = flip(k, this->Ns - 1 - i);			
+			setHamiltonianElem(k, this->g + this->dg(i), new_idx);	
+
+			// check if nn exists
+			if (const auto nn = this->lattice->get_nn(i, 0); nn >= 0) {
+				// Ising-like spin correlation - check the bit on the nn
+				double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;						
+				auto interaction = (this->J + this->dJ(i));
+
+				// setting the neighbors elements
+				this->H(k, k) += interaction * this->delta * si * sj;				
+		
+				// S+S- + S-S+ hopping
+				if (si * sj < 0) {
+					auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
+					setHamiltonianElem(k, 0.5 * interaction, new_new_idx);
+				}
+			}
+		}
+	}
+}
 
 /*
 * @brief Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
@@ -145,59 +200,14 @@ void Heisenberg<_type>::setHamiltonianElem(u64 k, _type value, u64 new_idx) {
 }
 
 /*
-* @brief Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state
+* @brief Sets the non-diagonal elements of the Hamimltonian matrix, by acting with the operator on the k-th state - complex override
 * @param k index of the basis state acted upon with the Hamiltonian
 * @param value value of the given matrix element to be set
 * @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
 */
 template <>
-void Heisenberg<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+inline void Heisenberg<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
 	this->H(new_idx, k) += value;
-}
-
-
-/*
-* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
-* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
-*/
-template <typename _type>
-void Heisenberg<_type>::hamiltonian() {
-	try {
-		this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
-	}
-	catch (const std::bad_alloc& e) {
-		std::cout << "Memory exceeded" << e.what() << "\n";
-		assert(false);
-	}
-
-	for (auto k = 0; k < this->N; k++) {
-		for (int j = 0; j <= this->Ns - 1; j++) {
-			// true - spin up, false - spin down
-			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
-				
-			// disorder // perpendicular magnetic field
-			this->H(k, k) += (this->h + dh(j)) * s_i;									
-
-			// transverse field
-			u64 new_idx = flip(k, this->Ns - 1 - j);			
-			setHamiltonianElem(k, this->g + this->dg(j), new_idx);	
-
-			// check if nn exists
-			if (const auto nn = this->lattice->get_nn(j, 0); nn >= 0) {
-				// Ising-like spin correlation // check the bit on the nn
-				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;						
-				auto interaction = (this->J + this->dJ(j));
-
-				// setting the neighbors elements
-				this->H(k, k) += interaction * this->delta * s_i * s_j;				
-		
-				// S+S- + S-S+ hopping
-				if (s_i * s_j < 0)
-					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
-
-			}
-		}
-	}
 }
 
 

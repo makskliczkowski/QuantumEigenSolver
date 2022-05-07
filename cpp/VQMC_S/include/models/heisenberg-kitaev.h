@@ -39,9 +39,9 @@ public:
 	void locEnergy(u64 _id) override;
 	void hamiltonian() override;
 
-	std::string inf(const v_1d<std::string>& skip = {}, std::string sep = "_") const override
+	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
-		std::string name = sep + \
+		string name = sep + \
 			"heisenberg_kitaev," + VEQ(Ns) + \
 			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
@@ -65,10 +65,17 @@ public:
 */
 template <typename _type>
 void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
+
+
 	// sumup the value of non-changed state
 	double localVal = 0;
+#ifndef DEBUG
 #pragma omp parallel for reduction(+ : localVal)
+#endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
+		// check all the neighbors
+		auto nn_number = this->lattice->get_nn_number(i);
+
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;
 
@@ -79,12 +86,7 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 		const u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
-		// check all the neighbors
-		auto nn_number = this->lattice->get_nn_number(i);
-
 		// check the correlations
-		//_type doubleFlipEn = 0.0;
-		//u64 flip_idx_nn = LONG_MAX;
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
 			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0 && nn > i) {
 				// check Sz 
@@ -92,29 +94,35 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 				
 				// --------------------- HEISENBERG 
 				// diagonal elements setting  interaction field
-				auto interaction = (this->J + this->dJ(i));
+				auto interaction = this->J + this->dJ(i);
 				auto sisj = si * sj;
 				localVal += interaction * this->delta * sisj;
 				
 				auto flip_idx_nn = flip(new_idx, this->Ns - 1 - nn);
 
 				// S+S- + S-S+
-				if (si * sj < 0)
+				if (sisj < 0)
 					this->locEnergies[this->Ns + i] = std::make_tuple(flip_idx_nn, 0.5 * interaction);
+				else
+					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
 				
 				// --------------------- KITAEV
 				if (n_num == 0)
 					localVal += (this->Kz + this->dKz(i)) * sisj;
-				if (n_num == 1)
+				else if (n_num == 1)
 					this->locEnergies[2 * this->Ns + i] = std::make_tuple(flip_idx_nn, (this->Ky + this->dKy(i)) * sisj);
-				if (n_num == 2)
+				else if (n_num == 2)
 					this->locEnergies[3 * this->Ns + i] = std::make_tuple(flip_idx_nn, this->Kx + this->dKx(i));
+				else
+				{
+					this->locEnergies[2 * this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+					this->locEnergies[3 * this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+				}
 			}
 		}
-		//if (flip_idx_nn < this->Ns)
-		//	this->locEnergies[2 * this->Ns + i] = std::make_tuple(flip_idx_nn, doubleFlipEn);
 	}
-	locEnergies[4 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				// append unchanged at the very end
+	// append unchanged at the very end
+	this->locEnergies[4 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
@@ -133,8 +141,12 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 		assert(false);
 	}
 
+
 	for (auto k = 0; k < this->N; k++) {
 		for (int j = 0; j < this->Ns; j++) {
+			// check all the neighbors
+			auto nn_number = this->lattice->get_nn_number(j);
+			
 			// true - spin up, false - spin down
 			double si = checkBit(k, Ns - j - 1) ? 1.0 : -1.0;
 
@@ -144,10 +156,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			// HEISENBERG
 			const u64 new_idx = flip(k, this->Ns - 1 - j);
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
-			
-			
-			// check all the neighbors
-			auto nn_number = this->lattice->get_nn_number(j);
+
 			// check the correlations
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
 				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0 && nn > j) {
