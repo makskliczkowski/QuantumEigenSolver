@@ -2,9 +2,9 @@
 #ifndef UI_H
 #define UI_H
 
-#define DONT_USE_ADAM
+
 //#define DEBUG
-#define PLOT
+
 
 
 #ifdef DEBUG
@@ -16,10 +16,20 @@
 //#define DEBUG_RBM_DRVT
 #endif
 #else
-#include <omp.h>
+	#include <omp.h>
+	#include <thread>
+	#include <mutex>
 #endif
 
-#include "../rbm.h"
+
+#ifndef RBM_H
+	#define DONT_USE_ADAM
+	#define S_REGULAR
+	#define RBM_ANGLES_UPD
+	#include "../rbm.h"
+#endif
+
+
 #include "../models/ising.h"
 #include "../models/heisenberg_dots.h"
 #include "../models/heisenberg-kitaev.h"
@@ -31,13 +41,49 @@
 	#include "../lattices/hexagonal.h"
 #endif
 
+
+#define PLOT
 #ifdef PLOT
 	// plotting
 	#define WITHOUT_NUMPY
 	#define WITH_OPENCV
 	#include "matplotlib-cpp/matplotlibcpp.h"
 	namespace plt = matplotlibcpp;
+	
+	template<typename _type>
+	void plot_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+		plt::plot(v);
+		plt::xlabel(xlabel);
+		plt::ylabel(ylabel);
+		plt::title(name);
+	};
+	#define PLOT_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+	template<typename _type>
+	void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+		std::vector<int> ivec(v.size());
+		std::iota(ivec.begin(), ivec.end(), 0); // ivec will become: [0..99]
+
+		plt::scatter_colored(ivec, v);
+		plt::xlabel(xlabel);
+		plt::ylabel(ylabel);
+		plt::title(name);
+	};
+	#define SCATTER_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+	void inline save_fig(string name, bool show = false) {
+		plt::save(name);
+		if (show) plt::show();
+		plt::close();
+	}
+	#define SAVEFIG(name, show) save_fig(name, show)
+#else 
+	#define PLOT_V1D(v, x, y, n)
+	#define SCATTER_V1D(v, x, y, n)
+	#define SAVEFIG(name, show)
 #endif
+
+// maximal ed size to compare
+constexpr int maxed = 14;
+
 
 namespace rbm_ui {
 	std::unordered_map <string, string> const default_params = {
@@ -101,7 +147,8 @@ public:
 	virtual void exit_with_help() = 0;
 
 	// ------------------------------------------- 				 REAL PARSING				 -------------------------------------------
-	virtual void parseModel(int argc, const v_1d<string>& argv) = 0;											// the function to parse the command line
+	// the function to parse the command line
+	virtual void parseModel(int argc, const v_1d<string>& argv) = 0;											
 	// ------------------------------------------- 				 HELPING FUNCIONS			 -------------------------------------------
 	virtual void set_default() = 0;																	 			// set default parameters
 	// ------------------------------------------- 				 NON-VIRTUALS				 -------------------------------------------
@@ -199,6 +246,7 @@ namespace rbm_ui {
 
 		// rbm stuff
 		unique_ptr<rbmState<_type, _hamtype>> phi;
+		int layer_mult = 2;
 		u64 nhidden;
 		u64 nvisible;
 		size_t batch = std::pow(2, 10);
@@ -214,18 +262,23 @@ namespace rbm_ui {
 		bool quiet;																	// bool flags	
 
 		// -------------------------------------------------------- HELPER FUNCTIONS
+		void compare_ed(double ground_rbm);
+		void calculate_operators(clk::time_point start, const Col<cpx>& eigvec, double energy, double energy_error = 0, string name = "");
+		void calculate_operators(clk::time_point start, const Col<double>& eigvec, double energy, double energy_error = 0, string name = "");
 
-	public:
+public:
 		// -------------------------------------------  				  CONSTRUCTORS  				 -------------------------------------------
 		ui() = default;
 		ui(int argc, char** argv);
 		// -------------------------------------------  				  PARSER FOR HELP  				 -------------------------------------------
 		void exit_with_help() override;
 		// -------------------------------------------  				  REAL PARSER  				 -------------------------------------------
-		void parseModel(int argc, const v_1d<string>& argv) override;									// the function to parse the command line
+		// the function to parse the command line
+		void parseModel(int argc, const v_1d<string>& argv) final;									
 		// ------------------------------------------- HELPERS  				 -------------------------------------------
 		void set_default() override;																		// set default parameters
 		// -------------------------------------------  				  SIMULATION  			-------------------------------------------	 
+		void define_models();
 		void make_simulation() override;
 	};
 }
@@ -327,6 +380,7 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 	this->batch = std::pow(2, 10);
 	this->mcSteps = 1000;
 	this->n_blocks = 500;
+	this->layer_mult = 2;
 	this->block_size = 8;
 	this->n_therm = size_t(0.1 * this->n_blocks);
 	this->n_flips = 1;
@@ -339,13 +393,14 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 * @param argv line arguments
 */
 template<typename _type, typename _hamtype>
-void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
+inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 {
 	this->set_default();
 
 	string choosen_option = "";
 
 	//---------- SIMULATION PARAMETERS
+
 	// monte carlo steps
 	choosen_option = "-m";
 	this->set_option(this->mcSteps, argv, choosen_option);
@@ -357,6 +412,7 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 	// number of blocks
 	choosen_option = "-nb";
 	this->set_option(this->n_blocks, argv, choosen_option);
+	this->n_therm = size_t(0.1 * n_blocks);
 	
 	// block size
 	choosen_option = "-bs";
@@ -365,6 +421,10 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 	// number of hidden layers
 	choosen_option = "-nh";
 	this->set_option(this->nhidden, argv, choosen_option, false);
+
+	// number of hidden layers
+	choosen_option = "-lm";
+	this->set_option(this->layer_mult, argv, choosen_option, false);
 
 	// ----------- lattice
 
@@ -394,9 +454,12 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 
 
 	// ---------- model
+
+	// model type
 	choosen_option = "-mod";
 	this->set_option(this->model_name, argv, choosen_option, false);
 
+	// spin interaction
 	choosen_option = "-J";
 	this->set_option(this->J, argv, choosen_option, false);
 
@@ -420,11 +483,13 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 	choosen_option = "-w";
 	this->set_option(this->w, argv, choosen_option, false);
 
+	// --- heisenberg ---
+
 	// delta
 	choosen_option = "-dlt";
 	this->set_option(this->delta, argv, choosen_option, false);
 
-	// --- kitaev
+	// --- kitaev ---
 	choosen_option = "-kx";
 	this->set_option(this->delta, argv, choosen_option, false);
 	choosen_option = "-ky";
@@ -434,15 +499,14 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 	choosen_option = "-k0";
 	this->set_option(this->delta, argv, choosen_option, false);
 
-	// -------- other
-	
 	//---------- OTHERS
+
 	// quiet
 	choosen_option = "-q";
 	this->set_option(this->quiet, argv, choosen_option, false);
-	// outer thread number
-	// inner thread number
-	choosen_option = "-ti";
+
+	// thread number
+	choosen_option = "-th";
 	this->set_option(this->thread_num, argv, choosen_option, false);
 
 	// get help
@@ -459,11 +523,12 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 	if (!set_dir)
 		this->saving_dir = fs::current_path().string() + kPS + "results" + kPS;
 
+	// create the directories
 	fs::create_directories(this->saving_dir);
 
-#ifndef DEBUG
-	omp_set_num_threads(this->thread_num);
-#endif // !DEBUG
+//#ifndef DEBUG
+//	omp_set_num_threads(this->thread_num);
+//#endif // !DEBUG
 }
 
 /*
@@ -472,27 +537,47 @@ void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
 template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 {
-	//stout << "STARTING THE SIMULATION AND USING OUTER THREADS = " << outer_threads << ", INNER THREADS = " << inner_threads << EL;
-	//this->set_default();
+	auto start = std::chrono::high_resolution_clock::now();
+	stouts("STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING + VEQ(thread_num)", start);
 
+	// monte carlo
+	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 
+	// print energies
+	auto fileRbmEn_name = this->saving_dir + kPS + "energies" + ham->get_info();
+	std::ofstream fileRbmEn;
+	openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
+	for (auto i = 0; i < energies.size(); i++)
+		printSeparatedP(fileRbmEn, '\t', 8, true, 5, i, energies(i).real());
+	fileRbmEn.close();
 
-	// save the log file
-//#pragma omp single
-//	{
-//		std::fstream fileLog(this->saving_dir + "HubbardLog.csv", std::ios::in | std::ios::app);
-//		fileLog.seekg(0, std::ios::end);
-//		if (fileLog.tellg() == 0) {
-//			fileLog.clear();
-//			fileLog.seekg(0, std::ios::beg);
-//			printSeparated(fileLog, ',', 20, true ,"lattice_type","mcsteps","avsNum","corrTime", "M", "M0", "dtau", "Lx",\
-//				"Ly", "Lz", "beta", "U", "mu", "occ", "sd(occ)", "av_sgn", "sd(sgn)", "Ekin",\
-//				"sd(Ekin)", "m^2_z", "sd(m^2_z)", "m^2_x", "time taken");
-//		}
-//		fileLog.close();
-//	}
-	int maxEd = 12;
+	// calculate the statistics of a simulation
+	auto energies_tail = energies.tail(block_size);
+	_type standard_dev = arma::stddev(energies_tail);
+	_type ground_rbm = arma::mean(energies_tail);
 
+	// if the size is small enough
+	this->compare_ed(std::real(ground_rbm));
+
+	// ------------------- check ground state
+	std::map<u64, _type> states = phi->avSampling(200, n_therm, block_size, n_flips);
+	// convert to our basis
+	Col<_type> states_col = SpinHamiltonian<_type>::map_to_state(states, ham->get_hilbert_size());
+
+	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
+	SAVEFIG(fileRbmEn_name + ".png", true);
+
+	this->calculate_operators(start, states_col, std::real(ground_rbm), std::real(standard_dev), "rbm");
+	stouts("FINISHED EVERY THREAD", start);
+	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
+}
+// -------------------------------------------------------- HELPERS
+
+/*
+*/
+template<typename _type, typename _hamtype>
+inline void rbm_ui::ui<_type, _hamtype>::define_models()
+{
 	// define the lattice
 	switch (this->lattice_type)
 	{
@@ -506,13 +591,9 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 		this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 		break;
 	}
-
 	auto lat_type = lat->get_type();
 	auto Ns = lat->get_Ns();
-	stout << VEQ(lat_type) << EL;
-	// rbm stuff
-	this->nhidden = Ns;
-	this->nvisible = 2 * this->nhidden;
+	stout << "\t\t-> " << VEQ(lat_type) << EL;
 
 	// define the hamiltonian
 	switch (this->model_name)
@@ -534,88 +615,227 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 		this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
 		break;
 	}
+	auto model_info = this->ham->get_info();
+	stout << "\t\t-> " << VEQ(model_info) << EL;
 
-	// test ED
-	double ground_ed = 0;
-	if (Ns <= maxEd) {
-		ham->hamiltonian();
-		ham->diag_h(false);
-		auto info = ham->get_info();
-		stout << VEQ(info) << EL;
-		stout << "------------------------------------------------------------------------" << EL;
-		stout << "GROUND STATE ED:" << EL;
-		SpinHamiltonian<_hamtype>::print_state_pretty(ham->get_eigenState(0), lat->get_Ns(), 0.1);
-		stout << "------------------------------------------------------------------------" << EL;
-		ground_ed = std::real(ham->get_eigenEnergy(0));
-		double sz = 0;
-		for (auto i = 0; i < ham->get_hilbert_size(); i++) {
-			auto value = ham->get_eigenStateValue(0, i);
-			if (abs(value) < 1e-7) continue;
-			//for (int j = 0; j < lat->get_Ns(); j++) {
-			auto j = 0;
-			sz += abs(abs(value) * value) * (checkBit(i, lat->get_Ns() - 1 - j) ? 1.0 : -1.0);
-			//}
-		}
-		stout << "ED sz: " << VEQ(sz) << EL;
-	}
 
+	// rbm stuff
+	this->nhidden = Ns;
+	this->nvisible = this->layer_mult * this->nhidden;
 	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nvisible, nhidden, ham, lr, batch, thread_num);
 	auto rbm_info = phi->get_info();
-	stout << VEQ(rbm_info) << EL;
+	stout << "\t\t-> " << VEQ(rbm_info) << EL;
 
-	// monte carlo
-	auto energies = phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-
-#ifdef PLOT
-	plt::plot(arma::conv_to< v_1d<double> >::from(arma::real(energies)));
-#endif
-
-	// print dem ens
-	auto filename = "energies" + ham->get_info() + ".dat";
-	std::ofstream file(filename);
-	for (int i = 0; i < energies.size(); i++)
-		printSeparatedP(file, '\t', 8, true, 5, i, energies(i).real());
-	file.close();
+}
 
 
-	energies = energies.tail(block_size);
-	_type standard_dev = arma::stddev(energies);
-	stout << "\t\t->ENERGIES" << EL;
-	_type ground_rbm = arma::mean(energies);
+/*
+* if it is possible to do so we can test the exact diagonalization states for comparison
+*/
+template<typename _type, typename _hamtype>
+inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
+{
+	// test ED
+	auto Ns = this->lat->get_Ns();
+	double ground_ed = 0;
 
-	// ------------------- check ground state
-	std::map<u64, _type> states = phi->avSampling(200, 50, 16, n_flips);
-	Col<_type> states_col = SpinHamiltonian<_type>::map_to_state(states, ham->get_hilbert_size());
-	//SpinHamiltonian<_type>::print_state_pretty(states_col, lat->get_Ns(), 0.1);
+	if (Ns <= maxed) {
+		auto diag_time = std::chrono::high_resolution_clock::now();
+		stout << "\n\n-> starting ED for:\n\t-> " + ham->get_info() << EL;
+		
+		this->ham->hamiltonian();
+		this->ham->diag_h(false);
+		ground_ed = std::real(ham->get_eigenEnergy(0));
 
-	// compare sigma_x
-	auto ed_av_s_x = this->ham->av_sigma_x(0, 0);
-	auto rbm_av_s_x = this->ham->av_sigma_x(states_col, states_col);
-
-	stout << VEQP(ed_av_s_x, 4) << "," << VEQP(rbm_av_s_x, 4) << EL;
-
-
+		auto eigvec = ham->get_eigenState(0);
+		stouts("\t\t-> finished ED", diag_time);
 
 
-	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
-	if (lat->get_Ns() <= maxEd) {
 		stout << "\t\t\t->" << VEQ(ground_ed) << EL;
-		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100;
-		stout << "\t\t\t->" << VEQ(relative_error) << "%" << EL;
-
+		stout << "\t\t\t->" << VEQ(ground_rbm) << EL;
+		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
+		stout << "\t\t\t->" << VEQP(relative_error, 4) << "%" << EL;
+		stout << "------------------------------------------------------------------------" << EL;
+		stout << "GROUND STATE ED:" << EL;
+		SpinHamiltonian<_hamtype>::print_state_pretty(ham->get_eigenState(0), Ns, 0.08);
+		stout << "------------------------------------------------------------------------" << EL;
 #ifdef PLOT
 		plt::axhline(ground_ed);
 		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm) + ",\n" + VEQ(relative_error) + "%", mcSteps / 3, 0);
-	}
-	plt::title(ham->get_info() + "\nrbm:" + rbm_info);
-	plt::xlabel("#mcstep");
-	plt::ylabel("$<E_{est}>$");
-	plt::save("energies" + ham->get_info() + ".png");
-	plt::show(true);
-#else
-	}
 #endif
-	stout << "FINISHED EVERY THREAD" << EL;
+		this->calculate_operators(diag_time, eigvec, ground_ed, 0.0, "exact");
+	}
 }
-// -------------------------------------------------------- HELPERS
+
+
+// -------------------------------- OPERATORS -----------------------------------------
+
+
+template<typename _type, typename _hamtype>
+inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point start, const Col<cpx>& eigvec, double energy, double energy_error, string name)
+{
+	auto Ns = this->lat->get_Ns();
+	std::ofstream fileSave;
+	std::fstream log;
+	string dir = this->saving_dir + kPS + name;
+	string filename = "";
+
+
+	v_1d<double> op(Ns, 0);
+	// --------------------- compare sigma_z ---------------------
+
+	// S_z_vector extensive
+	double sz = this->ham->av_sigma_z(eigvec, eigvec);
+
+	// S_z at each site
+	filename = dir + "_szSite_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^z_i$", "$S^z_i$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+	// S_z correlations
+	filename = dir + "_szCorr_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_{i+l}}$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+
+	// --------------------- compare sigma_x ---------------------
+	// S_x_vector extensive
+	double sx = this->ham->av_sigma_x(eigvec, eigvec);
+
+	// S_z at each site
+	filename = dir + "_sxSite_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+	// S_z correlations
+	filename = dir + "_sxCorr_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_{i+l}}$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+
+	// --------------------- save log ---------------------
+	// save the log file and append columns if it is empty
+	string logname = dir + ham->get_info() + ".dat";
+#pragma omp single
+	{
+		openFile(log, logname, ios::in | ios::app);
+		log.seekg(0, std::ios::end);
+		if (log.tellg() == 0) {
+			log.clear();
+			log.seekg(0, std::ios::beg);
+			printSeparated(log, '\t', 8, true, "lattice_type", "Lx", \
+				"Ly", "Lz", "En", "dEn", "Sz", "Sx", "time taken");
+		}
+		log.close();
+	}
+	openFile(log, logname, ios::app);
+	printSeparatedP(log, '\t', 8, true, 5, this->lat->get_type(), this->lat->get_Lx(), this->lat->get_Ly(), this->lat->get_Lz(), \
+		energy, energy_error, sz, sx, tim_s(start));
+	log.close();
+};
+
+template<typename _type, typename _hamtype>
+inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point start, const Col<double>& eigvec, double energy, double energy_error, string name)
+{
+	auto Ns = this->lat->get_Ns();
+	std::ofstream fileSave;
+	std::fstream log;
+	string dir = this->saving_dir + kPS + name;
+	string filename = "";
+
+
+	v_1d<double> op(Ns, 0);
+	// --------------------- compare sigma_z ---------------------
+
+	// S_z_vector extensive
+	auto sz = this->ham->av_sigma_z(eigvec, eigvec);
+
+	// S_z at each site
+	filename = dir + "_szSite_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^z_i$", "$S ^z_i$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+	// S_z correlations
+	filename = dir + "_szCorr_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_{i+l}}$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+
+	// --------------------- compare sigma_x ---------------------
+	// S_x_vector extensive
+	double sx = this->ham->av_sigma_x(eigvec, eigvec);
+
+	// S_z at each site
+	filename = dir + "_sxSite_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+	// S_z correlations
+	filename = dir + "_sxCorr_" + ham->get_info();
+	openFile(fileSave, filename + ".dat", ios::out);
+	for (auto i = 0; i < Ns; i++)
+		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
+	print_vector_1d(fileSave, op);
+	fileSave.close();
+	SCATTER_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_{i+l}}$" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
+
+
+	// --------------------- save log ---------------------
+	// save the log file and append columns if it is empty
+	string logname = dir + ham->get_info() + ".dat";
+#pragma omp single
+	{
+		openFile(log, logname, ios::app);
+		log.seekg(0, std::ios::end);
+		if (log.tellg() == 0) {
+			log.clear();
+			log.seekg(0, std::ios::beg);
+			printSeparated(log, '\t', 8, true, 5, "lattice_type", "Lx", \
+				"Ly", "Lz", "En", "dEn", "Sz", "Sx", "time taken");
+		}
+		log.close();
+	}
+	openFile(log, logname, ios::app);
+	printSeparatedP(log, '\t', 8, true, 5, this->lat->get_type(), this->lat->get_Lx(), this->lat->get_Ly(), this->lat->get_Lz(), \
+		energy, energy_error, sz, sx, tim_s(start));
+	log.close();
+};
+
+
 #endif // !UI_H

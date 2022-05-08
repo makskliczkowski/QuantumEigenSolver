@@ -19,9 +19,6 @@ using v_1d = std::vector<T>;										// 1d double vector
 
 //! -------------------------------------------------------- STRING RELATED FUNCTIONS --------------------------------------------------------
 
-
-
-
 /*
 * @brief Splits string according to the delimiter
 * @param s a string to be split

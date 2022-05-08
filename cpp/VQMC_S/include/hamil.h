@@ -105,19 +105,29 @@ public:
 	double av_sigma_z(u64 alfa, u64 beta);																				// check the sigma_z matrix element extensive
 	double av_sigma_z(u64 alfa, u64 beta, int corr_len);																// check the sigma_z matrix element with correlation length extensive
 	double av_sigma_z(u64 alfa, u64 beta, std::vector<int> sites);														// check the matrix element of sigma_z elements sites correlation
-	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta);													// check the sigma_z matrix element extensive
-	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, int corr_len);									// check the sigma_z matrix element with correlation length extensive
-	double av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites);							// check the matrix element of sigma_z elements sites correlation
-
+	double av_sigma_z(const Col<double>& alfa, const Col<double>& beta);												// check the sigma_z matrix element extensive
+	double av_sigma_z(const Col<double>& alfa, const Col<double>& beta, int corr_len);									// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_z(const Col<double>& alfa, const Col<double>& beta, std::vector<int> sites);						// check the matrix element of sigma_z elements sites correlation
+	double av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta);														// check the sigma_z matrix element extensive
+	double av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta, int corr_len);										// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta, std::vector<int> sites);								// check the matrix element of sigma_z elements sites correlation
+	double av_sigma_z(const Col<_type>& alfa);																			// check the sigma_z matrix element extensive
+	double av_sigma_z(const Col<_type>& alfa, int corr_len);															// check the sigma_z matrix element with correlation length extensive
+	double av_sigma_z(const Col<_type>& alfa, std::vector<int> sites);													// check the matrix element of sigma_z elements sites correlation
 
 
 	double av_sigma_x(u64 alfa, u64 beta);																				// check the sigma_z matrix element extensive
 	double av_sigma_x(u64 alfa, u64 beta, int corr_len);																// check the sigma_z matrix element with correlation length extensive
 	double av_sigma_x(u64 alfa, u64 beta, std::vector<int> sites);														// check the matrix element of sigma_x elements sites correlation
-	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta);
-	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, int corr_len);
-	double av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites);
-
+	double av_sigma_x(const Col<double>& alfa, const Col<double>& beta);
+	double av_sigma_x(const Col<double>& alfa, const Col<double>& beta, int corr_len);
+	double av_sigma_x(const Col<double>& alfa, const Col<double>& beta, std::vector<int> sites);
+	double av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta);
+	double av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta, int corr_len);
+	double av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta, std::vector<int> sites);
+	double av_sigma_x(const Col<_type>& alfa);
+	double av_sigma_x(const Col<_type>& alfa, int corr_len);
+	double av_sigma_x(const Col<_type>& alfa, std::vector<int> sites);
 
 	double av_spin_flip(u64 alfa, u64 beta);																			// check the spin flip element extensive
 	double av_spin_flip(u64 alfa, u64 beta, std::vector<int> sites);													// check the spin flip element at input sites (up to 2)
@@ -362,6 +372,8 @@ inline vec SpinHamiltonian<_type>::entaglement_entropy_sweep(u64 state) const
 
 // ----------------------------------------------------------------------------- PHYSICAL QUANTITES -----------------------------------------------------------------------------
 
+// ------------------------------------ SIGMA_Z
+
 /*
 * @brief Calculates the matrix element for sigma_z Pauli matrix
 * @param sites Sites the matrix works on
@@ -424,11 +436,11 @@ inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, int corr_le
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
 	_type value = 0;
-	auto neis = get_neigh_vector(this->lattice->_BC, this->Ns, corr_length);
+
 #pragma omp parallel for reduction (+: value) collapse(2)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
-			int nei = neis[l];
+			int nei = this->lattice->get_nei(l, corr_length);
 			if (nei < 0) continue;
 			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
 			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
@@ -438,19 +450,65 @@ inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, int corr_le
 	return std::real(value / sqrt(this->L));
 }
 
-/*
-* @brief Calculates the matrix element for sigma_z Pauli matrix
-* @param sites Sites the matrix works on
-* @param alfa Left state
-* @param beta Right state
-* @returnsThe matrix element
-*/
+// double 
+
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites) {
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<double>& alfa, const Col<double>& beta, std::vector<int> sites) {
 	for (auto& site : sites)
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 
-	_type value = 0;
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		double S_z = 1;
+		for (auto& site : sites)
+			S_z *= checkBit(k, this->Ns - 1 - site) ? 1.0 : -1.0;
+		value += S_z * (alfa(k)) * beta(k);
+	}
+	return real(value);
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<double>& alfa, const Col<double>& beta)
+{
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			value += Sz * (alfa(k)) * beta(k);
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<double>& alfa, const Col<double>& beta, int corr_length)
+{
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
+
+	cpx value = 0;
+#pragma omp parallel for reduction (+: value) collapse(2)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->get_nei(l, corr_length);
+			if (nei < 0) continue;
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			value += Sz * Sz_corr * (alfa(k)) * beta(k);
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+// cpx
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta, std::vector<int> sites) {
+	for (auto& site : sites)
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		double S_z = 1;
@@ -461,16 +519,10 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const C
 	return real(value);
 }
 
-/*
-* @brief Calculates the matrix element for sigma_z extensive
-* @param alfa Left state
-* @param beta Right state
-* @returnsThe matrix element
-*/
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta)
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta)
 {
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
@@ -481,23 +533,16 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const C
 	return real(value / sqrt(this->Ns));
 }
 
-/*
-* @brief Calculates the matrix element for sigma_z extensive correlations
-* @param alfa Left state
-* @param beta Right state
-* @param corr_length correlation length
-* @returnsThe matrix element
-*/
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const Col<_type>& beta, int corr_length)
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<cpx>& alfa, const Col<cpx>& beta, int corr_length)
 {
-	if (corr_length >= L) throw "exceeding correlation length\n";
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
 
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value) collapse(2)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
-			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			int nei = this->lattice->get_nei(l, corr_length);
 			if (nei < 0) continue;
 			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
 			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
@@ -506,6 +551,62 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, const C
 	}
 	return real(value / sqrt(this->Ns));
 }
+
+
+// one vector 
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, std::vector<int> sites) {
+	for (auto& site : sites)
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		double S_z = 1;
+		for (auto& site : sites)
+			S_z *= checkBit(k, this->Ns - 1 - site) ? 1.0 : -1.0;
+		auto tmp = abs(alfa(k));
+		value += S_z * tmp * tmp;
+	}
+	return real(value);
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa)
+{
+	_type value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			auto tmp = abs(alfa(k));
+			value += Sz * tmp * tmp;
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, int corr_length)
+{
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
+
+	_type value = 0;
+#pragma omp parallel for reduction (+: value) collapse(2)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->get_nei(l, corr_length);
+			if (nei < 0) continue;
+			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
+			double Sz_corr = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			auto tmp = abs(alfa(k));
+			value += Sz * Sz_corr * tmp * tmp;
+		}
+	}
+	return real(value / sqrt(this->Ns));
+}
+
+
 
 // ------------------------------------ SIGMA_X
 
@@ -542,7 +643,7 @@ inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, std::vector
 *  @returnsThe matrix element*/
 template<typename _type>
 inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta) {
-	_type overlap = 0;
+	cpx overlap = 0;
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
 #pragma omp parallel for reduction(+: overlap)
@@ -569,11 +670,11 @@ inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, int corr_le
 
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	double value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
-			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			int nei = this->lattice->get_nei(l, corr_length);
 			if (nei < 0) continue;
 			NO_OVERFLOW(
 				u64 idx = flip(k, this->Ns - 1 - nei);
@@ -585,20 +686,12 @@ inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, int corr_le
 	return real(value) / sqrt(this->Ns);
 }
 
-/*
-* Calculates the matrix element for sigma_x Pauli matrix
-
-* @param sites Sites the matrix works on
-* @param alfa Left state
-* @param beta Right state
-* @returnsThe matrix element
-*/
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, std::vector<int> sites) {
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta, std::vector<int> sites) {
 	for (auto& site : sites) {
-		if (site < 0 || site >= L) throw "Site index exceeds chain";
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	}
-	double value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (auto& site : sites) {
@@ -609,15 +702,9 @@ inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const C
 	return real(value);
 }
 
-/*
-* Calculates the matrix element for sigma_x extensive (sum over the system)
-
-* @param alfa Left state
-* @param beta Right state
-*  @returnsThe matrix element*/
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta) {
-	_type overlap = 0;
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta) {
+	cpx overlap = 0;
 #pragma omp parallel for reduction(+: overlap)
 	for (long int k = 0; k < N; k++) {
 		for (int j = 0; j < this->Ns; j++) {
@@ -628,23 +715,16 @@ inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const C
 	return real(overlap) / sqrt(this->Ns);
 }
 
-/*
-* Calculates the matrix element for sigma_x extensive correlations : s^x_i s^x_i+1
-
-* @param alfa Left state
-* @param beta Right state
-* @param corr_length correlation length
-*  @returnsThe matrix element*/
 template<typename _type>
-inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const Col<_type>& beta, int corr_length)
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<cpx>& alfa, const Col<cpx>& beta, int corr_length)
 {
-	if (corr_length >= L) throw "exceeding correlation length\n";
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
 
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
-			int nei = this->lattice->_BC ? ((l + corr_length) % this->Ns) : ((l + corr_length) >= this->Ns - 1 : (l + corr_length));
+			int nei = this->lattice->get_nei(l, corr_length);
 			if (nei < 0) continue;
 			NO_OVERFLOW(
 				u64 idx = flip(k, this->Ns - 1 - nei);
@@ -656,9 +736,110 @@ inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, const C
 	return real(value) / sqrt(this->Ns);
 }
 
+// double 
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<double>& alfa, const Col<double>& beta, std::vector<int> sites) {
+	for (auto& site : sites) {
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+	}
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (auto& site : sites) {
+			NO_OVERFLOW(u64 idx = flip(k, this->Ns - 1 - site);)
+				value += (alfa(idx)) * beta(k);
+		}
+	}
+	return real(value);
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<double>& alfa, const Col<double>& beta) {
+	double overlap = 0;
+#pragma omp parallel for reduction(+: overlap)
+	for (long int k = 0; k < N; k++) {
+		for (int j = 0; j < this->Ns; j++) {
+			NO_OVERFLOW(u64 new_idx = flip(k, this->Ns - 1 - j);)
+				overlap += (alfa(new_idx)) * beta(k);
+		}
+	}
+	return real(overlap) / sqrt(this->Ns);
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<double>& alfa, const Col<double>& beta, int corr_length)
+{
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
+
+	double value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->get_nei(l, corr_length);
+			if (nei < 0) continue;
+			NO_OVERFLOW(
+				u64 idx = flip(k, this->Ns - 1 - nei);
+			u64 new_idx = flip(idx, this->Ns - 1 - l);
+			);
+			value += (alfa(new_idx)) * beta(k);
+		}
+	}
+	return real(value) / sqrt(this->Ns);
+}
 
 
+// one vec
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, std::vector<int> sites) {
+	for (auto& site : sites) {
+		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+	}
+	cpx value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (auto& site : sites) {
+			NO_OVERFLOW(u64 idx = flip(k, this->Ns - 1 - site);)
+			value += conj(alfa(idx))* alfa(k);
+		}
+	}
+	return real(value);
+}
 
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa) {
+	cpx overlap = 0;
+#pragma omp parallel for reduction(+: overlap)
+	for (long int k = 0; k < N; k++) {
+		for (int j = 0; j < this->Ns; j++) {
+			NO_OVERFLOW(u64 new_idx = flip(k, this->Ns - 1 - j);)
+			overlap += conj(alfa(new_idx)) * alfa(k);
+		}
+	}
+	return real(overlap) / sqrt(this->Ns);
+}
+
+template<typename _type>
+inline double SpinHamiltonian<_type>::av_sigma_x(const Col<_type>& alfa, int corr_length)
+{
+	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
+
+	cpx value = 0;
+#pragma omp parallel for reduction (+: value)
+	for (int k = 0; k < N; k++) {
+		for (int l = 0; l < this->Ns; l++) {
+			int nei = this->lattice->get_nei(l, corr_length);
+			if (nei < 0) continue;
+			NO_OVERFLOW(
+				u64 idx = flip(k, this->Ns - 1 - nei);
+			u64 new_idx = flip(idx, this->Ns - 1 - l);
+			);
+			value += conj(alfa(new_idx)) * alfa(k);
+		}
+	}
+	return real(value) / sqrt(this->Ns);
+}
+
+// ------------------------------------ SPIN_FLIP
 
 
 /*
@@ -676,7 +857,7 @@ inline double SpinHamiltonian<_type>::av_spin_flip(u64 alfa, u64 beta, std::vect
 	}
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel
 	{
 		std::vector<bool> base_vector(L), temp(L);
@@ -707,7 +888,7 @@ template<typename _type>
 inline double SpinHamiltonian<_type>::av_spin_flip(u64 alfa, u64 beta) {
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel
 	{
 		std::vector<bool> base_vector(L), temp(L);
@@ -716,7 +897,7 @@ inline double SpinHamiltonian<_type>::av_spin_flip(u64 alfa, u64 beta) {
 			int_to_binary(map(k), base_vector);
 			for (int l = 0; l < this->Ns; l++) {
 				temp = base_vector;
-				const int nei = this->nearest_neighbors[l];
+				const int nei = this->lattice->get_nn(l, 0);
 				if (nei < 0) continue;
 				if ((base_vector[l] == 0 && base_vector[nei] == 1) || (base_vector[nei] == 0 && base_vector[l])) {
 					temp[l] = !base_vector[l];

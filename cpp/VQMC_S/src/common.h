@@ -61,9 +61,9 @@ R"(\)";
 
 #define EL std::endl
 #define stout std::cout << std::setprecision(8) << std::fixed											// standard out
-#define stouts(text, start) stout << text << " -> time : " << tim_s(start) << "s" << EL;				// standard out seconds
-#define stoutms(text, start) stout << text << " -> time : " << tim_ms(start) << "ms" << EL;				// standard out miliseconds
-#define stoutmus(text, start) stout << text << " -> time : " << tim_mus(start) << "mus" << EL;			// standard out microseconds
+#define stouts(text, start) stout << text << " -> time : " << tim_s(start) << "s" << EL					// standard out seconds
+#define stoutms(text, start) stout << text << " -> time : " << tim_ms(start) << "ms" << EL				// standard out miliseconds
+#define stoutmus(text, start) stout << text << " -> time : " << tim_mus(start) << "mus" << EL			// standard out microseconds
 #define stoutc(c) if(c) stout <<  std::setprecision(8) << std::fixed									// standard out conditional
 #define STR std::to_string
 #define STRP(str,prec) str_p(str, prec)
@@ -340,6 +340,10 @@ inline void openFile(T& file, std::string filename, std::ios_base::openmode mode
 	if (!file.is_open()) throw "couldn't open a file: " + filename + "\n";
 }
 
+
+
+// ----------------------------------------------------------------------------- DIRECTORIES -----------------------------------------------------------------------------
+
 /*
 * @brief Creates a single directory given a string path
 * @param dir the directory
@@ -359,7 +363,7 @@ inline void createDirs(const std::string& dir, const _Ty&... dirs) {
 }
 
 
-//? ------------------------------------------------------------------------------ VALUE EQUALS
+//? ------------------------------------------------------------------------------ VALUE EQUALS ------------------------------------------------------------------------------
 /*
 * checks if value is equal to some param up to given tolerance
 */
@@ -415,6 +419,8 @@ inline std::string valueEquals(const char name[], T value, int prec = 2) {
 inline std::string valueEquals(const char name[], std::string value, int prec) {
 	return std::string(name) + "=" + value;
 }
+
+// -------------------------------------------------------------------------------------------- PRINT SEPARATED -----------------------------------------------------------------------------
 
 /*
 * printing the separated number of variables using the variadic functions initializer
@@ -517,6 +523,8 @@ inline void printSeparatedP(std::ostream& output, char separator, arma::u16 widt
 	if (endline) output << std::endl;
 }
 
+// ---------------------------------------------------------------------------------------- STREAM OVERLOADED
+
 /*
 *Overwritten standard stream redirection operator for 2D vectors separated by commas
 *@param out outstream to be used
@@ -550,7 +558,7 @@ std::ostream& operator << (std::ostream& out, const v_2d<T>& v ) {
 	}
 	return out;
 }
-//! ----------------------------------------------------------------------------- HELPERS
+//! ----------------------------------------------------------------------------- HELPERS -----------------------------------------------------------------------------
 
 /*
 * @brief check the sign of a value
@@ -578,6 +586,16 @@ inline int myModuloEuclidean(int a, int b)
 
 
 // ----------------------------------------------------------------------------- VECTORS HANDLING -----------------------------------------------------------------------------
+
+
+
+
+template <typename T, typename T2>
+inline void print_vector_1d(T& file, const v_1d<T2>& v) {
+	for (auto i = 0; i < v.size(); i++)
+		printSeparatedP(file, '\t', 8, true, 5, i, v[i]);
+}
+
 
 
 /*

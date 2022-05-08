@@ -19,10 +19,10 @@
 #undef USE_ADAM
 #endif // !DONT_USE_ADAM
 
-#define RBM_ANGLES_UPD
+
 
 //#define PINV
-#define S_REGULAR
+
 
 #ifdef PINV
     constexpr auto pinv_tol = 1e-7;
@@ -30,9 +30,9 @@
         #undef S_REGULAR
     #endif
 #elif defined S_REGULAR 
-    constexpr auto lambda_0_reg = 100;
-    constexpr auto b_reg = 0.9;
-    constexpr auto lambda_min_reg = 1e-4;
+    constexpr double lambda_0_reg = 100;
+    constexpr double b_reg = 0.9;
+    constexpr double lambda_min_reg = 1e-4;
     #ifdef PINV
         #undef PINV
     #endif
@@ -54,7 +54,7 @@ private:
     bool dbg_blck = false;
 
     // general parameters
-    string info;                                           // info about the model
+    string info;                                                // info about the model
     size_t batch;                                               // batch size for stochastic
     size_t n_visible;                                           // visible neurons
     size_t n_hidden;                                            // hidden neurons
@@ -63,8 +63,10 @@ private:
     size_t thread_num;                                          // thread number
     double lr;                                                  // learning rate
 #ifdef S_REGULAR
-    double current_b_reg = b_reg;                               // parameter for regularisation, changes with Monte Carlo steps
-#endif // S_REGULAR
+    double b_reg_mult = b_reg;                                  // starting parameter for regularisation
+#endif
+    double current_b_reg = 0;                                   // parameter for regularisation, changes with Monte Carlo steps
+
 
     pBar pbar;                                                  // progress bar
     
@@ -121,10 +123,10 @@ public:
     // -------------------------------------------				 HELPERS				 -------------------------------------------
     
     // debug checker
-    void debug_check() {
-#ifndef DEBUG
-        omp_set_num_threads(this->thread_num);                  // Use threads for all consecutive parallel regions
-#else
+    void debug_check() const {
+#ifdef DEBUG
+//       omp_set_num_threads(this->thread_num);                  // Use threads for all consecutive parallel regions
+//#else
 #ifdef DEBUG_RBM_SAMP
         this->dbg_samp = true;
 #endif // DEBUG_RBM_SAMP
@@ -479,7 +481,7 @@ void rbmState<typename _type, typename _hamtype>::updVarDeriv(int current_step){
 * @brief Calculate the local energy depending on the given Hamiltonian
 */
 template<typename _type, typename _hamtype>
-_type rbmState<typename _type, typename _hamtype>::locEn(){
+inline _type rbmState<typename _type, typename _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
     const auto hilb = this->hamil->get_hilbert_size();
     // get the reference to all local energies and changed states from the model Hamiltonian
@@ -499,7 +501,7 @@ _type rbmState<typename _type, typename _hamtype>::locEn(){
         // changes accordingly not to create data race
         if (state != this->current_state) {
         #ifndef DEBUG
-            const int tid = omp_get_thread_num();
+            const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id()); //omp_get_thread_num();
             const int vid = tid % this->thread_num;
         #else
             const int vid = 0;
@@ -576,7 +578,7 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
 template<typename _type, typename _hamtype>
 Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
 #ifdef S_REGULAR
-    this->current_b_reg = b_reg;
+    this->current_b_reg = this->b_reg_mult;
 #endif
     
     // start the timer!
@@ -688,7 +690,7 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
 template<typename _type, typename _hamtype>
 inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_samples, size_t n_therm, size_t b_size, size_t n_flips)
 {
-    stout << "\t->Looking for the ground state for " + this->get_info();
+    stout << "\n\n\n->Looking for the ground state for " + this->get_info();
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -737,11 +739,11 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     s_z_rbm /= double(n_samples * b_size);
     en /= double(n_samples * b_size);
 
-    stouts("->\t\t\tMonte Carlo state search after finding weights ", start);
+    stouts("->Finished Monte Carlo state search after finding weights ", start);
     stout << "\n------------------------------------------------------------------------" << EL;
-    stout << "GROUND STATE RBM:" << EL;
-    this->pretty_print(states, 0.05);
-    stout << VEQP(s_z_rbm,5) << EL;
+    stout << "GROUND STATE RBM: " << VEQP(en, 4) << EL;
+    this->pretty_print(states, 0.08);
+    stout << VEQP(s_z_rbm, 5) << EL;
     stout << "\n------------------------------------------------------------------------" << EL;
 
     return states;
