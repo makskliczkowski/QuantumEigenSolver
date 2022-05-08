@@ -3,9 +3,6 @@
 #define UI_H
 
 
-//#define DEBUG
-
-
 
 #ifdef DEBUG
 //#define DEBUG_BINARY
@@ -23,12 +20,8 @@
 
 
 #ifndef RBM_H
-	#define DONT_USE_ADAM
-	#define S_REGULAR
-	#define RBM_ANGLES_UPD
 	#include "../rbm.h"
 #endif
-
 
 #include "../models/ising.h"
 #include "../models/heisenberg_dots.h"
@@ -42,7 +35,6 @@
 #endif
 
 
-#define PLOT
 #ifdef PLOT
 	// plotting
 	#define WITHOUT_NUMPY
@@ -267,22 +259,22 @@ namespace rbm_ui {
 		void calculate_operators(clk::time_point start, const Col<double>& eigvec, double energy, double energy_error = 0, string name = "");
 
 public:
-		// -------------------------------------------  				  CONSTRUCTORS  				 -------------------------------------------
+		// -------------------------------------------  					CONSTRUCTORS  					-------------------------------------------
 		ui() = default;
 		ui(int argc, char** argv);
-		// -------------------------------------------  				  PARSER FOR HELP  				 -------------------------------------------
+		// -------------------------------------------  					PARSER FOR HELP  					-------------------------------------------
 		void exit_with_help() override;
 		// -------------------------------------------  				  REAL PARSER  				 -------------------------------------------
 		// the function to parse the command line
 		void parseModel(int argc, const v_1d<string>& argv) final;									
-		// ------------------------------------------- HELPERS  				 -------------------------------------------
+		// -------------------------------------------   					HELPERS  							-------------------------------------------
 		void set_default() override;																		// set default parameters
 		// -------------------------------------------  				  SIMULATION  			-------------------------------------------	 
 		void define_models();
 		void make_simulation() override;
 	};
 }
-// --------------------------------------------------------    				 RBM   				  --------------------------------------------------------
+// --------------------------------------------------------    				RBM   						--------------------------------------------------------
 
 /*
 * @param argc number of cmd parameters
@@ -422,10 +414,13 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	choosen_option = "-nh";
 	this->set_option(this->nhidden, argv, choosen_option, false);
 
-	// number of hidden layers
+	// number of hidden layers multiplier
 	choosen_option = "-lm";
 	this->set_option(this->layer_mult, argv, choosen_option, false);
 
+	// learning rate
+	choosen_option = "-lr";
+	this->set_option(this->lr, argv, choosen_option, false);
 	// ----------- lattice
 
 	// lattice type
@@ -538,8 +533,8 @@ template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 {
 	auto start = std::chrono::high_resolution_clock::now();
-	stouts("STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING + VEQ(thread_num)", start);
-
+	stouts("STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: " + VEQ(thread_num), start);
+	printSeparated(stout, ',', 5, false, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
 	// monte carlo
 	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 
@@ -560,7 +555,7 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	this->compare_ed(std::real(ground_rbm));
 
 	// ------------------- check ground state
-	std::map<u64, _type> states = phi->avSampling(200, n_therm, block_size, n_flips);
+	std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, block_size, n_flips);
 	// convert to our basis
 	Col<_type> states_col = SpinHamiltonian<_type>::map_to_state(states, ham->get_hilbert_size());
 
@@ -646,8 +641,10 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		this->ham->hamiltonian();
 		this->ham->diag_h(false);
 		ground_ed = std::real(ham->get_eigenEnergy(0));
-
 		auto eigvec = ham->get_eigenState(0);
+		u64 state = 0;
+		auto sz = this->ham->av_sigma_z(state, state);
+		auto sx = this->ham->av_sigma_x(state, state);
 		stouts("\t\t-> finished ED", diag_time);
 
 
@@ -656,7 +653,10 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
 		stout << "\t\t\t->" << VEQP(relative_error, 4) << "%" << EL;
 		stout << "------------------------------------------------------------------------" << EL;
-		stout << "GROUND STATE ED:" << EL;
+		stout << "GROUND STATE ED ENERGY: " << VEQP(ground_ed, 4) << EL;
+		stout << "GROUND STATE ED SIGMA_X EXTENSIVE: " << VEQP(sx, 4) << EL;
+		stout << "GROUND STATE ED SIGMA_Z EXTENSIVE: " << VEQP(sz, 4) << EL;
+		stout << "\n------------------------------------------------------------------------" << EL;
 		SpinHamiltonian<_hamtype>::print_state_pretty(ham->get_eigenState(0), Ns, 0.08);
 		stout << "------------------------------------------------------------------------" << EL;
 #ifdef PLOT
@@ -694,7 +694,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^z_i$", "$S^z_i$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^z_i$", "$S^z_i$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
@@ -704,7 +704,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_{i+l}}$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_iS^z_{i+l}}$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 
@@ -719,7 +719,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
@@ -729,9 +729,17 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_{i+l}}$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_iS^x_{i+l}}$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
+	// --------------------- entropy ----------------------
+	filename = dir + "_ent_entro_" + ham->get_info();
+	auto entro = this->ham->entanglement_entropy_sweep(eigvec);
+	openFile(fileSave, filename + ".dat", ios::out);
+	print_vector_1d(fileSave, entro);
+	fileSave.close();
+	PLOT_V1D(arma::conv_to<v_1d<double>>::from(entro), "bond_cut", "$S_0(L)$", "Entanglement entropy" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
 
 	// --------------------- save log ---------------------
 	// save the log file and append columns if it is empty
@@ -777,7 +785,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^z_i$", "$S ^z_i$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^z_i$", "$S ^z_i$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
@@ -787,7 +795,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_{i+l}}$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_iS^z_{i+l}}$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 
@@ -802,7 +810,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
@@ -812,9 +820,17 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
 	print_vector_1d(fileSave, op);
 	fileSave.close();
-	SCATTER_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_{i+l}}$" + ham->get_info() + name);
+	PLOT_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_iS^x_{i+l}}$" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
+	// --------------------- entropy ----------------------
+	filename = dir + "_ent_entro_" + ham->get_info();
+	auto entro = this->ham->entanglement_entropy_sweep(eigvec);
+	openFile(fileSave, filename + ".dat", ios::out);
+	print_vector_1d(fileSave, entro);
+	fileSave.close();
+	PLOT_V1D(arma::conv_to<v_1d<double>>::from(entro), "bond_cut", "S_0(L)", "Entanglement entropy" + ham->get_info() + name);
+	SAVEFIG(filename + ".png", false);
 
 	// --------------------- save log ---------------------
 	// save the log file and append columns if it is empty
@@ -826,7 +842,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 		if (log.tellg() == 0) {
 			log.clear();
 			log.seekg(0, std::ios::beg);
-			printSeparated(log, '\t', 8, true, 5, "lattice_type", "Lx", \
+			printSeparated(log, '\t', 8, true, "lattice_type", "Lx", \
 				"Ly", "Lz", "En", "dEn", "Sz", "Sx", "time taken");
 		}
 		log.close();

@@ -388,14 +388,28 @@ inline std::string str_p(const T a_value, const int n = 2) {
 }
 
 /*
-* pretty prints the complex number in angular form
+* @brief pretty prints the complex number in angular form
+* @param val complex value
+* @n precision
 */
 inline std::string print_cpx(cpx val, int n = 2) {
 	double phase = std::arg(val) / PI;
 	while (phase < 0)
 		phase += 2;
+	auto absolute = "+" + str_p(std::abs(val), n);
+	std::string phase_str = "";
+	if (valueEqualsPrec(phase, 0.0, 1e-3) || valueEqualsPrec(phase, 2.0, 1e-3))
+		phase_str = "";
+	else if (valueEqualsPrec(phase, 1.0, 1e-3)) {
+		absolute = "-" + str_p(std::abs(val), n);;
+		phase_str = "";
+	}
+	else {
+		phase_str = "*exp(" + str_p(phase, n) + "*pi*i)";
+	}
 
-	return str_p(std::abs(val), n) + (!valueEqualsPrec(phase, 0.0, 1e-3) && !valueEqualsPrec(phase, 2.0, 1e-3) ? "*exp(" + str_p(phase, n) + "*pi*i)" : "");
+
+	return absolute + phase_str;
 }
 
 /*
@@ -596,7 +610,11 @@ inline void print_vector_1d(T& file, const v_1d<T2>& v) {
 		printSeparatedP(file, '\t', 8, true, 5, i, v[i]);
 }
 
-
+template <typename T, typename T2>
+inline void print_vector_1d(T& file, const Col<T2>& v) {
+	for (auto i = 0; i < v.size(); i++)
+		printSeparatedP(file, '\t', 8, true, 5, i, v(i));
+}
 
 /*
 * @brief take real part of a complex vector

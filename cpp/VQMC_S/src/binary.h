@@ -346,6 +346,14 @@ inline u64 baseToIntSpin(const Col<T>& vec, const v_1d<u64>& powers) {
 	return val;
 }
 
+template<typename T>
+inline u64 baseToIntSpin(const Col<T>& vec) {
+	u64 val = 0;
+	const u64 size = vec.size();
+	for (int k = 0; k < size; k++)
+		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0) / 2.0) * BinaryPowers[k];
+	return val;
+}
 // -----------------------------------------------------------------------------   				 for states operation   				 -----------------------------------------------------------------------------
 template<typename T1, typename T2>
 inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {

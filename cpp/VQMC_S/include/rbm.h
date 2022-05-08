@@ -21,7 +21,7 @@
 
 
 
-//#define PINV
+
 
 
 #ifdef PINV
@@ -38,12 +38,56 @@
     #endif
 #endif
 
+struct avOperators {
+    int Ns = 1;
+    int Lx = 1;
+    int Ly = 1;
+    int Lz = 1;
+
+    // sigma z
+    double s_z = 0.0;
+    v_3d<double> s_z_cor;
+    vec s_z_i;
+
+    // sigma x
+    cpx s_x = 0.0;
+    v_3d<double> s_x_cor;
+    cx_vec s_x_i;
+
+    // entropy
+    vec ent_entro;
+
+    // energy
+    cpx en = 0.0;
+
+    avOperators() = default;
+    avOperators(int Lx, int Ly, int Lz, int Ns)
+        : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns)
+    {
+        this->s_z_cor = v_3d<double>(Lx, v_2d<double>(Ly, v_1d<double>(Lz, 0.0)));
+        this->s_z_i = arma::vec(Ns, arma::fill::zeros);
+        this->s_x_cor = v_3d<double>(Lx, v_2d<double>(Ly, v_1d<double>(Lz, 0.0)));
+        this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
+        this->ent_entro = arma::vec(Ns, arma::fill::zeros);
+    };
+   
+    void normalise(u64 norm) {
+        this->s_z /= double(norm);
+        this->s_x /= double(norm);
+        this->s_z_i /= double(norm);
+        this->s_x_i /= double(norm);
+        this->en /= double(norm);
+    };
+};
 
 
 template <typename _type, typename _hamtype>
 class rbmState{
 
 private:
+
+    avOperators op;
+
     // debug bools
     bool dbg_lcen = false;
     bool dbg_grad = false;
@@ -116,6 +160,7 @@ public:
                 this->set_info();
                 // allocate memory
                 this->allocate();
+                this->initAv();
                 // initialize random state
                 this->init();
                 this->set_rand_state();
@@ -152,12 +197,13 @@ public:
     };
 
     // ------------------------------------------- 				 PRINTERS				  -------------------------------------------
+    
     // pretty print the state sampled
     void pretty_print(std::map<u64, _type>& sample_states, double tol = 5e-2) const;
 
     // ------------------------------------------- 				 SETTTERS				  -------------------------------------------
     // sets info
-    void set_info()                                                     { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(hilbert_size); };
+    void set_info()                                                     { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(hilbert_size) + "," + VEQ(lr); };
 
     // sets the current state
     void set_state(u64 state, bool set = false) {
@@ -186,12 +232,15 @@ public:
 
     // ------------------------------------------- 				 GETTERS				  ------------------------------------------
     auto get_info()                                                     const RETURNS(this->info);
+    auto get_op_av()                                                    const RETURNS(this->op);
+
 
     // ------------------------------------------- 				 INITIALIZERS				  ------------------------------------------
     // allocate the memory for the biases and weights
     void allocate();
     // initialize all
     void init();
+    void initAv();
     // ------------------------------------------- 				 AMPLITUDES AND ANSTATZ REPRESENTATION				  -------------------------------------------
 
     // the hiperbolic cosine of the parameters
@@ -219,6 +268,9 @@ public:
 
     // sample the probabilistic space
     Col<_type> mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
+
+    // average collection
+    void collectAv(_type loc_en);
     map<u64, _type> avSampling(size_t n_samples, size_t n_therm, size_t b_size, size_t n_flips = 1);
 
 };
@@ -337,6 +389,19 @@ inline void rbmState<cpx, cpx>::init() {
         for (int j = 0; j < this->W.n_cols; j++)
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const);
             this->W(i, j) = (this->hamil->ran.random_real_normal() + imn * this->hamil->ran.random_real_normal()) / double(Ns);
+}
+
+/*
+* @brief initialize operators average to be saved
+*/
+template<typename _type, typename _hamtype>
+inline void rbmState<_type, _hamtype>::initAv()
+{
+    auto Lx = this->hamil->lattice->get_Lx();
+    auto Ly = this->hamil->lattice->get_Ly();
+    auto Lz = this->hamil->lattice->get_Lz();
+    auto Ns = this->hamil->lattice->get_Ns();
+    this->op = avOperators(Lx, Ly, Lz, Ns);
 }
 // ------------------------------------------------- 				 UPDATERS				  ------------------------------------------------
 
@@ -501,8 +566,9 @@ inline _type rbmState<typename _type, typename _hamtype>::locEn(){
         // changes accordingly not to create data race
         if (state != this->current_state) {
         #ifndef DEBUG
-            const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id()); //omp_get_thread_num();
-            const int vid = tid % this->thread_num;
+            //const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id()); //omp_get_thread_num();
+            //const int vid = tid % this->thread_num;
+            const int vid = omp_get_thread_num();
         #else
             const int vid = 0;
         #endif
@@ -550,8 +616,8 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
         #endif
         if (this->hamil->ran.randomReal_uni() <= std::real(conj(proba) * proba)) {
             // update current state and vector
-            this->current_state = flip(this->current_state, this->n_visible - 1 - flip_place);
-            flipV(this->current_vector, flip_place);
+            // this->current_state = flip(this->current_state, this->n_visible - 1 - flip_place);
+            this->current_vector(flip_place) = this->tmp_vector(flip_place);
 
             // update angles if needed
             #ifdef RBM_ANGLES_UPD
@@ -563,6 +629,7 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
             this->tmp_vector(flip_place) = flip_spin;
         }
     }
+    this->current_state = BASE_TO_INT(this->current_vector);
     // calculate the effective angles
 }
 
@@ -584,22 +651,19 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
     // make the pbar!
-    this->pbar = pBar(25, n_samples);
-    // take out thermalization steps
-    const auto mcsteps = n_samples - n_therm;
+    this->pbar = pBar(33, n_samples);
+
     // calculate the probability that we include the element in the batch
-    const auto batch_proba = (this->batch / double(n_blocks));
+    const auto batch_proba = (this->batch / double(n_blocks - n_therm));
     // check if the batch is not bigger than the blocks number
-    const auto norm = (batch_proba > 1) ? n_blocks : this->batch;
+    const auto norm = (batch_proba > 1) ? n_blocks - n_therm : this->batch;
 
     // save all average weights for covariance matrix
     Col<_type> averageWeights(this->full_size);
     Col<_type> energies(norm, arma::fill::zeros);
-
-    Col<_type> meanEnergies(mcsteps, arma::fill::zeros);
+    Col<_type> meanEnergies(n_samples, arma::fill::zeros);
     
-
-    for(auto i = 0; i < mcsteps; i++){
+    for(auto i = 0; i < n_samples; i++){
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
 
@@ -633,11 +697,12 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
                 
                 // append gradient forces with the first part of covariance <E_kO_k*>
                 this->F += energies(took - 1) * this->O_flat;
+                //this->F += energies(took - 1) * arma::conj(this->O_flat);
                 
                 // append covariance matrices with the first part of covariance <O_k*O_k'>
                 this->S += this->O_flat * this->O_flat.t();
                 
-                // average weight gradients
+                // average weight gradients (conjugate)
                 averageWeights += this->O_flat;
                 
                 // append number of elements taken
@@ -657,7 +722,7 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
 
         // append gradient forces with the first part of covariance <E_k><O_k*>
         this->F -= meanLocEn * averageWeights;
-        
+        //this->F -= meanLocEn * arma::conj(averageWeights);
         // append covariance matrices with the first part of covariance <O_k*><O_k'>
         this->S -= averageWeights * averageWeights.t();
 
@@ -694,8 +759,11 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
 
+    // initialize averages
+    this->initAv();
+
     // make the pbar!
-    this->pbar = pBar(25, b_size);
+    this->pbar = pBar(25, n_samples);
 
     // states to be returned
     std::map<u64, _type> states;
@@ -707,7 +775,7 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
 
     _type en = 0;
     double s_z_rbm = 0;
-    for (auto r = 0; r < b_size; r++) {
+    for (auto r = 0; r < n_samples; r++) {
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
 
@@ -717,7 +785,7 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
         PRT(therm_time, this->dbg_thrm)
         
         // go through samples
-        for (auto i = 0; i < n_samples; i++) {
+        for (auto i = 0; i < b_size; i++) {
 
             // block sample the stuff
             auto sample_time = std::chrono::high_resolution_clock::now();
@@ -729,25 +797,70 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
                 states[this->current_state] = this->coeff(this->current_vector);
 
             // append local energies
-            en += this->locEn();
-            s_z_rbm += std::get<1>(sigma_z(this->current_state, Ns, sites));
+            this->collectAv(this->locEn());
         }
         // update the progress bar
         if (r % pbar.percentageSteps == 0)
             pbar.printWithTime("-> PROGRESS");
     }
-    s_z_rbm /= double(n_samples * b_size);
-    en /= double(n_samples * b_size);
+    this->op.normalise(n_samples * b_size);
+
 
     stouts("->Finished Monte Carlo state search after finding weights ", start);
     stout << "\n------------------------------------------------------------------------" << EL;
-    stout << "GROUND STATE RBM: " << VEQP(en, 4) << EL;
+    stout << "GROUND STATE RBM ENERGY: " << VEQP(op.en, 4) << EL;
+    stout << "GROUND STATE RBM SIGMA_X EXTENSIVE: " << VEQP(op.s_x, 4) << EL;
+    stout << "GROUND STATE RBM SIGMA_Z EXTENSIVE: " << VEQP(op.s_z, 4) << EL;
+    stout << "\n------------------------------------------------------------------------" << EL;
     this->pretty_print(states, 0.08);
-    stout << VEQP(s_z_rbm, 5) << EL;
     stout << "\n------------------------------------------------------------------------" << EL;
 
     return states;
 
+}
+
+template<typename _type, typename _hamtype>
+inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
+{   
+    auto Ns = this->hamil->lattice->get_Ns();
+
+    // calculate sigma_z 
+    auto s_z = 0.0;
+#pragma omp parallel for reduction(+ : s_z)
+    for (int i = 0; i < Ns; i++) {
+        const auto& [state, val] = sigma_z(this->current_state, Ns, v_1d<int>({ i }));
+        this->op.s_z_i[i] += val;
+        s_z += val;
+    }
+    this->op.s_z += s_z / double(Ns);
+
+    // calculate sigma_z 
+    cpx s_x = 0.0;
+#pragma omp parallel for reduction(+ : s_x)
+    for (int i = 0; i < Ns; i++) {
+        const auto& [state, val] = sigma_x(this->current_state, Ns, v_1d<int>({ i }));
+        _type v = val;
+        if (state != this->current_state) {
+            #ifndef DEBUG
+            const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+            const int vid = tid % this->thread_num;
+            #else
+            const int vid = 0;
+            #endif
+
+            INT_TO_BASE_BIT(state, this->tmp_vectors[vid]);
+
+            #ifndef RBM_ANGLES_UPD
+            v = v * this->pRatio(this->current_vector, this->tmp_vectors[vid]);
+            #else
+            v = v * this->pRatio(this->tmp_vectors[vid]);
+            #endif
+        }
+        s_x += v;
+    }
+    this->op.s_x += (s_x / double(Ns));
+    // local energy
+    this->op.en += loc_en;
 }
 
 #endif // !RBM_H

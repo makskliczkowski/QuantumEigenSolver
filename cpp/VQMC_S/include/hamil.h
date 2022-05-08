@@ -63,14 +63,18 @@ public:
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
 
 	// ------------------------------------------- 				  CALCULATORS  				 -------------------------------------------
-	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
+	Mat<double> red_dens_mat(const Col<double>& state, int A_size) const;												// calculate the reduced density matrix
+	Mat<cpx> red_dens_mat(const Col<cpx>& state, int A_size) const;														// calculate the reduced density matrix
 	Mat<_type> red_dens_mat(u64 state, int A_size) const;																// calculate the reduced density matrix based on eigenstate
 
-	double entanglement_entropy(const Col<_type>& state, int A_size) const;												// entanglement entropy 
+	double entanglement_entropy(const Col<double>& state, int A_size) const;											// entanglement entropy 
+	double entanglement_entropy(const Col<cpx>& state, int A_size) const;												// entanglement entropy 
 	double entanglement_entropy(u64 state, int A_size) const;															// entanglement entropy for eigenstate
 
-	vec entaglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
-	vec entaglement_entropy_sweep(u64 state) const;																		// entanglement entropy sweep over bonds for eigenstate
+	vec entanglement_entropy_sweep(const Col<double>& state) const;														// entanglement entropy sweep over bonds
+	vec entanglement_entropy_sweep(const Col<cpx>& state) const;														// entanglement entropy sweep over bonds
+	vec entanglement_entropy_sweep(u64 state) const;																	// entanglement entropy sweep over bonds for eigenstate
+	
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
 	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
@@ -240,14 +244,13 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 * @returns reduced density matrix 
 */
 template<typename _type>
-inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(const Col<_type>& state, int A_size) const
+inline Mat<cpx> SpinHamiltonian<_type>::red_dens_mat(const Col<cpx>& state, int A_size) const
 {
-	const auto Ns = this->lattice->get_Ns();
 	// set subsytsems size
 	const u64 dimA = ULLPOW(A_size);
 	const u64 dimB = ULLPOW(Ns - A_size);
 	
-	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
+	Mat<cpx> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
 	for (auto n = 0; n < this->N; n++) {						
 		u64 counter = 0;
@@ -262,6 +265,36 @@ inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(const Col<_type>& state, 
 	}
 	return rho;
 }
+
+/*
+* @brief Calculates the reduced density matrix of the system via the mixed density matrix
+* @param state state to produce the density matrix
+* @param A_size size of subsystem
+* @returns reduced density matrix
+*/
+template<typename _type>
+inline Mat<double> SpinHamiltonian<_type>::red_dens_mat(const Col<double>& state, int A_size) const
+{
+	// set subsytsems size
+	const u64 dimA = ULLPOW(A_size);
+	const u64 dimB = ULLPOW(Ns - A_size);
+
+	Mat<double> rho(dimA, dimA, arma::fill::zeros);
+	// loop over configurational basis
+	for (auto n = 0; n < this->N; n++) {
+		u64 counter = 0;
+		// pick out state with same B side (last L-A_size bits)
+		for (u64 m = n % dimB; m < N; m += dimB) {
+			// find index of state with same B-side (by dividing the last bits are discarded)
+			u64 idx = n / dimB;
+			rho(idx, counter) += (state(n)) * state(m);
+			// increase counter to move along reduced basis
+			counter++;
+		}
+	}
+	return rho;
+}
+
 
 /*
 *  @brief Calculates the reduced density matrix of the system via the mixed density matrix
@@ -300,11 +333,34 @@ inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(u64 state, int A_size) co
 *  @returns entropy of considered systsem
 */
 template<typename _type>
-inline double SpinHamiltonian<_type>::entanglement_entropy(const Col<_type>& state, int A_size) const {
-	auto rho = reduced_density_matrix(state, A_size);
+inline double SpinHamiltonian<_type>::entanglement_entropy(const Col<cpx>& state, int A_size) const {
+	auto rho = red_dens_mat(state, A_size);
 	vec probabilities;
 	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
 	eig_sym(probabilities, rho); 
+
+	double entropy = 0;
+	//#pragma omp parallel for reduction(+: entropy)
+	for (auto i = 0; i < probabilities.size(); i++) {
+		const auto value = probabilities(i);
+		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));
+	}
+	//double entropy = -real(trace(rho * real(logmat(rho))));
+	return entropy;
+}
+
+/*
+*  @brief Calculates the entropy of the system via the mixed density matrix
+*  @param state state to produce the density matrix
+*  @param A_size size of subsystem
+*  @returns entropy of considered systsem
+*/
+template<typename _type>
+inline double SpinHamiltonian<_type>::entanglement_entropy(const Col<double>& state, int A_size) const {
+	auto rho = red_dens_mat(state, A_size);
+	vec probabilities;
+	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
+	eig_sym(probabilities, rho);
 
 	double entropy = 0;
 	//#pragma omp parallel for reduction(+: entropy)
@@ -324,7 +380,7 @@ inline double SpinHamiltonian<_type>::entanglement_entropy(const Col<_type>& sta
 */
 template<typename _type>
 inline double SpinHamiltonian<_type>::entanglement_entropy(u64 state, int A_size) const {
-	auto rho = reduced_density_matrix(state, A_size);
+	auto rho = red_dens_mat(state, A_size);
 	vec probabilities;
 	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
 	eig_sym(probabilities, rho);
@@ -345,11 +401,26 @@ inline double SpinHamiltonian<_type>::entanglement_entropy(u64 state, int A_size
 * @returns entropy of considered systsem for different subsystem sizes
 */
 template<typename _type>
-inline vec SpinHamiltonian<_type>::entaglement_entropy_sweep(const Col<_type>& state) const
+inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(const Col<cpx>& state) const
 {
-	vec entropy(this->L - 1, arma::fill::zeros);
+	vec entropy(this->Ns - 1, arma::fill::zeros);
 #pragma omp parallel for
-	for (int i = 0; i < this->L - 1; i++)
+	for (int i = 0; i < this->Ns - 1; i++)
+		entropy(i) = entanglement_entropy(state, i + 1);
+	return entropy;
+}
+
+/*
+* @brief Calculates the entropy of the system via the mixed density matrix
+* @param state state vector to produce the density matrix
+* @returns entropy of considered systsem for different subsystem sizes
+*/
+template<typename _type>
+inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(const Col<double>& state) const
+{
+	vec entropy(this->Ns - 1, arma::fill::zeros);
+#pragma omp parallel for
+	for (int i = 0; i < this->Ns - 1; i++)
 		entropy(i) = entanglement_entropy(state, i + 1);
 	return entropy;
 }
@@ -360,11 +431,11 @@ inline vec SpinHamiltonian<_type>::entaglement_entropy_sweep(const Col<_type>& s
 * @returns entropy of considered systsem for different subsystem sizes
 */
 template<typename _type>
-inline vec SpinHamiltonian<_type>::entaglement_entropy_sweep(u64 state) const
+inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(u64 state) const
 {
-	vec entropy(this->L - 1, arma::fill::zeros);
+	vec entropy(this->Ns - 1, arma::fill::zeros);
 #pragma omp parallel for
-	for (int i = 0; i < this->L - 1; i++)
+	for (int i = 0; i < this->Ns - 1; i++)
 		entropy(i) = entanglement_entropy(state, i + 1);
 	return entropy;
 }
@@ -388,7 +459,7 @@ inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, std::vector
 
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		double S_z = 1;
@@ -410,12 +481,12 @@ inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta)
 {
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
 			double Sz = checkBit(k, this->Ns - 1 - l) ? 1.0 : -1.0;
-			value += Sz * conj(state_alfa(k)) * state_beta(k);
+			value += (Sz * conj(state_alfa(k)) * state_beta(k));
 		}
 	}
 	return std::real(value / sqrt(this->Ns));
@@ -435,7 +506,7 @@ inline double SpinHamiltonian<_type>::av_sigma_z(u64 alfa, u64 beta, int corr_le
 
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 
 #pragma omp parallel for reduction (+: value) collapse(2)
 	for (int k = 0; k < N; k++) {
@@ -559,7 +630,7 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, std::ve
 	for (auto& site : sites)
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		double S_z = 1;
@@ -574,7 +645,7 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, std::ve
 template<typename _type>
 inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa)
 {
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
@@ -591,7 +662,7 @@ inline double SpinHamiltonian<_type>::av_sigma_z(const Col<_type>& alfa, int cor
 {
 	if (corr_length >= this->Ns) throw "exceeding correlation length\n";
 
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value) collapse(2)
 	for (int k = 0; k < N; k++) {
 		for (int l = 0; l < this->Ns; l++) {
@@ -624,7 +695,7 @@ inline double SpinHamiltonian<_type>::av_sigma_x(u64 alfa, u64 beta, std::vector
 	}
 	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
 	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	_type value = 0;
+	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < N; k++) {
 		for (auto& site : sites) {
@@ -998,7 +1069,5 @@ inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta) {
 	}
 	return 2i * cpx(value_real, value_imag) / sqrt(this->Ns);
 }
-
-
 
 #endif
