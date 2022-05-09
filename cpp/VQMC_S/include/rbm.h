@@ -36,7 +36,7 @@
 #elif defined S_REGULAR 
     constexpr double lambda_0_reg = 100;
     constexpr double b_reg = 0.9;
-    constexpr double lambda_min_reg = 1e-4;
+    constexpr double lambda_min_reg = 1e-2;
     #ifdef PINV
         #undef PINV
     #endif
@@ -490,8 +490,9 @@ void rbmState<typename _type, typename _hamtype>::updVarDeriv(int current_step){
 #elif defined S_REGULAR 
     auto lambda_p = lambda_0_reg * this->current_b_reg; 
     if (lambda_p < lambda_min_reg) lambda_p = lambda_min_reg;
-    this->S.diag() += lambda_p * S.diag();
-    this->grad = (-this->lr) * arma::solve(this->S, this->F);
+    this->S.diag() += lambda_p * S.diag();// Col<_type>(this->full_size, arma::fill::randu);
+    //auto lr_new = this->hamil->ran.randomReal_uni(0, 1) * 3 * this->lr;
+    this->grad = (-lr) * arma::solve(this->S, this->F);
 #else 
     this->grad = (-this->lr) * arma::solve(this->S, this->F);
 #endif
@@ -733,12 +734,8 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     std::map<u64, _type> states;
     
     auto Ns = this->hamil->lattice->get_Ns();
-    v_1d<int> sites(1, 0);
-
-
 
     _type en = 0;
-    double s_z_rbm = 0;
     for (auto r = 0; r < n_samples; r++) {
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
@@ -759,7 +756,6 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             // look at the states coefficient (not found)
             if (!states.contains(this->current_state))
                 states[this->current_state] = this->coeff(this->current_vector);
-
             // append local energies
             this->collectAv(this->locEn());
         }
@@ -799,7 +795,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
         this->op.s_z_i[i] += real(val);
         s_z += real(val);
     }
-    this->op.s_z += s_z / double(Ns);
+    this->op.s_z += real(s_z / double(Ns));
 
     // calculate sigma_x
     cpx s_x = 0.0;
@@ -809,8 +805,9 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
         _type v = val;
         if (state != this->current_state) {
             #ifndef DEBUG
-            const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
-            const int vid = tid % this->thread_num;
+            //const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+            //const int vid = tid % this->thread_num;
+            const int vid = omp_get_thread_num();
             #else
             const int vid = 0;
             #endif

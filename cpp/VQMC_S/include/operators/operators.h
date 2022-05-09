@@ -101,9 +101,10 @@ public:
 	* @param sites the sites to meassure correlation at
 	*/
 	static std::pair<u64, cpx> sigma_x(u64 base_vec, int L, const v_1d<int>& sites) {
+		auto tmp = base_vec;
 		for (auto const& site : sites)
-			base_vec = flip(base_vec, L - 1 - site);
-		return std::make_pair(base_vec, 1.0);
+			tmp = flip(tmp, L - 1 - site);
+		return std::make_pair(tmp, 1.0);
 	};
 	
 	/*
@@ -203,7 +204,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 			value += val * conj(alfa(new_idx)) * beta(k);
 		}
 	}
-	return value / sqrt(this->Ns);
+	return value / double(this->Ns);
 }
 
 template<typename _type>
@@ -252,7 +253,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op)
 			value += val * conj(alfa(new_idx)) * alfa(k);
 		}
 	}
-	return value / sqrt(this->Ns);
+	return value / double(this->Ns);
 }
 
 template<typename _type>
@@ -419,7 +420,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	for (auto i = 0; i < Ns; i++) {
 		for (auto j = 0; j < Ns; j++) {
 			const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(x, y, z);
+			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
 		}
 	}
 

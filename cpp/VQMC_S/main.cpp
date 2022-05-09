@@ -3,7 +3,7 @@
 #define DONT_USE_ADAM
 #define S_REGULAR
 #define RBM_ANGLES_UPD
-//#define PLOT
+#define PLOT
 
 #include "include/user_interface/user_interface.h"
 
