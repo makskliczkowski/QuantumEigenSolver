@@ -121,7 +121,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <OpenMP>None</OpenMP>
+      <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
     </ClCompile>
     <Link>

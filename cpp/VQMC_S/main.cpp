@@ -3,14 +3,9 @@
 #define DONT_USE_ADAM
 #define S_REGULAR
 #define RBM_ANGLES_UPD
-#define PLOT
+//#define PLOT
 
 #include "include/user_interface/user_interface.h"
-
-template<typename _type, typename _hamtype>
-void testModel();
-
-
 
 int main(const int argc, char* argv[]) {
 

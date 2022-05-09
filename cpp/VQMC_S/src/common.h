@@ -73,8 +73,8 @@ R"(\)";
 #define EYE(X) arma::eye(X,X)
 #define ZEROV(X) arma::zeros(X)
 #define ZEROM(X) arma::zeros(X,X)
-
-
+#define SPACE_VEC_D(Lx, Ly, Lz) v_3d<double>(Lx, v_2d<double>(Ly, v_1d<double>(Lz, 0)))
+#define SPACE_VEC(Lx, Ly, Lz) v_3d<int>(Lx, v_2d<int>(Ly, v_1d<int>(Lz, 0)))
 /// using types
 using cpx = std::complex<double>;
 using uint = unsigned int;
@@ -155,7 +155,6 @@ inline double tim_mus(clk::time_point start) {
 
 
 // -----------------------------------------------------------------------------				TOOLS				-----------------------------------------------------------------------------
-
 //v_1d<double> fourierTransform(std::initializer_list<const arma::mat&> matToTransform, std::tuple<double,double,double> k, std::tuple<int,int,int> L);
 
 // ----------------------------------------------------------------------------- MATRIX MULTIPLICATION
@@ -609,6 +608,19 @@ inline void print_vector_1d(T& file, const v_1d<T2>& v) {
 	for (auto i = 0; i < v.size(); i++)
 		printSeparatedP(file, '\t', 8, true, 5, i, v[i]);
 }
+
+template <typename T, typename T2>
+inline void print_vector_2d(T& file, const v_2d<T2>& v) {
+	for (auto i = 0; i < v.size(); i++)
+		print_vector_1d(file, v[i]);
+}
+
+template <typename T, typename T2>
+inline void print_vector_3d(T& file, const v_3d<T2>& v) {
+	for (auto i = 0; i < v.size(); i++)
+		print_vector_2d(file, v[i]);
+}
+
 
 template <typename T, typename T2>
 inline void print_vector_1d(T& file, const Col<T2>& v) {

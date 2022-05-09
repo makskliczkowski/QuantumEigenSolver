@@ -8,6 +8,10 @@
 #include "hamil.h"
 #endif
 
+#ifndef OPERATORS_H
+#include "operators/operators.h"
+#endif
+
 #ifndef ADAM_H
     #ifndef USE_ADAM
         #define USE_ADAM
@@ -38,47 +42,7 @@
     #endif
 #endif
 
-struct avOperators {
-    int Ns = 1;
-    int Lx = 1;
-    int Ly = 1;
-    int Lz = 1;
 
-    // sigma z
-    double s_z = 0.0;
-    v_3d<double> s_z_cor;
-    vec s_z_i;
-
-    // sigma x
-    cpx s_x = 0.0;
-    v_3d<double> s_x_cor;
-    cx_vec s_x_i;
-
-    // entropy
-    vec ent_entro;
-
-    // energy
-    cpx en = 0.0;
-
-    avOperators() = default;
-    avOperators(int Lx, int Ly, int Lz, int Ns)
-        : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns)
-    {
-        this->s_z_cor = v_3d<double>(Lx, v_2d<double>(Ly, v_1d<double>(Lz, 0.0)));
-        this->s_z_i = arma::vec(Ns, arma::fill::zeros);
-        this->s_x_cor = v_3d<double>(Lx, v_2d<double>(Ly, v_1d<double>(Lz, 0.0)));
-        this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
-        this->ent_entro = arma::vec(Ns, arma::fill::zeros);
-    };
-   
-    void normalise(u64 norm) {
-        this->s_z /= double(norm);
-        this->s_x /= double(norm);
-        this->s_z_i /= double(norm);
-        this->s_x_i /= double(norm);
-        this->en /= double(norm);
-    };
-};
 
 
 template <typename _type, typename _hamtype>
@@ -401,7 +365,7 @@ inline void rbmState<_type, _hamtype>::initAv()
     auto Ly = this->hamil->lattice->get_Ly();
     auto Lz = this->hamil->lattice->get_Lz();
     auto Ns = this->hamil->lattice->get_Ns();
-    this->op = avOperators(Lx, Ly, Lz, Ns);
+    this->op = avOperators(Lx, Ly, Lz, Ns, this->hamil->lattice->get_type());
 }
 // ------------------------------------------------- 				 UPDATERS				  ------------------------------------------------
 
@@ -819,26 +783,29 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
 
 }
 
+/*
+* 
+*/
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 {   
     auto Ns = this->hamil->lattice->get_Ns();
 
     // calculate sigma_z 
-    auto s_z = 0.0;
+    double s_z = 0.0;
 #pragma omp parallel for reduction(+ : s_z)
     for (int i = 0; i < Ns; i++) {
-        const auto& [state, val] = sigma_z(this->current_state, Ns, v_1d<int>({ i }));
-        this->op.s_z_i[i] += val;
-        s_z += val;
+        const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
+        this->op.s_z_i[i] += real(val);
+        s_z += real(val);
     }
     this->op.s_z += s_z / double(Ns);
 
-    // calculate sigma_z 
+    // calculate sigma_x
     cpx s_x = 0.0;
 #pragma omp parallel for reduction(+ : s_x)
     for (int i = 0; i < Ns; i++) {
-        const auto& [state, val] = sigma_x(this->current_state, Ns, v_1d<int>({ i }));
+        const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i }));
         _type v = val;
         if (state != this->current_state) {
             #ifndef DEBUG
@@ -858,7 +825,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
         }
         s_x += v;
     }
-    this->op.s_x += (s_x / double(Ns));
+    this->op.s_x += real(s_x / double(Ns));
     // local energy
     this->op.en += loc_en;
 }

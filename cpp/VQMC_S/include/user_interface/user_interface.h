@@ -49,6 +49,15 @@
 		plt::ylabel(ylabel);
 		plt::title(name);
 	};
+	template<typename _type>
+
+	void plot_v_1d(Col<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+		plt::plot(arma::conv_to<v_1d<double> >::from(v));
+		plt::xlabel(xlabel);
+		plt::ylabel(ylabel);
+		plt::title(name);
+	};
+
 	#define PLOT_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
 	template<typename _type>
 	void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
@@ -253,11 +262,11 @@ namespace rbm_ui {
 		size_t thread_num = 16;														// thread parameters
 		bool quiet;																	// bool flags	
 
-		// -------------------------------------------------------- HELPER FUNCTIONS
-		void compare_ed(double ground_rbm);
-		void calculate_operators(clk::time_point start, const Col<cpx>& eigvec, double energy, double energy_error = 0, string name = "");
-		void calculate_operators(clk::time_point start, const Col<double>& eigvec, double energy, double energy_error = 0, string name = "");
 
+		avOperators av_op;															// averages from operators
+		// -------------------------------------------   					HELPER FUNCTIONS  					-------------------------------------------
+		void compare_ed(double ground_rbm);
+		void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
 public:
 		// -------------------------------------------  					CONSTRUCTORS  					-------------------------------------------
 		ui() = default;
@@ -562,7 +571,12 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
 	SAVEFIG(fileRbmEn_name + ".png", true);
 
-	this->calculate_operators(start, states_col, std::real(ground_rbm), std::real(standard_dev), "rbm");
+
+	this->av_op.reset();
+	Operators<_type> op(this->lat);
+	op.calculate_operators(states_col, this->av_op);
+	this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
+
 	stouts("FINISHED EVERY THREAD", start);
 	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
 }
@@ -589,6 +603,8 @@ inline void rbm_ui::ui<_type, _hamtype>::define_models()
 	auto lat_type = lat->get_type();
 	auto Ns = lat->get_Ns();
 	stout << "\t\t-> " << VEQ(lat_type) << EL;
+	// create operator averages
+	this->av_op = avOperators(Lx, Ly, Lz, this->lat->get_Ns(), lat_type);				
 
 	// define the hamiltonian
 	switch (this->model_name)
@@ -635,16 +651,23 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 	double ground_ed = 0;
 
 	if (Ns <= maxed) {
+		this->av_op.reset();
 		auto diag_time = std::chrono::high_resolution_clock::now();
 		stout << "\n\n-> starting ED for:\n\t-> " + ham->get_info() << EL;
+		// define the operators class
 		
 		this->ham->hamiltonian();
 		this->ham->diag_h(false);
+
+		Operators<_hamtype> op(this->lat); 
 		ground_ed = std::real(ham->get_eigenEnergy(0));
-		auto eigvec = ham->get_eigenState(0);
+		Col<_hamtype> eigvec = ham->get_eigenState(0);
+		op.calculate_operators(eigvec, this->av_op);
+		this->save_operators(diag_time, "", ground_ed, 0);
+
 		u64 state = 0;
-		auto sz = this->ham->av_sigma_z(state, state);
-		auto sx = this->ham->av_sigma_x(state, state);
+		auto sz = this->av_op.s_z;
+		auto sx = this->av_op.s_x;
 		stouts("\t\t-> finished ED", diag_time);
 
 
@@ -663,177 +686,60 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		plt::axhline(ground_ed);
 		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm) + ",\n" + VEQ(relative_error) + "%", mcSteps / 3, 0);
 #endif
-		this->calculate_operators(diag_time, eigvec, ground_ed, 0.0, "exact");
 	}
 }
-
 
 // -------------------------------- OPERATORS -----------------------------------------
 
 
 template<typename _type, typename _hamtype>
-inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point start, const Col<cpx>& eigvec, double energy, double energy_error, string name)
+inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, std::string name, double energy, double energy_error)
 {
-	auto Ns = this->lat->get_Ns();
 	std::ofstream fileSave;
 	std::fstream log;
 	string dir = this->saving_dir + kPS + name;
 	string filename = "";
-
-
-	v_1d<double> op(Ns, 0);
-	// --------------------- compare sigma_z ---------------------
-
-	// S_z_vector extensive
-	double sz = this->ham->av_sigma_z(eigvec, eigvec);
-
-	// S_z at each site
-	filename = dir + "_szSite_" + ham->get_info();
-	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
-	print_vector_1d(fileSave, op);
-	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^z_i$", "$S^z_i$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
-	// S_z correlations
-	filename = dir + "_szCorr_" + ham->get_info();
-	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
-	print_vector_1d(fileSave, op);
-	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_iS^z_{i+l}}$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
-
-	// --------------------- compare sigma_x ---------------------
-	// S_x_vector extensive
-	double sx = this->ham->av_sigma_x(eigvec, eigvec);
-
-	// S_z at each site
-	filename = dir + "_sxSite_" + ham->get_info();
-	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
-	print_vector_1d(fileSave, op);
-	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
-	// S_z correlations
-	filename = dir + "_sxCorr_" + ham->get_info();
-	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
-	print_vector_1d(fileSave, op);
-	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_iS^x_{i+l}}$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
-	// --------------------- entropy ----------------------
-	filename = dir + "_ent_entro_" + ham->get_info();
-	auto entro = this->ham->entanglement_entropy_sweep(eigvec);
-	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_1d(fileSave, entro);
-	fileSave.close();
-	PLOT_V1D(arma::conv_to<v_1d<double>>::from(entro), "bond_cut", "$S_0(L)$", "Entanglement entropy" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
-	// --------------------- save log ---------------------
-	// save the log file and append columns if it is empty
-	string logname = dir + ham->get_info() + ".dat";
-#pragma omp single
-	{
-		openFile(log, logname, ios::in | ios::app);
-		log.seekg(0, std::ios::end);
-		if (log.tellg() == 0) {
-			log.clear();
-			log.seekg(0, std::ios::beg);
-			printSeparated(log, '\t', 8, true, "lattice_type", "Lx", \
-				"Ly", "Lz", "En", "dEn", "Sz", "Sx", "time taken");
-		}
-		log.close();
-	}
-	openFile(log, logname, ios::app);
-	printSeparatedP(log, '\t', 8, true, 5, this->lat->get_type(), this->lat->get_Lx(), this->lat->get_Ly(), this->lat->get_Lz(), \
-		energy, energy_error, sz, sx, tim_s(start));
-	log.close();
-};
-
-template<typename _type, typename _hamtype>
-inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point start, const Col<double>& eigvec, double energy, double energy_error, string name)
-{
 	auto Ns = this->lat->get_Ns();
-	std::ofstream fileSave;
-	std::fstream log;
-	string dir = this->saving_dir + kPS + name;
-	string filename = "";
-
-
-	v_1d<double> op(Ns, 0);
 	// --------------------- compare sigma_z ---------------------
 
-	// S_z_vector extensive
-	auto sz = this->ham->av_sigma_z(eigvec, eigvec);
-
 	// S_z at each site
-	filename = dir + "_szSite_" + ham->get_info();
+	filename = dir + "_sz_site" + ham->get_info();
 	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_z(eigvec, eigvec, v_1d<int>({ i }));
-	print_vector_1d(fileSave, op);
+	print_vector_1d(fileSave, this->av_op.s_z_i);
 	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^z_i$", "$S ^z_i$" + ham->get_info() + name);
+	PLOT_V1D(this->av_op.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + this->ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
-	filename = dir + "_szCorr_" + ham->get_info();
+	filename = dir + "_sz_corr" + ham->get_info();
 	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_z(eigvec, eigvec, i);
-	print_vector_1d(fileSave, op);
+	print_vector_3d(fileSave, this->av_op.s_z_cor);
 	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^z_iS^z_{i+l}$", "$S^z_iS^z_{i+l}}$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
-
 
 	// --------------------- compare sigma_x ---------------------
-	// S_x_vector extensive
-	double sx = this->ham->av_sigma_x(eigvec, eigvec);
-
 	// S_z at each site
-	filename = dir + "_sxSite_" + ham->get_info();
+	filename = dir + "_sx_site" + ham->get_info();
 	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_x(eigvec, eigvec, v_1d<int>({ i }));
-	print_vector_1d(fileSave, op);
+	print_vector_1d(fileSave, this->av_op.s_x_i);
 	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^x_i$", "$S^x_i$" + ham->get_info() + name);
+	PLOT_V1D(this->av_op.s_x_i, "lat_site", "$S^x_i$", "$S^x_i$\n" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
 	// S_z correlations
-	filename = dir + "_sxCorr_" + ham->get_info();
+	filename = dir + "_sx_corr_" + ham->get_info();
 	openFile(fileSave, filename + ".dat", ios::out);
-	for (auto i = 0; i < Ns; i++)
-		op[i] = this->ham->av_sigma_x(eigvec, eigvec, i);
-	print_vector_1d(fileSave, op);
+	print_vector_3d(fileSave, this->av_op.s_x_cor);
 	fileSave.close();
-	PLOT_V1D(op, "lat_site", "$S^x_iS^x_{i+l}$", "$S^x_iS^x_{i+l}}$" + ham->get_info() + name);
-	SAVEFIG(filename + ".png", false);
 
 	// --------------------- entropy ----------------------
-	filename = dir + "_ent_entro_" + ham->get_info();
-	auto entro = this->ham->entanglement_entropy_sweep(eigvec);
+	filename = dir + "_ent_entro" + ham->get_info();
 	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_1d(fileSave, entro);
+	print_vector_1d(fileSave, this->av_op.ent_entro);
 	fileSave.close();
-	PLOT_V1D(arma::conv_to<v_1d<double>>::from(entro), "bond_cut", "S_0(L)", "Entanglement entropy" + ham->get_info() + name);
+	PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + name);
 	SAVEFIG(filename + ".png", false);
 
-	// --------------------- save log ---------------------
-	// save the log file and append columns if it is empty
+	// --------------------- save log ---------------------	// save the log file and append columns if it is empty
 	string logname = dir + ham->get_info() + ".dat";
 #pragma omp single
 	{
@@ -849,7 +755,7 @@ inline void rbm_ui::ui<_type, _hamtype>::calculate_operators(clk::time_point sta
 	}
 	openFile(log, logname, ios::app);
 	printSeparatedP(log, '\t', 8, true, 5, this->lat->get_type(), this->lat->get_Lx(), this->lat->get_Ly(), this->lat->get_Lz(), \
-		energy, energy_error, sz, sx, tim_s(start));
+		energy, energy_error, av_op.s_z, av_op.s_x, tim_s(start));
 	log.close();
 };
 

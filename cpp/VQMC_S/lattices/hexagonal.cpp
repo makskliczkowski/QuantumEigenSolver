@@ -1,7 +1,7 @@
 #include "../include/lattices/hexagonal.h"
 
 /*
-* Constructor for the hexagonal lattice
+* @brief Constructor for the hexagonal lattice
 */
 HexagonalLattice::HexagonalLattice(int Lx, int Ly, int Lz, int dim, int _BC)
 	: Lx(Lx), Ly(Ly), Lz(Lz)
@@ -21,33 +21,17 @@ HexagonalLattice::HexagonalLattice(int Lx, int Ly, int Lz, int dim, int _BC)
 	default:
 		break;
 	}
+
 	this->Ns = 2 * this->Lx * this->Ly * this->Lz;
 
 	this->calculate_nn();
 	this->calculate_coordinates();
-	// spatial norm
-	this->spatialNorm = v_3d<int>(2 * Lx - 1, v_2d<int>(2 * Ly - 1, v_1d<int>(2 * Lz - 1, 0)));
-	// for (int i = 0; i < this->Ns; i++) {
-	// 	for (int j = 0; j < this->Ns; j++) {
-	// 		const auto [x, y, z] = this->getSiteDifference(i, j);
-	// 		spatialNorm[x][y][z]++;
-	// 	}
-	// }
-}
-/*
-* @brief Returns the real space difference between lattice site cooridinates given in ascending order.
-* From left to right. Then second row left to right etc.
-* @param i First coordinate
-* @param j Second coordinate
-* @return Three-dimensional tuple (vector of vec[i]-vec[j])
-*/
-std::tuple<int, int, int> HexagonalLattice::getSiteDifference(uint i, uint j) const
-{
-	return std::tuple<int, int, int>(1, 1, 1);
+	// we take 2 * Ly because of the fact that we have two elements in one elementary cell always
+	this->calculate_spatial_norm(Lx, 2 * Ly, Lz);
 }
 
 /*
-* Calculate the nearest neighbors with PBC
+* @brief Calculate the nearest neighbors with PBC
 */
 void HexagonalLattice::calculate_nn_pbc()
 {
@@ -55,17 +39,17 @@ void HexagonalLattice::calculate_nn_pbc()
 	{
 	case 1:
 		// One dimension 
-		this->nearest_neighbors = std::vector<std::vector<int>>(Ns, std::vector<int>(1, 0));
+		this->nearest_neighbors = v_2d<int>(Ns, v_1d<int>(1, 0));
 		for (int i = 0; i < Lx; i++) {
 			// z bond only
-			this->nearest_neighbors[2 * i][0] = 2 * i + 1;
-			this->nearest_neighbors[2 * i + 1][0] = 2 * i;
+			this->nearest_neighbors[2 * i][0] = 2 * i + 1; // this is the neighbor top
+			this->nearest_neighbors[2 * i + 1][0] = 2 * i; // this is the neighbor bottom
 		}
 		break;
 	case 2:
 		// Two dimensions 
 		// numeration begins from the bottom as 0 to the second as 1 with lattice vectors move
-		this->nearest_neighbors = std::vector<std::vector<int>>(Ns, std::vector<int>(3, 0));
+		this->nearest_neighbors = v_2d<int>(Ns, v_1d<int>(3, 0));
 		for (int i = 0; i < Lx; i++) {
 			for (int j = 0; j < Ly; j++) {
 				auto current_elem_a = 2 * i + 2 * Lx * j;
@@ -77,17 +61,25 @@ void HexagonalLattice::calculate_nn_pbc()
 				auto left = myModuloEuclidean(i - 1, Lx);
 
 				// y and x bonding depends on current y level as the hopping between sites changes
-				auto x_change_i_a = (2 * i + 2 * down * Lx + 1); // false;
-				auto y_change_i_a = (2 * left + 2 * down * Lx + 1); // true;
+				// false;
+				auto x_change_i_a = (2 * i + 2 * down * Lx + 1); 
+				// true;
+				auto y_change_i_a = (2 * left + 2 * down * Lx + 1); 
+				
+				// true;
+				auto x_change_i_b = (2 * left + 2 * up * Lx); 
+				// false;
+				auto y_change_i_b = (2 * i + 2 * up * Lx); 
 
-				auto x_change_i_b = (2 * left + 2 * up * Lx); // true;
-				auto y_change_i_b = (2 * i + 2 * up * Lx); // false;
 				if (myModuloEuclidean(j, 2) == 1) {
-					x_change_i_a = (2 * right + 2 * down * Lx + 1); // true
-					x_change_i_b = (2 * i + 2 * up * Lx); // false
-
-					y_change_i_a = (2 * i + 2 * down * Lx + 1); // false;
-					y_change_i_b = (2 * right + 2 * up * Lx); // true;
+					// true
+					x_change_i_a = (2 * right + 2 * down * Lx + 1); 
+					// false
+					x_change_i_b = (2 * i + 2 * up * Lx); 
+					// false;
+					y_change_i_a = (2 * i + 2 * down * Lx + 1);
+					// true;
+					y_change_i_b = (2 * right + 2 * up * Lx); 
 				}
 
 				// x bonding
@@ -148,25 +140,33 @@ void HexagonalLattice::calculate_nn_obc()
 				auto y_change_i_b = -1;
 
 				if (down >= 0) {
-					x_change_i_a = (2 * i + 2 * down * Lx + 1); // false;
+					// false;
+					x_change_i_a = (2 * i + 2 * down * Lx + 1); 
 					if (left >= 0)
-						y_change_i_a = (2 * left + 2 * down * Lx + 1); // true;
+						// true;
+						y_change_i_a = (2 * left + 2 * down * Lx + 1); 
 				}
 				if (up < Ly) {
 					if (left >= 0)
-						x_change_i_b = (2 * left + 2 * up * Lx); // true;
-					y_change_i_b = (2 * i + 2 * up * Lx); // false;
+						// true;
+						x_change_i_b = (2 * left + 2 * up * Lx); 
+					// false;
+					y_change_i_b = (2 * i + 2 * up * Lx); 
 				}
 				if (myModuloEuclidean(j, 2) == 1) {
 					if (down >= 0) {
 						if (right < Lx)
-							x_change_i_a = (2 * right + 2 * down * Lx + 1); // true
-						y_change_i_a = (2 * i + 2 * down * Lx + 1); // false;
+							// true
+							x_change_i_a = (2 * right + 2 * down * Lx + 1); 
+						// false;
+						y_change_i_a = (2 * i + 2 * down * Lx + 1); 
 					}
 					if (up < Ly) {
-						x_change_i_b = (2 * i + 2 * up * Lx); // false
+						// false
+						x_change_i_b = (2 * i + 2 * up * Lx); 
 						if (right < Lx)
-							y_change_i_b = (2 * right + 2 * up * Lx); // true;
+							// true;
+							y_change_i_b = (2 * right + 2 * up * Lx);
 					}
 				}
 
@@ -216,5 +216,21 @@ void HexagonalLattice::calculate_nnn_pbc()
 */
 void HexagonalLattice::calculate_coordinates()
 {
+	const int LxLy = Lx * Ly;
+	this->coordinates = v_2d<int>(this->Ns, v_1d<int>(3, 0));
+	// we must categorize elements by pairs
+	for (int i = 0; i < Ns; i++) {
+		this->coordinates[i][0] = (static_cast<int>(1.0 * i / 2.0)) % Lx;				// x axis coordinate
+		this->coordinates[i][1] = (static_cast<int>(1.0 * i / Lx)) % Ly;				// y axis coordinate
+		// we calculate the big Y that is enumerated normally accordingly and then calculate the small y which is twice bigger or twice bigger + 1
+		if (i % 2 == 0)
+			this->coordinates[i][1] = this->coordinates[i][1] * 2;
+		else
+			this->coordinates[i][1] = this->coordinates[i][1] * 2 + 1;
+
+		this->coordinates[i][2] = (static_cast<int>(1.0 * i / (LxLy))) % Lz;			// z axis coordinate			
+		//std::cout << "(" << this->coordinates[i][0] << "," << this->coordinates[i][1] << "," << this->coordinates[i][2] << ")\n";
+	}
+
 
 }

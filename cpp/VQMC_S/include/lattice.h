@@ -7,6 +7,7 @@
 #ifndef LATTICE_H
 #define LATTICE_H
 using namespace std;
+
 // -------------------------------------------------------- GENERAL LATTICE --------------------------------------------------------
 
 /*
@@ -30,7 +31,7 @@ public:
 	virtual int get_Lx() const = 0;
 	virtual int get_Ly() const = 0;
 	virtual int get_Lz() const = 0;
-	virtual std::tuple<int, int, int> getSiteDifference(uint i, uint j) const = 0;
+	std::tuple<int, int, int> getSiteDifference(uint i, uint j) const;
 
 	// ----------------------- GETTERS
 	virtual int get_norm(int x, int y, int z) const = 0;
@@ -41,17 +42,22 @@ public:
 	auto get_nn_number(int lat_site)						const RETURNS(this->nearest_neighbors[lat_site].size());				// returns the number of nn
 	auto get_nnn_number(int lat_site)						const RETURNS(this->next_nearest_neighbors[lat_site].size());			// returns the number of nnn
 	auto get_coordinates(int lat_site, int axis)			const RETURNS(this->coordinates[lat_site][axis]);						// returns the given coordinate
+	auto get_spatial_norm(int x, int y, int z)				const RETURNS(this->spatialNorm[x][y][z]);								// returns the spatial norm
 	auto get_type()											const RETURNS(this->type);												// returns the type of the lattice as a string
 	auto get_nei(int lat_site, int corr_len)				const;
 
 // ----------------------- CALCULATORS
 	void calculate_nn();
+	void calculate_spatial_norm(int x, int y, int z);
 	virtual void calculate_nn_pbc() = 0;
 	virtual void calculate_nn_obc() = 0;
 	virtual void calculate_nnn_pbc() = 0;
 	virtual void calculate_coordinates() = 0;
 };
 
+/*
+* @brief calculates the nearest neighbors 
+*/
 inline void Lattice::calculate_nn() {
 	switch (this->_BC)
 	{
@@ -68,6 +74,22 @@ inline void Lattice::calculate_nn() {
 	}
 }
 
+/*
+* @brief calculates the spatial repetition of difference between the lattice sites considering _BC and enumeration
+*/
+inline void Lattice::calculate_spatial_norm(int x, int y, int z)
+{
+	// spatial norm
+	this->spatialNorm = SPACE_VEC(x, y, z);
+	for (int i = 0; i < this->Ns; i++) {
+		for (int j = 0; j < this->Ns; j++) {
+			const auto [x, y, z] = this->getSiteDifference(i, j);
+			spatialNorm[abs(x)][abs(y)][abs(z)]++;
+		}
+	}
+}
+
+
 inline auto Lattice::get_nei(int lat_site, int corr_len) const
 {
 	switch (this->_BC) {
@@ -80,6 +102,22 @@ inline auto Lattice::get_nei(int lat_site, int corr_len) const
 	default:
 		return myModuloEuclidean((lat_site + corr_len), this->Ns);
 	}
+}
+
+/*
+* @brief Returns the real space difference between lattice site cooridinates given in ascending order.
+* From left to right. Then second row left to right etc.
+* @param i First coordinate
+* @param j Second coordinate
+* @return Three-dimensional tuple (vector of vec[i]-vec[j])
+*/
+inline std::tuple<int, int, int> Lattice::getSiteDifference(uint i, uint j) const
+{
+	const int z = this->get_coordinates(i, 2) - this->get_coordinates(j, 2);
+	const int y = this->get_coordinates(i, 1) - this->get_coordinates(j, 1);
+	const int x = this->get_coordinates(i, 0) - this->get_coordinates(j, 0);
+	// returns the site difference
+	return std::tuple<int, int, int>(x, y, z);
 }
 
 #endif // !LATTICE_H

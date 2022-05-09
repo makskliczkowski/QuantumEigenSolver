@@ -22,8 +22,7 @@ public:
 	int get_Lx() const override { return this->Lx; };
 	int get_Ly() const override { return this->Ly; };
 	int get_Lz() const override { return this->Lz; };
-	int get_norm(int x, int y, int z) const override { return this->spatialNorm[x + this->Lx - 1][y + this->Ly - 1][z + this->Lz - 1]; };
-	std::tuple<int, int, int> getSiteDifference(uint i, uint j) const override;
+	int get_norm(int x, int y, int z) const override { return this->spatialNorm[x][y][z]; };
 
 	// CALCULATORS
 	void calculate_nn_pbc() override;
