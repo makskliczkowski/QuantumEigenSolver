@@ -109,6 +109,7 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 	double localVal = 0;
 #pragma omp parallel for reduction(+ : localVal)
 	for (auto i = 0; i < Ns; i++) {
+		auto nn_number = this->lattice->get_nn_number(i);
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 		
@@ -116,11 +117,12 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		localVal += (this->h + dh(i)) * si;												
 		
 		// diagonal elements setting the interaction field
-		if (auto nei = this->lattice->get_nn(i, 0);  nei >= 0) {
-			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-			localVal += (this->J + this->dJ(i)) * si * sj;								
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			if (auto nei = this->lattice->get_nn(i, n_num);  nei >= 0 && nei >= i) {
+				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+				localVal += (this->J + this->dJ(i)) * si * sj;
+			}
 		}
-
 		// flip with S^x_i with the transverse field
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
@@ -169,6 +171,7 @@ void IsingModel<_type>::hamiltonian() {
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
+			auto nn_number = this->lattice->get_nn_number(j);
 			// true - spin up, false - spin down
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
@@ -178,12 +181,13 @@ void IsingModel<_type>::hamiltonian() {
 
 			// diagonal elements setting the perpendicular field
 			H(k, k) += (this->h + dh(j)) * s_i;											
-
-			if (auto nn = this->lattice->get_nn(j, 0); nn >= 0) {
-				// Ising-like spin correlation
-				double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
-				// setting the neighbors elements
-				this->H(k, k) += (this->J + this->dJ(j)) * s_i * s_j;		
+			for (auto n_num = 0; n_num < nn_number; n_num++) {
+				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0 && nn >= j) {
+					// Ising-like spin correlation
+					double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					// setting the neighbors elements
+					this->H(k, k) += (this->J + this->dJ(j)) * s_i * s_j;
+				}
 			}
 		}
 	}

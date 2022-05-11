@@ -84,4 +84,76 @@ public:
 	arma::Col<_type> get_grad_cpy()					const { return this->gradient; };
 };
 
+
+
+template<typename _type>
+class RMSprop_mod {
+private:
+	size_t size;								// size of the gradient
+	size_t current_time = 0;					// current iteration - starts from zero
+	double beta_0 = 0.9;						// exponential decay starting parameter
+	double beta = 0.9;							// exponential decay
+	double eps = 1e-8;							// prevent zero-division
+	double lr;									// learning step rate
+
+	arma::Col<_type> v;							// norm
+	arma::Col<_type> gradient;					// gradient
+public:
+	// ---------------------------
+	~RMSprop_mod() = default;
+	RMSprop_mod() = default;
+	RMSprop_mod(double lr, size_t size)
+		: lr(lr), size(size)
+	{
+		this->beta_0 = 0.9;
+		this->beta = 0.9;
+		this->initialize();
+	};
+	RMSprop_mod(double beta, double lr, double eps, size_t size)
+		: beta(beta), lr(lr), eps(eps), size(size)
+	{
+		this->beta_0 = beta;
+		this->initialize();
+	};
+	/*
+	* resets Adam
+	*/
+	void reset() {
+		this->current_time = 0;
+		this->beta = this->beta_0;
+		this->v.zeros();
+		this->gradient.zeros();
+	}
+	/*
+	* initialize Adam
+	*/
+	void initialize() {
+		// initialize to zeros
+		this->v = arma::Col<_type>(size, arma::fill::zeros);
+		this->gradient = arma::Col<_type>(size, arma::fill::zeros);
+	}
+
+	/*
+	* updates Adam
+	*/
+	void update(const arma::Col<_type>& grad, const arma::Col<_type>& O) {
+		this->current_time += 1;
+		this->v = this->beta * this->v + (1.0 - this->beta) * O % arma::conj(O);
+		//this->v.print("v");
+		// calculate the new gradient according to RMSProp arXiv:1910.11163v2
+		this->gradient = this->lr * grad / (arma::sqrt(this->v) + this->eps);
+		//this->gradient.print("grad");
+	};
+	/*
+	* get the gradient :)
+	*/
+	const arma::Col<_type>& get_grad()				const { return this->gradient; };
+	arma::Col<_type> get_grad_cpy()					const { return this->gradient; };
+};
+
+
+
+
+
+
 #endif

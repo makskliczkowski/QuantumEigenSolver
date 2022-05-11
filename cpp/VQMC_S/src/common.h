@@ -114,10 +114,10 @@ namespace impDef {
 	};
 
 	enum ham_types {
-		ising,
-		heisenberg,
-		heisenberg_dots,
-		kitaev_heisenberg
+		ising = 0,
+		heisenberg = 1,
+		heisenberg_dots = 2,
+		kitaev_heisenberg = 3
 	};
 }
 
@@ -336,7 +336,10 @@ void inline makeTwoScalesFromUDT(const arma::mat& R, arma::vec& Db, arma::vec& D
 template <typename T>
 inline void openFile(T& file, std::string filename, std::ios_base::openmode mode = std::ios::out) {
 	file.open(filename, mode);
-	if (!file.is_open()) throw "couldn't open a file: " + filename + "\n";
+	if (!file.is_open()) {
+		stout << "couldn't open a file: " + filename + "\n";
+		throw "couldn't open a file: " + filename + "\n";
+	}
 }
 
 

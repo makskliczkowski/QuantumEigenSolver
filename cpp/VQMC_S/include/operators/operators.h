@@ -200,7 +200,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < Ns; k++) {
 		for (int j = 0; j < Ns; j++) {
-			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{j});
+			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * beta(k);
 		}
 	}
@@ -216,7 +216,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < Ns; k++) {
 		for (auto const& site : sites) {
-			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site});
+			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * beta(k);
 		}
 	}
@@ -249,7 +249,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op)
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < Ns; k++) {
 		for (int j = 0; j < Ns; j++) {
-			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{j});
+			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * alfa(k);
 		}
 	}
@@ -265,7 +265,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, std
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < Ns; k++) {
 		for (auto const& site : sites) {
-			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site});
+			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * alfa(k);
 		}
 	}
@@ -292,7 +292,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 }
 
 
-// ---------------------------- ENTROPY ----------------------------------
+// ----------------------------   				   ENTROPY  				    ----------------------------------
 /*
 * @brief Calculates the reduced density matrix of the system via the mixed density matrix
 * @param state state to produce the density matrix
@@ -385,7 +385,7 @@ inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state)
 	return entropy;
 }
 
-// ----------------- HELPERS -------------------
+// -----------------   				   HELPERS  				    -------------------
 template<typename _type>
 inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op)
 {
@@ -397,7 +397,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 
 	// S_z at each site
 	for (auto i = 0; i < Ns; i++)
-		av_op.s_z_i(i) = std::real(this->av_operator(eigvec, this->sigma_z, v_1d<int>({ i })));
+		av_op.s_z_i(i) = std::real(this->av_operator(eigvec, this->sigma_z, v_1d<int>(1, i)));
 
 	// S_z correlations
 	for (auto i = 0; i < Ns; i++) {
@@ -414,7 +414,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 
 	// S_x at each site
 	for (auto i = 0; i < Ns; i++)
-		av_op.s_z_i(i) = std::real(this->av_operator(eigvec, this->sigma_x, v_1d<int>({ i })));
+		av_op.s_x_i(i) = std::real(this->av_operator(eigvec, this->sigma_x, v_1d<int>(1, i)));
 
 	// S_x correlations
 	for (auto i = 0; i < Ns; i++) {

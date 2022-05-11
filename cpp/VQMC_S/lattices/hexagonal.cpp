@@ -93,7 +93,7 @@ void HexagonalLattice::calculate_nn_pbc()
 				this->nearest_neighbors[current_elem_b][0] = current_elem_b - 1;
 			}
 		}
-		//		stout << this->nearest_neighbors << EL;
+		// stout << this->nearest_neighbors << EL;
 		break;
 	case 3:
 		/* Three dimensions */

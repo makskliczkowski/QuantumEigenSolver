@@ -32,6 +32,8 @@ public:
 		this->dKz = create_random_vec(this->Ns, this->ran, this->K0);
 		this->loc_states_num = 4 * this->Ns + 1;																// number of states after local energy work
 		this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num, std::make_tuple(LONG_MAX, 0));	// set local energies vector
+		// change info
+		this->info = this->inf();
 	};
 	// ----------------------------------- SETTERS ---------------------------------
 
@@ -45,6 +47,7 @@ public:
 			"heisenberg_kitaev," + VEQ(Ns) + \
 			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
+			",d=" + STRP(delta, 2) + \
 			",g=" + STRP(g, 2) + \
 			",g0=" + STRP(g0, 2) + \
 			",h=" + STRP(h, 2) + \
@@ -74,6 +77,7 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 #endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
 		// check all the neighbors
+
 		auto nn_number = this->lattice->get_nn_number(i);
 
 		// true - spin up, false - spin down
@@ -88,11 +92,13 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 
 		// check the correlations
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
-			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0 && nn > i) {
+			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0 && nn >= i) {//&& nn >= i
+				// stout << VEQ(i) << ", nei=" << VEQ(nn) << EL;
 				// check Sz 
 				double sj = checkBit(_id, this->Ns - 1 - nn) ? 1.0 : -1.0;
 				
 				// --------------------- HEISENBERG 
+				
 				// diagonal elements setting  interaction field
 				auto interaction = this->J + this->dJ(i);
 				auto sisj = si * sj;
@@ -110,7 +116,7 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 				if (n_num == 0)
 					localVal += (this->Kz + this->dKz(i)) * sisj;
 				else if (n_num == 1)
-					this->locEnergies[2 * this->Ns + i] = std::make_tuple(flip_idx_nn, (this->Ky + this->dKy(i)) * sisj);
+					this->locEnergies[2 * this->Ns + i] = std::make_tuple(flip_idx_nn, -(this->Ky + this->dKy(i)) * sisj);
 				else if (n_num == 2)
 					this->locEnergies[3 * this->Ns + i] = std::make_tuple(flip_idx_nn, this->Kx + this->dKx(i));
 				else
@@ -148,7 +154,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			auto nn_number = this->lattice->get_nn_number(j);
 			
 			// true - spin up, false - spin down
-			double si = checkBit(k, Ns - j - 1) ? 1.0 : -1.0;
+			double si = checkBit(k, this->Ns - j - 1) ? 1.0 : -1.0;
 
 			// perpendicular field (SZ) - HEISENBERG
 			this->H(k, k) += (this->h + dh(j)) * si;
@@ -159,11 +165,12 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 			// check the correlations
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
-				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0 && nn > j) {
+				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0 && nn > j) { //  
 					// check Sz 
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
 					// --------------------- HEISENBERG 
+					
 					// diagonal elements setting  interaction field
 					auto interaction = (this->J + this->dJ(j));
 					auto sisj = si * sj;

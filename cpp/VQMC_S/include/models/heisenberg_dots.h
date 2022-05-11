@@ -237,6 +237,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 		// interaction with the dot at left site will be held with single variable as position is sorted
 		int dot_iter = 0;
 		for (int j = 0; j < this->Ns; j++) {
+			auto nn_number = this->lattice->get_nn_number(j);
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
 
@@ -248,17 +249,19 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// interaction - check if nn exists
-			if (const auto nn = this->lattice->get_nn(j, 0); nn >= 0) {						
-				// Ising-like spin correlation // check the bit on the nn
-				double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
-				auto interaction = (this->J + this->dJ(j));
-				
-				// setting the neighbors elements
-				this->H(k, k) += this->delta * interaction * si * sj;				
+			for (auto n_num = 0; n_num < nn_number; n_num++) {
+				if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
+					// Ising-like spin correlation // check the bit on the nn
+					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					auto interaction = (this->J + this->dJ(j));
 
-				// S+S- + S-S+ hopping
-				if (si * sj < 0)
-					setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+					// setting the neighbors elements
+					this->H(k, k) += this->delta * interaction * si * sj;
+
+					// S+S- + S-S+ hopping
+					if (si * sj < 0)
+						setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+				}
 			}
 			// handle the dot
 			if (positions[dot_iter] == j) {
@@ -290,6 +293,8 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 	int dot_iter = 0;
 
 	for (auto i = 0; i < this->Ns; i++) {
+		// 
+		auto nn_number = this->lattice->get_nn_number(i);
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 
@@ -301,26 +306,27 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 		_type s_flipped_en = this->g + this->dg(i);
 
 		// check the Siz Si+1z
-		if (auto nei = this->lattice->get_nn(i, 0); nei >= 0) {
-			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-			auto interaction = (this->J + this->dJ(i));
-			// diagonal elements setting  interaction field
-			localVal += this->delta * interaction * si * sj;
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
+				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+				auto interaction = (this->J + this->dJ(i));
+				// diagonal elements setting  interaction field
+				localVal += this->delta * interaction * si * sj;
 
-			// S+S- + S-S+
-			if (si * sj < 0)
-				this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
-			else
-				this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+				// S+S- + S-S+
+				if (si * sj < 0)
+					this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
+				else
+					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+			}
 		}
-
 		// handle the dot
 		if (positions[dot_iter] == i) {
 			const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, dot_iter);
 			// set sz_int
 			localVal += s_z_i;
-			// set sy_int and sx_int
-			s_flipped_en += s_y_i + s_z_i;
+			// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
+			s_flipped_en += -s_y_i + s_z_i;
 			// next position!
 			dot_iter++;
 		}

@@ -108,6 +108,9 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 #pragma omp parallel for reduction(+ : localVal)
 #endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
+		// check all the neighbors
+		auto nn_number = this->lattice->get_nn_number(i);
+
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 
@@ -118,22 +121,23 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 
-		// check the Siz Si+1z
-		if (auto nn = this->lattice->get_nn(i, 0); nn >= 0) {
-			double sj = checkBit(_id, this->Ns - 1 - nn) ? 1.0 : -1.0;
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) { //&& nn >= j
+				double sj = checkBit(_id, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
-			auto interaction = (this->J + this->dJ(i));
-			// diagonal elements setting  interaction field
-			localVal += interaction * this->delta * si * sj;
+				auto interaction = (this->J + this->dJ(i));
+				// diagonal elements setting  interaction field
+				localVal += interaction * this->delta * si * sj;
 
-			// S+S- + S-S+
-			if (si * sj < 0) {
-				auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
-				this->locEnergies[this->Ns + i] = std::make_tuple(new_new_idx, 0.5 * interaction);
+				// S+S- + S-S+
+				if (si * sj < 0) {
+					auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
+					this->locEnergies[this->Ns + i] = std::make_tuple(new_new_idx, 0.5 * interaction);
+				}
+				// change if we don't hit the energy
+				else
+					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
 			}
-			// change if we don't hit the energy
-			else
-				this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
 		}
 	}
 	// append unchanged at the very end
@@ -159,6 +163,9 @@ void Heisenberg<_type>::hamiltonian() {
 
 	for (auto k = 0; k < this->N; k++) {
 		for (auto i = 0; i < this->Ns; i++) {
+			// check all the neighbors
+			auto nn_number = this->lattice->get_nn_number(i);
+
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - i) ? 1.0 : -1.0;
 				
@@ -170,18 +177,20 @@ void Heisenberg<_type>::hamiltonian() {
 			setHamiltonianElem(k, this->g + this->dg(i), new_idx);	
 
 			// check if nn exists
-			if (const auto nn = this->lattice->get_nn(i, 0); nn >= 0) {
-				// Ising-like spin correlation - check the bit on the nn
-				double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;						
-				auto interaction = (this->J + this->dJ(i));
+			for (auto n_num = 0; n_num < nn_number; n_num++) {
+				if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) { //  && nn >= i
+					// Ising-like spin correlation - check the bit on the nn
+					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					auto interaction = (this->J + this->dJ(i));
 
-				// setting the neighbors elements
-				this->H(k, k) += interaction * this->delta * si * sj;				
-		
-				// S+S- + S-S+ hopping
-				if (si * sj < 0) {
-					auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
-					setHamiltonianElem(k, 0.5 * interaction, new_new_idx);
+					// setting the neighbors elements
+					this->H(k, k) += interaction * this->delta * si * sj;
+
+					// S+S- + S-S+ hopping
+					if (si * sj < 0) {
+						auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
+						setHamiltonianElem(k, 0.5 * interaction, new_new_idx);
+					}
 				}
 			}
 		}

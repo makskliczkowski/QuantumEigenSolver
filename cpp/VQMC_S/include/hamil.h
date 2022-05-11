@@ -85,6 +85,9 @@ public:
 	virtual void locEnergy(u64 _id) = 0;																				// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
+	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000,\
+		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
+	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
 
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
 	void set_angles() {};
@@ -130,8 +133,10 @@ inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<
 {
 	string tmp = "";
 	intToBaseBit(state, base_vector);
-	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
-		stout << str_p(val, 3) << "*|" << base_vector << +">";
+	if (!valueEqualsPrec(std::abs(val), 0.0, tol)) {
+		auto pm = val >= 0 ? "+" : "-";
+		stout << pm << str_p(val, 3) << "*|" << base_vector << +">";
+	}
 }
 
 /*
@@ -190,6 +195,47 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 		});
 	this->E_av_idx = i - std::begin(eigenvalues);
 }
+
+/*
+* @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
+* @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
+*/
+template <typename T>
+void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+	try {
+		eigs_opts opts; 
+		opts.tol = tol;
+		opts.maxiter = maxiter;
+		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 20) : subdim;	
+
+		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, k, "lm", opts);
+		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, k, "lm", opts);
+	}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		assert(false);
+	}
+}
+
+
+/*
+* @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
+* @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
+*/
+template <typename T>
+void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, int k, T sigma) {
+	try {
+		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, sigma);
+		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, sigma);
+	}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		assert(false);
+	}
+}
+
 
 
 // ------------------------------------------------------------  				    ENTROPY   				   ------------------------------------------------------------

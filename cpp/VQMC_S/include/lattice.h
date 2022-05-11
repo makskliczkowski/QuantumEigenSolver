@@ -45,6 +45,7 @@ public:
 	auto get_spatial_norm(int x, int y, int z)				const RETURNS(this->spatialNorm[x][y][z]);								// returns the spatial norm
 	auto get_type()											const RETURNS(this->type);												// returns the type of the lattice as a string
 	auto get_nei(int lat_site, int corr_len)				const;
+	auto get_info()											const RETURNS(VEQ(type) + "," + VEQ(dim) + "," + VEQ(Ns) + "," + VEQ(get_Lx()) + "," + VEQ(get_Ly()) + "," + VEQ(get_Lz()));
 
 // ----------------------- CALCULATORS
 	void calculate_nn();
