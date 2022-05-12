@@ -37,6 +37,7 @@ public:
 	// METHODS
 	void hamiltonian() override;
 	void locEnergy(u64 _id) override;																			// returns the local energy for VQMC purposes
+	void locEnergy(const vec& _id) override;																// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const
@@ -118,7 +119,7 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		
 		// diagonal elements setting the interaction field
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
-			if (auto nei = this->lattice->get_nn(i, n_num);  nei >= 0 && nei >= i) {
+			if (auto nei = this->lattice->get_nn(i, n_num);  nei >= 0) { //  && nei >= i
 				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 				localVal += (this->J + this->dJ(i)) * si * sj;
 			}
@@ -129,6 +130,41 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 	}
 	// append unchanged at the very end
 	locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+}
+
+/*
+* Calculate the local energy end return the corresponding vectors with the value
+* @param _id base state index
+*/
+template <typename _type>
+void IsingModel<_type>::locEnergy(const vec& v) {
+	// sumup the value of a non-changed state
+	double localVal = 0;
+#pragma omp parallel for reduction(+ : localVal)
+	for (auto i = 0; i < Ns; i++) {
+		auto nn_number = this->lattice->get_nn_number(i);
+
+		// check Sz 
+		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
+
+		// diagonal elements setting the perpendicular field
+		localVal += (this->h + dh(i)) * si;
+
+		// diagonal elements setting the interaction field
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			if (auto nn = this->lattice->get_nn(i, n_num);  nn >= 0) { //  && nei >= i
+				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
+				localVal += (this->J + this->dJ(i)) * si * sj;
+			}
+		}
+		// flip with S^x_i with the transverse field
+		this->tmp_vec = v;
+		flipV(tmp_vec, i);
+		const u64 new_idx = baseToInt(tmp_vec);
+		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+	}
+	// append unchanged at the very end
+	locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
@@ -182,7 +218,7 @@ void IsingModel<_type>::hamiltonian() {
 			// diagonal elements setting the perpendicular field
 			H(k, k) += (this->h + dh(j)) * s_i;											
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
-				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0 && nn >= j) {
+				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
 					// Ising-like spin correlation
 					double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 					// setting the neighbors elements

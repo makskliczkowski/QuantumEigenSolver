@@ -53,7 +53,7 @@ DISABLE_WARNING_PUSH // include <armadillo> and suppress its warnings, cause dev
 #define REVERSE_BITS R6(0), R6(2), R6(1), R6(3)
 #define ULLPOW(k) 1ULL << k
 #define RETURNS(...) -> decltype((__VA_ARGS__)) { return (__VA_ARGS__); }
-#define SPIN
+//
 
 // use binary representation 0/1 instead of -1/1
 #ifdef USE_BINARY
@@ -63,6 +63,9 @@ DISABLE_WARNING_PUSH // include <armadillo> and suppress its warnings, cause dev
 #ifdef SPIN
 	#define INT_TO_BASE_BIT intToBaseBitSpin
 	#define BASE_TO_INT baseToIntSpin
+#else
+	#define INT_TO_BASE_BIT intToBaseBit
+	#define BASE_TO_INT baseToInt
 #endif // SPIN
 
 
@@ -338,6 +341,23 @@ inline u64 baseToInt(const Col<T>& vec, const v_1d<u64>& powers) {
 *@returns unsigned long long integer
 */
 template<typename T>
+inline u64 baseToInt(const Col<T>& vec) {
+	u64 val = 0;
+	const u64 size = vec.size();
+	for (int k = 0; k < size; k++)
+		val += static_cast<u64>(std::real(vec(size - 1 - k))) * BinaryPowers[k];
+	return val;
+}
+
+
+/*
+*@brief Conversion from base vector to an integer
+*@param vec string
+*@param powers precalculated powers vector
+*@param base base to covert to
+*@returns unsigned long long integer
+*/
+template<typename T>
 inline u64 baseToIntSpin(const Col<T>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
@@ -604,7 +624,9 @@ inline void flipV(Col<_type>& n, int k) {
 #ifdef SPIN
 	n(k) *= -1;
 #else 
-	n(k) = n(k) == 1 ? 0 : 1;
+	//stout << "flippin from: " << VEQ(n(k));
+	n(k) = (n(k) > 0) ? 0.0 : 1.0;
+	//stout << "to " << VEQ(n(k)) << EL;
 #endif // SPIN
 }
 

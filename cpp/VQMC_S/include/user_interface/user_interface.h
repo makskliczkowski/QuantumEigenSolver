@@ -567,7 +567,8 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 
 	// if the size is small enough
 	this->compare_ed(std::real(ground_rbm));
-
+	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
+	SAVEFIG(fileRbmEn_name + ".png", true);
 	// ------------------- check ground state
 	std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
 	if (this->lat->get_Ns() <= maxed) {
@@ -582,9 +583,6 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 		this->av_op = this->phi->get_op_av();
 		this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
 	}
-	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
-	SAVEFIG(fileRbmEn_name + ".png", true);
-
 	stouts("FINISHED EVERY THREAD", start);
 	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
 }
@@ -668,10 +666,11 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		// define the operators class
 		
 		this->ham->hamiltonian();
-		this->ham->diag_h(false, 5);
+		this->ham->diag_h(false);
 
 		Operators<_hamtype> op(this->lat); 
 		ground_ed = std::real(ham->get_eigenEnergy(0));
+		auto excited_ed = std::real(ham->get_eigenEnergy(1));
 		Col<_hamtype> eigvec = ham->get_eigenState(0);
 		op.calculate_operators(eigvec, this->av_op);
 		this->save_operators(diag_time, "", ground_ed, 0);
@@ -687,14 +686,22 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		stout << "\t\t\t->" << VEQP(relative_error, 4) << "%" << EL;
 		stout << "------------------------------------------------------------------------" << EL;
 		stout << "GROUND STATE ED ENERGY: " << VEQP(ground_ed, 4) << EL;
+		stout << "1ST EXCITED STATE ED ENERGY: " << VEQP(excited_ed, 4) << EL;
 		stout << "GROUND STATE ED SIGMA_X EXTENSIVE: " << VEQP(sx, 4) << EL;
 		stout << "GROUND STATE ED SIGMA_Z EXTENSIVE: " << VEQP(sz, 4) << EL;
 		stout << "\n------------------------------------------------------------------------\n|Psi>=:" << EL;
+		stout << "\t->Ground(" + STRP(ground_ed, 3) + "):" << EL;
 		SpinHamiltonian<_hamtype>::print_state_pretty(ham->get_eigenState(0), Ns, 0.08);
+		stout << "\t->Excited(" + STRP(excited_ed, 3) + "):" << EL;
+		SpinHamiltonian<_hamtype>::print_state_pretty(ham->get_eigenState(1), Ns, 0.08);
 		stout << "------------------------------------------------------------------------" << EL;
 #ifdef PLOT
 		plt::axhline(ground_ed);
-		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm) + ",\n" + VEQ(relative_error) + "%", mcSteps / 3, 0);
+		plt::axhline(excited_ed);
+		plt::axhline(ham->get_eigenEnergy(2));
+		plt::axhline(ham->get_eigenEnergy(3));
+		plt::axhline(ham->get_eigenEnergy(4));
+		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(excited_ed) + ",\n" + VEQ(ground_rbm) + ",\n" + VEQ(relative_error) + "%", mcSteps / 3, (ground_rbm) / 2);
 #endif
 	}
 }

@@ -33,6 +33,7 @@ public:
 	// METHODS
 	void hamiltonian() override;
 	void locEnergy(u64 _id) override;																			// returns the local energy for VQMC purposes
+	void locEnergy(const vec& _id) override;																			// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -41,6 +42,7 @@ public:
 			"heisenberg,Ns=" + STR(Ns) + \
 			",J=" + STRP(J, 2) + \
 			",J0=" + STRP(J0, 2) + \
+			",dlt=" + STRP(delta, 2) + \
 			",g=" + STRP(g, 2) + \
 			",g0=" + STRP(g0, 2) + \
 			",h=" + STRP(h, 2) + \
@@ -144,6 +146,62 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
+/*
+* Calculate the local energy end return the corresponding vectors with the value
+* @param v base state vector
+*/
+template <typename _type>
+void Heisenberg<_type>::locEnergy(const vec& v) {
+
+	// sumup the value of non-changed state
+	double localVal = 0;
+	for (auto i = 0; i < this->Ns; i++) {
+		// check all the neighbors
+
+		auto nn_number = this->lattice->get_nn_number(i);
+
+		// true - spin up, false - spin down
+		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
+
+		// perpendicular field (SZ) - HEISENBERG
+		localVal += (this->h + this->dh(i)) * si;
+
+		// transverse field (SX) - HEISENBERG
+		this->tmp_vec = v;
+		flipV(tmp_vec, i);
+		const u64 new_idx = baseToInt(tmp_vec);
+		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+
+		// check the correlations
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			this->tmp_vec2 = this->tmp_vec;
+			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {//&& nn >= i
+				stout << VEQ(i) << ", nei=" << VEQ(nn) << EL;
+				// check Sz 
+				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
+
+				// --------------------- HEISENBERG 
+
+				// diagonal elements setting  interaction field
+				auto interaction = this->J + this->dJ(i);
+				auto sisj = si * sj;
+				localVal += interaction * this->delta * sisj;
+
+
+				// S+S- + S-S+
+				if (sisj < 0) {
+					flipV(tmp_vec2, nn);
+					auto flip_idx_nn = baseToInt(tmp_vec2);
+					this->locEnergies[this->Ns + i] = std::make_tuple(flip_idx_nn, 0.5 * interaction);
+				}
+				else
+					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+			}
+		}
+	}
+	// append unchanged at the very end
+	locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+}
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 
 /*

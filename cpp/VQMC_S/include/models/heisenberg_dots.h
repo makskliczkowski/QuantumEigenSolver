@@ -38,6 +38,7 @@ public:
 
 	// ----------------------------------- 				 OTHER STUFF 				 ---------------------------------
 	void locEnergy(u64 _id) override;
+	void locEnergy(const vec& v) override;
 	void hamiltonian() override;
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -336,4 +337,71 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 	// append unchanged at the very end
 	locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
+
+
+/*
+* @brief Calculate the local energy end return the corresponding vectors with the value
+* @param _id base state index
+*/
+template <typename _type>
+void Heisenberg_dots<_type>::locEnergy(const vec& v) {
+	// sumup the value of non-changed state
+	double localVal = 0;
+
+	// cannot use omp because of dot_iter
+	int dot_iter = 0;
+
+	for (auto i = 0; i < this->Ns; i++) {
+		// 
+		auto nn_number = this->lattice->get_nn_number(i);
+		// true - spin up, false - spin down
+		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
+
+		// perpendicular field
+		localVal += (this->h + this->dh(i)) * si;
+
+		// transverse field
+		this->tmp_vec = v;
+		flipV(tmp_vec, i);
+		const u64 new_idx = baseToInt(tmp_vec);
+		_type s_flipped_en = this->g + this->dg(i);
+
+		// check the Siz Si+1z
+		for (auto n_num = 0; n_num < nn_number; n_num++) {
+			this->tmp_vec2 = this->tmp_vec;
+			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {
+				// check Sz 
+				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
+
+				auto interaction = (this->J + this->dJ(i));
+				// diagonal elements setting  interaction field
+				localVal += this->delta * interaction * si * sj;
+
+				// S+S- + S-S+
+				if (si * sj < 0) {
+					flipV(tmp_vec2, nn);
+					auto flip_idx_nn = baseToInt(tmp_vec2);
+					this->locEnergies[this->Ns + i] = std::make_tuple(flip_idx_nn, 0.5 * interaction);
+				}
+				else
+					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+			}
+		}
+		// handle the dot
+		if (positions[dot_iter] == i) {
+			const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, dot_iter);
+			// set sz_int
+			localVal += s_z_i;
+			// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
+			s_flipped_en += -s_y_i + s_z_i;
+			// next position!
+			dot_iter++;
+		}
+		// set the flipped state
+		this->locEnergies[i] = std::make_tuple(new_idx, s_flipped_en);
+	}
+	// append unchanged at the very end
+	locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+}
+
 #endif

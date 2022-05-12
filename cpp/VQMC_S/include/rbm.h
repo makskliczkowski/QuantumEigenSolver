@@ -166,7 +166,7 @@ public:
 
 #ifdef RBM_ANGLES_UPD
     if (set)
-        this->set_angles(this->current_vector);
+        this->set_angles();
 #endif
     }
     
@@ -204,7 +204,7 @@ public:
 
     // get probability ratio for a reference state v1 and v2 state
     _type pRatio()                                                      const { return exp(dotm(this->b_v, Col<double>(this->tmp_vector - this->current_vector)) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)))); };
-    _type pRatio(const Col<double>& v)                                  const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector)) + sum(log(Fs(v) / arma::cosh(this->thetas)))); };
+    _type pRatio(const Col<double>& v)                                  const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector)) + arma::sum(log(Fs(v) / arma::cosh(this->thetas)))); };
     _type pRatio(const Col<double>& v1, const Col<double>& v2)          const { return exp(dotm(this->b_v, Col<double>(v2 - v1)) + sum(log(Fs(v2) / Fs(v1)))); };
 
     // get local energies
@@ -312,16 +312,19 @@ inline void rbmState<cpx, double>::init() {
     // initialize biases visible
     for (int i = 0; i < this->n_visible; i++)
         //this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-        this->b_v(i) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.random_real_normal(0, 0.01));
+        this->b_v(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1)) / double(Ns);
+        //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
     // hidden
     for (int i = 0; i < this->n_hidden; i++)
         //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.random_real_normal(0, 0.01));
+        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1)) / double(Ns);
+        //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
     // matrix
     for (int i = 0; i < this->W.n_rows; i++)
         for (int j = 0; j < this->W.n_cols; j++)
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-            this->W(i, j) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.random_real_normal(0, 0.01));
+            this->W(i, j) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1)) / double(Ns);
+            //this->W(i, j) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
 }
 
 /*
@@ -335,16 +338,19 @@ inline void rbmState<cpx, cpx>::init() {
     // initialize biases visible
     for (int i = 0; i < this->n_visible; i++)
         //this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const);
-        this->b_v(i) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.random_real_normal(0, 0.01));
+        this->b_v(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1));
+        //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
     // hidden
     for (int i = 0; i < this->n_hidden; i++)
         //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, this->xavier_const) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, this->xavier_const);
-        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.randomReal_uni(0, 0.01));
+        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.randomReal_uni(0, 1));
+        //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
     // matrix
     for (int i = 0; i < this->W.n_rows; i++)
         for (int j = 0; j < this->W.n_cols; j++)
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, this->xavier_const);
-            this->W(i, j) = (this->hamil->ran.random_real_normal(0, 0.01) + imn * this->hamil->ran.random_real_normal(0, 0.01));
+            this->W(i, j) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1));
+            //this->W(i, j) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
 }
 
 /*
@@ -370,7 +376,11 @@ inline void rbmState<_type, _hamtype>::initAv()
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(int flip_place, double flipped_spin)
 {
+#ifdef SPIN
     this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
+#else
+    this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
+#endif
 } 
 
 /*
@@ -381,7 +391,11 @@ inline void rbmState<_type, _hamtype>::update_angles(int flip_place, double flip
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int flip_place)
 {
+#ifdef SPIN
     this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
+#else
+    this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
+#endif
 }
 
 // -------------------------------------------------				  SETTERS				  -------------------------------------------------
@@ -443,7 +457,7 @@ inline void rbmState<_type, _hamtype>::rescale_covariance()
 {
     auto lambda_p = lambda_0_reg * this->current_b_reg;
     if (lambda_p < lambda_min_reg) lambda_p = lambda_min_reg;
-    this->S.diag() += lambda_p * arma::ones(S.n_rows);// Col<_type>(this->full_size, arma::fill::randu);
+    this->S.diag() += lambda_p;
 }
 
 /*
@@ -488,8 +502,10 @@ void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step
     // update flat vector
 #ifdef PINV
     this->grad = this->lr * arma::pinv(this->S, pinv_tol) * this->F;
+    //else
+    //    this->grad = this->lr * arma::solve(this->S, this->F);
 #elif defined S_REGULAR 
-    this->rescale_covariace();
+    this->rescale_covariance();
     //auto lr_new = this->hamil->ran.randomReal_uni(0, 1) * 3 * this->lr;
     this->grad = this->lr * arma::solve(this->S, this->F);
 #else 
@@ -570,23 +586,23 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
     for(auto i = 0; i < b_size; i++){
 
         const int flip_place = this->hamil->ran.randomInt_uni(0, this->n_visible - 1);
-        const auto flip_spin = this->tmp_vector(flip_place);
+        const double flip_spin = this->tmp_vector(flip_place);
 
         flipV(this->tmp_vector, flip_place);
 
         #ifndef RBM_ANGLES_UPD
-        _type proba = std::abs(this->pRatio(this->current_vector, this->tmp_vector));
+        _type proba = this->pRatio(this->current_vector, this->tmp_vector);
         #else
         _type proba = this->pRatio(this->tmp_vector);
         #endif
-        if (this->hamil->ran.randomReal_uni() <= std::real(conj(proba) * proba)) {
+        if (this->hamil->ran.randomReal_uni() <= std::abs(conj(proba) * proba)) {
             // update current state and vector
-            // this->current_state = flip(this->current_state, this->n_visible - 1 - flip_place);
+
             this->current_vector(flip_place) = this->tmp_vector(flip_place);
 
             // update angles if needed
             #ifdef RBM_ANGLES_UPD
-            this->update_angles(flip_place, flip_spin);
+            this->update_angles(this->current_vector, flip_place);
             #endif
         }
         else {
@@ -653,8 +669,10 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
             this->blockSampling(b_size, this->current_state, n_flips, false);
             PRT(sample_time, this->dbg_samp)
 
-            if (norm == n_blocks - n_therm || this->hamil->ran.randomReal_uni() <= batch_proba) {
+            if (norm == (n_blocks - n_therm) || this->hamil->ran.randomReal_uni() <= batch_proba) {
                 auto gradients_time = std::chrono::high_resolution_clock::now();
+
+
                 this->calcVarDeriv(this->current_vector);
                 // append local energies
                 energies(took - 1) = this->locEn();
@@ -720,10 +738,6 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
     stouts("->\t\t\tMonte Carlo energy search ", start);
     return meanEnergies;
 }
-
-
-
-
 
 /*
 * @brief sample the vectors and find the ground state and the operators

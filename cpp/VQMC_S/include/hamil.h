@@ -24,6 +24,8 @@ public:
 	mutex my_mute_button;																								// thread mutex
 	shared_ptr<Lattice> lattice;																						// contains all the information about the lattice
 
+	vec tmp_vec;																										// tmp vector for base states if the system is too big
+	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
 	v_1d<tuple<u64, _type>> locEnergies;																				// local energies map
@@ -83,6 +85,7 @@ public:
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																						// pure virtual Hamiltonian creator
 	virtual void locEnergy(u64 _id) = 0;																				// returns the local energy for VQMC purposes
+	virtual void locEnergy(const vec& v) = 0;																			// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
 	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000,\
@@ -134,7 +137,7 @@ inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<
 	string tmp = "";
 	intToBaseBit(state, base_vector);
 	if (!valueEqualsPrec(std::abs(val), 0.0, tol)) {
-		auto pm = val >= 0 ? "+" : "-";
+		auto pm = val >= 0 ? "+" : "";
 		stout << pm << str_p(val, 3) << "*|" << base_vector << +">";
 	}
 }
@@ -223,8 +226,8 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint 
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
-template <typename T>
-void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, int k, T sigma) {
+template <typename _type>
+void SpinHamiltonian<_type>::diag_h(bool withoutEigenVec, int k, _type sigma) {
 	try {
 		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, sigma);
 		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, sigma);
@@ -235,7 +238,6 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, int k, T sigma) {
 		assert(false);
 	}
 }
-
 
 
 // ------------------------------------------------------------  				    ENTROPY   				   ------------------------------------------------------------

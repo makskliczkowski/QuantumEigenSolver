@@ -1,20 +1,21 @@
 
 //#define DEBUG
-//#define USE_SR
+#define USE_SR
 //#define USE_ADAM
-#define USE_RMS
-#define RBM_ANGLES_UPD
-#define PLOT
+//#define USE_RMS
 
+//#define RBM_ANGLES_UPD
+#define PLOT
+//#define SPIN
 
 
 #ifdef USE_SR
-	#define PINV
+	//#define PINV
 	#define S_REGULAR
 #endif
 
 #ifdef PINV
-	constexpr auto pinv_tol = 1e-10;
+	constexpr auto pinv_tol = 1e-5;
 	#ifdef S_REGULAR
 		#undef S_REGULAR
 	#endif
