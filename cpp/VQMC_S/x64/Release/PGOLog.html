@@ -1,0 +1,2194 @@
+<html><head><META HTTP-EQUIV="Content-Type" content="text/html; charset=utf-16"></head><body><pre><pre><table width=100% bgcolor=#CFCFE5><tr> <td> <font face=arial size=+3>Instrumentation</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>Instrumenting project 'VQMC_S'...
+Build started...
+1>------ Build started: Project: VQMC_S, Configuration: Release x64 ------
+1>clang-cl: : warning : argument unused during compilation: '-std:c++20' [-Wunused-command-line-argument]
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:5:
+1>./include/user_interface/../../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/user_interface/../../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/user_interface/.././operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/user_interface/.././operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/user_interface/.././operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/user_interface/../rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/user_interface/../rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/user_interface/../rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/user_interface/../rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/../rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/user_interface/../rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/user_interface/../rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/user_interface/../rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/user_interface/../rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/user_interface/../rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/user_interface/../rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/user_interface/../rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/user_interface/../rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/user_interface/../rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>./include/user_interface/../models/ising.h(190,13): note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+1>inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(455,6): : warning : unused variable 'Ns' [-Wunused-variable]
+1>        int Ns = Lx * Ly * Lz;
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(3416,32): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::ui' requested here
+1>    return unique_ptr<_Ty>(new _Ty(_STD forward<_Types>(_Args)...));
+1>                               ^
+1>main.cpp(38,17): note: in instantiation of function template specialization 'std::make_unique<rbm_ui::ui<std::complex<double>, double>, const int &, char **&, 0>' requested here
+1>        auto ui = std::make_unique<rbm_ui::ui<cpx, double>>(argc, argv);
+1>                       ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\type_traits(355,69): note: in instantiation of template class 'IsingModel<double>' requested here
+1>struct is_convertible : bool_constant<__is_convertible_to(_From, _To)> {
+1>                                                                    ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1453,33): note: in instantiation of template class 'std::is_convertible<IsingModel<double> *, SpinHamiltonian<double> *>' requested here
+1>struct _SP_pointer_compatible : is_convertible<_Yty*, _Ty*>::type {
+1>                                ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1577,39): note: in instantiation of template class 'std::_SP_pointer_compatible<IsingModel<double>, SpinHamiltonian<double>>' requested here
+1>    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+1>                                      ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1578,5): note: while substituting prior template arguments into non-type template parameter [with _Ty2 = IsingModel<double>]
+1>    shared_ptr(const shared_ptr<_Ty2>& _Other) noexcept {
+1>    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1>./include/user_interface/user_interface.h(622,15): note: while substituting deduced template arguments into function template 'shared_ptr' [with _Ty2 = IsingModel<double>, $1 = (no value)]
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                            ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(78,19): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->N = ULLPOW(Ns);                                                                                                                           // Hilber space size
+1>                         ^
+1>                         this->
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(79,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dh = create_random_vec(Ns, this->ran, this->w);                                                           // creates random disorder vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(80,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dJ = create_random_vec(Ns, this->ran, this->J0);                                                          // creates random exchange vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(81,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dg = create_random_vec(Ns, this->ran, this->g0);                                                          // creates random transverse field vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(46,22): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "ising,Ns=" + STR(Ns) + \
+1>                                          ^
+1>                                          this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(53,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/ising.h(219,4): : warning : use of member 'H' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        H(k, k) += (this->h + dh(j)) * s_i;
+1>                        ^
+1>                        this->
+1>./include/user_interface/../models/ising.h(31,2): note: in instantiation of member function 'IsingModel<double>::hamiltonian' requested here
+1>        IsingModel(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../hamil.h(16,15): note: must qualify identifier to find this declaration in dependent base class
+1>        SpMat<_type> H;                                                                                                                                                                                                         // the Hamiltonian
+1>                     ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(112,23): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        for (auto i = 0; i < Ns; i++) {
+1>                             ^
+1>                             this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(132,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>./include/user_interface/../models/ising.h(144,23): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        for (auto i = 0; i < Ns; i++) {
+1>                             ^
+1>                             this->
+1>./include/user_interface/../models/ising.h(162,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/ising.h(163,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/ising.h(167,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'IsingModel<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<IsingModel<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<IsingModel<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(77,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dh = create_random_vec(Ns, this->ran, this->w);                                                                                   // creates random disorder vector
+1>                                     ^
+1>                                     this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(78,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dJ = create_random_vec(Ns, this->ran, this->J0);                                                                                  // creates random exchange vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/heisenberg.h(79,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dg = create_random_vec(Ns, this->ran, this->g0);                                                                                  // creates random transverse field vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/heisenberg.h(69,36): : warning : field 'g0' will be initialized after field 'delta' [-Wreorder-ctor]
+1>        : J(J), g(g), h(h), w(w), J0(J0), g0(g0), delta(delta)
+1>                            ~~~   ~~~~~   ^~~~~   ~~~~~~~~~~~
+1>                            delta(delta w(w J0(J0 g0(g0
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg<double>::Heisenberg' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(42,27): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg,Ns=" + STR(Ns) + \
+1>                                               ^
+1>                                               this->
+1>./include/user_interface/../models/heisenberg.h(50,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg.h(146,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>./include/user_interface/../models/heisenberg.h(171,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/heisenberg.h(172,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg.h(193,12): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        flipV(tmp_vec2, nn);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg.h(194,35): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                                     ^
+1>                                                                     this->
+1>./include/user_interface/../models/heisenberg.h(203,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(47,55): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg_with_dots," + VEQ(dot_num) + "," + VEQ(Ns) + \
+1>                                                                           ^
+1>                                                                           this->
+1>./src/common.h(71,38): note: expanded from macro 'VEQ'
+1>#define VEQ(name) valueEquals(#name,(name),2)
+1>                                     ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(48,17): : warning : use of undeclared identifier 'J'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J=" + STRP(J, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(49,18): : warning : use of undeclared identifier 'J0'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J0=" + STRP(J0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(50,17): : warning : use of undeclared identifier 'g'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g=" + STRP(g, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(51,18): : warning : use of undeclared identifier 'g0'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g0=" + STRP(g0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(52,17): : warning : use of undeclared identifier 'h'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",h=" + STRP(h, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(53,17): : warning : use of undeclared identifier 'w'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",w=" + STRP(w, 2);
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(54,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg_dots.h(246,32): : warning : use of member 'dh' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        this->H(k, k) += (this->h + dh(j)) * si;
+1>                                                    ^
+1>                                                    this->
+1>./include/user_interface/../models/heisenberg_dots.h(29,2): note: in instantiation of member function 'Heisenberg_dots<double>::hamiltonian' requested here
+1>        Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../models/heisenberg.h(19,6): note: must qualify identifier to find this declaration in dependent base class
+1>        vec dh;                                                                                                                                                                                                         // disorder in the system - deviation from a constant h value
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(250,4): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+1>                        ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(264,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(338,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(365,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/heisenberg_dots.h(366,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg_dots.h(382,12): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        flipV(tmp_vec2, nn);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg_dots.h(383,35): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                                     ^
+1>                                                                     this->
+1>./include/user_interface/../models/heisenberg_dots.h(404,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg_dots<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg_dots<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(48,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg_kitaev," + VEQ(Ns) + \
+1>                                                   ^
+1>                                                   this->
+1>./src/common.h(71,38): note: expanded from macro 'VEQ'
+1>#define VEQ(name) valueEquals(#name,(name),2)
+1>                                     ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(49,17): : warning : use of undeclared identifier 'J'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J=" + STRP(J, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(50,18): : warning : use of undeclared identifier 'J0'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J0=" + STRP(J0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(51,17): : warning : use of undeclared identifier 'delta'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",d=" + STRP(delta, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(52,17): : warning : use of undeclared identifier 'g'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g=" + STRP(g, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(53,18): : warning : use of undeclared identifier 'g0'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g0=" + STRP(g0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(54,17): : warning : use of undeclared identifier 'h'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",h=" + STRP(h, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(55,17): : warning : use of undeclared identifier 'w'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",w=" + STRP(w, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(60,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg-kitaev.h(232,32): : warning : use of member 'dh' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        this->H(k, k) += (this->h + dh(j)) * si;
+1>                                                    ^
+1>                                                    this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(22,2): note: in instantiation of member function 'Heisenberg_kitaev<double>::hamiltonian' requested here
+1>        Heisenberg_kitaev(double J, double J0, double g, double g0, double h, double w, double delta, std::tuple<double, double, double> K, double K0, std::shared_ptr<Lattice> lat)
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../models/heisenberg.h(19,6): note: must qualify identifier to find this declaration in dependent base class
+1>        vec dh;                                                                                                                                                                                                         // disorder in the system - deviation from a constant h value
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(236,4): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+1>                        ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(257,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(261,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, (this->Kz + this->dKz(j)) * sisj, k);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(263,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, -(this->Ky + this->dKy(j)) * sisj, flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(265,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, this->Kx + this->dKx(j), flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(158,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(159,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(177,11): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                                flipV(tmp_vec2, nn);
+1>                                      ^
+1>                                      this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(178,34): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                                auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                             ^
+1>                                                             this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg_kitaev<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg_kitaev<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(93,15): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>            : n_hidden(nH), n_visible(nV)
+1>              ^~~~~~~~~~~
+1>              batch(batch
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(3416,32): note: in instantiation of member function 'rbmState<std::complex<double>, double>::rbmState' requested here
+1>    return unique_ptr<_Ty>(new _Ty(_STD forward<_Types>(_Args)...));
+1>                               ^
+1>./include/user_interface/user_interface.h(645,19): note: in instantiation of function template specialization 'std::make_unique<rbmState<std::complex<double>, double>, unsigned long long &, unsigned long long &, std::shared_ptr<SpinHamiltonian<double>> &, double &, unsigned long long &, unsigned long long &, 0>' requested here
+1>        this->phi = std::make_unique<rbmState<_type, _hamtype>>(nvisible, nhidden, ham, lr, batch, thread_num);
+1>                         ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../rbm.h(93,15): note: field 'n_hidden' will be initialized after field 'n_visible'
+1>            : n_hidden(nH), n_visible(nV)
+1>              ^~~~~~~~~~~
+1>./include/user_interface/../rbm.h(94,15): note: field 'lr' will be initialized after field 'batch'
+1>            , lr(lr)
+1>              ^~~~~
+1>./include/user_interface/../rbm.h(674,22): : warning : unused variable 'gradients_time' [-Wunused-variable]
+1>                auto gradients_time = std::chrono::high_resolution_clock::now();
+1>                     ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(669,18): : warning : unused variable 'sample_time' [-Wunused-variable]
+1>            auto sample_time = std::chrono::high_resolution_clock::now();
+1>                 ^
+1>./include/user_interface/../rbm.h(660,14): : warning : unused variable 'therm_time' [-Wunused-variable]
+1>        auto therm_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(666,14): : warning : unused variable 'blocks_time' [-Wunused-variable]
+1>        auto blocks_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(470,10): : warning : unused variable 'var_deriv_time' [-Wunused-variable]
+1>    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+1>         ^
+1>./include/user_interface/user_interface.h(550,29): note: in instantiation of member function 'rbmState<std::complex<double>, double>::mcSampling' requested here
+1>        auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+1>                                   ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(547,10): : warning : unused variable 'loc_en_time' [-Wunused-variable]
+1>    auto loc_en_time = std::chrono::high_resolution_clock::now();
+1>         ^
+1>./include/user_interface/../rbm.h(501,10): : warning : unused variable 'var_deriv_time_upd' [-Wunused-variable]
+1>    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+1>         ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(678,7): : warning : unused variable 'state' [-Wunused-variable]
+1>                u64 state = 0;
+1>                    ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(788,18): : warning : unused variable 'sample_time' [-Wunused-variable]
+1>            auto sample_time = std::chrono::high_resolution_clock::now();
+1>                 ^
+1>./include/user_interface/../rbm.h(781,14): : warning : unused variable 'therm_time' [-Wunused-variable]
+1>        auto therm_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(767,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/user_interface.h(573,37): note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
+1>        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+1>                                           ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(307,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(384,16): note: in instantiation of member function 'Operators<std::complex<double>>::entanglement_entropy' requested here
+1>                entropy(i) = entanglement_entropy(state, i + 1);
+1>                             ^
+1>./include/user_interface/.././operators/operators.h(429,26): note: in instantiation of member function 'Operators<std::complex<double>>::entanglement_entropy_sweep' requested here
+1>        av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
+1>                                ^
+1>./include/user_interface/user_interface.h(579,6): note: in instantiation of member function 'Operators<std::complex<double>>::calculate_operators' requested here
+1>                op.calculate_operators(states_col, this->av_op);
+1>                   ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>./include/user_interface/.././operators/operators.h(307,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(723,7): : warning : unused variable 'Ns' [-Wunused-variable]
+1>        auto Ns = this->lat->get_Ns();
+1>             ^
+1>./include/user_interface/user_interface.h(580,9): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::save_operators' requested here
+1>                this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
+1>                      ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>104 warnings generated.
+1>In file included from rbm.cpp:1:
+1>In file included from ./include/rbm.h:5:
+1>./include/../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from rbm.cpp:1:
+1>In file included from ./include/rbm.h:8:
+1>In file included from ./include/hamil.h:3:
+1>./include/./operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/./operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/./operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/./operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/./operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/./operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/./operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from rbm.cpp:1:
+1>./include/rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>22 warnings generated.
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:5:
+1>./include/user_interface/../../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/user_interface/../../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/user_interface/.././operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/user_interface/.././operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/user_interface/.././operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/user_interface/../rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/user_interface/../rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/user_interface/../rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/user_interface/../rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/../rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/user_interface/../rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/user_interface/../rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/user_interface/../rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/user_interface/../rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/user_interface/../rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/user_interface/../rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/user_interface/../rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/user_interface/../rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/user_interface/../rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>./include/user_interface/../models/ising.h(190,13): note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+1>inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>23 warnings generated.
+1>VQMC_S.vcxproj -> C:\University\PHD\CODES\VariationalQMCandML\VarQMCSolver\cpp\VQMC_S\x64\Release\VQMC_S.exe
+1>Done building project "VQMC_S.vcxproj".
+</pre></table><pre><table width=100% bgcolor=#CFCFE5><tr> <td> <font face=arial size=+3>Run Application(s)</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>Executing 'C:\University\PHD\CODES\VariationalQMCandML\VarQMCSolver\cpp\VQMC_S\x64\Release\VQMC_S.exe -f input.txt'
+</pre></table><pre><table width=100% bgcolor=#CFCFE5><tr> <td> <font face=arial size=+3>Optimization</font></table><table width=* cellspacing=0 cellpadding=0><tr><td width=0 bgcolor=#EDEDF5>&nbsp;</td><td width=0 bgcolor=#FFFFFF>&nbsp;</td><td width=*><pre>Merging data...
+Executing 'llvm-profdata.exe'
+
+
+Optimizing project 'VQMC_S'...
+Build started...
+1>------ Build started: Project: VQMC_S, Configuration: Release x64 ------
+1>clang-cl: : warning : argument unused during compilation: '-std:c++20' [-Wunused-command-line-argument]
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:5:
+1>./include/user_interface/../../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/user_interface/../../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/user_interface/.././operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/user_interface/.././operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/user_interface/.././operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/user_interface/../rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/user_interface/../rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/user_interface/../rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/user_interface/../rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/../rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/user_interface/../rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/user_interface/../rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/user_interface/../rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/user_interface/../rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/user_interface/../rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/user_interface/../rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/user_interface/../rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/user_interface/../rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/user_interface/../rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>./include/user_interface/../models/ising.h(190,13): note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+1>inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(455,6): : warning : unused variable 'Ns' [-Wunused-variable]
+1>        int Ns = Lx * Ly * Lz;
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(3416,32): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::ui' requested here
+1>    return unique_ptr<_Ty>(new _Ty(_STD forward<_Types>(_Args)...));
+1>                               ^
+1>main.cpp(38,17): note: in instantiation of function template specialization 'std::make_unique<rbm_ui::ui<std::complex<double>, double>, const int &, char **&, 0>' requested here
+1>        auto ui = std::make_unique<rbm_ui::ui<cpx, double>>(argc, argv);
+1>                       ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\type_traits(355,69): note: in instantiation of template class 'IsingModel<double>' requested here
+1>struct is_convertible : bool_constant<__is_convertible_to(_From, _To)> {
+1>                                                                    ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1453,33): note: in instantiation of template class 'std::is_convertible<IsingModel<double> *, SpinHamiltonian<double> *>' requested here
+1>struct _SP_pointer_compatible : is_convertible<_Yty*, _Ty*>::type {
+1>                                ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1577,39): note: in instantiation of template class 'std::_SP_pointer_compatible<IsingModel<double>, SpinHamiltonian<double>>' requested here
+1>    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+1>                                      ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(1578,5): note: while substituting prior template arguments into non-type template parameter [with _Ty2 = IsingModel<double>]
+1>    shared_ptr(const shared_ptr<_Ty2>& _Other) noexcept {
+1>    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1>./include/user_interface/user_interface.h(622,15): note: while substituting deduced template arguments into function template 'shared_ptr' [with _Ty2 = IsingModel<double>, $1 = (no value)]
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                            ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(78,19): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->N = ULLPOW(Ns);                                                                                                                           // Hilber space size
+1>                         ^
+1>                         this->
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(79,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dh = create_random_vec(Ns, this->ran, this->w);                                                           // creates random disorder vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(80,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dJ = create_random_vec(Ns, this->ran, this->J0);                                                          // creates random exchange vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(81,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dg = create_random_vec(Ns, this->ran, this->g0);                                                          // creates random transverse field vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/ising.h(46,22): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "ising,Ns=" + STR(Ns) + \
+1>                                          ^
+1>                                          this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(53,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/ising.h(219,4): : warning : use of member 'H' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        H(k, k) += (this->h + dh(j)) * s_i;
+1>                        ^
+1>                        this->
+1>./include/user_interface/../models/ising.h(31,2): note: in instantiation of member function 'IsingModel<double>::hamiltonian' requested here
+1>        IsingModel(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../hamil.h(16,15): note: must qualify identifier to find this declaration in dependent base class
+1>        SpMat<_type> H;                                                                                                                                                                                                         // the Hamiltonian
+1>                     ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(112,23): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        for (auto i = 0; i < Ns; i++) {
+1>                             ^
+1>                             this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'IsingModel<double>::IsingModel' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(132,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>./include/user_interface/../models/ising.h(144,23): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        for (auto i = 0; i < Ns; i++) {
+1>                             ^
+1>                             this->
+1>./include/user_interface/../models/ising.h(162,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/ising.h(163,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/ising.h(167,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'IsingModel' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'IsingModel<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<IsingModel<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<IsingModel<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<IsingModel<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(622,20): note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(77,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dh = create_random_vec(Ns, this->ran, this->w);                                                                                   // creates random disorder vector
+1>                                     ^
+1>                                     this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(78,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dJ = create_random_vec(Ns, this->ran, this->J0);                                                                                  // creates random exchange vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/heisenberg.h(79,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        this->dg = create_random_vec(Ns, this->ran, this->g0);                                                                                  // creates random transverse field vector
+1>                                     ^
+1>                                     this->
+1>./include/user_interface/../models/heisenberg.h(69,36): : warning : field 'g0' will be initialized after field 'delta' [-Wreorder-ctor]
+1>        : J(J), g(g), h(h), w(w), J0(J0), g0(g0), delta(delta)
+1>                            ~~~   ~~~~~   ^~~~~   ~~~~~~~~~~~
+1>                            delta(delta w(w J0(J0 g0(g0
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg<double>::Heisenberg' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+1>./include/user_interface/../models/heisenberg.h(42,27): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg,Ns=" + STR(Ns) + \
+1>                                               ^
+1>                                               this->
+1>./include/user_interface/../models/heisenberg.h(50,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg.h(146,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>./include/user_interface/../models/heisenberg.h(171,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/heisenberg.h(172,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg.h(193,12): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        flipV(tmp_vec2, nn);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg.h(194,35): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                                     ^
+1>                                                                     this->
+1>./include/user_interface/../models/heisenberg.h(203,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(625,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(47,55): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg_with_dots," + VEQ(dot_num) + "," + VEQ(Ns) + \
+1>                                                                           ^
+1>                                                                           this->
+1>./src/common.h(71,38): note: expanded from macro 'VEQ'
+1>#define VEQ(name) valueEquals(#name,(name),2)
+1>                                     ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(48,17): : warning : use of undeclared identifier 'J'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J=" + STRP(J, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(49,18): : warning : use of undeclared identifier 'J0'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J0=" + STRP(J0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(50,17): : warning : use of undeclared identifier 'g'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g=" + STRP(g, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(51,18): : warning : use of undeclared identifier 'g0'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g0=" + STRP(g0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(52,17): : warning : use of undeclared identifier 'h'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",h=" + STRP(h, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(53,17): : warning : use of undeclared identifier 'w'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",w=" + STRP(w, 2);
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(54,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg_dots.h(246,32): : warning : use of member 'dh' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        this->H(k, k) += (this->h + dh(j)) * si;
+1>                                                    ^
+1>                                                    this->
+1>./include/user_interface/../models/heisenberg_dots.h(29,2): note: in instantiation of member function 'Heisenberg_dots<double>::hamiltonian' requested here
+1>        Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../models/heisenberg.h(19,6): note: must qualify identifier to find this declaration in dependent base class
+1>        vec dh;                                                                                                                                                                                                         // disorder in the system - deviation from a constant h value
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(250,4): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+1>                        ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(264,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(338,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_dots<double>::Heisenberg_dots' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:27:
+1>./include/user_interface/../models/heisenberg_dots.h(365,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>./include/user_interface/../models/heisenberg_dots.h(366,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg_dots.h(382,12): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        flipV(tmp_vec2, nn);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg_dots.h(383,35): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>                                        auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                                     ^
+1>                                                                     this->
+1>./include/user_interface/../models/heisenberg_dots.h(404,2): : warning : use of undeclared identifier 'locEnergies'; unqualified lookup into dependent bases of class template 'Heisenberg_dots' is a Microsoft extension [-Wmicrosoft-template]
+1>        locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+1>        ^
+1>        this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg_dots<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg_dots<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_dots<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(628,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(48,31): : warning : use of undeclared identifier 'Ns'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        "heisenberg_kitaev," + VEQ(Ns) + \
+1>                                                   ^
+1>                                                   this->
+1>./src/common.h(71,38): note: expanded from macro 'VEQ'
+1>#define VEQ(name) valueEquals(#name,(name),2)
+1>                                     ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(49,17): : warning : use of undeclared identifier 'J'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J=" + STRP(J, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(50,18): : warning : use of undeclared identifier 'J0'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",J0=" + STRP(J0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(51,17): : warning : use of undeclared identifier 'delta'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",d=" + STRP(delta, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(52,17): : warning : use of undeclared identifier 'g'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g=" + STRP(g, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(53,18): : warning : use of undeclared identifier 'g0'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",g0=" + STRP(g0, 2) + \
+1>                                      ^
+1>                                      this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(54,17): : warning : use of undeclared identifier 'h'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",h=" + STRP(h, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(55,17): : warning : use of undeclared identifier 'w'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                        ",w=" + STRP(w, 2) + \
+1>                                     ^
+1>                                     this->
+1>./src/common.h(69,30): note: expanded from macro 'STRP'
+1>#define STRP(str,prec) str_p(str, prec)
+1>                             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(60,10): : warning : use of undeclared identifier 'SpinHamiltonian'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                return SpinHamiltonian::inf(name, skip, sep);
+1>                       ^
+1>./include/user_interface/../models/heisenberg-kitaev.h(232,32): : warning : use of member 'dh' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        this->H(k, k) += (this->h + dh(j)) * si;
+1>                                                    ^
+1>                                                    this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(22,2): note: in instantiation of member function 'Heisenberg_kitaev<double>::hamiltonian' requested here
+1>        Heisenberg_kitaev(double J, double J0, double g, double g0, double h, double w, double delta, std::tuple<double, double, double> K, double K0, std::shared_ptr<Lattice> lat)
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../models/heisenberg.h(19,6): note: must qualify identifier to find this declaration in dependent base class
+1>        vec dh;                                                                                                                                                                                                         // disorder in the system - deviation from a constant h value
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(236,4): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                        setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+1>                        ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(257,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(261,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, (this->Kz + this->dKz(j)) * sisj, k);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(263,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, -(this->Ky + this->dKy(j)) * sisj, flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(265,7): : warning : use of member 'setHamiltonianElem' found via unqualified lookup into dependent bases of class templates is a Microsoft extension [-Wmicrosoft-template]
+1>                                                setHamiltonianElem(k, this->Kx + this->dKx(j), flip_idx_nn);
+1>                                                ^
+1>./include/user_interface/../models/heisenberg.h(37,7): note: must qualify identifier to find this declaration in dependent base class
+1>        void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
+1>             ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(158,9): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                flipV(tmp_vec, i);
+1>                      ^
+1>                      this->
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xutility(144,45): note: in instantiation of member function 'Heisenberg_kitaev<double>::Heisenberg_kitaev' requested here
+1>    return ::new (_Voidify_iter(_Location)) _Ty(_STD forward<_Types>(_Args)...);
+1>                                            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:28:
+1>./include/user_interface/../models/heisenberg-kitaev.h(159,33): : warning : use of undeclared identifier 'tmp_vec'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                const u64 new_idx = baseToInt(tmp_vec);
+1>                                              ^
+1>                                              this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(177,11): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                                flipV(tmp_vec2, nn);
+1>                                      ^
+1>                                      this->
+1>./include/user_interface/../models/heisenberg-kitaev.h(178,34): : warning : use of undeclared identifier 'tmp_vec2'; unqualified lookup into dependent bases of class template 'Heisenberg_kitaev' is a Microsoft extension [-Wmicrosoft-template]
+1>                                auto flip_idx_nn = baseToInt(tmp_vec2);
+1>                                                             ^
+1>                                                             this->
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:17:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\thread:11:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\chrono:19:
+1>In file included from C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\algorithm:11:
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,9): : warning : destructor called on non-final 'Heisenberg_kitaev<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+1>        _Obj.~_Ty();
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2047,9): note: in instantiation of function template specialization 'std::_Destroy_in_place<Heisenberg_kitaev<double>>' requested here
+1>        _Destroy_in_place(_Storage._Value);
+1>        ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2021,14): note: in instantiation of member function 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Destroy' requested here
+1>    explicit _Ref_count_obj2(_Types&&... _Args) : _Ref_count_base() {
+1>             ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(2748,26): note: in instantiation of function template specialization 'std::_Ref_count_obj2<Heisenberg_kitaev<double>>::_Ref_count_obj2<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>    const auto _Rx = new _Ref_count_obj2<_Ty>(_STD forward<_Types>(_Args)...);
+1>                         ^
+1>./include/user_interface/user_interface.h(632,20): note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+1>                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+1>                                 ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\xmemory(311,15): note: qualify call to silence this warning
+1>        _Obj.~_Ty();
+1>              ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(93,15): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>            : n_hidden(nH), n_visible(nV)
+1>              ^~~~~~~~~~~
+1>              batch(batch
+1>C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\include\memory(3416,32): note: in instantiation of member function 'rbmState<std::complex<double>, double>::rbmState' requested here
+1>    return unique_ptr<_Ty>(new _Ty(_STD forward<_Types>(_Args)...));
+1>                               ^
+1>./include/user_interface/user_interface.h(645,19): note: in instantiation of function template specialization 'std::make_unique<rbmState<std::complex<double>, double>, unsigned long long &, unsigned long long &, std::shared_ptr<SpinHamiltonian<double>> &, double &, unsigned long long &, unsigned long long &, 0>' requested here
+1>        this->phi = std::make_unique<rbmState<_type, _hamtype>>(nvisible, nhidden, ham, lr, batch, thread_num);
+1>                         ^
+1>main.cpp(39,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+1>        ui->define_models();
+1>            ^
+1>./include/user_interface/../rbm.h(93,15): note: field 'n_hidden' will be initialized after field 'n_visible'
+1>            : n_hidden(nH), n_visible(nV)
+1>              ^~~~~~~~~~~
+1>./include/user_interface/../rbm.h(94,15): note: field 'lr' will be initialized after field 'batch'
+1>            , lr(lr)
+1>              ^~~~~
+1>./include/user_interface/../rbm.h(674,22): : warning : unused variable 'gradients_time' [-Wunused-variable]
+1>                auto gradients_time = std::chrono::high_resolution_clock::now();
+1>                     ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(669,18): : warning : unused variable 'sample_time' [-Wunused-variable]
+1>            auto sample_time = std::chrono::high_resolution_clock::now();
+1>                 ^
+1>./include/user_interface/../rbm.h(660,14): : warning : unused variable 'therm_time' [-Wunused-variable]
+1>        auto therm_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(666,14): : warning : unused variable 'blocks_time' [-Wunused-variable]
+1>        auto blocks_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(470,10): : warning : unused variable 'var_deriv_time' [-Wunused-variable]
+1>    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+1>         ^
+1>./include/user_interface/user_interface.h(550,29): note: in instantiation of member function 'rbmState<std::complex<double>, double>::mcSampling' requested here
+1>        auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+1>                                   ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(547,10): : warning : unused variable 'loc_en_time' [-Wunused-variable]
+1>    auto loc_en_time = std::chrono::high_resolution_clock::now();
+1>         ^
+1>./include/user_interface/../rbm.h(501,10): : warning : unused variable 'var_deriv_time_upd' [-Wunused-variable]
+1>    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+1>         ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(678,7): : warning : unused variable 'state' [-Wunused-variable]
+1>                u64 state = 0;
+1>                    ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(788,18): : warning : unused variable 'sample_time' [-Wunused-variable]
+1>            auto sample_time = std::chrono::high_resolution_clock::now();
+1>                 ^
+1>./include/user_interface/../rbm.h(781,14): : warning : unused variable 'therm_time' [-Wunused-variable]
+1>        auto therm_time = std::chrono::high_resolution_clock::now();
+1>             ^
+1>./include/user_interface/../rbm.h(767,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/user_interface.h(573,37): note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
+1>        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+1>                                           ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>In file included from main.cpp:34:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(307,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(384,16): note: in instantiation of member function 'Operators<std::complex<double>>::entanglement_entropy' requested here
+1>                entropy(i) = entanglement_entropy(state, i + 1);
+1>                             ^
+1>./include/user_interface/.././operators/operators.h(429,26): note: in instantiation of member function 'Operators<std::complex<double>>::entanglement_entropy_sweep' requested here
+1>        av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
+1>                                ^
+1>./include/user_interface/user_interface.h(579,6): note: in instantiation of member function 'Operators<std::complex<double>>::calculate_operators' requested here
+1>                op.calculate_operators(states_col, this->av_op);
+1>                   ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>./include/user_interface/.././operators/operators.h(307,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from main.cpp:34:
+1>./include/user_interface/user_interface.h(723,7): : warning : unused variable 'Ns' [-Wunused-variable]
+1>        auto Ns = this->lat->get_Ns();
+1>             ^
+1>./include/user_interface/user_interface.h(580,9): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::save_operators' requested here
+1>                this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
+1>                      ^
+1>main.cpp(40,6): note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+1>        ui->make_simulation();
+1>            ^
+1>104 warnings generated.
+1>In file included from rbm.cpp:1:
+1>In file included from ./include/rbm.h:5:
+1>./include/../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from rbm.cpp:1:
+1>In file included from ./include/rbm.h:8:
+1>In file included from ./include/hamil.h:3:
+1>./include/./operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/./operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/./operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/./operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/./operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/./operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/./operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from rbm.cpp:1:
+1>./include/rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>22 warnings generated.
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:5:
+1>./include/user_interface/../../src/progress.h(2,10): : warning : #include resolved using non-portable Microsoft search rules as: ./src/common.h [-Wmicrosoft-include]
+1>#include "src/common.h"
+1>         ^
+1>./include/user_interface/../../src/progress.h(40,5): : warning : field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+1>                : percentage(percentage)
+1>                  ^~~~~~~~~~~~~~~~~~~~~~
+1>                  timer(std::chrono::high_resolution_clock::now())
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>In file included from ./include/user_interface/../rbm.h:8:
+1>In file included from ./include/user_interface/../hamil.h:3:
+1>./include/user_interface/.././operators/operators.h(40,21): : warning : initializer order does not match the declaration order [-Wreorder-ctor]
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+1>                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+1>./include/user_interface/.././operators/operators.h(40,21): note: field 'Lz' will be initialized after field 'Ns'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                  ^~~~~~
+1>./include/user_interface/.././operators/operators.h(40,29): note: field 'Ns' will be initialized after field 'lat_type'
+1>                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+1>                                          ^~~~~~
+1>./include/user_interface/.././operators/operators.h(331,29): : warning : operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                         ~~~~~~~~~~^~~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                       ~~ ^
+1>./include/user_interface/.././operators/operators.h(331,29): note: place parentheses around the '-' expression to silence this warning
+1>        const u64 dimB = ULLPOW(Ns - A_size);
+1>                                ~~~^~~~~~~~
+1>./include/user_interface/.././operators/../../src/binary.h(54,27): note: expanded from macro 'ULLPOW'
+1>#define ULLPOW(k) 1ULL << k
+1>                          ^
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:23:
+1>./include/user_interface/../rbm.h(240,31): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                              ^
+1>./include/user_interface/../rbm.h(240,47): : warning : expected a qualified name after 'typename'
+1>inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+1>                                              ^
+1>./include/user_interface/../rbm.h(264,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                       ^
+1>./include/user_interface/../rbm.h(264,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::allocate() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(289,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                       ^
+1>./include/user_interface/../rbm.h(289,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::init() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(338,10): : warning : unused variable 'Ns' [-Wunused-variable]
+1>    auto Ns = this->hamil->lattice->get_Ns();
+1>         ^
+1>./include/user_interface/../rbm.h(436,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                       ^
+1>./include/user_interface/../rbm.h(436,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::set_weights() {
+1>                                       ^
+1>./include/user_interface/../rbm.h(469,31): : warning : expected a qualified name after 'typename'
+1>void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+1>                              ^
+1>./include/user_interface/../rbm.h(500,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                       ^
+1>./include/user_interface/../rbm.h(500,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+1>                                       ^
+1>./include/user_interface/../rbm.h(546,32): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                               ^
+1>./include/user_interface/../rbm.h(546,48): : warning : expected a qualified name after 'typename'
+1>inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+1>                                               ^
+1>./include/user_interface/../rbm.h(581,24): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                       ^
+1>./include/user_interface/../rbm.h(581,40): : warning : expected a qualified name after 'typename'
+1>void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+1>                                       ^
+1>./include/user_interface/../rbm.h(628,30): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                             ^
+1>./include/user_interface/../rbm.h(628,46): : warning : expected a qualified name after 'typename'
+1>Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+1>                                             ^
+1>In file included from user_interface.cpp:1:
+1>In file included from ./include/user_interface/user_interface.h:26:
+1>./include/user_interface/../models/ising.h(43,9): : warning : 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+1>        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+1>               ^
+1>./include/user_interface/../models/ising.h(190,13): note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+1>inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+1>            ^
+1>./include/user_interface/../hamil.h(61,17): note: overridden virtual function is here
+1>        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+1>                       ^
+1>23 warnings generated.
+1>VQMC_S.vcxproj -> C:\University\PHD\CODES\VariationalQMCandML\VarQMCSolver\cpp\VQMC_S\x64\Release\VQMC_S.exe
+1>Done building project "VQMC_S.vcxproj".
+</pre></table><table width=100% height=20 bgcolor=#CFCFE5><tr><td><font face=arial size=+2></font></table></pre></body></html>

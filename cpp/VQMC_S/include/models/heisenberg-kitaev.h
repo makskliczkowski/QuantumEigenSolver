@@ -221,30 +221,30 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 
 	for (auto k = 0; k < this->N; k++) {
-		for (int j = 0; j < this->Ns; j++) {
+		for (int i = 0; i < this->Ns; i++) {
 			// check all the neighbors
-			auto nn_number = this->lattice->get_nn_number(j);
+			auto nn_number = this->lattice->get_nn_number(i);
 			
 			// true - spin up, false - spin down
-			double si = checkBit(k, this->Ns - j - 1) ? 1.0 : -1.0;
+			double si = checkBit(k, this->Ns - i - 1) ? 1.0 : -1.0;
 
 			// perpendicular field (SZ) - HEISENBERG
-			this->H(k, k) += (this->h + dh(j)) * si;
+			this->H(k, k) += (this->h + dh(i)) * si;
 
 			// HEISENBERG
-			const u64 new_idx = flip(k, this->Ns - 1 - j);
-			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+			const u64 new_idx = flip(k, this->Ns - 1 - i);
+			setHamiltonianElem(k, this->g + this->dg(i), new_idx);
 
 			// check the correlations
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
-				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0) { //   && nn > j
+				if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0) { //   && nn > j
 					// check Sz 
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
 					// --------------------- HEISENBERG 
 					
 					// diagonal elements setting  interaction field
-					auto interaction = (this->J + this->dJ(j));
+					auto interaction = (this->J + this->dJ(i));
 					auto sisj = si * sj;
 
 					// setting the neighbors elements
@@ -258,11 +258,11 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 					
 					// --------------------- KITAEV
 					if (n_num == 0)
-						setHamiltonianElem(k, (this->Kz + this->dKz(j)) * sisj, k);
+						setHamiltonianElem(k, (this->Kz + this->dKz(i)) * sisj, k);
 					else if (n_num == 1)
-						setHamiltonianElem(k, -(this->Ky + this->dKy(j)) * sisj, flip_idx_nn);
+						setHamiltonianElem(k, -(this->Ky + this->dKy(i)) * sisj, flip_idx_nn);
 					else if (n_num == 2)
-						setHamiltonianElem(k, this->Kx + this->dKx(j), flip_idx_nn);
+						setHamiltonianElem(k, this->Kx + this->dKx(i), flip_idx_nn);
 				}
 			}
 		}

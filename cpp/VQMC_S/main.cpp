@@ -4,7 +4,7 @@
 //#define USE_ADAM
 //#define USE_RMS
 
-//#define RBM_ANGLES_UPD
+#define RBM_ANGLES_UPD
 #define PLOT
 //#define SPIN
 

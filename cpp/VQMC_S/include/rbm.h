@@ -67,7 +67,6 @@ private:
     // variational derivatives                                  
     Col<_type> thetas;                                          // effective angles
     Col<_type> O_flat;                                          // flattened output for easier calculation of the covariance
-    Col<_type> grad;                                            // change of the weights
     Mat<_type> S;                                               // positive semi-definite covariance matrix
     Col<_type> F;                                               // forces
     
@@ -83,6 +82,8 @@ private:
     Col<double> current_vector;                                 // current state vector during the simulation
     Col<double> tmp_vector;                                     // tmp state vector during the simulation
     v_1d<Col<double>> tmp_vectors;                              // tmp vectors for omp 
+    map<u64, _type> mostCommonStates;                           // save most common states energy to save the time
+
 
     void rescale_covariance();                                  // 
 public:
@@ -271,10 +272,12 @@ void rbmState<typename _type, typename _hamtype>::allocate() {
     // allocate gradients
     this->O_flat = Col<_type>(this->full_size, arma::fill::zeros);
     this->thetas = Col<_type>(this->n_hidden, arma::fill::zeros);
-    this->grad = Col<_type>(this->full_size, arma::fill::zeros);
+
     // allocate covariance and forces
     this->F = Col<_type>(this->full_size, arma::fill::zeros);
+#ifdef USE_SR
     this->S = Mat<_type>(this->full_size, this->full_size, arma::fill::zeros);
+#endif
     // allocate vectors
     this->current_vector = Col<double>(this->n_visible, arma::fill::ones);
     this->tmp_vector = Col<double>(this->n_visible, arma::fill::ones);
@@ -436,17 +439,17 @@ void rbmState<typename _type, typename _hamtype>::set_weights() {
     // update weights accordingly
 #pragma omp parallel for
     for (auto i = 0; i < this->n_visible; i++)
-        this->b_v(i) -= this->grad(i);
+        this->b_v(i) -= this->F(i);
 #pragma omp parallel for
     for (auto i = 0; i < this->n_hidden; i++) {
         const auto elem = i + this->n_visible;
-        this->b_h(i) -= this->grad(elem);
+        this->b_h(i) -= this->F(elem);
     }
 #pragma omp parallel for
     for (auto i = 0; i < this->n_hidden; i++) {
         for (auto j = 0; j < this->n_visible; j++) {
             const auto elem = (this->n_visible + this->n_hidden) + i + j * this->n_hidden;
-            this->W(i, j) -= this->grad(elem);
+            this->W(i, j) -= this->F(elem);
         }
     }
 }
@@ -501,15 +504,15 @@ void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step
    
     // update flat vector
 #ifdef PINV
-    this->grad = this->lr * arma::pinv(this->S, pinv_tol) * this->F;
+    this->F = this->lr * arma::pinv(this->S, pinv_tol) * this->F;
     //else
     //    this->grad = this->lr * arma::solve(this->S, this->F);
 #elif defined S_REGULAR 
     this->rescale_covariance();
     //auto lr_new = this->hamil->ran.randomReal_uni(0, 1) * 3 * this->lr;
-    this->grad = this->lr * arma::solve(this->S, this->F);
+    this->F = this->lr * arma::solve(this->S, this->F);
 #else 
-    this->grad = this->lr * arma::solve(this->S, this->F);
+    this->F = this->lr * arma::solve(this->S, this->F);
 #endif 
     PRT(var_deriv_time_upd, this->dbg_updt)
 }
@@ -546,26 +549,22 @@ inline _type rbmState<typename _type, typename _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
     const auto hilb = this->hamil->get_hilbert_size();
     // get the reference to all local energies and changed states from the model Hamiltonian
-    auto energies = this->hamil->get_localEnergyRef(this->current_state);
     _type energy = 0;
+    auto energies = this->hamil->get_localEnergyRef(this->current_state);
 #ifndef DEBUG
 #pragma omp parallel for reduction(+ : energy) shared(energies)
 #endif
-    for (auto i = 0; i < energies.size(); i++) 
+    for (auto i = 0; i < energies.size(); i++)
     {
         const auto& [state, value] = energies[i];
         // if the state is not set
         if (state >= hilb)
             continue;
 
-        _type v = value;
         // changes accordingly not to create data race
-        if (state != this->current_state)
-            v = this->pRatioValChange(v, state);
-        energy += v;
+        energy += state != this->current_state ? this->pRatioValChange(value, state) : value;
     }
-
-    PRT(loc_en_time, this->dbg_lcen)
+    PRT(loc_en_time, this->dbg_lcen);
     return energy;
 }
 
@@ -717,13 +716,13 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
     #endif // S_REGULAR
 #elif defined USE_ADAM
         this->adam->update(this->F);
-        this->grad = this->adam->get_grad();
+        this->F = this->adam->get_grad();
 #elif defined USE_RMS
         this->rms->update(this->F, averageWeights);
-        this->grad = this->rms->get_grad();
+        this->F = this->rms->get_grad();
 #else
         // standard updater
-        this->grad = this->lr * this->F;
+        this->F = this->lr * this->F;
 #endif
         this->set_weights();
         // add energy
