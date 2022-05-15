@@ -1,7 +1,5 @@
 #pragma once
-#ifndef BINARY_H
-	#include "../../src/binary.h"
-#endif // ! BINARY_H
+
 #ifndef LATTICE_H
 	#include "../lattice.h"
 #endif
@@ -12,7 +10,8 @@
 
 using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
 
-struct avOperators {
+class avOperators {
+public:
 	std::string lat_type = "";
 	int Ns = 1;
 	int Lx = 1;

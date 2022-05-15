@@ -8,7 +8,10 @@
 //-- SUPPRESS WARNINGS
 
 
+#ifndef COMMON_H
+#define COMMON_H
 
+#include <stdio.h>
 // armadillo flags:
 #define ARMA_64BIT_WORD                                                                     // enabling 64 integers in armadillo obbjects
 #define ARMA_BLAS_LONG_LONG                                                                 // using long long inside LAPACK call
@@ -21,7 +24,7 @@
 #include <armadillo>
 
 
-#include <algorithm> 													// for std::ranges::copy depending on lib support
+#include <algorithm> 													// for std::copy depending on lib support
 #include <iostream>
 #include <ios>
 #include <iomanip>
@@ -35,17 +38,22 @@
 #    include <filesystem>
 #    define have_filesystem 1
 namespace fs = std::filesystem;
-using clk = std::chrono::steady_clock;
+//using clk = std::chrono::steady_clock;
 #  elif __has_include(<experimental/filesystem>)
 #    include <experimental/filesystem>
 #    define have_filesystem 1
 #    define experimental_filesystem
 namespace fs = std::experimental::filesystem;
-using clk = std::chrono::system_clock;
 #  else
 #    define have_filesystem 0
 #  endif
 #endif
+
+
+
+
+using clk = std::chrono::system_clock;
+//using clk = std::chrono::steady_clock;
 
 static const char* kPSep =
 #ifdef _WIN32
@@ -54,8 +62,6 @@ R"(\)";
 "/";
 #endif
 
-#ifndef COMMON_H
-#define COMMON_H
 
 // --------------------------------------------------------				DEFINITIONS				--------------------------------------------------------
 
@@ -662,7 +668,7 @@ T stddev(const v_1d<T>& v)
 	T mean = sum / cpx(v.size());
 
 	std::vector<T> diff(v.size());
-	std::ranges::transform(v.begin(), v.end(), diff.begin(), [mean](T x) { return x - mean; });
+	std::transform(v.begin(), v.end(), diff.begin(), [mean](T x) { return x - mean; });
 	T sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), cpx(0.0));
 	T stdev = std::sqrt(sq_sum / cpx(v.size()));
 	return stdev;

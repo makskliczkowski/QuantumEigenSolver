@@ -1,0 +1,1422 @@
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+In file included from ./include/user_interface/../../src/progress.h:2:
+In file included from ./include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+In file included from ./include/user_interface/../../src/progress.h:2:
+In file included from ./include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+./include/user_interface/../../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:8:
+In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+In file included from ./include/user_interface/../models/heisenberg.h:3:
+In file included from ./include/user_interface/../models/../hamil.h:3:
+./include/user_interface/.././operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+./include/user_interface/.././operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+./include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+./include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:8:
+In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+In file included from ./include/user_interface/../models/heisenberg.h:3:
+In file included from ./include/user_interface/../models/../hamil.h:3:
+./include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:14:
+./include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+./include/user_interface/../models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+./include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+./include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+./include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+./include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+In file included from main.cpp:22:
+./include/user_interface/user_interface.h:452:6: warning: unused variable 'Ns' [-Wunused-variable]
+        int Ns = Lx * Ly * Lz;
+            ^
+./include/user_interface/user_interface.h:675:7: warning: unused variable 'state' [-Wunused-variable]
+                u64 state = 0;
+                    ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:14:
+./include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1305:46: note: in instantiation of template class 'IsingModel<double>' requested here
+               typename = decltype(__test_aux<_To1>(std::declval<_From1>()))>
+                                                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1305:29: note: while substituting deduced template arguments into function template '__test_aux' [with _To1 = SpinHamiltonian<double> *]
+               typename = decltype(__test_aux<_To1>(std::declval<_From1>()))>
+                                   ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1307:2: note: in instantiation of default argument for '__test<IsingModel<double> *, SpinHamiltonian<double> *>' required here
+        __test(int);
+        ^~~~~~~~~~~
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1314:24: note: while substituting deduced template arguments into function template '__test' [with _From1 = IsingModel<double> *, _To1 = SpinHamiltonian<double> *, $2 = (no value)]
+      typedef decltype(__test<_From, _To>(0)) type;
+                       ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1321:14: note: in instantiation of template class 'std::__is_convertible_helper<IsingModel<double> *, SpinHamiltonian<double> *, false>' requested here
+    : public __is_convertible_helper<_From, _To>::type
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:926:7: note: (skipping 5 contexts in backtrace; use -ftemplate-backtrace-limit=0 to see all)
+    : is_convertible<_Yp*, _Tp*>::type
+      ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:107:4: note: in instantiation of template class 'std::is_constructible<std::__shared_ptr<SpinHamiltonian<double>, __gnu_cxx::_S_atomic>, const std::shared_ptr<IsingModel<double>> &>' requested here
+          is_constructible<__shared_ptr<_Tp>, _Args...>::value
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:245:20: note: in instantiation of template type alias '_Constructible' requested here
+               typename = _Constructible<const shared_ptr<_Yp>&>>
+                          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:246:2: note: in instantiation of default argument for 'shared_ptr<IsingModel<double>>' required here
+        shared_ptr(const shared_ptr<_Yp>& __r) noexcept
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./include/user_interface/user_interface.h:619:15: note: while substituting deduced template arguments into function template 'shared_ptr' [with _Yp = IsingModel<double>, $1 = (no value)]
+                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+                            ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+./include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:17:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:39:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/memory:63:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/allocator.h:46:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/x86_64-redhat-linux/bits/c++allocator.h:33:
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'IsingModel<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<IsingModel<double>>::destroy<IsingModel<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<IsingModel<double>>>::destroy<IsingModel<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<IsingModel<double>, std::allocator<IsingModel<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<IsingModel<double>, std::allocator<IsingModel<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<IsingModel<double>, std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<IsingModel<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<IsingModel<double>>::shared_ptr<std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<IsingModel<double>, std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+./include/user_interface/user_interface.h:619:20: note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:8:
+In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+./include/user_interface/../models/heisenberg.h:72:36: warning: field 'g0' will be initialized after field 'delta' [-Wreorder-ctor]
+        : J(J), g(g), h(h), w(w), J0(J0), g0(g0), delta(delta)
+                            ~~~   ~~~~~   ^~~~~   ~~~~~~~~~~~
+                            delta(delta w(w J0(J0 g0(g0
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:136:23: note: in instantiation of member function 'Heisenberg<double>::Heisenberg' requested here
+        { ::new((void *)__p) _Up(std::forward<_Args>(__args)...); }
+                             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:475:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg<double>>::construct<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        { __a.construct(__p, std::forward<_Args>(__args)...); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:545:30: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg<double>>>::construct<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+          allocator_traits<_Alloc>::construct(__a, _M_ptr(),
+                                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg<double>>::shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+./include/user_interface/user_interface.h:622:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:17:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:39:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/memory:63:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/allocator.h:46:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/x86_64-redhat-linux/bits/c++allocator.h:33:
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg<double>>::destroy<Heisenberg<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg<double>>>::destroy<Heisenberg<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg<double>>::shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+./include/user_interface/user_interface.h:622:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg_dots<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg_dots<double>>::destroy<Heisenberg_dots<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg_dots<double>>>::destroy<Heisenberg_dots<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg_dots<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg_dots<double>>::shared_ptr<std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+./include/user_interface/user_interface.h:625:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg_kitaev<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg_kitaev<double>>::destroy<Heisenberg_kitaev<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg_kitaev<double>>>::destroy<Heisenberg_kitaev<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg_kitaev<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg_kitaev<double>>::shared_ptr<std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+./include/user_interface/user_interface.h:629:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+In file included from main.cpp:22:
+In file included from ./include/user_interface/user_interface.h:23:
+./include/user_interface/../rbm.h:114:15: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+            : n_hidden(nH), n_visible(nV)
+              ^~~~~~~~~~~
+              batch(batch
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/unique_ptr.h:835:34: note: in instantiation of member function 'rbmState<std::complex<double>, double>::rbmState' requested here
+    { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
+                                 ^
+./include/user_interface/user_interface.h:642:19: note: in instantiation of function template specialization 'std::make_unique<rbmState<std::complex<double>, double>, unsigned long long &, unsigned long long &, std::shared_ptr<SpinHamiltonian<double>> &, double &, unsigned long &, unsigned long &>' requested here
+        this->phi = std::make_unique<rbmState<_type, _hamtype>>(nvisible, nhidden, ham, lr, batch, thread_num);
+                         ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+./include/user_interface/../rbm.h:114:15: note: field 'n_hidden' will be initialized after field 'n_visible'
+            : n_hidden(nH), n_visible(nV)
+              ^~~~~~~~~~~
+./include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
+            , lr(lr)
+              ^~~~~
+./include/user_interface/../rbm.h:784:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+./include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
+        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+                                           ^
+main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+        ui->make_simulation();
+            ^
+In file included from main.cpp:22:
+./include/user_interface/user_interface.h:720:7: warning: unused variable 'Ns' [-Wunused-variable]
+        auto Ns = this->lat->get_Ns();
+             ^
+./include/user_interface/user_interface.h:577:9: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::save_operators' requested here
+                this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
+                      ^
+main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+        ui->make_simulation();
+            ^
+31 warnings generated.
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:5:
+In file included from ./include/../src/progress.h:2:
+In file included from ./include/../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:5:
+In file included from ./include/../src/progress.h:2:
+In file included from ./include/../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:5:
+./include/../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:8:
+In file included from ./include/models/heisenberg_dots.h:3:
+In file included from ./include/models/heisenberg.h:3:
+In file included from ./include/models/../hamil.h:3:
+./include/./operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+./include/./operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+./include/./operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+./include/./operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/./operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:8:
+In file included from ./include/models/heisenberg_dots.h:3:
+In file included from ./include/models/heisenberg.h:3:
+In file included from ./include/models/../hamil.h:3:
+./include/./operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/./operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from rbm.cpp:1:
+In file included from ./include/rbm.h:14:
+./include/models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+./include/models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+./include/models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from rbm.cpp:1:
+./include/rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+./include/rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+./include/rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+./include/rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+20 warnings generated.
+In file included from common.cpp:1:
+In file included from ./src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from common.cpp:1:
+In file included from ./src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+5 warnings generated.
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+In file included from ./include/user_interface/../../src/progress.h:2:
+In file included from ./include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+In file included from ./include/user_interface/../../src/progress.h:2:
+In file included from ./include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:5:
+./include/user_interface/../../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:8:
+In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+In file included from ./include/user_interface/../models/heisenberg.h:3:
+In file included from ./include/user_interface/../models/../hamil.h:3:
+./include/user_interface/.././operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+./include/user_interface/.././operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+./include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+./include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:8:
+In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
+In file included from ./include/user_interface/../models/heisenberg.h:3:
+In file included from ./include/user_interface/../models/../hamil.h:3:
+./include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+./include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+In file included from ./include/user_interface/../rbm.h:14:
+./include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+./include/user_interface/../models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+./include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from user_interface.cpp:1:
+In file included from ./include/user_interface/user_interface.h:23:
+./include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+./include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+./include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+./include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+In file included from user_interface.cpp:1:
+./include/user_interface/user_interface.h:452:6: warning: unused variable 'Ns' [-Wunused-variable]
+        int Ns = Lx * Ly * Lz;
+            ^
+./include/user_interface/user_interface.h:675:7: warning: unused variable 'state' [-Wunused-variable]
+                u64 state = 0;
+                    ^
+22 warnings generated.
+In file included from lattices/hexagonal.cpp:1:
+In file included from lattices/../include/lattices/hexagonal.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from lattices/hexagonal.cpp:1:
+In file included from lattices/../include/lattices/hexagonal.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+5 warnings generated.
+In file included from lattices/square.cpp:1:
+In file included from lattices/../include/lattices/square.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:68:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/compiler_setup.hpp:401:11: warning: WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected [-W#pragma-messages]
+  #pragma message ("WARNING: use of OpenMP disabled; compiler support for OpenMP 3.1+ not detected")
+          ^
+In file included from lattices/square.cpp:1:
+In file included from lattices/../include/lattices/square.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+5 warnings generated.
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:5:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/progress.h:2:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:5:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:14:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+In file included from main.cpp:22:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:452:6: warning: unused variable 'Ns' [-Wunused-variable]
+        int Ns = Lx * Ly * Lz;
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:675:7: warning: unused variable 'state' [-Wunused-variable]
+                u64 state = 0;
+                    ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:14:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1305:46: note: in instantiation of template class 'IsingModel<double>' requested here
+               typename = decltype(__test_aux<_To1>(std::declval<_From1>()))>
+                                                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1305:29: note: while substituting deduced template arguments into function template '__test_aux' [with _To1 = SpinHamiltonian<double> *]
+               typename = decltype(__test_aux<_To1>(std::declval<_From1>()))>
+                                   ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1307:2: note: in instantiation of default argument for '__test<IsingModel<double> *, SpinHamiltonian<double> *>' required here
+        __test(int);
+        ^~~~~~~~~~~
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1314:24: note: while substituting deduced template arguments into function template '__test' [with _From1 = IsingModel<double> *, _To1 = SpinHamiltonian<double> *, $2 = (no value)]
+      typedef decltype(__test<_From, _To>(0)) type;
+                       ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/type_traits:1321:14: note: in instantiation of template class 'std::__is_convertible_helper<IsingModel<double> *, SpinHamiltonian<double> *, false>' requested here
+    : public __is_convertible_helper<_From, _To>::type
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:926:7: note: (skipping 5 contexts in backtrace; use -ftemplate-backtrace-limit=0 to see all)
+    : is_convertible<_Yp*, _Tp*>::type
+      ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:107:4: note: in instantiation of template class 'std::is_constructible<std::__shared_ptr<SpinHamiltonian<double>, __gnu_cxx::_S_atomic>, const std::shared_ptr<IsingModel<double>> &>' requested here
+          is_constructible<__shared_ptr<_Tp>, _Args...>::value
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:245:20: note: in instantiation of template type alias '_Constructible' requested here
+               typename = _Constructible<const shared_ptr<_Yp>&>>
+                          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:246:2: note: in instantiation of default argument for 'shared_ptr<IsingModel<double>>' required here
+        shared_ptr(const shared_ptr<_Yp>& __r) noexcept
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:619:15: note: while substituting deduced template arguments into function template 'shared_ptr' [with _Yp = IsingModel<double>, $1 = (no value)]
+                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+                            ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:17:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:39:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/memory:63:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/allocator.h:46:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/x86_64-redhat-linux/bits/c++allocator.h:33:
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'IsingModel<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<IsingModel<double>>::destroy<IsingModel<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<IsingModel<double>>>::destroy<IsingModel<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<IsingModel<double>, std::allocator<IsingModel<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<IsingModel<double>, std::allocator<IsingModel<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<IsingModel<double>, std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<IsingModel<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<IsingModel<double>>::shared_ptr<std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<IsingModel<double>, std::allocator<IsingModel<double>>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:619:20: note: in instantiation of function template specialization 'std::make_shared<IsingModel<double>, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:72:36: warning: field 'g0' will be initialized after field 'delta' [-Wreorder-ctor]
+        : J(J), g(g), h(h), w(w), J0(J0), g0(g0), delta(delta)
+                            ~~~   ~~~~~   ^~~~~   ~~~~~~~~~~~
+                            delta(delta w(w J0(J0 g0(g0
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:136:23: note: in instantiation of member function 'Heisenberg<double>::Heisenberg' requested here
+        { ::new((void *)__p) _Up(std::forward<_Args>(__args)...); }
+                             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:475:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg<double>>::construct<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        { __a.construct(__p, std::forward<_Args>(__args)...); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:545:30: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg<double>>>::construct<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+          allocator_traits<_Alloc>::construct(__a, _M_ptr(),
+                                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg<double>>::shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:622:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:17:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/thread:39:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/memory:63:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/allocator.h:46:
+In file included from /usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/x86_64-redhat-linux/bits/c++allocator.h:33:
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg<double>>::destroy<Heisenberg<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg<double>>>::destroy<Heisenberg<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg<double>, std::allocator<Heisenberg<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg<double>>::shared_ptr<std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg<double>, std::allocator<Heisenberg<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:622:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg_dots<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg_dots<double>>::destroy<Heisenberg_dots<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg_dots<double>>>::destroy<Heisenberg_dots<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg_dots<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg_dots<double>>::shared_ptr<std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg_dots<double>, std::allocator<Heisenberg_dots<double>>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:625:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg_dots<double>, double &, double &, double &, double &, double &, double &, double &, std::shared_ptr<Lattice> &, std::vector<int> &, arma::Col<double> &, double &>' requested here
+                this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:22: warning: destructor called on non-final 'Heisenberg_kitaev<double>' that has virtual functions but non-virtual destructor [-Wdelete-non-abstract-non-virtual-dtor]
+        destroy(_Up* __p) { __p->~_Up(); }
+                            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/alloc_traits.h:487:8: note: in instantiation of function template specialization '__gnu_cxx::new_allocator<Heisenberg_kitaev<double>>::destroy<Heisenberg_kitaev<double>>' requested here
+        { __a.destroy(__p); }
+              ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:554:28: note: in instantiation of function template specialization 'std::allocator_traits<std::allocator<Heisenberg_kitaev<double>>>::destroy<Heisenberg_kitaev<double>>' requested here
+        allocator_traits<_Alloc>::destroy(_M_impl._M_alloc(), _M_ptr());
+                                  ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:540:2: note: in instantiation of member function 'std::_Sp_counted_ptr_inplace<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, __gnu_cxx::_S_atomic>::_M_dispose' requested here
+        _Sp_counted_ptr_inplace(_Alloc __a, _Args&&... __args)
+        ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:678:6: note: in instantiation of function template specialization 'std::_Sp_counted_ptr_inplace<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, __gnu_cxx::_S_atomic>::_Sp_counted_ptr_inplace<double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+            _Sp_cp_type(__a._M_a, std::forward<_Args>(__args)...);
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr_base.h:1342:14: note: in instantiation of function template specialization 'std::__shared_count<__gnu_cxx::_S_atomic>::__shared_count<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+        : _M_ptr(), _M_refcount(_M_ptr, __tag, std::forward<_Args>(__args)...)
+                    ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:359:4: note: in instantiation of function template specialization 'std::__shared_ptr<Heisenberg_kitaev<double>, __gnu_cxx::_S_atomic>::__shared_ptr<std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+        : __shared_ptr<_Tp>(__tag, std::forward<_Args>(__args)...)
+          ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:705:14: note: in instantiation of function template specialization 'std::shared_ptr<Heisenberg_kitaev<double>>::shared_ptr<std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+      return shared_ptr<_Tp>(_Sp_alloc_shared_tag<_Alloc>{__a},
+             ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/shared_ptr.h:721:19: note: in instantiation of function template specialization 'std::allocate_shared<Heisenberg_kitaev<double>, std::allocator<Heisenberg_kitaev<double>>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+      return std::allocate_shared<_Tp>(std::allocator<_Tp_nc>(),
+                  ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:629:20: note: in instantiation of function template specialization 'std::make_shared<Heisenberg_kitaev<double>, double &, double &, double &, double &, double &, double &, double &, std::tuple<double, double, double>, double &, std::shared_ptr<Lattice> &>' requested here
+                this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
+                                 ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/ext/new_allocator.h:140:28: note: qualify call to silence this warning
+        destroy(_Up* __p) { __p->~_Up(); }
+                                  ^
+In file included from main.cpp:22:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:114:15: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+            : n_hidden(nH), n_visible(nV)
+              ^~~~~~~~~~~
+              batch(batch
+/usr/lib/gcc/x86_64-redhat-linux/8/../../../../include/c++/8/bits/unique_ptr.h:835:34: note: in instantiation of member function 'rbmState<std::complex<double>, double>::rbmState' requested here
+    { return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...)); }
+                                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:642:19: note: in instantiation of function template specialization 'std::make_unique<rbmState<std::complex<double>, double>, unsigned long long &, unsigned long long &, std::shared_ptr<SpinHamiltonian<double>> &, double &, unsigned long &, unsigned long &>' requested here
+        this->phi = std::make_unique<rbmState<_type, _hamtype>>(nvisible, nhidden, ham, lr, batch, thread_num);
+                         ^
+main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::define_models' requested here
+        ui->define_models();
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:114:15: note: field 'n_hidden' will be initialized after field 'n_visible'
+            : n_hidden(nH), n_visible(nV)
+              ^~~~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
+            , lr(lr)
+              ^~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:784:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
+        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+                                           ^
+main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+        ui->make_simulation();
+            ^
+In file included from main.cpp:22:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:720:7: warning: unused variable 'Ns' [-Wunused-variable]
+        auto Ns = this->lat->get_Ns();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:577:9: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::save_operators' requested here
+                this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
+                      ^
+main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
+        ui->make_simulation();
+            ^
+30 warnings generated.
+In file included from rbm.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:5:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/progress.h:2:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from rbm.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:5:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from rbm.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from rbm.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from rbm.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:14:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from rbm.cpp:1:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+19 warnings generated.
+In file included from common.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+4 warnings generated.
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:5:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/progress.h:2:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:5:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/progress.h:40:5: warning: field 'percentage' will be initialized after field 'timer' [-Wreorder-ctor]
+                : percentage(percentage)
+                  ^~~~~~~~~~~~~~~~~~~~~~
+                  timer(std::chrono::high_resolution_clock::now())
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:21: warning: initializer order does not match the declaration order [-Wreorder-ctor]
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                  ~~~~~~  ~~~~~~  ^~~~~~  ~~~~~~  ~~~~~~~~~~~~~~~~~~
+                  lat_type(lat_type) Ns(Ns) Lx(Lx) Ly(Ly) Lz(Lz)
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:21: note: field 'Lz' will be initialized after field 'Ns'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                  ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
+                : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
+                                          ^~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:8:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+        const u64 dimB = ULLPOW(Ns - A_size);
+                         ~~~~~~~~~~^~~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                       ~~ ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+        const u64 dimB = ULLPOW(Ns - A_size);
+                                ~~~^~~~~~~~
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
+#define ULLPOW(k) 1ULL << k
+                          ^
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:14:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/ising.h:44:9: warning: 'inf' overrides a member function but is not marked 'override' [-Winconsistent-missing-override]
+        string inf(const v_1d<string>& skip = {}, string sep = "_") const
+               ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/ising.h:192:13: note: in instantiation of template class 'IsingModel<std::complex<double>>' requested here
+inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:61:17: note: overridden virtual function is here
+        virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+                       ^
+In file included from user_interface.cpp:1:
+In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+    auto Ns = this->hamil->lattice->get_Ns();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+    auto var_deriv_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+    auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+         ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
+                auto gradients_time = std::chrono::high_resolution_clock::now();
+                     ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+            auto sample_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+In file included from user_interface.cpp:1:
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:452:6: warning: unused variable 'Ns' [-Wunused-variable]
+        int Ns = Lx * Ly * Lz;
+            ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:675:7: warning: unused variable 'state' [-Wunused-variable]
+                u64 state = 0;
+                    ^
+21 warnings generated.
+In file included from lattices/hexagonal.cpp:1:
+In file included from lattices/../include/lattices/hexagonal.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+4 warnings generated.
+In file included from lattices/square.cpp:1:
+In file included from lattices/../include/lattices/square.h:3:
+In file included from lattices/../include/lattices/../lattice.h:3:
+In file included from lattices/../include/lattices/../../src/binary.h:6:
+In file included from lattices/../include/lattices/../../src/./common.h:24:
+In file included from ../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo:363:
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:88:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:98:10: warning: comparison with infinity always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isinf(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:134:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+../../../../LIBRARIES_CPP/armadillo-11.0.1/include/armadillo_bits/arma_cmath.hpp:144:10: warning: comparison with NaN always evaluates to false in fast floating point modes [-Wtautological-constant-compare]
+  return std::isnan(x);
+         ^~~~~~~~~~~~~
+4 warnings generated.

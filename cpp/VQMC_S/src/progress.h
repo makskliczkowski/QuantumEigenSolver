@@ -1,5 +1,5 @@
 #pragma once
-#include "src/common.h"
+#include "common.h"
 
 #ifndef PROGRESS_H
 #define PROGRESS_H

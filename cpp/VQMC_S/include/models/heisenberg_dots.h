@@ -1,7 +1,7 @@
 #pragma once
-#ifndef HEISENBERG_H
+
 #include "heisenberg.h"
-#endif // !HEISENBERG_H
+
 
 // --------------------------------------------------------------------------- HEISENBERG INTERACTING WITH CLASSICAL SPINS ---------------------------------------------------------------------------
 #ifndef HEISENBERG_DOTS
@@ -20,12 +20,16 @@ private:
 	vec cos_phis;										// parametrized angles of the classical spins [0,2pi] - xy plane - cosinuses
 	vec sin_phis;										// parametrized angles of the classical spins [0,2pi] - xy plane - sinuses
 
+	vec tmp_vec;
+	vec tmp_vec2;
+
 	tuple<u64, double> sx_int;							// tuple to store the value of sx local interaction (after flip)
 	tuple<u64, _type> sy_int;							// tuple to store the value of sy local interaction (after flip)
 	tuple<u64, double> sz_int;							// tuple to store the value of sz local interaction (no flip)
 
 public:
 	~Heisenberg_dots() = default;
+	Heisenberg_dots() = default;
 	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
 		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
 	// ----------------------------------- 				 SETTERS 				 ---------------------------------
@@ -44,14 +48,14 @@ public:
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
 		string name = sep + \
-			"heisenberg_with_dots," + VEQ(dot_num) + "," + VEQ(Ns) + \
-			",J=" + STRP(J, 2) + \
-			",J0=" + STRP(J0, 2) + \
-			",g=" + STRP(g, 2) + \
-			",g0=" + STRP(g0, 2) + \
-			",h=" + STRP(h, 2) + \
-			",w=" + STRP(w, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+			"heisenberg_with_dots," + VEQ(this->dot_num) + "," + VEQ(this->Ns) + \
+			",J=" + STRP(this->J, 2) + \
+			",J0=" + STRP(this->J0, 2) + \
+			",g=" + STRP(this->g, 2) + \
+			",g0=" + STRP(this->g0, 2) + \
+			",h=" + STRP(this->h, 2) + \
+			",w=" + STRP(this->w, 2);
+		return SpinHamiltonian<double>::inf(name, skip, sep);
 	}
 };
 
@@ -64,7 +68,7 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 {
 	this->positions = positions;
 	// sort the postitions vector for building block convinience
-	std::ranges::sort(this->positions.begin(), this->positions.end());
+	std::sort(this->positions.begin(), this->positions.end());
 
 	this->dot_num = positions.size();
 	this->J_dot = J_dot;
@@ -243,11 +247,11 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			double si = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
 
 			// perpendicular magnetic field
-			this->H(k, k) += (this->h + dh(j)) * si;
+			this->H(k, k) += (this->h + this->dh(j)) * si;
 
 			// transverse field
 			const u64 new_idx = flip(k, this->Ns - 1 - j);
-			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+			this->setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// interaction - check if nn exists
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
@@ -261,7 +265,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
-						setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+						this->setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
 				}
 			}
 			// handle the dot
@@ -335,7 +339,7 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 		this->locEnergies[i] = std::make_tuple(new_idx, s_flipped_en);
 	}
 	// append unchanged at the very end
-	locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	this->locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
 
@@ -401,7 +405,7 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 		this->locEnergies[i] = std::make_tuple(new_idx, s_flipped_en);
 	}
 	// append unchanged at the very end
-	locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+	this->locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
 }
 
 #endif

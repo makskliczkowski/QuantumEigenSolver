@@ -1,7 +1,7 @@
 #pragma once
-#ifndef HEISENBERG_H
+
 #include "heisenberg.h"
-#endif // !HEISENBERG_H
+
 
 // --------------------------------------------------------------------------- HEISENBERG INTERACTING WITH KITAEV SPINS ---------------------------------------------------------------------------
 #ifndef HEISENBERG_KITAEV
@@ -16,9 +16,12 @@ private:
 	vec dKy;											// kitaev model exchange vector
 	vec dKz;											// kitaev model exchange vector
 	double K0;											// disorder with Kitaev exchange
+	vec tmp_vec;
+	vec tmp_vec2;
 
 public:
 	~Heisenberg_kitaev() = default;
+	Heisenberg_kitaev() = default;
 	Heisenberg_kitaev(double J, double J0, double g, double g0, double h, double w, double delta, std::tuple<double, double, double> K, double K0, std::shared_ptr<Lattice> lat)
 		: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 	{
@@ -45,19 +48,19 @@ public:
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
 		string name = sep + \
-			"heisenberg_kitaev," + VEQ(Ns) + \
-			",J=" + STRP(J, 2) + \
-			",J0=" + STRP(J0, 2) + \
-			",d=" + STRP(delta, 2) + \
-			",g=" + STRP(g, 2) + \
-			",g0=" + STRP(g0, 2) + \
-			",h=" + STRP(h, 2) + \
-			",w=" + STRP(w, 2) + \
-			",Kx=" + STRP(Kx, 2) + \
-			",Ky=" + STRP(Ky, 2) + \
-			",Kz=" + STRP(Kz, 2) + \
-			",K0=" + STRP(K0, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+			"heisenberg_kitaev," + VEQ(this->Ns) + \
+			",J=" + STRP(this->J, 2) + \
+			",J0=" + STRP(this->J0, 2) + \
+			",d=" + STRP(this->delta, 2) + \
+			",g=" + STRP(this->g, 2) + \
+			",g0=" + STRP(this->g0, 2) + \
+			",h=" + STRP(this->h, 2) + \
+			",w=" + STRP(this->w, 2) + \
+			",Kx=" + STRP(this->Kx, 2) + \
+			",Ky=" + STRP(this->Ky, 2) + \
+			",Kz=" + STRP(this->Kz, 2) + \
+			",K0=" + STRP(this->K0, 2);
+		return SpinHamiltonian<double>::inf(name, skip, sep);
 	}
 };
 
@@ -229,11 +232,11 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			double si = checkBit(k, this->Ns - i - 1) ? 1.0 : -1.0;
 
 			// perpendicular field (SZ) - HEISENBERG
-			this->H(k, k) += (this->h + dh(i)) * si;
+			this->H(k, k) += (this->h + this->dh(i)) * si;
 
 			// HEISENBERG
 			const u64 new_idx = flip(k, this->Ns - 1 - i);
-			setHamiltonianElem(k, this->g + this->dg(i), new_idx);
+			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
 
 			// check the correlations
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
@@ -254,15 +257,15 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
-						setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
+						this->setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
 					
 					// --------------------- KITAEV
 					if (n_num == 0)
-						setHamiltonianElem(k, (this->Kz + this->dKz(i)) * sisj, k);
+						this->setHamiltonianElem(k, (this->Kz + this->dKz(i)) * sisj, k);
 					else if (n_num == 1)
-						setHamiltonianElem(k, -(this->Ky + this->dKy(i)) * sisj, flip_idx_nn);
+						this->setHamiltonianElem(k, -(this->Ky + this->dKy(i)) * sisj, flip_idx_nn);
 					else if (n_num == 2)
-						setHamiltonianElem(k, this->Kx + this->dKx(i), flip_idx_nn);
+						this->setHamiltonianElem(k, this->Kx + this->dKx(i), flip_idx_nn);
 				}
 			}
 		}

@@ -193,7 +193,7 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 
 	// calculates the middle spectrum element
 	double E_av = trace(eigenvalues) / double(N);
-	auto i = std::ranges::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
 		return abs(x - E_av) < abs(y - E_av);
 		});
 	this->E_av_idx = i - std::begin(eigenvalues);
@@ -326,41 +326,41 @@ inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(u64 state) const
 *  @returns*/
 template<typename _type>
 inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vector<int> sites) {
-	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
-	for (auto& site : sites) {
-		if (site < 0 || site >= L) throw "Site index exceeds chain";
-	}
-	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	double value_real = 0, value_imag = 0;
-#pragma omp parallel
-	{
-		std::vector<bool> base_vector(L), temp(L);
-#pragma omp for reduction (+: value_real, value_imag)
-		for (int k = 0; k < N; k++) {
-			int_to_binary(map(k), base_vector);
-			auto l = *(sites.begin());
-			auto nei = *(sites.begin() + 1);
-			temp = base_vector;
-			if (nei < 0) continue;
-			cpx value = 0.0;
-			if (base_vector[l] && !base_vector[nei]) {
-				temp[l] = 0;
-				temp[nei] = 1;
-				const u64 idx = binary_to_int(temp);
-				value = conj(state_alfa(idx)) * state_beta(k) * im;
-			}
-			else if (!base_vector[l] && base_vector[nei]) {
-				temp[l] = 1;
-				temp[nei] = 0;
-				const u64 idx = binary_to_int(temp);
-				value = -conj(state_alfa(idx)) * state_beta(k) * im;
-			}
-			value_real += value.real();
-			value_imag += value.imag();
-		}
-	}
-	return 2i * cpx(value_real, value_imag);
+//	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
+//	for (auto& site : sites) {
+//		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+//	}
+//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+//	arma::subview_col state_beta = this->eigenvectors.col(beta);
+//	double value_real = 0, value_imag = 0;
+//#pragma omp parallel
+//	{
+//		std::vector<bool> base_vector(this->Ns), temp(this->Ns);
+//#pragma omp for reduction (+: value_real, value_imag)
+//		for (int k = 0; k < N; k++) {
+//			int_to_binary(map(k), base_vector);
+//			auto l = *(sites.begin());
+//			auto nei = *(sites.begin() + 1);
+//			temp = base_vector;
+//			if (nei < 0) continue;
+//			cpx value = 0.0;
+//			if (base_vector[l] && !base_vector[nei]) {
+//				temp[l] = 0;
+//				temp[nei] = 1;
+//				const u64 idx = binary_to_int(temp);
+//				value = conj(state_alfa(idx)) * state_beta(k) * im;
+//			}
+//			else if (!base_vector[l] && base_vector[nei]) {
+//				temp[l] = 1;
+//				temp[nei] = 0;
+//				const u64 idx = binary_to_int(temp);
+//				value = -conj(state_alfa(idx)) * state_beta(k) * im;
+//			}
+//			value_real += value.real();
+//			value_imag += value.imag();
+//		}
+//	}
+	return 2i;// *cpx(value_real, value_imag);
 }
 
 /*
@@ -371,38 +371,38 @@ inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vect
 *  @returns*/
 template<typename _type>
 inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta) {
-	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	double value_real = 0, value_imag = 0;
-#pragma omp parallel
-	{
-		std::vector<bool> base_vector(L), temp(L);
-#pragma omp for reduction (+: value_real, value_imag)
-		for (int k = 0; k < N; k++) {
-			int_to_binary(map(k), base_vector);
-			for (int l = 0; l < this->Ns; l++) {
-				temp = base_vector;
-				const int nei = this->lattice->get_nn(l, 0);
-				if (nei < 0) continue;
-				cpx value = 0.0;
-				if (base_vector[l] && !base_vector[nei]) {
-					temp[l] = 0;
-					temp[nei] = 1;
-					const u64 idx = binary_to_int(temp);
-					value = conj(state_alfa(idx)) * state_beta(k) * im;
-				}
-				else if (!base_vector[l] && base_vector[nei]) {
-					temp[l] = 1;
-					temp[nei] = 0;
-					const u64 idx = binary_to_int(temp);
-					value = -conj(state_alfa(idx)) * state_beta(k) * im;
-				}
-				value_real += value.real();
-				value_imag += value.imag();
-			}
-		}
-	}
-	return 2i * cpx(value_real, value_imag) / sqrt(this->Ns);
+//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+//	arma::subview_col state_beta = this->eigenvectors.col(beta);
+//	double value_real = 0, value_imag = 0;
+//#pragma omp parallel
+//	{
+//		std::vector<bool> base_vector(L), temp(L);
+//#pragma omp for reduction (+: value_real, value_imag)
+//		for (int k = 0; k < N; k++) {
+//			int_to_binary(map(k), base_vector);
+//			for (int l = 0; l < this->Ns; l++) {
+//				temp = base_vector;
+//				const int nei = this->lattice->get_nn(l, 0);
+//				if (nei < 0) continue;
+//				cpx value = 0.0;
+//				if (base_vector[l] && !base_vector[nei]) {
+//					temp[l] = 0;
+//					temp[nei] = 1;
+//					const u64 idx = binary_to_int(temp);
+//					value = conj(state_alfa(idx)) * state_beta(k) * im;
+//				}
+//				else if (!base_vector[l] && base_vector[nei]) {
+//					temp[l] = 1;
+//					temp[nei] = 0;
+//					const u64 idx = binary_to_int(temp);
+//					value = -conj(state_alfa(idx)) * state_beta(k) * im;
+//				}
+//				value_real += value.real();
+//				value_imag += value.imag();
+//			}
+//		}
+//	}
+	return 2i;// *cpx(value_real, value_imag) / sqrt(this->Ns);
 }
 
 #endif

@@ -17,7 +17,8 @@ private:
 	double J = 1;																								// spin exchange
 	double g = 1;																								// transverse magnetic field
 	double h = 1;																								// perpendicular magnetic field
-
+	vec tmp_vec;
+	vec tmp_vec2;
 	vec dh;																										// disorder in the system - deviation from a constant h value
 	double w = 0;																								// the distorder strength to set dh in (-disorder_strength, disorder_strength)
 	vec dJ;																										// disorder in the system - deviation from a constant J0 value
@@ -42,6 +43,7 @@ public:
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const
 	{
+		auto Ns = this->lattice->get_Ns();
 		string name = sep + \
 			"ising,Ns=" + STR(Ns) + \
 			",J=" + STRP(J, 2) + \
@@ -50,7 +52,7 @@ public:
 			",g0=" + STRP(g0, 2) + \
 			",h=" + STRP(h, 2) + \
 			",w=" + STRP(w, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+		return SpinHamiltonian<double>::inf(name, skip, sep);
 	}
 };
 
@@ -75,10 +77,10 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 	this->Ns = this->lattice->get_Ns();
 	this->loc_states_num = this->Ns + 1;												// number of states after local energy work
 	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num);				// set local energies vector
-	this->N = ULLPOW(Ns);																// Hilber space size
-	this->dh = create_random_vec(Ns, this->ran, this->w);								// creates random disorder vector
-	this->dJ = create_random_vec(Ns, this->ran, this->J0);								// creates random exchange vector
-	this->dg = create_random_vec(Ns, this->ran, this->g0);								// creates random transverse field vector
+	this->N = ULLPOW(this->Ns);															// Hilber space size
+	this->dh = create_random_vec(this->Ns, this->ran, this->w);							// creates random disorder vector
+	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);						// creates random exchange vector
+	this->dg = create_random_vec(this->Ns, this->ran, this->g0);						// creates random transverse field vector
 
 	//change info
 	this->info = this->inf();
@@ -109,7 +111,7 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 	// sumup the value of a non-changed state
 	double localVal = 0;
 #pragma omp parallel for reduction(+ : localVal)
-	for (auto i = 0; i < Ns; i++) {
+	for (auto i = 0; i < this->Ns; i++) {
 		auto nn_number = this->lattice->get_nn_number(i);
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
@@ -129,7 +131,7 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 	}
 	// append unchanged at the very end
-	locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	this->locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
 }
 
 /*
@@ -141,7 +143,7 @@ void IsingModel<_type>::locEnergy(const vec& v) {
 	// sumup the value of a non-changed state
 	double localVal = 0;
 #pragma omp parallel for reduction(+ : localVal)
-	for (auto i = 0; i < Ns; i++) {
+	for (auto i = 0; i < this->Ns; i++) {
 		auto nn_number = this->lattice->get_nn_number(i);
 
 		// check Sz 
@@ -159,12 +161,12 @@ void IsingModel<_type>::locEnergy(const vec& v) {
 		}
 		// flip with S^x_i with the transverse field
 		this->tmp_vec = v;
-		flipV(tmp_vec, i);
-		const u64 new_idx = baseToInt(tmp_vec);
+		flipV(this->tmp_vec, i);
+		const u64 new_idx = baseToInt(this->tmp_vec);
 		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
 	}
 	// append unchanged at the very end
-	locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+	this->locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
@@ -213,10 +215,10 @@ void IsingModel<_type>::hamiltonian() {
 			
 			// flip with S^x_i with the transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - j);
-			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+			this->setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// diagonal elements setting the perpendicular field
-			H(k, k) += (this->h + dh(j)) * s_i;											
+			this->H(k, k) += (this->h + dh(j)) * s_i;											
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
 				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
 					// Ising-like spin correlation

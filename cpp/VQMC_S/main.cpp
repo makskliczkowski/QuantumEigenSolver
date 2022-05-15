@@ -5,7 +5,7 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-#define PLOT
+//#define PLOT
 //#define SPIN
 
 
@@ -14,19 +14,7 @@
 	#define S_REGULAR
 #endif
 
-#ifdef PINV
-	constexpr auto pinv_tol = 1e-5;
-	#ifdef S_REGULAR
-		#undef S_REGULAR
-	#endif
-#elif defined S_REGULAR 
-	constexpr double lambda_0_reg = 100;
-	constexpr double b_reg = 0.9;
-	constexpr double lambda_min_reg = 1e-4;
-	#ifdef PINV
-		#undef PINV
-	#endif
-#endif
+
 
 
 

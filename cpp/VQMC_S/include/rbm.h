@@ -4,30 +4,49 @@
 
 #include "../src/progress.h"
 
-#ifndef HAMIL_H
-#include "hamil.h"
+#ifndef HEISENBERG_DOTS
+#include "models/heisenberg_dots.h"
+#endif
+#ifndef HEISENBERG_KITAEV
+#include "models/heisenberg-kitaev.h"
+#endif
+#ifndef ISINGMODEL
+#include "models/ising.h"
 #endif
 
 #ifndef OPERATORS_H
-#include "operators/operators.h"
+#include "/operators/operators.h"
 #endif
 
 
-
-#include "../include/ml.h"
-
-
-
+#ifndef ML_H
+#include "ml.h"
+#endif
 
 
+#ifdef PINV
+	constexpr auto pinv_tol = 1e-5;
+	#ifdef S_REGULAR
+		#undef S_REGULAR
+	#endif
+#elif defined S_REGULAR 
+
+	#ifdef PINV
+		#undef PINV
+	#endif
+#endif
 
 
+#include <omp.h>
 
 
-
+template <typename...> class rbmState;
+constexpr double lambda_0_reg = 100;
+constexpr double b_reg = 0.9;
+constexpr double lambda_min_reg = 1e-4;
 
 template <typename _type, typename _hamtype>
-class rbmState{
+class rbmState<_type, _hamtype>{
 
 private:
 
@@ -239,7 +258,7 @@ public:
 * @param tol tolerance on the absolute value
 */
 template<typename _type, typename _hamtype>
-inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+inline void rbmState<_type, _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
     v_1d<int> tmp(this->n_visible);
     double norm = 0;
     double phase = 0;
@@ -263,7 +282,7 @@ inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u
 * allocates memory for arma objects
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::allocate() {
+void rbmState<_type, _hamtype>::allocate() {
     auto Ns = this->hamil->lattice->get_Ns();
     // initialize biases
     this->b_v = Col<_type>(this->n_visible, arma::fill::randn) / double(Ns);
@@ -288,7 +307,7 @@ void rbmState<typename _type, typename _hamtype>::allocate() {
 * @brief Initialize the weights 
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::init() {
+void rbmState<_type, _hamtype>::init() {
     // initialize random state
     this->set_rand_state();
 
@@ -435,7 +454,7 @@ inline void rbmState<_type, _hamtype>::set_angles(const Col<double>& v)
 * @brief sets the weights according to the gradient descent - uses this->grad vector to update them
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::set_weights() {
+void rbmState<_type, _hamtype>::set_weights() {
     // update weights accordingly
 #pragma omp parallel for
     for (auto i = 0; i < this->n_visible; i++)
@@ -468,7 +487,7 @@ inline void rbmState<_type, _hamtype>::rescale_covariance()
 * @param v the base vector we want to calculate derivatives from
 */
 template<typename _type, typename _hamtype>
-void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+void rbmState<_type, _hamtype>::calcVarDeriv(const Col<double>& v){
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
 
 #ifndef RBM_ANGLES_UPD
@@ -499,7 +518,7 @@ void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
 * @param current_step if we would like to optimize according to current mcstep
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+void rbmState<_type, _hamtype>::updVarDerivSR(int current_step){
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
    
     // update flat vector
@@ -545,7 +564,7 @@ inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state)
 * @brief Calculate the local energy depending on the given Hamiltonian
 */
 template<typename _type, typename _hamtype>
-inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+inline _type rbmState<_type, _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
     const auto hilb = this->hamil->get_hilbert_size();
     // get the reference to all local energies and changed states from the model Hamiltonian
@@ -576,7 +595,7 @@ inline _type rbmState<typename _type, typename _hamtype>::locEn(){
 * @param n_flips number of flips at the single step
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
+void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
     this->set_state(start_state, thermalize);
 
     // set the tmp_vector to current state
@@ -623,7 +642,7 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
 #ifdef S_REGULAR
     this->current_b_reg = this->b_reg_mult;
 #endif
@@ -788,16 +807,15 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             PRT(sample_time, this->dbg_samp);
 
             // look at the states coefficient (not found)
-            if (!states.contains(this->current_state)) {
-                auto coefficient = this->coeff(this->current_vector);
-                if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-2)) {
+            //if (!states.contains(this->current_state)) {
+            auto coefficient = this->coeff(this->current_vector);
+            if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-2)) {
                     states[this->current_state] = coefficient;
 
                     //SpinHamiltonian<double>::print_base_state(this->current_state, 1, tmp_vec_print, 1);
                     //stout << VEQ(coefficient) << EL;
                     norm += pow(abs(coefficient), 2.0);
                 }
-            }
             // append local energies
             this->collectAv(this->locEn());
         }

@@ -126,7 +126,38 @@ inline u64 binary_search(const std::vector<double>& arr, u64 l_point, u64 r_poin
 	}
 	return -1;
 }
+// ---------------------------------- check bit ----------------------------------
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param k Number of bit (from 0 to 63) - count from right
+*@returns Bool on if the bit is set or not
+*/
+inline bool checkBit(u64 n, int k) {
+	return n & (1ULL << k);
+}
 
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const v_1d<_type>& n, int L) {
+	return n[L];
+}
+
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const Col<_type>& n, int L) {
+	return n(L);
+}
 // -----------------------------------------------------------------------------  				  transformations   				 -----------------------------------------------------------------------------
 
 /*
@@ -416,7 +447,7 @@ inline u64 rotateLeft(u64 n, int L) {
 */
 template<typename _type>
 inline v_1d<_type>& rotateLeftV(v_1d<_type>& n, int L) {
-	std::ranges::rotate(n.begin(), n.begin() + L, n.end());
+	std::rotate(n.begin(), n.begin() + L, n.end());
 	return v_1d<_type>();
 }
 
@@ -428,42 +459,11 @@ inline v_1d<_type>& rotateLeftV(v_1d<_type>& n, int L) {
 template<typename _type>
 inline v_1d<_type>& rotateLeftV(const v_1d<_type>& n, int L) {
 	auto tmp = n;
-	std::ranges::rotate(tmp.begin(), tmp.begin() + L, tmp.end());
+	std::rotate(tmp.begin(), tmp.begin() + L, tmp.end());
 	return tmp;
 }
 
-// ---------------------------------- check bit ----------------------------------
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param k Number of bit (from 0 to 63) - count from right
-*@returns Bool on if the bit is set or not
-*/
-inline bool checkBit(u64 n, int k) {
-	return n & (1ULL << k);
-}
 
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param L Number of bit - counted from left
-*@returns Bool on if the bit is set or not
-*/
-template<typename _type>
-inline _type checkBitV(const v_1d<_type>& n, int L) {
-	return n[L];
-}
-
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param L Number of bit - counted from left
-*@returns Bool on if the bit is set or not
-*/
-template<typename _type>
-inline _type checkBitV(const Col<_type>& n, int L) {
-	return n(L);
-}
 // ---------------------------------- flip all bits ----------------------------------
 
 /*
@@ -659,7 +659,7 @@ inline u64 reverseBits(u64 n, int L) {
 template<typename _type>
 inline u64 reverseBitsV_copy(const v_1d<_type>& n, int L) {
 	auto tmp = n;
-	std::ranges::reverse(tmp.begin(), tmp.end());
+	std::reverse(tmp.begin(), tmp.end());
 	return tmp;
 }
 
@@ -671,7 +671,7 @@ inline u64 reverseBitsV_copy(const v_1d<_type>& n, int L) {
 */
 template<typename _type>
 inline void reverseBitsV(v_1d<_type>& n, int L) {
-	std::ranges::reverse(n.begin(), n.end());
+	std::reverse(n.begin(), n.end());
 }
 
 /*

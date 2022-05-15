@@ -23,10 +23,6 @@
 	#include "../rbm.h"
 #endif
 
-#include "../models/ising.h"
-#include "../models/heisenberg_dots.h"
-#include "../models/heisenberg-kitaev.h"
-
 #ifndef SQUARE_H
 	#include "../lattices/square.h"
 #endif
@@ -85,6 +81,7 @@
 // maximal ed size to compare
 constexpr int maxed = 10;
 
+#include <omp.h>
 
 namespace rbm_ui {
 	std::unordered_map <string, string> const default_params = {
