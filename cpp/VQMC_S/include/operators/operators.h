@@ -425,7 +425,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 
 
 	// --------------------- entropy ----------------------
-	av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
+	// av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
 }
 
 

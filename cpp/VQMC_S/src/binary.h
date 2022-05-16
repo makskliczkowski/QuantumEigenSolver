@@ -171,7 +171,6 @@ inline void intToBaseBit(u64 idx, Col<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec(k) = checkBit(idx, size - 1 - k);
 #ifdef DEBUG_BINARY
@@ -190,7 +189,6 @@ inline void intToBaseBit(u64 idx, v_1d<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec[k] = checkBit(idx, size - 1 - k);
 #ifdef DEBUG_BINARY
@@ -210,7 +208,7 @@ inline void intToBaseBitSpin(u64 idx, Col<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec(k) = checkBit(idx, size - 1 - k) ? 1.0 : -1.0;
 #ifdef DEBUG_BINARY
@@ -229,7 +227,7 @@ inline void intToBaseBitSpin(u64 idx, v_1d<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec[k] = checkBit(idx, size - 1 - k) ? 1.0 : -1.0;
 #ifdef DEBUG_BINARY
@@ -359,8 +357,9 @@ template<typename T>
 inline u64 baseToInt(const Col<T>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
+#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>(std::real(vec(size - 1 - k))) * powers[k];
+		val += static_cast<u64>(vec(size - 1 - k)) * powers[k];
 	return val;
 }
 
@@ -375,8 +374,9 @@ template<typename T>
 inline u64 baseToInt(const Col<T>& vec) {
 	u64 val = 0;
 	const u64 size = vec.size();
+#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>(std::real(vec(size - 1 - k))) * BinaryPowers[k];
+		val += static_cast<u64>(vec(size - 1 - k)) * BinaryPowers[k];
 	return val;
 }
 
@@ -392,8 +392,9 @@ template<typename T>
 inline u64 baseToIntSpin(const Col<T>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
+#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0)/2.0) * powers[k];
+		val += static_cast<u64>((vec(size - 1 - k) + 1.0)/2.0) * powers[k];
 	return val;
 }
 
@@ -401,26 +402,27 @@ template<typename T>
 inline u64 baseToIntSpin(const Col<T>& vec) {
 	u64 val = 0;
 	const u64 size = vec.size();
+#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0) / 2.0) * BinaryPowers[k];
+		val += static_cast<u64>((vec(size - 1 - k) + 1.0) / 2.0) * BinaryPowers[k];
 	return val;
 }
 // -----------------------------------------------------------------------------   				 for states operation   				 -----------------------------------------------------------------------------
 template<typename T1, typename T2>
-inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv, int numthreads = 1) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
 	T1 acc = 0;
-//#pragma omp parallel for reduction(+ : acc)
+//#pragma omp parallel for reduction(+ : acc) numthreads(numthreads)
 	for (auto i = 0; i < lv.size(); i++)
 		acc += std::conj(lv(i)) * rv(i);
 	return acc;
 }
 
 template<typename T1, typename T2>
-inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv, int numthreads = 1) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
 	T1 acc = 0;
-//#pragma omp parallel for reduction(+ : acc)
+//#pragma omp parallel for reduction(+ : acc) numthreads(numthreads)
 	for (auto i = 0; i < lv.size(); i++)
 		acc += (lv(i)) * rv(i);
 	return acc;

@@ -494,13 +494,13 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 
 	// --- kitaev ---
 	choosen_option = "-kx";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Kx, argv, choosen_option, false);
 	choosen_option = "-ky";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Ky, argv, choosen_option, false);
 	choosen_option = "-kz";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Kz, argv, choosen_option, false);
 	choosen_option = "-k0";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->K0, argv, choosen_option, false);
 
 	//---------- OTHERS
 
@@ -750,12 +750,12 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	fileSave.close();
 
 	// --------------------- entropy ----------------------
-	filename = dir + "_ent_entro";
-	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_1d(fileSave, this->av_op.ent_entro);
-	fileSave.close();
-	PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + "\n" + name);
-	SAVEFIG(filename + ".png", false);
+	// filename = dir + "_ent_entro";
+	// openFile(fileSave, filename + ".dat", ios::out);
+	// print_vector_1d(fileSave, this->av_op.ent_entro);
+	// fileSave.close();
+	// PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + "\n" + name);
+	// SAVEFIG(filename + ".png", false);
 
 	// --------------------- save log ---------------------	// save the log file and append columns if it is empty
 	string logname = dir + "log.dat";

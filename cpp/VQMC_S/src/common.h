@@ -166,6 +166,139 @@ inline double tim_mus(clk::time_point start) {
 // ----------------------------------------------------------------------------- MATRIX MULTIPLICATION
 
 /*
+* @brief Allows to calculate the matrix consisting of Column vector times row vector
+* @param setMat matrix to set the elements onto
+* @param setVec column vector to set the elements from
+*/
+template <typename _type>
+inline void setColumnTimesRow(arma::Mat<_type>& setMat, const arma::Col<_type>& setVec) {
+#pragma omp parallel for
+	for (auto i = 0; i < setMat.n_rows; i++)
+		for (auto j = 0; j < setMat.n_cols; j++)
+			setMat(i, j) = conj(setVec(i)) * setVec(j);
+}
+
+/*
+* @brief Allows to calculate the matrix consisting of Column vector times row vector but updates it instead of overwritng
+* @param setMat matrix to set the elements onto
+* @param setVec column vector to set the elements from
+* @param plus if add or substract
+*/
+template <typename _type>
+inline void setColumnTimesRow(arma::Mat<_type>& setMat, const arma::Col<_type>& setVec, bool plus) {
+	if (plus)
+#pragma omp parallel for
+		for (auto i = 0; i < setMat.n_rows; i++)
+			for (auto j = 0; j < setMat.n_cols; j++)
+				setMat(i, j) += conj(setVec(i)) * setVec(j);
+	else
+#pragma omp parallel for
+		for (auto i = 0; i < setMat.n_rows; i++)
+			for (auto j = 0; j < setMat.n_cols; j++)
+				setMat(i, j) -= conj(setVec(i)) * setVec(j);
+}
+
+
+
+/*
+* @brief Allows to calculate the constant times column vector but updates it instead of overwritng
+* @param setCol column to set the elements onto
+* @param v value to multiply by
+* @param multCol column vector to set the elements from
+* @param conjug if we shall conjugate the column
+*/
+template <typename _type, typename _type2>
+inline void setConstTimesCol(arma::Col<_type>& setCol, _type2 v, const arma::Col<_type>& multCol, bool conjug) {
+	if(conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) = v * conj(multCol(i));
+	else
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) = v * multCol(i);
+}
+
+/*
+* @brief Allows to calculate the constant times column vector but updates it instead of overwritng
+* @param setCol column to set the elements onto
+* @param v value to multiply by
+* @param multCol column vector to set the elements from
+* @param conjug if we shall conjugate the column
+*/
+template <typename _type, typename _type2>
+inline void setConstTimesCol(arma::Col<_type>& setCol, _type2 v, const arma::subview_col<_type>& multCol, bool conjug) {
+	if (conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) = v * conj(multCol(i));
+	else
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) = v * multCol(i);
+}
+
+
+/*
+* @brief Allows to calculate the constant times column vector but updates it instead of overwritng
+* @param setCol column to set the elements onto
+* @param v value to multiply by
+* @param multCol column vector to set the elements from
+* @param plus if add or substract
+* @param conjug if we shall conjugate the column
+*/
+template <typename _type, typename _type2>
+inline void setConstTimesCol(arma::Col<_type>& setCol, _type2 v, const arma::Col<_type>& multCol, bool plus, bool conjug) {
+	if (plus && conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) += v * conj(multCol(i));
+	else if (plus && !conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) += v * multCol(i);
+	else if (!plus && conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) -= v * conj(multCol(i));
+	else
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) -= v * multCol(i);
+}
+
+/*
+* @brief Allows to calculate the constant times column vector but updates it instead of overwritng
+* @param setCol column to set the elements onto
+* @param v value to multiply by
+* @param multCol column vector to set the elements from
+* @param plus if add or substract
+* @param conjug if we shall conjugate the column
+*/
+template <typename _type, typename _type2>
+inline void setConstTimesCol(arma::Col<_type>& setCol, _type2 v, const arma::subview_col<_type>& multCol, bool plus, bool conjug) {
+	if (plus && conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) += v * conj(multCol(i));
+	else if (plus && !conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) += v * multCol(i);
+	else if (!plus && conjug)
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) -= v * conj(multCol(i));
+	else
+#pragma omp parallel for
+		for (auto i = 0; i < setCol.n_elem; i++)
+			setCol(i) -= v * multCol(i);
+}
+
+
+
+
+/*
 * Puts the given matrix MSet(smaller) to a specific place in the M2Set (bigger) matrix
 * @param M2Set (bigger) matrix to find the submatrix in and set it's elements
 * @param MSet (smaller) matrix to be put in the M2Set

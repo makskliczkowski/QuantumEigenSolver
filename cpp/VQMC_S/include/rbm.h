@@ -220,12 +220,13 @@ public:
     Col<_type> Fs(const Col<double>& v)                                 const { return arma::cosh(this->b_h + this->W * v); };
 
     // get the current amplitude given vector
-    auto coeff(const Col<double>& v)                                    const { return (exp(dotm(this->b_v, v)) * arma::prod(Fs(v))) / sqrt(this->hamil->lattice->get_Ns()); };//* std::pow(2.0, this->n_hidden)
+    auto coeff(const Col<double>& v, int tn = 1)                        const { return (exp(dotm(this->b_v, v, tn)) * arma::prod(Fs(v))) / sqrt(this->hamil->lattice->get_Ns()); };//* std::pow(2.0, this->n_hidden)
 
     // get probability ratio for a reference state v1 and v2 state
-    _type pRatio()                                                      const { return exp(dotm(this->b_v, Col<double>(this->tmp_vector - this->current_vector)) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)))); };
-    _type pRatio(const Col<double>& v)                                  const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector)) + arma::sum(log(Fs(v) / arma::cosh(this->thetas)))); };
-    _type pRatio(const Col<double>& v1, const Col<double>& v2)          const { return exp(dotm(this->b_v, Col<double>(v2 - v1)) + sum(log(Fs(v2) / Fs(v1)))); };
+    _type pRatio(int tn = 1)                                            const { return exp(dotm(this->b_v, Col<double>(this->tmp_vector - this->current_vector), tn) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)))); };
+    _type pRatio(const Col<double>& v, int tn = 1)                      const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector), tn) + arma::sum(log(Fs(v) / arma::cosh(this->thetas)))); };
+    _type pRatio(const Col<double>& v1, const Col<double>& v2\
+        , int tn = 1)                                                   const { return exp(dotm(this->b_v, Col<double>(v2 - v1), tn) + sum(log(Fs(v2) / Fs(v1)))); };
 
     // get local energies
     _type locEn();
@@ -399,9 +400,11 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(int flip_place, double flipped_spin)
 {
 #ifdef SPIN
-    this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
+    //this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (2.0 * flipped_spin), this->W.col(flip_place), false, false);
 #else
-    this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
+    //this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (1.0 - 2.0 * flipped_spin), this->W.col(flip_place), true, false);
 #endif
 } 
 
@@ -414,9 +417,11 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int flip_place)
 {
 #ifdef SPIN
-    this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
+    //this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (2.0 * v(flip_place)), this->W.col(flip_place), true, false);
 #else
-    this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
+    //this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (1.0 - 2.0 * v(flip_place)), this->W.col(flip_place), false, false);
 #endif
 }
 
@@ -533,7 +538,7 @@ void rbmState<_type, _hamtype>::updVarDerivSR(int current_step){
 #else 
     this->F = this->lr * arma::solve(this->S, this->F);
 #endif 
-    PRT(var_deriv_time_upd, this->dbg_updt)
+    PRT(var_deriv_time_upd, this->dbg_updt);
 }
 
 
@@ -567,21 +572,24 @@ template<typename _type, typename _hamtype>
 inline _type rbmState<_type, _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
     const auto hilb = this->hamil->get_hilbert_size();
-    // get the reference to all local energies and changed states from the model Hamiltonian
+    
+    this->hamil->locEnergy(this->current_state);
     _type energy = 0;
-    auto energies = this->hamil->get_localEnergyRef(this->current_state);
 #ifndef DEBUG
-#pragma omp parallel for reduction(+ : energy) shared(energies)
+#pragma omp parallel for reduction(+ : energy)
 #endif
-    for (auto i = 0; i < energies.size(); i++)
+    for (auto i = 0; i < this->hamil->get_loc_states_num(); i++)
     {
-        const auto& [state, value] = energies[i];
+        const auto [state, value] = this->hamil->get_loc_state_at(i);
         // if the state is not set
         if (state >= hilb)
             continue;
 
         // changes accordingly not to create data race
         energy += state != this->current_state ? this->pRatioValChange(value, state) : value;
+
+        // reset local energies
+        this->hamil->set_loc_en_elem(i, LLONG_MAX, 0.0);
     }
     PRT(loc_en_time, this->dbg_lcen);
     return energy;
@@ -609,11 +617,11 @@ void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, si
         flipV(this->tmp_vector, flip_place);
 
         #ifndef RBM_ANGLES_UPD
-        _type proba = this->pRatio(this->current_vector, this->tmp_vector);
+        _type proba = abs(this->pRatio(this->current_vector, this->tmp_vector, this->thread_num));
         #else
-        _type proba = this->pRatio(this->tmp_vector);
+        double proba = abs(this->pRatio(this->tmp_vector, this->thread_num));
         #endif
-        if (this->hamil->ran.randomReal_uni() <= std::abs(conj(proba) * proba)) {
+        if (this->hamil->ran.randomReal_uni() <= proba * proba) {
             // update current state and vector
 
             this->current_vector(flip_place) = this->tmp_vector(flip_place);
@@ -659,7 +667,6 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 
     // save all average weights for covariance matrix
     Col<_type> averageWeights(this->full_size);
-    Col<_type> energies(norm, arma::fill::zeros);
     Col<_type> meanEnergies(n_samples, arma::fill::zeros);
     
     for(auto i = 0; i < n_samples; i++){
@@ -676,58 +683,54 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
         // thermalize system
         auto therm_time = std::chrono::high_resolution_clock::now();
         this->blockSampling(n_therm * b_size, this->current_state, n_flips, true);
-        PRT(therm_time, this->dbg_thrm)
+        PRT(therm_time, this->dbg_thrm);
 
         // to check whether the batch is ready already
-        size_t took = 1;                                                               
+        size_t took = 0;          
+        _type meanLocEn = 0.0;                    
+        
         auto blocks_time = std::chrono::high_resolution_clock::now();
         while(took <= norm){
             // block sample the stuff
             auto sample_time = std::chrono::high_resolution_clock::now();
             this->blockSampling(b_size, this->current_state, n_flips, false);
-            PRT(sample_time, this->dbg_samp)
+            PRT(sample_time, this->dbg_samp);
 
-            if (norm == (n_blocks - n_therm) || this->hamil->ran.randomReal_uni() <= batch_proba) {
-                auto gradients_time = std::chrono::high_resolution_clock::now();
+            auto gradients_time = std::chrono::high_resolution_clock::now();
 
 
-                this->calcVarDeriv(this->current_vector);
-                // append local energies
-                energies(took - 1) = this->locEn();
-
-                // save conjugate first
-                this->O_flat = arma::conj(this->O_flat);
-                
-                // append gradient forces with the first part of covariance <E_kO_k*>
-                this->F += energies(took - 1) * this->O_flat;
+            this->calcVarDeriv(this->current_vector);
+            // append local energies
+            const _type locEnergy = this->locEn();
 #ifdef USE_SR
-                // append covariance matrices with the first part of covariance <O_k*O_k'>
-                this->S += this->O_flat * this->O_flat.t();
+            // append covariance matrices with the first part of covariance <O_k*O_k'>
+            setColumnTimesRow(this->S, this->O_flat, true);
 #endif
-                // average weight gradients (conjugate)
-                averageWeights += this->O_flat;
-                
-                // append number of elements taken
-                took += 1;
-                PRT(gradients_time, this->dbg_grad)
-            }
+            // append gradient forces with the first part of covariance <E_kO_k*>
+            setConstTimesCol(this->F, locEnergy, this->O_flat, true, true);
+
+            // average weight gradients (conjugate)
+            averageWeights += this->O_flat;
+            
+            // append number of elements taken
+            took += 1;
+            meanLocEn += locEnergy;
+            PRT(gradients_time, this->dbg_grad);
         }
-        PRT(blocks_time, this->dbg_blck)
+        PRT(blocks_time, this->dbg_blck);
 
         // normalize
+        meanLocEn /= double(took);
         averageWeights /= double(took);
         this->F /= double(took);
 
-        // update the covariance
-        _type meanLocEn = arma::mean(energies);
-
         // append gradient forces with the first part of covariance <E_k><O_k*>
-        this->F -= meanLocEn * averageWeights;
+        setConstTimesCol(this->F, meanLocEn, averageWeights, false, true);
 
 #ifdef USE_SR
         this->S /= double(took);
         // append covariance matrices with the first part of covariance <O_k*><O_k'>
-        this->S -= averageWeights * averageWeights.t();
+        setColumnTimesRow(this->S, averageWeights, false);
         // update model
         this->updVarDerivSR(i);
     #ifdef S_REGULAR

@@ -320,9 +320,7 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 
 				// S+S- + S-S+
 				if (si * sj < 0)
-					this->locEnergies[this->Ns + i] = std::make_tuple(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
-				else
-					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+					this->locEnergies[this->Ns + i] = std::make_pair(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
 			}
 		}
 		// handle the dot
@@ -336,10 +334,10 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 			dot_iter++;
 		}
 		// set the flipped state
-		this->locEnergies[i] = std::make_tuple(new_idx, s_flipped_en);
+		this->locEnergies[i] = std::make_pair(new_idx, s_flipped_en);
 	}
 	// append unchanged at the very end
-	this->locEnergies[2 * this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	this->locEnergies[2 * this->Ns] = std::make_pair(_id, static_cast<_type>(localVal));				
 }
 
 
@@ -385,10 +383,10 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 				if (si * sj < 0) {
 					flipV(tmp_vec2, nn);
 					auto flip_idx_nn = baseToInt(tmp_vec2);
-					this->locEnergies[this->Ns + i] = std::make_tuple(flip_idx_nn, 0.5 * interaction);
+					this->locEnergies[this->Ns + i] = std::make_pair(flip_idx_nn, 0.5 * interaction);
 				}
 				else
-					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+					this->locEnergies[this->Ns + i] = std::make_pair(LONG_MAX, 0);
 			}
 		}
 		// handle the dot
@@ -402,10 +400,10 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 			dot_iter++;
 		}
 		// set the flipped state
-		this->locEnergies[i] = std::make_tuple(new_idx, s_flipped_en);
+		this->locEnergies[i] = std::make_pair(new_idx, s_flipped_en);
 	}
 	// append unchanged at the very end
-	this->locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+	this->locEnergies[2 * this->Ns] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
 }
 
 #endif

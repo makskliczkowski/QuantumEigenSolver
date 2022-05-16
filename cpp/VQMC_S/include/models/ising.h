@@ -76,7 +76,7 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 	this->ran = randomGen();
 	this->Ns = this->lattice->get_Ns();
 	this->loc_states_num = this->Ns + 1;												// number of states after local energy work
-	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num);				// set local energies vector
+	this->locEnergies = v_1d<std::pair<u64, _type>>(this->loc_states_num);				// set local energies vector
 	this->N = ULLPOW(this->Ns);															// Hilber space size
 	this->dh = create_random_vec(this->Ns, this->ran, this->w);							// creates random disorder vector
 	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);						// creates random exchange vector
@@ -128,10 +128,10 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 		}
 		// flip with S^x_i with the transverse field
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
-		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+		this->locEnergies[i] = std::make_pair(new_idx, this->g + this->dg(i));
 	}
 	// append unchanged at the very end
-	this->locEnergies[this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	this->locEnergies[this->Ns] = std::make_pair(_id, static_cast<_type>(localVal));				
 }
 
 /*
@@ -163,10 +163,10 @@ void IsingModel<_type>::locEnergy(const vec& v) {
 		this->tmp_vec = v;
 		flipV(this->tmp_vec, i);
 		const u64 new_idx = baseToInt(this->tmp_vec);
-		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+		this->locEnergies[i] = std::make_pair(new_idx, this->g + this->dg(i));
 	}
 	// append unchanged at the very end
-	this->locEnergies[this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+	this->locEnergies[this->Ns] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------

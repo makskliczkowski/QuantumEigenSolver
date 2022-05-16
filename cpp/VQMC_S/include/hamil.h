@@ -28,9 +28,9 @@ public:
 	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
-	v_1d<tuple<u64, _type>> locEnergies;																				// local energies map
+	v_1d<pair<u64, _type>> locEnergies;																					// local energies map
 
-	virtual u64 map(u64 index) = 0;																	// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
+	virtual u64 map(u64 index) = 0;																						// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	// virtual ~SpinHamiltonian() = 0;																	// pure virtual destructor
 	
 	// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
@@ -66,17 +66,19 @@ public:
 	vec entanglement_entropy_sweep(u64 state) const;																	// entanglement entropy sweep over bonds for eigenstate
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
-	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
-	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef(u64 _id)														// returns the constant reference to local energy
+	const v_1d<std::pair<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
+	const v_1d<std::pair<u64, _type>>& get_localEnergyRef(u64 _id)														// returns the constant reference to local energy
 	{ 
 		this->locEnergy(_id);
 		return this->locEnergies; 
 	};	
+	auto get_loc_states_num()										const RETURNS(this->loc_states_num);				// return the number of local states
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian
 	auto get_eigenvectors()											const RETURNS(this->eigenvectors);					// get the const reference to the eigenvectors
 	auto get_eigenvalues()											const RETURNS(this->eigenvalues);					// get the const reference to eigenvalues
+	auto get_loc_state_at(int i)									const RETURNS(this->locEnergies[i]);				// gets the local energy at given position i
 	auto get_eigenEnergy(u64 idx)									const RETURNS(this->eigenvalues(idx));				// get eigenenergy at a given idx
 	auto get_eigenState(u64 idx)									const RETURNS(this->eigenvectors.col(idx));			// get an eigenstate at a given idx
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
@@ -92,6 +94,7 @@ public:
 		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
 
+	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
 	void set_angles() {};
 	void set_angles(const vec& phis, const vec& thetas) {};

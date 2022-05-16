@@ -92,34 +92,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
                        ^
 In file included from main.cpp:22:
 In file included from ./include/user_interface/user_interface.h:23:
-./include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+./include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-./include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
-        auto therm_time = std::chrono::high_resolution_clock::now();
-             ^
-./include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
-./include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from main.cpp:22:
@@ -386,7 +386,7 @@ main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::comple
 ./include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
             , lr(lr)
               ^~~~~
-./include/user_interface/../rbm.h:784:10: warning: unused variable 'Ns' [-Wunused-variable]
+./include/user_interface/../rbm.h:787:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
 ./include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
@@ -493,34 +493,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
         virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
                        ^
 In file included from rbm.cpp:1:
-./include/rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+./include/rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-./include/rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-./include/rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+./include/rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
-./include/rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 20 warnings generated.
@@ -640,34 +640,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
                        ^
 In file included from user_interface.cpp:1:
 In file included from ./include/user_interface/user_interface.h:23:
-./include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+./include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-./include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
-        auto blocks_time = std::chrono::high_resolution_clock::now();
-             ^
-./include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+./include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-./include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from user_interface.cpp:1:
@@ -819,34 +819,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
                        ^
 In file included from main.cpp:22:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from main.cpp:22:
@@ -1113,7 +1113,7 @@ main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::comple
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
             , lr(lr)
               ^~~~~
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:784:10: warning: unused variable 'Ns' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:787:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
@@ -1212,34 +1212,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
         virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
                        ^
 In file included from rbm.cpp:1:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
-        auto blocks_time = std::chrono::high_resolution_clock::now();
-             ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 19 warnings generated.
@@ -1344,34 +1344,34 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
                        ^
 In file included from user_interface.cpp:1:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:23:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:359:10: warning: unused variable 'Ns' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:491:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:522:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:568:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:691:22: warning: unused variable 'gradients_time' [-Wunused-variable]
-                auto gradients_time = std::chrono::high_resolution_clock::now();
-                     ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:686:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:683:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+            auto gradients_time = std::chrono::high_resolution_clock::now();
+                 ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:677:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:805:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:798:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from user_interface.cpp:1:
