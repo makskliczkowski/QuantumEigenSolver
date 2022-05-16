@@ -1,0 +1,8 @@
+nohup: ignoring input
+		-> lat_info=type=hexagonal,dim=2,Ns=40,get_Lx()=5,get_Ly()=4,get_Lz()=1
+		-> model_info=_heisenberg_kitaev,this->Ns=40,J=0.50,J0=0.00,d=1.00,g=0.00,g0=0.00,h=0.00,w=0.00,Kx=-1.00,Ky=-1.00,Kz=-1.00,K0=0.00
+		-> rbm_info=n_visible=40,n_hidden=80,batch=1024,hilbert_size=1099511627776,lr=0.01
+STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: thread_num=8 -> time : 0.00000000s
+mcSteps=300,n_blocks=1000,n_therm=100,block_size=6,
+				-> time: 42.94200000-> PROGRESS : 
+				[|                                                  ] (0%)

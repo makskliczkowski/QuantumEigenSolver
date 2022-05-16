@@ -73,16 +73,13 @@ public:
 template <typename _type>
 void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 
-
+	auto nn_number = this->lattice->get_nn_number(0);
 	// sumup the value of non-changed state
 	double localVal = 0;
 #ifndef DEBUG
 #pragma omp parallel for reduction(+ : localVal)
 #endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
-		// check all the neighbors
-
-		auto nn_number = this->lattice->get_nn_number(i);
 
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;
@@ -104,8 +101,8 @@ void Heisenberg_kitaev<_type>::locEnergy(u64 _id) {
 				// --------------------- HEISENBERG 
 				
 				// diagonal elements setting  interaction field
-				auto interaction = this->J + this->dJ(i);
-				auto sisj = si * sj;
+				double interaction = this->J + this->dJ(i);
+				double sisj = si * sj;
 				localVal += interaction * this->delta * sisj;
 				
 				auto flip_idx_nn = flip(new_idx, this->Ns - 1 - nn);

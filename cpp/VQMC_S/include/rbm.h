@@ -25,7 +25,7 @@
 
 
 #ifdef PINV
-	constexpr auto pinv_tol = 1e-5;
+	constexpr auto pinv_tol = 1e-9;
 	#ifdef S_REGULAR
 		#undef S_REGULAR
 	#endif
@@ -433,7 +433,8 @@ inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int f
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::set_rand_state()
 { 
-    this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size - 1)); 
+    this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size - 1), true); 
+    //this->set_angles(this->current_vector);
 }
 
 /*
@@ -596,6 +597,7 @@ inline _type rbmState<_type, _hamtype>::locEn(){
 }
 
 // ------------------------------------------------- SAMPLING -------------------------------------------------
+
 /*
 * @brief block updates the current state according to Metropolis-Hastings algorithm
 * @param b_size the size of the correlation block
@@ -604,7 +606,8 @@ inline _type rbmState<_type, _hamtype>::locEn(){
 */
 template<typename _type, typename _hamtype>
 void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
-    this->set_state(start_state, thermalize);
+    if(start_state != this->current_state)
+        this->set_state(start_state, thermalize);
 
     // set the tmp_vector to current state
     this->tmp_vector = this->current_vector;
@@ -771,7 +774,7 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 template<typename _type, typename _hamtype>
 inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips)
 {
-    stout << "\n\n\n->Looking for the ground state for " + this->get_info();
+    stout << "\n\n\n->Looking for the ground state for " + this->get_info() << "," + VEQ(n_samples) + "," + VEQ(n_blocks) + "," + VEQ(b_size) << EL;
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -792,8 +795,6 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     double norm = 0.0;
     this->op.reset();
     for (auto r = 0; r < n_samples; r++) {
-        // go through samples to get rid of the correlations
-        
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
 
@@ -801,7 +802,6 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
         auto therm_time = std::chrono::high_resolution_clock::now();
         this->blockSampling(n_therm * b_size, this->current_state, n_flips, true);
         PRT(therm_time, this->dbg_thrm);
-        v_1d<int> tmp_vec_print(this->n_visible, 0);
         for (int i = 0; i < n_blocks; i++) {
 
             // block sample the stuff
@@ -812,13 +812,9 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             // look at the states coefficient (not found)
             //if (!states.contains(this->current_state)) {
             auto coefficient = this->coeff(this->current_vector);
-            if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-2)) {
+            if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-3)) {
                     states[this->current_state] = coefficient;
-
-                    //SpinHamiltonian<double>::print_base_state(this->current_state, 1, tmp_vec_print, 1);
-                    //stout << VEQ(coefficient) << EL;
-                    norm += pow(abs(coefficient), 2.0);
-                }
+            }
             // append local energies
             this->collectAv(this->locEn());
         }
@@ -826,7 +822,7 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
         if (r % pbar.percentageSteps == 0)
             pbar.printWithTime("-> STATE NORM:" + VEQ(sqrt(norm)) + ". PROGRESS");
     }
-    this->op.normalise(n_samples * n_blocks);
+    this->op.normalise(n_samples * n_blocks, this->hamil->lattice->get_spatial_norm());
 
 
     stouts("->Finished Monte Carlo state search after finding weights ", start);
@@ -850,18 +846,21 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 {   
     auto Ns = this->hamil->lattice->get_Ns();
-
+    //stout << VEQ(this->current_state) << EL;
     // calculate sigma_z 
     double s_z = 0.0;
 #pragma omp parallel for reduction(+ : s_z)
     for (int i = 0; i < Ns; i++) {
         const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
         this->op.s_z_i(i) += real(val);
+        //stout << VEQ(val) << EL;
         s_z += real(val);
         for (int j = 0; j < Ns; j++) {
-            const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
+            //const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
             const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, j }));
-            this->op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(val) / this->hamil->lattice->get_spatial_norm(abs(x), abs(y), abs(z));
+            //stout << x << "," << y << "," << z << "->" << VEQ(val) << EL;
+            //this->op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(val);
+            this->op.s_z_cor(i, j) += std::real(val);
         }
     }
     this->op.s_z += real(s_z / double(Ns));
@@ -879,10 +878,11 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
             v = this->pRatioValChange(v, state);
         s_x += v;
         for (int j = 0; j < Ns; j++) {
-            const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
+            //const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
             const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, j }));
             v = this->pRatioValChange(val, state);
-            this->op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(val) / this->hamil->lattice->get_spatial_norm(abs(x), abs(y), abs(z));
+            //this->op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(val);
+            this->op.s_x_cor(i, j) += std::real(v);
         }
     }
     this->op.s_x += real(s_x / double(Ns));

@@ -1,34 +1,33 @@
 nohup: ignoring input
-		-> lat_info=type=hexagonal,dim=2,Ns=24,get_Lx()=4,get_Ly()=3,get_Lz()=1
-		-> model_info=_heisenberg_kitaev,this->Ns=24,J=-1.00,J0=0.00,d=1.00,g=0.00,g0=0.00,h=0.00,w=0.00,Kx=0.75,Ky=0.75,Kz=0.75,K0=0.00
-		-> rbm_info=n_visible=24,n_hidden=48,batch=1024,hilbert_size=16777216,lr=0.01
-STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: thread_num=32 -> time : 0.00000000s
-mcSteps=1000,n_blocks=1000,n_therm=100,block_size=8,
-				-> time: 1.74000000-> PROGRESS : 
+		-> lat_info=type=hexagonal,dim=2,Ns=32,get_Lx()=4,get_Ly()=4,get_Lz()=1
+		-> model_info=_heisenberg_kitaev,this->Ns=32,J=0.95,J0=0.00,d=1.00,g=0.00,g0=0.00,h=0.00,w=0.00,Kx=-1.00,Ky=-1.00,Kz=-1.00,K0=0.00
+		-> rbm_info=n_visible=32,n_hidden=64,batch=1024,hilbert_size=4294967296,lr=0.01
+STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: thread_num=16 -> time : 0.00000000s
+mcSteps=300,n_blocks=500,n_therm=50,block_size=7,
+				-> time: 4.70000000-> PROGRESS : 
 				[|                                                  ] (0%)
-				-> time: 139.39200000-> PROGRESS : 
+				-> time: 125.42900000-> PROGRESS : 
 				[|||||\                                             ] (10%)
-				-> time: 263.09800000-> PROGRESS : 
+				-> time: 275.42600000-> PROGRESS : 
 				[||||||||||/                                        ] (20%)
-				-> time: 390.56100000-> PROGRESS : 
+				-> time: 456.28800000-> PROGRESS : 
 				[||||||||||||||||                                   ] (30%)
-				-> time: 523.89100000-> PROGRESS : 
+				-> time: 644.38100000-> PROGRESS : 
 				[||||||||||||||||||||\                              ] (40%)
-				-> time: 651.59700000-> PROGRESS : 
+				-> time: 844.24800000-> PROGRESS : 
 				[|||||||||||||||||||||||||/                         ] (50%)
-				-> time: 776.68400000-> PROGRESS : 
+				-> time: 1033.16900000-> PROGRESS : 
 				[|||||||||||||||||||||||||||||||                    ] (60%)
-				-> time: 905.87400000-> PROGRESS : 
+				-> time: 1231.67800000-> PROGRESS : 
 				[|||||||||||||||||||||||||||||||||||\               ] (70%)
-				-> time: 1025.92900000-> PROGRESS : 
+				-> time: 1435.45400000-> PROGRESS : 
 				[||||||||||||||||||||||||||||||||||||||||/          ] (80%)
-				-> time: 1150.33300000-> PROGRESS : 
+				-> time: 1637.16700000-> PROGRESS : 
 				[||||||||||||||||||||||||||||||||||||||||||||||     ] (90%)
-->			Monte Carlo energy search  -> time : 1266.49000000s
+->			Monte Carlo energy search  -> time : 1801.71900000s
 
 
 
-->Looking for the ground state for n_visible=24,n_hidden=48,batch=1024,hilbert_size=16777216,lr=0.01				-> time: 0.55700000-> STATE NORM:sqrt(norm)=95937210.53. PROGRESS : 
+->Looking for the ground state for n_visible=32,n_hidden=64,batch=1024,hilbert_size=4294967296,lr=0.01,n_samples=100,n_blocks=500,b_size=10
+				-> time: 6.45700000-> STATE NORM:sqrt(norm)=0.00. PROGRESS : 
 				[|                                                  ] (0%)
-				-> time: 146.31600000-> STATE NORM:sqrt(norm)=1465122799.99. PROGRESS : 
-				[||||||||||||\                                      ] (25%)

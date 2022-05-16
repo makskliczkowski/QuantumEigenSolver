@@ -10,8 +10,8 @@
 
 
 #ifdef USE_SR
-	//#define PINV
-	#define S_REGULAR
+	#define PINV
+	//#define S_REGULAR
 #endif
 
 

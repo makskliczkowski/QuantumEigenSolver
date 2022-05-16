@@ -6,5 +6,5 @@
 
 source /opt/intel/oneapi/setvars.sh
 echo "Start exec"
-nohup ./rbm.o -f input.txt ./results/ >& results.txt
+nohup ./rbm.o -f input.txt ./results/ >& results$1.txt
 echo "Finished exec"

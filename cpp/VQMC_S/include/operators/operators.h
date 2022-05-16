@@ -20,12 +20,12 @@ public:
 
 	// sigma z
 	double s_z = 0.0;
-	v_3d<double> s_z_cor;
+	mat s_z_cor;
 	vec s_z_i;
 
 	// sigma x
 	cpx s_x = 0.0;
-	v_3d<double> s_x_cor;
+	mat s_x_cor;
 	cx_vec s_x_i;
 
 	// entropy
@@ -38,42 +38,54 @@ public:
 	avOperators(int Lx, int Ly, int Lz, int Ns, std::string lat_type)
 		: Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
 	{
-		v_3d<double> corr_vec;
-		if (lat_type == "square") {
-			corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
-		}
-		else if (lat_type == "hexagonal") {
-			corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
-		}
+		//v_3d<double> corr_vec;
+		//if (lat_type == "square") {
+		//	corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
+		//}
+		//else if (lat_type == "hexagonal") {
+		//	corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
+		//}
 
-		this->s_z_cor = corr_vec;
+		this->s_z_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_z_i = arma::vec(Ns, arma::fill::zeros);
-		this->s_x_cor = corr_vec;
+		this->s_x_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
 		this->ent_entro = arma::vec(Ns - 1, arma::fill::zeros);
 	};
 
 	void reset() {
-		v_3d<double> corr_vec;
-		if (lat_type == "square") {
-			corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
-		}
-		else if (lat_type == "hexagonal") {
-			corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
-		}
+		//v_3d<double> corr_vec;
+		//if (lat_type == "square") {
+		//	corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
+		//}
+		//else if (lat_type == "hexagonal") {
+		//	corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
+		//}
 
-		this->s_z_cor = corr_vec;
+		this->s_z_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_z_i = arma::vec(Ns, arma::fill::zeros);
-		this->s_x_cor = corr_vec;
+		this->s_x_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
 		this->ent_entro = arma::vec(Ns - 1, arma::fill::zeros);
 	};
 
-	void normalise(u64 norm) {
+	void normalise(u64 norm, const v_3d<int>& spatialNorm) {
 		this->s_z /= double(norm);
 		this->s_x /= double(norm);
 		this->s_z_i /= double(norm);
 		this->s_x_i /= double(norm);
+
+		this->s_x_cor /= double(norm);
+		this->s_z_cor /= double(norm);
+
+		//for (int i = 0; i < this->s_x_cor.size(); i++) {
+		//	for (int j = 0; j < this->s_x_cor[i].size(); j++) {
+		//		for (int k = 0; k < this->s_x_cor[i][j].size(); k++) {
+		//			this->s_x_cor[i][j][k] /= spatialNorm[i][j][k] * norm;
+		//			this->s_z_cor[i][j][k] /= spatialNorm[i][j][k] * norm;
+		//		}
+		//	}
+		//}
 		this->en /= double(norm);
 	};
 };
@@ -197,7 +209,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 {
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * beta(k);
@@ -213,7 +225,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * beta(k);
@@ -228,7 +240,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 		value += val * conj(alfa(new_idx)) * beta(k);
 	}
@@ -246,7 +258,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op)
 {
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * alfa(k);
@@ -262,7 +274,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, std
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * alfa(k);
@@ -277,7 +289,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_rows; k++) {
 		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 		value += val * conj(alfa(new_idx)) * alfa(k);
 	}
@@ -388,7 +400,6 @@ inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state)
 template<typename _type>
 inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op)
 {
-	
 	// --------------------- compare sigma_z ---------------------
 
 	// S_z_vector extensive
@@ -397,15 +408,17 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_z at each site
 	for (auto i = 0; i < Ns; i++)
 		av_op.s_z_i(i) = std::real(this->av_operator(eigvec, this->sigma_z, v_1d<int>(1, i)));
-
+	// stout << av_op.s_z_i << EL;
 	// S_z correlations
 	for (auto i = 0; i < Ns; i++) {
 		for (auto j = 0; j < Ns; j++) {
-			const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_z, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
+			//av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_z, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			av_op.s_z_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_z, i, j));
+			//stout << VEQ(av_op.s_z_cor[abs(x)][abs(y)][abs(z)]) << EL;
 		}
 	}
-
+	//stout << av_op.s_z_cor << EL;
 	// --------------------- compare sigma_x ---------------------
 	
 	// S_x_vector extensive
@@ -418,8 +431,9 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_x correlations
 	for (auto i = 0; i < Ns; i++) {
 		for (auto j = 0; j < Ns; j++) {
-			const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
+			//av_op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			av_op.s_x_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_x, i, j));
 		}
 	}
 

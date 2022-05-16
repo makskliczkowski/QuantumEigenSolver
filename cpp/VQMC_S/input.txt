@@ -1,1 +1,1 @@
--mod 3 -l 1 -m 1000 -lr 0.01 -lm 2 -nb 1000 -bs 8 -d 2 -lx 4 -ly 3 -J -1.0 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -kx 0.75 -ky 0.75 -kz 0.75 -th 32
+-mod 3 -bc 0 -l 1 -m 300 -lr 0.01 -lm 2 -nb 1000 -bs 6 -d 2 -lx 5 -ly 4 -J 0.50 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -kx -1.0 -ky -1.0 -kz -1.0 -delta 1.0 -th 8 -dir resultsNight/

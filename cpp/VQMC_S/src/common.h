@@ -759,10 +759,22 @@ inline void print_vector_2d(T& file, const v_2d<T2>& v) {
 
 template <typename T, typename T2>
 inline void print_vector_3d(T& file, const v_3d<T2>& v) {
-	for (auto i = 0; i < v.size(); i++)
-		print_vector_2d(file, v[i]);
+	//for (auto i = 0; i < v.size(); i++)
+	//	print_vector_2d(file, v[i]);
+	for(auto i = 0; i < v.size(); i++)
+		for(auto j = 0; j < v[i].size(); j++)
+			for(auto k = 0; k < v[i][j].size(); k++)
+				printSeparatedP(file, '\t', 8, true, 5, i, j, k, v[i][j][k]);
 }
 
+template <typename T, typename T2>
+inline void print_mat(T& file, const Mat<T2>& m) {
+	//for (auto i = 0; i < v.size(); i++)
+	//	print_vector_2d(file, v[i]);
+	for (auto i = 0; i < m.n_rows; i++)
+		for (auto j = 0; j < m.n_cols; j++)
+				printSeparatedP(file, '\t', 8, true, 5, i, j, m(i,j));
+}
 
 template <typename T, typename T2>
 inline void print_vector_1d(T& file, const Col<T2>& v) {

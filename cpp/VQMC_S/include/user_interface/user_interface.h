@@ -79,7 +79,7 @@
 #endif
 
 // maximal ed size to compare
-constexpr int maxed = 10;
+constexpr int maxed = 20;
 
 #include <omp.h>
 
@@ -567,8 +567,8 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
 	SAVEFIG(fileRbmEn_name + ".png", true);
 	// ------------------- check ground state
-	std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
-	if (this->lat->get_Ns() <= maxed) {
+	std::map<u64, _type> states = phi->avSampling(100, n_blocks, n_therm, 10, n_flips);
+	if (false) {
 		// convert to our basis
 		Col<_type> states_col = SpinHamiltonian<_type>::map_to_state(states, ham->get_hilbert_size());
 		this->av_op.reset();
@@ -663,7 +663,7 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		// define the operators class
 		
 		this->ham->hamiltonian();
-		this->ham->diag_h(false);
+		this->ham->diag_h(false, 5, 0, 1000);
 
 		Operators<_hamtype> op(this->lat); 
 		ground_ed = std::real(ham->get_eigenEnergy(0));
@@ -731,7 +731,7 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	// S_z correlations
 	filename = dir + "_sz_corr";
 	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_3d(fileSave, this->av_op.s_z_cor);
+	print_mat(fileSave, this->av_op.s_z_cor);
 	fileSave.close();
 
 	// --------------------- compare sigma_x ---------------------
@@ -746,7 +746,7 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	// S_z correlations
 	filename = dir + "_sx_corr_";
 	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_3d(fileSave, this->av_op.s_x_cor);
+	print_mat(fileSave, this->av_op.s_x_cor);
 	fileSave.close();
 
 	// --------------------- entropy ----------------------

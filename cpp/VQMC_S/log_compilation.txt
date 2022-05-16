@@ -1,3 +1,19 @@
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
+dpcpp: warning: overriding '-ffp-model=fast=2' option with '-ffp-model=fast' [-Woverriding-t-option]
 In file included from main.cpp:22:
 In file included from ./include/user_interface/user_interface.h:23:
 In file included from ./include/user_interface/../rbm.h:5:
@@ -48,13 +64,13 @@ In file included from ./include/user_interface/../models/../hamil.h:3:
 ./include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-./include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/user_interface/.././operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+./include/user_interface/.././operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -66,13 +82,13 @@ In file included from ./include/user_interface/../rbm.h:8:
 In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
 In file included from ./include/user_interface/../models/heisenberg.h:3:
 In file included from ./include/user_interface/../models/../hamil.h:3:
-./include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/user_interface/.././operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+./include/user_interface/.././operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -95,31 +111,31 @@ In file included from ./include/user_interface/user_interface.h:23:
 ./include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/user_interface/../rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
-./include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 ./include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from main.cpp:22:
@@ -386,11 +402,11 @@ main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::comple
 ./include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
             , lr(lr)
               ^~~~~
-./include/user_interface/../rbm.h:787:10: warning: unused variable 'Ns' [-Wunused-variable]
+./include/user_interface/../rbm.h:790:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
 ./include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
-        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+        std::map<u64, _type> states = phi->avSampling(100, n_blocks, n_therm, 10, n_flips);
                                            ^
 main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
         ui->make_simulation();
@@ -452,13 +468,13 @@ In file included from ./include/models/../hamil.h:3:
 ./include/./operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-./include/./operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/./operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/./operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+./include/./operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -469,13 +485,13 @@ In file included from ./include/rbm.h:8:
 In file included from ./include/models/heisenberg_dots.h:3:
 In file included from ./include/models/heisenberg.h:3:
 In file included from ./include/models/../hamil.h:3:
-./include/./operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/./operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/./operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+./include/./operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -496,31 +512,31 @@ In file included from rbm.cpp:1:
 ./include/rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+./include/rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
-        auto therm_time = std::chrono::high_resolution_clock::now();
-             ^
-./include/rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+./include/rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 ./include/rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 20 warnings generated.
@@ -596,13 +612,13 @@ In file included from ./include/user_interface/../models/../hamil.h:3:
 ./include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-./include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/user_interface/.././operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+./include/user_interface/.././operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -614,13 +630,13 @@ In file included from ./include/user_interface/../rbm.h:8:
 In file included from ./include/user_interface/../models/heisenberg_dots.h:3:
 In file included from ./include/user_interface/../models/heisenberg.h:3:
 In file included from ./include/user_interface/../models/../hamil.h:3:
-./include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+./include/user_interface/.././operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-./include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+./include/user_interface/.././operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 ./include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -643,31 +659,31 @@ In file included from ./include/user_interface/user_interface.h:23:
 ./include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-./include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+./include/user_interface/../rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-./include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
-        auto therm_time = std::chrono::high_resolution_clock::now();
-             ^
-./include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
+             ^
+./include/user_interface/../rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
+        auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 ./include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-./include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+./include/user_interface/../rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from user_interface.cpp:1:
@@ -775,13 +791,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -793,13 +809,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -822,31 +838,31 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
-        auto blocks_time = std::chrono::high_resolution_clock::now();
-             ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from main.cpp:22:
@@ -1113,11 +1129,11 @@ main.cpp:27:6: note: in instantiation of member function 'rbm_ui::ui<std::comple
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:115:15: note: field 'lr' will be initialized after field 'batch'
             , lr(lr)
               ^~~~~
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:787:10: warning: unused variable 'Ns' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:790:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/user_interface.h:570:37: note: in instantiation of member function 'rbmState<std::complex<double>, double>::avSampling' requested here
-        std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
+        std::map<u64, _type> states = phi->avSampling(100, n_blocks, n_therm, 10, n_flips);
                                            ^
 main.cpp:28:6: note: in instantiation of member function 'rbm_ui::ui<std::complex<double>, double>::make_simulation' requested here
         ui->make_simulation();
@@ -1171,13 +1187,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -1188,13 +1204,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg_dots.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/heisenberg.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/models/../hamil.h:3:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/./operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -1215,31 +1231,31 @@ In file included from rbm.cpp:1:
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
         auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 19 warnings generated.
@@ -1300,13 +1316,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:39:29: note: field 'Ns' will be initialized after field 'lat_type'
                 : Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
                                           ^~~~~~
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:318:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:306:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:318:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -1318,13 +1334,13 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg_dots.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/heisenberg.h:3:
 In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../models/../hamil.h:3:
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:342:29: warning: operator '<<' has lower precedence than '-'; '-' will be evaluated first [-Wshift-op-parentheses]
         const u64 dimB = ULLPOW(Ns - A_size);
                          ~~~~~~~~~~^~~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
 #define ULLPOW(k) 1ULL << k
                        ~~ ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:330:29: note: place parentheses around the '-' expression to silence this warning
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/.././operators/operators.h:342:29: note: place parentheses around the '-' expression to silence this warning
         const u64 dimB = ULLPOW(Ns - A_size);
                                 ~~~^~~~~~~~
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../../src/binary.h:54:27: note: expanded from macro 'ULLPOW'
@@ -1347,31 +1363,31 @@ In file included from /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/incl
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:360:10: warning: unused variable 'Ns' [-Wunused-variable]
     auto Ns = this->hamil->lattice->get_Ns();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:496:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:497:10: warning: unused variable 'var_deriv_time' [-Wunused-variable]
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:527:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:528:10: warning: unused variable 'var_deriv_time_upd' [-Wunused-variable]
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:573:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:574:10: warning: unused variable 'loc_en_time' [-Wunused-variable]
     auto loc_en_time = std::chrono::high_resolution_clock::now();
          ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:18: warning: unused variable 'sample_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:698:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:699:18: warning: unused variable 'gradients_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:702:18: warning: unused variable 'gradients_time' [-Wunused-variable]
             auto gradients_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:692:14: warning: unused variable 'blocks_time' [-Wunused-variable]
-        auto blocks_time = std::chrono::high_resolution_clock::now();
-             ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:684:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:687:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
+             ^
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:695:14: warning: unused variable 'blocks_time' [-Wunused-variable]
+        auto blocks_time = std::chrono::high_resolution_clock::now();
              ^
 /home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:808:18: warning: unused variable 'sample_time' [-Wunused-variable]
             auto sample_time = std::chrono::high_resolution_clock::now();
                  ^
-/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:801:14: warning: unused variable 'therm_time' [-Wunused-variable]
+/home/max/VariationalQMCandML/VarQMCSolver/cpp/VQMC_S/include/user_interface/../rbm.h:802:14: warning: unused variable 'therm_time' [-Wunused-variable]
         auto therm_time = std::chrono::high_resolution_clock::now();
              ^
 In file included from user_interface.cpp:1:
