@@ -28,7 +28,7 @@ public:
 	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
-	v_1d<tuple<u64, _type>> locEnergies;																				// local energies map
+	v_1d<pair<u64, _type>> locEnergies;																				// local energies map
 
 	virtual u64 map(u64 index) = 0;																	// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	// virtual ~SpinHamiltonian() = 0;																	// pure virtual destructor
@@ -66,17 +66,19 @@ public:
 	vec entanglement_entropy_sweep(u64 state) const;																	// entanglement entropy sweep over bonds for eigenstate
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
-	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
-	const v_1d<std::tuple<u64, _type>>& get_localEnergyRef(u64 _id)														// returns the constant reference to local energy
+	const v_1d<std::pair<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
+	const v_1d<std::pair<u64, _type>>& get_localEnergyRef(u64 _id)														// returns the constant reference to local energy
 	{ 
 		this->locEnergy(_id);
 		return this->locEnergies; 
 	};	
+	auto get_loc_states_num()										const RETURNS(this->loc_states_num);				// return the number of local states
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian
 	auto get_eigenvectors()											const RETURNS(this->eigenvectors);					// get the const reference to the eigenvectors
 	auto get_eigenvalues()											const RETURNS(this->eigenvalues);					// get the const reference to eigenvalues
+	auto get_loc_state_at(int i)									const RETURNS(this->locEnergies[i]);				// gets the local energy at given position i
 	auto get_eigenEnergy(u64 idx)									const RETURNS(this->eigenvalues(idx));				// get eigenenergy at a given idx
 	auto get_eigenState(u64 idx)									const RETURNS(this->eigenvectors.col(idx));			// get an eigenstate at a given idx
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
@@ -92,6 +94,8 @@ public:
 		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
 
+
+	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
 	void set_angles() {};
 	void set_angles(const vec& phis, const vec& thetas) {};
@@ -209,10 +213,10 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint 
 		eigs_opts opts; 
 		opts.tol = tol;
 		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 20) : subdim;	
-
-		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, k, "lm", opts);
-		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, k, "lm", opts);
+		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;	
+		stout << "\t\t\t->Using Lanczos" << EL;
+		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, k, "sa", opts);
+		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, k, "sa", opts);
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
@@ -326,41 +330,41 @@ inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(u64 state) const
 *  @returns*/
 template<typename _type>
 inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vector<int> sites) {
-	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
-	for (auto& site : sites) {
-		if (site < 0 || site >= L) throw "Site index exceeds chain";
-	}
-	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	double value_real = 0, value_imag = 0;
-#pragma omp parallel
-	{
-		std::vector<bool> base_vector(L), temp(L);
-#pragma omp for reduction (+: value_real, value_imag)
-		for (int k = 0; k < N; k++) {
-			int_to_binary(map(k), base_vector);
-			auto l = *(sites.begin());
-			auto nei = *(sites.begin() + 1);
-			temp = base_vector;
-			if (nei < 0) continue;
-			cpx value = 0.0;
-			if (base_vector[l] && !base_vector[nei]) {
-				temp[l] = 0;
-				temp[nei] = 1;
-				const u64 idx = binary_to_int(temp);
-				value = conj(state_alfa(idx)) * state_beta(k) * im;
-			}
-			else if (!base_vector[l] && base_vector[nei]) {
-				temp[l] = 1;
-				temp[nei] = 0;
-				const u64 idx = binary_to_int(temp);
-				value = -conj(state_alfa(idx)) * state_beta(k) * im;
-			}
-			value_real += value.real();
-			value_imag += value.imag();
-		}
-	}
-	return 2i * cpx(value_real, value_imag);
+//	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
+//	for (auto& site : sites) {
+//		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
+//	}
+//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+//	arma::subview_col state_beta = this->eigenvectors.col(beta);
+//	double value_real = 0, value_imag = 0;
+//#pragma omp parallel
+//	{
+//		std::vector<bool> base_vector(this->Ns), temp(this->Ns);
+//#pragma omp for reduction (+: value_real, value_imag)
+//		for (int k = 0; k < N; k++) {
+//			int_to_binary(map(k), base_vector);
+//			auto l = *(sites.begin());
+//			auto nei = *(sites.begin() + 1);
+//			temp = base_vector;
+//			if (nei < 0) continue;
+//			cpx value = 0.0;
+//			if (base_vector[l] && !base_vector[nei]) {
+//				temp[l] = 0;
+//				temp[nei] = 1;
+//				const u64 idx = binary_to_int(temp);
+//				value = conj(state_alfa(idx)) * state_beta(k) * im;
+//			}
+//			else if (!base_vector[l] && base_vector[nei]) {
+//				temp[l] = 1;
+//				temp[nei] = 0;
+//				const u64 idx = binary_to_int(temp);
+//				value = -conj(state_alfa(idx)) * state_beta(k) * im;
+//			}
+//			value_real += value.real();
+//			value_imag += value.imag();
+//		}
+//	}
+	return 2i;// *cpx(value_real, value_imag);
 }
 
 /*
@@ -371,38 +375,38 @@ inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vect
 *  @returns*/
 template<typename _type>
 inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta) {
-	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-	arma::subview_col state_beta = this->eigenvectors.col(beta);
-	double value_real = 0, value_imag = 0;
-#pragma omp parallel
-	{
-		std::vector<bool> base_vector(L), temp(L);
-#pragma omp for reduction (+: value_real, value_imag)
-		for (int k = 0; k < N; k++) {
-			int_to_binary(map(k), base_vector);
-			for (int l = 0; l < this->Ns; l++) {
-				temp = base_vector;
-				const int nei = this->lattice->get_nn(l, 0);
-				if (nei < 0) continue;
-				cpx value = 0.0;
-				if (base_vector[l] && !base_vector[nei]) {
-					temp[l] = 0;
-					temp[nei] = 1;
-					const u64 idx = binary_to_int(temp);
-					value = conj(state_alfa(idx)) * state_beta(k) * im;
-				}
-				else if (!base_vector[l] && base_vector[nei]) {
-					temp[l] = 1;
-					temp[nei] = 0;
-					const u64 idx = binary_to_int(temp);
-					value = -conj(state_alfa(idx)) * state_beta(k) * im;
-				}
-				value_real += value.real();
-				value_imag += value.imag();
-			}
-		}
-	}
-	return 2i * cpx(value_real, value_imag) / sqrt(this->Ns);
+//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
+//	arma::subview_col state_beta = this->eigenvectors.col(beta);
+//	double value_real = 0, value_imag = 0;
+//#pragma omp parallel
+//	{
+//		std::vector<bool> base_vector(L), temp(L);
+//#pragma omp for reduction (+: value_real, value_imag)
+//		for (int k = 0; k < N; k++) {
+//			int_to_binary(map(k), base_vector);
+//			for (int l = 0; l < this->Ns; l++) {
+//				temp = base_vector;
+//				const int nei = this->lattice->get_nn(l, 0);
+//				if (nei < 0) continue;
+//				cpx value = 0.0;
+//				if (base_vector[l] && !base_vector[nei]) {
+//					temp[l] = 0;
+//					temp[nei] = 1;
+//					const u64 idx = binary_to_int(temp);
+//					value = conj(state_alfa(idx)) * state_beta(k) * im;
+//				}
+//				else if (!base_vector[l] && base_vector[nei]) {
+//					temp[l] = 1;
+//					temp[nei] = 0;
+//					const u64 idx = binary_to_int(temp);
+//					value = -conj(state_alfa(idx)) * state_beta(k) * im;
+//				}
+//				value_real += value.real();
+//				value_imag += value.imag();
+//			}
+//		}
+//	}
+	return 2i;// *cpx(value_real, value_imag) / sqrt(this->Ns);
 }
 
 #endif

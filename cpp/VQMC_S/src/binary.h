@@ -127,6 +127,40 @@ inline u64 binary_search(const std::vector<double>& arr, u64 l_point, u64 r_poin
 	return -1;
 }
 
+
+// ---------------------------------- check bit ----------------------------------
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param k Number of bit (from 0 to 63) - count from right
+*@returns Bool on if the bit is set or not
+*/
+inline bool checkBit(u64 n, int k) {
+	return n & (1ULL << k);
+}
+
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const v_1d<_type>& n, int L) {
+	return n[L];
+}
+
+/*
+*@brief Check the k'th bit
+*@param n Number on which the bit shall be checked
+*@param L Number of bit - counted from left
+*@returns Bool on if the bit is set or not
+*/
+template<typename _type>
+inline _type checkBitV(const Col<_type>& n, int L) {
+	return n(L);
+}
+
 // -----------------------------------------------------------------------------  				  transformations   				 -----------------------------------------------------------------------------
 
 /*
@@ -140,7 +174,6 @@ inline void intToBaseBit(u64 idx, Col<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec(k) = checkBit(idx, size - 1 - k);
 #ifdef DEBUG_BINARY
@@ -159,7 +192,6 @@ inline void intToBaseBit(u64 idx, v_1d<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec[k] = checkBit(idx, size - 1 - k);
 #ifdef DEBUG_BINARY
@@ -179,7 +211,6 @@ inline void intToBaseBitSpin(u64 idx, Col<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec(k) = checkBit(idx, size - 1 - k) ? 1.0 : -1.0;
 #ifdef DEBUG_BINARY
@@ -198,7 +229,7 @@ inline void intToBaseBitSpin(u64 idx, v_1d<T>& vec) {
 #ifdef DEBUG_BINARY
 	auto start = std::chrono::high_resolution_clock::now();
 #endif // DEBUG
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (int k = 0; k < size; k++)
 		vec[k] = checkBit(idx, size - 1 - k) ? 1.0 : -1.0;
 #ifdef DEBUG_BINARY
@@ -311,7 +342,7 @@ inline u64 baseToInt(const v_1d<int>& vec, int base = 2) {
 inline u64 baseToInt(const v_1d<int>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
-#pragma omp parallel for reduction(+:val)
+//#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
 		val += static_cast<u64>(vec[size - 1 - k]) * powers[k];
 	return val;
@@ -328,8 +359,9 @@ template<typename T>
 inline u64 baseToInt(const Col<T>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
+//#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>(std::real(vec(size - 1 - k))) * powers[k];
+		val += static_cast<u64>(vec(size - 1 - k)) * powers[k];
 	return val;
 }
 
@@ -344,8 +376,9 @@ template<typename T>
 inline u64 baseToInt(const Col<T>& vec) {
 	u64 val = 0;
 	const u64 size = vec.size();
+//#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>(std::real(vec(size - 1 - k))) * BinaryPowers[k];
+		val += static_cast<u64>(vec(size - 1 - k)) * BinaryPowers[k];
 	return val;
 }
 
@@ -361,8 +394,9 @@ template<typename T>
 inline u64 baseToIntSpin(const Col<T>& vec, const v_1d<u64>& powers) {
 	u64 val = 0;
 	const u64 size = vec.size();
+//#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
-		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0)/2.0) * powers[k];
+		val += static_cast<u64>((vec(size - 1 - k) + 1.0)/2.0) * powers[k];
 	return val;
 }
 
@@ -370,26 +404,27 @@ template<typename T>
 inline u64 baseToIntSpin(const Col<T>& vec) {
 	u64 val = 0;
 	const u64 size = vec.size();
+//#pragma omp parallel for reduction(+:val)
 	for (int k = 0; k < size; k++)
 		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0) / 2.0) * BinaryPowers[k];
 	return val;
 }
 // -----------------------------------------------------------------------------   				 for states operation   				 -----------------------------------------------------------------------------
 template<typename T1, typename T2>
-inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv, int numthreads = 1) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
 	T1 acc = 0;
-//#pragma omp parallel for reduction(+ : acc)
+//#pragma omp parallel for reduction(+ : acc) numthreads(numthreads)
 	for (auto i = 0; i < lv.size(); i++)
 		acc += std::conj(lv(i)) * rv(i);
 	return acc;
 }
 
 template<typename T1, typename T2>
-inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv) {
+inline T1 dotm(arma::Col<T1> lv, arma::Col<T2> rv, int numthreads = 1) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
 	T1 acc = 0;
-//#pragma omp parallel for reduction(+ : acc)
+//#pragma omp parallel for reduction(+ : acc) numthreads(numthreads)
 	for (auto i = 0; i < lv.size(); i++)
 		acc += (lv(i)) * rv(i);
 	return acc;
@@ -432,38 +467,7 @@ inline v_1d<_type>& rotateLeftV(const v_1d<_type>& n, int L) {
 	return tmp;
 }
 
-// ---------------------------------- check bit ----------------------------------
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param k Number of bit (from 0 to 63) - count from right
-*@returns Bool on if the bit is set or not
-*/
-inline bool checkBit(u64 n, int k) {
-	return n & (1ULL << k);
-}
 
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param L Number of bit - counted from left
-*@returns Bool on if the bit is set or not
-*/
-template<typename _type>
-inline _type checkBitV(const v_1d<_type>& n, int L) {
-	return n[L];
-}
-
-/*
-*@brief Check the k'th bit
-*@param n Number on which the bit shall be checked
-*@param L Number of bit - counted from left
-*@returns Bool on if the bit is set or not
-*/
-template<typename _type>
-inline _type checkBitV(const Col<_type>& n, int L) {
-	return n(L);
-}
 // ---------------------------------- flip all bits ----------------------------------
 
 /*

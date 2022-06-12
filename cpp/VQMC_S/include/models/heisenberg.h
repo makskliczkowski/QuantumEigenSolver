@@ -1,7 +1,6 @@
 #pragma once
-#ifndef HAMIL_H
+
 #include "../hamil.h"
-#endif // !HAMIL_H
 
 
 #ifndef HEISENBERGMODEL
@@ -15,6 +14,8 @@ protected:
 	double g = 1;																								// transverse magnetic field
 	double h = 1;																								// perpendicular magnetic field
 	double delta = 0;																							// delta with Sz_i * Sz_ip1
+	vec tmp_vec;
+	vec tmp_vec2;
 
 	vec dh;																										// disorder in the system - deviation from a constant h value
 	double w;																									// the distorder strength to set dh in (-disorder_strength, disorder_strength)
@@ -39,14 +40,14 @@ public:
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
 		string name = sep + \
-			"heisenberg,Ns=" + STR(Ns) + \
-			",J=" + STRP(J, 2) + \
-			",J0=" + STRP(J0, 2) + \
-			",dlt=" + STRP(delta, 2) + \
-			",g=" + STRP(g, 2) + \
-			",g0=" + STRP(g0, 2) + \
-			",h=" + STRP(h, 2) + \
-			",w=" + STRP(w, 2);
+			"heisenberg,Ns=" + STR(this->Ns) + \
+			",J=" + STRP(this->J, 2) + \
+			",J0=" + STRP(this->J0, 2) + \
+			",dlt=" + STRP(this->delta, 2) + \
+			",g=" + STRP(this->g, 2) + \
+			",g0=" + STRP(this->g0, 2) + \
+			",h=" + STRP(this->h, 2) + \
+			",w=" + STRP(this->w, 2);
 		return SpinHamiltonian::inf(name, skip, sep);
 	}
 };
@@ -70,13 +71,13 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 {
 	this->lattice = lat;
 	this->ran = randomGen();
-	this->Ns = this->lattice->get_Ns();																// number of lattice sites
-	this->loc_states_num = 2 * this->Ns + 1;														// number of states after local energy work
-	this->locEnergies = v_1d<std::tuple<u64, _type>>(this->loc_states_num, std::make_tuple(0,0));	// set local energies vector
-	this->N = ULLPOW(this->Ns);																		// Hilber space size
-	this->dh = create_random_vec(Ns, this->ran, this->w);											// creates random disorder vector
-	this->dJ = create_random_vec(Ns, this->ran, this->J0);											// creates random exchange vector
-	this->dg = create_random_vec(Ns, this->ran, this->g0);											// creates random transverse field vector
+	this->Ns = this->lattice->get_Ns();																		// number of lattice sites
+	this->loc_states_num = 2 * this->Ns + 1;																// number of states after local energy work
+	this->locEnergies = v_1d<std::pair<u64, _type>>(this->loc_states_num, std::pair(LLONG_MAX, 0.0));		// set local energies vector
+	this->N = ULLPOW(this->Ns);																				// Hilber space size
+	this->dh = create_random_vec(this->Ns, this->ran, this->w);												// creates random disorder vector
+	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);											// creates random exchange vector
+	this->dg = create_random_vec(this->Ns, this->ran, this->g0);											// creates random transverse field vector
 
 	// change info
 	this->info = this->inf();
@@ -121,7 +122,7 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 
 		// transverse field (SX)
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
-		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+		this->locEnergies[i] = std::pair{ new_idx, this->g + this->dg(i) };
 
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
 			if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) { //&& nn >= j
@@ -134,16 +135,16 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 				// S+S- + S-S+
 				if (si * sj < 0) {
 					auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
-					this->locEnergies[this->Ns + i] = std::make_tuple(new_new_idx, 0.5 * interaction);
+					this->locEnergies[this->Ns + i] = std::pair{ new_new_idx, 0.5 * interaction };
 				}
 				// change if we don't hit the energy
 				else
-					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+					this->locEnergies[this->Ns + i] = std::pair{ LONG_MAX, 0 };
 			}
 		}
 	}
 	// append unchanged at the very end
-	locEnergies[2*this->Ns] = std::make_tuple(_id, static_cast<_type>(localVal));				
+	this->locEnergies[2 * this->Ns] = std::pair{ _id, static_cast<_type>(localVal) };
 }
 
 /*
@@ -170,7 +171,7 @@ void Heisenberg<_type>::locEnergy(const vec& v) {
 		this->tmp_vec = v;
 		flipV(tmp_vec, i);
 		const u64 new_idx = baseToInt(tmp_vec);
-		this->locEnergies[i] = std::make_tuple(new_idx, this->g + this->dg(i));
+		this->locEnergies[i] = std::pair{ new_idx, this->g + this->dg(i) };
 
 		// check the correlations
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
@@ -192,15 +193,15 @@ void Heisenberg<_type>::locEnergy(const vec& v) {
 				if (sisj < 0) {
 					flipV(tmp_vec2, nn);
 					auto flip_idx_nn = baseToInt(tmp_vec2);
-					this->locEnergies[this->Ns + i] = std::make_tuple(flip_idx_nn, 0.5 * interaction);
+					this->locEnergies[this->Ns + i] = std::pair{ flip_idx_nn, 0.5 * interaction };
 				}
 				else
-					this->locEnergies[this->Ns + i] = std::make_tuple(LONG_MAX, 0);
+					this->locEnergies[this->Ns + i] = std::pair{ LONG_MAX, 0 };
 			}
 		}
 	}
 	// append unchanged at the very end
-	locEnergies[2 * this->Ns] = std::make_tuple(baseToInt(v), static_cast<_type>(localVal));
+	locEnergies[2 * this->Ns] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
 }
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 
@@ -232,7 +233,7 @@ void Heisenberg<_type>::hamiltonian() {
 
 			// transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - i);			
-			setHamiltonianElem(k, this->g + this->dg(i), new_idx);	
+			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
 
 			// check if nn exists
 			for (auto n_num = 0; n_num < nn_number; n_num++) {
@@ -247,7 +248,7 @@ void Heisenberg<_type>::hamiltonian() {
 					// S+S- + S-S+ hopping
 					if (si * sj < 0) {
 						auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
-						setHamiltonianElem(k, 0.5 * interaction, new_new_idx);
+						this->setHamiltonianElem(k, 0.5 * interaction, new_new_idx);
 					}
 				}
 			}

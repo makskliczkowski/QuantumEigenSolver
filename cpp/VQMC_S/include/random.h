@@ -10,7 +10,7 @@
 // -------------------------------------------------------- RANDOM NUMBER CLASS --------------------------------------------------------
 
 /*
-/// Random number generator class
+// Random number generator class
 */
 class randomGen {
 private:
@@ -41,7 +41,8 @@ public:
 		return std::uniform_real_distribution<double>(_min, _max)(engine);
 	}
 	uint64_t randomInt_uni(int _min, int _max) {
-		return std::uniform_int_distribution<uint64_t>(_min, _max)(engine);
+		return _min + static_cast<int>((_max - _min) * this->randomReal_uni());
+		//return std::uniform_int_distribution<uint64_t>(_min, _max)(engine);
 	}
 	// --- normal
 	double random_real_normal(double _mean = 0, double _std = 1) {

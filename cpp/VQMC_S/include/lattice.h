@@ -42,10 +42,11 @@ public:
 	auto get_nn_number(int lat_site)						const RETURNS(this->nearest_neighbors[lat_site].size());				// returns the number of nn
 	auto get_nnn_number(int lat_site)						const RETURNS(this->next_nearest_neighbors[lat_site].size());			// returns the number of nnn
 	auto get_coordinates(int lat_site, int axis)			const RETURNS(this->coordinates[lat_site][axis]);						// returns the given coordinate
-	auto get_spatial_norm(int x, int y, int z)				const RETURNS(this->spatialNorm[x][y][z]);								// returns the spatial norm
+	auto get_spatial_norm()									const RETURNS(this->spatialNorm);										// returns the spatial norm
+	auto get_spatial_norm(int x, int y, int z)				const RETURNS(this->spatialNorm[x][y][z]);								// returns the spatial norm at x,y,z
 	auto get_type()											const RETURNS(this->type);												// returns the type of the lattice as a string
 	auto get_nei(int lat_site, int corr_len)				const;
-	auto get_info()											const RETURNS(VEQ(type) + "," + VEQ(dim) + "," + VEQ(Ns) + "," + VEQ(get_Lx()) + "," + VEQ(get_Ly()) + "," + VEQ(get_Lz()));
+	auto get_info()											const RETURNS(VEQ(type) + "," + VEQ(_BC) + "," + VEQ(dim) + "," + VEQ(Ns) + "," + VEQ(get_Lx()) + "," + VEQ(get_Ly()) + "," + VEQ(get_Lz()));
 
 // ----------------------- CALCULATORS
 	void calculate_nn();

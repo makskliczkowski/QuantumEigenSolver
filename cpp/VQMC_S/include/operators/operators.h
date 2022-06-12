@@ -1,7 +1,4 @@
 #pragma once
-#ifndef BINARY_H
-	#include "../../src/binary.h"
-#endif // ! BINARY_H
 #ifndef LATTICE_H
 	#include "../lattice.h"
 #endif
@@ -9,10 +6,13 @@
 
 #ifndef OPERATORS_H
 #define OPERATORS_H
+#include <queue>
+
 
 using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
 
-struct avOperators {
+class avOperators {
+public:
 	std::string lat_type = "";
 	int Ns = 1;
 	int Lx = 1;
@@ -21,12 +21,14 @@ struct avOperators {
 
 	// sigma z
 	double s_z = 0.0;
-	v_3d<double> s_z_cor;
+	//v_3d<double> s_z_cor;
+	mat s_z_cor;
 	vec s_z_i;
 
 	// sigma x
 	cpx s_x = 0.0;
-	v_3d<double> s_x_cor;
+	//v_3d<double> s_x_cor;
+	mat s_x_cor;
 	cx_vec s_x_i;
 
 	// entropy
@@ -39,42 +41,54 @@ struct avOperators {
 	avOperators(int Lx, int Ly, int Lz, int Ns, std::string lat_type)
 		: Lx(Lx), Ly(Ly), Lz(Lz), Ns(Ns), lat_type(lat_type)
 	{
-		v_3d<double> corr_vec;
-		if (lat_type == "square") {
-			corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
-		}
-		else if (lat_type == "hexagonal") {
-			corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
-		}
+		//v_3d<double> corr_vec;
+		//if (lat_type == "square") {
+		//	corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
+		//}
+		//else if (lat_type == "hexagonal") {
+		//	corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
+		//}
 
-		this->s_z_cor = corr_vec;
+		this->s_z_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_z_i = arma::vec(Ns, arma::fill::zeros);
-		this->s_x_cor = corr_vec;
+		this->s_x_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
 		this->ent_entro = arma::vec(Ns - 1, arma::fill::zeros);
 	};
 
 	void reset() {
-		v_3d<double> corr_vec;
-		if (lat_type == "square") {
-			corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
-		}
-		else if (lat_type == "hexagonal") {
-			corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
-		}
+		//v_3d<double> corr_vec;
+		//if (lat_type == "square") {
+		//	corr_vec = SPACE_VEC_D(Lx, Ly, Lz);
+		//}
+		//else if (lat_type == "hexagonal") {
+		//	corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
+		//}
 
-		this->s_z_cor = corr_vec;
+		this->s_z_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_z_i = arma::vec(Ns, arma::fill::zeros);
-		this->s_x_cor = corr_vec;
+		this->s_x_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_x_i = arma::cx_vec(Ns, arma::fill::zeros);
 		this->ent_entro = arma::vec(Ns - 1, arma::fill::zeros);
 	};
 
-	void normalise(u64 norm) {
+	void normalise(u64 norm, const v_3d<int>& spatialNorm) {
 		this->s_z /= double(norm);
 		this->s_x /= double(norm);
 		this->s_z_i /= double(norm);
 		this->s_x_i /= double(norm);
+
+		this->s_x_cor /= double(norm);
+		this->s_z_cor /= double(norm);
+
+		//for (int i = 0; i < this->s_x_cor.size(); i++) {
+		//	for (int j = 0; j < this->s_x_cor[i].size(); j++) {
+		//		for (int k = 0; k < this->s_x_cor[i][j].size(); k++) {
+		//			this->s_x_cor[i][j][k] /= spatialNorm[i][j][k] * norm;
+		//			this->s_z_cor[i][j][k] /= spatialNorm[i][j][k] * norm;
+		//		}
+		//	}
+		//}
 		this->en /= double(norm);
 	};
 };
@@ -182,13 +196,19 @@ public:
 	// -----------------------------------------------  				   ENTROPY 				    ----------------------------------------------
 
 	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
+	//Mat<_type> red_dens_mat(const std::map<u64, _type>& state, int A_size) const;										// calculate the reduced density matrix with a map
+	//Mat<_type> red_dens_mat(const std::priority_queue<u64, _type>& state, int A_size) const;							// calculate the reduced density matrix with a priority queue
 	double entanglement_entropy(const Col<_type>& state, int A_size) const;												// entanglement entropy 
+	//double entanglement_entropy(const std::map<u64, _type>& state, int A_size) const;									// entanglement entropy with a map
+	//double entanglement_entropy(const std::priority_queue<u64, _type>& state, int A_size) const;						// entanglement entropy with a priority queue
 	vec entanglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
+	//vec entanglement_entropy_sweep(const std::map<u64, _type>& state) const;											// entanglement entropy sweep over bonds with a map
+	//vec entanglement_entropy_sweep(const std::priority_queue<u64, _type>& state) const;									// entanglement entropy sweep over bonds with a priority queue
 
 
 	// helpers
-	void calculate_operators(const Col<_type>& alfa, avOperators& av_op);
-	void calculate_operators(const Col<_type>& alfa, const Col<_type>& beta, avOperators& av_op);
+	void calculate_operators(const Col<_type>& alfa, avOperators& av_op, bool cal_entro = true);
+	//void calculate_operators(const Col<_type>& alfa, const Col<_type>& beta, avOperators& av_op);
 
 };
 
@@ -198,7 +218,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 {
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * beta(k);
@@ -214,7 +234,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * beta(k);
@@ -229,7 +249,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 		value += val * conj(alfa(new_idx)) * beta(k);
 	}
@@ -246,11 +266,13 @@ template<typename _type>
 inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op)
 {
 	cpx value = 0;
+	//stout << alfa << EL;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
 			value += val * conj(alfa(new_idx)) * alfa(k);
+			//stout << VEQ(k) << "," << VEQ(new_idx) << "," << VEQ(val) << ", " << VEQ(value) << EL;
 		}
 	}
 	return value / double(this->Ns);
@@ -262,11 +284,13 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, std
 	for (auto& site : sites)
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
+	//stout << alfa << EL;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
 			value += val * conj(alfa(new_idx)) * alfa(k);
+			//stout << VEQ(k) << "," << VEQ(new_idx) << "," << VEQ(val) << ", " << VEQ(value) << "," << VEQ(site) << EL;
 		}
 	}
 	return value;
@@ -277,10 +301,12 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 {
 	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
+	//stout << alfa << EL;
 #pragma omp parallel for reduction (+: value)
-	for (int k = 0; k < Ns; k++) {
+	for (int k = 0; k < alfa.n_elem; k++) {
 		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 		value += val * conj(alfa(new_idx)) * alfa(k);
+		//stout << VEQ(k) << "," << VEQ(new_idx) << "," << VEQ(val) << ", " << VEQ(value) << "," << VEQ(site_a) << "," << VEQ(site_b) << EL;
 	}
 	return value;
 }
@@ -387,7 +413,7 @@ inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state)
 
 // -----------------   				   HELPERS  				    -------------------
 template<typename _type>
-inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op)
+inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op, bool cal_entro)
 {
 	
 	// --------------------- compare sigma_z ---------------------
@@ -398,15 +424,17 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_z at each site
 	for (auto i = 0; i < Ns; i++)
 		av_op.s_z_i(i) = std::real(this->av_operator(eigvec, this->sigma_z, v_1d<int>(1, i)));
-
+	// stout << av_op.s_z_i << EL;
 	// S_z correlations
 	for (auto i = 0; i < Ns; i++) {
 		for (auto j = 0; j < Ns; j++) {
-			const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_z, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
+			//av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_z, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			av_op.s_z_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_z, i, j));
+			//stout << VEQ(av_op.s_z_cor[abs(x)][abs(y)][abs(z)]) << EL;
 		}
 	}
-
+	//stout << av_op.s_z_cor << EL;
 	// --------------------- compare sigma_x ---------------------
 	
 	// S_x_vector extensive
@@ -419,14 +447,15 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_x correlations
 	for (auto i = 0; i < Ns; i++) {
 		for (auto j = 0; j < Ns; j++) {
-			const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
+			//av_op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
+			av_op.s_x_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_x, i, j));
 		}
 	}
 
-
 	// --------------------- entropy ----------------------
-	av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
+	if(cal_entro)
+		av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
 }
 
 

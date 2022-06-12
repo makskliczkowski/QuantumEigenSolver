@@ -23,10 +23,6 @@
 	#include "../rbm.h"
 #endif
 
-#include "../models/ising.h"
-#include "../models/heisenberg_dots.h"
-#include "../models/heisenberg-kitaev.h"
-
 #ifndef SQUARE_H
 	#include "../lattices/square.h"
 #endif
@@ -83,7 +79,7 @@
 #endif
 
 // maximal ed size to compare
-constexpr int maxed = 10;
+constexpr int maxed = 20;
 
 
 namespace rbm_ui {
@@ -497,13 +493,13 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 
 	// --- kitaev ---
 	choosen_option = "-kx";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Kx, argv, choosen_option, false);
 	choosen_option = "-ky";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Ky, argv, choosen_option, false);
 	choosen_option = "-kz";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->Kz, argv, choosen_option, false);
 	choosen_option = "-k0";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->K0, argv, choosen_option, false);
 
 	//---------- OTHERS
 
@@ -550,7 +546,7 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 
 	// print energies
-	string dir = this->saving_dir + kPS + ham->get_info() + kPS + phi->get_info() + kPS;
+	string dir = this->saving_dir + ham->get_info() + kPS + phi->get_info() + kPS;
 	fs::create_directories(dir);
 
 	auto fileRbmEn_name = dir + "energies";
@@ -570,13 +566,13 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", ham->get_info() + "\nrbm:" + this->phi->get_info());
 	SAVEFIG(fileRbmEn_name + ".png", true);
 	// ------------------- check ground state
-	std::map<u64, _type> states = phi->avSampling(mcSteps, n_therm, n_blocks, block_size, n_flips);
-	if (this->lat->get_Ns() <= maxed) {
+	std::map<u64, _type> states = phi->avSampling(100, n_blocks, n_therm, 8, n_flips);
+	if (false) {
 		// convert to our basis
 		Col<_type> states_col = SpinHamiltonian<_type>::map_to_state(states, ham->get_hilbert_size());
 		this->av_op.reset();
 		Operators<_type> op(this->lat);
-		op.calculate_operators(states_col, this->av_op);
+		op.calculate_operators(states_col, this->av_op, this->nvisible <= maxed);
 		this->save_operators(start, this->phi->get_info(), real(ground_rbm), real(standard_dev));
 	}
 	else {
@@ -666,13 +662,18 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		// define the operators class
 		
 		this->ham->hamiltonian();
-		this->ham->diag_h(false);
+		if(Ns <= 12)
+			this->ham->diag_h(false);
+		else
+			this->ham->diag_h(false, 3, 0, 1000);
 
 		Operators<_hamtype> op(this->lat); 
 		ground_ed = std::real(ham->get_eigenEnergy(0));
 		auto excited_ed = std::real(ham->get_eigenEnergy(1));
 		Col<_hamtype> eigvec = ham->get_eigenState(0);
-		op.calculate_operators(eigvec, this->av_op);
+
+		op.calculate_operators(eigvec, this->av_op, true);
+
 		this->save_operators(diag_time, "", ground_ed, 0);
 
 		u64 state = 0;
@@ -699,8 +700,6 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		plt::axhline(ground_ed);
 		plt::axhline(excited_ed);
 		plt::axhline(ham->get_eigenEnergy(2));
-		plt::axhline(ham->get_eigenEnergy(3));
-		plt::axhline(ham->get_eigenEnergy(4));
 		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(excited_ed) + ",\n" + VEQ(ground_rbm) + ",\n" + VEQ(relative_error) + "%", mcSteps / 3, (ground_rbm) / 2);
 #endif
 	}
@@ -734,7 +733,7 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	// S_z correlations
 	filename = dir + "_sz_corr";
 	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_3d(fileSave, this->av_op.s_z_cor);
+	print_mat(fileSave, this->av_op.s_z_cor);
 	fileSave.close();
 
 	// --------------------- compare sigma_x ---------------------
@@ -749,16 +748,18 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	// S_z correlations
 	filename = dir + "_sx_corr_";
 	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_3d(fileSave, this->av_op.s_x_cor);
+	print_mat(fileSave, this->av_op.s_x_cor);
 	fileSave.close();
 
 	// --------------------- entropy ----------------------
-	filename = dir + "_ent_entro";
-	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_1d(fileSave, this->av_op.ent_entro);
-	fileSave.close();
-	PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + "\n" + name);
-	SAVEFIG(filename + ".png", false);
+	if (Ns <= maxed) {
+		filename = dir + "_ent_entro";
+		openFile(fileSave, filename + ".dat", ios::out);
+		print_vector_1d(fileSave, this->av_op.ent_entro);
+		fileSave.close();
+		PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + "\n" + name);
+		SAVEFIG(filename + ".png", false);
+	}
 
 	// --------------------- save log ---------------------	// save the log file and append columns if it is empty
 	string logname = dir + "log.dat";

@@ -4,23 +4,43 @@
 
 #include "../src/progress.h"
 
-#ifndef HAMIL_H
-#include "hamil.h"
+
+#ifndef HEISENBERG_DOTS
+#include "models/heisenberg_dots.h"
+#endif
+#ifndef HEISENBERG_KITAEV
+#include "models/heisenberg-kitaev.h"
+#endif
+#ifndef ISINGMODEL
+#include "models/ising.h"
 #endif
 
 #ifndef OPERATORS_H
 #include "operators/operators.h"
 #endif
 
-
-
+#ifndef ML_H
 #include "../include/ml.h"
+#endif
+
+
+#ifdef PINV
+constexpr auto pinv_tol = 5e-5;
+#ifdef S_REGULAR
+#undef S_REGULAR
+#endif
+#elif defined S_REGULAR 
+
+#ifdef PINV
+#undef PINV
+#endif
+#endif
 
 
 
-
-
-
+constexpr double lambda_0_reg = 100;
+constexpr double b_reg = 0.9;
+constexpr double lambda_min_reg = 1e-4;
 
 
 
@@ -157,7 +177,7 @@ public:
 
     // ------------------------------------------- 				 SETTTERS				  -------------------------------------------
     // sets info
-    void set_info()                                                     { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(hilbert_size) + "," + VEQ(lr); };
+    void set_info()                                                     { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(lr); };
 
     // sets the current state
     void set_state(u64 state, bool set = false) {
@@ -201,12 +221,13 @@ public:
     Col<_type> Fs(const Col<double>& v)                                 const { return arma::cosh(this->b_h + this->W * v); };
 
     // get the current amplitude given vector
-    auto coeff(const Col<double>& v)                                    const { return (exp(dotm(this->b_v, v)) * arma::prod(Fs(v))) / sqrt(this->hamil->lattice->get_Ns()); };//* std::pow(2.0, this->n_hidden)
+    auto coeff(const Col<double>& v, int tn = 1)                        const { return (exp(dotm(this->b_v, v, tn)) * arma::prod(Fs(v))) / sqrt(this->hamil->lattice->get_Ns()); };//* std::pow(2.0, this->n_hidden)
 
     // get probability ratio for a reference state v1 and v2 state
-    _type pRatio()                                                      const { return exp(dotm(this->b_v, Col<double>(this->tmp_vector - this->current_vector)) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)))); };
-    _type pRatio(const Col<double>& v)                                  const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector)) + arma::sum(log(Fs(v) / arma::cosh(this->thetas)))); };
-    _type pRatio(const Col<double>& v1, const Col<double>& v2)          const { return exp(dotm(this->b_v, Col<double>(v2 - v1)) + sum(log(Fs(v2) / Fs(v1)))); };
+    _type pRatio(int tn = 1)                                            const { return exp(dotm(this->b_v, Col<double>(this->tmp_vector - this->current_vector), tn) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)))); };
+    _type pRatio(const Col<double>& v, int tn = 1)                      const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector), tn) + arma::sum(log(Fs(v) / arma::cosh(this->thetas)))); };
+    _type pRatio(const Col<double>& v1, const Col<double>& v2\
+        , int tn = 1)                                                   const { return exp(dotm(this->b_v, Col<double>(v2 - v1), tn) + sum(log(Fs(v2) / Fs(v1)))); };
 
     // get local energies
     _type locEn();
@@ -220,7 +241,7 @@ public:
     // ------------------------------------------- 				 SAMPLING				  -------------------------------------------
     
     // sample block
-    void blockSampling(size_t b_size, u64 start_stae, size_t n_flips = 1, bool thermalize = true);
+    void blockSampling(size_t b_size, u64 start_stae, size_t n_flips = 1, bool thermalize = true, bool update = false);
 
     // sample the probabilistic space
     Col<_type> mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
@@ -239,7 +260,7 @@ public:
 * @param tol tolerance on the absolute value
 */
 template<typename _type, typename _hamtype>
-inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
+inline void rbmState<_type, _hamtype>::pretty_print(std::map<u64, _type>& sample_states, double tol) const {
     v_1d<int> tmp(this->n_visible);
     double norm = 0;
     double phase = 0;
@@ -263,7 +284,7 @@ inline void rbmState<typename _type, typename _hamtype>::pretty_print(std::map<u
 * allocates memory for arma objects
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::allocate() {
+void rbmState<_type, _hamtype>::allocate() {
     auto Ns = this->hamil->lattice->get_Ns();
     // initialize biases
     this->b_v = Col<_type>(this->n_visible, arma::fill::randn) / double(Ns);
@@ -288,7 +309,7 @@ void rbmState<typename _type, typename _hamtype>::allocate() {
 * @brief Initialize the weights 
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::init() {
+void rbmState<_type, _hamtype>::init() {
     // initialize random state
     this->set_rand_state();
 
@@ -320,7 +341,7 @@ inline void rbmState<cpx, double>::init() {
     // hidden
     for (int i = 0; i < this->n_hidden; i++)
         //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.random_real_normal(0, 1)) / double(Ns);
+        this->b_h(i) = (this->hamil->ran.random_real_normal(0, 1) + imn * this->hamil->ran.randomReal_uni(0, 1)) / double(Ns);
         //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
     // matrix
     for (int i = 0; i < this->W.n_rows; i++)
@@ -380,9 +401,11 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(int flip_place, double flipped_spin)
 {
 #ifdef SPIN
-    this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
+    //this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (2.0 * flipped_spin), this->W.col(flip_place), false, false);
 #else
-    this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
+    //this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (1.0 - 2.0 * flipped_spin), this->W.col(flip_place), true, false);
 #endif
 } 
 
@@ -395,9 +418,11 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int flip_place)
 {
 #ifdef SPIN
-    this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
+    //this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (2.0 * v(flip_place)), this->W.col(flip_place), true, false);
 #else
-    this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
+    //this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
+    setConstTimesCol(this->thetas, (1.0 - 2.0 * v(flip_place)), this->W.col(flip_place), false, false);
 #endif
 }
 
@@ -409,7 +434,7 @@ inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int f
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::set_rand_state()
 { 
-    this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size - 1)); 
+    this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size), true); 
 }
 
 /*
@@ -435,7 +460,7 @@ inline void rbmState<_type, _hamtype>::set_angles(const Col<double>& v)
 * @brief sets the weights according to the gradient descent - uses this->grad vector to update them
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::set_weights() {
+void rbmState<_type, _hamtype>::set_weights() {
     // update weights accordingly
 #pragma omp parallel for
     for (auto i = 0; i < this->n_visible; i++)
@@ -459,6 +484,7 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::rescale_covariance()
 {
     auto lambda_p = lambda_0_reg * this->current_b_reg;
+    //stout << VEQ(lambda_p) << EL;
     if (lambda_p < lambda_min_reg) lambda_p = lambda_min_reg;
     this->S.diag() += lambda_p;
 }
@@ -468,7 +494,7 @@ inline void rbmState<_type, _hamtype>::rescale_covariance()
 * @param v the base vector we want to calculate derivatives from
 */
 template<typename _type, typename _hamtype>
-void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
+void rbmState<_type, _hamtype>::calcVarDeriv(const Col<double>& v){
     auto var_deriv_time = std::chrono::high_resolution_clock::now();
 
 #ifndef RBM_ANGLES_UPD
@@ -499,36 +525,38 @@ void rbmState<_type, typename _hamtype>::calcVarDeriv(const Col<double>& v){
 * @param current_step if we would like to optimize according to current mcstep
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::updVarDerivSR(int current_step){
+void rbmState<_type, _hamtype>::updVarDerivSR(int current_step){
     auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
    
     // update flat vector
 #ifdef PINV
-    this->F = this->lr * arma::pinv(this->S, pinv_tol) * this->F;
+    this->F = this->lr * arma::pinv(this->S, pinv_tol, "std") * this->F;
     //else
     //    this->grad = this->lr * arma::solve(this->S, this->F);
 #elif defined S_REGULAR 
     this->rescale_covariance();
     //auto lr_new = this->hamil->ran.randomReal_uni(0, 1) * 3 * this->lr;
-    this->F = this->lr * arma::solve(this->S, this->F);
+    this->F = this->lr * S.i() * this->F;//arma::solve(this->S, this->F);
 #else 
     this->F = this->lr * arma::solve(this->S, this->F);
 #endif 
-    PRT(var_deriv_time_upd, this->dbg_updt)
+    PRT(var_deriv_time_upd, this->dbg_updt);
 }
 
 
 // ------------------------------------------------- LOCAL ENERGY AND OPERATORS ------------------------------------------------------
 
 
-/**/
+/*
+* 
+*/
 template<typename _type, typename _hamtype>
 inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state)
 {
 #ifndef DEBUG
         //const int tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
         //const int vid = tid % this->thread_num;
-        const int vid = omp_get_thread_num();
+        const int vid = omp_get_thread_num() % this->thread_num;
 #else
         const int vid = 0;
 #endif
@@ -545,30 +573,36 @@ inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state)
 * @brief Calculate the local energy depending on the given Hamiltonian
 */
 template<typename _type, typename _hamtype>
-inline _type rbmState<typename _type, typename _hamtype>::locEn(){
+inline _type rbmState<_type, _hamtype>::locEn(){
     auto loc_en_time = std::chrono::high_resolution_clock::now();
     const auto hilb = this->hamil->get_hilbert_size();
-    // get the reference to all local energies and changed states from the model Hamiltonian
+
+    this->hamil->locEnergy(this->current_state);
     _type energy = 0;
-    auto energies = this->hamil->get_localEnergyRef(this->current_state);
 #ifndef DEBUG
-#pragma omp parallel for reduction(+ : energy) shared(energies)
+#pragma omp parallel for reduction(+ : energy)
 #endif
-    for (auto i = 0; i < energies.size(); i++)
+    for (auto i = 0; i < this->hamil->get_loc_states_num(); i++)
     {
-        const auto& [state, value] = energies[i];
+        const auto [state, value] = this->hamil->get_loc_state_at(i);
+
+        //stout << state << "\t" << value << EL;
         // if the state is not set
         if (state >= hilb)
             continue;
 
         // changes accordingly not to create data race
         energy += state != this->current_state ? this->pRatioValChange(value, state) : value;
+
+        // reset local energies
+        this->hamil->set_loc_en_elem(i, LLONG_MAX, 0.0);
     }
     PRT(loc_en_time, this->dbg_lcen);
     return energy;
 }
 
 // ------------------------------------------------- SAMPLING -------------------------------------------------
+
 /*
 * @brief block updates the current state according to Metropolis-Hastings algorithm
 * @param b_size the size of the correlation block
@@ -576,25 +610,27 @@ inline _type rbmState<typename _type, typename _hamtype>::locEn(){
 * @param n_flips number of flips at the single step
 */
 template<typename _type, typename _hamtype>
-void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize){
-    this->set_state(start_state, thermalize);
+void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize, bool update){
+    if(start_state != this->current_state)
+        this->set_state(start_state, thermalize);
 
     // set the tmp_vector to current state
     this->tmp_vector = this->current_vector;
 
     for(auto i = 0; i < b_size; i++){
 
-        const int flip_place = this->hamil->ran.randomInt_uni(0, this->n_visible - 1);
+        const int flip_place = this->hamil->ran.randomInt_uni(0, this->n_visible);
         const double flip_spin = this->tmp_vector(flip_place);
 
         flipV(this->tmp_vector, flip_place);
 
         #ifndef RBM_ANGLES_UPD
-        _type proba = this->pRatio(this->current_vector, this->tmp_vector);
+        double proba = abs(this->pRatio(this->current_vector, this->tmp_vector, this->thread_num));
         #else
-        _type proba = this->pRatio(this->tmp_vector);
+        double proba = abs(this->pRatio(this->tmp_vector, this->thread_num));
+        //stout << VEQ(proba) << EL;
         #endif
-        if (this->hamil->ran.randomReal_uni() <= std::abs(conj(proba) * proba)) {
+        if (this->hamil->ran.randomReal_uni() <= proba * proba ){//
             // update current state and vector
 
             this->current_vector(flip_place) = this->tmp_vector(flip_place);
@@ -623,7 +659,7 @@ void rbmState<typename _type, typename _hamtype>::blockSampling(size_t b_size, u
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
+Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips){
 #ifdef S_REGULAR
     this->current_b_reg = this->b_reg_mult;
 #endif
@@ -636,16 +672,18 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
     // calculate the probability that we include the element in the batch
     const auto batch_proba = (this->batch / double(n_blocks - n_therm));
     // check if the batch is not bigger than the blocks number
-    const auto norm = (batch_proba > 1) ? n_blocks - n_therm : this->batch;
+    const auto norm = n_blocks - n_therm; //(batch_proba > 1) ? n_blocks - n_therm : this->batch;
 
     // save all average weights for covariance matrix
     Col<_type> averageWeights(this->full_size);
-    Col<_type> energies(norm, arma::fill::zeros);
     Col<_type> meanEnergies(n_samples, arma::fill::zeros);
-    
+    Col<_type> energies(norm, arma::fill::zeros);
+    //Mat<_type> derivatives(this->full_size, norm, arma::fill::zeros);
+
     for(auto i = 0; i < n_samples; i++){
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
+        //this->set_angles();
 
         // start the simulation
 #ifdef USE_SR
@@ -657,58 +695,60 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
         // thermalize system
         auto therm_time = std::chrono::high_resolution_clock::now();
         this->blockSampling(n_therm * b_size, this->current_state, n_flips, true);
-        PRT(therm_time, this->dbg_thrm)
+        PRT(therm_time, this->dbg_thrm);
 
         // to check whether the batch is ready already
-        size_t took = 1;                                                               
+
+        
         auto blocks_time = std::chrono::high_resolution_clock::now();
-        while(took <= norm){
+        for(auto took = 0; took < norm; took++){
             // block sample the stuff
             auto sample_time = std::chrono::high_resolution_clock::now();
             this->blockSampling(b_size, this->current_state, n_flips, false);
-            PRT(sample_time, this->dbg_samp)
-
-            if (norm == (n_blocks - n_therm) || this->hamil->ran.randomReal_uni() <= batch_proba) {
-                auto gradients_time = std::chrono::high_resolution_clock::now();
+            PRT(sample_time, this->dbg_samp);
 
 
-                this->calcVarDeriv(this->current_vector);
-                // append local energies
-                energies(took - 1) = this->locEn();
+            //if (norm == (n_blocks - n_therm) || this->hamil->ran.randomReal_uni() <= batch_proba) {
+            auto gradients_time = std::chrono::high_resolution_clock::now();
 
-                // save conjugate first
-                this->O_flat = arma::conj(this->O_flat);
-                
-                // append gradient forces with the first part of covariance <E_kO_k*>
-                this->F += energies(took - 1) * this->O_flat;
+
+            this->calcVarDeriv(this->current_vector);
+            // append local energies
+            const _type locEnergy = this->locEn();
 #ifdef USE_SR
-                // append covariance matrices with the first part of covariance <O_k*O_k'>
-                this->S += this->O_flat * this->O_flat.t();
+            // append covariance matrices with the first part of covariance <O_k*O_k'>
+            setColumnTimesRow(this->S, this->O_flat, true);
 #endif
-                // average weight gradients (conjugate)
-                averageWeights += this->O_flat;
+            // append gradient forces with the first part of covariance <E_kO_k*>
+            //this->F += locEnergy * arma::conj(this->O_flat);
+            setConstTimesCol(this->F, locEnergy, this->O_flat, true, true);
+
+            // average weight gradients (conjugate)
+            averageWeights += this->O_flat;
                 
-                // append number of elements taken
-                took += 1;
-                PRT(gradients_time, this->dbg_grad)
-            }
+            // append number of elements taken
+            energies(took) = locEnergy;
+
+            PRT(gradients_time, this->dbg_grad);
+            //}
         }
-        PRT(blocks_time, this->dbg_blck)
+        PRT(blocks_time, this->dbg_blck);
 
         // normalize
-        averageWeights /= double(took);
-        this->F /= double(took);
+        auto meanLocEn = arma::mean(energies);
+        averageWeights /= double(norm);
+        this->F /= double(norm);
 
-        // update the covariance
-        _type meanLocEn = arma::mean(energies);
 
         // append gradient forces with the first part of covariance <E_k><O_k*>
-        this->F -= meanLocEn * averageWeights;
+        //this->F -= meanLocEn * arma::conj(averageWeights);
+        setConstTimesCol(this->F, meanLocEn, averageWeights, false, true);
 
 #ifdef USE_SR
-        this->S /= double(took);
+        this->S /= double(norm);
         // append covariance matrices with the first part of covariance <O_k*><O_k'>
-        this->S -= averageWeights * averageWeights.t();
+        setColumnTimesRow(this->S, averageWeights, false);
+        //this->S -= averageWeights * averageWeights.t();
         // update model
         this->updVarDerivSR(i);
     #ifdef S_REGULAR
@@ -749,7 +789,7 @@ Col<_type> rbmState<typename _type, typename _hamtype>::mcSampling(size_t n_samp
 template<typename _type, typename _hamtype>
 inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips)
 {
-    stout << "\n\n\n->Looking for the ground state for " + this->get_info();
+    stout << "\n\n\n->Looking for the ground state for " + this->get_info() << "," + VEQ(n_samples) + "," + VEQ(n_blocks) + "," + VEQ(b_size) << EL;
     // start the timer!
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -767,11 +807,8 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
     // set the random state at each Monte Carlo iteration
     this->set_rand_state();
 
-    double norm = 0.0;
     this->op.reset();
     for (auto r = 0; r < n_samples; r++) {
-        // go through samples to get rid of the correlations
-        
         // set the random state at each Monte Carlo iteration
         this->set_rand_state();
 
@@ -779,7 +816,6 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
         auto therm_time = std::chrono::high_resolution_clock::now();
         this->blockSampling(n_therm * b_size, this->current_state, n_flips, true);
         PRT(therm_time, this->dbg_thrm);
-        v_1d<int> tmp_vec_print(this->n_visible, 0);
         for (int i = 0; i < n_blocks; i++) {
 
             // block sample the stuff
@@ -788,32 +824,27 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
             PRT(sample_time, this->dbg_samp);
 
             // look at the states coefficient (not found)
-            if (!states.contains(this->current_state)) {
-                auto coefficient = this->coeff(this->current_vector);
-                if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-2)) {
-                    states[this->current_state] = coefficient;
 
-                    //SpinHamiltonian<double>::print_base_state(this->current_state, 1, tmp_vec_print, 1);
-                    //stout << VEQ(coefficient) << EL;
-                    norm += pow(abs(coefficient), 2.0);
-                }
+            auto coefficient = this->coeff(this->current_vector);
+            if (!valueEqualsPrec(std::abs(coefficient), 0.0, 1e-2)) {
+                states[this->current_state] = coefficient;
             }
+
             // append local energies
             this->collectAv(this->locEn());
         }
         // update the progress bar
         if (r % pbar.percentageSteps == 0)
-            pbar.printWithTime("-> STATE NORM:" + VEQ(sqrt(norm)) + ". PROGRESS");
+            pbar.printWithTime("-> PROGRESS");
     }
-    this->op.normalise(n_samples * n_blocks);
-
-
+    //stout << this->op.s_z_cor << EL;
+    this->op.normalise(n_samples * n_blocks, this->hamil->lattice->get_spatial_norm());
+    //stout << this->op.s_z_cor << EL;
     stouts("->Finished Monte Carlo state search after finding weights ", start);
     stout << "\n------------------------------------------------------------------------" << EL;
     stout << "GROUND STATE RBM ENERGY: " << VEQP(op.en, 4) << EL;
     stout << "GROUND STATE RBM SIGMA_X EXTENSIVE: " << VEQP(op.s_x, 4) << EL;
     stout << "GROUND STATE RBM SIGMA_Z EXTENSIVE: " << VEQP(op.s_z, 4) << EL;
-    stout << "GROUND STATE RBM NORM OF STATE FOUND: " << VEQP(sqrt(norm), 4) << EL;
     stout << "\n------------------------------------------------------------------------\n|Psi>=" << EL;
     this->pretty_print(states, 0.08);
     stout << "\n------------------------------------------------------------------------" << EL;
@@ -829,18 +860,21 @@ template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 {   
     auto Ns = this->hamil->lattice->get_Ns();
-
+    //stout << VEQ(this->current_state) << EL;
     // calculate sigma_z 
     double s_z = 0.0;
 #pragma omp parallel for reduction(+ : s_z)
     for (int i = 0; i < Ns; i++) {
         const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
         this->op.s_z_i(i) += real(val);
+        //stout << VEQ(val) << EL;
         s_z += real(val);
         for (int j = 0; j < Ns; j++) {
-            const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
+            //const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
             const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, j }));
-            this->op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(val) / this->hamil->lattice->get_spatial_norm(abs(x), abs(y), abs(z));
+            //stout << x << "," << y << "," << z << "->" << VEQ(val) << EL;
+            //this->op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(val);
+            this->op.s_z_cor(i, j) += std::real(val);
         }
     }
     this->op.s_z += real(s_z / double(Ns));
@@ -858,10 +892,11 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
             v = this->pRatioValChange(v, state);
         s_x += v;
         for (int j = 0; j < Ns; j++) {
-            const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
+            //const auto [x, y, z] = this->hamil->lattice->getSiteDifference(i, j);
             const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, j }));
             v = this->pRatioValChange(val, state);
-            this->op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(val) / this->hamil->lattice->get_spatial_norm(abs(x), abs(y), abs(z));
+            //this->op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(val);
+            this->op.s_x_cor(i, j) += std::real(v);
         }
     }
     this->op.s_x += real(s_x / double(Ns));

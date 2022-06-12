@@ -221,7 +221,7 @@ void HexagonalLattice::calculate_coordinates()
 	// we must categorize elements by pairs
 	for (int i = 0; i < Ns; i++) {
 		this->coordinates[i][0] = (static_cast<int>(1.0 * i / 2.0)) % Lx;				// x axis coordinate
-		this->coordinates[i][1] = (static_cast<int>(1.0 * i / Lx)) % Ly;				// y axis coordinate
+		this->coordinates[i][1] = (static_cast<int>(1.0 * i / (2.0*Lx))) % Ly;				// y axis coordinate
 		// we calculate the big Y that is enumerated normally accordingly and then calculate the small y which is twice bigger or twice bigger + 1
 		if (i % 2 == 0)
 			this->coordinates[i][1] = this->coordinates[i][1] * 2;
@@ -229,7 +229,7 @@ void HexagonalLattice::calculate_coordinates()
 			this->coordinates[i][1] = this->coordinates[i][1] * 2 + 1;
 
 		this->coordinates[i][2] = (static_cast<int>(1.0 * i / (LxLy))) % Lz;			// z axis coordinate			
-		//std::cout << "(" << this->coordinates[i][0] << "," << this->coordinates[i][1] << "," << this->coordinates[i][2] << ")\n";
+		//stout << VEQ(i) << "->(" << this->coordinates[i][0] << "," << this->coordinates[i][1] << "," << this->coordinates[i][2] << ")\n";
 	}
 
 
