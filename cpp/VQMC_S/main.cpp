@@ -5,13 +5,13 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-#define PLOT
+//#define PLOT
 #define SPIN
 
 
 #ifdef USE_SR
-	#define PINV
-	//#define S_REGULAR
+	//#define PINV
+	#define S_REGULAR
 #endif
 
 
@@ -24,9 +24,9 @@
 int main(const int argc, char* argv[]) {
 
 	auto ui = std::make_unique<rbm_ui::ui<cpx, double>>(argc, argv);
-	ui->define_models();
-	ui->make_simulation();
-	
+	//ui->define_models();
+	//ui->make_simulation();
+	ui->make_mc_classical(100, 0.5, 0.1, 0);
 
 	return 0;
 }

@@ -816,7 +816,7 @@ T stddev(const v_1d<T>& v)
 
 
 /// <summary>
-/// Creates a random vector of custom length using the random library and the merson-twister (?) engine
+/// Creates a random vector of custom length using the random library and the Mersenne-Twister (?) engine
 /// </summary>
 /// <param name="N"> length of the generated random vector </param>
 /// <returns> returns the custom-length random vector </returns>

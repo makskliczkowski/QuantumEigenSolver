@@ -72,7 +72,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 	this->lattice = lat;
 	this->ran = randomGen();
 	this->Ns = this->lattice->get_Ns();																		// number of lattice sites
-	this->loc_states_num = 2 * this->Ns + 1;																// number of states after local energy work
+	this->loc_states_num = this->Ns * (this->lattice->get_nn_number(0) + 1) + 1;							// number of states after local energy work
 	this->locEnergies = v_1d<std::pair<u64, _type>>(this->loc_states_num, std::pair(LLONG_MAX, 0.0));		// set local energies vector
 	this->N = ULLPOW(this->Ns);																				// Hilber space size
 	this->dh = create_random_vec(this->Ns, this->ran, this->w);												// creates random disorder vector
@@ -107,9 +107,10 @@ template <typename _type>
 void Heisenberg<_type>::locEnergy(u64 _id) {
 	// sumup the value of non-changed state
 	double localVal = 0;
-#ifndef DEBUG
-#pragma omp parallel for reduction(+ : localVal)
-#endif // !DEBUG
+	uint iter = 1;
+//#ifndef DEBUG
+//#pragma omp parallel for reduction(+ : localVal)
+//#endif // !DEBUG
 	for (auto i = 0; i < this->Ns; i++) {
 		// check all the neighbors
 		auto nn_number = this->lattice->get_nn_number(i);
@@ -122,29 +123,28 @@ void Heisenberg<_type>::locEnergy(u64 _id) {
 
 		// transverse field (SX)
 		u64 new_idx = flip(_id, this->Ns - 1 - i);
-		this->locEnergies[i] = std::pair{ new_idx, this->g + this->dg(i) };
+		this->locEnergies[iter] = std::pair{ new_idx, this->g + this->dg(i) };
+		iter++;
 
 		for (auto n_num = 0; n_num < nn_number; n_num++) {
 			if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) { //&& nn >= j
 				double sj = checkBit(_id, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
-				auto interaction = (this->J + this->dJ(i));
+				auto interaction = (this->J + this->dJ(i)) / 2.0;
 				// diagonal elements setting  interaction field
 				localVal += interaction * this->delta * si * sj;
 
 				// S+S- + S-S+
 				if (si * sj < 0) {
 					auto new_new_idx = flip(new_idx, this->Ns - 1 - nn);
-					this->locEnergies[this->Ns + i] = std::pair{ new_new_idx, 0.5 * interaction };
+					this->locEnergies[iter] = std::pair{ new_new_idx, 0.5 * interaction };
+					iter++;
 				}
-				// change if we don't hit the energy
-				else
-					this->locEnergies[this->Ns + i] = std::pair{ LONG_MAX, 0 };
 			}
 		}
 	}
 	// append unchanged at the very end
-	this->locEnergies[2 * this->Ns] = std::pair{ _id, static_cast<_type>(localVal) };
+	this->locEnergies[0] = std::pair{ _id, static_cast<_type>(localVal) };
 }
 
 /*
@@ -212,13 +212,7 @@ void Heisenberg<_type>::locEnergy(const vec& v) {
 template <typename _type>
 void Heisenberg<_type>::hamiltonian() {
 	//  hamiltonian memory reservation
-	try {
-		this->H = SpMat<_type>(this->N, this->N);										
-	}
-	catch (const std::bad_alloc& e) {
-		std::cout << "Memory exceeded" << e.what() << "\n";
-		assert(false);
-	}
+	this->init_ham_mat();
 
 	for (auto k = 0; k < this->N; k++) {
 		for (auto i = 0; i < this->Ns; i++) {

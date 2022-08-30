@@ -53,7 +53,7 @@
     <PlatformToolset>Intel C++ Compiler 2022</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseInteloneMKL>Parallel</UseInteloneMKL>
+    <UseInteloneMKL>Sequential</UseInteloneMKL>
     <UseILP64Interfaces1A>true</UseILP64Interfaces1A>
     <EnableMKLOpenMPOffloadToGPU>true</EnableMKLOpenMPOffloadToGPU>
   </PropertyGroup>

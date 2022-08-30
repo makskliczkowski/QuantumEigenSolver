@@ -28,10 +28,10 @@ public:
 	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
-	v_1d<pair<u64, _type>> locEnergies;																				// local energies map
+	v_1d<pair<u64, _type>> locEnergies;																					// local energies map
 
-	virtual u64 map(u64 index) = 0;																	// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
-	// virtual ~SpinHamiltonian() = 0;																	// pure virtual destructor
+	virtual u64 map(u64 index) = 0;																						// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
+	// virtual ~SpinHamiltonian() = 0;																						// pure virtual destructor
 	
 	// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
 	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);												// converts a map to arma column
@@ -64,6 +64,18 @@ public:
 	Mat<_type> red_dens_mat(u64 state, int A_size) const;																// calculate the reduced density matrix based on eigenstate
 	double entanglement_entropy(u64 state, int A_size) const;															// entanglement entropy for eigenstate
 	vec entanglement_entropy_sweep(u64 state) const;																	// entanglement entropy sweep over bonds for eigenstate
+
+	// -------------------------------------------				  SETTERS					  -------------------------------------------
+	void init_ham_mat() {
+		try {
+			this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
+		}
+		catch (const std::bad_alloc& e) {
+			std::cout << "Memory exceeded" << e.what() << "\n";
+			assert(false);
+		}
+	};
+
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
 	const v_1d<std::pair<u64, _type>>& get_localEnergyRef() const { return this->locEnergies; };						// returns the constant reference to local energy
@@ -97,9 +109,9 @@ public:
 
 	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
+	virtual void update_info() = 0;
 	void set_angles() {};
 	void set_angles(const vec& phis, const vec& thetas) {};
-
 
 	// -------------------------------------------                    OPERATORS						  --------------------------------------------
 

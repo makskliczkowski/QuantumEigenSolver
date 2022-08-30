@@ -1,1 +1,1 @@
--mod 0 -bc 0 -l 0 -m 5000 -lr 0.001 -lm 2 -nb 1500 -bs 1 -d 1 -lx 12 -ly 1 -J -1.0 -J0 0.0 -h 0.0 -w 0.0 -g 1.0 -g0 0.0 -dlt 1.0 -kx -1.0 -ky -1.0 -kz -1.0 -delta 1.0 -th 16 -dir results32/
+-mod 2 -bc 0 -l 1 -m 1550 -lr 0.005 -lm 2 -nb 150 -bs 10 -d 1 -lx 4 -ly 1 -J -1.0 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -th 16 -dir resultsFin/

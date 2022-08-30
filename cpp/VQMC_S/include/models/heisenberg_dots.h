@@ -33,10 +33,14 @@ public:
 	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
 		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
 	// ----------------------------------- 				 SETTERS 				 ---------------------------------
+	void set_Jdot(const vec& Jdot)						{ this->J_dot = Jdot; };
+	void update_info() override							{ this->info = this->inf(); };
 	void set_angles();
 	void set_angles(const vec& phis, const vec& thetas);
-
+	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas);
+	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas);
 	// -----------------------------------				 GETTERS 				 ---------------------------------
+	auto get_Jdot()										const RETURNS(this->J_dot);
 	void get_dot_interaction(u64 state, int position_elem);
 	tuple<double, _type, double> get_dot_int_return(double si, int position_elem);
 
@@ -50,6 +54,9 @@ public:
 		string name = sep + \
 			"_hei_dots,dN=" + STRP(dot_num,2) + ",Ns=" + STR(this->Ns) + \
 			",J=" + STRP(J, 2) + \
+			",Jx=" + STRP(J_dot(0), 2) + \
+			",Jy=" + STRP(J_dot(1), 2) + \
+			",Jz=" + STRP(J_dot(2), 2) + \
 			",J0=" + STRP(J0, 2) + \
 			",g=" + STRP(g, 2) + \
 			",g0=" + STRP(g0, 2) + \
@@ -66,7 +73,7 @@ template<typename _type>
 inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0)
 	: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 {
-	this->positions = positions;
+	this->positions = positions; // at each position we hold classical spin
 	// sort the postitions vector for building block convinience
 	std::ranges::sort(this->positions.begin(), this->positions.end());
 
@@ -78,7 +85,10 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 
 	// reserve memory
 	this->set_angles();
-
+	//stout << "cos(theta)" << EL << this->cos_thetas << EL;
+	//stout << "sin(theta)" << EL << this->sin_thetas << EL;
+	//stout << "cos(phi)" << EL << this->cos_phis << EL;
+	//stout << "sin(phi)" << EL << this->sin_phis << EL;
 	// set info
 	this->info = this->inf();
 }
@@ -96,14 +106,15 @@ inline void Heisenberg_dots<_type>::set_angles()
 	vec thetas = vec(this->dot_num, arma::fill::randu);
 	phis = phis * TWOPI;
 	thetas = thetas * PI;
-	this->cos_thetas = cos(thetas);
-	this->sin_thetas = sin(thetas);
-	this->cos_phis = cos(phis);
-	this->sin_phis = sin(phis);
+	//this->cos_thetas = cos(thetas);
+	//this->sin_thetas = sin(thetas);
+	//this->cos_phis = cos(phis);
+	//this->sin_phis = sin(phis);
+	
 }
 /*
 * @brief sets the angles
-* @param phis classical spins [0,1] - xy plane - you give this in PI units
+* @param phis classical spins [0,1] - xy plane - you give this in 2*PI units
 * @param thetas classical spins [0,1] - z plane - you give this in PI units
 */
 template<typename _type>
@@ -131,6 +142,45 @@ inline void Heisenberg_dots<_type>::set_angles(const vec& phis, const vec& theta
 	this->sin_phis = sin(a_phis);
 }
 
+/*
+* @brief sets the angles
+* @param phis classical spins [0,1] - xy plane - you give this in 2*PI units
+* @param thetas classical spins [0,1] - z plane - you give this in PI units
+*/
+template<typename _type>
+inline void Heisenberg_dots<_type>::set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas)
+{
+	// set the angles now
+	this->cos_thetas = cos_thetas;
+	this->sin_thetas = sin_thetas;
+	this->cos_phis = cos_phis;
+	this->sin_phis = sin_phis;
+
+	//stout << "cos(theta)" << EL << this->cos_thetas << EL;
+	//stout << "sin(theta)" << EL << this->sin_thetas << EL;
+	//stout << "cos(phi)" << EL << this->cos_phis << EL;
+	//stout << "sin(phi)" << EL << this->sin_phis << EL;
+}
+
+/*
+* @brief sets the angles
+* @param phis classical spins [0,1] - xy plane - you give this in 2*PI units
+* @param thetas classical spins [0,1] - z plane - you give this in PI units
+*/
+template<typename _type>
+inline void Heisenberg_dots<_type>::set_angles(int position, double sin_phi, double sin_theta, double cos_phi, double cos_theta)
+{
+	// set the angles now
+	this->cos_thetas(position) = cos_theta;
+	this->sin_thetas(position) = sin_theta;
+	this->cos_phis(position) = cos_phi;
+	this->sin_phis(position) = sin_phi;
+
+	//stout << "cos(theta)(" << position << ")" << EL << this->cos_thetas(position) << EL;
+	//stout << "sin(theta)(" << position << ")" << EL << this->sin_thetas(position) << EL;
+	//stout << "cos(phi)(" << position << ")" << EL << this->cos_phis(position) << EL;
+	//stout << "sin(phi)(" << position << ")" << EL << this->sin_phis(position) << EL;
+}
 // ----------------------------------------------------------------------------- DOT INTERACTION -----------------------------------------------------------------------------
 
 /*
@@ -180,7 +230,7 @@ inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return
 	if (position >= 0 && position < this->Ns) {
 		// set the s_z element
 		const auto Jz = this->J_dots(position_elem) + this->J_dot(2);
-		s_z_int = this->cos_thetas[position_elem] > 0 ? Jz * si : -Jz * si;
+		s_z_int = this->cos_thetas[position_elem] * Jz * si;
 
 		// set the s_y element 
 		s_y_int = 0;
@@ -230,19 +280,15 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, int position_
 */
 template <typename _type>
 void Heisenberg_dots<_type>::hamiltonian() {
-	try {
-		this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
-	}
-	catch (const std::bad_alloc& e) {
-		std::cout << "Memory exceeded" << e.what() << "\n";
-		assert(false);
-	}
+	init_ham_mat();
+
 	// build the Hamiltonian
 	for (auto k = 0; k < this->N; k++) {
 		// interaction with the dot at left site will be held with single variable as position is sorted
 		int dot_iter = 0;
 		for (int j = 0; j < this->Ns; j++) {
-			auto nn_number = this->lattice->get_nn_number(j);
+			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
+
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
 
@@ -254,9 +300,10 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			this->setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// interaction - check if nn exists
-			for (auto n_num = 0; n_num < nn_number; n_num++) {
+			for (auto n_num : nn_number) {
+				// double checking neighbors
 				if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
-					// Ising-like spin correlation // check the bit on the nn
+					// Ising-like spin correlation - check the bit on the nn
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 					auto interaction = (this->J + this->dJ(j));
 
@@ -296,10 +343,13 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 	
 	// cannot use omp because of dot_iter
 	int dot_iter = 0;
-
+	uint iter = 1;
+	//for (int i = 0; i < this->loc_states_num; i++)
+	//	stout << VEQ(i) << "\t" << VEQ(this->locEnergies[i].first) << "\t" << VEQ(this->locEnergies[i].second) << EL;
+	//stout << EL;
 	for (auto i = 0; i < this->Ns; i++) {
-		// 
-		auto nn_number = this->lattice->get_nn_number(i);
+		
+		v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
 		// true - spin up, false - spin down
 		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
 
@@ -311,7 +361,8 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 		_type s_flipped_en = this->g + this->dg(i);
 
 		// check the Siz Si+1z
-		for (auto n_num = 0; n_num < nn_number; n_num++) {
+		for (auto n_num : nn_number) {
+			// double checking neighbors
 			if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
 				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 				auto interaction = (this->J + this->dJ(i));
@@ -319,8 +370,9 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 				localVal += this->delta * interaction * si * sj;
 
 				// S+S- + S-S+
-				if (si * sj < 0)
-					this->locEnergies[this->Ns + i] = std::pair{ flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction };
+				if (si * sj < 0) {
+					this->locEnergies[iter++] = std::pair{ flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction };
+				}
 			}
 		}
 		// handle the dot
@@ -334,10 +386,14 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 			dot_iter++;
 		}
 		// set the flipped state
-		this->locEnergies[i] = std::pair{ new_idx, s_flipped_en };
+		this->locEnergies[iter++] = std::pair{ new_idx, s_flipped_en };
 	}
 	// append unchanged at the very end
-	this->locEnergies[2 * this->Ns] = std::pair{ _id, static_cast<_type>(localVal) };
+	this->locEnergies[0] = std::pair{ _id, static_cast<_type>(localVal) };
+	this->loc_states_num = iter;
+	//for (int i = 0; i < this->loc_states_num; i++)
+	//	stout << VEQ(i) << "\t" << VEQ(this->locEnergies[i].first) << "\t" << VEQ(this->locEnergies[i].second) << EL;
+	//stout << EL;
 }
 
 
@@ -352,10 +408,10 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 
 	// cannot use omp because of dot_iter
 	int dot_iter = 0;
-
+	uint iter = 1;
 	for (auto i = 0; i < this->Ns; i++) {
-		// 
-		auto nn_number = this->lattice->get_nn_number(i);
+		 
+		v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
 		// true - spin up, false - spin down
 		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
 
@@ -369,8 +425,9 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 		_type s_flipped_en = this->g + this->dg(i);
 
 		// check the Siz Si+1z
-		for (auto n_num = 0; n_num < nn_number; n_num++) {
+		for (auto n_num : nn_number){
 			this->tmp_vec2 = this->tmp_vec;
+			// double checking neighbors
 			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {
 				// check Sz 
 				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
@@ -383,10 +440,9 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 				if (si * sj < 0) {
 					flipV(tmp_vec2, nn);
 					auto flip_idx_nn = baseToInt(tmp_vec2);
-					this->locEnergies[this->Ns + i] = std::pair{ flip_idx_nn, 0.5 * interaction };
+					this->locEnergies[iter] = std::pair{ flip_idx_nn, 0.5 * interaction };
+					iter++;
 				}
-				else
-					this->locEnergies[this->Ns + i] = std::pair{ LONG_MAX, 0 };
 			}
 		}
 		// handle the dot
@@ -400,10 +456,12 @@ void Heisenberg_dots<_type>::locEnergy(const vec& v) {
 			dot_iter++;
 		}
 		// set the flipped state
-		this->locEnergies[i] = std::pair{ new_idx, s_flipped_en };
+		this->locEnergies[iter] = std::pair{ new_idx, s_flipped_en };
+		iter++;
 	}
 	// append unchanged at the very end
-	this->locEnergies[2 * this->Ns] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	this->locEnergies[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	this->loc_states_num = iter + 1;
 }
 
 #endif

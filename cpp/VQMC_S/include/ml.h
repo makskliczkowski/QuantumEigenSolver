@@ -139,6 +139,7 @@ public:
 	void update(const arma::Col<_type>& grad, const arma::Col<_type>& O) {
 		this->current_time += 1;
 		this->v = this->beta * this->v + (1.0 - this->beta) * O % arma::conj(O);
+
 		//this->v.print("v");
 		// calculate the new gradient according to RMSProp arXiv:1910.11163v2
 		this->gradient = this->lr * grad / (arma::sqrt(this->v) + this->eps);
