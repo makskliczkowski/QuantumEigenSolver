@@ -39,8 +39,8 @@ private:
 public:
 	// METHODS
 	void hamiltonian() override;
-	void locEnergy(u64 _id) override;																			// returns the local energy for VQMC purposes
-	void locEnergy(const vec& _id) override;																// returns the local energy for VQMC purposes
+	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;												// returns the local energy for VQMC purposes
+	v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override;										// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const 
@@ -77,8 +77,6 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 	this->lattice = lat;
 	this->ran = randomGen();
 	this->Ns = this->lattice->get_Ns();
-	this->loc_states_num = this->Ns + 1;												// number of states after local energy work
-	this->locEnergies = v_1d<std::pair<u64, _type>>(this->loc_states_num);				// set local energies vector
 	this->N = ULLPOW(this->Ns);															// Hilber space size
 	this->dh = create_random_vec(this->Ns, this->ran, this->w);							// creates random disorder vector
 	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);						// creates random exchange vector
@@ -109,31 +107,36 @@ u64 IsingModel<_type>::map(u64 index) {
 * @param _id base state index
 */
 template <typename _type>
-void IsingModel<_type>::locEnergy(u64 _id) {
-	// sumup the value of a non-changed state
+v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(u64 _id, uint site) {
+	// sumup the value of non-changed state
 	double localVal = 0;
-#pragma omp parallel for reduction(+ : localVal)
-	for (auto i = 0; i < this->Ns; i++) {
-		auto nn_number = this->lattice->get_nn_number(i);
-		// true - spin up, false - spin down
-		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
+
+	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
+	v_1d<std::pair<u64, _type>> state_val(2);
+
+
+	// true - spin up, false - spin down
+	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;								
 		
-		// diagonal elements setting the perpendicular field
-		localVal += (this->h + dh(i)) * si;												
+	// diagonal elements setting the perpendicular field
+	localVal += (this->h + dh(i)) * si;												
 		
-		// diagonal elements setting the interaction field
-		for (auto n_num = 0; n_num < nn_number; n_num++) {
-			if (auto nei = this->lattice->get_nn(i, n_num);  nei >= 0) { //  && nei >= i
-				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-				localVal += (this->J + this->dJ(i)) * si * sj;
-			}
+	// check the Siz Si+1z
+	for (auto n_num : nn_number) {
+		// double checking neighbors
+		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			localVal += (this->J + this->dJ(site)) * si * sj;
 		}
-		// flip with S^x_i with the transverse field
-		u64 new_idx = flip(_id, this->Ns - 1 - i);
-		this->locEnergies[i] = std::pair{ new_idx, this->g + this->dg(i) };
 	}
+	
+	// flip with S^x_i with the transverse field
+	u64 new_idx = flip(_id, this->Ns - 1 - site);
+	state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
 	// append unchanged at the very end
-	this->locEnergies[this->Ns] = std::pair{ _id, static_cast<_type>(localVal) };
+	state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
+
+	return state_val;
 }
 
 /*
@@ -141,34 +144,36 @@ void IsingModel<_type>::locEnergy(u64 _id) {
 * @param _id base state index
 */
 template <typename _type>
-void IsingModel<_type>::locEnergy(const vec& v) {
-	// sumup the value of a non-changed state
+v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(const vec& v, uint site) {
 	double localVal = 0;
-#pragma omp parallel for reduction(+ : localVal)
-	for (auto i = 0; i < this->Ns; i++) {
-		auto nn_number = this->lattice->get_nn_number(i);
 
-		// check Sz 
-		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
+	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
+	v_1d<std::pair<u64, _type>> state_val(2);
 
-		// diagonal elements setting the perpendicular field
-		localVal += (this->h + dh(i)) * si;
 
-		// diagonal elements setting the interaction field
-		for (auto n_num = 0; n_num < nn_number; n_num++) {
-			if (auto nn = this->lattice->get_nn(i, n_num);  nn >= 0) { //  && nei >= i
-				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
-				localVal += (this->J + this->dJ(i)) * si * sj;
-			}
+	// check Sz 
+	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
+
+	// diagonal elements setting the perpendicular field
+	localVal += (this->h + dh(site)) * si;
+
+	// diagonal elements setting the interaction field
+	for (auto n_num : nn_number) {
+		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			double sj = checkBitV(v, nei) > 0 ? 1.0 : -1.0;
+			localVal += (this->J + this->dJ(site)) * si * sj;
 		}
-		// flip with S^x_i with the transverse field
-		this->tmp_vec = v;
-		flipV(this->tmp_vec, i);
-		const u64 new_idx = baseToInt(this->tmp_vec);
-		this->locEnergies[i] = std::pair{ new_idx, this->g + this->dg(i) };
 	}
+	// flip with S^x_i with the transverse field
+	this->tmp_vec = v;
+	flipV(this->tmp_vec, site);
+	const u64 new_idx = baseToInt(this->tmp_vec);
+	state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
+
 	// append unchanged at the very end
-	this->locEnergies[this->Ns] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+
+	return state_val;
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------

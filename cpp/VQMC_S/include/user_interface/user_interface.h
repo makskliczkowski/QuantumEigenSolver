@@ -119,6 +119,21 @@ namespace rbm_ui {
 }
 // -------------------------------------------------------- Make a User interface class --------------------------------------------------------
 
+template<typename _hamtype>
+void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
+	// compare ED
+	auto Ns = hamiltonian->lattice->get_Ns();
+	if (Ns <= 12) {
+		hamiltonian->hamiltonian();
+		if (Ns <= 12)
+			hamiltonian->diag_h(false);
+		else
+			hamiltonian->diag_h(false, 3, 0, 1000);
+		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
+		stout << "\t\t\t\t->" << VEQ(ground_ed) << "\t" << VEQ(ground_rbm) << EL;
+	}
+}
+
 class user_interface {
 protected:
 	int thread_number;																				 			// number of threads
@@ -534,7 +549,6 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 //#endif // !DEBUG
 }
 
-
 /*
 *
 */
@@ -594,12 +608,14 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
 	stout << "->outside mc_steps = " << mc_outside << EL;
 
+	// make the lattice
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	auto Ns = this->lat->get_Ns();
 	this->positions = v_1d<int>(Ns);
 	// use all the positions for the lattice sites
 	std::iota(this->positions.begin(), this->positions.end(), 0); 
 
+	// use no disorder at classical - quantum interaction
 	this->J0_dot = 0;
 	// set angles (let's set only the z'th direction (set all phis to 0)
 	this->phis = arma::vec(Ns, arma::fill::zeros);
@@ -608,19 +624,22 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	vec sin_phis = sin(this->phis * TWOPI);
 	vec cos_phis = cos(this->phis * TWOPI);
 	vec sin_thetas = sin(this->thetas * PI);
-	vec cos_thetas = cos(this->thetas * PI);
+	vec cos_thetas_rbm = cos(this->thetas * PI);
+	vec cos_thetas_ed = cos(this->thetas * PI);
 
 	this->J_dot = vec(3, arma::fill::zeros);
 	auto jdot_step = 0.05;
 	auto jdot_num = 40;
 
-	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
-	hamiltonian->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
+	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+	hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_rbm);
+	hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_ed);
 
 	// rbm stuff
 	this->nvisible = Ns;
 	this->nhidden = this->layer_mult * this->nvisible;
-	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian, lr, batch, thread_num);
+	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
 	auto rbm_info = phi->get_info();
 	stout << "-> " << VEQ(rbm_info) << EL;
 
@@ -628,90 +647,95 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	// start the Jdot loop
 	for (int jdot = 1; jdot < jdot_num; jdot++) {
 		this->J_dot(2) = jdot * jdot_step;
-		hamiltonian->set_Jdot(this->J_dot);
-		hamiltonian->update_info();
+		hamiltonian_rbm->set_Jdot(this->J_dot);
+		hamiltonian_rbm->update_info();
+		hamiltonian_ed->set_Jdot(this->J_dot);
+		hamiltonian_ed->update_info();
 
-		auto model_info = hamiltonian->get_info();
+		auto model_info = hamiltonian_rbm->get_info();
 		stout << "\t-> " << VEQ(model_info) << EL;
 
 		// print energies
 		string dir = this->saving_dir + model_info + kPS + rbm_info + kPS;
+		string dir_ed = this->saving_dir + model_info + kPS + "ed" + kPS;
 		fs::create_directories(dir);
-
+		fs::create_directories(dir_ed);
 
 		// to store outter monte carlo energies
 		vec outter_energies(mc_outside * Tnum, arma::fill::zeros);
+		vec outter_energies_ed(mc_outside * Tnum, arma::fill::zeros);
+
 		// monte carlo for energy
 		auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-	
-		// calculate the statistics of a simulation
 		auto energies_tail = energies.tail(block_size);
+	
 		double ground_rbm = std::real(arma::mean(energies_tail));
+		double ground_rbm_new = 0;
 		double ground_ed = 0;
 		double ground_ed_new = 0;
-		// compare ED
-		if (Ns <= 16) {
-			hamiltonian->hamiltonian();
-			if (Ns <= 12)
-				hamiltonian->diag_h(false);
-			else
-				hamiltonian->diag_h(false, 3, 0, 1000);
-			ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
-			stout << "\t->" << VEQ(ground_ed) << "\t" << VEQ(ground_rbm) << EL;
-		}
 
+		calculate_ed<_hamtype>(ground_ed, ground_rbm, hamiltonian_ed);
 
 
 		uint iter = 0;
 		// iterate the temperature
 		for (int Titer = 0; Titer <= Tnum; Titer++) {
 			auto T = Tmax - Titer * dT;
-			stout << "\t\t->Starting " << VEQ(T) << EL;
+			stout << "\t\t->Starting temperature " << VEQ(T) << EL;
 			// iterate Monte Carlo steps
 			for (int i = 0; i < mc_outside; i++) {
 				// iterate the system
 				for (int j = 0; j < Ns; j++) {
+					const auto direction_rbm = cos_thetas_rbm(j);
+					const auto direction_ed = cos_thetas_ed(j);
 					// change one of the classical spins
-					hamiltonian->set_angles(j, 0, 0, 1, -cos_thetas(j));
+					hamiltonian_rbm->set_angles(j, 0, 0, 1, -direction_rbm);
+					hamiltonian_ed->set_angles(j, 0, 0, 1, -direction_ed);
+					
 					// calculate the corresponding energy
 					energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-
-					double ground_rbm_new = std::real(arma::mean(energies.tail(block_size)));
-					double dE = ground_rbm_new - ground_rbm;
-					// compare ED
-					if (Ns <= 16) {
-						hamiltonian->hamiltonian();
-						if (Ns <= 12)
-							hamiltonian->diag_h(false);
-						else
-							hamiltonian->diag_h(false, 3, 0, 1000);
-						ground_ed_new = std::real(hamiltonian->get_eigenEnergy(0));
-					}
-					double dE_ed = ground_ed_new - ground_ed;
-
+					ground_rbm_new = std::real(arma::mean(energies.tail(block_size)));
 
 					// update if lower energy or exponent works
-					if (dE < 0 || exp(-dE / T) > hamiltonian->ran.randomReal_uni(0, 1)){
-						stout << "\t\t\t-> flipped the spin at " << VEQ(j) << "\t" << VEQ(ground_rbm_new) << "\t" << VEQ(ground_ed_new) << "\t" << VEQ(ground_rbm) << "\t" << VEQ(ground_ed) << EL;
-
-						ground_rbm = ground_rbm_new; // set new energy
-						ground_ed = ground_ed_new;
+					if (double dE = ground_rbm_new - ground_rbm; dE <= 0 || exp(-dE / T) >= hamiltonian_rbm->ran.randomReal_uni(0, 1)){
+						cos_thetas_rbm(j) = -direction_rbm;
+						ground_rbm = ground_rbm_new;															// set new energy rbm
+						this->phi->init();																		// reinitialize the weights - probalby better thing to do
 					}
 					else{
-						stout << "\t\t\t->returning previous angle" << EL;
-						hamiltonian->set_angles(j, 0, 0, 1, -cos_thetas(j)); // return previous state
+						stout << "\t\t\t->returning previous angle rbm mc_step: " << \
+							VEQ(i) << "\t" << VEQ(j) << EL;
+						hamiltonian_rbm->set_angles(j, 0, 0, 1, direction_rbm); // return previous state
+					}
+					
+					// compare ED
+					calculate_ed<_hamtype>(ground_ed_new, ground_rbm_new, hamiltonian_ed);
+					// update if lower energy or exponent works
+					if (Ns <= 10) {
+						if (double dE_ed = ground_ed_new - ground_ed; dE_ed <= 0 || exp(-dE_ed / T) >= hamiltonian_ed->ran.randomReal_uni(0, 1)) {
+							stout << "\t\t\t-> flipped the spin at mc_step: "<< VEQ(i) << "\t" << \
+								VEQ(j) << "\t" << VEQ(ground_rbm_new) << "\t" << VEQ(ground_ed_new) << \
+								"\t" << VEQ(ground_rbm) << "\t" << VEQ(ground_ed) << EL;
+							cos_thetas_ed(j) = -direction_ed;
+							ground_ed = ground_ed_new;															// set new energy ed
+						}
+						else {
+							stout << "\t\t\t->returning previous angle" << EL;
+							hamiltonian_ed->set_angles(j, 0, 0, 1, direction_ed);								// return previous state
+						}
 					}
 				}
 			}
 			outter_energies(iter) = ground_rbm;
-			stout << "\t\t-> " << VEQ(T) << "\t" << VEQ(ground_rbm) << EL;
+			outter_energies_ed(iter) = ground_ed;
+			stout << "\t\t-> " << VEQ(T) << "\t" << VEQ(ground_rbm) << "\t" << VEQ(ground_ed) << EL;
 			iter++;
 		}
 		// calculate the averages for the operators
 		this->av_op.reset();
 		this->av_op = this->phi->get_op_av();
 
-
+		// -------------------------------------------------------- SAVE RBM --------------------------------------------------
 		auto fileRbmEn_name = dir + "energies";
 		std::ofstream fileRbmEn;
 		openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
@@ -739,6 +763,14 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 		print_mat(fileSave, this->av_op.s_z_cor);
 		fileSave.close();
 
+		// -------------------------------------------------------- SAVE ED --------------------------------------------------
+		if (Ns <= 10) {
+			Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
+			this->av_op.reset();
+			Operators<_hamtype> op(this->lat);
+			this->saving_dir = dir_ed;
+			op.calculate_operators(eigvec, this->av_op, true);
+		}
 
 	}
 

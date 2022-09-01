@@ -41,12 +41,12 @@ public:
 	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas);
 	// -----------------------------------				 GETTERS 				 ---------------------------------
 	auto get_Jdot()										const RETURNS(this->J_dot);
-	void get_dot_interaction(u64 state, int position_elem);
-	tuple<double, _type, double> get_dot_int_return(double si, int position_elem);
+	void get_dot_interaction(u64 state, uint position, uint dotnum);
+	tuple<double, _type, double> get_dot_int_return(double si, uint dotnum);
 
 	// ----------------------------------- 				 OTHER STUFF 				 ---------------------------------
-	void locEnergy(u64 _id) override;
-	void locEnergy(const vec& v) override;
+	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;
+	v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) override;
 	void hamiltonian() override;
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -73,24 +73,25 @@ template<typename _type>
 inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0)
 	: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 {
-	this->positions = positions; // at each position we hold classical spin
-	// sort the postitions vector for building block convinience
-	std::ranges::sort(this->positions.begin(), this->positions.end());
+	
+	this->positions = v_1d<int>(this->Ns);											// at each position we hold classical spin
+	auto iter = 1;
+	for (auto pos : positions) 
+		this->positions[pos] = iter++;												// set to iter(meaning the position in angles and interaction) when present
 
 	this->dot_num = positions.size();
 	this->J_dot = J_dot;
 	this->J_dot0 = J_dot0;
-	// creates random disorder vector
-	this->J_dots = create_random_vec(dot_num, this->ran, this->J_dot0);
 
-	// reserve memory
-	this->set_angles();
+	this->J_dots = create_random_vec(this->dot_num, this->ran, this->J_dot0);			// creates random disorder vector
+
+	this->set_angles();																// reserve memory
 	//stout << "cos(theta)" << EL << this->cos_thetas << EL;
 	//stout << "sin(theta)" << EL << this->sin_thetas << EL;
 	//stout << "cos(phi)" << EL << this->cos_phis << EL;
 	//stout << "sin(phi)" << EL << this->sin_phis << EL;
-	// set info
-	this->info = this->inf();
+	
+	this->info = this->inf();														// set info
 }
 
 
@@ -101,7 +102,6 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 template<typename _type>
 inline void Heisenberg_dots<_type>::set_angles()
 {
-
 	vec phis = vec(this->dot_num, arma::fill::randu);
 	vec thetas = vec(this->dot_num, arma::fill::randu);
 	phis = phis * TWOPI;
@@ -112,6 +112,7 @@ inline void Heisenberg_dots<_type>::set_angles()
 	//this->sin_phis = sin(phis);
 	
 }
+
 /*
 * @brief sets the angles
 * @param phis classical spins [0,1] - xy plane - you give this in 2*PI units
@@ -124,13 +125,13 @@ inline void Heisenberg_dots<_type>::set_angles(const vec& phis, const vec& theta
 	vec a_thetas(this->dot_num);
 
 	// check if phis is not full if so make it random
-	if (phis.n_elem < (this->dot_num))
+	if (phis.n_elem < this->dot_num)
 		a_phis = vec(this->dot_num, arma::fill::randu) * TWOPI;
 	else
 		a_phis = phis;
 
 	// check if thetas is not full if so make it random
-	if (thetas.n_elem < (this->dot_num))
+	if (thetas.n_elem < this->dot_num)
 		a_thetas = vec(this->dot_num, arma::fill::randu) * PI;
 	else
 		a_thetas = thetas;
@@ -186,30 +187,28 @@ inline void Heisenberg_dots<_type>::set_angles(int position, double sin_phi, dou
 /*
 * @brief Gets the interaction with the dots at the given position_elem from positions vector and returns it
 * @param si spin at i'th position
-* @param position_elem - element of possitions in dots
+* @param position - dot possition
 */
 template<typename _type>
-inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(double si, int position_elem)
+inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(double si, uint dotnum)
 {
-	const auto position = this->positions[position_elem];
 	double s_z_int = 0.0;
 	_type s_y_int = 0.0;
 	double s_x_int = 0.0;
-	
-	// check the position at elem site as if the dot would be on top of the site (left nei)
-	if (position >= 0 && position < this->Ns) {
-		// set the s_z element
-		const auto Jz = this->J_dots(position_elem) + this->J_dot(2);
-		s_z_int = Jz * si * this->cos_thetas[position_elem];
+	uint dot = dotnum - 1; // we must neglect one to keep convinience
 
-		const auto Jy = this->J_dots(position_elem) + this->J_dot(1);
-		// set the s_y element 
-		s_y_int = Jy * imn * si * this->sin_thetas[position_elem] * this->sin_phis[position_elem];
+	// set the s_z element
+	const auto Jz = this->J_dots(dot) + this->J_dot(2);
+	s_z_int = Jz * si * this->cos_thetas(dot);
 
-		const auto Jx = this->J_dots(position_elem) + this->J_dot(0);
-		// set the s_x element 
-		s_x_int = Jx * this->sin_thetas[position_elem] * this->cos_phis[position_elem];
-	}
+	const auto Jy = this->J_dots(dot) + this->J_dot(1);
+	// set the s_y element 
+	s_y_int = Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot);
+
+	const auto Jx = this->J_dots(dot) + this->J_dot(0);
+	// set the s_x element 
+	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot);
+
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
 
@@ -220,25 +219,24 @@ inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(d
 * @param position_elem element of possitions in dots
 */
 template<>
-inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return(double si, int position_elem)
+inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return(double si, uint dotnum)
 {
-	const auto position = this->positions[position_elem];
+	uint dot = dotnum - 1; // we must neglect one to keep convinience
 	double s_z_int = 0.0;
 	double s_y_int = 0.0;
 	double s_x_int = 0.0;
-	// check the position at elem site as if the dot would be on top of the site (left nei)
-	if (position >= 0 && position < this->Ns) {
-		// set the s_z element
-		const auto Jz = this->J_dots(position_elem) + this->J_dot(2);
-		s_z_int = this->cos_thetas[position_elem] * Jz * si;
 
-		// set the s_y element 
-		s_y_int = 0;
+	// set the s_z element
+	const auto Jz = this->J_dots(dot) + this->J_dot(2);
+	s_z_int = this->cos_thetas(dot) * Jz * si;
 
-		const auto Jx = this->J_dots(position_elem) + this->J_dot(0);
-		// set the s_x element 
-		s_x_int = Jx * this->sin_thetas[position_elem] * this->cos_phis[position_elem];
-	}
+	// set the s_y element 
+	s_y_int = 0;
+
+	const auto Jx = this->J_dots(dot) + this->J_dot(0);
+	// set the s_x element 
+	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot);
+
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
 
@@ -248,28 +246,27 @@ inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return
 * @param position_elem element of possitions in dots
 */
 template<typename _type>
-inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, int position_elem)
+inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, uint position, uint dotnum)
 {
-	const auto position = this->positions[position_elem];
-	// check the position at elem site as if the dot would be on top of the site (left nei)
-	if (position >= 0 && position < this->Ns) {
-		double si = checkBit(state, this->Ns - 1 - position) ? 1.0 : -1.0;
+	uint dot = dotnum - 1; // we must neglect one to keep convinience
 
-		// set the s_z element
-		auto Jz = (this->J_dots(2) + this->J_dot(2));
-		sz_int = make_tuple(state, Jz * si * this->cos_thetas[position_elem]);
+	double si = checkBit(state, this->Ns - 1 - position) ? 1.0 : -1.0;
 
-		// flip the state 
-		u64 new_state = flip(state, this->Ns - 1 - position);
+	// set the s_z element
+	auto Jz = (this->J_dots(2) + this->J_dot(2));
+	sz_int = make_tuple(state, Jz * si * this->cos_thetas(dot));
 
-		auto Jy = (this->J_dots(1) + this->J_dot(1));
-		// set the s_y element 
-		sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas[position_elem] * this->sin_phis[position_elem]);
+	// flip the state 
+	u64 new_state = flip(state, this->Ns - 1 - position);
 
-		auto Jx = (this->J_dots(0) + this->J_dot(0));
-		// set the s_x element 
-		sx_int = make_tuple(new_state, Jx * this->sin_thetas[position_elem] * this->cos_phis[position_elem]);
-	}
+	auto Jy = (this->J_dots(1) + this->J_dot(1));
+	// set the s_y element 
+	sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot));
+
+	auto Jx = (this->J_dots(0) + this->J_dot(0));
+	// set the s_x element 
+	sx_int = make_tuple(new_state, Jx * this->sin_thetas(dot) * this->cos_phis(dot));
+
 }
 
 // ----------------------------------------------------------- 				 BUILDING HAMILTONIAN 				 -----------------------------------------------------------
@@ -316,8 +313,8 @@ void Heisenberg_dots<_type>::hamiltonian() {
 				}
 			}
 			// handle the dot
-			if (positions[dot_iter] == j) {
-				const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, dot_iter);
+			if (positions[j] > 0) {
+				const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, positions[j]);
 				// set sz_int
 				this->H(k, k) += s_z_i;
 				// set sy_int
@@ -337,63 +334,53 @@ void Heisenberg_dots<_type>::hamiltonian() {
 * @param _id base state index
 */
 template <typename _type>
-void Heisenberg_dots<_type>::locEnergy(u64 _id) {
+v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 	// sumup the value of non-changed state
 	double localVal = 0;
-	
-	// cannot use omp because of dot_iter
-	int dot_iter = 0;
+
 	uint iter = 1;
-	//for (int i = 0; i < this->loc_states_num; i++)
-	//	stout << VEQ(i) << "\t" << VEQ(this->locEnergies[i].first) << "\t" << VEQ(this->locEnergies[i].second) << EL;
-	//stout << EL;
-	for (auto i = 0; i < this->Ns; i++) {
-		
-		v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
-		// true - spin up, false - spin down
-		double si = checkBit(_id, this->Ns - i - 1) ? 1.0 : -1.0;								
+	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
+	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
+	
+	// true - spin up, false - spin down
+	const double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
 
-		// perpendicular field
-		localVal += (this->h + this->dh(i)) * si;
+	// perpendicular field
+	localVal += (this->h + this->dh(site)) * si;
 
-		// transverse field
-		const u64 new_idx = flip(_id, this->Ns - 1 - i);
-		_type s_flipped_en = this->g + this->dg(i);
+	// transverse field
+	const u64 new_idx = flip(_id, this->Ns - 1 - site);
+	_type s_flipped_en = this->g + this->dg(site);
 
-		// check the Siz Si+1z
-		for (auto n_num : nn_number) {
-			// double checking neighbors
-			if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
-				double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-				auto interaction = (this->J + this->dJ(i));
-				// diagonal elements setting  interaction field
-				localVal += this->delta * interaction * si * sj;
+	// check the Siz Si+1z
+	for (auto n_num : nn_number) {
+		// double checking neighbors
+		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			const auto interaction = (this->J + this->dJ(site));
+			// diagonal elements setting  interaction field
+			localVal += this->delta * interaction * si * sj;
 
-				// S+S- + S-S+
-				if (si * sj < 0) {
-					this->locEnergies[iter++] = std::pair{ flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction };
-				}
-			}
+			// S+S- + S-S+
+			if (si * sj < 0)
+				state_val[iter++] = std::make_pair(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
 		}
-		// handle the dot
-		if (positions[dot_iter] == i) {
-			const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, dot_iter);
-			// set sz_int
-			localVal += s_z_i;
-			// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
-			s_flipped_en += -s_y_i + s_z_i;
-			// next position!
-			dot_iter++;
-		}
-		// set the flipped state
-		this->locEnergies[iter++] = std::pair{ new_idx, s_flipped_en };
 	}
+	// handle the dot
+	if (auto i = this->positions[site]; i > 0) {
+		const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, i);
+		// set sz_int
+		localVal += s_z_i;
+		// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
+		s_flipped_en += -s_y_i + s_z_i;
+	}
+	
+	// set the flipped state
+	state_val[iter++] = std::make_pair(new_idx, s_flipped_en);
 	// append unchanged at the very end
-	this->locEnergies[0] = std::pair{ _id, static_cast<_type>(localVal) };
-	this->loc_states_num = iter;
-	//for (int i = 0; i < this->loc_states_num; i++)
-	//	stout << VEQ(i) << "\t" << VEQ(this->locEnergies[i].first) << "\t" << VEQ(this->locEnergies[i].second) << EL;
-	//stout << EL;
+	state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
+	
+	return state_val;
 }
 
 
@@ -402,66 +389,60 @@ void Heisenberg_dots<_type>::locEnergy(u64 _id) {
 * @param _id base state index
 */
 template <typename _type>
-void Heisenberg_dots<_type>::locEnergy(const vec& v) {
+v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site) {
 	// sumup the value of non-changed state
 	double localVal = 0;
 
-	// cannot use omp because of dot_iter
-	int dot_iter = 0;
 	uint iter = 1;
-	for (auto i = 0; i < this->Ns; i++) {
+	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
+	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
+
 		 
-		v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
-		// true - spin up, false - spin down
-		double si = checkBitV(v, i) > 0 ? 1.0 : -1.0;
 
-		// perpendicular field
-		localVal += (this->h + this->dh(i)) * si;
+	// true - spin up, false - spin down
+	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
 
-		// transverse field
-		this->tmp_vec = v;
-		flipV(tmp_vec, i);
-		const u64 new_idx = baseToInt(tmp_vec);
-		_type s_flipped_en = this->g + this->dg(i);
+	// perpendicular field
+	localVal += (this->h + this->dh(site)) * si;
 
-		// check the Siz Si+1z
-		for (auto n_num : nn_number){
-			this->tmp_vec2 = this->tmp_vec;
-			// double checking neighbors
-			if (auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {
-				// check Sz 
-				double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
+	// transverse field
+	this->tmp_vec = v;
+	flipV(tmp_vec, site);
+	const u64 new_idx = baseToInt(tmp_vec);
+	_type s_flipped_en = this->g + this->dg(site);
 
-				auto interaction = (this->J + this->dJ(i));
-				// diagonal elements setting  interaction field
-				localVal += this->delta * interaction * si * sj;
+	// check the Siz Si+1z
+	for (auto n_num : nn_number) {
+		this->tmp_vec2 = this->tmp_vec;
+		// double checking neighbors
+		if (auto nn = this->lattice->get_nn(site, n_num); nn >= 0) {
+			// check Sz 
+			double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
 
-				// S+S- + S-S+
-				if (si * sj < 0) {
-					flipV(tmp_vec2, nn);
-					auto flip_idx_nn = baseToInt(tmp_vec2);
-					this->locEnergies[iter] = std::pair{ flip_idx_nn, 0.5 * interaction };
-					iter++;
-				}
+			auto interaction = (this->J + this->dJ(site));
+			// diagonal elements setting  interaction field
+			localVal += this->delta * interaction * si * sj;
+
+			// S+S- + S-S+
+			if (si * sj < 0) {
+				flipV(tmp_vec2, nn);
+				auto flip_idx_nn = baseToInt(tmp_vec2);
+				state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
 			}
 		}
-		// handle the dot
-		if (positions[dot_iter] == i) {
-			const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, dot_iter);
-			// set sz_int
-			localVal += s_z_i;
-			// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
-			s_flipped_en += -s_y_i + s_z_i;
-			// next position!
-			dot_iter++;
-		}
-		// set the flipped state
-		this->locEnergies[iter] = std::pair{ new_idx, s_flipped_en };
-		iter++;
 	}
+		// handle the dot
+	if (auto i = positions[site]; i > 0) {
+		const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, i);
+		// set sz_int
+		localVal += s_z_i;
+		// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
+		s_flipped_en += -s_y_i + s_z_i;
+	}
+		// set the flipped state
+	state_val[iter++] = std::pair{ new_idx, s_flipped_en };
 	// append unchanged at the very end
-	this->locEnergies[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
-	this->loc_states_num = iter + 1;
+	state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
 }
 
 #endif
