@@ -34,6 +34,9 @@
     <Filter Include="Header Files\user_interface">
       <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\models\symmetries">
+      <UniqueIdentifier>{71e01006-7309-4bcd-a319-d4c50b7c4629}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\random.h">
@@ -92,6 +95,12 @@
     </ClInclude>
     <ClInclude Include="include\user_interface\user_interface.h">
       <Filter>Header Files\user_interface</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hamil_sym.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\models\symmetries\ising_sym.h">
+      <Filter>Header Files\models\symmetries</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

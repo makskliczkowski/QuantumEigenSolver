@@ -143,7 +143,6 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CCppSupport>Cpp20Support</CCppSupport>
-      <Optimization>MaxSpeedHighLevel</Optimization>
       <OpenMP>GenerateParallelCode</OpenMP>
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
@@ -158,6 +157,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\hamil.h" />
+    <ClInclude Include="include\hamil_sym.h" />
     <ClInclude Include="include\lattice.h" />
     <ClInclude Include="include\lattices\hexagonal.h" />
     <ClInclude Include="include\lattices\square.h" />
@@ -166,6 +166,7 @@
     <ClInclude Include="include\models\heisenberg.h" />
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
+    <ClInclude Include="include\models\symmetries\ising_sym.h" />
     <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\random.h" />
     <ClInclude Include="include\rbm.h" />

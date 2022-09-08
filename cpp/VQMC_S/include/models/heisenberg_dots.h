@@ -33,8 +33,8 @@ public:
 	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
 		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
 	// ----------------------------------- 				 SETTERS 				 ---------------------------------
-	void set_Jdot(const vec& Jdot)						{ this->J_dot = Jdot; };
 	void update_info() override							{ this->info = this->inf(); };
+	void set_Jdot(const vec& Jdot)						{ this->J_dot = Jdot; };
 	void set_angles();
 	void set_angles(const vec& phis, const vec& thetas);
 	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas);
@@ -52,17 +52,17 @@ public:
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
 		string name = sep + \
-			"_hei_dots,dN=" + STRP(dot_num,2) + ",Ns=" + STR(this->Ns) + \
-			",J=" + STRP(J, 2) + \
-			",Jx=" + STRP(J_dot(0), 2) + \
-			",Jy=" + STRP(J_dot(1), 2) + \
-			",Jz=" + STRP(J_dot(2), 2) + \
-			",J0=" + STRP(J0, 2) + \
-			",g=" + STRP(g, 2) + \
-			",g0=" + STRP(g0, 2) + \
-			",h=" + STRP(h, 2) + \
-			",w=" + STRP(w, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+			"_hei_dots,dN=" + STRP(this->dot_num,2) + ",Ns=" + STR(this->Ns) + \
+			",J=" + STRP(this->J, 2) + \
+			",Jx=" + STRP(this->J_dot(0), 2) + \
+			",Jy=" + STRP(this->J_dot(1), 2) + \
+			",Jz=" + STRP(this->J_dot(2), 2) + \
+			",J0=" + STRP(this->J0, 2) + \
+			",g=" + STRP(this->g, 2) + \
+			",g0=" + STRP(this->g0, 2) + \
+			",h=" + STRP(this->h, 2) + \
+			",w=" + STRP(this->w, 2);
+		return SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 };
 
@@ -277,7 +277,7 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, uint position
 */
 template <typename _type>
 void Heisenberg_dots<_type>::hamiltonian() {
-	init_ham_mat();
+	this->init_ham_mat();
 
 	// build the Hamiltonian
 	for (auto k = 0; k < this->N; k++) {

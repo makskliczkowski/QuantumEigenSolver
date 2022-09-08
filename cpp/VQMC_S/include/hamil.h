@@ -18,7 +18,6 @@ public:
 	vec eigenvalues;																									// eigenvalues vector
 	u64 E_av_idx = -1;																									// average energy
 
-	u64 loc_states_num;																									// local energy states number
 	u64 N;																												// the Hilbert space size
 	u64 Ns;																												// lattice sites number
 	mutex my_mute_button;																								// thread mutex
@@ -29,11 +28,12 @@ public:
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
 
-	virtual u64 map(u64 index) = 0;																						// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
-	// virtual ~SpinHamiltonian() = 0;																						// pure virtual destructor
+	virtual u64 map(u64 index) const = 0;																				// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
+	
+																														// virtual ~SpinHamiltonian() = 0;																					// pure virtual destructor
 	
 	// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
-	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);												// converts a map to arma column
+	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);												// converts a map to arma column (VQMC)
 	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);								// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);									// pretty prints the eigenstate at a given idx
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };								// prints the eigenstate at a given idx
@@ -77,6 +77,7 @@ public:
 
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
+	auto get_en_av_idx()											const RETURNS(this->E_av_idx);
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian
@@ -86,29 +87,25 @@ public:
 	auto get_eigenState(u64 idx)									const RETURNS(this->eigenvectors.col(idx));			// get an eigenstate at a given idx
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
 	auto get_info(const v_1d<string>& skip = {}, string sep = "_")	const RETURNS(this->inf("", skip, sep));			// get the info about the model
+	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));	// get an eigenstate at a given idx but in symmetries it changes
 
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																						// pure virtual Hamiltonian creator
-	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) = 0;																				// returns the local energy for VQMC purposes
-	virtual v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) = 0;																			// returns the local energy for VQMC purposes
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
 	
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
 	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000,\
 		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
-
+	// ------------------------------------------- 				   VQMC  				  -------------------------------------------
+	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) = 0;													// returns the local energy for VQMC purposes
+	virtual v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) = 0;												// returns the local energy for VQMC purposes
 
 	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
 	virtual void update_info() = 0;
-	void set_angles() {};
-	void set_angles(const vec& phis, const vec& thetas) {};
 
 	// -------------------------------------------                    OPERATORS						  --------------------------------------------
-
-	cpx av_spin_current(u64 alfa, u64 beta);																			// check the extensive spin current
-	cpx av_spin_current(u64 alfa, u64 beta, std::vector<int> sites);													// check the spin current at given sites
 
 
 };
@@ -188,7 +185,7 @@ inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, 
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename T> 
-void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
+inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	try {
 		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, arma::Mat<T>(this->H));
 		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, arma::Mat<T>(this->H));
@@ -212,7 +209,7 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename T>
-void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
 	try {
 		eigs_opts opts; 
 		opts.tol = tol;
@@ -229,13 +226,32 @@ void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint 
 	}
 }
 
+template <>
+inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+	try {
+		eigs_opts opts;
+		opts.tol = tol;
+		opts.maxiter = maxiter;
+		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;
+		stout << "\t\t\t->Using Lanczos" << EL;
+		cx_vec eigval(this->N);
+		arma::eig_sym(this->eigenvalues, arma::Mat<cpx>(this->H));
+		this->eigenvalues = arma::real(eigval);
+	}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		assert(false);
+	}
+}
+
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename _type>
-void SpinHamiltonian<_type>::diag_h(bool withoutEigenVec, int k, _type sigma) {
+inline void SpinHamiltonian<_type>::diag_h(bool withoutEigenVec, int k, _type sigma) {
 	try {
 		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, sigma);
 		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, sigma);
@@ -274,7 +290,8 @@ inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(u64 state, int A_size) co
 		for (u64 m = n % dimB; m < N; m += dimB) {
 			// find index of state with same B-side (by dividing the last bits are discarded)
 			u64 idx = n / dimB;
-			rho(idx, counter) += conj(this->get_eigenStateValue(state, n)) * this->get_eigenStateValue(state, m);
+			auto val = conj(this->get_eigenStateValue(state, n)) * this->get_eigenStateValue(state, m);
+			rho(idx, counter) += val;
 			// increase counter to move along reduced basis
 			counter++;
 		}
@@ -282,6 +299,35 @@ inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(u64 state, int A_size) co
 	return rho;
 }
 
+/*
+*  @brief Calculates the reduced density matrix of the system via the mixed density matrix
+*  @param state state to produce the density matrix
+*  @param A_size size of subsystem
+*  @returns reduced density matrix
+*/
+template<>
+inline Mat<double> SpinHamiltonian<double>::red_dens_mat(u64 state, int A_size) const
+{
+	const auto Ns = this->lattice->get_Ns();
+	// set subsytsems size
+	const u64 dimA = ULLPOW(A_size);
+	const u64 dimB = ULLPOW(Ns - A_size);
+
+	Mat<double> rho(dimA, dimA, arma::fill::zeros);
+	// loop over configurational basis
+	for (auto n = 0; n < this->N; n++) {
+		u64 counter = 0;
+		// pick out state with same B side (last L-A_size bits)
+		for (u64 m = n % dimB; m < N; m += dimB) {
+			// find index of state with same B-side (by dividing the last bits are discarded)
+			u64 idx = n / dimB;
+			rho(idx, counter) += this->get_eigenStateValue(state, n) * this->get_eigenStateValue(state, m);
+			// increase counter to move along reduced basis
+			counter++;
+		}
+	}
+	return rho;
+}
 
 /*
 *  @brief Calculates the entropy of the system via the mixed density matrix
@@ -324,93 +370,5 @@ inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(u64 state) const
 
 
 // ------------------------------------------------------------  				     PHYSICAL QUANTITES   				    ------------------------------------------------------------
-
-/*
-*
-
-* @param alfa 
-* @param beta 
-* @param sites 
-*  @returns*/
-template<typename _type>
-inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta, std::vector<int> sites) {
-//	if (sites.size() != 2) throw "Not implemented such exotic operators, choose 1 or 2 sites\n";
-//	for (auto& site : sites) {
-//		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
-//	}
-//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-//	arma::subview_col state_beta = this->eigenvectors.col(beta);
-//	double value_real = 0, value_imag = 0;
-//#pragma omp parallel
-//	{
-//		std::vector<bool> base_vector(this->Ns), temp(this->Ns);
-//#pragma omp for reduction (+: value_real, value_imag)
-//		for (int k = 0; k < N; k++) {
-//			int_to_binary(map(k), base_vector);
-//			auto l = *(sites.begin());
-//			auto nei = *(sites.begin() + 1);
-//			temp = base_vector;
-//			if (nei < 0) continue;
-//			cpx value = 0.0;
-//			if (base_vector[l] && !base_vector[nei]) {
-//				temp[l] = 0;
-//				temp[nei] = 1;
-//				const u64 idx = binary_to_int(temp);
-//				value = conj(state_alfa(idx)) * state_beta(k) * im;
-//			}
-//			else if (!base_vector[l] && base_vector[nei]) {
-//				temp[l] = 1;
-//				temp[nei] = 0;
-//				const u64 idx = binary_to_int(temp);
-//				value = -conj(state_alfa(idx)) * state_beta(k) * im;
-//			}
-//			value_real += value.real();
-//			value_imag += value.imag();
-//		}
-//	}
-	return 2i;// *cpx(value_real, value_imag);
-}
-
-/*
-*
-
-* @param alfa 
-* @param beta 
-*  @returns*/
-template<typename _type>
-inline cpx SpinHamiltonian<_type>::av_spin_current(u64 alfa, u64 beta) {
-//	arma::subview_col state_alfa = this->eigenvectors.col(alfa);
-//	arma::subview_col state_beta = this->eigenvectors.col(beta);
-//	double value_real = 0, value_imag = 0;
-//#pragma omp parallel
-//	{
-//		std::vector<bool> base_vector(L), temp(L);
-//#pragma omp for reduction (+: value_real, value_imag)
-//		for (int k = 0; k < N; k++) {
-//			int_to_binary(map(k), base_vector);
-//			for (int l = 0; l < this->Ns; l++) {
-//				temp = base_vector;
-//				const int nei = this->lattice->get_nn(l, 0);
-//				if (nei < 0) continue;
-//				cpx value = 0.0;
-//				if (base_vector[l] && !base_vector[nei]) {
-//					temp[l] = 0;
-//					temp[nei] = 1;
-//					const u64 idx = binary_to_int(temp);
-//					value = conj(state_alfa(idx)) * state_beta(k) * im;
-//				}
-//				else if (!base_vector[l] && base_vector[nei]) {
-//					temp[l] = 1;
-//					temp[nei] = 0;
-//					const u64 idx = binary_to_int(temp);
-//					value = -conj(state_alfa(idx)) * state_beta(k) * im;
-//				}
-//				value_real += value.real();
-//				value_imag += value.imag();
-//			}
-//		}
-//	}
-	return 2i;// *cpx(value_real, value_imag) / sqrt(this->Ns);
-}
 
 #endif

@@ -8,7 +8,7 @@
 #define ISINGMODEL
 
 /*
-/// Model with disorder thus with no symmetries
+* Model with disorder thus with no symmetries
 */
 template <typename _type>
 class IsingModel : public SpinHamiltonian<_type> {
@@ -34,16 +34,18 @@ public:
 	IsingModel(double J, double J0, double g, double g0, double h, double w, std::shared_ptr<Lattice> lat);
 
 private:
-	u64 map(u64 index) override;
+	u64 map(u64 index) const override;
 
 public:
 	// METHODS
 	void hamiltonian() override;
+	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
 	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;												// returns the local energy for VQMC purposes
 	v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override;										// returns the local energy for VQMC purposes
-	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
+	
+	// ------------------------------------------- 				 Info				  -------------------------------------------
 
-	string inf(const v_1d<string>& skip = {}, string sep = "_") const 
+	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 	{
 		auto Ns = this->lattice->get_Ns();
 		string name = sep + \
@@ -54,8 +56,9 @@ public:
 			",g0=" + STRP(g0, 2) + \
 			",h=" + STRP(h, 2) + \
 			",w=" + STRP(w, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+		return SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
+	void update_info() override { this->info = this->inf(); };
 };
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
@@ -95,7 +98,7 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 * @returns index
 */ 
 template <typename _type>
-u64 IsingModel<_type>::map(u64 index) {
+u64 IsingModel<_type>::map(u64 index) const {
 	if (index < 0 || index >= std::pow(2, this->lattice->get_Ns())) throw "Element out of range\n No such index in map\n";
 	return index;
 }
@@ -119,7 +122,7 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(u64 _id, uint site) {
 	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;								
 		
 	// diagonal elements setting the perpendicular field
-	localVal += (this->h + dh(i)) * si;												
+	localVal += (this->h + dh(site)) * si;												
 		
 	// check the Siz Si+1z
 	for (auto n_num : nn_number) {
@@ -206,17 +209,11 @@ inline void IsingModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) {
 */
 template <typename _type>
 void IsingModel<_type>::hamiltonian() {
-	try {
-		this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
-	}
-	catch (const std::bad_alloc& e) {
-		std::cout << "Memory exceeded" << e.what() << "\n";
-		assert(false);
-	}
+	this->init_ham_mat();
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
-			auto nn_number = this->lattice->get_nn_number(j);
+			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
 			// true - spin up, false - spin down
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
@@ -225,9 +222,11 @@ void IsingModel<_type>::hamiltonian() {
 			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
 			// diagonal elements setting the perpendicular field
-			H(k, k) += (this->h + dh(j)) * s_i;											
-			for (auto n_num = 0; n_num < nn_number; n_num++) {
-				if (auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
+			this->H(k, k) += (this->h + dh(j)) * s_i;
+
+			for (auto n_num : nn_number) {
+				// double checking neighbors
+				if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
 					// Ising-like spin correlation
 					double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 					// setting the neighbors elements

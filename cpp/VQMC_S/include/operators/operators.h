@@ -93,7 +93,11 @@ public:
 	};
 };
 
-
+template <typename T1, typename T2>
+inline function<T1(T1, T2)> multiply_operators(const function<T1(T1, T2)>& A, const std::function<T1(T1, T2)>& B) {
+	//auto result = [A, B](T1 n, T2 L) { return A(B(n, L), L); };
+	return [A, B](T1 n, T2 L) { return A(B(n, L), L); };
+}
 
 template<typename _type>
 class Operators {

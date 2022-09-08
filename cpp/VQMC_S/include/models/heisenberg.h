@@ -24,7 +24,7 @@ protected:
 	vec dg;																										// disorder in the system - deviation from a constant g0 value
 	double g0;																									// transverse magnetic field
 
-	u64 map(u64 index) override;
+	u64 map(u64 index) const override;
 public:
 	// Constructors 
 	~Heisenberg() = default;
@@ -48,7 +48,7 @@ public:
 			",g0=" + STRP(this->g0, 2) + \
 			",h=" + STRP(this->h, 2) + \
 			",w=" + STRP(this->w, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+		return SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 };
 
@@ -90,7 +90,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 * @returns index
 */
 template <typename _type>
-u64 Heisenberg<_type>::map(u64 index) {
+u64 Heisenberg<_type>::map(u64 index) const {
 	if (index < 0 || index >= std::pow(2, this->lattice->get_Ns())) throw "Element out of range\n No such index in map\n";
 	return index;
 }

@@ -1,0 +1,1 @@
+-bc 0 -l 0 -d 1 -lx 10 -ly 1 -J -1.0 -h 0.81 -g 0.79 -th 16 -ks 0 -ps 1 -xs 1 -S 0 -dir resultsSym/

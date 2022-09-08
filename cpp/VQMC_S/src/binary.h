@@ -132,7 +132,7 @@ inline u64 binary_search(const std::vector<double>& arr, u64 l_point, u64 r_poin
 /*
 *@brief Check the k'th bit
 *@param n Number on which the bit shall be checked
-*@param k Number of bit (from 0 to 63) - count from right
+*@param k Number of bit (from 0 to 63) - count from right!!!
 *@returns Bool on if the bit is set or not
 */
 inline bool checkBit(u64 n, int k) {
@@ -237,6 +237,7 @@ inline void intToBaseBitSpin(u64 idx, v_1d<T>& vec) {
 #endif // DEBUG
 }
 
+// -----------------------------------------------------------------------------  				  transformations using modulo
 
 /*
 *@brief Conversion to system vector of a given base (modulo)
@@ -313,7 +314,7 @@ inline void intToBase(u64 idx, Col<T>& vec, const v_1d<u64>& powers) {
 		temp -= vec[size - 1 - k] * powers[k];
 	}
 }
-// ----------------------------------------------------------------------------- base change
+// -----------------------------------------------------------------------------  				  base change
 
 /*
 *@brief Conversion from base vector to an integer
@@ -409,7 +410,9 @@ inline u64 baseToIntSpin(const Col<T>& vec) {
 		val += static_cast<u64>((std::real(vec(size - 1 - k)) + 1.0) / 2.0) * BinaryPowers[k];
 	return val;
 }
+
 // -----------------------------------------------------------------------------   				 for states operation   				 -----------------------------------------------------------------------------
+
 template<typename T1, typename T2>
 inline T1 cdotm(arma::Col<T1> lv, arma::Col<T2> rv, int numthreads = 1) {
 	//if (lv.size() != rv.size()) throw "not matching sizes";
@@ -450,18 +453,18 @@ inline u64 rotateLeft(u64 n, int L) {
 *@returns rotated number
 */
 template<typename _type>
-inline v_1d<_type>& rotateLeftV(v_1d<_type>& n, int L) {
+inline void rotateLeftV(v_1d<_type>& n, int L) {
 	std::ranges::rotate(n.begin(), n.begin() + L, n.end());
 	return v_1d<_type>();
 }
 
 /*
-*@brief Rotates the binary representation of the input decimal number by one left shift
+*@brief Rotates the binary representation of the input decimal number by one left shift - copy
 *@param n vector to rotate
 *@returns rotated number
 */
 template<typename _type>
-inline v_1d<_type>& rotateLeftV(const v_1d<_type>& n, int L) {
+inline v_1d<_type> rotateLeftV_C(const v_1d<_type>& n, int L) {
 	auto tmp = n;
 	std::ranges::rotate(tmp.begin(), tmp.begin() + L, tmp.end());
 	return tmp;
@@ -487,7 +490,7 @@ inline u64 flipAll(u64 n, int L) {
 *@returns flipped number
 */
 template<typename _type>
-inline v_1d<_type> flipAllV_copy(const v_1d<_type>& n, int L) {
+inline v_1d<_type> flipAllV_C(const v_1d<_type>& n, int L) {
 	auto tmp = n;
 	for (auto i = 0; i < L; i++) {
 #ifdef SPIN
@@ -507,7 +510,7 @@ inline v_1d<_type> flipAllV_copy(const v_1d<_type>& n, int L) {
 *@returns flipped number
 */
 template<typename _type>
-inline Col<_type> flipAllV_copy(const Col<_type>& n, int L) {
+inline Col<_type> flipAllV_C(const Col<_type>& n, int L) {
 	auto tmp = n;
 	for (auto i = 0; i < L; i++) {
 #ifdef SPIN
@@ -574,7 +577,7 @@ inline u64 flip(u64 n, int k) {
 *@returns number with k'th bit from the right flipped
 */
 template<typename _type>
-inline v_1d<_type> flipV_copy(const v_1d<_type>& n, int k) {
+inline v_1d<_type> flipV_C(const v_1d<_type>& n, int k) {
 	auto tmp = n;
 #ifdef SPIN
 	tmp[k] *= -1;
@@ -591,7 +594,7 @@ inline v_1d<_type> flipV_copy(const v_1d<_type>& n, int k) {
 *@returns number with k'th bit from the right flipped
 */
 template<typename _type>
-inline Col<_type> flipV_copy(const Col<_type>& n, int k) {
+inline Col<_type> flipV_C(const Col<_type>& n, int k) {
 	auto tmp = n;
 #ifdef SPIN
 	tmp(k) *= -1;
@@ -634,13 +637,13 @@ inline void flipV(Col<_type>& n, int k) {
 #endif // SPIN
 }
 
-// ---------------------------------- flip single bit ----------------------------------
+// ---------------------------------- revelse all bits ----------------------------------
 
 /*
 * @brief Function that calculates the bit reverse, note that 64 bit representation
 * is now taken and one has to be sure that it doesn't exceede it (which it doesn't, we sure)
-*@param L We need to know how many bits does the number really take because the function can take up to 64
-*@returns number with reversed bits moved to be maximally of size L again
+* @param L We need to know how many bits does the number really take because the function can take up to 64
+* @returns number with reversed bits moved to be maximally of size L again
 */
 inline u64 reverseBits(u64 n, int L) {
 	u64 rev = (lookup[n & 0xffULL] << 56) |					// consider the first 8 bits
@@ -661,8 +664,8 @@ inline u64 reverseBits(u64 n, int L) {
 *@returns number with reversed bits moved to be maximally of size L again
 */
 template<typename _type>
-inline u64 reverseBitsV_copy(const v_1d<_type>& n, int L) {
-	auto tmp = n;
+inline v_1d<_type> reverseBitsV_C(const v_1d<_type>& n, int L) {
+	v_1d<_type> tmp = n;
 	std::ranges::reverse(tmp.begin(), tmp.end());
 	return tmp;
 }
