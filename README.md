@@ -8,8 +8,8 @@ This is the general solver for lattice Hamiltonians. The works is in progress bu
 The plan for the future is to extend it to either more than 1D Hamitlonians in the case of symmetries or add symmetries to the variational ansatz potentially 
 in higher dimensions and non-spin Hamiltonians.
 
-Copyright 2022\n
-Maksymilian Kliczkowski\n
-PhD candidate\n
-Wroclaw University of Science and Technology\n
-maksymilian.kliczkowski.at.pwr.edu.pl\n
+Copyright 2022 <br> 
+Maksymilian Kliczkowski <br> 
+PhD candidate <br> 
+Wroclaw University of Science and Technology <br> 
+maksymilian.kliczkowski.at.pwr.edu.pl <br> 
