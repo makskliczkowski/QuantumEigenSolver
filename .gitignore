@@ -144,3 +144,4 @@ dmypy.json
 *.suo
 *CodeGraphData/
 *V16/
+*v16/
