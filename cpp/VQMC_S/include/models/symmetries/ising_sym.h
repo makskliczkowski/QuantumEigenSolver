@@ -39,7 +39,7 @@ namespace ising_sym {
 	public:
 		~IsingModelSym() = default;
 		IsingModelSym() = default;
-		IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym = 0, bool p_sym = true, bool x_sym = true);
+		IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym = 0, bool p_sym = true, bool x_sym = true, u32 thread_num = 1);
 
 
 		// -------------------------------- GETTERS --------------------------------
@@ -71,9 +71,11 @@ namespace ising_sym {
 	* @brief standard constructor 
 	*/
 	template<typename _type>
-	ising_sym::IsingModelSym<_type>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym) : J(J), g(g), h(h)
+	ising_sym::IsingModelSym<_type>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym, u32 thread_num)
+		: J(J), g(g), h(h)
 	{
 		this->lattice = lat;
+		this->thread_num = thread_num;
 		this->Ns = lat->get_Ns();
 		symmetries.p_sym = (p_sym) ? 1 : -1;
 		symmetries.x_sym = (x_sym) ? 1 : -1;
@@ -152,6 +154,7 @@ namespace ising_sym {
 	inline void ising_sym::IsingModelSym<_type>::hamiltonian()
 	{
 		this->init_ham_mat();
+#pragma omp parallel for num_threads(this->thread_num)
 		for (long int k = 0; k < this->N; k++) {
 			for (int j = 0; j <= this->Ns - 1; j++) {
 				v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
@@ -159,7 +162,7 @@ namespace ising_sym {
 				double s_i = checkBit(this->mapping[k], this->Ns - 1 - j) ? 1.0 : -1.0;
 
 				// flip with S^x_i with the transverse field
-				u64 new_idx = flip(k, this->Ns - 1 - j);
+				u64 new_idx = flip(this->mapping[k], this->Ns - 1 - j);
 				if(this->g != 0)
 					this->setHamiltonianElem(k, this->g, new_idx);
 

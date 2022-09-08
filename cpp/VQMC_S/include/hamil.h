@@ -21,6 +21,7 @@ public:
 	u64 N;																												// the Hilbert space size
 	u64 Ns;																												// lattice sites number
 	mutex my_mute_button;																								// thread mutex
+	u32 thread_num = 1;																									// number of threads to be used
 	shared_ptr<Lattice> lattice;																						// contains all the information about the lattice
 
 	vec tmp_vec;																										// tmp vector for base states if the system is too big

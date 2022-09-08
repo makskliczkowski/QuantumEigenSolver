@@ -14,7 +14,7 @@
 #endif
 #else
 	#include <omp.h>
-	#define OMP_NUM_THREADS 16;
+	//#define OMP_NUM_THREADS 16;
 	#include <thread>
 	#include <mutex>
 #endif
@@ -239,6 +239,7 @@ namespace rbm_ui {
 		int k_sym = 0;
 		bool p_sym = true;
 		bool x_sym = true;
+		long double spectrum_size = 0.2;
 
 		// define basic model
 		shared_ptr<SpinHamiltonian<_hamtype>> ham;
@@ -378,6 +379,8 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 	this->k_sym = 0;
 	this->p_sym = true;
 	this->x_sym = true;
+	this->sym = false;
+	this->spectrum_size = 0.2;
 
 	// define basic model
 	this->model_name = impDef::ham_types::ising;
@@ -551,6 +554,10 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	// include symmetries
 	choosen_option = "-S";
 	this->set_option(this->sym, argv, choosen_option, false);
+
+	// spectrum size from the middle of the spectrum to test
+	choosen_option = "-SS";
+	this->set_option(this->spectrum_size, argv, choosen_option, true);
 
 	//---------- OTHERS
 
@@ -1044,57 +1051,81 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 	auto start = std::chrono::high_resolution_clock::now();
 	stouts("STARTING THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: " + VEQ(thread_num), start);
 	stout << "->" << (sym ? "" : "not") << " including symmetries" << EL;
-	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
-	auto Ns = this->lat->get_Ns();
 	
+	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
+	stout << "->" << this->lat->get_info() << EL;
+	auto Ns = this->lat->get_Ns();
+
 	if(sym)
-		this->ham = std::make_shared<ising_sym::IsingModelSym<_hamtype>>(J, g, h, lat, k_sym, p_sym, x_sym);
+		this->ham = std::make_shared<ising_sym::IsingModelSym<_hamtype>>(J, g, h, lat, k_sym, p_sym, x_sym, this->thread_num);
 	else {
 		this->ham = std::make_shared<IsingModel<_hamtype>>(J, 0, g, 0, h, 0, lat);
 		this->ham->hamiltonian();
 	}
-	stout << "->" << this->ham->get_info() << EL;
+	stouts("\t->finished buiding Hamiltonian", start);
+	stout << "\t->" << this->ham->get_info() << EL;
 	this->ham->diag_h(false);
-
-	// calculate the reduced density matrices
-	Operators<_hamtype> op(this->lat);
-	auto ground_ed = std::real(this->ham->get_eigenEnergy(0));
-	auto excited_ed = std::real(this->ham->get_eigenEnergy(1));
+	stouts("\t->finished diagonalizing Hamiltonian", start);
+	const u64 N = this->ham->get_hilbert_size();
 
 	// define the window to calculate the entropy
-	const u64 spectrum_num = 0.5 * this->ham->get_hilbert_size();
-	const u64 av_energy_idx = this->ham->get_en_av_idx();
-	const u64 min_idx = av_energy_idx - static_cast<int>(spectrum_num / 2.0);
-	const u64 max_idx = av_energy_idx + static_cast<int>(spectrum_num / 2.0);
-	// iterate through bond cut
-	//int bond_num = this->lat->get_Ns() / 2;
-	int bond_num = this->lat->get_Ns() - 1;
-	arma::mat entropies(bond_num, spectrum_num, arma::fill::zeros);
+	u64 spectrum_num = 0;
+	if (this->spectrum_size <= 1.0)
+		spectrum_num = this->spectrum_size * N;
+	else
+		spectrum_num = static_cast<u64>(this->spectrum_size);
+	auto name = ((this->spectrum_size <= 1.0) ? "spectrum_num=" + STRP(spectrum_size, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(spectrum_num));
+	stout << "->middle_spectrum_size : " << name << EL;
+
 
 	string dir = this->saving_dir + this->ham->get_info() + kPS;
 	fs::create_directories(dir);
-	std::ofstream file, fileAv;
-	openFile(file, dir + "entropies_window=" + STR(spectrum_num) + ".dat", ios::out);
-	openFile(fileAv, dir + "av_entropies_window=" + STR(spectrum_num) + ".dat", ios::out);
+	std::ofstream file;
+	std::ofstream fileAv;
+	
+	// save energies to check
+	openFile(file, dir + "energies," + name + ".dat");
+	for (u64 i = 0; i < N; i++)
+		file << this->ham->get_eigenEnergy(i) << EL;
+	file.close();
+
+	// calculate the reduced density matrices
+	Operators<_hamtype> op(this->lat);
+
+
+	const u64 av_energy_idx = this->ham->get_en_av_idx();
+	const u64 min_idx = av_energy_idx - static_cast<int>(spectrum_num / 2.0);
+
+	// iterate through bond cut
+	int bond_num = this->lat->get_Ns() / 2;
+	//int bond_num = this->lat->get_Ns() - 1;
+	arma::mat entropies(bond_num, spectrum_num, arma::fill::zeros);
+
+
+	openFile(file, dir + "entropies," + name + ".dat", ios::out);
+	openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
 
 	for (int i = 1; i <= bond_num; i++) {
 		// iterate through the state
 		stout << "\t->doing : " << VEQ(i) << EL;
 		printSeparated(file, '\t', 15, false, i);
 		printSeparated(fileAv, '\t', 15, false, i);
-
+#pragma omp parallel for
 		for (u64 j = 0; j < spectrum_num; j++) {
 			u64 idx = min_idx + j;
 			auto entro = op.entanglement_entropy(ham->get_eigenStateFull(idx), i);
 			entropies(i - 1, j) = entro;
-			// printer
-			printSeparated(file, '\t', 15, false, entro);
 		}
+		// print seperately
+		for(u64 j = 0; j < spectrum_num; j++)
+			printSeparated(file, '\t', 15, false, entropies(i - 1, j));
 		file << EL;
+		
 		auto mean = arma::mean(entropies.row(i - 1));
 		printSeparated(fileAv, '\t', 15, true, mean);
 		stout << "\t\t->mean : " << VEQ(mean) << EL;
 	}
+	stouts("->finished all", start);
 	file.close();
 	fileAv.close();
 }

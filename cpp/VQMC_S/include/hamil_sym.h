@@ -182,7 +182,7 @@ inline void SpinHamiltonianSym<_type>::generate_mapping()
 	auto stop = static_cast<u64>(pow(2, this->Ns));
 	u64 two_powL = BinaryPowers[this->Ns];
 #ifndef DEBUG
-	int num_of_threads = OMP_NUM_THREADS;
+	int num_of_threads = this->thread_num;
 #else
 	int num_of_threads = 1;
 #endif // !DEBUG
@@ -199,8 +199,8 @@ inline void SpinHamiltonianSym<_type>::generate_mapping()
 		// reserve threads
 		threads.reserve(num_of_threads);
 		for (int t = 0; t < num_of_threads; t++) {
-			auto start = (u64)(two_powL / (double)num_of_threads * t);
-			auto stop = ((t + 1) == num_of_threads ? two_powL : u64(two_powL / (double)num_of_threads * (double)(t + 1)));
+			start = (u64)(two_powL / (double)num_of_threads * t);
+			stop = ((t + 1) == num_of_threads ? two_powL : u64(two_powL / (double)num_of_threads * (double)(t + 1)));
 			
 			map_threaded[t] = v_1d<u64>();
 			norm_threaded[t] = v_1d<_type>();
