@@ -145,3 +145,7 @@ dmypy.json
 *CodeGraphData/
 *V16/
 *v16/
+*.out
+*.txt
+*.o
+*armadillo*

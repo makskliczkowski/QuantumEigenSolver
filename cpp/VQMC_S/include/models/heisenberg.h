@@ -48,7 +48,7 @@ public:
 			",g0=" + STRP(this->g0, 2) + \
 			",h=" + STRP(this->h, 2) + \
 			",w=" + STRP(this->w, 2);
-		return SpinHamiltonian<_type>::inf(name, skip, sep);
+		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 };
 

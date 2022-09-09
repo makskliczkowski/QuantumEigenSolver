@@ -62,7 +62,7 @@ namespace ising_sym {
 				",k=" + STRP(symmetries.k_sym, 2) + \
 				",p=" + STRP(symmetries.p_sym, 2) + \
 				",x=" + STRP(symmetries.x_sym, 2);
-			return SpinHamiltonian<_type>::inf(name, skip, sep);
+			return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 		}
 		void update_info() override { this->info = this->inf(); };
 	};

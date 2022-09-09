@@ -1,4 +1,5 @@
 #pragma once
+#include <omp.h>
 /// user includes
 #include "str.h"
 #include "../include/random.h"
@@ -37,18 +38,18 @@
 #    include <filesystem>
 #    define have_filesystem 1
 namespace fs = std::filesystem;
-using clk = std::chrono::steady_clock;
+//using clk = std::chrono::steady_clock;
 #  elif __has_include(<experimental/filesystem>)
 #    include <experimental/filesystem>
 #    define have_filesystem 1
 #    define experimental_filesystem
 namespace fs = std::experimental::filesystem;
-using clk = std::chrono::system_clock;
+//using clk = std::chrono::system_clock;
 #  else
 #    define have_filesystem 0
 #  endif
 #endif
-
+using clk = std::chrono::system_clock;
 static const char* kPSep =
 #ifdef _WIN32
 R"(\)";
