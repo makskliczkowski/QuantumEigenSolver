@@ -56,7 +56,7 @@ public:
 			",w=" + STRP(this->w, 2) + \
 			",K=(" + STRP(this->Kx, 2) + "," + STRP(this->Ky,2) + "," + STRP(this->Ky, 2) + ")" \
 			",K0=" + STRP(this->K0, 2);
-		return SpinHamiltonian::inf(name, skip, sep);
+		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 };
 

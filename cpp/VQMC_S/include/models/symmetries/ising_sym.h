@@ -62,7 +62,7 @@ namespace ising_sym {
 				",k=" + STRP(symmetries.k_sym, 2) + \
 				",p=" + STRP(symmetries.p_sym, 2) + \
 				",x=" + STRP(symmetries.x_sym, 2);
-			return SpinHamiltonian<_type>::inf(name, skip, sep);
+			return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 		}
 		void update_info() override { this->info = this->inf(); };
 	};
@@ -83,8 +83,9 @@ namespace ising_sym {
 		//change info
 		this->info = this->inf();
 		symmetries.k_sym = k_sym * TWOPI / double(this->Ns);
-		
 		k_sector = valueEqualsPrec(symmetries.k_sym, 0.0, 1e-4) || valueEqualsPrec(symmetries.k_sym, double(PI), 1e-4);
+
+		// printSeparatedP(stout, '\t', 6, true, 4, symmetries.k_sym, k_sym, VEQ(k_sector));
 
 		// precalculate the exponents
 		this->k_exponents = v_1d<cpx>(this->Ns, 0.0);

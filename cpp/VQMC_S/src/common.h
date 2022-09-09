@@ -1,4 +1,5 @@
 #pragma once
+#include <omp.h>
 /// user includes
 #include "str.h"
 #include "../include/random.h"

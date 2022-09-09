@@ -13,7 +13,6 @@
 //#define DEBUG_RBM_DRVT
 #endif
 #else
-	#include <omp.h>
 	//#define OMP_NUM_THREADS 16;
 	#include <thread>
 	#include <mutex>
