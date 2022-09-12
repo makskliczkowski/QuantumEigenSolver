@@ -69,6 +69,24 @@ inline pair<u64, _type> SpinHamiltonianSym<_type>::find_rep_and_sym_eigval(u64 b
 		return std::make_pair(0, 0);
 }
 
+template<>
+inline pair<u64, double> SpinHamiltonianSym<double>::find_rep_and_sym_eigval(u64 base_idx, double normalisation_beta)
+{
+	// found representative already
+	u64 idx = binary_search(this->mapping, 0, this->N - 1, base_idx);
+	if (idx < this->N)
+		return std::make_pair(idx, this->normalisation[idx] / normalisation_beta);
+
+	// need to find the representative
+	auto [min, sym_eig] = this->find_SEC_repr(base_idx);
+	idx = binary_search(this->mapping, 0, this->N - 1, min);
+	if (idx < this->N)
+		return std::make_pair(idx, this->normalisation[idx] / normalisation_beta * sym_eig);
+	// haven't found the representative - differen block sector
+	else
+		return std::make_pair(0, 0);
+}
+
 
 /*
 * finds the representative for a given base_idx in sector_alfa normalisation potentailly from other symmetry sector beta(the same is used creating the Hamiltonian with beta = alfa)
@@ -163,7 +181,7 @@ inline void SpinHamiltonianSym<_type>::mapping_kernel(u64 start, u64 stop, v_1d<
 	for (u64 j = start; j < stop; j++) {
 		if (const auto [SEC, some_value] = find_SEC_repr(j); SEC == j) {
 			// normalisation condition -- check if state in basis
-			if (cpx N = get_symmetry_norm(j); std::abs(N) > 1e-6) {
+			if (_type N = get_symmetry_norm(j); std::abs(N) > 1e-6) {
 				map_thr.push_back(j);
 				norm_thr.push_back(N);
 			}

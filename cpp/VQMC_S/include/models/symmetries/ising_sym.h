@@ -71,7 +71,7 @@ namespace ising_sym {
 	* @brief standard constructor 
 	*/
 	template<typename _type>
-	ising_sym::IsingModelSym<_type>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym, u32 thread_num)
+	inline ising_sym::IsingModelSym<_type>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym, u32 thread_num)
 		: J(J), g(g), h(h)
 	{
 		this->lattice = lat;
@@ -88,16 +88,16 @@ namespace ising_sym {
 		// printSeparatedP(stout, '\t', 6, true, 4, symmetries.k_sym, k_sym, VEQ(k_sector));
 
 		// precalculate the exponents
-		this->k_exponents = v_1d<cpx>(this->Ns, 0.0);
+		this->k_exponents = v_1d<_type>(this->Ns, 0.0);
 #pragma omp parallel for
-		for (int l = 0; l < this->Ns; l++)
+		for (int l = 0; l < this->Ns; l++) 
 			this->k_exponents[l] = std::exp(-imn * this->symmetries.k_sym * double(l));
 
 		// calculate symmetry group
 		this->createSymmetryGroup();
 
-		this->mapping = std::vector<u64>();
-		this->normalisation = std::vector<cpx>();
+		this->mapping = v_1d<u64>();
+		this->normalisation = v_1d<cpx>();
 		this->generate_mapping();
 		if (this->N <= 0) {
 			stout << "No states in Hilbert space" << EL;
@@ -106,6 +106,43 @@ namespace ising_sym {
 		this->hamiltonian();
 	}
 
+	template<>
+	inline ising_sym::IsingModelSym<double>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym, u32 thread_num)
+		: J(J), g(g), h(h)
+	{
+		this->lattice = lat;
+		this->thread_num = thread_num;
+		this->Ns = lat->get_Ns();
+		symmetries.p_sym = (p_sym) ? 1 : -1;
+		symmetries.x_sym = (x_sym) ? 1 : -1;
+		symmetries.k_sym = k_sym;
+		//change info
+		this->info = this->inf();
+		symmetries.k_sym = k_sym * TWOPI / double(this->Ns);
+		k_sector = valueEqualsPrec(symmetries.k_sym, 0.0, 1e-4) || valueEqualsPrec(symmetries.k_sym, double(PI), 1e-4);
+
+		// printSeparatedP(stout, '\t', 6, true, 4, symmetries.k_sym, k_sym, VEQ(k_sector));
+
+		// precalculate the exponents
+		this->k_exponents = v_1d<double>(this->Ns, 0.0);
+#pragma omp parallel for
+		for (int l = 0; l < this->Ns; l++) {
+			cpx val = std::exp(-imn * this->symmetries.k_sym * double(l));
+			this->k_exponents[l] = std::real(val);
+		}
+
+		// calculate symmetry group
+		this->createSymmetryGroup();
+
+		this->mapping = v_1d<u64>();
+		this->normalisation = v_1d<double>();
+		this->generate_mapping();
+		if (this->N <= 0) {
+			stout << "No states in Hilbert space" << EL;
+			return;
+		}
+		this->hamiltonian();
+	}
 
 	// ---------------------------------------------------------------- SYMMETRY ELEMENTS ----------------------------------------------------------------
 

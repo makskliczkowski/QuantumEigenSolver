@@ -18,8 +18,8 @@ public:
 	vec eigenvalues;																									// eigenvalues vector
 	u64 E_av_idx = -1;																									// average energy
 
-	u64 N;																												// the Hilbert space size
-	u64 Ns;																												// lattice sites number
+	u64 N=1;																											// the Hilbert space size
+	u64 Ns=1;																											// lattice sites number
 	mutex my_mute_button;																								// thread mutex
 	u32 thread_num = 1;																									// number of threads to be used
 	shared_ptr<Lattice> lattice;																						// contains all the information about the lattice
@@ -27,7 +27,7 @@ public:
 	vec tmp_vec;																										// tmp vector for base states if the system is too big
 	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
-	v_1d<cpx> normalisation;																							// used for normalization in the symmetry case
+	v_1d<_type> normalisation;																							// used for normalization in the symmetry case
 
 	virtual u64 map(u64 index) const = 0;																				// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	
