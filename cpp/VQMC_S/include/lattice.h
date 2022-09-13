@@ -51,6 +51,7 @@ public:
 	virtual int get_norm(int x, int y, int z)				const = 0;
 	virtual v_1d<uint> get_nn_forward_number(int lat_site)	const = 0;
 	auto get_Ns()											const RETURNS(this->Ns);												// returns the number of sites
+	auto get_BC()											const RETURNS(this->_BC);												// returns the boundary conditions
 	auto get_Dim()											const RETURNS(this->dim);												// returns dimension of the lattice
 	auto get_nn(int lat_site, int nei_num)					const RETURNS(this->nearest_neighbors[lat_site][nei_num]);				// returns given nearest nei at given lat site
 	auto get_nnn(int lat_site, int nei_num)					const RETURNS(this->next_nearest_neighbors[lat_site][nei_num]);			// returns given next nearest nei at given lat site

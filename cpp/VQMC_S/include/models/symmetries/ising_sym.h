@@ -61,7 +61,9 @@ namespace ising_sym {
 				",h=" + STRP(h, 2) + \
 				",k=" + STRP(symmetries.k_sym, 2) + \
 				",p=" + STRP(symmetries.p_sym, 2) + \
-				",x=" + STRP(symmetries.x_sym, 2);
+				",x=" + STRP(symmetries.x_sym, 2) + \
+				",bc=" + STR(this->lattice->get_BC());
+
 			return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 		}
 		void update_info() override { this->info = this->inf(); };
@@ -125,9 +127,9 @@ namespace ising_sym {
 
 		// precalculate the exponents
 		this->k_exponents = v_1d<double>(this->Ns, 0.0);
-#pragma omp parallel for
+
 		for (int l = 0; l < this->Ns; l++) {
-			cpx val = std::exp(-imn * this->symmetries.k_sym * double(l));
+			auto val = std::exp(-imn * this->symmetries.k_sym * double(l));
 			this->k_exponents[l] = std::real(val);
 		}
 
@@ -162,23 +164,45 @@ namespace ising_sym {
 
 
 		// loop through all the possible states
-		for (int k = 0; k < this->Ns; k++) {
+		if (this->lattice->get_BC() == 0) {
+			for (int k = 0; k < this->Ns; k++) {
+				this->symmetry_group.push_back(T);
+				this->symmetry_eigval.push_back(this->k_exponents[k]);
+				if (this->h == 0) {
+					this->symmetry_group.push_back(multiply_operators(Z, T));
+					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.x_sym));
+				}
+				// if parity can be applied
+				if (this->k_sector) {
+					this->symmetry_group.push_back(multiply_operators(P, T));
+					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym));
+					if (this->h == 0) {
+						this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
+						NO_OVERFLOW(this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * (long)this->symmetries.x_sym));)
+					}
+				}
+				T = multiply_operators(function<u64(u64, int)>(rotateLeft), T);
+			}
+		}
+		else if(this->lattice->get_BC() == 1) {
+			// neutral element
 			this->symmetry_group.push_back(T);
-			this->symmetry_eigval.push_back(this->k_exponents[k]);
+			this->symmetry_eigval.push_back(1.0);
+
+			// check if spin flip is eligable
 			if (this->h == 0) {
 				this->symmetry_group.push_back(multiply_operators(Z, T));
-				this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.x_sym));
+				this->symmetry_eigval.push_back(double(this->symmetries.x_sym));
 			}
+
 			// if parity can be applied
-			if (this->k_sector) {
-				this->symmetry_group.push_back(multiply_operators(P, T));
-				this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym));
-				if (this->h == 0) {
-					this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
-					NO_OVERFLOW(this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * (long)this->symmetries.x_sym));)
-				}
+			this->symmetry_group.push_back(multiply_operators(P, T));
+			this->symmetry_eigval.push_back(double(this->symmetries.p_sym));
+			// furthermore add the spin flip
+			if (this->h == 0) {
+				this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
+				this->symmetry_eigval.push_back(double(this->symmetries.p_sym * (double)this->symmetries.x_sym));
 			}
-			T = multiply_operators(function<u64(u64, int)>(rotateLeft), T);
 		}
 	}
 

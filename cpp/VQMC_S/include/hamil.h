@@ -60,11 +60,6 @@ public:
 	};
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
 
-	// ------------------------------------------- 				  CALCULATORS  				 -------------------------------------------
-	Mat<_type> red_dens_mat(u64 state, int A_size) const;																// calculate the reduced density matrix based on eigenstate
-	double entanglement_entropy(u64 state, int A_size) const;															// entanglement entropy for eigenstate
-	vec entanglement_entropy_sweep(u64 state) const;																	// entanglement entropy sweep over bonds for eigenstate
-
 	// -------------------------------------------				  SETTERS					  -------------------------------------------
 	void init_ham_mat() {
 		try {
@@ -95,9 +90,11 @@ public:
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
 	
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
+	void diag_hs(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian sparse
 	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000,\
 		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
+	
 	// ------------------------------------------- 				   VQMC  				  -------------------------------------------
 	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) = 0;													// returns the local energy for VQMC purposes
 	virtual v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) = 0;												// returns the local energy for VQMC purposes
@@ -193,13 +190,33 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
 
 	// calculates the middle spectrum element
 	double E_av = trace(eigenvalues) / double(N);
-	auto i = std::ranges::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+		return abs(x - E_av) < abs(y - E_av);
+		});
+	this->E_av_idx = i - std::begin(eigenvalues);
+}
+
+template <>
+inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec) {
+	try {
+		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, arma::Mat<cpx>(this->H));
+		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, arma::Mat<cpx>(this->H));
+	}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
+		assert(false);
+	}
+
+	// calculates the middle spectrum element
+	double E_av = trace(eigenvalues) / double(N);
+	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
 		return abs(x - E_av) < abs(y - E_av);
 		});
 	this->E_av_idx = i - std::begin(eigenvalues);
@@ -222,7 +239,7 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
 }
@@ -241,11 +258,10 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subd
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
 }
-
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
@@ -259,116 +275,31 @@ inline void SpinHamiltonian<_type>::diag_h(bool withoutEigenVec, int k, _type si
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
 }
 
-
-// ------------------------------------------------------------  				    ENTROPY   				   ------------------------------------------------------------
-
-
-
-/*
-*  @brief Calculates the reduced density matrix of the system via the mixed density matrix
-*  @param state state to produce the density matrix
-*  @param A_size size of subsystem
-*  @returns reduced density matrix
-*/
 template<typename _type>
-inline Mat<_type> SpinHamiltonian<_type>::red_dens_mat(u64 state, int A_size) const
+inline void SpinHamiltonian<_type>::diag_hs(bool withoutEigenVec)
 {
-	const auto Ns = this->lattice->get_Ns();
-	// set subsytsems size
-	const u64 dimA = ULLPOW(A_size);
-	const u64 dimB = ULLPOW(Ns - A_size);
-
-	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
-	// loop over configurational basis
-	for (auto n = 0; n < this->N; n++) {
-		u64 counter = 0;
-		// pick out state with same B side (last L-A_size bits)
-		for (u64 m = n % dimB; m < N; m += dimB) {
-			// find index of state with same B-side (by dividing the last bits are discarded)
-			u64 idx = n / dimB;
-			auto val = conj(this->get_eigenStateValue(state, n)) * this->get_eigenStateValue(state, m);
-			rho(idx, counter) += val;
-			// increase counter to move along reduced basis
-			counter++;
-		}
+	try {
+		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, this->N);
+		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, this->N);
 	}
-	return rho;
-}
-
-/*
-*  @brief Calculates the reduced density matrix of the system via the mixed density matrix
-*  @param state state to produce the density matrix
-*  @param A_size size of subsystem
-*  @returns reduced density matrix
-*/
-template<>
-inline Mat<double> SpinHamiltonian<double>::red_dens_mat(u64 state, int A_size) const
-{
-	const auto Ns = this->lattice->get_Ns();
-	// set subsytsems size
-	const u64 dimA = ULLPOW(A_size);
-	const u64 dimB = ULLPOW(Ns - A_size);
-
-	Mat<double> rho(dimA, dimA, arma::fill::zeros);
-	// loop over configurational basis
-	for (auto n = 0; n < this->N; n++) {
-		u64 counter = 0;
-		// pick out state with same B side (last L-A_size bits)
-		for (u64 m = n % dimB; m < N; m += dimB) {
-			// find index of state with same B-side (by dividing the last bits are discarded)
-			u64 idx = n / dimB;
-			rho(idx, counter) += this->get_eigenStateValue(state, n) * this->get_eigenStateValue(state, m);
-			// increase counter to move along reduced basis
-			counter++;
-		}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
+		assert(false);
 	}
-	return rho;
+
+	// calculates the middle spectrum element
+	double E_av = trace(eigenvalues) / double(N);
+	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+		return abs(x - E_av) < abs(y - E_av);
+		});
+	this->E_av_idx = i - std::begin(eigenvalues);
 }
-
-/*
-*  @brief Calculates the entropy of the system via the mixed density matrix
-*  @param state state index to produce the density matrix
-*  @param A_size size of subsystem
-*  @returns entropy of considered systsem
-*/
-template<typename _type>
-inline double SpinHamiltonian<_type>::entanglement_entropy(u64 state, int A_size) const {
-	auto rho = red_dens_mat(state, A_size);
-	vec probabilities;
-	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
-	eig_sym(probabilities, rho);
-
-	double entropy = 0;
-	//#pragma omp parallel for reduction(+: entropy)
-	for (auto i = 0; i < probabilities.size(); i++) {
-		const auto value = probabilities(i);
-		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));
-	}
-	//double entropy = -real(trace(rho * real(logmat(rho))));
-	return entropy;
-}
-
-
-/*
-* @brief Calculates the entropy of the system via the mixed density matrix
-* @param state state index to produce the density matrix
-* @returns entropy of considered systsem for different subsystem sizes
-*/
-template<typename _type>
-inline vec SpinHamiltonian<_type>::entanglement_entropy_sweep(u64 state) const
-{
-	vec entropy(this->Ns - 1, arma::fill::zeros);
-#pragma omp parallel for
-	for (int i = 0; i < this->Ns - 1; i++)
-		entropy(i) = entanglement_entropy(state, i + 1);
-	return entropy;
-}
-
 
 // ------------------------------------------------------------  				     PHYSICAL QUANTITES   				    ------------------------------------------------------------
 

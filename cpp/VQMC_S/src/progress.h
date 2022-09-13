@@ -37,8 +37,8 @@ public:
 	}
 	pBar() : timer(std::chrono::high_resolution_clock::now()) { };							// constructor
 	pBar(double percentage, int discreteSteps)
-		: percentage(percentage)
-		, timer(std::chrono::high_resolution_clock::now())
+		: timer(std::chrono::high_resolution_clock::now())
+		, percentage(percentage)
 		, percentageSteps(static_cast<int>(percentage* discreteSteps / 100.0))
 	{};
 private:

@@ -127,6 +127,7 @@ void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHami
 	// compare ED
 	auto Ns = hamiltonian->lattice->get_Ns();
 	if (Ns <= 12) {
+		stout << "\t\t\t\t->calculating ed" << EL;
 		hamiltonian->hamiltonian();
 		if (Ns <= 12)
 			hamiltonian->diag_h(false);
@@ -134,6 +135,9 @@ void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHami
 			hamiltonian->diag_h(false, 3, 0, 1000);
 		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
 		stout << "\t\t\t\t->" << VEQ(ground_ed) << "\t" << VEQ(ground_rbm) << EL;
+	}
+	else {
+		stout << "\t\t\t\t->skipping ed" << EL;
 	}
 }
 
@@ -657,6 +661,8 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	// make the lattice
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	auto Ns = this->lat->get_Ns();
+	stout << "->" << this->lat->get_info() << EL;
+
 	this->positions = v_1d<int>(Ns);
 	// use all the positions for the lattice sites
 	std::iota(this->positions.begin(), this->positions.end(), 0); 
@@ -687,7 +693,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	this->nhidden = this->layer_mult * this->nvisible;
 	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
 	auto rbm_info = phi->get_info();
-	stout << "-> " << VEQ(rbm_info) << EL;
+	stout << "->" << VEQ(rbm_info) << EL;
 
 	int Tnum = (Tmax - Tmin) / dT;
 	// start the Jdot loop
@@ -724,9 +730,10 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 
 
 		uint iter = 0;
+		auto T = 0.0;
 		// iterate the temperature
 		for (int Titer = 0; Titer <= Tnum; Titer++) {
-			auto T = Tmax - Titer * dT;
+			T = Tmax - Titer * dT;
 			stout << "\t\t->Starting temperature " << VEQ(T) << EL;
 			// iterate Monte Carlo steps
 			for (int i = 0; i < mc_outside; i++) {
@@ -1052,6 +1059,7 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start)
 {
+	stout << "->using real" << EL;
 	if(sym)
 		this->ham_d = std::make_shared<ising_sym::IsingModelSym<double>>(J, g, h, lat, k_sym, p_sym, x_sym, this->thread_num);
 	else {
@@ -1062,6 +1070,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_d->get_info() << EL;
 	this->ham_d->diag_h(false);
+
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 	const u64 N = this->ham_d->get_hilbert_size();
 
@@ -1071,11 +1080,12 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		spectrum_num = this->spectrum_size * N;
 	else
 		spectrum_num = static_cast<u64>(this->spectrum_size);
-	auto name = ((this->spectrum_size <= 1.0) ? "spectrum_num=" + STRP(spectrum_size, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(spectrum_num));
+
+	std::string name = ((this->spectrum_size <= 1.0) ? "spectrum_num=" + STRP(spectrum_size, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(spectrum_num));
 	stout << "->middle_spectrum_size : " << name << EL;
 
 
-	string dir = this->saving_dir + this->ham_d->get_info() + kPS;
+	std::string dir = this->saving_dir + this->ham_d->get_info() + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
@@ -1088,7 +1098,6 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 	// calculate the reduced density matrices
 	Operators<double> op(this->lat);
-
 
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 	const u64 min_idx = av_energy_idx - static_cast<int>(spectrum_num / 2.0);
@@ -1110,7 +1119,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 #pragma omp parallel for
 		for (u64 j = 0; j < spectrum_num; j++) {
 			u64 idx = min_idx + j;
-			auto state = ham_d->get_eigenStateFull(idx);
+			auto state = this->ham_d->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}
@@ -1131,6 +1140,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 {
+	stout << "->using complex" << EL;
 	if (sym)
 		this->ham_cpx = std::make_shared<ising_sym::IsingModelSym<cpx>>(J, g, h, lat, k_sym, p_sym, x_sym, this->thread_num);
 	else {
@@ -1189,7 +1199,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 #pragma omp parallel for
 		for (u64 j = 0; j < spectrum_num; j++) {
 			u64 idx = min_idx + j;
-			auto state = ham_cpx->get_eigenStateFull(idx);
+			auto state = this->ham_cpx->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}
@@ -1207,25 +1217,24 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 
 }
 
-
-
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 {
 	auto start = std::chrono::high_resolution_clock::now();
 	stouts("STARTING THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: " + VEQ(thread_num), start);
-	stout << "->" << (sym ? "" : "not") << " including symmetries" << EL;
+	stout << "->" << (sym ? "" : "not ") << "including symmetries" << EL;
 	
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	stout << "->" << this->lat->get_info() << EL;
 	auto Ns = this->lat->get_Ns();
 
 	// initialize hamiltonian
-	if (sym)
-		if (k_sym == 0 || k_sym == this->lat->get_Ns() / 2)
+	if (this->sym) {
+		if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
 			this->symmetries_double(start);
 		else
 			this->symmetries_cpx(start);
+	}
 	else
 		this->symmetries_double(start);
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);

@@ -100,8 +100,8 @@ void SquareLattice::calculate_nn_obc()
 		this->nearest_neighbors = std::vector<std::vector<int>>(Ns, std::vector<int>(4, 0));
 		for (int i = 0; i < Ns; i++) {
 			this->nearest_neighbors[i][0] = (i + 1) < Lx ? static_cast<int>(1.0 * i / Lx) * Lx + i + 1 : -1;		// right
-			this->nearest_neighbors[i][1] = (i - 1) >= 0 ? static_cast<int>(1.0 * i / Lx) * Lx + i - 1 : -1;		// left
-			this->nearest_neighbors[i][2] = i + Lx < Ns ? i + Lx : -1;												// top
+			this->nearest_neighbors[i][1] = i + Lx < Ns ? i + Lx : -1;												// top
+			this->nearest_neighbors[i][2] = (i - 1) >= 0 ? static_cast<int>(1.0 * i / Lx) * Lx + i - 1 : -1;		// left
 			this->nearest_neighbors[i][3] = i - Lx >= 0 ? i - Lx : -1;												// bottom
 		}
 		break;
@@ -181,7 +181,7 @@ void SquareLattice::calculate_k_vectors()
 */
 v_1d<uint> SquareLattice::get_nn_forward_number(int lat_site) const
 {
-	if (this->dim == 0)
+	if (this->dim == 1)
 		return { 0 };
 	else
 		return { 0, 1 };

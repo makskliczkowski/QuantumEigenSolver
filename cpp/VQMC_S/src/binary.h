@@ -55,6 +55,8 @@ DISABLE_WARNING_PUSH // include <armadillo> and suppress its warnings, cause dev
 #define RETURNS(...) -> decltype((__VA_ARGS__)) { return (__VA_ARGS__); }
 //
 
+#define SPIN
+
 // use binary representation 0/1 instead of -1/1
 #ifdef USE_BINARY
 	#undef SPIN

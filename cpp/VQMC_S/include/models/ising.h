@@ -55,7 +55,9 @@ public:
 			",g=" + STRP(g, 2) + \
 			",g0=" + STRP(g0, 2) + \
 			",h=" + STRP(h, 2) + \
-			",w=" + STRP(w, 2);
+			",w=" + STRP(w, 2) + \
+			",bc=" + STR(this->lattice->get_BC());
+		
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 	void update_info() override { this->info = this->inf(); };

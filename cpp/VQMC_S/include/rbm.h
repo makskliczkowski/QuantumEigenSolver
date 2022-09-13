@@ -9,7 +9,6 @@
 
 #define RBM_ANGLES_UPD
 //#define PLOT
-#define SPIN
 
 
 #ifdef USE_SR
@@ -292,7 +291,7 @@ inline _type rbmState<_type, _hamtype>::pRatio(int flip_place, int flipped_spin)
 #ifdef RBM_ANGLES_UPD
     value = value * this->b_v(flip_place) + sum(log(cosh(this->thetas + value * this->W.col(flip_place))/cosh(this->thetas)));
 #else
-    value += sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)));
+    value = value * this->b_v(flip_place) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)));
 #endif
     return exp(value);
 }
@@ -692,7 +691,7 @@ void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, si
             this->current_vector(flip_place) = this->tmp_vector(flip_place);
             // update angles if needed
             #ifdef RBM_ANGLES_UPD
-            this->update_angles(this->current_vector, flip_place);
+            this->update_angles(flip_place, flip_spin);
             #endif
         }
         else {
@@ -736,7 +735,8 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 
     for(auto i = 0; i < n_samples; i++){
         // set the random state at each Monte Carlo iteration
-        // this->set_rand_state();
+        //this->set_rand_state();
+        //this->set_angles(this->current_vector);
 
         // thermalize system
         auto therm_time = std::chrono::high_resolution_clock::now();
