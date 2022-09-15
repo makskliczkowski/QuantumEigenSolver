@@ -649,7 +649,6 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
 }
 
-
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, double Tmax, double dT, double Tmin)
 {
@@ -747,6 +746,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 					hamiltonian_ed->set_angles(j, 0, 0, 1, -direction_ed);
 					
 					// calculate the corresponding energy
+					// this->phi->init();																			// reinitialize the weights - probalby better thing to do
 					energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 					ground_rbm_new = std::real(arma::mean(energies.tail(block_size)));
 
@@ -754,7 +754,6 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 					if (double dE = ground_rbm_new - ground_rbm; dE <= 0 || exp(-dE / T) >= hamiltonian_rbm->ran.randomReal_uni(0, 1)){
 						cos_thetas_rbm(j) = -direction_rbm;
 						ground_rbm = ground_rbm_new;															// set new energy rbm
-						this->phi->init();																		// reinitialize the weights - probalby better thing to do
 					}
 					else{
 						stout << "\t\t\t->returning previous angle rbm mc_step: " << \

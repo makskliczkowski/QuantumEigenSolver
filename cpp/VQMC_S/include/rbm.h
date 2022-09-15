@@ -41,7 +41,7 @@
 
 
 #ifdef PINV
-constexpr auto pinv_tol = 1e-5;
+constexpr auto pinv_tol = 1e-4;
 #ifdef S_REGULAR
 #undef S_REGULAR
 #endif
@@ -132,7 +132,12 @@ public:
             , lr(lr)
             , batch(batch)
             {
+                #ifdef DEBUG
+                this->thread_num = 1;
+                #else
                 this->thread_num = thread_num;
+                #endif // DEBUG
+
                 // checks for the debug info
                 this->debug_check();          
                 // creates the hamiltonian class
@@ -248,6 +253,8 @@ public:
         , int tn = 1)                                                   const { return exp(dotm(this->b_v, Col<double>(v2 - v1), tn) + sum(log(Fs(v2) / Fs(v1)))); };
 
     // get local energies
+    void locEnKernel(uint start, uint stop, Col<_type>& energies, uint tid);
+    _type locEnKernelAll();
     _type locEn();
     _type pRatioValChange(_type v, u64 state, uint vid);
 
@@ -365,17 +372,22 @@ template<typename _type, typename _hamtype>
 void rbmState<_type, _hamtype>::init() {
     // initialize random state
     this->set_rand_state();
-
+    auto Ns = this->hamil->lattice->get_Ns();
     // initialize biases visible
     for (int i = 0; i < this->n_visible; i++)
-        this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-    // hidden
+        //this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
+        this->b_v(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
+    //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+// hidden
     for (int i = 0; i < this->n_hidden; i++)
-        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-    // matrix
+        //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
+        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
+    //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+// matrix
     for (int i = 0; i < this->W.n_rows; i++)
-        for(int j = 0; j < this->W.n_cols; j++)
-            this->W(i,j) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
+        for (int j = 0; j < this->W.n_cols; j++)
+            //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
+            this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
 }
 
 /*
@@ -389,19 +401,18 @@ inline void rbmState<cpx, double>::init() {
     // initialize biases visible
     for (int i = 0; i < this->n_visible; i++)
         //this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-        this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-        //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-    // hidden
+        this->b_v(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
+    //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+// hidden
     for (int i = 0; i < this->n_hidden; i++)
         //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-        //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-    // matrix
+        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
+    //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+// matrix
     for (int i = 0; i < this->W.n_rows; i++)
         for (int j = 0; j < this->W.n_cols; j++)
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-            this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-            //this->W(i, j) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+            this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
 }
 
 /*
@@ -415,19 +426,18 @@ inline void rbmState<cpx, cpx>::init() {
     // initialize biases visible
     for (int i = 0; i < this->n_visible; i++)
         //this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-        this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
+        this->b_v(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
     //this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
 // hidden
     for (int i = 0; i < this->n_hidden; i++)
         //this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
+        this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
     //this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
 // matrix
     for (int i = 0; i < this->W.n_rows; i++)
         for (int j = 0; j < this->W.n_cols; j++)
             //this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-            this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0, 1);
-    //this->W(i, j) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
+            this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
 }
 
 /*
@@ -618,19 +628,14 @@ inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state, uint
 #endif
 }
 
-
-/*
-* @brief Calculate the local energy depending on the given Hamiltonian
-*/
 template<typename _type, typename _hamtype>
-inline _type rbmState<_type, _hamtype>::locEn(){
-    auto loc_en_time = std::chrono::high_resolution_clock::now();
+inline _type rbmState<_type, _hamtype>::locEnKernelAll()
+{
     const auto hilb = this->hamil->get_hilbert_size();
-
     _type energy = 0;
     // loop over all lattice sites
 #ifndef DEBUG
-#pragma omp parallel for reduction(+ : energy)
+#pragma omp parallel for reduction(+ : energy) num_threads(this->thread_num)
 #endif
     for (uint i = 0; i < this->n_visible; i++) {
         auto states = this->hamil->locEnergy(this->current_state, i);
@@ -652,6 +657,62 @@ inline _type rbmState<_type, _hamtype>::locEn(){
 
     PRT(loc_en_time, this->dbg_lcen);
     return energy;
+}
+
+template<typename _type, typename _hamtype>
+inline void rbmState<_type, _hamtype>::locEnKernel(uint start, uint stop, Col<_type>& energies, uint tid)
+{
+    _type energy = 0;
+    // loop over all lattice sites
+    for (uint i = start; i < stop; i++) {
+        auto states = this->hamil->locEnergy(this->current_state, i);
+        _type energy_tmp = 0;
+        for (const auto [state, value] : states) {
+            if (state >= this->hamil->get_hilbert_size()) break;
+            // changes accordingly not to create data race
+            energy_tmp += state != this->current_state ? this->pRatioValChange(value, state, tid) : value;
+        }
+        energy += energy_tmp;
+    }
+    energies[tid] = energy;
+}
+
+/*
+* @brief Calculate the local energy depending on the given Hamiltonian
+*/
+template<typename _type, typename _hamtype>
+inline _type rbmState<_type, _hamtype>::locEn(){
+    auto loc_en_time = std::chrono::high_resolution_clock::now();
+    size_t Ns = this->hamil->lattice->get_Ns();
+    // get thread id
+#ifndef DEBUG
+    int num_of_threads = (Ns < 32) ? 1 : std::min(this->thread_num, Ns);
+#else
+    int num_of_threads = 1;
+#endif
+   
+    if (num_of_threads == 1)
+        return this->locEnKernelAll();
+    else {
+        //Threaded
+        v_1d<std::jthread> threads;
+        // reserve threads
+        threads.reserve(num_of_threads);
+        Col<_type> energies(num_of_threads, arma::fill::zeros);
+
+        for (int t = 0; t < num_of_threads; t++) {
+            auto start = (Ns / (double)num_of_threads * t);
+            auto stop = ((t + 1) == num_of_threads ? Ns : (Ns / (double)num_of_threads * (double)(t + 1)));
+            threads.emplace_back(&rbmState::locEnKernel, this, start, stop, ref(energies), t);
+        }
+
+        // join the threads together
+        for (auto& t : threads)
+            t.join();
+
+        PRT(loc_en_time, this->dbg_lcen);
+        return arma::mean(energies);
+    }
 }
 
 // ------------------------------------------------- SAMPLING -------------------------------------------------
@@ -681,12 +742,10 @@ void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, si
         double proba = abs(this->pRatio(this->current_vector, this->tmp_vector, this->thread_num));
         #else
         double proba = abs(this->pRatio(flip_place, flip_spin));
-        //double proba = abs(this->pRatio(this->tmp_vector, this->thread_num));
-        //stout << VEQ(proba) << EL;
+
         #endif
-        // ? > or <
-        //if (this->hamil->ran.randomReal_uni() <= proba * proba) {//
-        if (this->hamil->ran.randomReal_uni() <= proba * proba ){//
+
+        if (this->hamil->ran.randomReal_uni() <= proba * proba ){
             // update current state and vector
             this->current_vector(flip_place) = this->tmp_vector(flip_place);
             // update angles if needed
@@ -732,8 +791,9 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
     Col<_type> meanEnergies(n_samples, arma::fill::zeros);
     Col<_type> energies(norm, arma::fill::zeros);
     Mat<_type> derivatives(norm, this->full_size, arma::fill::zeros);
-
-    for(auto i = 0; i < n_samples; i++){
+    
+    this->set_rand_state();
+    for (auto i = 0; i < n_samples; i++) {
         // set the random state at each Monte Carlo iteration
         //this->set_rand_state();
         //this->set_angles(this->current_vector);
@@ -745,14 +805,11 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 
         // to check whether the batch is ready already  
         auto blocks_time = std::chrono::high_resolution_clock::now();
-        for(auto took = 0; took < norm; took++){
+        for (auto took = 0; took < norm; took++) {
             // block sample the stuff
             auto sample_time = std::chrono::high_resolution_clock::now();
             this->blockSampling(b_size, this->current_state, n_flips, false);
             PRT(sample_time, this->dbg_samp);
-
-            // if (norm == (n_blocks - n_therm) || this->hamil->ran.randomReal_uni() <= batch_proba) {
-            // auto gradients_time = std::chrono::high_resolution_clock::now();
 
             this->calcVarDeriv(this->current_vector);
 
@@ -772,15 +829,12 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 #ifdef USE_SR
         this->S = arma::cov(conj(derivatives), derivatives);
         // update model
-
         this->updVarDerivSR(i);
-
-
         //this->adam->update(this->F);
         //this->F = this->adam->get_grad();
-    #ifdef S_REGULAR
+#ifdef S_REGULAR
         this->current_b_reg = this->current_b_reg * b_reg;
-    #endif // S_REGULAR
+#endif // S_REGULAR
 #elif defined USE_ADAM
         this->adam->update(this->F);
         this->F = this->adam->get_grad();
@@ -794,17 +848,20 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
         this->set_weights();
         // add energy
         meanEnergies(i) = meanLocEn;
-        
 
-
+#ifdef DEBUG 
         // update the progress bar
-        //if (i % pbar.percentageSteps == 0)
-        //    pbar.printWithTime("-> PROGRESS");
+        if (i % pbar.percentageSteps == 0)
+            pbar.printWithTime("-> PROGRESS");
     }
-    //stouts("->\t\t\tMonte Carlo energy search ", start);
+    stouts("->\t\t\tMonte Carlo energy search ", start);
     this->W.save("W.csv", csv_ascii);
     this->b_h.save("bh.csv", csv_ascii);
     this->b_v.save("bv.csv", csv_ascii);
+#else
+    }
+#endif
+
     return meanEnergies;
 }
 

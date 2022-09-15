@@ -1,1 +1,1 @@
--mod 2 -bc 0 -l 1 -m 500 -lr 0.01 -lm 2 -nb 150 -bs 12 -d 1 -lx 4 -ly 4 -J -1.0 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -th 16 -dir resultsClassical/
+-mod 2 -bc 0 -l 1 -m 500 -lr 0.001 -lm 2 -nb 150 -bs 10 -d 2 -lx 3 -ly 3 -J 1.0 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -th 1 -dir resultsClassical/
