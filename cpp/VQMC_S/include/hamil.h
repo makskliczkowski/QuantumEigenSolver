@@ -195,11 +195,15 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	}
 
 	// calculates the middle spectrum element
-	double E_av = trace(eigenvalues) / double(N);
-	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
-		return abs(x - E_av) < abs(y - E_av);
-		});
-	this->E_av_idx = i - std::begin(eigenvalues);
+	//double E_av = trace(eigenvalues) / double(N);
+	double E_av = arma::mean(eigenvalues);
+	// calculates the middle spectrum element
+	v_1d<double> vect(this->N, 0.0);
+	for(int i = 0; i<this->N; i++)
+		vect[i] = abs(eigenvalues(i) - E_av);
+	
+	auto i = std::min_element(std::begin(vect), std::end(vect));
+	this->E_av_idx = i - std::begin(vect);
 }
 
 template <>
@@ -215,11 +219,18 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec) {
 	}
 
 	// calculates the middle spectrum element
-	double E_av = trace(eigenvalues) / double(N);
-	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
-		return abs(x - E_av) < abs(y - E_av);
-		});
-	this->E_av_idx = i - std::begin(eigenvalues);
+	//double E_av = trace(eigenvalues) / double(N);
+	//auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+	//	return abs(x - E_av) < abs(y - E_av);
+	//	});
+	double E_av = arma::mean(eigenvalues);
+	//this->E_av_idx = i - std::begin(eigenvalues);
+	v_1d<double> vect(this->N, 0.0);
+	for (int i = 0; i < this->N; i++)
+		vect[i] = abs(eigenvalues(i) - E_av);
+
+	auto i = std::min_element(std::begin(vect), std::end(vect));
+	this->E_av_idx = i - std::begin(vect);
 }
 
 /*
@@ -294,11 +305,11 @@ inline void SpinHamiltonian<_type>::diag_hs(bool withoutEigenVec)
 	}
 
 	// calculates the middle spectrum element
-	double E_av = trace(eigenvalues) / double(N);
-	auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
-		return abs(x - E_av) < abs(y - E_av);
-		});
-	this->E_av_idx = i - std::begin(eigenvalues);
+	//double E_av = trace(eigenvalues) / double(N);
+	//auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
+	//	return abs(x - E_av) < abs(y - E_av);
+	//	});
+	//this->E_av_idx = i - std::begin(eigenvalues);
 }
 
 // ------------------------------------------------------------  				     PHYSICAL QUANTITES   				    ------------------------------------------------------------
