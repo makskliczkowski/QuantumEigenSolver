@@ -13,107 +13,113 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\src">
-      <UniqueIdentifier>{120bce59-f09f-4183-b537-8c5b3cf089e9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\models">
-      <UniqueIdentifier>{81cc70c4-169b-45c4-89fe-65b351a1acf7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\lattices">
-      <UniqueIdentifier>{ece9fe9c-e46d-4af2-82f3-feafd9add054}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Lattices">
-      <UniqueIdentifier>{95abad81-f007-4a50-8e25-9619e508d605}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Hamiltonians">
       <UniqueIdentifier>{0e843970-642b-44d0-ac89-eab8903f2859}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\operators">
-      <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
+    <Filter Include="Source Files\source">
+      <UniqueIdentifier>{ac9c1a2c-b498-43c9-b8dd-18430dfe1da3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\user_interface">
-      <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
+    <Filter Include="Source Files\source\Lattices">
+      <UniqueIdentifier>{46a8c06b-6472-4dd1-bce8-8e82c4696c46}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\models\symmetries">
+    <Filter Include="Header Files\include">
+      <UniqueIdentifier>{b6e86515-ee1e-4143-a145-66fbd140c670}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\include\models">
+      <UniqueIdentifier>{81cc70c4-169b-45c4-89fe-65b351a1acf7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\include\models\symmetries">
       <UniqueIdentifier>{71e01006-7309-4bcd-a319-d4c50b7c4629}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\include\operators">
+      <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\include\user_interface">
+      <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\source">
+      <UniqueIdentifier>{fbb02f40-0eca-4911-8292-4f847505a9c2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\source\Lattices">
+      <UniqueIdentifier>{549cf93f-dd75-4ddf-a55c-82e99f066fa1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\source\LinearAlgebra">
+      <UniqueIdentifier>{9820086f-9130-4bcc-bf3a-3700efd5e865}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\source\user_interface">
+      <UniqueIdentifier>{7f28158b-e987-4c7c-be8b-cb0651cefe3b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\random.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\rbm.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\binary.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\common.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\progress.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\statistical.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\str.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\xoshiro_pp.h">
-      <Filter>Header Files\src</Filter>
-    </ClInclude>
     <ClInclude Include="include\models\ising.h">
-      <Filter>Header Files\models</Filter>
-    </ClInclude>
-    <ClInclude Include="include\hamil.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\lattices\square.h">
-      <Filter>Header Files\lattices</Filter>
-    </ClInclude>
-    <ClInclude Include="include\lattice.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\ml.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\include\models</Filter>
     </ClInclude>
     <ClInclude Include="include\models\heisenberg.h">
-      <Filter>Header Files\models</Filter>
+      <Filter>Header Files\include\models</Filter>
     </ClInclude>
     <ClInclude Include="include\models\heisenberg_dots.h">
-      <Filter>Header Files\models</Filter>
+      <Filter>Header Files\include\models</Filter>
     </ClInclude>
     <ClInclude Include="include\models\heisenberg-kitaev.h">
-      <Filter>Header Files\models</Filter>
-    </ClInclude>
-    <ClInclude Include="include\lattices\hexagonal.h">
-      <Filter>Header Files\lattices</Filter>
+      <Filter>Header Files\include\models</Filter>
     </ClInclude>
     <ClInclude Include="include\operators\operators.h">
-      <Filter>Header Files\operators</Filter>
-    </ClInclude>
-    <ClInclude Include="include\user_interface\user_interface.h">
-      <Filter>Header Files\user_interface</Filter>
-    </ClInclude>
-    <ClInclude Include="include\hamil_sym.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\include\operators</Filter>
     </ClInclude>
     <ClInclude Include="include\models\symmetries\ising_sym.h">
-      <Filter>Header Files\models\symmetries</Filter>
+      <Filter>Header Files\include\models\symmetries</Filter>
+    </ClInclude>
+    <ClInclude Include="include\user_interface\user_interface.h">
+      <Filter>Header Files\include\user_interface</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hamil.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hamil_sym.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\ml.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rbm.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\common.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\lattices.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\progress.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\random.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\statistical.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\str.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\xoshiro_pp.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\Lattices\hexagonal.h">
+      <Filter>Header Files\source\Lattices</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\Lattices\square.h">
+      <Filter>Header Files\source\Lattices</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\LinearAlgebra\alg.h">
+      <Filter>Header Files\source\LinearAlgebra</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\UserInterface\ui.h">
+      <Filter>Header Files\source\user_interface</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="common.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="rbm.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="statistical.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="str.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
@@ -122,11 +128,17 @@
     <ClCompile Include="user_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="lattices\hexagonal.cpp">
-      <Filter>Source Files\Lattices</Filter>
+    <ClCompile Include="source\cpp\Lattices\square.cpp">
+      <Filter>Source Files\source\Lattices</Filter>
     </ClCompile>
-    <ClCompile Include="lattices\square.cpp">
-      <Filter>Source Files\Lattices</Filter>
+    <ClCompile Include="source\cpp\Lattices\hexagonal.cpp">
+      <Filter>Source Files\source\Lattices</Filter>
+    </ClCompile>
+    <ClCompile Include="source\cpp\common.cpp">
+      <Filter>Source Files\source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\cpp\statistical.cpp">
+      <Filter>Source Files\source</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

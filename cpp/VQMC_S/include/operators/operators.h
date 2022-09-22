@@ -1,6 +1,9 @@
 #pragma once
 #ifndef LATTICE_H
-	#include "../lattice.h"
+	#include "../../source/src/lattices.h"
+#endif
+#ifndef BINARY_H
+	#include "../../source/src/binary.h"
 #endif
 
 

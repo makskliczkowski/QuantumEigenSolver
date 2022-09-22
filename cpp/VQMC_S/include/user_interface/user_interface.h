@@ -27,10 +27,10 @@
 #endif
 
 #ifndef SQUARE_H
-	#include "../lattices/square.h"
+	#include "../../source/src/Lattices/square.h"
 #endif
 #ifndef HEXAGONAL_H
-	#include "../lattices/hexagonal.h"
+	#include "../../source/src/Lattices/hexagonal.h"
 #endif
 
 

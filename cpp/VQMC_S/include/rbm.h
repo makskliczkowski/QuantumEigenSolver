@@ -18,7 +18,7 @@
 
 
 
-#include "../src/progress.h"
+#include "../source/src/progress.h"
 
 
 #ifndef HEISENBERG_DOTS

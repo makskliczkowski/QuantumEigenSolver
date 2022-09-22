@@ -159,9 +159,6 @@
   <ItemGroup>
     <ClInclude Include="include\hamil.h" />
     <ClInclude Include="include\hamil_sym.h" />
-    <ClInclude Include="include\lattice.h" />
-    <ClInclude Include="include\lattices\hexagonal.h" />
-    <ClInclude Include="include\lattices\square.h" />
     <ClInclude Include="include\ml.h" />
     <ClInclude Include="include\models\heisenberg-kitaev.h" />
     <ClInclude Include="include\models\heisenberg.h" />
@@ -169,24 +166,27 @@
     <ClInclude Include="include\models\ising.h" />
     <ClInclude Include="include\models\symmetries\ising_sym.h" />
     <ClInclude Include="include\operators\operators.h" />
-    <ClInclude Include="include\random.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />
-    <ClInclude Include="src\binary.h" />
-    <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\progress.h" />
-    <ClInclude Include="src\statistical.h" />
-    <ClInclude Include="src\str.h" />
-    <ClInclude Include="src\xoshiro_pp.h" />
+    <ClInclude Include="source\src\common.h" />
+    <ClInclude Include="source\src\lattices.h" />
+    <ClInclude Include="source\src\Lattices\hexagonal.h" />
+    <ClInclude Include="source\src\Lattices\square.h" />
+    <ClInclude Include="source\src\LinearAlgebra\alg.h" />
+    <ClInclude Include="source\src\progress.h" />
+    <ClInclude Include="source\src\random.h" />
+    <ClInclude Include="source\src\statistical.h" />
+    <ClInclude Include="source\src\str.h" />
+    <ClInclude Include="source\src\UserInterface\ui.h" />
+    <ClInclude Include="source\src\xoshiro_pp.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="common.cpp" />
-    <ClCompile Include="lattices\hexagonal.cpp" />
-    <ClCompile Include="lattices\square.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rbm.cpp" />
-    <ClCompile Include="statistical.cpp" />
-    <ClCompile Include="str.cpp" />
+    <ClCompile Include="source\cpp\common.cpp" />
+    <ClCompile Include="source\cpp\Lattices\hexagonal.cpp" />
+    <ClCompile Include="source\cpp\Lattices\square.cpp" />
+    <ClCompile Include="source\cpp\statistical.cpp" />
     <ClCompile Include="user_interface.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
