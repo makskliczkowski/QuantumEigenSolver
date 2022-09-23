@@ -32,9 +32,9 @@ public:
 	Heisenberg(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat);
 
 	// METHODS
-	void hamiltonian() override;
-	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;												// returns the local energy for VQMC purposes
-	v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override;										// returns the local energy for VQMC purposes
+	virtual void hamiltonian() override;
+	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;										// returns the local energy for VQMC purposes
+	virtual v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override;								// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -50,6 +50,7 @@ public:
 			",w=" + STRP(this->w, 2);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
+	virtual void update_info() override { this->info = this->inf(); };
 };
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
@@ -91,7 +92,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 */
 template <typename _type>
 u64 Heisenberg<_type>::map(u64 index) const {
-	if (index < 0 || index >= std::pow(2, this->lattice->get_Ns())) throw "Element out of range\n No such index in map\n";
+	if (index < 0 || index >= this->get_hilbert_size()) throw "Element out of range\n No such index in map\n";
 	return index;
 }
 
@@ -126,7 +127,7 @@ v_1d<pair<u64, _type>> Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 
-			auto interaction = (this->J + this->dJ(site)) / 2.0;
+			auto interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += interaction * this->delta * si * sj;
 

@@ -54,10 +54,11 @@ public:
 			",g0=" + STRP(this->g0, 2) + \
 			",h=" + STRP(this->h, 2) + \
 			",w=" + STRP(this->w, 2) + \
-			",K=(" + STRP(this->Kx, 2) + "," + STRP(this->Ky,2) + "," + STRP(this->Ky, 2) + ")" \
+			",K=(" + STRP(this->Kx, 2) + "," + STRP(this->Ky, 2) + "," + STRP(this->Ky, 2) + ")" \
 			",K0=" + STRP(this->K0, 2);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
-	}
+	};
+	void update_info() override { this->info = this->inf(); };
 };
 
 // ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
@@ -196,14 +197,8 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 */
 template <typename _type>
 void Heisenberg_kitaev<_type>::hamiltonian() {
-	try {
-		this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
-	}
-	catch (const std::bad_alloc& e) {
-		std::cout << "Memory exceeded" << e.what() << "\n";
-		assert(false);
-	}
-
+	
+	this->init_ham_mat();
 
 	for (auto k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->Ns; i++) {

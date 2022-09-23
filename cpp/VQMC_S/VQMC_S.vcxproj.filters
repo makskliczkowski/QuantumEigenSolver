@@ -140,5 +140,8 @@
     <ClCompile Include="source\cpp\statistical.cpp">
       <Filter>Source Files\source</Filter>
     </ClCompile>
+    <ClCompile Include="source\cpp\ui.cpp">
+      <Filter>Source Files\source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

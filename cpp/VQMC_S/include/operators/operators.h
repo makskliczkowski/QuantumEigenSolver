@@ -415,7 +415,7 @@ inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state)
 #pragma omp parallel for
 	for (int i = 0; i < this->Ns - 1; i++)
 		entropy(i) = entanglement_entropy(state, i + 1);
-	stout << EL << EL << entropy << EL << EL;
+	//stout << EL << EL << entropy << EL << EL;
 	return entropy;
 }
 

@@ -40,6 +40,7 @@ public:
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };								// prints the eigenstate at a given idx
 	
 	// ------------------------------------------- 				  INFO 				  -------------------------------------------
+	
 	/*
 	* @brief sets and gets the information about the model
 	* @param skip vector of elements to be skipped in the info showcase
@@ -73,7 +74,7 @@ public:
 
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
-	auto get_en_av_idx()											const RETURNS(this->E_av_idx);
+	auto get_en_av_idx()											const RETURNS(this->E_av_idx);						// return the index closest to the mean energy
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian
@@ -105,7 +106,13 @@ public:
 
 	// -------------------------------------------                    OPERATORS						  --------------------------------------------
 
-
+	// -------------------------------------------
+public:
+	// Heisenberg-dots
+	void set_angles() {};
+	void set_angles(const vec& phis, const vec& thetas) {};
+	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
+	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
 };
 
 // ------------------------------------------------------------  				   PRINTERS 				    ------------------------------------------------------------

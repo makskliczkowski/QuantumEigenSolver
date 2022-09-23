@@ -33,18 +33,20 @@ public:
 	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
 		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
 	// ----------------------------------- 				 SETTERS 				 ---------------------------------
-	void update_info() override							{ this->info = this->inf(); };
+	
 	void set_Jdot(const vec& Jdot)						{ this->J_dot = Jdot; };
 	void set_angles();
 	void set_angles(const vec& phis, const vec& thetas);
 	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas);
 	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas);
 	// -----------------------------------				 GETTERS 				 ---------------------------------
+	
 	auto get_Jdot()										const RETURNS(this->J_dot);
 	void get_dot_interaction(u64 state, uint position, uint dotnum);
 	tuple<double, _type, double> get_dot_int_return(double si, uint dotnum);
 
 	// ----------------------------------- 				 OTHER STUFF 				 ---------------------------------
+	
 	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;
 	v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) override;
 	void hamiltonian() override;
@@ -64,6 +66,7 @@ public:
 			",w=" + STRP(this->w, 2);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
+	void update_info() override { this->info = this->inf(); };
 };
 
 
@@ -357,7 +360,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 		// double checking neighbors
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-			const auto interaction = (this->J + this->dJ(site));
+			const auto interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += this->delta * interaction * si * sj;
 
