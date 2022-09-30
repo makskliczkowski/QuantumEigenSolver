@@ -1,1 +1,1 @@
--mod 1 -bc 0 -l 0 -m 1000 -lr 0.01 -lm 2 -nb 300 -bs 80 -d 1 -lx 8 -ly 2 -J 1.0 -J0 0.0 -h 0.5 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -th 16 -dir resultsKitaev/
+-mod 3 -bc 0 -l 1 -m 1000 -lr 0.017 -lm 2 -nb 300 -bs 80 -d 2 -lx 2 -ly 3 -J 0.0 -kx -1.0 -ky -1.0 -kz -1.0 -J0 0.0 -h 0.0 -w 0.0 -g 0.0 -g0 0.0 -dlt 1.0 -th 16 -dir resultsKitaev/

@@ -152,12 +152,27 @@ inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
 	u64 dim = ULLPOW(this->Ns);
 	
 	Col<_type> output(dim, arma::fill::zeros);
-#pragma omp parallel for
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
 			if (idx < dim) // only if exists in sector
-				output(idx) += this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())) * this->get_eigenStateValue(state, k);
+				output(idx) += this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())) * this->eigenvectors(k, state);
+		}
+	}
+	return output;
+}
+
+template<>
+inline Col<cpx> SpinHamiltonianSym<cpx>::symmetryRotation(u64 state) const
+{
+	u64 dim = ULLPOW(this->Ns);
+
+	Col<cpx> output(dim, arma::fill::zeros);
+	for (long int k = 0; k < this->N; k++) {
+		for (int i = 0; i < this->symmetry_group.size(); i++) {
+			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
+			if (idx < dim) // only if exists in sector
+				output(idx) += this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())) * this->eigenvectors(k, state);
 		}
 	}
 	return output;

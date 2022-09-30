@@ -86,6 +86,8 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 	this->dh = create_random_vec(this->Ns, this->ran, this->w);							// creates random disorder vector
 	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);						// creates random exchange vector
 	this->dg = create_random_vec(this->Ns, this->ran, this->g0);						// creates random transverse field vector
+	this->state_val_num = 2;
+	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num);
 
 	//change info
 	this->info = this->inf();
@@ -116,9 +118,7 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(u64 _id, uint site) {
 	// sumup the value of non-changed state
 	double localVal = 0;
 
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2);
-
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;								
@@ -127,8 +127,8 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(u64 _id, uint site) {
 	localVal += (this->h + dh(site)) * si;												
 		
 	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
-		// double checking neighbors
+	for (auto nn = 0; nn < nn_number; nn++) {
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 			localVal += (this->J + this->dJ(site)) * si * sj;
@@ -137,11 +137,11 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(u64 _id, uint site) {
 	
 	// flip with S^x_i with the transverse field
 	u64 new_idx = flip(_id, this->Ns - 1 - site);
-	state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
 	// append unchanged at the very end
-	state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
+	this->state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
 
-	return state_val;
+	return this->state_val;
 }
 
 /*
@@ -152,8 +152,7 @@ template <typename _type>
 v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(const vec& v, uint site) {
 	double localVal = 0;
 
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2);
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 
 	// check Sz 
@@ -162,8 +161,10 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(const vec& v, uint site) {
 	// diagonal elements setting the perpendicular field
 	localVal += (this->h + dh(site)) * si;
 
-	// diagonal elements setting the interaction field
-	for (auto n_num : nn_number) {
+	// check the Siz Si+1z
+	for (auto nn = 0; nn < nn_number; nn++) {
+		// double checking neighbors
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			double sj = checkBitV(v, nei) > 0 ? 1.0 : -1.0;
 			localVal += (this->J + this->dJ(site)) * si * sj;
@@ -173,10 +174,10 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(const vec& v, uint site) {
 	this->tmp_vec = v;
 	flipV(this->tmp_vec, site);
 	const u64 new_idx = baseToInt(this->tmp_vec);
-	state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
 
 	// append unchanged at the very end
-	state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
 
 	return state_val;
 }
@@ -215,7 +216,7 @@ void IsingModel<_type>::hamiltonian() {
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
-			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
+			uint nn_number = this->lattice->get_nn_forward_num(j);
 			// true - spin up, false - spin down
 			double s_i = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;							
 			
@@ -226,11 +227,12 @@ void IsingModel<_type>::hamiltonian() {
 			// diagonal elements setting the perpendicular field
 			this->H(k, k) += (this->h + dh(j)) * s_i;
 
-			for (auto n_num : nn_number) {
-				// double checking neighbors
-				if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
+			// check the Siz Si+1z
+			for (auto nn = 0; nn < nn_number; nn++) {
+				auto n_num = this->lattice->get_nn_forward_num(j, nn);
+				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 					// Ising-like spin correlation
-					double s_j = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					double s_j = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
 					// setting the neighbors elements
 					this->H(k, k) += (this->J + this->dJ(j)) * s_i * s_j;
 				}

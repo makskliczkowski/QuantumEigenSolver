@@ -90,41 +90,9 @@
 constexpr int maxed = 20;
 
 
-namespace rbm_ui {
-	std::unordered_map <string, string> const default_params = {
-	{"m","300"},								// mcsteps	
-	{"b","100"},								// batch
-	{"nb","500"},								// number of blocks	
-	{"bs","8"},									// block size
-	{"nh","2"},									// hidden parameters
-	// lattice parameters
-	{"d","1"},									// dimension
-	{"lx","4"},
-	{"ly","1"},
-	{"lz","1"},
-	{"bc","0"},									// boundary condition
-	{"l","0"},									// lattice type (default square)
-	{"f",""},									// file to read from directory
-	// model parameters
-	{"mod","0"},								// choose model
-	{"J","1.0"},								// spin coupling
-	{"J0","0.0"},								// spin coupling randomness maximum (-J0 to J0)
-	{"h","0.1"},								// perpendicular magnetic field constant
-	{"w","0.01"},								// disorder strength
-	{"g","1.0"},								// transverse magnetic field constant
-	{"g0","0.0"},								// transverse field randomness maximum (-g0 to g0)
-	// heisenberg
-	{"dlt", "0"},								// delta
-	// kitaev
-	{"kx", "0.0"},								// kitaev x interaction
-	{"ky", "0.0"},								// kitaev y interaction
-	{"kz", "0.0"},								// kitaev z interaction
-	{"k0", "0.0"},								// kitaev interaction disorder
-	// other
-	{"th","1"},									// number of threads
-	{"q","0"},									// quiet?
-	};
-}
+
+
+
 // -------------------------------------------------------- Make a User interface class --------------------------------------------------------
 
 template<typename _hamtype>
@@ -155,6 +123,40 @@ namespace rbm_ui {
 	template<typename _type, typename _hamtype>
 	class ui : public user_interface {
 	private:
+		std::unordered_map <string, string> default_params = {
+			{"m","300"},								// mcsteps	
+			{"b","100"},								// batch
+			{"nb","500"},								// number of blocks	
+			{"bs","8"},									// block size
+			{"nh","2"},									// hidden parameters
+			// lattice parameters
+			{"d","1"},									// dimension
+			{"lx","4"},
+			{"ly","1"},
+			{"lz","1"},
+			{"bc","0"},									// boundary condition
+			{"l","0"},									// lattice type (default square)
+			{"f",""},									// file to read from directory
+			// model parameters
+			{"mod","0"},								// choose model
+			{"J","1.0"},								// spin coupling
+			{"J0","0.0"},								// spin coupling randomness maximum (-J0 to J0)
+			{"h","0.1"},								// perpendicular magnetic field constant
+			{"w","0.01"},								// disorder strength
+			{"g","1.0"},								// transverse magnetic field constant
+			{"g0","0.0"},								// transverse field randomness maximum (-g0 to g0)
+			// heisenberg
+			{"dlt", "0"},								// delta
+			// kitaev
+			{"kx", "0.0"},								// kitaev x interaction
+			{"ky", "0.0"},								// kitaev y interaction
+			{"kz", "0.0"},								// kitaev z interaction
+			{"k0", "0.0"},								// kitaev interaction disorder
+			// other
+			{"th","1"},									// number of threads
+			{"q","0"},									// quiet?
+		};
+		
 		// lattice stuff
 		impDef::lattice_types lattice_type; 																					// for non_numeric data
 		int dim = 1;
@@ -241,6 +243,7 @@ public:
 		void symmetries_cpx(clk::time_point start);
 		void symmetries_double(clk::time_point start);
 		void make_simulation_symmetries();
+		void make_symmetries_test(int l = -1);
 		void make_simulation() override;
 	};
 }

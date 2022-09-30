@@ -116,25 +116,25 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level2</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.0.0\include;C:\LibrariesCpp\armadillo-11.0.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level2</WarningLevel>
+      <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -146,7 +146,6 @@
       <OpenMPSupport>true</OpenMPSupport>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <InterproceduralOptimization>NoIPO</InterproceduralOptimization>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <Optimization>MinSpace</Optimization>
     </ClCompile>
     <Link>

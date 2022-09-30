@@ -86,7 +86,7 @@ namespace ising_sym {
 		this->info = this->inf();
 		symmetries.k_sym = k_sym * TWOPI / double(this->Ns);
 		k_sector = valueEqualsPrec(symmetries.k_sym, 0.0, 1e-4) || valueEqualsPrec(symmetries.k_sym, double(PI), 1e-4);
-
+		stout << "\t->Making complex\n";
 		// printSeparatedP(stout, '\t', 6, true, 4, symmetries.k_sym, k_sym, VEQ(k_sector));
 
 		// precalculate the exponents
@@ -122,7 +122,7 @@ namespace ising_sym {
 		this->info = this->inf();
 		symmetries.k_sym = k_sym * TWOPI / double(this->Ns);
 		k_sector = valueEqualsPrec(symmetries.k_sym, 0.0, 1e-4) || valueEqualsPrec(symmetries.k_sym, double(PI), 1e-4);
-
+		stout << "\t->Making double\n";
 		// printSeparatedP(stout, '\t', 6, true, 4, symmetries.k_sym, k_sym, VEQ(k_sector));
 
 		// precalculate the exponents
@@ -219,23 +219,24 @@ namespace ising_sym {
 #pragma omp parallel for num_threads(this->thread_num)
 		for (long int k = 0; k < this->N; k++) {
 			for (int j = 0; j <= this->Ns - 1; j++) {
-				v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
+				uint nn_number = this->lattice->get_nn_forward_num(j);
 				// true - spin up, false - spin down
 				double s_i = checkBit(this->mapping[k], this->Ns - 1 - j) ? 1.0 : -1.0;
 
 				// flip with S^x_i with the transverse field
-				u64 new_idx = flip(this->mapping[k], this->Ns - 1 - j);
-				if(this->g != 0)
+				if (this->g != 0) {
+					u64 new_idx = flip(this->mapping[k], this->Ns - 1 - j);
 					this->setHamiltonianElem(k, this->g, new_idx);
+				}
 
 				// diagonal elements setting the perpendicular field
 				this->H(k, k) += this->h * s_i;
 
-				for (auto n_num : nn_number) {
-					// double checking neighbors
-					if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
+				for (auto nn = 0; nn < nn_number; nn++) {
+					auto n_num = this->lattice->get_nn_forward_num(j, nn);
+					if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 						// Ising-like spin correlation
-						double s_j = checkBit(this->mapping[k], this->Ns - 1 - nn) ? 1.0 : -1.0;
+						double s_j = checkBit(this->mapping[k], this->Ns - 1 - nei) ? 1.0 : -1.0;
 						// setting the neighbors elements
 						this->H(k, k) += this->J * s_i * s_j;
 					}

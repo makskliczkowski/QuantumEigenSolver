@@ -633,9 +633,10 @@ inline _type rbmState<_type, _hamtype>::locEnKernelAll()
     _type energy = 0;
     // loop over all lattice sites
 #ifndef DEBUG
-#pragma omp parallel for reduction(+ : energy) num_threads(this->thread_num)
+#pragma omp parallel for reduction(+ : energy)// num_threads(this->thread_num)
 #endif
     for (uint i = 0; i < this->n_visible; i++) {
+        uint nn_num = this->hamil->lattice->get_nn_forward_num(i);
         auto states = this->hamil->locEnergy(this->current_state, i);
         _type energy_tmp = 0;
         // get thread id
@@ -644,7 +645,8 @@ inline _type rbmState<_type, _hamtype>::locEnKernelAll()
 #else
         const int vid = 0;
 #endif
-        for (const auto [state, value] : states) {
+        for (uint j = 0; j < this->hamil->get_state_val_n() + nn_num; j++) {
+            const auto [state, value] = states[j];
             if (state >= hilb) break;
             // stout << VEQ(state) << "\t" << VEQ(value) << EL;
             // changes accordingly not to create data race
@@ -661,9 +663,12 @@ inline void rbmState<_type, _hamtype>::locEnKernel(uint start, uint stop, Col<_t
     _type energy = 0;
     // loop over all lattice sites
     for (uint i = start; i < stop; i++) {
+        uint nn_num = this->hamil->lattice->get_nn_forward_num(i);
         auto states = this->hamil->locEnergy(this->current_state, i);
         _type energy_tmp = 0;
-        for (const auto [state, value] : states) {
+        //for (const auto [state, value] : states) {
+        for (uint j = 0; j < this->hamil->get_state_val_n() + nn_num; j++) {
+            const auto [state, value] = states[j];
             if (state >= this->hamil->get_hilbert_size()) break;
             // changes accordingly not to create data race
             energy_tmp += state != this->current_state ? this->pRatioValChange(value, state, tid) : value;
@@ -692,7 +697,7 @@ inline _type rbmState<_type, _hamtype>::locEn(){
         return this->locEnKernelAll();
     else {
         // Threaded
-        v_1d<std::jthread> threads;
+        v_1d<std::thread> threads;
         // reserve threads
         threads.reserve(num_of_threads);
         Col<_type> energies(num_of_threads, arma::fill::zeros);
@@ -934,6 +939,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 
     // calculate sigma_z 
     double s_z = 0.0;
+    double s_z_nei = 0.0;
 #pragma omp parallel for reduction(+ : s_z) num_threads(this->thread_num)
     for (int i = 0; i < Ns; i++) {
         const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
@@ -943,15 +949,32 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
             const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, j }));
             this->op.s_z_cor(i, j) += std::real(val);
         }
+        const auto& [state_n, val_n] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_z_nn(i) }));
+        s_z_nei += real(val_n);
     }
     this->op.s_z += real(s_z / double(Ns));
+    this->op.s_z_nei += real(s_z_nei / double(Ns));
+
+    // calculate sigma_y
+    cpx s_y_nei = 0.0;
+#pragma omp parallel for reduction(+ : s_y_nei) num_threads(this->thread_num)
+    for (int i = 0; i < Ns; i++) {
+        const auto& [state, val] = Operators<double>::sigma_y(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_y_nn(i) }));
+#ifndef DEBUG
+        const int vid = omp_get_thread_num() % this->thread_num;
+#else
+        const int vid = 0;
+#endif
+        s_y_nei += this->pRatioValChange(val, state, vid);
+    }
+    this->op.s_y_nei += real(s_y_nei / double(Ns));
 
     // calculate sigma_x
     cpx s_x = 0.0;
-#pragma omp parallel for reduction(+ : s_x) num_threads(this->thread_num)
+    cpx s_x_nei = 0.0;
+#pragma omp parallel for reduction(+ : s_x, s_x_nei) num_threads(this->thread_num)
     for (int i = 0; i < Ns; i++) {
         const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i }));
-
 #ifndef DEBUG
         const int vid = omp_get_thread_num() % this->thread_num;
 #else
@@ -962,7 +985,10 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
             const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, j }));
             this->op.s_x_cor(i, j) += std::real(this->pRatioValChange(val, state, vid));
         }
+        const auto& [state_n, val_n] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_x_nn(i) }));
+        s_x_nei += this->pRatioValChange(val_n, state_n, vid);
     }
+    this->op.s_x_nei += real(s_x_nei / double(Ns));
     this->op.s_x += real(s_x / double(Ns));
     // local energy
     this->op.en += loc_en;

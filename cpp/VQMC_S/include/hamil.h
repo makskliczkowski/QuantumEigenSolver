@@ -28,6 +28,8 @@ public:
 	vec tmp_vec2;
 	v_1d<u64> mapping;																									// mapping for the reduced Hilbert space
 	v_1d<_type> normalisation;																							// used for normalization in the symmetry case
+	v_1d<pair<u64, _type>> state_val;																					// to return the values from local energy
+	uint state_val_num;																									// basic number of state_values
 
 	virtual u64 map(u64 index) const = 0;																				// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 	
@@ -75,6 +77,7 @@ public:
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
 	auto get_en_av_idx()											const RETURNS(this->E_av_idx);						// return the index closest to the mean energy
+	auto get_state_val_n()											const RETURNS(this->state_val_num)					// returns the minimum number of states to be used in locenergy
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian

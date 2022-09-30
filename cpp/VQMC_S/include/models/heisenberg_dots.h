@@ -89,10 +89,8 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 	this->J_dots = create_random_vec(this->dot_num, this->ran, this->J_dot0);			// creates random disorder vector
 
 	this->set_angles();																// reserve memory
-	//stout << "cos(theta)" << EL << this->cos_thetas << EL;
-	//stout << "sin(theta)" << EL << this->sin_thetas << EL;
-	//stout << "cos(phi)" << EL << this->cos_phis << EL;
-	//stout << "sin(phi)" << EL << this->sin_phis << EL;
+	this->state_val_num = 2;
+	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_number(0), std::pair(LLONG_MAX, 0.0));
 	
 	this->info = this->inf();														// set info
 }
@@ -287,7 +285,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 		// interaction with the dot at left site will be held with single variable as position is sorted
 		int dot_iter = 0;
 		for (int j = 0; j < this->Ns; j++) {
-			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(j);
+			uint nn_number = this->lattice->get_nn_forward_num(j);
 
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
@@ -299,10 +297,10 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			const u64 new_idx = flip(k, this->Ns - 1 - j);
 			this->setHamiltonianElem(k, this->g + this->dg(j), new_idx);
 
-			// interaction - check if nn exists
-			for (auto n_num : nn_number) {
+			for (auto nn = 0; nn < nn_number; nn++) {
 				// double checking neighbors
-				if (const auto nn = this->lattice->get_nn(j, n_num); nn >= 0) {
+				auto n_num = this->lattice->get_nn_forward_num(i, nn);
+				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 					auto interaction = (this->J + this->dJ(j));
@@ -312,7 +310,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
-						this->setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nn));
+						this->setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nei));
 				}
 			}
 			// handle the dot
@@ -342,8 +340,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 	double localVal = 0;
 
 	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 	
 	// true - spin up, false - spin down
 	const double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
@@ -355,9 +352,9 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 	const u64 new_idx = flip(_id, this->Ns - 1 - site);
 	_type s_flipped_en = this->g + this->dg(site);
 
-	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
+	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 			const auto interaction = this->J + this->dJ(site);
@@ -366,7 +363,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 
 			// S+S- + S-S+
 			if (si * sj < 0)
-				state_val[iter++] = std::make_pair(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
+				this->state_val[iter++] = std::make_pair(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
 		}
 	}
 	// handle the dot
@@ -379,11 +376,11 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
 	}
 	
 	// set the flipped state
-	state_val[iter++] = std::make_pair(new_idx, s_flipped_en);
+	this->state_val[iter++] = std::make_pair(new_idx, s_flipped_en);
 	// append unchanged at the very end
-	state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
+	this->state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
 	
-	return state_val;
+	return this->state_val;
 }
 
 
@@ -397,10 +394,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site
 	double localVal = 0;
 
 	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
-
-		 
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
@@ -414,11 +408,12 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site
 	const u64 new_idx = baseToInt(tmp_vec);
 	_type s_flipped_en = this->g + this->dg(site);
 
-	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
+	for (auto nn = 0; nn < nn_number; nn++) {
+		// double checking neighbors
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		this->tmp_vec2 = this->tmp_vec;
 		// double checking neighbors
-		if (auto nn = this->lattice->get_nn(site, n_num); nn >= 0) {
+		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
 			double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
 
@@ -428,7 +423,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site
 
 			// S+S- + S-S+
 			if (si * sj < 0) {
-				flipV(tmp_vec2, nn);
+				flipV(tmp_vec2, nei);
 				auto flip_idx_nn = baseToInt(tmp_vec2);
 				state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
 			}

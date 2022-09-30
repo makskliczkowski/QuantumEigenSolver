@@ -297,7 +297,7 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 	// monte carlo
 	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 
-	string dir = this->saving_dir + this->ham->get_info() + kPS + this->phi->get_info() + kPS;
+	std::string dir = this->saving_dir;// +this->lat->get_type() + kPS + this->ham->get_info() + kPS + this->phi->get_info() + kPS;
 	fs::create_directories(dir);
 
 	// print energies
@@ -343,7 +343,8 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	stouts("STARTING THE SIMULATION FOR MINIMIZING CONFIGURATION SEEK AND USING: " + VEQ(thread_num), start);
 	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
 	stout << "->outside mc_steps = " << mc_outside << EL;
-
+	
+	auto ran = randomGen();
 	// make the lattice
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	auto Ns = this->lat->get_Ns();
@@ -359,6 +360,10 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	this->phis = arma::vec(Ns, arma::fill::zeros);
 	// set thetas to 1 corresponding to all classical spins up
 	this->thetas = arma::vec(Ns, arma::fill::zeros);
+	for (int i = 0; i < thetas.size(); i++)
+		this->thetas(i) = ran.randomReal_uni() <= 0.5 ? 0 : 1.0;
+	this->thetas.print("thetas=");
+
 	vec sin_phis = sin(this->phis * TWOPI);
 	vec cos_phis = cos(this->phis * TWOPI);
 	vec sin_thetas = sin(this->thetas * PI);
@@ -404,7 +409,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 		vec outter_energies_ed(mc_outside * (Tnum + 1), arma::fill::zeros);
 
 		// monte carlo for energy
-		auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+		auto energies = this->phi->mcSampling(1000, n_blocks, n_therm, block_size, n_flips);
 		auto energies_tail = energies.tail(block_size);
 
 		double ground_rbm = std::real(arma::mean(energies_tail));
@@ -414,18 +419,17 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 
 		calculate_ed<_hamtype>(ground_ed, ground_rbm, hamiltonian_ed);
 
-
 		uint iter = 0;
 		auto T = 0.0;
 		// iterate the temperature
 		for (int Titer = 0; Titer <= Tnum; Titer++) {
 			T = Tmax - Titer * dT;
-			stout << "\t\t->Starting temperature " << VEQ(T) << EL;
+			stout << "\t\t->Starting temperature " << VEQP(T, 5) << EL;
 			// iterate Monte Carlo steps
 			for (int i = 0; i < mc_outside; i++) {
 				// iterate the system
 				for (int k = 0; k < Ns; k++) {
-					int j = hamiltonian_ed->ran.randomInt_uni(0, Ns);
+					int j = ran.randomInt_uni(0, Ns);
 					const auto direction_rbm = cos_thetas_rbm(j);
 					const auto direction_ed = cos_thetas_ed(j);
 					// change one of the classical spins
@@ -433,8 +437,14 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 					hamiltonian_ed->set_angles(j, 0, 0, 1, -direction_ed);
 
 					// calculate the corresponding energy
-					// this->phi->init();																			// reinitialize the weights - probalby better thing to do
+					this->phi->init();																			// reinitialize the weights - probalby better thing to do
 					energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+					#ifdef PLOT
+						plt::axhline(ground_ed);
+						plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm), mcSteps / 3, (ground_rbm) / 2);
+					#endif
+					PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
+					SAVEFIG(dir + "en" + VEQP(T,5) + ".png", true);
 					ground_rbm_new = std::real(arma::mean(energies.tail(block_size)));
 
 					// update if lower energy or exponent works
@@ -599,7 +609,6 @@ inline void rbm_ui::ui<_type, _hamtype>::define_models()
 
 }
 
-
 /*
 * if it is possible to do so we can test the exact diagonalization states for comparison
 */
@@ -660,18 +669,17 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 
 // -------------------------------- OPERATORS -----------------------------------------
 
-
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, std::string name, double energy, double energy_error)
 {
 	std::ofstream fileSave;
 	std::fstream log;
 
-	string dir = this->saving_dir + kPS + this->ham->get_info() + kPS;
+	std::string dir = this->saving_dir + kPS + this->lat->get_type() + kPS + this->ham->get_info() + kPS;
 	if (name != "") dir = dir + name + kPS;
 	fs::create_directories(dir);
 
-	string filename = "";
+	std::string filename = "";
 	auto Ns = this->lat->get_Ns();
 	// --------------------- compare sigma_z ---------------------
 
@@ -688,6 +696,21 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	openFile(fileSave, filename + ".dat", ios::out);
 	print_mat(fileSave, this->av_op.s_z_cor);
 	fileSave.close();
+
+	// --------------------- compare sigma_y ---------------------
+	// S_y at each site
+	//filename = dir + "_sy_site";
+	//openFile(fileSave, filename + ".dat", ios::out);
+	//print_vector_1d(fileSave, this->av_op.s_x_i);
+	//fileSave.close();
+	//PLOT_V1D(this->av_op.s_x_i, "lat_site", "$S^x_i$", "$S^x_i$\n" + ham->get_info() + "\n" + name);
+	//SAVEFIG(filename + ".png", false);
+	//
+	//// S_z correlations
+	//filename = dir + "_sx_corr_";
+	//openFile(fileSave, filename + ".dat", ios::out);
+	//print_mat(fileSave, this->av_op.s_x_cor);
+	//fileSave.close();
 
 	// --------------------- compare sigma_x ---------------------
 	// S_z at each site
@@ -713,7 +736,14 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 		PLOT_V1D(this->av_op.ent_entro, "bond_cut", "$S_0(L)$", "Entanglement entropy\n" + ham->get_info() + "\n" + name);
 		SAVEFIG(filename + ".png", false);
 	}
-
+	
+	// --------------------- neigbors ----------------------
+	filename = dir + "_neighbor_corr_";
+	openFile(fileSave, filename + ".dat", ios::out);
+	printSeparatedP(fileSave, '\t', 14, true, 5, "<S^x_iS^x_(i+m)>", "<S^y_iS^y_(i+m)>", "<S^z_iS^z_(i+m)>");
+	printSeparatedP(fileSave, '\t', 14, true, 5, real(this->av_op.s_x_nei), real(this->av_op.s_y_nei), real(this->av_op.s_z_nei));
+	fileSave.close();
+	
 	// --------------------- save log ---------------------	// save the log file and append columns if it is empty
 	string logname = dir + "log.dat";
 #pragma omp single
@@ -734,6 +764,8 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 	log.close();
 };
 
+// -------------------------------- HAMILTONIAN WITH SYMMETRIES --------------------------------
+
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start)
 {
@@ -752,18 +784,10 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 	const u64 N = this->ham_d->get_hilbert_size();
 
-	// define the window to calculate the entropy
-	u64 spectrum_num = 0;
-	if (this->spectrum_size <= 1.0)
-		spectrum_num = this->spectrum_size * N;
-	else
-		spectrum_num = static_cast<u64>(this->spectrum_size);
-
-	std::string name = ((this->spectrum_size <= 1.0) ? "spectrum_num=" + STRP(spectrum_size, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(spectrum_num));
+	std::string name = "spectrum_num=" + STR(N);
 	stout << "->middle_spectrum_size : " << name << EL;
 
-
-	std::string dir = this->saving_dir + this->ham_d->get_info() + kPS;
+	std::string dir = this->saving_dir + kPS + this->ham_d->get_info() + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
@@ -777,41 +801,66 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// calculate the reduced density matrices
 	Operators<double> op(this->lat);
 
-	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
-	const u64 min_idx = av_energy_idx - static_cast<int>(spectrum_num / 2.0);
-
 	// iterate through bond cut
 	int bond_num = this->lat->get_Ns() / 2;
-	//int bond_num = this->lat->get_Ns() - 1;
-	arma::mat entropies(bond_num, spectrum_num, arma::fill::zeros);
-
-
-	openFile(file, dir + "entropies," + name + ".dat", ios::out);
-	openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+	arma::mat entropies(bond_num, N, arma::fill::zeros);
 
 	for (int i = 1; i <= bond_num; i++) {
 		// iterate through the state
 		stout << "\t->doing : " << VEQ(i) << EL;
-		printSeparated(file, '\t', 15, false, i);
-		printSeparated(fileAv, '\t', 15, false, i);
+
 #pragma omp parallel for
-		for (u64 j = 0; j < spectrum_num; j++) {
-			u64 idx = min_idx + j;
+		for (u64 j = 0; j < N; j++) {
+			u64 idx = j;
 			auto state = this->ham_d->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}
-		// print seperately
-		for (u64 j = 0; j < spectrum_num; j++)
-			printSeparated(file, '\t', 15, false, entropies(i - 1, j));
-		file << EL;
-
 		auto mean = arma::mean(entropies.row(i - 1));
-		printSeparated(fileAv, '\t', 15, true, mean);
 		stout << "\t\t->mean : " << VEQ(mean) << EL;
 	}
-	file.close();
-	fileAv.close();
+	// save binary file
+	std::string filename = dir + "entropies," + name + ".bin";
+	entropies.save(filename, arma::raw_binary);
+	if (this->lat->get_Ns() < 16) {
+		filename = dir + "entropies," + name + ".txt";
+		entropies.save(filename);
+	}
+	entropies.col(N - 1).print(STR(N-1) + "\n");
+	entropies.col(int(N / 2)).print(STR(int(N/2)) + "\n");
+	entropies.col(0).print(STR(0) + "\n");
+	//openFile(file, filename, ios::out | ios::binary);
+	//stout << "\t\t->SAVING: " + filename;
+	//for (int i = 0; i < bond_num; i++)
+	//	for (int j = 0; j < N; j++) {
+	//		double val = entropies(i, j);
+	//		file.write(reinterpret_cast<const char*>(&val), sizeof(double));
+	//	}
+	//if (!file.good())
+	//	stout << "\t\t->Error occurred at writing time!" << endl;
+	//file.close();
+
+	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
+	// iterate through fractions
+	for (v_1d<double> fractions = { 0.1, 0.25, 0.5, 100, 300, 500 }; double frac : fractions) {
+		u64 spectrum_num = this->spectrum_size <= 1.0 ? frac * N : static_cast<u64>(frac);
+		name = ((frac <= 1.0) ? "spectrum_num=" + STRP(frac, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(frac));
+		// define the window to calculate the entropy
+		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
+			continue;
+		openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+
+		auto subview = entropies.submat(0, av_energy_idx - u64(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
+		for (int i = 1; i <= bond_num; i++) {
+			double mean = arma::mean(subview.row(i - 1));
+			printSeparated(fileAv, '\t', 18, false, i);
+			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
+		}
+		fileAv.close();
+	}
+
+
+
 
 }
 
@@ -832,17 +881,13 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 	const u64 N = this->ham_cpx->get_hilbert_size();
 
-	// define the window to calculate the entropy
-	u64 spectrum_num = 0;
-	if (this->spectrum_size <= 1.0)
-		spectrum_num = this->spectrum_size * N;
-	else
-		spectrum_num = static_cast<u64>(this->spectrum_size);
-	auto name = ((this->spectrum_size <= 1.0) ? "spectrum_num=" + STRP(spectrum_size, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(spectrum_num));
+
+
+	std::string name = "spectrum_num=" + STR(N);
 	stout << "->middle_spectrum_size : " << name << EL;
 
 
-	string dir = this->saving_dir + this->ham_cpx->get_info() + kPS;
+	std::string dir = this->saving_dir + kPS + this->ham_cpx->get_info() + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
@@ -856,42 +901,60 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// calculate the reduced density matrices
 	Operators<cpx> op(this->lat);
 
-
-	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
-	const u64 min_idx = av_energy_idx - static_cast<int>(spectrum_num / 2.0);
-
 	// iterate through bond cut
 	int bond_num = this->lat->get_Ns() / 2;
-	//int bond_num = this->lat->get_Ns() - 1;
-	arma::mat entropies(bond_num, spectrum_num, arma::fill::zeros);
-
-
-	openFile(file, dir + "entropies," + name + ".dat", ios::out);
-	openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+	arma::mat entropies(bond_num, N, arma::fill::zeros);
 
 	for (int i = 1; i <= bond_num; i++) {
 		// iterate through the state
 		stout << "\t->doing : " << VEQ(i) << EL;
-		printSeparated(file, '\t', 15, false, i);
-		printSeparated(fileAv, '\t', 15, false, i);
+
 #pragma omp parallel for
-		for (u64 j = 0; j < spectrum_num; j++) {
-			u64 idx = min_idx + j;
+		for (u64 j = 0; j < N; j++) {
+			u64 idx = j;
 			auto state = this->ham_cpx->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}
-		// print seperately
-		for (u64 j = 0; j < spectrum_num; j++)
-			printSeparated(file, '\t', 15, false, entropies(i - 1, j));
-		file << EL;
-
 		auto mean = arma::mean(entropies.row(i - 1));
-		printSeparated(fileAv, '\t', 15, true, mean);
 		stout << "\t\t->mean : " << VEQ(mean) << EL;
 	}
-	file.close();
-	fileAv.close();
+	// save binary file
+	std::string filename = dir + "entropies," + name + ".bin";
+	entropies.save(filename, arma::raw_binary);
+	if (this->lat->get_Ns() < 16) {
+		filename = dir + "entropies," + name + ".txt";
+		entropies.save(filename);
+	}
+	//openFile(file, filename, ios::out | ios::binary);
+	//stout << "\t\t->SAVING: " + filename;
+	//for (int i = 0; i < bond_num; i++)
+	//	for (int j = 0; j < N; j++) {
+	//		double val = entropies(i, j);
+	//		file.write(reinterpret_cast<const char*>(&val), sizeof(double));
+	//	}
+	//if(!file.good())
+	//	stout << "\t\t->Error occurred at writing time!" << endl;
+	//file.close();
+
+	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
+	// iterate through fractions
+	for (v_1d<double> fractions = { 0.1, 0.25, 0.5, 100, 300, 500 }; double frac : fractions) {
+		u64 spectrum_num = this->spectrum_size <= 1.0 ? frac * N : static_cast<u64>(frac);
+		name = ((frac <= 1.0) ? "spectrum_num=" + STRP(frac, 2) + "x" + STR(N) + "=" + STR(spectrum_num) : VEQ(frac));
+		// define the window to calculate the entropy
+		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
+			continue;
+		openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+
+		auto subview = entropies.submat(0, av_energy_idx - u64(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
+		for (int i = 1; i <= bond_num; i++) {
+			double mean = arma::mean(subview.row(i - 1));
+			printSeparated(fileAv, '\t', 18, false, i);
+			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
+		}
+		fileAv.close();
+	}
 
 }
 
@@ -917,4 +980,85 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 		this->symmetries_double(start);
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
 
+}
+
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	stouts("STARTING THE TESTS FOR QUANTUM ISING HAMILTONIAN SYMMETRIES ENTROPY: " + VEQ(thread_num), start);
+
+	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
+	stout << "->" << this->lat->get_info() << EL;
+	auto Ns = this->lat->get_Ns();
+	int La = (l == -1) ? int(Ns / 2) : l;
+
+
+	v_1d<double> energies_sym = {};
+	v_1d<double> entropies = {};
+	v_1d<std::pair<int, int>> sym = {};
+	Operators<cpx> op(this->lat);
+
+	double entro = 0;
+	v_1d<int> ps = {};
+	for (int k = 0; k < Ns; k++) {
+		if (k == 0 || k == int(Ns / 2))
+			ps = { 0, 1 };
+		else
+			ps = { 1 };
+
+		for (auto p : ps) {
+			this->ham_cpx = std::make_shared<ising_sym::IsingModelSym<cpx>>(J, g, h, lat, k, p, x_sym, this->thread_num);
+			stout << "\tDoing: " << VEQ(k) << "," << VEQ(p) << ".\tHilbert size = " << this->ham_cpx->get_hilbert_size() << EL;
+			stouts("\t->finished buiding Hamiltonian", start);
+			stout << "\t->" << this->ham_cpx->get_info() << EL;
+			this->ham_cpx->diag_h(false);
+			for (u64 i = 0; i < this->ham_cpx->get_hilbert_size(); i++) {
+				energies_sym.push_back(this->ham_cpx->get_eigenEnergy(i));
+				auto entropy = op.entanglement_entropy(this->ham_cpx->get_eigenStateFull(i), La);
+				entropies.push_back(entropy);
+				entro += entropy;
+				sym.push_back(std::make_pair(k, p));
+			}
+		}
+	}
+	entro /= double(entropies.size());
+	// sort stuff
+	v_1d<int> index(energies_sym.size(), 0);
+	for (int i = 0; i != index.size(); i++) {
+		index[i] = i;
+	}
+	sort(index.begin(), index.end(),
+		[&](const int& a, const int& b) {
+			return (energies_sym[a] < energies_sym[b]);
+		}
+	);
+
+
+	double entro_ed = 0;
+	// calculate full ed
+	this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
+	this->ham_d->hamiltonian();
+	this->ham_d->diag_h(false);
+	std::string dir = this->saving_dir + kPS + this->ham_d->get_info() + kPS;
+	fs::create_directories(dir);
+	std::ofstream file;
+	openFile(file, dir + "all_compare.dat");
+	printSeparated(file, '\t', 15, true, "E_ed", "E_sym", "Symmetry", "S_ed", "S_sym");
+	Operators<double> op2(this->lat);
+	for (u64 i = 0; i < this->ham_d->get_hilbert_size(); i++) {
+		auto E_ed = this->ham_d->get_eigenEnergy(i);
+		auto ent_ed = op2.entanglement_entropy(this->ham_d->get_eigenStateFull(i), La);
+		entro_ed += ent_ed;
+
+		auto sort_i = index[i];
+		auto E_sym = energies_sym[sort_i];
+		const auto [k, p] = sym[sort_i];
+		auto ent_sym = entropies[sort_i];
+
+		printSeparatedP(file, '\t', 15, true, 7, E_ed, E_sym, STR(k) + "," + STR(p), ent_ed, ent_sym);
+	}
+	entro_ed /= double(entropies.size());
+	stout << VEQ(entro) << "\t<-sym\t" << VEQ(entro_ed) << "\t<-ed\t" << EL;
+	file.close();
 }

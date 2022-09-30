@@ -33,6 +33,9 @@ public:
 		this->dKy = create_random_vec(this->Ns, this->ran, this->K0);
 		this->dKz = create_random_vec(this->Ns, this->ran, this->K0);
 
+		// state values number in local energy without the number of nearest neighbors
+		this->state_val_num = 2;							
+		this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_number(0), std::pair(LLONG_MAX, 0.0));
 		// change info
 		this->info = this->inf();
 	};
@@ -74,9 +77,7 @@ inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint 
 	double localVal = 0;
 
 	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
-
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
@@ -86,15 +87,15 @@ inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint 
 
 	// transverse field (SX) - HEISENBERG
 	const u64 new_idx = flip(_id, this->Ns - 1 - site);
-	state_val[iter++] = std::make_pair(new_idx, this->g + this->dg(site));
+	this->state_val[iter++] = std::make_pair(new_idx, this->g + this->dg(site));
 
 	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
+	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
-
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
 			// --------------------- HEISENBERG 
 
 			// diagonal elements setting  interaction field
@@ -113,17 +114,16 @@ inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint 
 			if (n_num == 0)
 				localVal += (this->Kz + this->dKz(site)) * sisj;
 			else if (n_num == 1)
-				flip_val -= (this->Ky + this->dKy(site)) * sisj;
-
+				flip_val -= (this->Ky + this->dKy(site)) * sisj
 			else if (n_num == 2)
 				flip_val += this->Kx + this->dKx(site);
 
-			state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
+			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
 	}
 	// append unchanged at the very end
-	state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
-	return state_val;
+	this->state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
+	return this->state_val;
 }
 
 /*
@@ -135,8 +135,7 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 	double localVal = 0;
 
 	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
+	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
@@ -151,7 +150,9 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 	state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
 
 	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
+	for (auto nn = 0; nn < nn_number; nn++) {
+		// double checking neighbors
+		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		this->tmp_vec2 = this->tmp_vec;
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
@@ -177,7 +178,6 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 				localVal += (this->Kz + this->dKz(site)) * sisj;
 			else if (n_num == 1)
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
-
 			else if (n_num == 2)
 				flip_val += this->Kx + this->dKx(site);
 			state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
@@ -203,7 +203,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 	for (auto k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->Ns; i++) {
 			// check all the neighbors
-			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
+			uint nn_number = this->lattice->get_nn_forward_num(i);
 			
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - i - 1) ? 1.0 : -1.0;
@@ -215,9 +215,11 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			const u64 new_idx = flip(k, this->Ns - 1 - i);
 			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
 
-			// check if nn exists
-			for (auto n_num : nn_number) {
-				if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {
+			// check the Siz Si+1z
+			for (auto nn = 0; nn < nn_number; nn++) {
+				// double checking neighbors
+				auto n_num = this->lattice->get_nn_forward_num(i, nn);
+				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
 					// check Sz 
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 

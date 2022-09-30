@@ -24,15 +24,29 @@ public:
 
 	// sigma z
 	double s_z = 0.0;
+
+	// correlation with z neighbor
+	double s_z_nei = 0.0;
 	//v_3d<double> s_z_cor;
 	mat s_z_cor;
 	vec s_z_i;
 
 	// sigma x
 	cpx s_x = 0.0;
+	// correlation with x neighbor
+	double s_x_nei = 0.0;
 	//v_3d<double> s_x_cor;
 	mat s_x_cor;
 	cx_vec s_x_i;
+
+	// sigma y
+	cpx s_y = 0.0;
+	// correlation with x neighbor
+	cpx s_y_nei = 0.0;
+	//v_3d<double> s_x_cor;
+	//mat s_y_cor;
+	//cx_vec s_y_i;
+
 
 	// entropy
 	vec ent_entro;
@@ -77,9 +91,13 @@ public:
 
 	void normalise(u64 norm, const v_3d<int>& spatialNorm) {
 		this->s_z /= double(norm);
+		this->s_y /= double(norm);
 		this->s_x /= double(norm);
 		this->s_z_i /= double(norm);
 		this->s_x_i /= double(norm);
+		this->s_z_nei /= double(norm);
+		this->s_x_nei /= double(norm);
+		this->s_y_nei /= double(norm);
 
 		this->s_x_cor /= double(norm);
 		this->s_z_cor /= double(norm);
@@ -338,7 +356,7 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, int A_
 	// set subsytsems size
 	const u64 dimA = ULLPOW(A_size);
 	const u64 dimB = ULLPOW(Ns - A_size);
-	const u64 Nh = state.n_elem;
+	const u64 Nh = dimA*dimB;
 
 	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
@@ -362,7 +380,7 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int
 	// set subsytsems size
 	const u64 dimA = ULLPOW(A_size);
 	const u64 dimB = ULLPOW(Ns - A_size);
-	const u64 Nh = state.n_elem;
+	const u64 Nh = dimA*dimB;
 
 	Mat<double> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
@@ -397,7 +415,7 @@ inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, in
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
 		const auto value = probabilities(i);
-		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));
+		entropy += (abs(value) < 1e-10) ? 0 : -value * log((value));
 	}
 	//double entropy = -real(trace(rho * real(logmat(rho))));
 	return entropy;
@@ -423,7 +441,8 @@ inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state)
 template<typename _type>
 inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op, bool cal_entro)
 {
-	
+	av_op.reset();
+
 	// --------------------- compare sigma_z ---------------------
 
 	// S_z_vector extensive
@@ -435,14 +454,28 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// stout << av_op.s_z_i << EL;
 	// S_z correlations
 	for (auto i = 0; i < Ns; i++) {
+		int z_nei = this->lat->get_z_nn(i);
+		av_op.s_z_nei += std::real(this->av_operator(eigvec, this->sigma_z, i, z_nei));
 		for (auto j = 0; j < Ns; j++) {
-			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			//av_op.s_z_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_z, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
 			av_op.s_z_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_z, i, j));
-			//stout << VEQ(av_op.s_z_cor[abs(x)][abs(y)][abs(z)]) << EL;
 		}
 	}
-	//stout << av_op.s_z_cor << EL;
+	av_op.s_z_nei /= Ns;
+	// --------------------- compare sigma_u ---------------------
+
+	// S_y_vector extensive
+	//av_op.s_y = std::real(this->av_operator(eigvec, this->sigma_y));
+
+	// S_y at each site
+	//for (auto i = 0; i < Ns; i++)
+	//	av_op.s_y_i(i) = std::real(this->av_operator(eigvec, this->sigma_y, v_1d<int>(1, i)));
+
+	// S_y correlations
+	for (auto i = 0; i < Ns; i++) {
+		int y_nei = this->lat->get_y_nn(i);
+		av_op.s_y_nei += std::real(this->av_operator(eigvec, this->sigma_y, i, y_nei));
+	}
+	av_op.s_y_nei /= Ns;
 	// --------------------- compare sigma_x ---------------------
 	
 	// S_x_vector extensive
@@ -454,12 +487,13 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 
 	// S_x correlations
 	for (auto i = 0; i < Ns; i++) {
+		int x_nei = this->lat->get_x_nn(i);
+		av_op.s_x_nei += std::real(this->av_operator(eigvec, this->sigma_x, i, x_nei));
 		for (auto j = 0; j < Ns; j++) {
-			//const auto [x, y, z] = this->lat->getSiteDifference(i, j);
-			//av_op.s_x_cor[abs(x)][abs(y)][abs(z)] += std::real(this->av_operator(eigvec, this->sigma_x, i, j)) / this->lat->get_spatial_norm(abs(x), abs(y), abs(z));
 			av_op.s_x_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_x, i, j));
 		}
 	}
+	av_op.s_x_nei /= Ns;
 
 	// --------------------- entropy ----------------------
 	if(cal_entro)
