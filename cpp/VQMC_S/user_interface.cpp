@@ -1121,6 +1121,4 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 				printSeparated(file, '\t', 32, true, i, j, res(i, j), H0(i, j));
 	file.close();
 
-
-
 }

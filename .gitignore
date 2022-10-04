@@ -141,10 +141,12 @@ dmypy.json
 *.filters
 *.suo
 *.db
-*.suo
+*.out
 *CodeGraphData/
+*armadillo*
 *V16/
 *v16/
 *.sh
 *.txt
+*.out
 *.bin
