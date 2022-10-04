@@ -299,7 +299,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 			for (auto nn = 0; nn < nn_number; nn++) {
 				// double checking neighbors
-				auto n_num = this->lattice->get_nn_forward_num(i, nn);
+				auto n_num = this->lattice->get_nn_forward_num(j, nn);
 				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
