@@ -300,7 +300,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 			for (auto nn = 0; nn < nn_number; nn++) {
 				// double checking neighbors
 				auto n_num = this->lattice->get_nn_forward_num(i, nn);
-				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
+				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 					auto interaction = (this->J + this->dJ(j));
@@ -425,7 +425,7 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site
 			if (si * sj < 0) {
 				flipV(tmp_vec2, nei);
 				auto flip_idx_nn = baseToInt(tmp_vec2);
-				state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
+				this->state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
 			}
 		}
 	}
@@ -438,9 +438,9 @@ v_1d<pair<u64, _type>> Heisenberg_dots<_type>::locEnergy(const vec& v, uint site
 		s_flipped_en += -s_y_i + s_z_i;
 	}
 		// set the flipped state
-	state_val[iter++] = std::pair{ new_idx, s_flipped_en };
+	this->state_val[iter++] = std::pair{ new_idx, s_flipped_en };
 	// append unchanged at the very end
-	state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
 }
 
 #endif

@@ -179,7 +179,7 @@ v_1d<pair<u64, _type>> IsingModel<_type>::locEnergy(const vec& v, uint site) {
 	// append unchanged at the very end
 	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
 
-	return state_val;
+	return this->state_val;
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------

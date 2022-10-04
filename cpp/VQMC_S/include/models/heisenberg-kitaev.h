@@ -114,7 +114,7 @@ inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint 
 			if (n_num == 0)
 				localVal += (this->Kz + this->dKz(site)) * sisj;
 			else if (n_num == 1)
-				flip_val -= (this->Ky + this->dKy(site)) * sisj
+				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
 				flip_val += this->Kx + this->dKx(site);
 
@@ -147,7 +147,7 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 	this->tmp_vec = v;
 	flipV(tmp_vec, site);
 	const u64 new_idx = baseToInt(tmp_vec);
-	state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
@@ -180,12 +180,12 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
 				flip_val += this->Kx + this->dKx(site);
-			state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
+			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
 	}
 	// append unchanged at the very end
-	state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
-	return state_val;
+	this->state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
+	return this->state_val;
 }
 
 
