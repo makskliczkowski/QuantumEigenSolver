@@ -223,9 +223,12 @@ public:
 	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
 	//Mat<_type> red_dens_mat(const std::map<u64, _type>& state, int A_size) const;										// calculate the reduced density matrix with a map
 	//Mat<_type> red_dens_mat(const std::priority_queue<u64, _type>& state, int A_size) const;							// calculate the reduced density matrix with a priority queue
+	Mat<_type> red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size);
+
 	double entanglement_entropy(const Col<_type>& state, int A_size) const;												// entanglement entropy 
 	//double entanglement_entropy(const std::map<u64, _type>& state, int A_size) const;									// entanglement entropy with a map
 	//double entanglement_entropy(const std::priority_queue<u64, _type>& state, int A_size) const;						// entanglement entropy with a priority queue
+	double entanglement_entropy(const Mat<_type>& red_dens_mat) const;
 	vec entanglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
 	//vec entanglement_entropy_sweep(const std::map<u64, _type>& state) const;											// entanglement entropy sweep over bonds with a map
 	//vec entanglement_entropy_sweep(const std::priority_queue<u64, _type>& state) const;									// entanglement entropy sweep over bonds with a priority queue
@@ -354,19 +357,19 @@ template<typename _type>
 inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, int A_size) const
 {
 	// set subsytsems size
-	const u64 dimA = ULLPOW(A_size);
-	const u64 dimB = ULLPOW(Ns - A_size);
-	const u64 Nh = dimA*dimB;
+	const long long dimA = ULLPOW(A_size);
+	const long long dimB = ULLPOW(Ns - A_size);
+	const long long Nh = dimA*dimB;
 
 	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
-	for (auto n = 0; n < Nh; n++) {
+	for (long long n = 0; n < Nh; n++) {
 		u64 counter = 0;
 		// pick out state with same B side (last L-A_size bits)
-		for (u64 m = n % dimB; m < Nh; m += dimB) {
+		for (long long m = n % dimB; m < Nh; m += dimB) {
 			// find index of state with same B-side (by dividing the last bits are discarded)
 			u64 idx = n / dimB;
-			rho(idx, counter) += conj(state(n)) * state(m);
+			rho(idx, counter) += state(n) * std::conj(state(m));
 			// increase counter to move along reduced basis
 			counter++;
 		}
@@ -378,16 +381,16 @@ template<>
 inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int A_size) const
 {
 	// set subsytsems size
-	const u64 dimA = ULLPOW(A_size);
-	const u64 dimB = ULLPOW(Ns - A_size);
-	const u64 Nh = dimA*dimB;
+	const long long dimA = ULLPOW(A_size);
+	const long long dimB = ULLPOW(Ns - A_size);
+	const long long Nh = dimA*dimB;
 
 	Mat<double> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
-	for (auto n = 0; n < Nh; n++) {
+	for (long long n = 0; n < Nh; n++) {
 		u64 counter = 0;
 		// pick out state with same B side (last L-A_size bits)
-		for (u64 m = n % dimB; m < Nh; m += dimB) {
+		for (long long m = n % dimB; m < Nh; m += dimB) {
 			// find index of state with same B-side (by dividing the last bits are discarded)
 			u64 idx = n / dimB;
 			rho(idx, counter) += (state(n)) * state(m);
@@ -397,6 +400,65 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int
 	}
 	return rho;
 }
+
+template<typename _type>
+inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size)
+{
+	const long long dimA = ULLPOW(A_size);
+	const long long dimB = ULLPOW(Ns - A_size);
+	const long long Nh = dimA * dimB;
+	const long long N = map.size();
+
+	auto find_index = [&](u64 index) { return binary_search(map, 0, N - 1, index); };
+
+	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
+	for (long long n = 0; n < N; n++) {						
+		// loop over configurational basis
+		u64 counter = 0;
+		long long true_n = map[n];
+		for (long long m = true_n % dimB; m < Nh; m += dimB) {	
+			// pick out state with same B side (last L-A_size bits)
+			long idx = true_n / dimB;
+			long long j = find_index(m);
+			if(j >= 0)
+				rho(idx, counter) += std::conj(state(n)) * state(j);
+			counter++;										    
+			// increase counter to move along reduced basis
+		}
+	}
+	return rho;
+}
+
+template<>
+inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, const v_1d<u64>& map, int A_size)
+{
+	const long long dimA = ULLPOW(A_size);
+	const long long dimB = ULLPOW(Ns - A_size);
+	const long long Nh = dimA * dimB;
+	const long long N = map.size();
+
+
+	auto find_index = [&](u64 index) { return binary_search(map, 0, N - 1, index); };
+
+	Mat<double> rho(dimA, dimA, arma::fill::zeros);
+	for (long long n = 0; n < N; n++) {
+		// loop over configurational basis
+		u64 counter = 0;
+		long long true_n = map[n];
+		for (long long m = true_n % dimB; m < Nh; m += dimB) {
+			// pick out state with same B side (last L-A_size bits)
+			long idx = true_n / dimB;
+			long long j = find_index(m);
+			if (j >= 0)
+				rho(idx, counter) += (state(n)) * state(j);
+			counter++;
+			// increase counter to move along reduced basis
+		}
+	}
+	return rho;
+}
+
+// ---- ENTROPY ----
 
 /*
 *  @brief Calculates the entropy of the system via the mixed density matrix
@@ -415,11 +477,45 @@ inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, in
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
 		const auto value = probabilities(i);
-		entropy += (abs(value) < 1e-10) ? 0 : -value * log((value));
+		entropy -= value * log(abs(value));
 	}
 	//double entropy = -real(trace(rho * real(logmat(rho))));
 	return entropy;
 }
+
+template<>
+inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_size) const {
+	Mat<cpx> rho = this->red_dens_mat(state, A_size);
+	vec probabilities;
+	//// diagonalize to find probabilities and calculate trace in rho's eigenbasis
+	eig_sym(probabilities, rho);
+	
+	double entropy = 0;
+	//#pragma omp parallel for reduction(+: entropy)
+	for (auto i = 0; i < probabilities.size(); i++) {
+		const auto value = probabilities(i);
+		entropy -= value * log(abs(value));
+	}
+	return entropy;
+	// return -real(trace(rho * (logmat(rho))));
+}
+
+template<typename _type>
+inline double Operators<_type>::entanglement_entropy(const Mat<_type>& rho) const
+{
+	vec probabilities;
+	eig_sym(probabilities, rho);
+
+	double entropy = 0;
+	//#pragma omp parallel for reduction(+: entropy)
+	for (auto i = 0; i < probabilities.size(); i++) {
+		const auto value = probabilities(i);
+		entropy += (abs(value) < 1e-17) ? 0 : -value * log(abs(value));
+	}
+	//double entropy = -real(trace(rho * real(logmat(rho))));
+	return entropy;
+}
+// ---- SWEEP ----
 
 /*
 * @brief Calculates the entropy of the system via the mixed density matrix

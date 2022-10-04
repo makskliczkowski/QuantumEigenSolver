@@ -36,8 +36,9 @@ public:
 	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override { return v_1d<pair<u64, _type>>(); };					// returns the local energy for VQMC purposes
 	v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override { return v_1d<pair<u64, _type>>(); };			// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;													// sets the Hamiltonian elements
-	
+public:
 	Col<_type> symmetryRotation(u64 state) const;
+	Mat<_type> symmetryRotationMat() const override;
 	// -------------------------------- GETTERS --------------------------------
 
 	auto get_normalization()					const RETURNS(this->normalisation);										// returns the normalization
@@ -47,8 +48,7 @@ public:
 
 	// -------------------------------- CALCULATORS 
 	pair<u64,_type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);
-	//friend pair<u64, _type> find_rep_and_sym_eigval(u64 base_idx, const SpinHamiltonianSym<_type>& sector_alfa, _type normalisation_beta);
-	//arma::sp_cx_mat symmetryRotation() const;
+
 };
 
 template<typename _type>
@@ -107,8 +107,6 @@ inline pair<u64, double> SpinHamiltonianSym<double>::find_rep_and_sym_eigval(u64
 //	else						return std::make_pair(0, 0);
 //}
 
-
-
 // ---------------------------------------------------------------- SYMMETRY ELEMENTS ----------------------------------------------------------------
 
 /*
@@ -145,6 +143,39 @@ inline _type SpinHamiltonianSym<_type>::get_symmetry_norm(u64 base_idx) const
 	return sqrt(normalisation);
 }
 
+template<typename _type>
+inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat() const
+{
+
+	u64 max_dim = ULLPOW(this->Ns);
+	Mat<cpx> U(max_dim, this->N, arma::fill::zeros);
+	
+	for (long int k = 0; k < this->N; k++) {
+		for (int i = 0; i < this->symmetry_group.size(); i++) {
+			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
+			if (idx < max_dim) // only if exists in sector
+				U(idx, k) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
+		}
+	}
+	return U;
+}
+
+template<>
+inline Mat<double> SpinHamiltonianSym<double>::symmetryRotationMat() const
+{
+
+	u64 max_dim = ULLPOW(this->Ns);
+	Mat<double> U(max_dim, this->N, arma::fill::zeros);
+
+	for (long int k = 0; k < this->N; k++) {
+		for (int i = 0; i < this->symmetry_group.size(); i++) {
+			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
+			if (idx < max_dim) // only if exists in sector
+				U(idx, k) += (this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())));
+		}
+	}
+	return U;
+}
 
 template<typename _type>
 inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
@@ -156,18 +187,18 @@ inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
 			if (idx < dim) // only if exists in sector
-				output(idx) += this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())) * this->eigenvectors(k, state);
+				output(idx) += conj(this->symmetry_eigval[i] / (real(this->normalisation[k]) * sqrt(this->symmetry_group.size()))) * this->eigenvectors(k, state);
 		}
 	}
 	return output;
 }
 
 template<>
-inline Col<cpx> SpinHamiltonianSym<cpx>::symmetryRotation(u64 state) const
+inline Col<double> SpinHamiltonianSym<double>::symmetryRotation(u64 state) const
 {
 	u64 dim = ULLPOW(this->Ns);
 
-	Col<cpx> output(dim, arma::fill::zeros);
+	Col<double> output(dim, arma::fill::zeros);
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);

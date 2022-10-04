@@ -91,7 +91,6 @@ namespace ising_sym {
 
 		// precalculate the exponents
 		this->k_exponents = v_1d<_type>(this->Ns, 0.0);
-#pragma omp parallel for
 		for (int l = 0; l < this->Ns; l++) 
 			this->k_exponents[l] = std::exp(-imn * this->symmetries.k_sym * double(l));
 

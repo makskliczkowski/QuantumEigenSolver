@@ -116,6 +116,9 @@ public:
 	void set_angles(const vec& phis, const vec& thetas) {};
 	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
 	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
+
+	virtual Mat<_type> symmetryRotationMat() const { return Mat<_type>(); };
+	virtual Mat<_type> reduced_dens_mat(u64 state, int A_size) { return Mat<_type>(); };
 };
 
 // ------------------------------------------------------------  				   PRINTERS 				    ------------------------------------------------------------
