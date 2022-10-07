@@ -19,7 +19,9 @@
 
 #include "../source/src/progress.h"
 
-
+#ifndef TESTER_H
+#include "models/tester.h"
+#endif // !TESTER_H
 #ifndef HEISENBERG_DOTS
 #include "models/heisenberg_dots.h"
 #endif

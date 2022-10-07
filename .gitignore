@@ -150,3 +150,6 @@ dmypy.json
 *.txt
 *.out
 *.bin
+
+*v17
+*FileContentIndex

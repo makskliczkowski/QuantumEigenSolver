@@ -29,12 +29,12 @@ public:
 		this->K0 = K0;
 
 		// creates random disorder vector
-		this->dKx = create_random_vec(this->Ns, this->ran, this->K0);						
+		this->dKx = create_random_vec(this->Ns, this->ran, this->K0);
 		this->dKy = create_random_vec(this->Ns, this->ran, this->K0);
 		this->dKz = create_random_vec(this->Ns, this->ran, this->K0);
 
 		// state values number in local energy without the number of nearest neighbors
-		this->state_val_num = 2;							
+		this->state_val_num = 2;
 		this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_number(0), std::pair(LLONG_MAX, 0.0));
 		// change info
 		this->info = this->inf();
@@ -42,8 +42,8 @@ public:
 	// ----------------------------------- SETTERS ---------------------------------
 
 	// ----------------------------------- GETTERS ---------------------------------
-	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;
-	v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) override;
+	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;
+	const v_1d<pair<u64, _type>>& locEnergy(const vec& v, uint site) override;
 	void hamiltonian() override;
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -71,7 +71,7 @@ public:
 * @param _id base state index
 */
 template <typename _type>
-inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site) {
+inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site) {
 
 	// sumup the value of non-changed state
 	double localVal = 0;
@@ -131,7 +131,7 @@ inline v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint 
 * @param _id base state index
 */
 template <typename _type>
-v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site) {
+const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site) {
 	double localVal = 0;
 
 	uint iter = 1;
@@ -197,14 +197,14 @@ v_1d<pair<u64, _type>> Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint si
 */
 template <typename _type>
 void Heisenberg_kitaev<_type>::hamiltonian() {
-	
+
 	this->init_ham_mat();
 
 	for (auto k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->Ns; i++) {
 			// check all the neighbors
 			uint nn_number = this->lattice->get_nn_forward_num(i);
-			
+
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - i - 1) ? 1.0 : -1.0;
 
@@ -224,7 +224,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
 
 					// --------------------- HEISENBERG 
-					
+
 					// diagonal elements setting  interaction field
 					double interaction = (this->J + this->dJ(i));
 					double sisj = si * sj;
@@ -237,7 +237,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
 						this->setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
-					
+
 					// --------------------- KITAEV
 					if (n_num == 0)
 						this->setHamiltonianElem(k, (this->Kz + this->dKz(i)) * sisj, k);

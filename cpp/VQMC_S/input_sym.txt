@@ -1,1 +1,1 @@
--bc 0 -l 0 -d 1 -lx 8 -ly 1 -J 1.0 -h 0.8090 -g 0.9045 -th 1 -ks 5 -ps 1 -xs 1 -S 1 -w 0.0 -g0 0.0 -J0 0.0 -dir resultsSym3
+-bc 1 -l 0 -d 1 -lx 14 -ly 1 -J 1.0 -h 0.8090 -g 0.9045 -th 1 -ks 7 -ps 1 -xs 1 -S 1 -w 0.0 -g0 0.0 -J0 0.0 -dir resultsSym3

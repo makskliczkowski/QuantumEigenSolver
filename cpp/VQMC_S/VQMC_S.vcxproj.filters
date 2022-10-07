@@ -117,6 +117,9 @@
     <ClInclude Include="source\src\UserInterface\ui.h">
       <Filter>Header Files\source\user_interface</Filter>
     </ClInclude>
+    <ClInclude Include="include\models\tester.h">
+      <Filter>Header Files\include\models</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="rbm.cpp">

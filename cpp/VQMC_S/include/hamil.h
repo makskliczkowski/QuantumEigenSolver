@@ -18,8 +18,8 @@ public:
 	vec eigenvalues;																									// eigenvalues vector
 	u64 E_av_idx = -1;																									// average energy
 
-	u64 N=1;																											// the Hilbert space size
-	u64 Ns=1;																											// lattice sites number
+	u64 N = 1;																											// the Hilbert space size
+	u64 Ns = 1;																											// lattice sites number
 	mutex my_mute_button;																								// thread mutex
 	u32 thread_num = 1;																									// number of threads to be used
 	shared_ptr<Lattice> lattice;																						// contains all the information about the lattice
@@ -32,17 +32,17 @@ public:
 	uint state_val_num;																									// basic number of state_values
 
 	virtual u64 map(u64 index) const = 0;																				// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
-	
-																														// virtual ~SpinHamiltonian() = 0;																					// pure virtual destructor
-	
-	// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
+
+	// virtual ~SpinHamiltonian() = 0;																					// pure virtual destructor
+
+// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
 	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);												// converts a map to arma column (VQMC)
 	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);								// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);									// pretty prints the eigenstate at a given idx
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };								// prints the eigenstate at a given idx
-	
+
 	// ------------------------------------------- 				  INFO 				  -------------------------------------------
-	
+
 	/*
 	* @brief sets and gets the information about the model
 	* @param skip vector of elements to be skipped in the info showcase
@@ -77,7 +77,7 @@ public:
 	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
 
 	auto get_en_av_idx()											const RETURNS(this->E_av_idx);						// return the index closest to the mean energy
-	auto get_state_val_n()											const RETURNS(this->state_val_num)					// returns the minimum number of states to be used in locenergy
+	auto get_state_val_n()											const RETURNS(this->state_val_num);					// returns the minimum number of states to be used in locenergy
 	auto get_hilbert_size()											const RETURNS(this->N);								// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);						// constant reference to the mapping
 	auto get_hamiltonian()											const RETURNS(this->H);								// get the const reference to a Hamiltonian
@@ -88,20 +88,21 @@ public:
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
 	auto get_info(const v_1d<string>& skip = {}, string sep = "_")	const RETURNS(this->inf("", skip, sep));			// get the info about the model
 	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));	// get an eigenstate at a given idx but in symmetries it changes
+	const Col<_type>& get_eigenStateRef(u64 idx)					const RETURNS(this->eigenvectors.col(idx));			// get the reference to the eigenstate
 
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																						// pure virtual Hamiltonian creator
 	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;												// sets the Hamiltonian elements in a virtual way
-	
+
 	void diag_h(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian
 	void diag_hs(bool withoutEigenVec = false);																			// diagonalize the Hamiltonian sparse
-	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000,\
+	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000, \
 		double tol = 0, std::string form = "lm");																		// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																// diagonalize the Hamiltonian using shift and inverse
-	
+
 	// ------------------------------------------- 				   VQMC  				  -------------------------------------------
-	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) = 0;													// returns the local energy for VQMC purposes
-	virtual v_1d<pair<u64, _type>> locEnergy(const vec& v, uint site) = 0;												// returns the local energy for VQMC purposes
+	virtual const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) = 0;											// returns the local energy for VQMC purposes
+	virtual const v_1d<pair<u64, _type>>& locEnergy(const vec& v, uint site) = 0;										// returns the local energy for VQMC purposes
 
 	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
@@ -111,6 +112,10 @@ public:
 
 	// -------------------------------------------
 public:
+
+	void clear_energies() { this->eigenvalues.reset(); };																// resets the energy memory to 0
+	void clear_hamiltonian() { this->H.reset(); };																		// resets the hamiltonian memory to 0
+
 	// Heisenberg-dots
 	void set_angles() {};
 	void set_angles(const vec& phis, const vec& thetas) {};
@@ -125,8 +130,8 @@ public:
 
 /*
 * @brief converts a map to armadillo column
-* @param mp map from state index to a given 
-*/ 
+* @param mp map from state index to a given
+*/
 template<typename _type>
 inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, int N_hilbert)
 {
@@ -195,7 +200,7 @@ inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, 
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
-template <typename T> 
+template <typename T>
 inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	try {
 		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, arma::Mat<T>(this->H));
@@ -212,9 +217,9 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	double E_av = arma::mean(eigenvalues);
 	// calculates the middle spectrum element
 	v_1d<double> vect(this->N, 0.0);
-	for(int i = 0; i<this->N; i++)
+	for (int i = 0; i < this->N; i++)
 		vect[i] = abs(eigenvalues(i) - E_av);
-	
+
 	auto i = std::min_element(std::begin(vect), std::end(vect));
 	this->E_av_idx = i - std::begin(vect);
 }
@@ -244,6 +249,8 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec) {
 
 	auto i = std::min_element(std::begin(vect), std::end(vect));
 	this->E_av_idx = i - std::begin(vect);
+
+
 }
 
 /*
@@ -253,10 +260,10 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec) {
 template <typename T>
 inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
 	try {
-		eigs_opts opts; 
+		eigs_opts opts;
 		opts.tol = tol;
 		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;	
+		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;
 		stout << "\t\t\t->Using Lanczos" << EL;
 		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, k, "sa", opts);
 		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, k, "sa", opts);

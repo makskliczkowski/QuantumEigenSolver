@@ -16,11 +16,11 @@ public:
 
 	virtual void createSymmetryGroup() = 0;																				// create symmetry group elements and their corresponding eigenvalues
 	pair<u64, _type> find_SEC_repr(u64 base_idx) const;																	// for a given base vector finds its corresponding symmetry representative
-	
+
 	// -------------------------------- GETTERS --------------------------------
-	
+
 	_type get_symmetry_norm(u64 base_idx) const;																		// returns the normalization of a symmetrized state
-	
+
 	// -------------------------------- MULTITHREADED MAPPING --------------------------------
 
 	void generate_mapping();																							// utilizes the mapping kernel
@@ -33,8 +33,8 @@ public:
 		return this->mapping[index];
 	};
 
-	v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override { return v_1d<pair<u64, _type>>(); };					// returns the local energy for VQMC purposes
-	v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override { return v_1d<pair<u64, _type>>(); };			// returns the local energy for VQMC purposes
+	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override { return v_1d<pair<u64, _type>>(); };			// returns the local energy for VQMC purposes
+	const v_1d<pair<u64, _type>>& locEnergy(const vec& _id, uint site) override { return v_1d<pair<u64, _type>>(); };	// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;													// sets the Hamiltonian elements
 public:
 	Col<_type> symmetryRotation(u64 state) const;
@@ -47,7 +47,7 @@ public:
 	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx));
 
 	// -------------------------------- CALCULATORS 
-	pair<u64,_type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);
+	pair<u64, _type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);
 
 };
 
@@ -65,7 +65,7 @@ inline pair<u64, _type> SpinHamiltonianSym<_type>::find_rep_and_sym_eigval(u64 b
 	if (idx < this->N)
 		return std::make_pair(idx, this->normalisation[idx] / normalisation_beta * conj(sym_eig));
 	// haven't found the representative - differen block sector
-	else 
+	else
 		return std::make_pair(0, 0);
 }
 
@@ -149,7 +149,7 @@ inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat() const
 
 	u64 max_dim = ULLPOW(this->Ns);
 	Mat<cpx> U(max_dim, this->N, arma::fill::zeros);
-	
+
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
@@ -181,13 +181,13 @@ template<typename _type>
 inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
 {
 	u64 dim = ULLPOW(this->Ns);
-	
+
 	Col<_type> output(dim, arma::fill::zeros);
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
 			if (idx < dim) // only if exists in sector
-				output(idx) += conj(this->symmetry_eigval[i] / (real(this->normalisation[k]) * sqrt(this->symmetry_group.size()))) * this->eigenvectors(k, state);
+				output(idx) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size()))) * this->eigenvectors(k, state);
 		}
 	}
 	return output;
@@ -242,7 +242,7 @@ inline void SpinHamiltonianSym<_type>::mapping_kernel(u64 start, u64 stop, v_1d<
 template<typename _type>
 inline void SpinHamiltonianSym<_type>::generate_mapping()
 {
-	u64 start = 0; 
+	u64 start = 0;
 	auto stop = static_cast<u64>(pow(2, this->Ns));
 	u64 two_powL = BinaryPowers[this->Ns];
 #ifndef DEBUG
@@ -265,14 +265,14 @@ inline void SpinHamiltonianSym<_type>::generate_mapping()
 		for (int t = 0; t < num_of_threads; t++) {
 			start = (u64)(two_powL / (double)num_of_threads * t);
 			stop = ((t + 1) == num_of_threads ? two_powL : u64(two_powL / (double)num_of_threads * (double)(t + 1)));
-			
+
 			map_threaded[t] = v_1d<u64>();
 			norm_threaded[t] = v_1d<_type>();
 			threads.emplace_back(&SpinHamiltonianSym::mapping_kernel, this, start, stop, ref(map_threaded[t]), ref(norm_threaded[t]), t);
 		}
 
 		// join the threads together
-		for (auto& t : threads) 
+		for (auto& t : threads)
 			t.join();
 
 		for (auto& t : map_threaded)

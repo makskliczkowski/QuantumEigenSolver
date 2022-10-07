@@ -146,7 +146,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <InterproceduralOptimization>NoIPO</InterproceduralOptimization>
-      <Optimization>MinSpace</Optimization>
+      <Optimization>MaxSpeedHighLevel</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -164,6 +164,7 @@
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
     <ClInclude Include="include\models\symmetries\ising_sym.h" />
+    <ClInclude Include="include\models\tester.h" />
     <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />

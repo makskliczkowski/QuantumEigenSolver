@@ -33,8 +33,8 @@ public:
 
 	// METHODS
 	virtual void hamiltonian() override;
-	virtual v_1d<pair<u64, _type>> locEnergy(u64 _id, uint site) override;										// returns the local energy for VQMC purposes
-	virtual v_1d<pair<u64, _type>> locEnergy(const vec& _id, uint site) override;								// returns the local energy for VQMC purposes
+	virtual const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;								// returns the local energy for VQMC purposes
+	virtual const v_1d<pair<u64, _type>>& locEnergy(const vec& _id, uint site) override;						// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -77,7 +77,7 @@ Heisenberg<_type>::Heisenberg(double J, double J0, double g, double g0, double h
 	this->dh = create_random_vec(this->Ns, this->ran, this->w);												// creates random disorder vector
 	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);											// creates random exchange vector
 	this->dg = create_random_vec(this->Ns, this->ran, this->g0);											// creates random transverse field vector
-	
+
 
 	// change info
 	this->info = this->inf();
@@ -104,7 +104,7 @@ u64 Heisenberg<_type>::map(u64 index) const {
 * @param _id base state index
 */
 template <typename _type>
-v_1d<pair<u64, _type>> Heisenberg<_type>::locEnergy(u64 _id, uint site) {
+const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 	// sumup the value of non-changed state
 	double localVal = 0;
 
@@ -139,7 +139,7 @@ v_1d<pair<u64, _type>> Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 			}
 		}
 	}
-	
+
 	// append unchanged at the very end
 	this->state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
 	return this->state_val;
@@ -150,7 +150,7 @@ v_1d<pair<u64, _type>> Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 * @param v base state vector
 */
 template <typename _type>
-v_1d<pair<u64, _type>> Heisenberg<_type>::locEnergy(const vec& v, uint site) {
+const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint site) {
 	double localVal = 0;
 
 	uint iter = 1;
@@ -216,12 +216,12 @@ void Heisenberg<_type>::hamiltonian() {
 
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - i) ? 1.0 : -1.0;
-				
+
 			// disorder // perpendicular magnetic field
-			this->H(k, k) += (this->h + dh(i)) * si;									
+			this->H(k, k) += (this->h + dh(i)) * si;
 
 			// transverse field
-			u64 new_idx = flip(k, this->Ns - 1 - i);			
+			u64 new_idx = flip(k, this->Ns - 1 - i);
 			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
 
 			// check if nn exists
