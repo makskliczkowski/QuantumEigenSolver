@@ -150,7 +150,7 @@ void TesterModel<_type>::hamiltonian() {
 			this->H(k, k) += this->hz * (1.0 - 0.5 * ((j == this->Ns - 1) ? 1 : 0)) * s_i;
 
 			// check the Siz Si+1z
-			int nei = this->lattice->get_BC() == 0 ? ((j != Ns - 1) ? j + 1 : 0) : (j + 1);
+			int nei = this->lattice->get_BC() == 0 ? ((j != this->Ns - 1) ? j + 1 : 0) : (j + 1);
 			if (nei < this->Ns) {
 				// Ising-like spin correlation
 				double s_j = checkBit(k, this->Ns - 1 - nei) ? spin : -spin;
