@@ -10,9 +10,9 @@
 //#define DEBUG_RBM_DRVT
 #endif
 #else
-	//#define OMP_NUM_THREADS 16;
-	#include <thread>
-	#include <mutex>
+//#define OMP_NUM_THREADS 16;
+#include <thread>
+#include <mutex>
 #endif
 
 // symmetric models 
@@ -20,70 +20,70 @@
 
 // RBM
 #ifndef RBM_H
-	#include "../rbm.h"
+#include "../rbm.h"
 #endif
 
 #ifndef SQUARE_H
-	#include "../../source/src/Lattices/square.h"
+#include "../../source/src/Lattices/square.h"
 #endif
 #ifndef HEXAGONAL_H
-	#include "../../source/src/Lattices/hexagonal.h"
+#include "../../source/src/Lattices/hexagonal.h"
 #endif
 
 
 #ifdef PLOT
-	#ifdef _DEBUG
-		#undef _DEBUG
-		#include <python.h>
-		#define _DEBUG
-	#else
-		#include <python.h>
-	#endif
+#ifdef _DEBUG
+#undef _DEBUG
+#include <python.h>
+#define _DEBUG
+#else
+#include <python.h>
+#endif
 
-	// plotting
-	#define WITHOUT_NUMPY
-	#define WITH_OPENCV
-	#include "matplotlib-cpp/matplotlibcpp.h"
-	namespace plt = matplotlibcpp;
-	
-	template<typename _type>
-	void plot_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
-		plt::plot(v);
-		plt::xlabel(xlabel);
-		plt::ylabel(ylabel);
-		plt::title(name);
-	};
-	template<typename _type>
+// plotting
+#define WITHOUT_NUMPY
+#define WITH_OPENCV
+#include "matplotlib-cpp/matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 
-	void plot_v_1d(Col<_type> v, string xlabel = "", string ylabel = "", string name = "") {
-		plt::plot(arma::conv_to<v_1d<double> >::from(v));
-		plt::xlabel(xlabel);
-		plt::ylabel(ylabel);
-		plt::title(name);
-	};
+template<typename _type>
+void plot_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+	plt::plot(v);
+	plt::xlabel(xlabel);
+	plt::ylabel(ylabel);
+	plt::title(name);
+};
+template<typename _type>
 
-	#define PLOT_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
-	template<typename _type>
-	void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
-		std::vector<int> ivec(v.size());
-		std::iota(ivec.begin(), ivec.end(), 0); // ivec will become: [0..99]
+void plot_v_1d(Col<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+	plt::plot(arma::conv_to<v_1d<double> >::from(v));
+	plt::xlabel(xlabel);
+	plt::ylabel(ylabel);
+	plt::title(name);
+};
 
-		plt::scatter_colored(ivec, v);
-		plt::xlabel(xlabel);
-		plt::ylabel(ylabel);
-		plt::title(name);
-	};
-	#define SCATTER_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
-	void inline save_fig(string name, bool show = false) {
-		plt::save(name);
-		if (show) plt::show();
-		plt::close();
-	}
-	#define SAVEFIG(name, show) save_fig(name, show)
+#define PLOT_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+template<typename _type>
+void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
+	std::vector<int> ivec(v.size());
+	std::iota(ivec.begin(), ivec.end(), 0); // ivec will become: [0..99]
+
+	plt::scatter_colored(ivec, v);
+	plt::xlabel(xlabel);
+	plt::ylabel(ylabel);
+	plt::title(name);
+};
+#define SCATTER_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+void inline save_fig(string name, bool show = false) {
+	plt::save(name);
+	if (show) plt::show();
+	plt::close();
+}
+#define SAVEFIG(name, show) save_fig(name, show)
 #else 
-	#define PLOT_V1D(v, x, y, n)
-	#define SCATTER_V1D(v, x, y, n)
-	#define SAVEFIG(name, show)
+#define PLOT_V1D(v, x, y, n)
+#define SCATTER_V1D(v, x, y, n)
+#define SAVEFIG(name, show)
 #endif
 
 // maximal ed size to compare
@@ -99,13 +99,15 @@ template<typename _hamtype>
 void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
 	// compare ED
 	auto Ns = hamiltonian->lattice->get_Ns();
-	if (Ns <= 12) {
+	auto maxNs = 16;
+	if (maxNs <= 16) {
 		stout << "\t\t\t\t->calculating ed" << EL;
 		hamiltonian->hamiltonian();
-		if (Ns <= 12)
+		if (maxNs <= 16)
 			hamiltonian->diag_h(false);
 		else
 			hamiltonian->diag_h(false, 3, 0, 1000);
+
 		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
 		stout << "\t\t\t\t->" << VEQ(ground_ed) << "\t" << VEQ(ground_rbm) << EL;
 	}
@@ -117,9 +119,9 @@ void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHami
 // --------------------------------------------------------  				 HUBBARD USER INTERFACE 					  --------------------------------------------------------
 
 namespace rbm_ui {
-// --------------------------------------------------------  				 MAP OF DEFAULTS FOR HUBBARD 				  --------------------------------------------------------
+	// --------------------------------------------------------  				 MAP OF DEFAULTS FOR HUBBARD 				  --------------------------------------------------------
 
-	// ------------------------------------------- 				  CLASS				 -------------------------------------------
+		// ------------------------------------------- 				  CLASS				 -------------------------------------------
 	template<typename _type, typename _hamtype>
 	class ui : public user_interface {
 	private:
@@ -156,7 +158,7 @@ namespace rbm_ui {
 			{"th","1"},									// number of threads
 			{"q","0"},									// quiet?
 		};
-		
+
 		// lattice stuff
 		impDef::lattice_types lattice_type; 																					// for non_numeric data
 		int dim = 1;
@@ -185,7 +187,7 @@ namespace rbm_ui {
 		double w = 0.0;																// the distorder strength to set dh in (-disorder_strength, disorder_strength)
 		double g = 0.0;																// transverse magnetic field
 		double g0 = 0.0;															// disorder in the system - deviation from a constant g0 value
-		
+
 		// heisenberg stuff
 		double delta = 0.00;														// 
 
@@ -201,6 +203,7 @@ namespace rbm_ui {
 		vec thetas = vec({});
 		vec J_dot = { 1.0,0.0,-1.0 };
 		double J0_dot = 0.0;
+		double J_dot_dot = 1.0;														// dot - dot  classical interaction
 
 		// rbm stuff
 		unique_ptr<rbmState<_type, _hamtype>> phi;
@@ -221,12 +224,12 @@ namespace rbm_ui {
 
 
 		// averages from operators
-		avOperators av_op;	
+		avOperators av_op;
 
 		// -------------------------------------------   					HELPER FUNCTIONS  					-------------------------------------------
 		void compare_ed(double ground_rbm);
 		void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-public:
+	public:
 		// -------------------------------------------  					CONSTRUCTORS  					-------------------------------------------
 		ui() = default;
 		ui(int argc, char** argv);
@@ -234,12 +237,12 @@ public:
 		void exit_with_help() override;
 		// -------------------------------------------  				  REAL PARSER  				 -------------------------------------------
 		// the function to parse the command line
-		void parseModel(int argc, const v_1d<string>& argv) final;									
+		void parseModel(int argc, const v_1d<string>& argv) final;
 		// -------------------------------------------   					HELPERS  							-------------------------------------------
 		void set_default() override;																		// set default parameters
 		// -------------------------------------------  				  SIMULATION  			-------------------------------------------	 
 		void define_models();
-		void make_mc_classical(int mc_outside, double Tmax, double dT, double Tmin);
+		void make_mc_classical(bool ferromagnetic = true);
 		void symmetries_cpx(clk::time_point start);
 		void symmetries_double(clk::time_point start);
 		void make_simulation_symmetries();

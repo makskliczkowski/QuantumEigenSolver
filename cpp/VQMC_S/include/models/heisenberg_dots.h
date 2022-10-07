@@ -32,7 +32,7 @@ public:
 	~Heisenberg_dots() = default;
 	Heisenberg_dots() = default;
 	Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat,
-		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0);
+		const v_1d<int>& positions, const vec& J_dot = { 0,0,1 }, double J_dot0 = 0, double J_dot_dot = 1.0);
 	// ----------------------------------- 				 SETTERS 				 ---------------------------------
 
 	void set_Jdot(const vec& Jdot) { this->J_dot = Jdot; };
@@ -60,7 +60,9 @@ public:
 			",Jx=" + STRP(this->J_dot(0), 2) + \
 			",Jy=" + STRP(this->J_dot(1), 2) + \
 			",Jz=" + STRP(this->J_dot(2), 2) + \
+			",d=" + STRP(this->delta, 2) + \
 			",J0=" + STRP(this->J0, 2) + \
+			",Jdd=" + STRP(this->J_dot_dot, 2) + \
 			",g=" + STRP(this->g, 2) + \
 			",g0=" + STRP(this->g0, 2) + \
 			",h=" + STRP(this->h, 2) + \
@@ -74,24 +76,26 @@ public:
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
 template<typename _type>
-inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta, std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0)
+inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, double g0, double h, double w, double delta,
+	std::shared_ptr<Lattice> lat, const v_1d<int>& positions, const vec& J_dot, double J_dot0, double J_dot_dot)
 	: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 {
 
 	this->positions = v_1d<int>(this->Ns);											// at each position we hold classical spin
-	auto iter = 1;
-	for (auto pos : positions)
-		this->positions[pos] = iter++;												// set to iter(meaning the position in angles and interaction) when present
+	//auto iter = 1;
+	//for (auto pos : positions)
+	//	this->positions[pos] = iter++;												// set to iter(meaning the position in angles and interaction) when present
 
 	this->dot_num = positions.size();
 	this->J_dot = J_dot;
 	this->J_dot0 = J_dot0;
+	this->J_dot_dot = J_dot_dot;
 
 	this->J_dots = create_random_vec(this->dot_num, this->ran, this->J_dot0);			// creates random disorder vector
 
 	this->set_angles();																// reserve memory
 	this->state_val_num = 2;
-	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_number(0), std::pair(LLONG_MAX, 0.0));
+	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_forward_num(0), std::pair(LLONG_MAX, 0.0));
 
 	this->info = this->inf();														// set info
 }
@@ -283,13 +287,11 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 	// build the Hamiltonian
 	for (auto k = 0; k < this->N; k++) {
-		// interaction with the dot at left site will be held with single variable as position is sorted
-		int dot_iter = 0;
 		for (int j = 0; j < this->Ns; j++) {
 			uint nn_number = this->lattice->get_nn_forward_num(j);
 
 			// true - spin up, false - spin down
-			double si = checkBit(k, this->Ns - 1 - j) ? 1.0 : -1.0;
+			double si = checkBit(k, this->Ns - 1 - j) ? this->_SPIN : -this->_SPIN;
 
 			// perpendicular magnetic field
 			this->H(k, k) += (this->h + this->dh(j)) * si;
@@ -316,7 +318,6 @@ void Heisenberg_dots<_type>::hamiltonian() {
 					// dot - dot interaction
 					if (this->positions[j] > 0 && this->positions[nei] > 0)
 						this->H(k, k) += this->J_dot_dot * this->cos_thetas(this->positions[j]) * this->cos_thetas(this->positions[nei]);
-
 				}
 			}
 			// handle the dot
@@ -325,10 +326,9 @@ void Heisenberg_dots<_type>::hamiltonian() {
 				// set sz_int
 				this->H(k, k) += s_z_i;
 				// set sy_int
-				this->setHamiltonianElem(k, s_y_i, new_idx);
+				this->setHamiltonianElem(k, -s_y_i, new_idx);
 				// set sx_int 
 				this->setHamiltonianElem(k, s_x_i, new_idx);
-				dot_iter++;
 			}
 		}
 	}
@@ -349,7 +349,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	const double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
+	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field
 	localVal += (this->h + this->dh(site)) * si;
@@ -362,7 +362,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 		// double checking neighbors
 		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 			const auto interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += this->delta * interaction * si * sj;
@@ -392,7 +392,6 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 
 	return this->state_val;
 }
-
 
 /*
 * @brief Calculate the local energy end return the corresponding vectors with the value

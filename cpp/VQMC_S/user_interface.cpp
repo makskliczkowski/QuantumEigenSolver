@@ -98,6 +98,7 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 	this->thetas = vec({ 1 });
 	this->J_dot = { 0.0,0.0,-1.0 };
 	this->J0_dot = 0.0;
+	this->J_dot_dot = 1.0;
 
 	// others 
 	this->thread_num = 16;
@@ -195,6 +196,10 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	// spin coupling disorder
 	choosen_option = "-J0";
 	this->set_option(this->J0, argv, choosen_option, false);
+
+	// dot - dot classical interaction
+	choosen_option = "-Jd";
+	this->set_option(this->J_dot_dot, argv, choosen_option, false);
 
 	// transverse field
 	choosen_option = "-g";
@@ -337,17 +342,18 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 }
 
 template<typename _type, typename _hamtype>
-inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, double Tmax, double dT, double Tmin)
+inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(bool ferromagnetic)
 {
 	auto start = std::chrono::high_resolution_clock::now();
 	stouts("STARTING THE SIMULATION FOR MINIMIZING CONFIGURATION SEEK AND USING: " + VEQ(thread_num), start);
 	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
-	stout << "->outside mc_steps = " << mc_outside << EL;
 
 	auto ran = randomGen();
 	// make the lattice
+	this->_BC = 0;
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	auto Ns = this->lat->get_Ns();
+	this->av_op = avOperators(Lx, Ly, Lz, Ns, this->lat->get_type());
 	stout << "->" << this->lat->get_info() << EL;
 
 	this->positions = v_1d<int>(Ns);
@@ -360,8 +366,25 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	this->phis = arma::vec(Ns, arma::fill::zeros);
 	// set thetas to 1 corresponding to all classical spins up
 	this->thetas = arma::vec(Ns, arma::fill::zeros);
-	for (int i = 0; i < thetas.size(); i++)
-		this->thetas(i) = ran.randomReal_uni() <= 0.5 ? 0 : 1.0;
+
+	this->J_dot = vec(3, arma::fill::zeros);
+	this->J_dot(2) = this->J0;
+
+	// ------------------------ FERROMAGNETIC CLASSICAL SPINS ------------------------
+	if (ferromagnetic)
+		for (int i = 0; i < thetas.size(); i++) {
+			this->thetas(i) = 0.0;
+		}
+	else
+	{
+		for (int y = 0; y < this->Ly; y++) {
+			bool y_start = y % 2 == 0 ? 0 : 1;
+			for (int x = 0; x < this->Lx; x++) {
+				int n = x + this->Lx * y;
+				this->thetas(n) = x % 2 == 0 ? int(y_start) : int(!y_start);
+			}
+		}
+	}
 	this->thetas.print("thetas=");
 
 	vec sin_phis = sin(this->phis * TWOPI);
@@ -369,144 +392,49 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 	vec sin_thetas = sin(this->thetas * PI);
 	vec cos_thetas_rbm = cos(this->thetas * PI);
 	vec cos_thetas_ed = cos(this->thetas * PI);
-
-	this->J_dot = vec(3, arma::fill::zeros);
-	auto jdot_step = 0.05;
-	auto jdot_num = 40;
-
-	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
-	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
+	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
+	std::shared_ptr<Heisenberg_dots<double>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, J0);
 	hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_rbm);
 	hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_ed);
+	auto model_info = hamiltonian_rbm->get_info();
+	stout << "\t-> " << VEQ(model_info) << EL;
 
 	// rbm stuff
 	this->nvisible = Ns;
 	this->nhidden = this->layer_mult * this->nvisible;
 	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
 	auto rbm_info = phi->get_info();
-	stout << "->" << VEQ(rbm_info) << EL;
+	stout << "\t\t->" << VEQ(rbm_info) << EL;
+	string order = ferromagnetic ? "ferro" : "aferro";
+	string dir = this->saving_dir + order + kPS + rbm_info + kPS + model_info + kPS;
+	string dir_ed = this->saving_dir + order + kPS + "ed" + kPS + model_info + kPS;
+	fs::create_directories(dir);
+	fs::create_directories(dir_ed);
+	std::ofstream fileSave;
 
-	int Tnum = (Tmax - Tmin) / dT;
-	// start the Jdot loop
-	for (int jdot = 1; jdot < jdot_num; jdot++) {
-		this->J_dot(2) = jdot * jdot_step;
-		hamiltonian_rbm->set_Jdot(this->J_dot);
-		hamiltonian_rbm->update_info();
-		hamiltonian_ed->set_Jdot(this->J_dot);
-		hamiltonian_ed->update_info();
+	// ------------------- calculator rbm -------------------
+	// monte carlo for energy
+	auto energies = this->phi->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips);
+	auto energies_tail = energies.tail(int(0.05 * this->mcSteps));
+	double ground_rbm = std::real(arma::mean(energies_tail));
 
-		auto model_info = hamiltonian_rbm->get_info();
-		stout << "\t-> " << VEQ(model_info) << EL;
-
-		// print energies
-		string dir = this->saving_dir + model_info + kPS + rbm_info + kPS;
-		string dir_ed = this->saving_dir + model_info + kPS + "ed" + kPS;
-		fs::create_directories(dir);
-		fs::create_directories(dir_ed);
-
-		// to store outter monte carlo energies
-		vec outter_energies(mc_outside * (Tnum + 1), arma::fill::zeros);
-		vec outter_energies_ed(mc_outside * (Tnum + 1), arma::fill::zeros);
-
-		// monte carlo for energy
-		auto energies = this->phi->mcSampling(1000, n_blocks, n_therm, block_size, n_flips);
-		auto energies_tail = energies.tail(block_size);
-
-		double ground_rbm = std::real(arma::mean(energies_tail));
-		double ground_rbm_new = 0;
-		double ground_ed = 0;
-		double ground_ed_new = 0;
-
-		calculate_ed<_hamtype>(ground_ed, ground_rbm, hamiltonian_ed);
-
-		uint iter = 0;
-		auto T = 0.0;
-		// iterate the temperature
-		for (int Titer = 0; Titer <= Tnum; Titer++) {
-			T = Tmax - Titer * dT;
-			stout << "\t\t->Starting temperature " << VEQP(T, 5) << EL;
-			// iterate Monte Carlo steps
-			for (int i = 0; i < mc_outside; i++) {
-				// iterate the system
-				for (int k = 0; k < Ns; k++) {
-					int j = ran.randomInt_uni(0, Ns);
-					const auto direction_rbm = cos_thetas_rbm(j);
-					const auto direction_ed = cos_thetas_ed(j);
-					// change one of the classical spins
-					hamiltonian_rbm->set_angles(j, 0, 0, 1, -direction_rbm);
-					hamiltonian_ed->set_angles(j, 0, 0, 1, -direction_ed);
-
-					// calculate the corresponding energy
-					this->phi->init();																			// reinitialize the weights - probalby better thing to do
-					energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+	// ------------------- calculator ed -------------------
+	double ground_ed = 0.0;
+	if (Ns <= 16) {
+		calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
-					plt::axhline(ground_ed);
-					plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm), mcSteps / 3, (ground_rbm) / 2);
+		plt::axhline(ground_ed);
+		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm), mcSteps / 3, (ground_rbm) / 2);
+		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
+		SAVEFIG(dir + "energy" + ".png", true);
 #endif
-					PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
-					SAVEFIG(dir + "en" + VEQP(T, 5) + ".png", true);
-					ground_rbm_new = std::real(arma::mean(energies.tail(block_size)));
-
-					// update if lower energy or exponent works
-					if (double dE = ground_rbm_new - ground_rbm; dE <= 0 || exp(-dE / T) >= hamiltonian_rbm->ran.randomReal_uni(0, 1)) {
-						cos_thetas_rbm(j) = -direction_rbm;
-						ground_rbm = ground_rbm_new;															// set new energy rbm
-					}
-					else {
-						stout << "\t\t\t->returning previous angle rbm mc_step: " << \
-							VEQ(i) << "\t" << VEQ(j) << EL;
-						hamiltonian_rbm->set_angles(j, 0, 0, 1, direction_rbm); // return previous state
-					}
-
-					// compare ED
-					calculate_ed<_hamtype>(ground_ed_new, ground_rbm_new, hamiltonian_ed);
-					// update if lower energy or exponent works
-					if (Ns <= 10) {
-						if (double dE_ed = ground_ed_new - ground_ed; dE_ed <= 0 || exp(-dE_ed / T) >= hamiltonian_ed->ran.randomReal_uni(0, 1)) {
-							stout << "\t\t\t-> flipped the spin at mc_step: " << VEQ(i) << "\t" << \
-								VEQ(j) << "\t" << VEQ(ground_rbm_new) << "\t" << VEQ(ground_ed_new) << \
-								"\t" << VEQ(ground_rbm) << "\t" << VEQ(ground_ed) << EL;
-							cos_thetas_ed(j) = -direction_ed;
-							ground_ed = ground_ed_new;															// set new energy ed
-						}
-						else {
-							stout << "\t\t\t->returning previous angle" << EL;
-							hamiltonian_ed->set_angles(j, 0, 0, 1, direction_ed);								// return previous state
-						}
-					}
-				}
-				outter_energies(iter) = ground_rbm;
-				outter_energies_ed(iter) = ground_ed;
-				iter++;
-			}
-			stout << "\t\t-> " << VEQ(T) << "\t" << VEQ(ground_rbm) << "\t" << VEQ(ground_ed) << EL;
-		}
-		this->phi->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-		// calculate the averages for the operators
-		// this->av_op.reset();
-		this->av_op = this->phi->get_op_av();
-
-		// -------------------------------------------------------- SAVE RBM --------------------------------------------------
-		auto fileRbmEn_name = dir + "energies";
-		auto fileEdEn_name = dir_ed + "energies";
-		std::ofstream fileRbmEn, fileEdEn;
-		openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
-		openFile(fileEdEn, fileEdEn_name + ".dat", ios::out);
-		for (auto i = 0; i < outter_energies.size(); i++)
-			printSeparatedP(fileRbmEn, '\t', 8, true, 5, i, outter_energies(i));
-		for (auto i = 0; i < outter_energies_ed.size(); i++)
-			printSeparatedP(fileEdEn, '\t', 8, true, 5, i, outter_energies_ed(i));
-		fileRbmEn.close();
-		fileEdEn.close();
-
-		// other observables
-		std::ofstream fileSave;
-		string filename = "";
-		auto Ns = this->lat->get_Ns();
+		Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
+		Operators<_hamtype> op(this->lat);
+		op.calculate_operators(eigvec, this->av_op, true);
 		// --------------------- compare sigma_z ---------------------
 
 		// S_z at each site
-		filename = dir + "_sz_site";
+		std::string filename = dir_ed + "_sz_site";
 		openFile(fileSave, filename + ".dat", ios::out);
 		print_vector_1d(fileSave, this->av_op.s_z_i);
 		fileSave.close();
@@ -514,37 +442,45 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(int mc_outside, doubl
 		SAVEFIG(filename + ".png", false);
 
 		// S_z correlations
-		filename = dir + "_sz_corr";
+		filename = dir_ed + "_sz_corr";
 		openFile(fileSave, filename + ".dat", ios::out);
 		print_mat(fileSave, this->av_op.s_z_cor);
 		fileSave.close();
-
-		// -------------------------------------------------------- SAVE ED --------------------------------------------------
-		if (Ns <= 10) {
-			Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
-			this->av_op.reset();
-			Operators<_hamtype> op(this->lat);
-			this->saving_dir = dir_ed;
-			op.calculate_operators(eigvec, this->av_op, true);
-			// --------------------- compare sigma_z ---------------------
-
-			// S_z at each site
-			filename = dir_ed + "_sz_site";
-			openFile(fileSave, filename + ".dat", ios::out);
-			print_vector_1d(fileSave, this->av_op.s_z_i);
-			fileSave.close();
-			PLOT_V1D(this->av_op.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
-			SAVEFIG(filename + ".png", false);
-
-			// S_z correlations
-			filename = dir_ed + "_sz_corr";
-			openFile(fileSave, filename + ".dat", ios::out);
-			print_mat(fileSave, this->av_op.s_z_cor);
-			fileSave.close();
-		}
-
+	}
+	else {
+		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
+		SAVEFIG(dir + "energy" + ".png", true);
 	}
 
+	// ------------------- sampling rbm -------------------
+	this->phi->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+	this->av_op.reset();
+	this->av_op = this->phi->get_op_av();
+	auto fileRbmEn_name = dir + "energies";
+	std::ofstream fileRbmEn;
+	openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
+	for (auto i = 0; i < energies.size(); i++)
+		printSeparatedP(fileRbmEn, '\t', 8, true, 5, i, real(energies(i)));
+	fileRbmEn.close();
+
+	// other observables
+
+	string filename = "";
+	// --------------------- compare sigma_z
+
+	// S_z at each site
+	filename = dir + "_sz_site";
+	openFile(fileSave, filename + ".dat", ios::out);
+	print_vector_1d(fileSave, this->av_op.s_z_i);
+	fileSave.close();
+	PLOT_V1D(this->av_op.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+	SAVEFIG(filename + ".png", false);
+
+	// S_z correlations
+	filename = dir + "_sz_corr";
+	openFile(fileSave, filename + ".dat", ios::out);
+	print_mat(fileSave, this->av_op.s_z_cor);
+	fileSave.close();
 }
 
 // -------------------------------------------------------- HELPERS
