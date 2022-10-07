@@ -814,7 +814,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 #pragma omp parallel for
 		for (u64 j = 0; j < N; j++) {
 			u64 idx = j;
-			auto state = this->ham_d->get_eigenStateFull(idx);
+			Col<double> state = this->ham_d->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}
@@ -903,7 +903,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 #pragma omp parallel for
 		for (u64 j = 0; j < N; j++) {
 			u64 idx = j;
-			auto state = this->ham_d->get_eigenStateFull(idx);
+			Col<cpx> state = this->ham_cpx->get_eigenStateFull(idx);
 			auto entro = op.entanglement_entropy(state, i);
 			entropies(i - 1, j) = entro;
 		}

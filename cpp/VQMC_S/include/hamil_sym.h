@@ -44,7 +44,7 @@ public:
 	auto get_normalization()					const RETURNS(this->normalisation);										// returns the normalization
 	auto get_symmetry_group()					const RETURNS(this->symmetry_group);									// returns the symmetry group generators
 	auto get_symmetry_eigval()					const RETURNS(this->symmetry_eigval);									// returns the symmetry group generators eigenvalues
-	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx));
+	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx)) override;					// rotates the state with symmetry group
 
 	// -------------------------------- CALCULATORS 
 	pair<u64, _type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);

@@ -88,7 +88,7 @@ public:
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));		// get an eigenstate at a given idx
 	auto get_info(const v_1d<string>& skip = {}, string sep = "_")	const RETURNS(this->inf("", skip, sep));			// get the info about the model
 	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));	// get an eigenstate at a given idx but in symmetries it changes
-	const Col<_type>& get_eigenStateRef(u64 idx)					const RETURNS(this->eigenvectors.col(idx));			// get the reference to the eigenstate
+	const Col<_type>& get_eigenStateRef(u64 idx)					const { this->eigenvectors.col(idx); };				// get the reference to the eigenstate
 
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																						// pure virtual Hamiltonian creator
