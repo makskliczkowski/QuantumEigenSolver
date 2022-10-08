@@ -99,11 +99,11 @@ template<typename _hamtype>
 void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
 	// compare ED
 	auto Ns = hamiltonian->lattice->get_Ns();
-	auto maxNs = 16;
-	if (maxNs <= 16) {
+	auto maxNs = 14;
+	if (Ns <= maxNs) {
 		stout << "\t\t\t\t->calculating ed" << EL;
 		hamiltonian->hamiltonian();
-		if (maxNs <= 16)
+		if (Ns <= maxNs)
 			hamiltonian->diag_h(false);
 		else
 			hamiltonian->diag_h(false, 3, 0, 1000);
@@ -242,7 +242,7 @@ namespace rbm_ui {
 		void set_default() override;																		// set default parameters
 		// -------------------------------------------  				  SIMULATION  			-------------------------------------------	 
 		void define_models();
-		void make_mc_classical(bool ferromagnetic = true);
+		void make_mc_classical();
 		void symmetries_cpx(clk::time_point start);
 		void symmetries_double(clk::time_point start);
 		void make_simulation_symmetries();

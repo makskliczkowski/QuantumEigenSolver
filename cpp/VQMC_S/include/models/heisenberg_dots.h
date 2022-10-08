@@ -62,11 +62,11 @@ public:
 			",Jz=" + STRP(this->J_dot(2), 2) + \
 			",d=" + STRP(this->delta, 2) + \
 			",J0=" + STRP(this->J0, 2) + \
-			",Jdd=" + STRP(this->J_dot_dot, 2) + \
-			",g=" + STRP(this->g, 2) + \
-			",g0=" + STRP(this->g0, 2) + \
-			",h=" + STRP(this->h, 2) + \
-			",w=" + STRP(this->w, 2);
+			",Jdd=" + STRP(this->J_dot_dot, 2);
+		//",g=" + STRP(this->g, 2) + \
+			//",g0=" + STRP(this->g0, 2) + \
+			//",h=" + STRP(this->h, 2) + \
+			//",w=" + STRP(this->w, 2);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 	void update_info() override { this->info = this->inf(); };

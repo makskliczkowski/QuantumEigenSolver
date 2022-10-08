@@ -13,8 +13,7 @@ int main(const int argc, char* argv[]) {
 
 	// ------------ CLASSICAL -----------
 	// ferro
-	ui->make_mc_classical(true);
-	// antiferro
-	ui->make_mc_classical(false);
+	ui->make_mc_classical();
+
 	return 0;
 }

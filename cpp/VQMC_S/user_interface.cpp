@@ -342,7 +342,7 @@ void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 }
 
 template<typename _type, typename _hamtype>
-inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(bool ferromagnetic)
+inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 {
 	auto start = std::chrono::high_resolution_clock::now();
 	stouts("STARTING THE SIMULATION FOR MINIMIZING CONFIGURATION SEEK AND USING: " + VEQ(thread_num), start);
@@ -350,11 +350,11 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(bool ferromagnetic)
 
 	auto ran = randomGen();
 	// make the lattice
-	this->_BC = 0;
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
 	auto Ns = this->lat->get_Ns();
+	std::string lat_info = this->lat->get_info();
 	this->av_op = avOperators(Lx, Ly, Lz, Ns, this->lat->get_type());
-	stout << "->" << this->lat->get_info() << EL;
+	stout << "->" << lat_info << EL;
 
 	this->positions = v_1d<int>(Ns);
 	// use all the positions for the lattice sites
@@ -370,71 +370,122 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(bool ferromagnetic)
 	this->J_dot = vec(3, arma::fill::zeros);
 	this->J_dot(2) = this->J0;
 
-	// ------------------------ FERROMAGNETIC CLASSICAL SPINS ------------------------
-	if (ferromagnetic)
-		for (int i = 0; i < thetas.size(); i++) {
-			this->thetas(i) = 0.0;
-		}
-	else
-	{
-		for (int y = 0; y < this->Ly; y++) {
-			bool y_start = y % 2 == 0 ? 0 : 1;
-			for (int x = 0; x < this->Lx; x++) {
-				int n = x + this->Lx * y;
-				this->thetas(n) = x % 2 == 0 ? int(y_start) : int(!y_start);
+	double e_ferro = 0;
+	double e_ferro_ed = 0;
+	double e_aferro = 0;
+	double e_aferro_ed = 0;
+	for (int ferro = 0; ferro <= 1; ferro++) {
+		stout << "\t\t->DOING " << (bool(ferro) ? "ferromagnet" : "antiferromagnet") << EL;
+		// ------------------------ FERROMAGNETIC CLASSICAL SPINS ------------------------
+		if (bool(ferro))
+			for (int i = 0; i < thetas.size(); i++) {
+				this->thetas(i) = 0.0;
+			}
+		else
+		{
+			for (int y = 0; y < this->lat->get_Ly(); y++) {
+				bool y_start = y % 2 == 0 ? 0 : 1;
+				for (int x = 0; x < this->lat->get_Lx(); x++) {
+					int n = x + this->lat->get_Lx() * y;
+					this->thetas(n) = x % 2 == 0 ? int(y_start) : int(!y_start);
+				}
 			}
 		}
-	}
-	this->thetas.print("thetas=");
+		this->thetas.print("thetas=");
 
-	vec sin_phis = sin(this->phis * TWOPI);
-	vec cos_phis = cos(this->phis * TWOPI);
-	vec sin_thetas = sin(this->thetas * PI);
-	vec cos_thetas_rbm = cos(this->thetas * PI);
-	vec cos_thetas_ed = cos(this->thetas * PI);
-	std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
-	std::shared_ptr<Heisenberg_dots<double>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, J0);
-	hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_rbm);
-	hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_ed);
-	auto model_info = hamiltonian_rbm->get_info();
-	stout << "\t-> " << VEQ(model_info) << EL;
+		vec sin_phis = sin(this->phis * TWOPI);
+		vec cos_phis = cos(this->phis * TWOPI);
+		vec sin_thetas = sin(this->thetas * PI);
+		vec cos_thetas_rbm = cos(this->thetas * PI);
+		vec cos_thetas_ed = cos(this->thetas * PI);
+		std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
+		std::shared_ptr<Heisenberg_dots<double>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, J0);
+		hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_rbm);
+		hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_ed);
+		auto model_info = hamiltonian_rbm->get_info();
+		stout << "\t-> " << VEQ(model_info) << EL;
 
-	// rbm stuff
-	this->nvisible = Ns;
-	this->nhidden = this->layer_mult * this->nvisible;
-	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
-	auto rbm_info = phi->get_info();
-	stout << "\t\t->" << VEQ(rbm_info) << EL;
-	string order = ferromagnetic ? "ferro" : "aferro";
-	string dir = this->saving_dir + order + kPS + rbm_info + kPS + model_info + kPS;
-	string dir_ed = this->saving_dir + order + kPS + "ed" + kPS + model_info + kPS;
-	fs::create_directories(dir);
-	fs::create_directories(dir_ed);
-	std::ofstream fileSave;
+		// rbm stuff
+		this->nvisible = Ns;
+		this->nhidden = this->layer_mult * this->nvisible;
+		this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
+		auto rbm_info = phi->get_info();
+		stout << "\t\t->" << VEQ(rbm_info) << EL;
+		string order = string(ferro ? "ferro" : "aferro") + ",Lx=" + STR(this->lat->get_Lx()) + ",Ly=" + STR(this->lat->get_Ly()) + ",bc=" + STR(_BC) + ",d=" + STR(this->lat->get_Dim());
+		string dir = this->saving_dir + kPS + order + kPS;
+		fs::create_directories(dir);
+		dir = dir + rbm_info + kPS;
+		fs::create_directories(dir);
+		dir = dir + model_info + kPS;
+		fs::create_directories(dir);
 
-	// ------------------- calculator rbm -------------------
-	// monte carlo for energy
-	auto energies = this->phi->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips);
-	auto energies_tail = energies.tail(int(0.05 * this->mcSteps));
-	double ground_rbm = std::real(arma::mean(energies_tail));
+		string dir_ed = this->saving_dir + kPS + order + kPS;
+		fs::create_directories(dir_ed);
+		dir_ed = dir_ed + "ed" + kPS;
+		fs::create_directories(dir_ed);
+		dir_ed = dir_ed + model_info + kPS;
+		fs::create_directories(dir_ed);
 
-	// ------------------- calculator ed -------------------
-	double ground_ed = 0.0;
-	if (Ns <= 16) {
-		calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_ed);
+		std::ofstream fileSave;
+
+		// ------------------- calculator rbm -------------------
+		// monte carlo for energy
+		auto energies = this->phi->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips);
+		auto energies_tail = energies.tail(int(0.05 * this->mcSteps));
+		double ground_rbm = std::real(arma::mean(energies_tail));
+
+		// ------------------- calculator ed -------------------
+		double ground_ed = 0.0;
+		if (Ns <= 14) {
+			calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
-		plt::axhline(ground_ed);
-		plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm), mcSteps / 3, (ground_rbm) / 2);
-		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
-		SAVEFIG(dir + "energy" + ".png", true);
+			plt::axhline(ground_ed);
+			plt::annotate(VEQ(ground_ed) + ",\n" + VEQ(ground_rbm), mcSteps / 3, (ground_rbm) / 2);
+			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
+			SAVEFIG(dir + "energy" + ".png", true);
 #endif
-		Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
-		Operators<_hamtype> op(this->lat);
-		op.calculate_operators(eigvec, this->av_op, true);
-		// --------------------- compare sigma_z ---------------------
+			Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
+			Operators<_hamtype> op(this->lat);
+			op.calculate_operators(eigvec, this->av_op, true);
+			// --------------------- compare sigma_z ---------------------
+
+			// S_z at each site
+			std::string filename = dir_ed + "_sz_site";
+			openFile(fileSave, filename + ".dat", ios::out);
+			print_vector_1d(fileSave, this->av_op.s_z_i);
+			fileSave.close();
+			PLOT_V1D(this->av_op.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+			SAVEFIG(filename + ".png", false);
+
+			// S_z correlations
+			filename = dir_ed + "_sz_corr";
+			openFile(fileSave, filename + ".dat", ios::out);
+			print_mat(fileSave, this->av_op.s_z_cor);
+			fileSave.close();
+	}
+		else {
+			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
+			SAVEFIG(dir + "energy" + ".png", true);
+		}
+
+		// ------------------- sampling rbm -------------------
+		this->phi->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+		this->av_op.reset();
+		this->av_op = this->phi->get_op_av();
+		auto fileRbmEn_name = dir + "energies";
+		std::ofstream fileRbmEn;
+		openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
+		for (auto i = 0; i < energies.size(); i++)
+			printSeparatedP(fileRbmEn, '\t', 8, true, 5, i, real(energies(i)));
+		fileRbmEn.close();
+
+		// other observables
+
+		string filename = "";
+		// --------------------- compare sigma_z
 
 		// S_z at each site
-		std::string filename = dir_ed + "_sz_site";
+		filename = dir + "_sz_site";
 		openFile(fileSave, filename + ".dat", ios::out);
 		print_vector_1d(fileSave, this->av_op.s_z_i);
 		fileSave.close();
@@ -442,45 +493,24 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical(bool ferromagnetic)
 		SAVEFIG(filename + ".png", false);
 
 		// S_z correlations
-		filename = dir_ed + "_sz_corr";
+		filename = dir + "_sz_corr";
 		openFile(fileSave, filename + ".dat", ios::out);
 		print_mat(fileSave, this->av_op.s_z_cor);
 		fileSave.close();
-	}
-	else {
-		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
-		SAVEFIG(dir + "energy" + ".png", true);
-	}
 
-	// ------------------- sampling rbm -------------------
-	this->phi->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-	this->av_op.reset();
-	this->av_op = this->phi->get_op_av();
-	auto fileRbmEn_name = dir + "energies";
-	std::ofstream fileRbmEn;
-	openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
-	for (auto i = 0; i < energies.size(); i++)
-		printSeparatedP(fileRbmEn, '\t', 8, true, 5, i, real(energies(i)));
-	fileRbmEn.close();
-
-	// other observables
-
-	string filename = "";
-	// --------------------- compare sigma_z
-
-	// S_z at each site
-	filename = dir + "_sz_site";
-	openFile(fileSave, filename + ".dat", ios::out);
-	print_vector_1d(fileSave, this->av_op.s_z_i);
-	fileSave.close();
-	PLOT_V1D(this->av_op.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
-	SAVEFIG(filename + ".png", false);
-
-	// S_z correlations
-	filename = dir + "_sz_corr";
-	openFile(fileSave, filename + ".dat", ios::out);
-	print_mat(fileSave, this->av_op.s_z_cor);
-	fileSave.close();
+		if (bool(ferro)) {
+			e_ferro = ground_rbm;
+			e_ferro_ed = ground_ed;
+		}
+		else {
+			e_aferro = ground_rbm;
+			e_aferro_ed = ground_ed;
+		}
+}
+	std::ofstream file;
+	openFile(file, this->saving_dir + lat_info + ".dat", ios::out | ios::app);
+	printSeparatedP(file, '\t', 17, true, 13, this->J, this->J0, e_ferro, e_aferro, e_ferro_ed, e_aferro_ed);
+	file.close();
 }
 
 // -------------------------------------------------------- HELPERS
