@@ -144,12 +144,12 @@ void TesterModel<_type>::hamiltonian() {
 
 			// flip with S^x_i with the transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - j);
-			// this->H(new_idx, k) += this->hx * (1.0 - 0.5 * ((j == 0) ? 1 : 0));
-			this->H(new_idx, k) += 4.0;
+			this->H(new_idx, k) += this->hx * (1.0 - 0.5 * ((j == 0) ? 1 : 0));
+			//this->H(new_idx, k) += 4.0;
 
 			// diagonal elements setting the perpendicular field
-			//this->H(k, k) += this->hz * (1.0 - 0.5 * ((j == this->Ns - 1) ? 1 : 0)) * s_i;
-			this->H(k, k) += 16.0 * s_i;
+			this->H(k, k) += this->hz * (1.0 - 0.5 * ((j == this->Ns - 1) ? 1 : 0)) * s_i;
+			//this->H(k, k) += 16.0 * s_i;
 
 			// check the Siz Si+1z
 			int nei = this->lattice->get_BC() == 0 ? ((j != this->Ns - 1) ? j + 1 : 0) : (j + 1);
@@ -157,31 +157,32 @@ void TesterModel<_type>::hamiltonian() {
 				// Ising-like spin correlation
 				double s_j = checkBit(k, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 				// setting the neighbors elements
-				//this->H(k, k) += this->Delta * s_i * s_j;
-				this->H(k, k) += 9.0 * s_i * s_j;
+				this->H(k, k) += this->Delta * s_i * s_j;
+				//this->H(k, k) += 9.0 * s_i * s_j;
 
 				const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nei);
 				// sigma x
-				//this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
-				this->H(flip_idx_nn, k) += 5.0;
+				this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
+				//this->H(flip_idx_nn, k) += 5.0;
 				// sigma y
-				//this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
-				this->H(flip_idx_nn, k) -= 15.0 * (s_i) * (s_j);
+				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
+				//this->H(flip_idx_nn, k) -= 15.0 * (s_i) * (s_j);
 			}
 			// next nearest
 			int nnn = this->lattice->get_BC() == 0 ? ((j + 2) % this->Ns) : (j + 2);
 			if (nnn < this->Ns) {
 				double s_j = checkBit(k, this->Ns - 1 - nnn) ? this->_SPIN : -this->_SPIN;
 				// setting the neighbors elements
-				this->H(k, k) += 9.0 * s_i * s_j;
+				this->H(k, k) += this->Delta * s_i * s_j;
+				//this->H(k, k) += 9.0 * s_i * s_j;
 
-				const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nei);
+				const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nnn);
 				// sigma x
-				//this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
-				this->H(flip_idx_nn, k) += 5.0;
+				this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
+				//this->H(flip_idx_nn, k) += 5.0;
 				// sigma y
-				//this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
-				this->H(flip_idx_nn, k) -= 15.0 * (s_i) * (s_j);
+				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
+				//this->H(flip_idx_nn, k) -= 15.0 * (s_i) * (s_j);
 			}
 		}
 	}
