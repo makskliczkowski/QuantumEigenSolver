@@ -367,8 +367,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 	// set thetas to 1 corresponding to all classical spins up
 	this->thetas = arma::vec(Ns, arma::fill::zeros);
 
-	this->J_dot = vec(3, arma::fill::zeros);
-	this->J_dot(2) = this->J0;
+	this->J_dot = { 0.0, 0.0, this->J0 };
 
 	double e_ferro = 0;
 	double e_ferro_ed = 0;
@@ -392,14 +391,15 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 			}
 		}
 		this->thetas.print("thetas=");
+		this->delta = 1.0;
 
 		vec sin_phis = sin(this->phis * TWOPI);
 		vec cos_phis = cos(this->phis * TWOPI);
 		vec sin_thetas = sin(this->thetas * PI);
 		vec cos_thetas_rbm = cos(this->thetas * PI);
 		vec cos_thetas_ed = cos(this->thetas * PI);
-		std::shared_ptr<Heisenberg_dots<_hamtype>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
-		std::shared_ptr<Heisenberg_dots<double>> hamiltonian_ed = std::make_shared<Heisenberg_dots<_hamtype>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, J0);
+		std::shared_ptr<Heisenberg_dots<double>> hamiltonian_rbm = std::make_shared<Heisenberg_dots<double>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
+		std::shared_ptr<Heisenberg_dots<double>> hamiltonian_ed = std::make_shared<Heisenberg_dots<double>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, J_dot, 0.0, this->J_dot_dot);
 		hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_rbm);
 		hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas_ed);
 		auto model_info = hamiltonian_rbm->get_info();
@@ -408,7 +408,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 		// rbm stuff
 		this->nvisible = Ns;
 		this->nhidden = this->layer_mult * this->nvisible;
-		this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
+		this->phi = std::make_unique<rbmState<_type, double>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, thread_num);
 		auto rbm_info = phi->get_info();
 		stout << "\t\t->" << VEQ(rbm_info) << EL;
 		string order = string(ferro ? "ferro" : "aferro") + ",Lx=" + STR(this->lat->get_Lx()) + ",Ly=" + STR(this->lat->get_Ly()) + ",bc=" + STR(_BC) + ",d=" + STR(this->lat->get_Dim());
@@ -431,7 +431,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 		// ------------------- calculator rbm -------------------
 		// monte carlo for energy
 		auto energies = this->phi->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips);
-		auto energies_tail = energies.tail(int(0.05 * this->mcSteps));
+		auto energies_tail = energies.tail(block_size);
 		double ground_rbm = std::real(arma::mean(energies_tail));
 
 		// ------------------- calculator ed -------------------
@@ -462,7 +462,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 			openFile(fileSave, filename + ".dat", ios::out);
 			print_mat(fileSave, this->av_op.s_z_cor);
 			fileSave.close();
-	}
+		}
 		else {
 			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->phi->get_info());
 			SAVEFIG(dir + "energy" + ".png", true);
@@ -506,7 +506,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 			e_aferro = ground_rbm;
 			e_aferro_ed = ground_ed;
 		}
-}
+	}
 	std::ofstream file;
 	openFile(file, this->saving_dir + lat_info + ".dat", ios::out | ios::app);
 	printSeparatedP(file, '\t', 17, true, 13, this->J, this->J0, e_ferro, e_aferro, e_ferro_ed, e_aferro_ed);
@@ -949,7 +949,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	openFile(file_together, dir + "all.dat", std::ios::out);
 
 	for (int l = 8; l <= this->Lx; l += 2) {
-		this->lat = std::make_shared<SquareLattice>(l, Ly, Lz, dim, _BC);
+		this->lat = std::make_shared<SquareLattice>(l, Ly, Lz, dim, 1);
 		stout << "->" << this->lat->get_info() << EL;
 		auto Ns = this->lat->get_Ns();
 
