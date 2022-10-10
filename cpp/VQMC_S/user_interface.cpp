@@ -956,7 +956,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	std::string dir = this->saving_dir + kPS;
 	std::ofstream file_together;
 	openFile(file_together, dir + "all.dat", std::ios::out);
-
+	this->_BC = 1;
 	for (int l = 8; l <= this->Lx; l += 2) {
 		this->lat = std::make_shared<SquareLattice>(l, Ly, Lz, dim, 1);
 		stout << "->" << this->lat->get_info() << EL;
@@ -982,7 +982,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 		// save energies to check
 		openFile(file, dir + "energies," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
-			file << VEQP(this->ham_d->get_eigenEnergy(i), 14) << EL;
+			file << STRP(this->ham_d->get_eigenEnergy(i), 14) << EL;
 		file.close();
 
 		// calculate the reduced density matrices

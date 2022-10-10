@@ -9,11 +9,11 @@ int main(const int argc, char* argv[]) {
 	//ui->define_models();
 	//ui->make_simulation();
 	//ui->make_simulation_symmetries();
-	//ui->make_symmetries_test();
+	ui->make_symmetries_test();
 
 	// ------------ CLASSICAL -----------
 	// ferro
-	ui->make_mc_classical();
+	//ui->make_mc_classical();
 
 	return 0;
 }
