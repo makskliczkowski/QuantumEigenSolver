@@ -135,12 +135,11 @@ inline void TesterModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) 
 template <typename _type>
 void TesterModel<_type>::hamiltonian() {
 	this->init_ham_mat();
-	double spin = 0.5;
 	for (long int k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
-			uint nn_number = this->lattice->get_nn_forward_num(j);
+
 			// true - spin up, false - spin down
-			double s_i = checkBit(k, this->Ns - 1 - j) ? spin : -spin;
+			double s_i = checkBit(k, this->Ns - 1 - j) ? this->_SPIN : -this->_SPIN;
 
 			// flip with S^x_i with the transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - j);
@@ -153,7 +152,7 @@ void TesterModel<_type>::hamiltonian() {
 			int nei = this->lattice->get_BC() == 0 ? ((j != this->Ns - 1) ? j + 1 : 0) : (j + 1);
 			if (nei < this->Ns) {
 				// Ising-like spin correlation
-				double s_j = checkBit(k, this->Ns - 1 - nei) ? spin : -spin;
+				double s_j = checkBit(k, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 				// setting the neighbors elements
 				this->H(k, k) += this->Delta * s_i * s_j;
 
@@ -161,12 +160,12 @@ void TesterModel<_type>::hamiltonian() {
 				// sigma x
 				this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
 				// sigma y
-				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (-s_i) * (-s_j);
+				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
 			}
 			// next nearest
 			int nnn = this->lattice->get_BC() == 0 ? ((j + 2) % this->Ns) : (j + 2);
 			if (nnn < this->Ns) {
-				double s_j = checkBit(k, this->Ns - 1 - nnn) ? spin : -spin;
+				double s_j = checkBit(k, this->Ns - 1 - nnn) ? this->_SPIN : -this->_SPIN;
 				// setting the neighbors elements
 				this->H(k, k) += this->Delta * s_i * s_j;
 
@@ -174,7 +173,7 @@ void TesterModel<_type>::hamiltonian() {
 				// sigma x
 				this->H(flip_idx_nn, k) += this->J * (1.0 - this->eta);
 				// sigma y
-				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (-s_i) * (-s_j);
+				this->H(flip_idx_nn, k) -= this->J * (1.0 + this->eta) * (s_i) * (s_j);
 			}
 		}
 	}

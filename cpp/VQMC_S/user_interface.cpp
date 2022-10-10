@@ -992,8 +992,8 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 		int bond_num = this->lat->get_Ns() / 2;
 		u64 max_idx = 0;
 		double max_val = -1.;
-		arma::mat entropies(bond_num + 1, N, arma::fill::zeros);
-		for (int i = 1; i <= bond_num + 1; i++) {
+		arma::mat entropies(bond_num, N, arma::fill::zeros);
+		for (int i = 1; i <= bond_num; i++) {
 			// iterate through the state
 			stout << "\t->doing : " << VEQ(i) << EL;
 
@@ -1037,7 +1037,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 
 			auto subview = entropies.submat(0, av_energy_idx - u64(spectrum_num / 2), entropies.n_rows - 1, av_energy_idx + u64(spectrum_num / 2) - 1);
 			stout << VEQ(subview.n_cols) << EL;
-			for (int i = 1; i <= bond_num + 1; i++) {
+			for (int i = 1; i <= bond_num; i++) {
 				double mean = 0.0;
 				for (int k = av_energy_idx - u64(spectrum_num / 2); k < av_energy_idx + u64(spectrum_num / 2); k++)
 					mean += entropies(i - 1, k);
