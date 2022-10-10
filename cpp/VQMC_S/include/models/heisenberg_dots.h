@@ -81,7 +81,7 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 	: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
 {
 
-	this->positions = v_1d<int>(this->Ns);											// at each position we hold classical spin
+	this->positions = positions;											// at each position we hold classical spin
 	//auto iter = 1;
 	//for (auto pos : positions)
 	//	this->positions[pos] = iter++;												// set to iter(meaning the position in angles and interaction) when present
