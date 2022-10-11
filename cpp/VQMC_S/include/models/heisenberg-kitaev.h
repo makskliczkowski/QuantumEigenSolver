@@ -80,7 +80,7 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
+	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
@@ -95,7 +95,7 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 		auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			const double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 			// --------------------- HEISENBERG 
 
 			// diagonal elements setting  interaction field
@@ -120,6 +120,8 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 
 			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// append unchanged at the very end
 	this->state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
@@ -138,7 +140,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
+	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
@@ -156,7 +158,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 		this->tmp_vec2 = this->tmp_vec;
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBitV(v, nei) > 0 ? 1.0 : -1.0;
+			double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
 
 			// --------------------- HEISENBERG 
 
@@ -182,6 +184,8 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 				flip_val += this->Kx + this->dKx(site);
 			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// append unchanged at the very end
 	this->state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
@@ -206,7 +210,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 			uint nn_number = this->lattice->get_nn_forward_num(i);
 
 			// true - spin up, false - spin down
-			double si = checkBit(k, this->Ns - i - 1) ? 1.0 : -1.0;
+			double si = checkBit(k, this->Ns - i - 1) ? this->_SPIN : -this->_SPIN;
 
 			// perpendicular field (SZ) - HEISENBERG
 			this->H(k, k) += (this->h + this->dh(i)) * si;
@@ -221,7 +225,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 				auto n_num = this->lattice->get_nn_forward_num(i, nn);
 				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
 					// check Sz 
-					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					double sj = checkBit(k, this->Ns - 1 - nn) ? this->_SPIN : -this->_SPIN;
 
 					// --------------------- HEISENBERG 
 

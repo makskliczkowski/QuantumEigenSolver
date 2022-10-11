@@ -220,7 +220,7 @@ namespace ising_sym {
 			for (int j = 0; j <= this->Ns - 1; j++) {
 				uint nn_number = this->lattice->get_nn_forward_num(j);
 				// true - spin up, false - spin down
-				double s_i = checkBit(this->mapping[k], this->Ns - 1 - j) ? 1.0 : -1.0;
+				double s_i = checkBit(this->mapping[k], this->Ns - 1 - j) ? this->_SPIN : -this->_SPIN;
 
 				// flip with S^x_i with the transverse field
 				if (this->g != 0) {
@@ -235,7 +235,7 @@ namespace ising_sym {
 					auto n_num = this->lattice->get_nn_forward_num(j, nn);
 					if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 						// Ising-like spin correlation
-						double s_j = checkBit(this->mapping[k], this->Ns - 1 - nei) ? 1.0 : -1.0;
+						double s_j = checkBit(this->mapping[k], this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 						// setting the neighbors elements
 						this->H(k, k) += this->J * s_i * s_j;
 					}

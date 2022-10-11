@@ -113,7 +113,7 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 	this->state_val = v_1d<std::pair<u64, _type>>(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));			// create local energy pair
 
 	// true - spin up, false - spin down
-	double si = checkBit(_id, this->Ns - site - 1) ? 1.0 : -1.0;
+	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ)
 	localVal += (this->h + dh(site)) * si;
@@ -126,7 +126,7 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 	for (auto n_num : nn_number) {
 		// double checking neighbors
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-			double sj = checkBit(_id, this->Ns - 1 - nei) ? 1.0 : -1.0;
+			double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 
 			auto interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
@@ -138,6 +138,8 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 				this->state_val[iter++] = std::pair{ new_new_idx, 0.5 * interaction };
 			}
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 
 	// append unchanged at the very end
@@ -155,11 +157,9 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint si
 
 	uint iter = 1;
 	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	v_1d<std::pair<u64, _type>> state_val(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));
-
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
+	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
@@ -168,14 +168,14 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint si
 	this->tmp_vec = v;
 	flipV(tmp_vec, site);
 	const u64 new_idx = baseToInt(tmp_vec);
-	state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
 
 	// check the Siz Si+1z
 	for (auto n_num : nn_number) {
 		this->tmp_vec2 = this->tmp_vec;
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBitV(v, nei) > 0 ? 1.0 : -1.0;
+			double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
 
 			// --------------------- HEISENBERG 
 
@@ -189,14 +189,16 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint si
 			if (sisj < 0) {
 				flipV(tmp_vec2, nei);
 				auto flip_idx_nn = baseToInt(tmp_vec2);
-				state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
+				this->state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
 			}
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// append unchanged at the very end
-	state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
+	this->state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
 
-	return state_val;
+	return this->state_val;
 }
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 
@@ -215,7 +217,7 @@ void Heisenberg<_type>::hamiltonian() {
 			v_1d<uint> nn_number = this->lattice->get_nn_forward_number(i);
 
 			// true - spin up, false - spin down
-			double si = checkBit(k, this->Ns - 1 - i) ? 1.0 : -1.0;
+			double si = checkBit(k, this->Ns - 1 - i) ? this->_SPIN : -this->_SPIN;
 
 			// disorder // perpendicular magnetic field
 			this->H(k, k) += (this->h + dh(i)) * si;
@@ -228,7 +230,7 @@ void Heisenberg<_type>::hamiltonian() {
 			for (auto n_num : nn_number) {
 				if (const auto nn = this->lattice->get_nn(i, n_num); nn >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
-					double sj = checkBit(k, this->Ns - 1 - nn) ? 1.0 : -1.0;
+					double sj = checkBit(k, this->Ns - 1 - nn) ? this->_SPIN : -this->_SPIN;
 					auto interaction = (this->J + this->dJ(i));
 
 					// setting the neighbors elements

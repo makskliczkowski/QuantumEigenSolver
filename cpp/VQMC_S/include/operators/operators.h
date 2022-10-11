@@ -1,9 +1,9 @@
 #pragma once
 #ifndef LATTICE_H
-	#include "../../source/src/lattices.h"
+#include "../../source/src/lattices.h"
 #endif
 #ifndef BINARY_H
-	#include "../../source/src/binary.h"
+#include "../../source/src/binary.h"
 #endif
 
 
@@ -127,13 +127,13 @@ protected:
 	int Ns = 1;
 public:
 	~Operators() = default;
-	
+
 	Operators(std::shared_ptr<Lattice> lat)
 	{
 		this->lat = lat;
 		this->Ns = this->lat->get_Ns();
 	};
-	
+
 	/*
 	* @brief multiplication of sigma_xi | state >
 	* @param L lattice dimensionality (base vector length)
@@ -145,7 +145,7 @@ public:
 			tmp = flip(tmp, L - 1 - site);
 		return std::make_pair(tmp, 1.0);
 	};
-	
+
 	/*
 	* @brief multiplication of sigma_yi | state >
 	* @param L lattice dimensionality (base vector length)
@@ -160,7 +160,7 @@ public:
 		}
 		return std::make_pair(tmp, val);
 	};
-	
+
 	/*
 	* @brief multiplication of sigma_zi | state >
 	* @param L lattice dimensionality (base vector length)
@@ -172,7 +172,7 @@ public:
 			val *= checkBit(base_vec, L - 1 - site) ? 1.0 : -1.0;
 		return std::make_pair(base_vec, val);
 	};
-	
+
 	/*
 	*/
 	static std::pair<u64, cpx> spin_flip(u64 base_vec, int L, v_1d<int> sites) {
@@ -195,9 +195,9 @@ public:
 		else val = 0.0;
 		return std::make_pair(tmp, val);
 	};
-	
+
 	// -----------------------------------------------  				   AVERAGE OPERATOR 				    ----------------------------------------------
-	
+
 	// calculates the matrix element of operator at given sites (sum)
 	cpx av_operator(const Col<_type>& alfa, const Col<_type>& beta, op_type op);
 	// calculates the matrix element of operator at given sites
@@ -208,7 +208,7 @@ public:
 	cpx av_operator(const Col<_type>& alfa, const Col<_type>& beta, op_type op, int corr_len);
 
 	// -----------------------------------------------				 SINGLE (diagonal elements)
-	
+
 	// calculates the matrix element of operator at given sites (sum)
 	cpx av_operator(const Col<_type>& alfa, op_type op);
 	// calculates the matrix element of operator at given sites
@@ -359,7 +359,7 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, int A_
 	// set subsytsems size
 	const long long dimA = ULLPOW(A_size);
 	const long long dimB = ULLPOW(Ns - A_size);
-	const long long Nh = dimA*dimB;
+	const long long Nh = dimA * dimB;
 
 	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
@@ -383,7 +383,7 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int
 	// set subsytsems size
 	const long long dimA = ULLPOW(A_size);
 	const long long dimB = ULLPOW(Ns - A_size);
-	const long long Nh = dimA*dimB;
+	const long long Nh = dimA * dimB;
 
 	Mat<double> rho(dimA, dimA, arma::fill::zeros);
 	// loop over configurational basis
@@ -412,17 +412,17 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const 
 	auto find_index = [&](u64 index) { return binary_search(map, 0, N - 1, index); };
 
 	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
-	for (long long n = 0; n < N; n++) {						
+	for (long long n = 0; n < N; n++) {
 		// loop over configurational basis
 		u64 counter = 0;
 		long long true_n = map[n];
-		for (long long m = true_n % dimB; m < Nh; m += dimB) {	
+		for (long long m = true_n % dimB; m < Nh; m += dimB) {
 			// pick out state with same B side (last L-A_size bits)
 			long idx = true_n / dimB;
 			long long j = find_index(m);
-			if(j >= 0)
+			if (j >= 0)
 				rho(idx, counter) += std::conj(state(n)) * state(j);
-			counter++;										    
+			counter++;
 			// increase counter to move along reduced basis
 		}
 	}
@@ -489,7 +489,7 @@ inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_
 	vec probabilities;
 	//// diagonalize to find probabilities and calculate trace in rho's eigenbasis
 	eig_sym(probabilities, rho);
-	
+
 	double entropy = 0;
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
@@ -573,7 +573,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	}
 	av_op.s_y_nei /= Ns;
 	// --------------------- compare sigma_x ---------------------
-	
+
 	// S_x_vector extensive
 	av_op.s_x = std::real(this->av_operator(eigvec, this->sigma_x));
 
@@ -592,7 +592,7 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	av_op.s_x_nei /= Ns;
 
 	// --------------------- entropy ----------------------
-	if(cal_entro)
+	if (cal_entro)
 		av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
 }
 

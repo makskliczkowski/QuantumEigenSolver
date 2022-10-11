@@ -256,7 +256,7 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, uint position
 {
 	uint dot = dotnum - 1; // we must neglect one to keep convinience
 
-	double si = checkBit(state, this->Ns - 1 - position) ? 1.0 : -1.0;
+	double si = checkBit(state, this->Ns - 1 - position) ? this->_SPIN : -this->_SPIN;
 
 	// set the s_z element
 	auto Jz = (this->J_dots(2) + this->J_dot(2));
@@ -305,7 +305,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 				auto n_num = this->lattice->get_nn_forward_num(j, nn);
 				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
-					double sj = checkBit(k, this->Ns - 1 - nei) ? 1.0 : -1.0;
+					double sj = checkBit(k, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 					auto interaction = (this->J + this->dJ(j));
 
 					// setting the neighbors elements
@@ -361,7 +361,8 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
 		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+		auto nei = this->lattice->get_nn(site, n_num);
+		if (nei >= 0) {
 			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 			const auto interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
@@ -375,6 +376,8 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// handle the dot
 	if (auto i = this->positions[site]; i > 0) {
@@ -406,7 +409,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, ui
 	uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? 1.0 : -1.0;
+	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field
 	localVal += (this->h + this->dh(site)) * si;
@@ -424,7 +427,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, ui
 		// double checking neighbors
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBitV(v, nn) > 0 ? 1.0 : -1.0;
+			double sj = checkBitV(v, nn) > 0 ? this->_SPIN : -this->_SPIN;
 
 			auto interaction = (this->J + this->dJ(site));
 			// diagonal elements setting  interaction field
@@ -440,6 +443,8 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, ui
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
 		}
+		else
+			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// handle the dot
 	if (auto i = positions[site]; i > 0) {
