@@ -135,7 +135,8 @@ inline void TesterModel<cpx>::setHamiltonianElem(u64 k, cpx value, u64 new_idx) 
 template <typename _type>
 void TesterModel<_type>::hamiltonian() {
 	this->init_ham_mat();
-	this->_SPIN = 0.5;
+	this->_SPIN = 1.0;
+	//this->_SPIN = 0.5;
 	for (long int k = 0; k < this->N; k++) {
 		for (int j = 0; j <= this->Ns - 1; j++) {
 
@@ -143,12 +144,12 @@ void TesterModel<_type>::hamiltonian() {
 			double s_i = checkBit(k, this->Ns - 1 - j) ? this->_SPIN : -this->_SPIN;
 
 			// flip with S^x_i with the transverse field
-			u64 new_idx = flip(k, this->Ns - 1 - j);
-			this->H(new_idx, k) += this->hx * (1.0 - 0.5 * ((j == 0) ? 1 : 0));
+			const u64 new_idx = flip(k, this->Ns - 1 - j);
+			this->H(new_idx, k) += this->hx * (1.0 - 0.5 * ((j == 0) ? 1.0 : 0.0));
 			//this->H(new_idx, k) += 4.0;
 
 			// diagonal elements setting the perpendicular field
-			this->H(k, k) += this->hz * (1.0 - 0.5 * ((j == this->Ns - 1) ? 1 : 0)) * s_i;
+			this->H(k, k) += this->hz * (1.0 - 0.5 * ((j == this->Ns - 1) ? 1.0 : 0.0)) * s_i;
 			//this->H(k, k) += 16.0 * s_i;
 
 			// check the Siz Si+1z
