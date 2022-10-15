@@ -17,6 +17,7 @@
 
 // symmetric models 
 #include "../models/symmetries/ising_sym.h"
+#include "../models/symmetries/xyz_sym.h"
 
 // RBM
 #ifndef RBM_H

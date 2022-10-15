@@ -45,7 +45,7 @@
     <PlatformToolset>Intel C++ Compiler 2022</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseILP64Interfaces1A>false</UseILP64Interfaces1A>
-    <UseInteloneMKL>Sequential</UseInteloneMKL>
+    <UseInteloneMKL>Parallel</UseInteloneMKL>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -120,7 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.2.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -164,7 +164,8 @@
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
     <ClInclude Include="include\models\symmetries\ising_sym.h" />
-    <ClInclude Include="include\models\tester.h" />
+    <ClInclude Include="include\models\symmetries\XYZ_sym.h" />
+    <ClInclude Include="include\models\XYZ.h" />
     <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />

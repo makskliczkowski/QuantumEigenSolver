@@ -11,7 +11,9 @@
 #define OPERATORS_H
 #include <queue>
 
-
+namespace operators {
+	constexpr double _SPIN = 1.0;
+}
 using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
 
 class avOperators {
@@ -21,6 +23,7 @@ public:
 	int Lx = 1;
 	int Ly = 1;
 	int Lz = 1;
+
 
 	// sigma z
 	double s_z = 0.0;
@@ -125,6 +128,7 @@ class Operators {
 protected:
 	shared_ptr<Lattice> lat;
 	int Ns = 1;
+
 public:
 	~Operators() = default;
 
@@ -143,7 +147,7 @@ public:
 		auto tmp = base_vec;
 		for (auto const& site : sites)
 			tmp = flip(tmp, L - 1 - site);
-		return std::make_pair(tmp, 1.0);
+		return std::make_pair(tmp, operators::_SPIN);
 	};
 
 	/*
@@ -155,7 +159,7 @@ public:
 		auto tmp = base_vec;
 		cpx val = 1.0;
 		for (auto const& site : sites) {
-			val *= checkBit(tmp, L - 1 - site) ? imn : -imn;
+			val *= checkBit(tmp, L - 1 - site) ? imn * operators::_SPIN : -imn * operators::_SPIN;
 			tmp = flip(tmp, L - 1 - site);
 		}
 		return std::make_pair(tmp, val);
@@ -169,7 +173,7 @@ public:
 	static std::pair<u64, cpx> sigma_z(u64 base_vec, int L, const v_1d<int>& sites) {
 		double val = 1.0;
 		for (auto const& site : sites)
-			val *= checkBit(base_vec, L - 1 - site) ? 1.0 : -1.0;
+			val *= checkBit(base_vec, L - 1 - site) ? operators::_SPIN : -operators::_SPIN;
 		return std::make_pair(base_vec, val);
 	};
 
@@ -477,7 +481,7 @@ inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, in
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
 		const auto value = probabilities(i);
-		entropy -= value * log(abs(value));
+		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));;
 	}
 	//double entropy = -real(trace(rho * real(logmat(rho))));
 	return entropy;
@@ -494,7 +498,7 @@ inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
 		const auto value = probabilities(i);
-		entropy -= value * log(abs(value));
+		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));;
 	}
 	return entropy;
 	// return -real(trace(rho * (logmat(rho))));

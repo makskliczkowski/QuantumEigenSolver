@@ -117,8 +117,11 @@
     <ClInclude Include="source\src\UserInterface\ui.h">
       <Filter>Header Files\source\user_interface</Filter>
     </ClInclude>
-    <ClInclude Include="include\models\tester.h">
+    <ClInclude Include="include\models\XYZ.h">
       <Filter>Header Files\include\models</Filter>
+    </ClInclude>
+    <ClInclude Include="include\models\symmetries\XYZ_sym.h">
+      <Filter>Header Files\include\models\symmetries</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
