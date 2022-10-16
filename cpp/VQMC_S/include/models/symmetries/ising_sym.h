@@ -27,13 +27,13 @@ namespace ising_sym {
 		double J = 1;																	// spin exchange
 		double g = 1;																	// transverse magnetic field
 		double h = 1;																	// perpendicular magnetic field
-		
+
 		ising_sym::sym symmetries;
-		
+
 		// ------------------- TRANSLATION -------------------
 		bool k_sector;																	// if the k-sector allows parity symmetry
 		v_1d<_type> k_exponents;														// precalculate the symmetry exponents for current k vector
-		
+
 		// -------------------------------- SYMMETRY ELEMENTS --------------------------------
 
 	public:
@@ -50,7 +50,7 @@ namespace ising_sym {
 		// -------------------------------- OVERRIDING --------------------------------
 		void createSymmetryGroup() override;											// create symmetry group elements and their corresponding eigenvalues
 		void hamiltonian() override;													// creates the Hamiltonian itself
-		
+
 		string inf(const v_1d<string>& skip = {}, string sep = "_") const override
 		{
 			auto Ns = this->lattice->get_Ns();
@@ -70,7 +70,7 @@ namespace ising_sym {
 	};
 
 	/*
-	* @brief standard constructor 
+	* @brief standard constructor
 	*/
 	template<typename _type>
 	inline ising_sym::IsingModelSym<_type>::IsingModelSym(double J, double g, double h, std::shared_ptr<Lattice> lat, int k_sym, bool p_sym, bool x_sym, u32 thread_num)
@@ -91,7 +91,7 @@ namespace ising_sym {
 
 		// precalculate the exponents
 		this->k_exponents = v_1d<_type>(this->Ns, 0.0);
-		for (int l = 0; l < this->Ns; l++) 
+		for (int l = 0; l < this->Ns; l++)
 			this->k_exponents[l] = std::exp(-imn * this->symmetries.k_sym * double(l));
 
 		// calculate symmetry group
@@ -183,7 +183,7 @@ namespace ising_sym {
 				T = multiply_operators(function<u64(u64, int)>(rotateLeft), T);
 			}
 		}
-		else if(this->lattice->get_BC() == 1) {
+		else if (this->lattice->get_BC() == 1) {
 			// neutral element
 			this->symmetry_group.push_back(T);
 			this->symmetry_eigval.push_back(1.0);
@@ -206,7 +206,7 @@ namespace ising_sym {
 	}
 
 	// ----------------------------------------------------------- 				 BUILDING HAMILTONIAN 				 -----------------------------------------------------------
-	
+
 	/*
 	* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
 	* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
@@ -225,7 +225,7 @@ namespace ising_sym {
 				// flip with S^x_i with the transverse field
 				if (this->g != 0) {
 					u64 new_idx = flip(this->mapping[k], this->Ns - 1 - j);
-					this->setHamiltonianElem(k, this->g, new_idx);
+					this->setHamiltonianElem(k, this->_SPIN * this->g, new_idx);
 				}
 
 				// diagonal elements setting the perpendicular field

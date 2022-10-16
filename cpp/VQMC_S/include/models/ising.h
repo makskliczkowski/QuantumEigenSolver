@@ -137,7 +137,7 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(u64 _id, uint site) {
 
 	// flip with S^x_i with the transverse field
 	u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[1] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
 	// append unchanged at the very end
 	this->state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
 
@@ -174,7 +174,7 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(const vec& v, uint si
 	this->tmp_vec = v;
 	flipV(this->tmp_vec, site);
 	const u64 new_idx = baseToInt(this->tmp_vec);
-	this->state_val[1] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[1] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
 
 	// append unchanged at the very end
 	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
@@ -222,7 +222,7 @@ void IsingModel<_type>::hamiltonian() {
 
 			// flip with S^x_i with the transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - j);
-			setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+			setHamiltonianElem(k, this->_SPIN * (this->g + this->dg(j)), new_idx);
 
 			// diagonal elements setting the perpendicular field
 			this->H(k, k) += (this->h + dh(j)) * s_i;

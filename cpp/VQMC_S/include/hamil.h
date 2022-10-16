@@ -9,10 +9,11 @@
 using namespace std;
 template <typename _type>
 class SpinHamiltonian {
+protected:
+	double _SPIN = operators::_SPIN;																					// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
 public:
 	string info;																										// information about the model
 	randomGen ran;																										// consistent quick random number generator
-	double _SPIN = 1.0;																									// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
 
 	SpMat<_type> H;																										// the Hamiltonian
 	Mat<_type> eigenvectors;																							// matrix of the eigenvectors in increasing order

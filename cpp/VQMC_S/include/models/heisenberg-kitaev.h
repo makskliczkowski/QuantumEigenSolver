@@ -87,7 +87,7 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 
 	// transverse field (SX) - HEISENBERG
 	const u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[iter++] = std::make_pair(new_idx, this->g + this->dg(site));
+	this->state_val[iter++] = std::make_pair(new_idx, this->_SPIN * (this->g + this->dg(site)));
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
@@ -116,7 +116,7 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 			else if (n_num == 1)
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
-				flip_val += this->Kx + this->dKx(site);
+				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
 
 			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
@@ -149,7 +149,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 	this->tmp_vec = v;
 	flipV(tmp_vec, site);
 	const u64 new_idx = baseToInt(tmp_vec);
-	this->state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[iter++] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
@@ -181,7 +181,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 			else if (n_num == 1)
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
-				flip_val += this->Kx + this->dKx(site);
+				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
 			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
 		}
 		else
@@ -217,7 +217,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 			// HEISENBERG
 			const u64 new_idx = flip(k, this->Ns - 1 - i);
-			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
+			this->setHamiltonianElem(k, this->_SPIN * (this->g + this->dg(i)), new_idx);
 
 			// check the Siz Si+1z
 			for (auto nn = 0; nn < nn_number; nn++) {
@@ -248,7 +248,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 					else if (n_num == 1)
 						this->setHamiltonianElem(k, -(this->Ky + this->dKy(i)) * sisj, flip_idx_nn);
 					else if (n_num == 2)
-						this->setHamiltonianElem(k, this->Kx + this->dKx(i), flip_idx_nn);
+						this->setHamiltonianElem(k, this->_SPIN * this->_SPIN * (this->Kx + this->dKx(i)), flip_idx_nn);
 				}
 			}
 		}

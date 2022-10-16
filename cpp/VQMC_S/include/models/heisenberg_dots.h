@@ -205,15 +205,15 @@ inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(d
 
 	// set the s_z element
 	const auto Jz = this->J_dots(dot) + this->J_dot(2);
-	s_z_int = Jz * si * this->cos_thetas(dot);
+	s_z_int = Jz * si * this->cos_thetas(dot) * this->_SPIN;
 
 	const auto Jy = this->J_dots(dot) + this->J_dot(1);
 	// set the s_y element 
-	s_y_int = Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot);
+	s_y_int = Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot) * this->_SPIN;
 
 	const auto Jx = this->J_dots(dot) + this->J_dot(0);
 	// set the s_x element 
-	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot);
+	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot) * this->_SPIN * this->_SPIN;
 
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
@@ -234,14 +234,14 @@ inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return
 
 	// set the s_z element
 	const auto Jz = this->J_dots(dot) + this->J_dot(2);
-	s_z_int = this->cos_thetas(dot) * Jz * si;
+	s_z_int = this->cos_thetas(dot) * Jz * si * this->_SPIN;
 
 	// set the s_y element 
 	s_y_int = 0;
 
 	const auto Jx = this->J_dots(dot) + this->J_dot(0);
 	// set the s_x element 
-	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot);
+	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot) * this->_SPIN * this->_SPIN;
 
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
@@ -260,18 +260,18 @@ inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, uint position
 
 	// set the s_z element
 	auto Jz = (this->J_dots(2) + this->J_dot(2));
-	sz_int = make_tuple(state, Jz * si * this->cos_thetas(dot));
+	sz_int = make_tuple(state, Jz * si * this->cos_thetas(dot) * this->_SPIN);
 
 	// flip the state 
 	u64 new_state = flip(state, this->Ns - 1 - position);
 
 	auto Jy = (this->J_dots(1) + this->J_dot(1));
 	// set the s_y element 
-	sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot));
+	sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot) * this->_SPIN);
 
 	auto Jx = (this->J_dots(0) + this->J_dot(0));
 	// set the s_x element 
-	sx_int = make_tuple(new_state, Jx * this->sin_thetas(dot) * this->cos_phis(dot));
+	sx_int = make_tuple(new_state, this->_SPIN * this->_SPIN * Jx * this->sin_thetas(dot) * this->cos_phis(dot));
 
 }
 
@@ -298,7 +298,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 			// transverse field
 			const u64 new_idx = flip(k, this->Ns - 1 - j);
-			this->setHamiltonianElem(k, this->g + this->dg(j), new_idx);
+			this->setHamiltonianElem(k, this->_SPIN * (this->g + this->dg(j)), new_idx);
 
 			for (auto nn = 0; nn < nn_number; nn++) {
 				// double checking neighbors
@@ -356,7 +356,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 
 	// transverse field
 	const u64 new_idx = flip(_id, this->Ns - 1 - site);
-	_type s_flipped_en = this->g + this->dg(site);
+	_type s_flipped_en = this->_SPIN * (this->g + this->dg(site));
 
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
@@ -418,7 +418,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, ui
 	this->tmp_vec = v;
 	flipV(tmp_vec, site);
 	const u64 new_idx = baseToInt(tmp_vec);
-	_type s_flipped_en = this->g + this->dg(site);
+	_type s_flipped_en = this->_SPIN * (this->g + this->dg(site));
 
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors

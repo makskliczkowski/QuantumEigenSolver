@@ -229,7 +229,7 @@ namespace xyz_sym {
 	{
 		this->init_ham_mat();
 		auto Ns = this->lattice->get_Ns();
-		this->_SPIN = 1.0;
+
 		//#pragma omp parallel for num_threads(this->thread_num)
 		for (u64 k = 0; k < this->N; k++) {
 			for (int j = 0; j <= Ns - 1; j++) {

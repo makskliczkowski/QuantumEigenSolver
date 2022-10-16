@@ -120,7 +120,7 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 
 	// transverse field (SX)
 	u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[iter++] = std::make_pair(new_idx, this->g + this->dg(site));
+	this->state_val[iter++] = std::make_pair(new_idx, this->_SPIN * (this->g + this->dg(site)));
 
 	// check the Siz Si+1z
 	for (auto n_num : nn_number) {
@@ -168,7 +168,7 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint si
 	this->tmp_vec = v;
 	flipV(tmp_vec, site);
 	const u64 new_idx = baseToInt(tmp_vec);
-	this->state_val[iter++] = std::pair{ new_idx, this->g + this->dg(site) };
+	this->state_val[iter++] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
 
 	// check the Siz Si+1z
 	for (auto n_num : nn_number) {
@@ -224,7 +224,7 @@ void Heisenberg<_type>::hamiltonian() {
 
 			// transverse field
 			u64 new_idx = flip(k, this->Ns - 1 - i);
-			this->setHamiltonianElem(k, this->g + this->dg(i), new_idx);
+			this->setHamiltonianElem(k, this->_SPIN * (this->g + this->dg(i)), new_idx);
 
 			// check if nn exists
 			for (auto n_num : nn_number) {
