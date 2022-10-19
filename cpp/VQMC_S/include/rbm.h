@@ -908,9 +908,9 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_sampl
 
 			// look at the states coefficient (not found)
 
-			if (auto coefficient = this->coeff(this->current_vector); !valueEqualsPrec(std::abs(coefficient), 0.0, 1e-3)) {
-				states[this->current_state] = coefficient;
-			}
+			//if (auto coefficient = this->coeff(this->current_vector); !valueEqualsPrec(std::abs(coefficient), 0.0, 1e-3)) {
+			//	states[this->current_state] = coefficient;
+			//}
 
 			// append local energies
 			this->collectAv(this->locEn());
