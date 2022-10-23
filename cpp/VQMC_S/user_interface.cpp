@@ -776,9 +776,10 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// save energies to check
 	openFile(file, dir + "energies," + name + ".dat");
 	for (u64 i = 0; i < N; i++)
-		file << this->ham_d->get_eigenEnergy(i) << EL;
+		file << STRP(this->ham_d->get_eigenEnergy(i), 14) << EL;
 	file.close();
 	this->ham_d->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
+	this->ham_d->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
 	this->ham_d->clear_energies();
 	this->ham_d->clear_hamiltonian();
 
@@ -807,6 +808,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// save binary file
 	std::string filename = dir + "entropies," + name + ".bin";
 	entropies.save(filename, arma::raw_binary);
+	entropies.save(arma::hdf5_name(dir + "entropies," + name + ".h5", "entropy"));
 	if (this->lat->get_Ns() < 16) {
 		filename = dir + "entropies," + name + ".txt";
 		entropies.save(filename, arma::arma_ascii);
@@ -830,10 +832,6 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		}
 		fileAv.close();
 	}
-
-
-
-
 }
 
 template<typename _type, typename _hamtype>
@@ -874,9 +872,10 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// save energies to check
 	openFile(file, dir + "energies," + name + ".dat");
 	for (u64 i = 0; i < N; i++)
-		file << this->ham_cpx->get_eigenEnergy(i) << EL;
+		file << STRP(this->ham_cpx->get_eigenEnergy(i), 14) << EL;
 	file.close();
 	this->ham_cpx->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
+	this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
 	this->ham_cpx->clear_energies();
 	this->ham_cpx->clear_hamiltonian();
 
@@ -904,6 +903,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// save binary file
 	std::string filename = dir + "entropies," + name + ".bin";
 	entropies.save(filename, arma::raw_binary);
+	entropies.save(arma::hdf5_name(dir + "entropies," + name + ".h5", "entropy"));
 	if (this->lat->get_Ns() < 16) {
 		filename = dir + "entropies," + name + ".txt";
 		entropies.save(filename, arma::arma_ascii);

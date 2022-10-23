@@ -120,16 +120,18 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.2.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.2.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
       <EnableModules>true</EnableModules>
+      <AdditionalOptions>-lhdf5 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
+      <AdditionalOptions>-D_HDF5USEDLL_ %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -138,7 +140,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -151,8 +153,9 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
+      <AdditionalOptions>-D_HDF5USEDLL_ %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
