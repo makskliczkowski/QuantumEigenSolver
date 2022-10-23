@@ -9,7 +9,7 @@
 template <typename _type>
 class Heisenberg_dots : public Heisenberg<_type> {
 private:
-	size_t dot_num;										// number of the dots
+	uint dot_num;										// number of the dots
 	vec J_dot;											// interaction of a single classical spin
 	vec J_dots;											// interactions with the classical spins
 	double J_dot0 = 0;									// disorder at the classical spin interaction

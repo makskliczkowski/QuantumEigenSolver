@@ -81,12 +81,12 @@ private:
 
 	// general parameters
 	string info;                                                // info about the model
-	size_t batch;                                               // batch size for stochastic
-	size_t n_visible;                                           // visible neurons
-	size_t n_hidden;                                            // hidden neurons
-	size_t full_size;                                           // full size of the parameters
-	size_t hilbert_size;                                        // hilbert space size
-	size_t thread_num;                                          // thread number
+	uint batch;                                               // batch size for stochastic
+	uint n_visible;                                           // visible neurons
+	uint n_hidden;                                            // hidden neurons
+	uint full_size;                                           // full size of the parameters
+	uint hilbert_size;                                        // hilbert space size
+	uint thread_num;                                          // thread number
 	double lr;                                                  // learning rate
 #ifdef S_REGULAR
 	double b_reg_mult = b_reg;                                  // starting parameter for regularisation
@@ -126,8 +126,8 @@ private:
 public:
 	~rbmState() = default;
 	rbmState() = default;
-	rbmState(size_t nH, size_t nV, std::shared_ptr<SpinHamiltonian<_hamtype>> const& hamiltonian,
-		double lr, size_t batch, size_t thread_num
+	rbmState(uint nH, uint nV, std::shared_ptr<SpinHamiltonian<_hamtype>> const& hamiltonian,
+		double lr, uint batch, uint thread_num
 	)
 		: n_hidden(nH), n_visible(nV)
 		, lr(lr)
@@ -269,15 +269,15 @@ public:
 	// ------------------------------------------- 				 SAMPLING				  -------------------------------------------
 
 	// sample block
-	void blockSampling(size_t b_size, u64 start_stae, size_t n_flips = 1, bool thermalize = true);
+	void blockSampling(uint b_size, u64 start_stae, uint n_flips = 1, bool thermalize = true);
 
 	// sample the probabilistic space
-	Col<_type> mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
+	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1);
 
 
 	// average collection
 	void collectAv(_type loc_en);
-	map<u64, _type> avSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips = 1);
+	map<u64, _type> avSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1);
 
 };
 
@@ -689,7 +689,7 @@ inline void rbmState<_type, _hamtype>::locEnKernel(uint start, uint stop, Col<_t
 template<typename _type, typename _hamtype>
 inline _type rbmState<_type, _hamtype>::locEn() {
 	auto loc_en_time = std::chrono::high_resolution_clock::now();
-	size_t Ns = this->hamil->lattice->get_Ns();
+	uint Ns = this->hamil->lattice->get_Ns();
 	// get thread id
 #ifndef DEBUG
 	int num_of_threads = (Ns < 32) ? 1 : std::min(this->thread_num, Ns);
@@ -731,7 +731,7 @@ inline _type rbmState<_type, _hamtype>::locEn() {
 * @param n_flips number of flips at the single step
 */
 template<typename _type, typename _hamtype>
-void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, size_t n_flips, bool thermalize) {
+void rbmState<_type, _hamtype>::blockSampling(uint b_size, u64 start_state, uint n_flips, bool thermalize) {
 	if (start_state != this->current_state)
 		this->set_state(start_state, thermalize);
 
@@ -779,7 +779,7 @@ void rbmState<_type, _hamtype>::blockSampling(size_t b_size, u64 start_state, si
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips) {
+Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips) {
 #ifdef S_REGULAR
 	this->current_b_reg = this->b_reg_mult;
 #endif
@@ -877,7 +877,7 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(size_t n_samples, size_t n_bloc
 * @returns map of base state to the value of coefficient next to it
 */
 template<typename _type, typename _hamtype>
-inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(size_t n_samples, size_t n_blocks, size_t n_therm, size_t b_size, size_t n_flips)
+inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips)
 {
 	stout << "\n\n\n->Looking for the ground state for " + this->get_info() << "," + VEQ(n_samples) + "," + VEQ(n_blocks) + "," + VEQ(b_size) << EL;
 	// start the timer!

@@ -9,8 +9,8 @@
 template<typename _type>
 class Adam {
 private:
-	size_t size;								// size of the gradient
-	size_t current_time = 0;					// current iteration - starts from zero
+	uint size;								// size of the gradient
+	uint current_time = 0;					// current iteration - starts from zero
 	double beta1_0 = 0.9;						// 1st order exponential decay starting parameter
 	double beta1 = 0.9;							// 1st order exponential decay
 	double beta2_0 = 0.99;						// 2nd order exponential decay starting parameter
@@ -25,7 +25,7 @@ public:
 	// ---------------------------
 	~Adam() = default;
 	Adam() = default;
-	Adam(double lr, size_t size)
+	Adam(double lr, uint size)
 		: lr(lr), size(size)
 	{
 		this->beta1 = this->beta1_0;
@@ -33,7 +33,7 @@ public:
 		this->alpha = lr;
 		this->initialize();
 	};
-	Adam(double beta1, double beta2, double lr, double eps, size_t size)
+	Adam(double beta1, double beta2, double lr, double eps, uint size)
 		: beta1(beta1), beta2(beta2), lr(lr), eps(eps), size(size)
 	{
 		this->beta1_0 = beta1;
@@ -89,8 +89,8 @@ public:
 template<typename _type>
 class RMSprop_mod {
 private:
-	size_t size;								// size of the gradient
-	size_t current_time = 0;					// current iteration - starts from zero
+	uint size;								// size of the gradient
+	uint current_time = 0;					// current iteration - starts from zero
 	double beta_0 = 0.9;						// exponential decay starting parameter
 	double beta = 0.9;							// exponential decay
 	double eps = 1e-8;							// prevent zero-division
@@ -102,14 +102,14 @@ public:
 	// ---------------------------
 	~RMSprop_mod() = default;
 	RMSprop_mod() = default;
-	RMSprop_mod(double lr, size_t size)
+	RMSprop_mod(double lr, uint size)
 		: lr(lr), size(size)
 	{
 		this->beta_0 = 0.9;
 		this->beta = 0.9;
 		this->initialize();
 	};
-	RMSprop_mod(double beta, double lr, double eps, size_t size)
+	RMSprop_mod(double beta, double lr, double eps, uint size)
 		: beta(beta), lr(lr), eps(eps), size(size)
 	{
 		this->beta_0 = beta;

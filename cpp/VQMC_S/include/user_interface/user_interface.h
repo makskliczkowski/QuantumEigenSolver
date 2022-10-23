@@ -211,16 +211,16 @@ namespace rbm_ui {
 		int layer_mult = 2;
 		u64 nhidden;
 		u64 nvisible;
-		size_t batch = std::pow(2, 10);
-		size_t mcSteps = 1000;
-		size_t n_blocks = 500;
-		size_t block_size = 8;
-		size_t n_therm = size_t(0.1 * n_blocks);
-		size_t n_flips = 1;
+		uint batch = std::pow(2, 10);
+		uint mcSteps = 1000;
+		uint n_blocks = 500;
+		uint block_size = 8;
+		uint n_therm = uint(0.1 * n_blocks);
+		uint n_flips = 1;
 		double lr = 1e-2;
 
 		// others 
-		size_t thread_num = 16;														// thread parameters
+		uint thread_num = 16;														// thread parameters
 		bool quiet;																	// bool flags	
 
 

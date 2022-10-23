@@ -109,7 +109,7 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 	this->n_blocks = 500;
 	this->layer_mult = 2;
 	this->block_size = 8;
-	this->n_therm = size_t(0.1 * this->n_blocks);
+	this->n_therm = uint(0.1 * this->n_blocks);
 	this->n_flips = 1;
 	this->lr = 1e-2;
 }
@@ -139,7 +139,7 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	// number of blocks
 	choosen_option = "-nb";
 	this->set_option(this->n_blocks, argv, choosen_option);
-	this->n_therm = size_t(0.1 * n_blocks);
+	this->n_therm = uint(0.1 * n_blocks);
 
 	// block size
 	choosen_option = "-bs";
