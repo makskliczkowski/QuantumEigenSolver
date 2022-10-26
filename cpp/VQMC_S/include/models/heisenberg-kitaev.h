@@ -179,7 +179,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
 
 			flipV(tmp, nei);
-			changedVal += flip_val * f2(tmp2);
+			changedVal += flip_val * f2(tmp);
 		}
 	}
 	return changedVal + localVal;
