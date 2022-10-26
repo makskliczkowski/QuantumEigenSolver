@@ -33,8 +33,8 @@ public:
 
 	// METHODS
 	virtual void hamiltonian() override;
-	virtual const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;								// returns the local energy for VQMC purposes
-	virtual const v_1d<pair<u64, _type>>& locEnergy(const vec& _id, uint site) override;						// returns the local energy for VQMC purposes
+	virtual cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;								// returns the local energy for VQMC purposes
+	virtual cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;						// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
 	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -104,47 +104,44 @@ u64 Heisenberg<_type>::map(u64 index) const {
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
+inline cpx Heisenberg<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 	// sumup the value of non-changed state
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
-	this->state_val = v_1d<std::pair<u64, _type>>(2 + nn_number.size(), std::pair(LLONG_MAX, 0.0));			// create local energy pair
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
+	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ)
 	localVal += (this->h + dh(site)) * si;
 
 	// transverse field (SX)
-	u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[iter++] = std::make_pair(new_idx, this->_SPIN * (this->g + this->dg(site)));
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+
 
 	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
+	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-			double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			// check Sz 
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 
-			auto interaction = this->J + this->dJ(site);
+			const double interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += interaction * this->delta * si * sj;
 
 			// S+S- + S-S+
 			if (si * sj < 0) {
-				auto new_new_idx = flip(new_idx, this->Ns - 1 - nei);
-				this->state_val[iter++] = std::pair{ new_new_idx, 0.5 * interaction };
+				const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
+				INT_TO_BASE_BIT(flip_idx_nn, tmp);
+				changedVal += 0.5 * interaction * f2(tmp);
 			}
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
-
-	// append unchanged at the very end
-	this->state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
-	return this->state_val;
+	return changedVal + localVal;
 }
 
 /*
@@ -152,30 +149,30 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(u64 _id, uint site) {
 * @param v base state vector
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint site) {
+inline cpx Heisenberg<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	v_1d<uint> nn_number = this->lattice->get_nn_forward_number(site);
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field (SX) - HEISENBERG
-	this->tmp_vec = v;
-	flipV(tmp_vec, site);
-	const u64 new_idx = baseToInt(tmp_vec);
-	this->state_val[iter++] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+	tmp = v;
+	flipV(tmp, site);
 
 	// check the Siz Si+1z
-	for (auto n_num : nn_number) {
-		this->tmp_vec2 = this->tmp_vec;
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+	for (auto nn = 0; nn < nn_number; nn++) {
+		// double checking neighbors
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
 
 			// --------------------- HEISENBERG 
 
@@ -184,21 +181,15 @@ const v_1d<pair<u64, _type>>& Heisenberg<_type>::locEnergy(const vec& v, uint si
 			const auto sisj = si * sj;
 			localVal += interaction * this->delta * sisj;
 
-
 			// S+S- + S-S+
 			if (sisj < 0) {
-				flipV(tmp_vec2, nei);
-				auto flip_idx_nn = baseToInt(tmp_vec2);
-				this->state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
+				flipV(tmp, nei);
+				changedVal += 0.5 * interaction * f2(tmp);
+				flipV(tmp, nei);
 			}
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
-	// append unchanged at the very end
-	this->state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
-
-	return this->state_val;
+	return changedVal + localVal;
 }
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
 

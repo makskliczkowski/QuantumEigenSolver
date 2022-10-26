@@ -110,7 +110,8 @@ void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHami
 			hamiltonian->diag_h(false, 3, 0, 1000);
 
 		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
-		stout << "\t\t\t\t->" << VEQ(ground_ed) << "\t" << VEQ(ground_rbm) << EL;
+		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
+		stout << "\t\t\t\t->" << VEQP(ground_ed, 7) << "\t" << VEQP(ground_rbm, 7) << "\t" << VEQP(relative_error, 5) << "%" << EL;
 	}
 	else {
 		stout << "\t\t\t\t->skipping ed" << EL;

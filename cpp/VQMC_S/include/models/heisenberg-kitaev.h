@@ -35,15 +35,14 @@ public:
 
 		// state values number in local energy without the number of nearest neighbors
 		this->state_val_num = 2;
-		this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_number(0), std::pair(LLONG_MAX, 0.0));
 		// change info
 		this->info = this->inf();
 	};
 	// ----------------------------------- SETTERS ---------------------------------
 
 	// ----------------------------------- GETTERS ---------------------------------
-	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;
-	const v_1d<pair<u64, _type>>& locEnergy(const vec& v, uint site) override;
+	cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
+	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
 	void hamiltonian() override;
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -71,29 +70,29 @@ public:
 * @param _id base state index
 */
 template <typename _type>
-inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site) {
+inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 
 	// sumup the value of non-changed state
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	uint nn_number = this->lattice->get_nn_forward_num(site);
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
+	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field (SX) - HEISENBERG
-	const u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[iter++] = std::make_pair(new_idx, this->_SPIN * (this->g + this->dg(site)));
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
-		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
 			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 			// --------------------- HEISENBERG 
@@ -103,7 +102,7 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 			const double sisj = si * sj;
 			localVal += interaction * this->delta * sisj;
 
-			const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nei);
+			const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
 			double flip_val = 0.0;
 
 			// S+S- + S-S+
@@ -118,14 +117,11 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 			else if (n_num == 2)
 				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
 
-			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
+			INT_TO_BASE_BIT(flip_idx_nn, tmp);
+			changedVal += flip_val * f2(tmp);
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
-	// append unchanged at the very end
-	this->state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
-	return this->state_val;
+	return changedVal + localVal;
 }
 
 /*
@@ -133,32 +129,32 @@ inline const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(u64 _id
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site) {
+inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
+	// sumup the value of non-changed state
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	uint nn_number = this->lattice->get_nn_forward_num(site);
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field (SX) - HEISENBERG
-	this->tmp_vec = v;
-	flipV(tmp_vec, site);
-	const u64 new_idx = baseToInt(tmp_vec);
-	this->state_val[iter++] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+
+	tmp = v;
+	flipV(tmp, site);
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
-		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-		this->tmp_vec2 = this->tmp_vec;
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
 
 			// --------------------- HEISENBERG 
 
@@ -167,8 +163,7 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 			const auto sisj = si * sj;
 			localVal += interaction * this->delta * sisj;
 
-			flipV(tmp_vec2, nei);
-			auto flip_idx_nn = baseToInt(tmp_vec2);
+			flipV(tmp, nei);
 			double flip_val = 0.0;
 
 			// S+S- + S-S+
@@ -182,14 +177,12 @@ const v_1d<pair<u64, _type>>& Heisenberg_kitaev<_type>::locEnergy(const vec& v, 
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
 				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
-			this->state_val[iter++] = std::make_pair(flip_idx_nn, flip_val);
+
+			flipV(tmp, nei);
+			changedVal += flip_val * f2(tmp2);
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
-	// append unchanged at the very end
-	this->state_val[0] = std::make_pair(baseToInt(v), static_cast<_type>(localVal));
-	return this->state_val;
+	return changedVal + localVal;
 }
 
 

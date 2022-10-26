@@ -12,7 +12,7 @@
 #include <queue>
 
 namespace operators {
-	constexpr double _SPIN = 0.5;
+	constexpr double _SPIN = 1.0;
 }
 using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
 
@@ -331,13 +331,14 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, std
 template<typename _type>
 inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int site_a, int site_b)
 {
-	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 	//stout << alfa << EL;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
-		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
-		value += val * conj(alfa(new_idx)) * alfa(k);
+		if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) {
+			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
+			value += val * conj(alfa(new_idx)) * alfa(k);
+		}
 		//stout << VEQ(k) << "," << VEQ(new_idx) << "," << VEQ(val) << ", " << VEQ(value) << "," << VEQ(site_a) << "," << VEQ(site_b) << EL;
 	}
 	return value;

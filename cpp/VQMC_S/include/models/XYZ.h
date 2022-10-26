@@ -20,12 +20,12 @@ public:
 	XYZ(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, bool parity_break = true)
 		: Ja(Ja), Jb(Jb), hx(hx), hz(hz), Delta_a(Delta_a), Delta_b(Delta_b), eta_a(eta_a), eta_b(eta_b), XYZ(lat, parity_break) {};
 
-	double Ja = 1.0;																						// nearest neighbors J
-	double Jb = 1.0;																						// next nearest neighbors J	
-	double hx = 0.2;																						// sigma x field
-	double hz = 0.8;																						// sigma z field
-	double Delta_a = 0.9;																					// sigma_z*sigma_z nearest neighbors
-	double Delta_b = 0.9;																					// sigma_z*sigma_z next nearest neighbors
+	double Ja = 1.0;																									// nearest neighbors J
+	double Jb = 1.0;																									// next nearest neighbors J	
+	double hx = 0.2;																									// sigma x field
+	double hz = 0.8;																									// sigma z field
+	double Delta_a = 0.9;																								// sigma_z*sigma_z nearest neighbors
+	double Delta_b = 0.9;																								// sigma_z*sigma_z next nearest neighbors
 	double eta_a = 0.5;
 	double eta_b = 0.5;
 
@@ -37,9 +37,9 @@ private:
 public:
 	// METHODS
 	void hamiltonian() override;
-	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;										// sets the Hamiltonian elements
-	const v_1d<std::pair<u64, _type>>& locEnergy(u64 _id, uint site) override;								// returns the local energy for VQMC purposes
-	const v_1d<std::pair<u64, _type>>& locEnergy(const vec& _id, uint site) override;						// returns the local energy for VQMC purposes
+	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;													// sets the Hamiltonian elements
+	cpx locEnergy(u64, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override;					// returns the local energy for VQMC purposes
+	cpx locEnergy(const vec&, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override;			// returns the local energy for VQMC purposes
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -78,7 +78,6 @@ XYZ<_type>::XYZ(std::shared_ptr<Lattice> lat, bool parity_break)
 	this->Ns = this->lattice->get_Ns();
 	this->N = ULLPOW(this->Ns);															// Hilber space size
 	this->state_val_num = 2;
-	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num);
 
 	//change info
 	this->info = this->inf();
@@ -104,9 +103,9 @@ u64 XYZ<_type>::map(u64 index) const {
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& XYZ<_type>::locEnergy(u64 _id, uint site) {
+cpx XYZ<_type>::locEnergy(u64, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec& v) {
 
-	return this->state_val;
+	return 0.0;
 }
 
 /*
@@ -114,8 +113,8 @@ const v_1d<pair<u64, _type>>& XYZ<_type>::locEnergy(u64 _id, uint site) {
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& XYZ<_type>::locEnergy(const vec& v, uint site) {
-	return this->state_val;
+cpx XYZ<_type>::locEnergy(const vec&, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec& v) {
+	return 0.0;
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------

@@ -7,11 +7,11 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-//#define PLOT
+#define PLOT
 
 //#define DEBUG
 #ifdef USE_SR
-#define PINV
+//#define PINV
 #define S_REGULAR
 #endif
 
@@ -56,7 +56,7 @@ constexpr auto pinv_tol = 1e-5;
 
 
 constexpr double lambda_0_reg = 100;
-constexpr double b_reg = 0.9;
+constexpr double b_reg = 0.91;
 constexpr double lambda_min_reg = 1e-4;
 
 
@@ -81,12 +81,12 @@ private:
 
 	// general parameters
 	string info;                                                // info about the model
-	uint batch;                                               // batch size for stochastic
-	uint n_visible;                                           // visible neurons
-	uint n_hidden;                                            // hidden neurons
-	uint full_size;                                           // full size of the parameters
-	uint hilbert_size;                                        // hilbert space size
-	uint thread_num;                                          // thread number
+	uint batch;													// batch size for stochastic
+	uint n_visible;												// visible neurons
+	uint n_hidden;												// hidden neurons
+	uint full_size;												// full size of the parameters
+	uint hilbert_size;											// hilbert space size
+	uint thread_num;											// thread number
 	double lr;                                                  // learning rate
 #ifdef S_REGULAR
 	double b_reg_mult = b_reg;                                  // starting parameter for regularisation
@@ -230,6 +230,16 @@ public:
 	// ------------------------------------------- 				 GETTERS				  ------------------------------------------
 	auto get_info()                                                     const RETURNS(this->info);
 	auto get_op_av()                                                    const RETURNS(this->op);
+	int get_vec_id() {
+#ifndef DEBUG
+		if (this->thread_num == 1)
+			return 0;
+		else
+			return omp_get_thread_num() % this->thread_num;
+#else
+		return 0;
+#endif
+	}
 
 	// ------------------------------------------- 				 INITIALIZERS				  ------------------------------------------
 
@@ -248,7 +258,7 @@ public:
 
 	// get probability ratio for a reference state v1 and v2 state
 	_type pRatio(int tn = 1) const;
-	_type pRatio(int flip_place, int flipped_spin) const;
+	_type pRatio(int flip_place, double flipped_spin) const;
 	_type pRatio(const Col<double>& v, int tn = 1)                      const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector), tn) + sum(log(Fs(v) / cosh(this->thetas)))); };
 	_type pRatio(const Col<double>& v1, const Col<double>& v2\
 		, int tn = 1)                                                   const {
@@ -283,12 +293,13 @@ public:
 
 
 // ------------------------------------------------- 				 pValues				  -------------------------------------------------
+
 /*
 * @brief computes Log Psi'/Psi, where Psi' is the state with certain flipped spins - only one working for now
 * Look-up tables are used for speed; the vector flips tells us which are flipped
 */
 template<typename _type, typename _hamtype>
-inline _type rbmState<_type, _hamtype>::pRatio(int flip_place, int flipped_spin) const
+inline _type rbmState<_type, _hamtype>::pRatio(int flip_place, double flipped_spin) const
 {
 	// set the first value of b_visible
 #ifdef SPIN
@@ -531,18 +542,16 @@ void rbmState<_type, _hamtype>::set_weights() {
 #pragma omp parallel for num_threads(this->thread_num)
 	for (auto i = 0; i < this->n_visible; i++)
 		this->b_v(i) -= this->F(i);
+
 #pragma omp parallel for num_threads(this->thread_num)
-	for (auto i = 0; i < this->n_hidden; i++) {
-		const auto elem = i + this->n_visible;
-		this->b_h(i) -= this->F(elem);
-	}
+	for (auto i = 0; i < this->n_hidden; i++)
+		this->b_h(i) -= this->F(i + this->n_visible);
+
 #pragma omp parallel for num_threads(this->thread_num)
-	for (auto i = 0; i < this->n_hidden; i++) {
-		for (auto j = 0; j < this->n_visible; j++) {
-			const auto elem = (this->n_visible + this->n_hidden) + i + j * this->n_hidden;
-			this->W(i, j) -= this->F(elem);
-		}
-	}
+	for (auto i = 0; i < this->n_hidden; i++)
+		for (auto j = 0; j < this->n_visible; j++)
+			this->W(i, j) -= this->F((this->n_visible + this->n_hidden) + i + j * this->n_hidden);
+
 }
 
 // ------------------------------------------------- 				 CALCULATORS				  -------------------------------------------------
@@ -571,19 +580,17 @@ void rbmState<_type, _hamtype>::calcVarDeriv(const Col<double>& v) {
 #pragma omp parallel for num_threads(this->thread_num)
 	for (auto i = 0; i < this->n_visible; i++)
 		this->O_flat(i) = v(i);
+
 #pragma omp parallel for num_threads(this->thread_num)
-	for (auto i = 0; i < this->n_hidden; i++) {
-		const auto elem = i + this->n_visible;
-		this->O_flat(elem) = std::tanh(this->thetas(i));
-	}
+	for (auto i = 0; i < this->n_hidden; i++)
+		this->O_flat(i + this->n_visible) = std::tanh(this->thetas(i));
+
 #pragma omp parallel for num_threads(this->thread_num)
-	for (auto i = 0; i < this->n_hidden; i++) {
-		for (auto j = 0; j < this->n_visible; j++) {
-			const auto elem = (this->n_visible + this->n_hidden) + i + j * this->n_hidden;
-			const auto elem_hidden = i + this->n_visible;
-			this->O_flat(elem) = this->O_flat(elem_hidden) * v(j);
-		}
-	}
+	for (auto i = 0; i < this->n_hidden; i++)
+		for (auto j = 0; j < this->n_visible; j++)
+			this->O_flat((this->n_visible + this->n_hidden) + i + j * this->n_hidden) = this->O_flat(i + this->n_visible) * v(j);
+
+
 	PRT(var_deriv_time, this->dbg_drvt)
 }
 
@@ -630,56 +637,62 @@ inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state, uint
 #endif
 }
 
+/*
+* @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP
+*/
 template<typename _type, typename _hamtype>
 inline _type rbmState<_type, _hamtype>::locEnKernelAll()
 {
 	const auto hilb = this->hamil->get_hilbert_size();
 	_type energy = 0;
+
+	// define the lambda function
+	std::function<cpx(int, double)> f1 = [&](int flip_place, double flip_spin) {return static_cast<cpx>(this->pRatio(flip_place, flip_spin)); };
+	std::function<cpx(const vec&)> f2 = [&](const vec& v)
+	{
+#ifndef RBM_ANGLES_UPD
+		return static_cast<cpx>(this->pRatio(this->current_vector, v));
+#else
+		return static_cast<cpx>(this->pRatio(v));
+#endif
+	};
+
 	// loop over all lattice sites
 #ifndef DEBUG
 #pragma omp parallel for reduction(+ : energy) num_threads(this->thread_num)
 #endif
 	for (uint i = 0; i < this->n_visible; i++) {
-		uint nn_num = this->hamil->lattice->get_nn_forward_num(i);
-		auto states = this->hamil->locEnergy(this->current_state, i);
-		_type energy_tmp = 0;
-		// get thread id
-#ifndef DEBUG
-		const int vid = omp_get_thread_num() % this->thread_num;
-#else
-		const int vid = 0;
-#endif
-		uint num_vals = this->hamil->get_state_val_n() + nn_num;
-		for (uint j = 0; j < num_vals; j++) {
-			const auto [state, value] = states[j];
-			if (state >= hilb) break;
-			// stout << VEQ(state) << "\t" << VEQ(value) << EL;
-			// changes accordingly not to create data race
-			energy_tmp += state != this->current_state ? this->pRatioValChange(value, state, vid) : value;
-		}
-		energy += energy_tmp;
+		int vid = this->get_vec_id();
+		energy += this->hamil->locEnergy(this->current_state, i, f1, f2, this->tmp_vectors[vid]);
 	}
+
 	return energy;
 }
 
+/*
+* @brief Calculate the local energy depending on the given Hamiltonian - kernel of the function for multithreading purposes
+* @param start start of the subrange
+* @param end end of the subrange
+* @param energies energies column to save onto
+* @param tid thread id
+*/
 template<typename _type, typename _hamtype>
 inline void rbmState<_type, _hamtype>::locEnKernel(uint start, uint stop, Col<_type>& energies, uint tid)
 {
 	_type energy = 0;
+	std::function<cpx(int, double)> f1 = [&](int flip_place, double flip_spin) {return static_cast<cpx>(this->pRatio(flip_place, flip_spin)); };
+	std::function<cpx(const vec&)> f2 = [&](vec v)
+	{
+#ifndef RBM_ANGLES_UPD
+		return static_cast<cpx>(this->pRatio(this->current_vector, v));
+#else
+		return static_cast<cpx>(this->pRatio(v));
+#endif
+	};
 	// loop over all lattice sites
-	for (uint i = start; i < stop; i++) {
-		uint nn_num = this->hamil->lattice->get_nn_forward_num(i);
-		auto states = this->hamil->locEnergy(this->current_state, i);
-		_type energy_tmp = 0;
-		//for (const auto [state, value] : states) {
-		for (uint j = 0; j < this->hamil->get_state_val_n() + nn_num; j++) {
-			const auto [state, value] = states[j];
-			if (state >= this->hamil->get_hilbert_size()) break;
-			// changes accordingly not to create data race
-			energy_tmp += state != this->current_state ? this->pRatioValChange(value, state, tid) : value;
-		}
-		energy += energy_tmp;
-	}
+	for (uint i = start; i < stop; i++)
+		energy += this->hamil->locEnergy(this->current_state, i, f1, f2, this->tmp_vectors[this->get_vec_id()]);
+
 	energies[tid] = energy;
 }
 
@@ -692,7 +705,7 @@ inline _type rbmState<_type, _hamtype>::locEn() {
 	uint Ns = this->hamil->lattice->get_Ns();
 	// get thread id
 #ifndef DEBUG
-	int num_of_threads = (Ns < 32) ? 1 : std::min(this->thread_num, Ns);
+	int num_of_threads = (Ns < 50) ? 1 : std::min(this->thread_num, Ns);
 #else
 	int num_of_threads = 1;
 #endif
@@ -801,6 +814,7 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, 
 	for (auto i = 0; i < n_samples; i++) {
 		// set the random state at each Monte Carlo iteration
 		//this->set_rand_state();
+
 		this->set_angles(this->current_vector);
 
 		// thermalize system
@@ -965,11 +979,8 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 #pragma omp parallel for reduction(+ : s_y_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_y(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_y_nn(i) }));
-#ifndef DEBUG
-		const int vid = omp_get_thread_num() % this->thread_num;
-#else
-		const int vid = 0;
-#endif
+		const int vid = this->get_vec_id();
+
 		s_y_nei += this->pRatioValChange(val, state, vid);
 	}
 	this->op.s_y_nei += real(s_y_nei / double(Ns));
@@ -980,11 +991,8 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 #pragma omp parallel for reduction(+ : s_x, s_x_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i }));
-#ifndef DEBUG
-		const int vid = omp_get_thread_num() % this->thread_num;
-#else
-		const int vid = 0;
-#endif
+		const int vid = this->get_vec_id();
+
 		s_x += this->pRatioValChange(val, state, vid);
 		for (int j = 0; j < Ns; j++) {
 			const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, j }));

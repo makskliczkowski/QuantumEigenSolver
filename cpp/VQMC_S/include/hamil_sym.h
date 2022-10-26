@@ -11,21 +11,21 @@ class SpinHamiltonianSym : public SpinHamiltonian<_type> {
 public:
 	// -------------------------------- SYMMETRY ELEMENTS --------------------------------
 
-	v_1d<function<u64(u64, int)>> symmetry_group;																		// precalculate the symmetry exponents
-	v_1d<_type>	symmetry_eigval;																						// save all of the symmetry representatives eigenvalues
+	v_1d<function<u64(u64, int)>> symmetry_group;																				// precalculate the symmetry exponents
+	v_1d<_type>	symmetry_eigval;																								// save all of the symmetry representatives eigenvalues
 
-	virtual void createSymmetryGroup() = 0;																				// create symmetry group elements and their corresponding eigenvalues
-	pair<u64, _type> find_SEC_repr(u64 base_idx) const;																	// for a given base vector finds its corresponding symmetry representative
+	virtual void createSymmetryGroup() = 0;																						// create symmetry group elements and their corresponding eigenvalues
+	pair<u64, _type> find_SEC_repr(u64 base_idx) const;																			// for a given base vector finds its corresponding symmetry representative
 
 	// -------------------------------- GETTERS --------------------------------
 
-	_type get_symmetry_norm(u64 base_idx) const;																		// returns the normalization of a symmetrized state
+	_type get_symmetry_norm(u64 base_idx) const;																				// returns the normalization of a symmetrized state
 
 	// -------------------------------- MULTITHREADED MAPPING --------------------------------
 
-	void generate_mapping();																							// utilizes the mapping kernel
-	void mapping_kernel(u64 start, u64 stop, v_1d<u64>& map_thr, v_1d<_type>& norm_thr, int t);							// multithreaded mapping
-	v_1d<u64> generate_full_map() const;																				// generates a full map without symmetries
+	void generate_mapping();																									// utilizes the mapping kernel
+	void mapping_kernel(u64 start, u64 stop, v_1d<u64>& map_thr, v_1d<_type>& norm_thr, int t);									// multithreaded mapping
+	v_1d<u64> generate_full_map() const;																						// generates a full map without symmetries
 
 	u64 map(u64 index) const override
 	{
@@ -33,18 +33,18 @@ public:
 		return this->mapping[index];
 	};
 
-	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override { return v_1d<pair<u64, _type>>(); };			// returns the local energy for VQMC purposes
-	const v_1d<pair<u64, _type>>& locEnergy(const vec& _id, uint site) override { return v_1d<pair<u64, _type>>(); };	// returns the local energy for VQMC purposes
-	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;													// sets the Hamiltonian elements
+	cpx locEnergy(u64, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override { return 0.0; };			// returns the local energy for VQMC purposes
+	cpx locEnergy(const vec&, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override { return 0.0; };	// returns the local energy for VQMC purposes
+	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;															// sets the Hamiltonian elements
 public:
 	Col<_type> symmetryRotation(u64 state) const;
 	Mat<_type> symmetryRotationMat() const override;
 	// -------------------------------- GETTERS --------------------------------
 
-	auto get_normalization()					const RETURNS(this->normalisation);										// returns the normalization
-	auto get_symmetry_group()					const RETURNS(this->symmetry_group);									// returns the symmetry group generators
-	auto get_symmetry_eigval()					const RETURNS(this->symmetry_eigval);									// returns the symmetry group generators eigenvalues
-	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx)) override;					// rotates the state with symmetry group
+	auto get_normalization()					const RETURNS(this->normalisation);												// returns the normalization
+	auto get_symmetry_group()					const RETURNS(this->symmetry_group);											// returns the symmetry group generators
+	auto get_symmetry_eigval()					const RETURNS(this->symmetry_eigval);											// returns the symmetry group generators eigenvalues
+	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx)) override;							// rotates the state with symmetry group
 
 	// -------------------------------- CALCULATORS 
 	pair<u64, _type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);

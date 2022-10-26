@@ -48,8 +48,8 @@ public:
 
 	// ----------------------------------- 				 OTHER STUFF 				 ---------------------------------
 
-	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;
-	const v_1d<pair<u64, _type>>& locEnergy(const vec& v, uint site) override;
+	cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
+	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
 	void hamiltonian() override;
 
 	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
@@ -95,7 +95,6 @@ inline Heisenberg_dots<_type>::Heisenberg_dots(double J, double J0, double g, do
 
 	this->set_angles();																// reserve memory
 	this->state_val_num = 2;
-	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num + this->lattice->get_nn_forward_num(0), std::pair(LLONG_MAX, 0.0));
 
 	this->info = this->inf();														// set info
 }
@@ -288,7 +287,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 	// build the Hamiltonian
 	for (auto k = 0; k < this->N; k++) {
 		for (int j = 0; j < this->Ns; j++) {
-			uint nn_number = this->lattice->get_nn_forward_num(j);
+			const uint nn_number = this->lattice->get_nn_forward_num(j);
 
 			// true - spin up, false - spin down
 			double si = checkBit(k, this->Ns - 1 - j) ? this->_SPIN : -this->_SPIN;
@@ -302,8 +301,8 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 			for (auto nn = 0; nn < nn_number; nn++) {
 				// double checking neighbors
-				auto n_num = this->lattice->get_nn_forward_num(j, nn);
-				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
+				const uint n_num = this->lattice->get_nn_forward_num(j, nn);
+				if (int nei = this->lattice->get_nn(j, n_num); nei >= 0) {
 					// Ising-like spin correlation - check the bit on the nn
 					double sj = checkBit(k, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 					auto interaction = (this->J + this->dJ(j));
@@ -313,7 +312,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 					// S+S- + S-S+ hopping
 					if (si * sj < 0)
-						this->setHamiltonianElem(k, 0.5 * interaction, flip(new_idx, this->Ns - 1 - nei));
+						this->setHamiltonianElem(k, 0.5 * interaction, flip(flip(k, this->Ns - 1 - nei), this->Ns - 1 - j));
 
 					// dot - dot interaction
 					if (this->positions[j] > 0 && this->positions[nei] > 0)
@@ -341,12 +340,12 @@ void Heisenberg_dots<_type>::hamiltonian() {
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint site) {
+inline cpx Heisenberg_dots<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 	// sumup the value of non-changed state
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	uint nn_number = this->lattice->get_nn_forward_num(site);
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
@@ -355,29 +354,28 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field
-	const u64 new_idx = flip(_id, this->Ns - 1 - site);
-	_type s_flipped_en = this->_SPIN * (this->g + this->dg(site));
+	_type single_flip_val = this->_SPIN * (this->g + this->dg(site));
+
 
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
-		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-		auto nei = this->lattice->get_nn(site, n_num);
-		if (nei >= 0) {
-			const auto sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
-			const auto interaction = this->J + this->dJ(site);
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
+			const double interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += this->delta * interaction * si * sj;
 
+			const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
+			INT_TO_BASE_BIT(flip_idx_nn, tmp);
 			// S+S- + S-S+
 			if (si * sj < 0)
-				this->state_val[iter++] = std::make_pair(flip(new_idx, this->Ns - 1 - nei), 0.5 * interaction);
+				changedVal += f2(tmp) * 0.5 * interaction;
 
 			// dot - dot interaction
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// handle the dot
 	if (auto i = this->positions[site]; i > 0) {
@@ -385,15 +383,11 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 		// set sz_int
 		localVal += s_z_i;
 		// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
-		s_flipped_en += -s_y_i + s_z_i;
+		single_flip_val += -s_y_i + s_x_i;
 	}
+	changedVal += f1(site, si) * single_flip_val;
 
-	// set the flipped state
-	this->state_val[iter++] = std::make_pair(new_idx, s_flipped_en);
-	// append unchanged at the very end
-	this->state_val[0] = std::make_pair(_id, static_cast<_type>(localVal));
-
-	return this->state_val;
+	return localVal + changedVal;
 }
 
 /*
@@ -401,50 +395,48 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(u64 _id, uint si
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, uint site) {
+inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 	// sumup the value of non-changed state
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint iter = 1;
-	uint nn_number = this->lattice->get_nn_forward_num(site);
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// perpendicular field
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field
-	this->tmp_vec = v;
-	flipV(tmp_vec, site);
-	const u64 new_idx = baseToInt(tmp_vec);
-	_type s_flipped_en = this->_SPIN * (this->g + this->dg(site));
+	_type single_flip_val = this->_SPIN * (this->g + this->dg(site));
 
+	tmp = v;
+	flipV(tmp, site);
 	for (auto nn = 0; nn < nn_number; nn++) {
 		// double checking neighbors
-		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-		this->tmp_vec2 = this->tmp_vec;
-		// double checking neighbors
-		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-			// check Sz 
-			double sj = checkBitV(v, nn) > 0 ? this->_SPIN : -this->_SPIN;
+		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
 
-			auto interaction = (this->J + this->dJ(site));
+		// double checking neighbors
+		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
+			// check Sz 
+			const double sj = checkBitV(v, nn) > 0 ? this->_SPIN : -this->_SPIN;
+
+			const double interaction = (this->J + this->dJ(site));
 			// diagonal elements setting  interaction field
 			localVal += this->delta * interaction * si * sj;
 
 			// S+S- + S-S+
 			if (si * sj < 0) {
-				flipV(tmp_vec2, nei);
-				auto flip_idx_nn = baseToInt(tmp_vec2);
-				this->state_val[iter++] = std::pair{ flip_idx_nn, 0.5 * interaction };
+				flipV(tmp, nei);
+				changedVal += 0.5 * interaction * f2(tmp);
+				// unflip
+				flipV(tmp, nei);
 			}
 			// dot - dot interaction
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
 		}
-		else
-			this->state_val[iter++] = std::make_pair(INT64_MAX, 0.0);
 	}
 	// handle the dot
 	if (auto i = positions[site]; i > 0) {
@@ -452,14 +444,12 @@ const v_1d<pair<u64, _type>>& Heisenberg_dots<_type>::locEnergy(const vec& v, ui
 		// set sz_int
 		localVal += s_z_i;
 		// set sy_int and sx_int (REMEMBER TO CONJUGATE AS WE CALCULATE <s|O|s'> not <s'|O|s>)
-		s_flipped_en += -s_y_i + s_z_i;
+		single_flip_val += -s_y_i + s_x_i;
 	}
 	// set the flipped state
-	this->state_val[iter++] = std::pair{ new_idx, s_flipped_en };
-	// append unchanged at the very end
-	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	changedVal += f1(site, si) * single_flip_val;
 
-	return this->state_val;
+	return localVal + changedVal;
 }
 
 #endif

@@ -374,7 +374,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 	v_1d<double> e_aferro = {};
 	v_1d<double> e_aferro_ed = {};
 	double step = 0.1;
-#pragma omp parallel for num_threads(this->thread_num)
+
 	for (int ferro = 0; ferro <= 1; ferro++) {
 		stout << "\t\t->DOING " << (bool(ferro) ? "ferromagnet" : "antiferromagnet") << EL;
 		// ------------------------ FERROMAGNETIC CLASSICAL SPINS ------------------------
@@ -400,7 +400,10 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 		vec sin_thetas = sin(this->thetas * PI);
 		vec cos_thetas_rbm = cos(this->thetas * PI);
 		vec cos_thetas_ed = cos(this->thetas * PI);
-		for (int j0 = 0; j0 < 41; j0++) {
+		uint threads = this->thread_num / 2 < 1 ? 1 : uint(this->thread_num / 2);
+		cos_thetas_rbm.print(VEQ(ferro));
+		//#pragma omp parallel for num_threads(threads)
+		for (int j0 = 0; j0 <= 40; j0++) {
 			v_1d<double> Jd = { 0.0, 0.0, -2.0 + j0 * step };
 			stout << "\t-> doing " << VEQ(Jd[2]) << EL;
 			// create Hamiltonians
@@ -412,7 +415,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 			stout << "\t-> " << VEQ(model_info) << EL;
 
 			// rbm stuff
-			auto ph = std::make_unique<rbmState<_type, double>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, this->thread_num / 2);
+			auto ph = std::make_unique<rbmState<_type, double>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, this->thread_num);
 			auto rbm_info = ph->get_info();
 			stout << "\t\t->" << VEQ(rbm_info) << EL;
 			string order = string(ferro ? "ferro" : "aferro") + ",Lx=" + STR(this->lat->get_Lx()) + ",Ly=" + STR(this->lat->get_Ly()) + ",bc=" + STR(_BC) + ",d=" + STR(this->lat->get_Dim());
@@ -440,6 +443,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 
 			// ------------------- calculator ed -------------------
 			double ground_ed = 0.0;
+			avOperators av_operator(Lx, Ly, Lz, Ns, this->lat->get_type());
 			if (Ns <= 14) {
 				calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
@@ -450,7 +454,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 #endif
 				Col<_hamtype> eigvec = hamiltonian_ed->get_eigenState(0);
 				Operators<_hamtype> op(this->lat);
-				op.calculate_operators(eigvec, this->av_op, true);
+				op.calculate_operators(eigvec, av_operator, true);
 				// --------------------- compare sigma_z ---------------------
 
 				// S_z at each site
@@ -468,14 +472,15 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 				fileSave.close();
 			}
 			else {
-				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + this->ph->get_info());
+				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
 				SAVEFIG(dir + "energy" + ".png", true);
 			}
 
 			// ------------------- sampling rbm -------------------
 			ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-			this->av_op.reset();
-			this->av_op = ph->get_op_av();
+			av_operator.reset();
+			av_operator = ph->get_op_av();
+
 			auto fileRbmEn_name = dir + "energies";
 			std::ofstream fileRbmEn;
 			openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
@@ -514,7 +519,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 	}
 	std::ofstream file;
 	openFile(file, this->saving_dir + lat_info + ".dat", ios::out | ios::app);
-	for (int i = 0; i < 41; i++) {
+	for (int i = 0; i <= 40; i++) {
 		this->J0 = -2.0 + i * step;
 		printSeparatedP(file, '\t', 17, true, 13, this->J, this->J0, e_ferro[i], e_aferro[i], e_ferro_ed[i], e_aferro_ed[i]);
 	}
@@ -618,8 +623,8 @@ inline void rbm_ui::ui<_type, _hamtype>::compare_ed(double ground_rbm)
 		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
 
 		stouts("\t\t-> finished ED", diag_time);
-		stout << "\t\t\t->" << VEQ(ground_ed) << EL;
-		stout << "\t\t\t->" << VEQ(ground_rbm) << EL;
+		stout << "\t\t\t->" << VEQP(ground_ed, 8) << EL;
+		stout << "\t\t\t->" << VEQP(ground_rbm, 8) << EL;
 		stout << "\t\t\t->" << VEQP(relative_error, 4) << "%" << EL;
 		stout << "------------------------------------------------------------------------" << EL;
 		stout << "GROUND STATE ED ENERGY: " << VEQP(ground_ed, 4) << EL;

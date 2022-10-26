@@ -14,19 +14,19 @@ template <typename _type>
 class IsingModel : public SpinHamiltonian<_type> {
 private:
 	// MODEL BASED PARAMETERS 
-	double J = 1;																								// spin exchange
-	double g = 1;																								// transverse magnetic field
-	double h = 1;																								// perpendicular magnetic field
+	double J = 1;																													// spin exchange
+	double g = 1;																													// transverse magnetic field
+	double h = 1;																													// perpendicular magnetic field
 
 	vec tmp_vec;
 	vec tmp_vec2;
 
-	vec dh;																										// disorder in the system - deviation from a constant h value
-	double w = 0;																								// the distorder strength to set dh in (-disorder_strength, disorder_strength)
-	vec dJ;																										// disorder in the system - deviation from a constant J0 value
-	double J0 = 0;																								// spin exchange coefficient
-	vec dg;																										// disorder in the system - deviation from a constant g0 value
-	double g0 = 0;																								// transverse magnetic field
+	vec dh;																															// disorder in the system - deviation from a constant h value
+	double w = 0;																													// the distorder strength to set dh in (-disorder_strength, disorder_strength)
+	vec dJ;																															// disorder in the system - deviation from a constant J0 value
+	double J0 = 0;																													// spin exchange coefficient
+	vec dg;																															// disorder in the system - deviation from a constant g0 value
+	double g0 = 0;																													// transverse magnetic field
 public:
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
 	~IsingModel() = default;
@@ -39,9 +39,9 @@ private:
 public:
 	// METHODS
 	void hamiltonian() override;
-	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;											// sets the Hamiltonian elements
-	const v_1d<pair<u64, _type>>& locEnergy(u64 _id, uint site) override;										// returns the local energy for VQMC purposes
-	const v_1d<pair<u64, _type>>& locEnergy(const vec& _id, uint site) override;								// returns the local energy for VQMC purposes
+	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;																// sets the Hamiltonian elements
+	cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;			// returns the local energy for VQMC purposes
+	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;	// returns the local energy for VQMC purposes
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -87,7 +87,6 @@ IsingModel<_type>::IsingModel(double J, double J0, double g, double g0, double h
 	this->dJ = create_random_vec(this->Ns, this->ran, this->J0);						// creates random exchange vector
 	this->dg = create_random_vec(this->Ns, this->ran, this->g0);						// creates random transverse field vector
 	this->state_val_num = 2;
-	this->state_val = v_1d<std::pair<u64, _type>>(this->state_val_num);
 
 	//change info
 	this->info = this->inf();
@@ -113,12 +112,13 @@ u64 IsingModel<_type>::map(u64 index) const {
 * Calculate the local energy end return the corresponding vectors with the value
 * @param _id base state index
 */
-template <typename _type>
-const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(u64 _id, uint site) {
-	// sumup the value of non-changed state
-	double localVal = 0;
 
-	uint nn_number = this->lattice->get_nn_forward_num(site);
+template <typename _type>
+cpx IsingModel<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
+	// sumup the value of non-changed state
+	double localVal = 0.0;
+	cpx changedVal = 0.0;
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
 	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
@@ -128,7 +128,7 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(u64 _id, uint site) {
 
 	// check the Siz Si+1z
 	for (auto nn = 0; nn < nn_number; nn++) {
-		auto n_num = this->lattice->get_nn_forward_num(site, nn);
+		const auto n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
 			localVal += (this->J + this->dJ(site)) * si * sj;
@@ -136,12 +136,9 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(u64 _id, uint site) {
 	}
 
 	// flip with S^x_i with the transverse field
-	u64 new_idx = flip(_id, this->Ns - 1 - site);
-	this->state_val[1] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
-	// append unchanged at the very end
-	this->state_val[0] = std::pair{ _id, static_cast<_type>(localVal) };
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
 
-	return this->state_val;
+	return changedVal + localVal;
 }
 
 /*
@@ -149,14 +146,14 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(u64 _id, uint site) {
 * @param _id base state index
 */
 template <typename _type>
-const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(const vec& v, uint site) {
+cpx IsingModel<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
 	double localVal = 0;
+	cpx changedVal = 0.0;
 
-	uint nn_number = this->lattice->get_nn_forward_num(site);
-
+	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// check Sz 
-	double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
 
 	// diagonal elements setting the perpendicular field
 	localVal += (this->h + dh(site)) * si;
@@ -171,15 +168,10 @@ const v_1d<pair<u64, _type>>& IsingModel<_type>::locEnergy(const vec& v, uint si
 		}
 	}
 	// flip with S^x_i with the transverse field
-	this->tmp_vec = v;
-	flipV(this->tmp_vec, site);
-	const u64 new_idx = baseToInt(this->tmp_vec);
-	this->state_val[1] = std::pair{ new_idx, this->_SPIN * (this->g + this->dg(site)) };
 
-	// append unchanged at the very end
-	this->state_val[0] = std::pair{ baseToInt(v), static_cast<_type>(localVal) };
+	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
 
-	return this->state_val;
+	return changedVal + localVal;
 }
 
 // ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
