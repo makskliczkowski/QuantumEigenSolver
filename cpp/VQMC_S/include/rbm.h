@@ -7,7 +7,7 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-//#define PLOT
+#define PLOT
 
 //#define DEBUG
 #ifdef USE_SR
@@ -56,7 +56,7 @@ constexpr auto pinv_tol = 1e-5;
 
 
 constexpr double lambda_0_reg = 100;
-constexpr double b_reg = 0.91;
+constexpr double b_reg = 0.95;
 constexpr double lambda_min_reg = 1e-4;
 
 

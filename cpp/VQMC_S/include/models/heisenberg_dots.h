@@ -200,19 +200,18 @@ inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(d
 	double s_z_int = 0.0;
 	_type s_y_int = 0.0;
 	double s_x_int = 0.0;
-	uint dot = dotnum - 1; // we must neglect one to keep convinience
 
 	// set the s_z element
-	const auto Jz = this->J_dots(dot) + this->J_dot(2);
-	s_z_int = Jz * si * this->cos_thetas(dot) * this->_SPIN;
+	const auto Jz = this->J_dots(dotnum) + this->J_dot(2);
+	s_z_int = Jz * si * this->cos_thetas(dotnum) * this->_SPIN;
 
-	const auto Jy = this->J_dots(dot) + this->J_dot(1);
+	const auto Jy = this->J_dots(dotnum) + this->J_dot(1);
 	// set the s_y element 
-	s_y_int = Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot) * this->_SPIN;
+	s_y_int = Jy * imn * si * this->sin_thetas(dotnum) * this->sin_phis(dotnum) * this->_SPIN;
 
-	const auto Jx = this->J_dots(dot) + this->J_dot(0);
+	const auto Jx = this->J_dots(dotnum) + this->J_dot(0);
 	// set the s_x element 
-	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot) * this->_SPIN * this->_SPIN;
+	s_x_int = Jx * this->sin_thetas(dotnum) * this->cos_phis(dotnum) * this->_SPIN * this->_SPIN;
 
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
@@ -226,21 +225,20 @@ inline tuple<double, _type, double> Heisenberg_dots<_type>::get_dot_int_return(d
 template<>
 inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return(double si, uint dotnum)
 {
-	uint dot = dotnum - 1; // we must neglect one to keep convinience
 	double s_z_int = 0.0;
 	double s_y_int = 0.0;
 	double s_x_int = 0.0;
 
 	// set the s_z element
-	const auto Jz = this->J_dots(dot) + this->J_dot(2);
-	s_z_int = this->cos_thetas(dot) * Jz * si * this->_SPIN;
+	const auto Jz = this->J_dots(dotnum) + this->J_dot(2);
+	s_z_int = this->cos_thetas(dotnum) * Jz * si * this->_SPIN;
 
 	// set the s_y element 
 	s_y_int = 0;
 
-	const auto Jx = this->J_dots(dot) + this->J_dot(0);
+	const auto Jx = this->J_dots(dotnum) + this->J_dot(0);
 	// set the s_x element 
-	s_x_int = Jx * this->sin_thetas(dot) * this->cos_phis(dot) * this->_SPIN * this->_SPIN;
+	s_x_int = Jx * this->sin_thetas(dotnum) * this->cos_phis(dotnum) * this->_SPIN * this->_SPIN;
 
 	return std::make_tuple(s_x_int, s_y_int, s_z_int);
 }
@@ -253,24 +251,22 @@ inline tuple<double, double, double> Heisenberg_dots<double>::get_dot_int_return
 template<typename _type>
 inline void Heisenberg_dots<_type>::get_dot_interaction(u64 state, uint position, uint dotnum)
 {
-	uint dot = dotnum - 1; // we must neglect one to keep convinience
-
 	double si = checkBit(state, this->Ns - 1 - position) ? this->_SPIN : -this->_SPIN;
 
 	// set the s_z element
 	auto Jz = (this->J_dots(2) + this->J_dot(2));
-	sz_int = make_tuple(state, Jz * si * this->cos_thetas(dot) * this->_SPIN);
+	sz_int = make_tuple(state, Jz * si * this->cos_thetas(dotnum) * this->_SPIN);
 
 	// flip the state 
 	u64 new_state = flip(state, this->Ns - 1 - position);
 
 	auto Jy = (this->J_dots(1) + this->J_dot(1));
 	// set the s_y element 
-	sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas(dot) * this->sin_phis(dot) * this->_SPIN);
+	sy_int = make_tuple(new_state, Jy * imn * si * this->sin_thetas(dotnum) * this->sin_phis(dotnum) * this->_SPIN);
 
 	auto Jx = (this->J_dots(0) + this->J_dot(0));
 	// set the s_x element 
-	sx_int = make_tuple(new_state, this->_SPIN * this->_SPIN * Jx * this->sin_thetas(dot) * this->cos_phis(dot));
+	sx_int = make_tuple(new_state, this->_SPIN * this->_SPIN * Jx * this->sin_thetas(dotnum) * this->cos_phis(dotnum));
 
 }
 
@@ -316,7 +312,7 @@ void Heisenberg_dots<_type>::hamiltonian() {
 
 					// dot - dot interaction
 					if (this->positions[j] > 0 && this->positions[nei] > 0)
-						this->H(k, k) += this->J_dot_dot * this->cos_thetas(this->positions[j]) * this->cos_thetas(this->positions[nei]);
+						this->H(k, k) += this->J_dot_dot * this->cos_thetas(this->positions[j]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 				}
 			}
 			// handle the dot
@@ -374,7 +370,7 @@ inline cpx Heisenberg_dots<_type>::locEnergy(u64 _id, uint site, std::function<c
 
 			// dot - dot interaction
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
-				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
+				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 		}
 	}
 	// handle the dot
@@ -435,7 +431,7 @@ inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::funct
 			}
 			// dot - dot interaction
 			if (this->positions[site] > 0 && this->positions[nei] > 0)
-				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]);
+				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 		}
 	}
 	// handle the dot
