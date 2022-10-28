@@ -282,7 +282,7 @@ public:
 	void blockSampling(uint b_size, u64 start_stae, uint n_flips = 1, bool thermalize = true);
 
 	// sample the probabilistic space
-	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1);
+	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1, std::string dir = "");
 
 
 	// average collection
@@ -792,7 +792,7 @@ void rbmState<_type, _hamtype>::blockSampling(uint b_size, u64 start_state, uint
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips) {
+Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips, std::string dir) {
 #ifdef S_REGULAR
 	this->current_b_reg = this->b_reg_mult;
 #endif
@@ -864,21 +864,15 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, 
 		// add energy
 		meanEnergies(i) = meanLocEn;
 
-#ifdef DEBUG 
 		// update the progress bar
-		if (i % pbar.percentageSteps == 0)
+		if (i % pbar.percentageSteps == 0) {
 			pbar.printWithTime("-> PROGRESS");
+			// saving the weights, thus the progress
+			this->W.save(arma::hdf5_name(dir + "W.h5", "interaction"));
+			this->b_h.save(arma::hdf5_name(dir + "bh.h5", "hidden"));
+			this->b_v.save(arma::hdf5_name(dir + "bv.h5", "visible"));
+		}
 	}
-	stouts("->\t\t\tMonte Carlo energy search ", start);
-	this->W.save("W.csv", csv_ascii);
-	this->b_h.save("bh.csv", csv_ascii);
-	this->b_v.save("bv.csv", csv_ascii);
-#else
-		// update the progress bar
-		if (i % pbar.percentageSteps == 0)
-			pbar.printWithTime("-> PROGRESS");
-	}
-#endif
 	return meanEnergies;
 }
 

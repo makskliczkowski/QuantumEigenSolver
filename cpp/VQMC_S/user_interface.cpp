@@ -437,7 +437,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 
 			// ------------------- calculator rbm -------------------
 			// monte carlo for energy
-			auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips);
+			auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips, dir);
 			auto energies_tail = energies.tail(block_size);
 			double ground_rbm = std::real(arma::mean(energies_tail));
 
