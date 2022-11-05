@@ -329,6 +329,10 @@ void rbm_ui::ui<_type, _hamtype>::functionChoice()
 		// this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)
 		this->make_symmetries_test();
 		break;
+	case 3:
+		// this option utilizes the Hamiltonian with symmetries calculation
+		this->make_simulation_symmetries_sweep();
+		break;
 	default:
 		// default case of showing the help
 		this->exit_with_help();
@@ -1073,6 +1077,103 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
 
 }
+
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	stouts("STARTING THE CALCULATIONS FOR QUANTUM HAMILTONIAN: " + VEQ(thread_num), start);
+	stout << "->" << (sym ? "" : "not ") << "including symmetries" << EL;
+
+	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
+	stout << "->" << this->lat->get_info() << EL;
+	int Ns = this->lat->get_Ns();
+
+	// for SU(2) eta_a, eta_b needs to be set to 0.0, hz needs to be set to 0, we sweep delta_b outside
+	// for no SU(2) eta_a, eta_b need to be set 0.5, delta_b needs to be set to 0.9, we sweep hz outside
+
+
+	this->J = 1.0;
+	this->delta = 0.9;
+	this->J0 = 0.0;
+	this->g = 0.0;
+
+	this->w = 0.0;
+	this->g0 = 0.0;
+
+
+
+	v_1d<int> su2v = {};
+	if (this->eta_a == 0.0 && this->eta_b == 0.0) {
+		this->h = 0.0;
+		//for (int i = 0; i <= Ns; i++)
+		//	su2v.push_back(i);
+
+		// check only the sz=0
+		su2v.push_back(int(Ns / 2.0));
+	}
+	else {
+		this->Delta_b = delta;
+		su2v.push_back(-1);
+	}
+
+
+
+
+	double J2_max = 2.0;
+	double J2_min = 0.1;
+	double J2_step = 0.1;
+	int J2_num = abs(J2_max - J2_min) / J2_step;
+	// over next nearest interaction
+
+	// set momenta
+	v_1d<int> ks(Ns);
+	if (this->lat->get_BC() == 0)
+		std::iota(ks.begin(), ks.end(), 0);
+	else
+		ks = { 0 };
+	// set the parities
+	v_1d<int> ps = {};
+	// set the fields
+	v_1d<int> xs = {};
+	if (this->h == 0.0 && this->g == 0.0)
+		xs = { 0, 1 };
+	else
+		xs = { 1 };
+
+	for (int i = 0; i <= J2_num; i++) {
+		this->Jb = J2_min + J2_step * i;
+		// initialize hamiltonian
+		if (this->sym) {
+			for (auto su2 : su2v) {
+				this->su2 = su2;
+				for (auto k : ks) {
+					this->k_sym = k;
+					if (k == 0 || k == int(Ns / 2))
+						ps = { 0, 1 };
+					else
+						ps = { 1 };
+					for (auto x : xs) {
+						this->x_sym = x;
+						for (auto p : ps)
+						{
+							this->p_sym = p;
+							if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
+								this->symmetries_double(start);
+							else
+								this->symmetries_cpx(start);
+						}
+					}
+				}
+			}
+		}
+		else
+			this->symmetries_double(start);
+	}
+	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
+}
+
+
 
 template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)

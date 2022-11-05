@@ -276,6 +276,7 @@ namespace rbm_ui {
 
 		// #######################        SYMMETRIES            #######################
 		void make_simulation_symmetries();
+		void make_simulation_symmetries_sweep();
 		void make_symmetries_test(int l = -1);
 
 	};
