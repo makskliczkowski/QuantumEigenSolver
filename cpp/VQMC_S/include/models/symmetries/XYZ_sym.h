@@ -102,7 +102,7 @@ namespace xyz_sym {
 		this->thread_num = thread_num;
 		this->Ns = lat->get_Ns();
 
-		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), Ns, this->_SPIN);
+		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns, this->_SPIN);
 
 		this->symmetries.p_sym = (p_sym) ? 1 : -1;
 		this->symmetries.x_sym = (x_sym) ? 1 : -1;
@@ -143,7 +143,7 @@ namespace xyz_sym {
 		this->thread_num = thread_num;
 		this->Ns = lat->get_Ns();
 
-		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), Ns, this->_SPIN);
+		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns, this->_SPIN);
 
 		this->symmetries.p_sym = (p_sym) ? 1 : -1;
 		this->symmetries.x_sym = (x_sym) ? 1 : -1;
