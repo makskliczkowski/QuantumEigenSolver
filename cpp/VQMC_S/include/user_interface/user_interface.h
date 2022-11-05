@@ -150,13 +150,20 @@ namespace rbm_ui {
 			{"g","1.0"},								// transverse magnetic field constant
 			{"g0","0.0"},								// transverse field randomness maximum (-g0 to g0)
 			// heisenberg
-			{"dlt", "0"},								// delta
+			{"dlt", "1.0"},								// delta
+			// xyz
+			{"dlt2", "0.9"},							// delta2
+			{"J2", "1.0"},								// J2
+			{"eta", "0.0"},								// eta
+			{"eta2", "0.0"},							// eta2
+
 			// kitaev
 			{"kx", "0.0"},								// kitaev x interaction
 			{"ky", "0.0"},								// kitaev y interaction
 			{"kz", "0.0"},								// kitaev z interaction
 			{"k0", "0.0"},								// kitaev interaction disorder
 			// other
+			{"fun","-1"},								// choice of the function to be calculated
 			{"th","1"},									// number of threads
 			{"q","0"},									// quiet?
 		};
@@ -175,6 +182,7 @@ namespace rbm_ui {
 		int k_sym = 0;
 		bool p_sym = true;
 		bool x_sym = true;
+		double su2 = 0.0;
 		long double spectrum_size = 0.2;
 
 		// define basic model
@@ -207,6 +215,13 @@ namespace rbm_ui {
 		double J0_dot = 0.0;
 		double J_dot_dot = 1.0;														// dot - dot  classical interaction
 
+		// xyz parameters
+		double Jb = 1.0;																						// next nearest neighbors J	
+		double Delta_b = 0.9;																					// sigma_z*sigma_z next nearest neighbors
+		double eta_a = 0.5;
+		double eta_b = 0.5;
+
+
 		// rbm stuff
 		unique_ptr<rbmState<_type, _hamtype>> phi;
 		int layer_mult = 2;
@@ -228,28 +243,40 @@ namespace rbm_ui {
 		// averages from operators
 		avOperators av_op;
 
-		// -------------------------------------------   					HELPER FUNCTIONS  					-------------------------------------------
+		// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
 		void compare_ed(double ground_rbm);
 		void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-	public:
-		// -------------------------------------------  					CONSTRUCTORS  					-------------------------------------------
-		ui() = default;
-		ui(int argc, char** argv);
-		// -------------------------------------------  					PARSER FOR HELP  					-------------------------------------------
-		void exit_with_help() override;
-		// -------------------------------------------  				  REAL PARSER  				 -------------------------------------------
-		// the function to parse the command line
-		void parseModel(int argc, const v_1d<string>& argv) final;
-		// -------------------------------------------   					HELPERS  							-------------------------------------------
-		void set_default() override;																		// set default parameters
-		// -------------------------------------------  				  SIMULATION  			-------------------------------------------	 
-		void define_models();
-		void make_mc_classical();
+	
+	private:
+		// INNER METHODS
+		
+		// ####################### SYMMETRIES #######################
 		void symmetries_cpx(clk::time_point start);
 		void symmetries_double(clk::time_point start);
+
+
+	public:
+		// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
+		ui() = default;
+		ui(int argc, char** argv);
+		// -----------------------------------------------   	 PARSER FOR HELP  		-------------------------------------------
+		void exit_with_help() override;
+		// -----------------------------------------------    	   REAL PARSER          -------------------------------------------
+		// the function to parse the command line
+		void parseModel(int argc, const v_1d<string>& argv) final;
+		void functionChoice() final;
+		// ----------------------------------------------- 			HELPERS  			-------------------------------------------
+		void set_default() override;																		
+		// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
+		void define_models();
+
+		// #######################		     RBMs               #######################
+		void make_mc_classical();
+		void make_simulation() override;
+
+		// #######################        SYMMETRIES            #######################
 		void make_simulation_symmetries();
 		void make_symmetries_test(int l = -1);
-		void make_simulation() override;
+
 	};
 }
-// --------------------------------------------------------    				RBM   						--------------------------------------------------------

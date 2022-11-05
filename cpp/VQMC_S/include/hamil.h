@@ -6,10 +6,32 @@
 #ifndef HAMIL_H
 #define HAMIL_H
 
+
+namespace ham_sym {
+	struct global_sym {
+
+		// particle number conservation
+		bool su2 = false;
+		double su2v = 0.0;
+		bool check_su2(u64 state) const {
+			auto value = __builtin_popcountll(state);
+			return (this->su2 && double(value) != su2v);
+		}
+		void set_su2(double su2v, bool outter_condition, int Ns, double SPIN = 0.5) {
+			this->su2v = su2v;
+			this->su2 = (outter_condition && su2v >= 0 && su2v <= double(Ns)) ? true : false;
+		}
+
+	};
+}
+
+
 using namespace std;
 template <typename _type>
 class SpinHamiltonian {
 protected:
+	ham_sym::global_sym global;
+
 	double _SPIN = operators::_SPIN;																								// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
 public:
 	string info;																													// information about the model
@@ -36,13 +58,13 @@ public:
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
-// ------------------------------------------- 				  PRINTERS 				  -------------------------------------------
+// ------------------------------------------- 				          PRINTERS 				          -------------------------------------------
 	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);															// converts a map to arma column (VQMC)
 	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);											// pretty prints the base state
 	static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);												// pretty prints the eigenstate at a given idx
 	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };											// prints the eigenstate at a given idx
 
-	// ------------------------------------------- 				  INFO 				  -------------------------------------------
+	// ------------------------------------------- 				        INFO 				          -------------------------------------------
 
 	/*
 	* @brief sets and gets the information about the model
@@ -62,9 +84,9 @@ public:
 		tmp_str.pop_back();
 		return tmp_str;
 	};
-	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const = 0;
+	virtual string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const = 0;
 
-	// -------------------------------------------				  SETTERS					  -------------------------------------------
+	// -------------------------------------------				       SETTERS					      -------------------------------------------
 	void init_ham_mat() {
 		try {
 			this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
@@ -75,21 +97,24 @@ public:
 		}
 	};
 
-	// -------------------------------------------  				  GETTERS  				  -------------------------------------------
+	// -------------------------------------------  				   GETTERS  					  -------------------------------------------
 
 	auto get_en_av_idx()											const RETURNS(this->E_av_idx);									// return the index closest to the mean energy
-	auto get_state_val_n()											const RETURNS(this->state_val_num);								// returns the minimum number of states to be used in locenergy
 	auto get_hilbert_size()											const RETURNS(this->N);											// get the Hilbert space size 2^N
 	auto get_mapping()												const RETURNS(this->mapping);									// constant reference to the mapping
+	auto get_global_sym()											const RETURNS(this->global);									// returns global symmetries
 	auto get_hamiltonian()											const RETURNS(this->H);											// get the const reference to a Hamiltonian
 	auto get_eigenvectors()											const RETURNS(this->eigenvectors);								// get the const reference to the eigenvectors
 	auto get_eigenvalues()											const RETURNS(this->eigenvalues);								// get the const reference to eigenvalues
 	auto get_eigenEnergy(u64 idx)									const RETURNS(this->eigenvalues(idx));							// get eigenenergy at a given idx
 	auto get_eigenState(u64 idx)									const RETURNS(this->eigenvectors.col(idx));						// get an eigenstate at a given idx
 	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));					// get an eigenstate at a given idx
-	auto get_info(const v_1d<string>& skip = {}, string sep = "_")	const RETURNS(this->inf("", skip, sep));						// get the info about the model
 	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
+	virtual auto get_eigenStateFull(u64 idx, v_1d<u64> map)			const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
+	virtual v_1d<u64> get_mapping_full()							const { return this->mapping; };								// returns the full mapping
 	const Col<_type>& get_eigenStateRef(u64 idx)					const { this->eigenvectors.col(idx); };							// get the reference to the eigenstate
+	auto get_info(const v_1d<string>& skip = {}, string sep = "_", int prec = 2)	const RETURNS(this->inf("", skip, sep));						// get the info about the model
+
 
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
 	virtual void hamiltonian() = 0;																									// pure virtual Hamiltonian creator
@@ -101,7 +126,7 @@ public:
 		double tol = 0, std::string form = "lm");																					// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																			// diagonalize the Hamiltonian using shift and inverse
 
-	// ------------------------------------------- 				   VQMC  				  -------------------------------------------
+	// ------------------------------------------- 				        VQMC 				          -------------------------------------------
 	virtual cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;		// returns the local energy for VQMC purposes
 	virtual cpx locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;	// returns the local energy for VQMC purposes
 
@@ -113,9 +138,11 @@ public:
 
 	// -------------------------------------------
 public:
-
+	// -------------------------------------------					    CLEAR 						  -------------------------------------------
 	void clear_energies() { this->eigenvalues.reset(); };																			// resets the energy memory to 0
 	void clear_hamiltonian() { this->H.reset(); };																					// resets the hamiltonian memory to 0
+
+	// -------------------------------------------					    OTHER 						  -------------------------------------------
 
 	// Heisenberg-dots
 	void set_angles() {};
@@ -123,7 +150,7 @@ public:
 	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
 	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
 
-	virtual Mat<_type> symmetryRotationMat() const { return Mat<_type>(); };
+	virtual Mat<_type> symmetryRotationMat(const v_1d<u64>& full_map = {}) const { return Mat<_type>(); };
 	virtual Mat<_type> reduced_dens_mat(u64 state, int A_size) { return Mat<_type>(); };
 };
 

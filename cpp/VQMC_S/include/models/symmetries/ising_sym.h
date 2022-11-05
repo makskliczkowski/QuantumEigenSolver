@@ -51,17 +51,17 @@ namespace ising_sym {
 		void createSymmetryGroup() override;											// create symmetry group elements and their corresponding eigenvalues
 		void hamiltonian() override;													// creates the Hamiltonian itself
 
-		string inf(const v_1d<string>& skip = {}, string sep = "_") const override
+		string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 		{
 			auto Ns = this->lattice->get_Ns();
 			string name = sep + \
 				"ising_sym,Ns=" + STR(Ns) + \
-				",J=" + STRP(J, 2) + \
-				",g=" + STRP(g, 2) + \
-				",h=" + STRP(h, 2) + \
-				",k=" + STRP(symmetries.k_sym, 2) + \
-				",p=" + STRP(symmetries.p_sym, 2) + \
-				",x=" + STRP(symmetries.x_sym, 2) + \
+				",J=" + STRP(J, prec) + \
+				",g=" + STRP(g, prec) + \
+				",h=" + STRP(h, prec) + \
+				",k=" + STRP(symmetries.k_sym, prec) + \
+				",p=" + STRP(symmetries.p_sym, prec) + \
+				",x=" + STRP(symmetries.x_sym, prec) + \
 				",bc=" + STR(this->lattice->get_BC());
 
 			return this->SpinHamiltonian<_type>::inf(name, skip, sep);
@@ -158,7 +158,7 @@ namespace ising_sym {
 
 		function<u64(u64, int)> e = [](u64 n, int L) {return n; };						// neutral element
 		function<u64(u64, int)> T = e;													// in 1st iteration is neutral element
-		function<u64(u64, int)> Z = static_cast<u64(*)(u64, int)>(&flip);				// spin flip operator (all spins)
+		function<u64(u64, int)> Z = static_cast<u64(*)(u64, int)>(&flipAll);				// spin flip operator (all spins)
 		function<u64(u64, int)> P = reverseBits;										// parity operator
 
 
@@ -177,7 +177,7 @@ namespace ising_sym {
 					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym));
 					if (this->h == 0) {
 						this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
-						NO_OVERFLOW(this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * (long)this->symmetries.x_sym));)
+						this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * this->symmetries.x_sym));
 					}
 				}
 				T = multiply_operators(function<u64(u64, int)>(rotateLeft), T);

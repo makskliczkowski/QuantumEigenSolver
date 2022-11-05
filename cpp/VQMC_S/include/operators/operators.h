@@ -12,9 +12,9 @@
 #include <queue>
 
 namespace operators {
-	constexpr double _SPIN = 1.0;
+	constexpr double _SPIN = 0.5;
 }
-using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
+
 
 class avOperators {
 public:
@@ -117,6 +117,13 @@ public:
 	};
 };
 
+
+using op_type = std::function<std::pair<u64, cpx>(u64, int, std::vector<int>)>;
+/*
+* @brief multiplies two operators together
+* @param A a left operator
+* @param B a right operator
+*/
 template <typename T1, typename T2>
 inline function<T1(T1, T2)> multiply_operators(const function<T1(T1, T2)>& A, const std::function<T1(T1, T2)>& B) {
 	//auto result = [A, B](T1 n, T2 L) { return A(B(n, L), L); };
@@ -225,17 +232,10 @@ public:
 	// -----------------------------------------------  				   ENTROPY 				    ----------------------------------------------
 
 	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
-	//Mat<_type> red_dens_mat(const std::map<u64, _type>& state, int A_size) const;										// calculate the reduced density matrix with a map
-	//Mat<_type> red_dens_mat(const std::priority_queue<u64, _type>& state, int A_size) const;							// calculate the reduced density matrix with a priority queue
-	Mat<_type> red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size);
-
-	double entanglement_entropy(const Col<_type>& state, int A_size) const;												// entanglement entropy 
-	//double entanglement_entropy(const std::map<u64, _type>& state, int A_size) const;									// entanglement entropy with a map
-	//double entanglement_entropy(const std::priority_queue<u64, _type>& state, int A_size) const;						// entanglement entropy with a priority queue
+	Mat<_type> red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size) const;
+	double entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}) const;												// entanglement entropy 
 	double entanglement_entropy(const Mat<_type>& red_dens_mat) const;
 	vec entanglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
-	//vec entanglement_entropy_sweep(const std::map<u64, _type>& state) const;											// entanglement entropy sweep over bonds with a map
-	//vec entanglement_entropy_sweep(const std::priority_queue<u64, _type>& state) const;									// entanglement entropy sweep over bonds with a priority queue
 
 
 	// helpers
@@ -374,7 +374,7 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, int A_
 		for (long long m = n % dimB; m < Nh; m += dimB) {
 			// find index of state with same B-side (by dividing the last bits are discarded)
 			u64 idx = n / dimB;
-			rho(idx, counter) += state(n) * std::conj(state(m));
+			rho(idx, counter) += std::conj(state(n)) * state(m);
 			// increase counter to move along reduced basis
 			counter++;
 		}
@@ -407,7 +407,7 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int
 }
 
 template<typename _type>
-inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size)
+inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size) const
 {
 	const long long dimA = ULLPOW(A_size);
 	const long long dimB = ULLPOW(Ns - A_size);
@@ -435,7 +435,7 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const 
 }
 
 template<>
-inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, const v_1d<u64>& map, int A_size)
+inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, const v_1d<u64>& map, int A_size) const
 {
 	const long long dimA = ULLPOW(A_size);
 	const long long dimB = ULLPOW(Ns - A_size);
@@ -472,8 +472,8 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, con
 *  @returns entropy of considered systsem
 */
 template<typename _type>
-inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, int A_size) const {
-	Mat<_type> rho = red_dens_mat(state, A_size);
+inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map) const {
+	Mat<_type> rho = !map.empty() ? this->red_dens_mat(state, map, A_size) : this->red_dens_mat(state, A_size);
 	vec probabilities;
 	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
 	eig_sym(probabilities, rho);
@@ -489,8 +489,9 @@ inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, in
 }
 
 template<>
-inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_size) const {
-	Mat<cpx> rho = this->red_dens_mat(state, A_size);
+inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_size, const v_1d<u64>& map) const {
+
+	Mat<cpx> rho = !map.empty() ? this->red_dens_mat(state, map, A_size) : this->red_dens_mat(state, A_size);
 	vec probabilities;
 	//// diagonalize to find probabilities and calculate trace in rho's eigenbasis
 	eig_sym(probabilities, rho);
@@ -499,12 +500,15 @@ inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_
 	//#pragma omp parallel for reduction(+: entropy)
 	for (auto i = 0; i < probabilities.size(); i++) {
 		const auto value = probabilities(i);
-		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));;
+		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));
 	}
 	return entropy;
 	// return -real(trace(rho * (logmat(rho))));
 }
 
+/*
+* @brief entanglement entropy using the precalculated reduced density matrix
+*/
 template<typename _type>
 inline double Operators<_type>::entanglement_entropy(const Mat<_type>& rho) const
 {

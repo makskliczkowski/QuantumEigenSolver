@@ -37,17 +37,17 @@ public:
 	virtual cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;						// returns the local energy for VQMC purposes
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;
 
-	virtual string inf(const v_1d<string>& skip = {}, string sep = "_") const override
+	virtual string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		string name = sep + \
 			"heisenberg,Ns=" + STR(this->Ns) + \
-			",J=" + STRP(this->J, 2) + \
-			",J0=" + STRP(this->J0, 2) + \
-			",dlt=" + STRP(this->delta, 2) + \
-			",g=" + STRP(this->g, 2) + \
-			",g0=" + STRP(this->g0, 2) + \
-			",h=" + STRP(this->h, 2) + \
-			",w=" + STRP(this->w, 2);
+			",J=" + STRP(this->J, prec) + \
+			",J0=" + STRP(this->J0, prec) + \
+			",dlt=" + STRP(this->delta, prec) + \
+			",g=" + STRP(this->g, prec) + \
+			",g0=" + STRP(this->g0, prec) + \
+			",h=" + STRP(this->h, prec) + \
+			",w=" + STRP(this->w, prec);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	}
 	virtual void update_info() override { this->info = this->inf(); };

@@ -8,24 +8,25 @@
 
 template <typename _type>
 class SpinHamiltonianSym : public SpinHamiltonian<_type> {
+
 public:
 	// -------------------------------- SYMMETRY ELEMENTS --------------------------------
 
-	v_1d<function<u64(u64, int)>> symmetry_group;																				// precalculate the symmetry exponents
-	v_1d<_type>	symmetry_eigval;																								// save all of the symmetry representatives eigenvalues
+	v_1d<function<u64(u64, int)>> symmetry_group;																						// precalculate the symmetry exponents
+	v_1d<_type>	symmetry_eigval;																										// save all of the symmetry representatives eigenvalues
 
-	virtual void createSymmetryGroup() = 0;																						// create symmetry group elements and their corresponding eigenvalues
-	pair<u64, _type> find_SEC_repr(u64 base_idx) const;																			// for a given base vector finds its corresponding symmetry representative
+	virtual void createSymmetryGroup() = 0;																								// create symmetry group elements and their corresponding eigenvalues
+	pair<u64, _type> find_SEC_repr(u64 base_idx) const;																					// for a given base vector finds its corresponding symmetry representative
 
 	// -------------------------------- GETTERS --------------------------------
-
-	_type get_symmetry_norm(u64 base_idx) const;																				// returns the normalization of a symmetrized state
+		
+	_type get_symmetry_norm(u64 base_idx) const;																						// returns the normalization of a symmetrized state
 
 	// -------------------------------- MULTITHREADED MAPPING --------------------------------
 
-	void generate_mapping();																									// utilizes the mapping kernel
-	void mapping_kernel(u64 start, u64 stop, v_1d<u64>& map_thr, v_1d<_type>& norm_thr, int t);									// multithreaded mapping
-	v_1d<u64> generate_full_map() const;																						// generates a full map without symmetries
+	void generate_mapping();																											// utilizes the mapping kernel
+	void mapping_kernel(u64 start, u64 stop, v_1d<u64>& map_thr, v_1d<_type>& norm_thr, int t);											// multithreaded mapping
+	v_1d<u64> generate_full_map() const;																								// generates a full map without symmetries
 
 	u64 map(u64 index) const override
 	{
@@ -35,21 +36,27 @@ public:
 
 	cpx locEnergy(u64, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override { return 0.0; };			// returns the local energy for VQMC purposes
 	cpx locEnergy(const vec&, uint, std::function<cpx(int, double)>, std::function<cpx(const vec&)>, vec&) override { return 0.0; };	// returns the local energy for VQMC purposes
-	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;															// sets the Hamiltonian elements
+	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;																	// sets the Hamiltonian elements
 public:
-	Col<_type> symmetryRotation(u64 state) const;
-	Mat<_type> symmetryRotationMat() const override;
+	Col<_type> symmetryRotation(u64 state, const v_1d<u64>& full_map = {}) const;
+	Mat<_type> symmetryRotationMat(const v_1d<u64>& full_map = {}) const override;
 	// -------------------------------- GETTERS --------------------------------
 
-	auto get_normalization()					const RETURNS(this->normalisation);												// returns the normalization
-	auto get_symmetry_group()					const RETURNS(this->symmetry_group);											// returns the symmetry group generators
-	auto get_symmetry_eigval()					const RETURNS(this->symmetry_eigval);											// returns the symmetry group generators eigenvalues
-	auto get_eigenStateFull(u64 idx)			const RETURNS(this->symmetryRotation(idx)) override;							// rotates the state with symmetry group
-
+	auto get_normalization()											const RETURNS(this->normalisation);								// returns the normalization
+	auto get_symmetry_group()											const RETURNS(this->symmetry_group);							// returns the symmetry group generators
+	auto get_symmetry_eigval()											const RETURNS(this->symmetry_eigval);							// returns the symmetry group generators eigenvalues
+	Col<_type> get_eigenStateFull(u64 idx)								const override { return this->symmetryRotation(idx); };			// rotates the state with symmetry group
+	Col<_type> get_eigenStateFull(u64 idx, const v_1d<u64> fullmap)		const override { return this->symmetryRotation(idx, fullmap); };// rotates the state with symmetry group, using mapping when global symmetry is present
+	v_1d<u64> get_mapping_full()										const override { return this->generate_full_map(); };			// returns the full mapping excluding the global symmetry
 	// -------------------------------- CALCULATORS 
 	pair<u64, _type> find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta);
 
 };
+
+
+
+
+// ---------------------------------------------------------------- REPRESENTATIVES ----------------------------------------------------------------
 
 template<typename _type>
 inline pair<u64, _type> SpinHamiltonianSym<_type>::find_rep_and_sym_eigval(u64 base_idx, _type normalisation_beta)
@@ -119,7 +126,8 @@ inline pair<u64, _type> SpinHamiltonianSym<_type>::find_SEC_repr(u64 base_idx) c
 	u64 SEC = INT64_MAX;
 	int _min = INT_MAX;
 	for (int l = 0; l < this->symmetry_group.size(); l++) {
-		if (u64 new_idx = this->symmetry_group[l](base_idx, this->Ns); new_idx < SEC) {
+		const u64 new_idx = this->symmetry_group[l](base_idx, this->Ns);
+		if (new_idx < SEC) {
 			SEC = new_idx;
 			_min = l;
 		}
@@ -137,22 +145,31 @@ inline _type SpinHamiltonianSym<_type>::get_symmetry_norm(u64 base_idx) const
 	_type normalisation = 0.0;
 	for (int l = 0; l < this->symmetry_group.size(); l++) {
 		// if we return to the same state by acting with symmetry group operators
-		if (this->symmetry_group[l](base_idx, this->Ns) == base_idx)
+		const u64 new_idx = this->symmetry_group[l](base_idx, this->Ns);
+		if (new_idx == base_idx)
 			normalisation += this->symmetry_eigval[l];
 	}
-	return sqrt(normalisation);
+	return std::sqrt(normalisation);
 }
 
-template<typename _type>
-inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat() const
-{
+// ---------------------------------------------------------------- SYMMETRY MAPPING ----------------------------------------------------------------
 
-	u64 max_dim = ULLPOW(this->Ns);
+/*
+* @brief Creates a unitary matrix that applies a symmetry rotation of a given state vector to the basis where the local symmetries are not considered
+* @param full_map uses the map to transform only to global symmetry sector
+*/
+template<typename _type>
+inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat(const v_1d<u64>& full_map) const
+{
+	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
+	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
 	Mat<cpx> U(max_dim, this->N, arma::fill::zeros);
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
+			// apply the mapping
+			idx = find_index(idx);
 			if (idx < max_dim) // only if exists in sector
 				U(idx, k) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
 		}
@@ -161,15 +178,17 @@ inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat() const
 }
 
 template<>
-inline Mat<double> SpinHamiltonianSym<double>::symmetryRotationMat() const
+inline Mat<double> SpinHamiltonianSym<double>::symmetryRotationMat(const v_1d<u64>& full_map) const
 {
-
-	u64 max_dim = ULLPOW(this->Ns);
+	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
+	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
 	Mat<double> U(max_dim, this->N, arma::fill::zeros);
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
+			// apply the mapping
+			idx = find_index(idx);
 			if (idx < max_dim) // only if exists in sector
 				U(idx, k) += (this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())));
 		}
@@ -177,16 +196,24 @@ inline Mat<double> SpinHamiltonianSym<double>::symmetryRotationMat() const
 	return U;
 }
 
+/*
+* @brief Applies a symmetry rotation of a given state vector to the basis where the local symmetries are not considered
+* @param state state vector to be transformed
+* @param full_map uses the map to transform only to global symmetry sector
+*/
 template<typename _type>
-inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
+inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state, const v_1d<u64>& full_map) const
 {
-	u64 dim = ULLPOW(this->Ns);
+	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
+	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
 
-	Col<_type> output(dim, arma::fill::zeros);
+	Col<_type> output(max_dim, arma::fill::zeros);
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
-			if (idx < dim) // only if exists in sector
+			// apply the mapping
+			idx = find_index(idx);
+			if (idx < max_dim) // only if exists in sector
 				output(idx) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size()))) * this->eigenvectors(k, state);
 		}
 	}
@@ -194,15 +221,16 @@ inline Col<_type> SpinHamiltonianSym<_type>::symmetryRotation(u64 state) const
 }
 
 template<>
-inline Col<double> SpinHamiltonianSym<double>::symmetryRotation(u64 state) const
+inline Col<double> SpinHamiltonianSym<double>::symmetryRotation(u64 state, const v_1d<u64>& full_map) const
 {
-	u64 dim = ULLPOW(this->Ns);
+	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
+	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
 
-	Col<double> output(dim, arma::fill::zeros);
+	Col<double> output(max_dim, arma::fill::zeros);
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
 			auto idx = this->symmetry_group[i](this->mapping[k], this->Ns);
-			if (idx < dim) // only if exists in sector
+			if (idx < max_dim) // only if exists in sector
 				output(idx) += this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(this->symmetry_group.size())) * this->eigenvectors(k, state);
 		}
 	}
@@ -225,9 +253,16 @@ template<typename _type>
 inline void SpinHamiltonianSym<_type>::mapping_kernel(u64 start, u64 stop, v_1d<u64>& map_thr, v_1d<_type>& norm_thr, int t)
 {
 	for (u64 j = start; j < stop; j++) {
-		if (const auto [SEC, some_value] = find_SEC_repr(j); SEC == j) {
+
+		// check particle number conservation
+		if (this->global.check_su2(j))
+			continue;
+
+		const auto [SEC, some_value] = find_SEC_repr(j);
+		if (SEC == j) {
 			// normalisation condition -- check if state in basis
-			if (_type N = get_symmetry_norm(j); std::abs(N) > 1e-6) {
+			_type N = get_symmetry_norm(j);
+			if (std::abs(N) > 1e-6) {
 				map_thr.push_back(j);
 				norm_thr.push_back(N);
 			}
@@ -285,17 +320,17 @@ inline void SpinHamiltonianSym<_type>::generate_mapping()
 }
 
 /*
-* @brief generates full mapping of the Hamiltonian
+* @brief generates full mapping of the Hamiltonian excluding the potential global symmetries
 */
 template<typename _type>
 inline v_1d<u64> SpinHamiltonianSym<_type>::generate_full_map() const
 {
-	//v_1d<u64> full_map;
-	//for (u64 j = 0; j < (ULLPOW(this->Ns)); j++) {
-	//	if (__builtin_popcountll(j) == this->Ns / 2.)
-	//		full_map.push_back(j);
-	//}
-	return v_1d<u64>();
+	v_1d<u64> full_map;
+	for (u64 j = 0; j < (ULLPOW(this->Ns)); j++) {
+		if (!this->global.check_su2(j))
+			full_map.push_back(j);
+	}
+	return full_map;
 }
 
 // ---------------------------------------------------------------- SYMMETRY ELEMENTS ----------------------------------------------------------------

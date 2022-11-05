@@ -52,17 +52,17 @@ public:
 	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
 	void hamiltonian() override;
 
-	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
+	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		string name = sep + \
 			"_hei_dots,dN=" + STRP(this->dot_num, 2) + ",Ns=" + STR(this->Ns) + \
-			",J=" + STRP(this->J, 2) + \
-			",Jx=" + STRP(this->J_dot(0), 2) + \
-			",Jy=" + STRP(this->J_dot(1), 2) + \
-			",Jz=" + STRP(this->J_dot(2), 2) + \
-			",d=" + STRP(this->delta, 2) + \
-			",J0=" + STRP(this->J0, 2) + \
-			",Jdd=" + STRP(this->J_dot_dot, 2);
+			",J=" + STRP(this->J, prec) + \
+			",Jx=" + STRP(this->J_dot(0), prec) + \
+			",Jy=" + STRP(this->J_dot(1), prec) + \
+			",Jz=" + STRP(this->J_dot(2), prec) + \
+			",d=" + STRP(this->delta, prec) + \
+			",J0=" + STRP(this->J0, prec) + \
+			",Jdd=" + STRP(this->J_dot_dot, prec);
 		//",g=" + STRP(this->g, 2) + \
 			//",g0=" + STRP(this->g0, 2) + \
 			//",h=" + STRP(this->h, 2) + \

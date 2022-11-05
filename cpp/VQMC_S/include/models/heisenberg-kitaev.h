@@ -45,19 +45,19 @@ public:
 	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
 	void hamiltonian() override;
 
-	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
+	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		string name = sep + \
 			"hei_kitv,Ns=" + STR(this->Ns) + \
-			",J=" + STRP(this->J, 2) + \
-			",J0=" + STRP(this->J0, 2) + \
-			",d=" + STRP(this->delta, 2) + \
-			",g=" + STRP(this->g, 2) + \
-			",g0=" + STRP(this->g0, 2) + \
-			",h=" + STRP(this->h, 2) + \
-			",w=" + STRP(this->w, 2) + \
-			",K=(" + STRP(this->Kx, 2) + "," + STRP(this->Ky, 2) + "," + STRP(this->Ky, 2) + ")" \
-			",K0=" + STRP(this->K0, 2);
+			",J=" + STRP(this->J, prec) + \
+			",J0=" + STRP(this->J0, prec) + \
+			",d=" + STRP(this->delta, prec) + \
+			",g=" + STRP(this->g, prec) + \
+			",g0=" + STRP(this->g0, prec) + \
+			",h=" + STRP(this->h, prec) + \
+			",w=" + STRP(this->w, prec) + \
+			",K=(" + STRP(this->Kx, prec) + "," + STRP(this->Ky, prec) + "," + STRP(this->Ky, prec) + ")" \
+			",K0=" + STRP(this->K0, prec);
 		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 	};
 	void update_info() override { this->info = this->inf(); };

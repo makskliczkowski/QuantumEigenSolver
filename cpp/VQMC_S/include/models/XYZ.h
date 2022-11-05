@@ -18,7 +18,10 @@ public:
 	XYZ() = default;
 	XYZ(std::shared_ptr<Lattice> lat, bool parity_break = true);
 	XYZ(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, bool parity_break = true)
-		: Ja(Ja), Jb(Jb), hx(hx), hz(hz), Delta_a(Delta_a), Delta_b(Delta_b), eta_a(eta_a), eta_b(eta_b), XYZ(lat, parity_break) {};
+		: XYZ(lat, parity_break) 
+	{
+		this->init(Ja, Jb, hx, hz, Delta_a, Delta_b, eta_a, eta_b);
+	};
 
 	double Ja = 1.0;																									// nearest neighbors J
 	double Jb = 1.0;																									// next nearest neighbors J	
@@ -34,6 +37,19 @@ public:
 private:
 	u64 map(u64 index) const override;
 
+	void init(double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b) {
+		this->Ja = Ja;
+		this->Jb = Jb;
+		this->hx = hx;
+		this->hz = hz;
+		this->Delta_a = Delta_a;
+		this->Delta_b = Delta_b;
+		this->eta_a = eta_a;
+		this->eta_b = eta_b;
+		this->update_info();
+	}
+
+
 public:
 	// METHODS
 	void hamiltonian() override;
@@ -43,18 +59,18 @@ public:
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
-	string inf(const v_1d<std::string>& skip = {}, std::string sep = "_") const override
+	string inf(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
 		std::string name = sep + \
 			"xyz,Ns=" + STR(this->Ns) + \
-			",Ja=" + STRP(this->Ja, 2) + \
-			",Jb=" + STRP(this->Jb, 2) + \
-			",hx=" + STRP(this->hx, 2) + \
-			",hz=" + STRP(this->hz, 2) + \
-			",da=" + STRP(this->Delta_a, 2) + \
-			",db=" + STRP(this->Delta_b, 2) + \
-			",ea=" + STRP(this->eta_a, 2) + \
-			",eb=" + STRP(this->eta_b, 2) + \
+			",Ja=" + STRP(this->Ja, prec) + \
+			",Jb=" + STRP(this->Jb, prec) + \
+			",hx=" + STRP(this->hx, prec) + \
+			",hz=" + STRP(this->hz, prec) + \
+			",da=" + STRP(this->Delta_a, prec) + \
+			",db=" + STRP(this->Delta_b, prec) + \
+			",ea=" + STRP(this->eta_a, prec) + \
+			",eb=" + STRP(this->eta_b, prec) + \
 			",pb=" + STR(this->parity_break) + \
 			",bc=" + STR(this->lattice->get_BC());
 
@@ -161,29 +177,19 @@ void XYZ<_type>::hamiltonian() {
 
 			// diagonal elements setting the perpendicular field
 
-			const double perpendicular_val = ((j == Ns - 1) && this->parity_break) ? 0.5 * this->hz : this->hz;
+			const double perpendicular_val = ((j == Ns - 1) && this->parity_break) ? 0.1 : this->hz;
 			std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { j });
 			this->H(idx, k) += perpendicular_val * real(val);
 
-			if (this->parity_break && Ns < 10)
-				stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(perpendicular_val) << EL;
-			//this->H(k, k) += 16.0 * s_i;
-
-			// flip with S^x_i with the transverse field
-			const double transverse_val = ((j == 0) && this->parity_break) ? 0.5 * hx : hx;
+			// flip with S^x_i with the transverse field -> just one place to break
+			const double transverse_val = ((j == 0) && this->parity_break) ? 0.1 : this->hx;
 			std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { j });
 			this->setHamiltonianElem(k, transverse_val * real(val), idx);
-
-			if (this->parity_break && Ns < 10)
-				stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(transverse_val) << EL;
-			//this->H(new_idx, k) += 4.0;
 
 			// -------------- CHECK NN ---------------
 			for (auto nn = 0; nn < nn_number; nn++) {
 				auto n_num = this->lattice->get_nn_forward_num(j, nn);
 				if (auto nei = this->lattice->get_nn(j, n_num); nei >= 0) {
-					if (this->parity_break && Ns < 10)
-						stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(nn_number) << "\t" << VEQ(n_num) << "\t" << VEQ(nei) << EL;
 
 					// setting the neighbors elements
 					auto [idx_x, val_x] = Operators<cpx>::sigma_x(k, Ns, { j });
@@ -198,19 +204,14 @@ void XYZ<_type>::hamiltonian() {
 					auto [idx_z2, val_z2] = Operators<cpx>::sigma_z(idx_z, Ns, { nei });
 					this->H(idx_z2, k) += this->Ja * this->Delta_a * real(val_z * val_z2);
 
-					if (this->parity_break && Ns < 10)
-						stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(real(val_x * val_x2)) << "\t" << VEQ(real(val_y * val_y2)) << EL;
-
-					//this->H(flip_idx_nn, k) -= 15.0 * (s_i) * (s_j);
 				}
 			}
 
 			// -------------- CHECK NNN ---------------
 			for (auto nnn = 0; nnn < nnn_number; nnn++) {
 				auto n_num = this->lattice->get_nnn_forward_num(j, nnn);
-				if (auto nei = this->lattice->get_nnn(j, n_num); nei >= 0 && (j > 0 || !this->parity_break)) {
-					if (this->parity_break && Ns < 10)
-						stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(nnn_number) << "\t" << VEQ(n_num) << "\t" << VEQ(nei) << EL;
+				//if (auto nei = this->lattice->get_nnn(j, n_num); nei >= 0 && (j > 0 || !this->parity_break)) {
+				if (auto nei = this->lattice->get_nnn(j, n_num); nei >= 0) {
 
 					// setting the neighbors elements
 					auto [idx_x, val_x] = Operators<cpx>::sigma_x(k, Ns, { j });
@@ -225,8 +226,6 @@ void XYZ<_type>::hamiltonian() {
 					auto [idx_z2, val_z2] = Operators<cpx>::sigma_z(idx_z, Ns, { nei });
 					this->H(idx_z2, k) += this->Jb * this->Delta_b * real(val_z * val_z2);
 
-					if (this->parity_break && Ns < 10)
-						stout << VEQ(k) << "\t" << VEQ(j) << "\t" << VEQ(real(val_x * val_x2)) << "\t" << VEQ(real(val_y * val_y2)) << EL;
 				}
 			}
 			if (this->parity_break && Ns < 10) stout << EL;

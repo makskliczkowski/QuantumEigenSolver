@@ -45,7 +45,7 @@ public:
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
-	string inf(const v_1d<string>& skip = {}, string sep = "_") const override
+	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		auto Ns = this->lattice->get_Ns();
 		string name = sep + \
