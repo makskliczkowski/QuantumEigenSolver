@@ -200,7 +200,7 @@ public:
 
 	// ------------------------------------------- 				 SETTTERS				  -------------------------------------------
 	// sets info
-	void set_info() { this->info = VEQ(n_visible) + "," + VEQ(n_hidden) + "," + VEQ(batch) + "," + VEQ(lr); };
+	void set_info() { this->info = "nv=" + STR(n_visible) + ",nh=" + STR(n_hidden) + ",b=" + STR(batch) + "," + VEQP(lr,3); };
 
 	// sets the current state
 	void set_state(u64 state, bool set = false) {
@@ -282,7 +282,7 @@ public:
 	void blockSampling(uint b_size, u64 start_stae, uint n_flips = 1, bool thermalize = true);
 
 	// sample the probabilistic space
-	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1, std::string dir = "");
+	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1, std::string dir = "", bool save_weights = false);
 
 
 	// average collection
@@ -792,7 +792,7 @@ void rbmState<_type, _hamtype>::blockSampling(uint b_size, u64 start_state, uint
 * @returns energies obtained during each Monte Carlo step
 */
 template<typename _type, typename _hamtype>
-Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips, std::string dir) {
+Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips, std::string dir, bool save_weights) {
 #ifdef S_REGULAR
 	this->current_b_reg = this->b_reg_mult;
 #endif
@@ -868,9 +868,11 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, 
 		if (i % pbar.percentageSteps == 0) {
 			pbar.printWithTime("-> PROGRESS");
 			// saving the weights, thus the progress
-			this->W.save(arma::hdf5_name(dir + "W.h5", "interaction"));
-			this->b_h.save(arma::hdf5_name(dir + "bh.h5", "hidden"));
-			this->b_v.save(arma::hdf5_name(dir + "bv.h5", "visible"));
+			if (save_weights) {
+				this->W.save(arma::hdf5_name(dir + "W.h5", "interaction"));
+				this->b_h.save(arma::hdf5_name(dir + "bh.h5", "hidden"));
+				this->b_v.save(arma::hdf5_name(dir + "bv.h5", "visible"));
+			}
 		}
 	}
 	return meanEnergies;

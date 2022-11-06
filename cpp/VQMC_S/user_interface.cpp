@@ -46,10 +46,15 @@ void rbm_ui::ui<_type, _hamtype>::exit_with_help()
 		"-q : 0 or 1 -> quiet mode (no outputs) (default false)\n"
 		"\n"
 		"-fun : function to be used in the calculations. There are predefined functions in the model that allow that:\n"
+		"   The options divide each other on different categories according to the first number _ \n"
 		"   -1 -- default option -> shows help \n"
-		"    0 -- this option utilizes the classical degrees of freedom with RBM\n"
-		"    1 -- this option utilizes the Hamiltonian with symmetries calculation\n"
-		"    2 -- this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)\n"	
+		"    0 -- this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)\n"	
+		"    1 -- this option utilizes the classical degrees of freedom with RBM\n"
+		"		11 -- check the difference between AF and FM classical spins configuration\n"
+		"		12 -- check the minimum of energy when classical spins are varied with angle and with interaction\n"
+		"    2 -- this option utilizes the Hamiltonian with symmetries calculation\n"
+		"		21 -- input the symmetries and the model information and a given block will be calculated\n"
+		"		22 -- input the symmetries and the model information and a given block will be calculated with a sweep in Jb (to be changed)\n"
 		"\n"
 		"-h - help\n"
 	);
@@ -177,94 +182,78 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	// ---------- model
 
 	// model type
-	choosen_option = "-mod";
-	this->set_option(this->model_name, argv, choosen_option, false);
+	this->set_option(this->model_name, argv, "-mod", false);
 
 	// spin interaction
-	choosen_option = "-J";
-	this->set_option(this->J, argv, choosen_option, false);
+	this->set_option(this->J, argv, "-J", false);
 
 	// spin coupling disorder
-	choosen_option = "-J0";
-	this->set_option(this->J0, argv, choosen_option, false);
+	this->set_option(this->J0, argv, "-J0", false);
 
 	// dot - dot classical interaction
-	choosen_option = "-Jd";
-	this->set_option(this->J_dot_dot, argv, choosen_option, false);
+	this->set_option(this->J_dot_dot, argv, "-Jd", false);
 
 	// transverse field
-	choosen_option = "-g";
-	this->set_option(this->g, argv, choosen_option, false);
+	this->set_option(this->g, argv, "-g", false);
 
 	// transverse field disorder
-	choosen_option = "-g0";
-	this->set_option(this->g0, argv, choosen_option, false);
+	this->set_option(this->g0, argv, "-g0", false);
 
 	// perpendicular field
-	choosen_option = "-h";
-	this->set_option(this->h, argv, choosen_option, false);
+	this->set_option(this->h, argv, "-h", false);
 
 	// perpendicular field disorder
-	choosen_option = "-w";
-	this->set_option(this->w, argv, choosen_option, false);
+	this->set_option(this->w, argv, "-w", false);
 
 	// --- heisenberg ---
 
 	// delta
-	choosen_option = "-dlt";
-	this->set_option(this->delta, argv, choosen_option, false);
+	this->set_option(this->delta, argv, "-dlt", false);
 
 	// --- XYZ --- 
 
 	// delta nnn
-	choosen_option = "-dlt2";
-	this->set_option(this->Delta_b, argv, choosen_option, false);
+	this->set_option(this->Delta_b, argv, "-dlt2", false);
 
 	// J nnn
-	choosen_option = "-J2";
-	this->set_option(this->Jb, argv, choosen_option, false);
+	this->set_option(this->Jb, argv, "-J2", false);
 
 	// anisotropy term 1
-	choosen_option = "-eta";
-	this->set_option(this->eta_a, argv, choosen_option, false);	
+	this->set_option(this->eta_a, argv, "-eta", false);
 	
 	// anisotropy term 2
-	choosen_option = "-eta2";
-	this->set_option(this->eta_b, argv, choosen_option, false);
+	this->set_option(this->eta_b, argv, "-eta2", false);
 
 	// --- kitaev ---
 	choosen_option = "-kx";
-	this->set_option(this->Kx, argv, choosen_option, false);
+	this->set_option(this->Kx, argv, "-kx", false);
 	choosen_option = "-ky";
-	this->set_option(this->Ky, argv, choosen_option, false);
+	this->set_option(this->Ky, argv, "-ky", false);
 	choosen_option = "-kz";
-	this->set_option(this->Kz, argv, choosen_option, false);
+	this->set_option(this->Kz, argv, "-kz", false);
 	choosen_option = "-k0";
-	this->set_option(this->K0, argv, choosen_option, false);
+	this->set_option(this->K0, argv, "-k0", false);
 
 	//---------- SYMMETRIES
 	
 	// translation
-	choosen_option = "-ks";
-	this->set_option(this->k_sym, argv, choosen_option, false);
+	this->set_option(this->k_sym, argv, "-ks", false);
 	if (this->k_sym < 0 || this->k_sym >= Ns)
 		this->k_sym = 0;
 
 	// parity
-	choosen_option = "-ps";
-	this->set_option(this->p_sym, argv, choosen_option, false);
+	this->set_option(this->p_sym, argv, "-ps", false);
 
 	// spin_flip
-	choosen_option = "-xs";
-	this->set_option(this->x_sym, argv, choosen_option, false);
+	this->set_option(this->x_sym, argv, "-xs", false);
 
 	// include symmetries
-	choosen_option = "-S";
-	this->set_option(this->sym, argv, choosen_option, false);
+	this->set_option(this->sym, argv, "-S", false);
 
 	// spectrum size from the middle of the spectrum to test
-	choosen_option = "-SS";
-	this->set_option(this->spectrum_size, argv, choosen_option, true);
+	this->set_option(this->spectrum_size, argv, "-SS", true);
+
+	//---------- GLOBAL SYMMETRIES
 
 	// global SU(2)
 	this->set_option(this->su2, argv, "-su2", false);
@@ -272,20 +261,19 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	//---------- OTHERS
 
 	// quiet
-	choosen_option = "-q";
-	this->set_option(this->quiet, argv, choosen_option, false);
+	this->set_option(this->quiet, argv, "-q", false);
 
 	// thread number
-	choosen_option = "-th";
-	this->set_option(this->thread_num, argv, choosen_option, false);
+	this->set_option(this->thread_num, argv, "-th", false);
 
 	// get help
-	choosen_option = "-hlp";
-	if (string option = this->getCmdOption(argv, choosen_option); option != "")
+	if (string option = this->getCmdOption(argv, "-hlp"); option != "")
 		exit_with_help();
 
 	// later function choice
 	this->set_option(this->choosen_funtion, argv, "-fun", false);
+
+	//---------- DIRECTORY
 
 	bool set_dir = false;
 	choosen_option = "-dir";
@@ -298,10 +286,6 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 
 	// create the directories
 	fs::create_directories(this->saving_dir);
-
-	//#ifndef DEBUG
-	//	omp_set_num_threads(this->thread_num);
-	//#endif // !DEBUG
 }
 
 /*
@@ -316,21 +300,24 @@ void rbm_ui::ui<_type, _hamtype>::functionChoice()
 		// default case of showing the help
 		this->exit_with_help();
 		break;
-
 	case 0:
-		// calculate the simulation with classical degrees of freedom
+		// test
 		this->make_symmetries_test();
 		break;
-	case 1:
+	case 11:
+		// calculate the simulation with classical degrees of freedom
+		this->make_mc_classical();
+		break;
+	case 12:
+		// check the minimum of energy when classical spins are varied with angle and with interaction
+		this->make_mc_angles_sweep();
+		break;
+	case 21:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		this->make_simulation_symmetries();
 		break;
-	case 2:
-		// this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)
-		this->make_symmetries_test();
-		break;
-	case 3:
-		// this option utilizes the Hamiltonian with symmetries calculation
+	case 22:
+		// this option utilizes the Hamiltonian with symmetries calculation - sweep!
 		this->make_simulation_symmetries_sweep();
 		break;
 	default:
@@ -577,6 +564,209 @@ inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 	file.close();
 }
 
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	stouts("STARTING THE SIMULATION FOR MINIMIZING CONFIGURATION SEEK AND USING: " + VEQ(thread_num), start);
+	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
+
+	vec Jd(3, arma::fill::ones);
+	Jd = Jd * Jdot;
+
+	// create files
+	std::ofstream file, log;
+	auto ran = randomGen();
+
+	// make the lattice
+	auto lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
+	const auto Ns = lat->get_Ns();
+	auto nvisible = Ns;
+	auto nhidden = this->layer_mult * nvisible;
+	// use all the positions for the lattice sites
+	auto positions = v_1d<int>(Ns);
+	std::iota(positions.begin(), positions.end(), 0);
+	std::string lat_info = lat->get_info();
+
+	// initialize the angles in x-dimension
+	vec phis = arma::vec(Ns, arma::fill::zeros);
+	// set thetas to pi/2 (remember that this is multiplied in the class)
+	vec thetas = arma::vec(Ns, arma::fill::ones) / 2.0;
+
+	// set the allowed angles
+	v_1d<double> allowed_angles(int(Ns/2.0) + 1);
+	for (int i = 0; i < allowed_angles.size(); i++)
+		allowed_angles[i] = (i) / double(Ns);
+
+	// open file for saving the energies and the angles
+	auto hamiltonian_rbm = std::make_shared<Heisenberg_dots<cpx>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, Jd, 0.0, this->J_dot_dot);
+	auto model_info = hamiltonian_rbm->get_info();
+	
+	// rbm stuff
+	unique_ptr<rbmState<_type, cpx>> ph = std::make_unique<rbmState<_type, cpx>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, 1);
+	auto rbm_info = ph->get_info();
+
+	std::string dir = this->saving_dir + kPS + lat_info + kPS;
+	fs::create_directories(dir);
+	dir = dir + rbm_info + kPS;
+	fs::create_directories(dir);
+
+	openFile(log, dir + "log" + VEQP(Jdot, 3) + ".txt");
+	log << "->" << lat_info << EL;
+	log << "\t->" << Jd.t() << EL;
+	log << "\t\t->" << VEQ(rbm_info) << EL;
+	
+	openFile(file, dir + "energies_log.dat", ios::app);
+
+	// iterate through all angles
+	std::string dir_start = dir;
+	int iter = 0;
+	for (auto angle : allowed_angles) {
+		dir = dir_start;
+		log << "\t\t\t->DOING " << VEQ(angle) << "->" << STR(iter) + "/" + STR(Ns) << "PI" << EL << EL;
+
+		// set the angles accordingly
+		for (int site = 0; site < Ns; site++){
+			auto x = lat->get_coordinates(site, 0);
+			auto y = lat->get_coordinates(site, 1);
+			phis(site) = x * angle + y * angle;
+		}
+		vec sin_phis = sin(phis * TWOPI);
+		vec cos_phis = cos(phis * TWOPI);
+		vec sin_thetas = sin(thetas * PI);
+		vec cos_thetas = cos(thetas * PI);
+		log << "\t\t\t\tsin_phi: " << sin_phis.t();
+		log << "\t\t\t\tcos_phi: " << cos_phis.t();
+		log << "\t\t\t\tsin_theta: " << sin_thetas.t();
+		log << "\t\t\t\tcos_theta: " << cos_thetas.t() << EL;
+
+		// create Hamiltonians
+		auto hamiltonian_ed = std::make_shared<Heisenberg_dots<cpx>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, Jd, 0.0, this->J_dot_dot);
+		hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
+		hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
+		model_info = hamiltonian_rbm->get_info();
+		ph->init();
+
+		log << "\t\t\t\t-> " << VEQ(model_info) << EL;
+
+		std::string angle_str = STR(iter) + "_" + STR(Ns);
+		dir = dir + angle_str + kPS;
+		fs::create_directories(dir);
+		dir = dir + model_info + kPS;
+		createDirs(dir);
+
+		std::string dir_ed = dir + "ed" + kPS;
+		fs::create_directories(dir_ed);
+
+		std::ofstream fileSave;
+		// ------------------- calculator rbm -------------------
+		// monte carlo for energy
+		auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips, dir);
+		auto energies_tail = energies.tail(block_size);
+		double max_rbm = arma::max(arma::real(energies));
+		double ground_rbm = std::real(arma::mean(energies_tail));
+		double rbm_difference = max_rbm - ground_rbm;
+		double var_rbm = std::real(arma::var(energies_tail));
+		
+		// save the log of energies
+
+		// ------------------- calculator ed -------------------
+		double ground_ed = -1.0;
+		avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
+#pragma omp single
+		if (Ns <= 14) {
+			auto relative_error = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
+#ifdef PLOT
+			plt::axhline(ground_ed);
+			plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
+			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+			SAVEFIG(dir + "en.png", false);
+#endif
+			Col<cpx> eigvec = hamiltonian_ed->get_eigenState(0);
+			Operators<cpx> op(lat);
+			op.calculate_operators(eigvec, av_operator, true);
+			// --------------------- compare sigma_z ---------------------
+
+			// S_z at each site
+			std::string filename = dir_ed + "_sz_site";
+			openFile(fileSave, filename + ".dat", ios::out);
+			print_vector_1d(fileSave, av_operator.s_z_i);
+			fileSave.close();
+			PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+			SAVEFIG(dir + "_sz_site.png", false);
+
+			// S_z correlations
+			filename = dir_ed + "_sz_corr";
+			openFile(fileSave, filename + ".dat", ios::out);
+			print_mat(fileSave, av_operator.s_z_cor);
+			fileSave.close();
+		}
+		else {
+			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+			SAVEFIG(dir + "energy" + ".png", true);
+		}
+
+#pragma omp single
+		printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
+		// ------------------- sampling rbm -------------------
+		ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+		av_operator.reset();
+		av_operator = ph->get_op_av();
+
+		auto fileRbmEn_name = dir + "en";
+		std::ofstream fileRbmEn;
+		openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
+		for (auto i = 0; i < energies.size(); i++)
+			printSeparatedP(fileRbmEn, '\t', 14, true, 10, i, real(energies(i)));
+		fileRbmEn.close();
+
+		// other observables
+		string filename = "";
+		// --------------------- compare sigma_z
+
+		// S_z at each site
+		filename = dir + "_sz_site";
+		openFile(fileSave, filename + ".dat", ios::out);
+		print_vector_1d(fileSave, av_operator.s_z_i);
+		fileSave.close();
+		PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+		SAVEFIG(filename + ".png", false);
+
+		// S_z correlations
+		filename = dir + "_sz_corr";
+		openFile(fileSave, filename + ".dat", ios::out);
+		print_mat(fileSave, av_operator.s_z_cor);
+		fileSave.close();
+		iter++;
+	}
+
+	file.close();
+	log.close();
+}
+
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_mc_angles_sweep()
+{
+	// set default parameters
+	// use no disorder at classical - quantum interaction
+	this->g = 0.0;
+	this->h = 0.0;
+	this->J_dot_dot = 0.0;
+	this->delta = 1.0;
+
+	double Jd_start = -2.0;
+	double Jd_end = 2.0;
+	double Jd_step = 0.1;
+	int Jd_num = abs(Jd_end - Jd_start) / Jd_step;
+
+#pragma omp parallel for num_threads(this->thread_num)
+	for (int i = 0; i <= Jd_num; i++)
+	{
+		// use J0_dot for Jd
+		auto Jd = Jd_start + i * Jd_step;
+		this->make_mc_classical_angles(Jd);
+	}
+}
 // -------------------------------------------------------- HELPERS
 
 /*
@@ -1172,8 +1362,6 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	}
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
 }
-
-
 
 template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)

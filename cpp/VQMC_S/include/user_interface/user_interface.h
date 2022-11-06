@@ -33,18 +33,18 @@
 
 
 #ifdef PLOT
-#ifdef _DEBUG
-#undef _DEBUG
-#include <python.h>
-#define _DEBUG
-#else
-#include <python.h>
-#endif
+	#ifdef _DEBUG
+		#undef _DEBUG
+		#include <python.h>
+		#define _DEBUG
+	#else
+		#include <python.h>
+	#endif
 
 // plotting
-#define WITHOUT_NUMPY
-#define WITH_OPENCV
-#include "matplotlib-cpp/matplotlibcpp.h"
+	#define WITHOUT_NUMPY
+	#define WITH_OPENCV
+	#include "matplotlib-cpp/matplotlibcpp.h"
 namespace plt = matplotlibcpp;
 
 template<typename _type>
@@ -55,15 +55,14 @@ void plot_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string nam
 	plt::title(name);
 };
 template<typename _type>
-
 void plot_v_1d(Col<_type> v, string xlabel = "", string ylabel = "", string name = "") {
 	plt::plot(arma::conv_to<v_1d<double> >::from(v));
 	plt::xlabel(xlabel);
 	plt::ylabel(ylabel);
 	plt::title(name);
 };
-
 #define PLOT_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+
 template<typename _type>
 void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string name = "") {
 	std::vector<int> ivec(v.size());
@@ -75,16 +74,19 @@ void scatter_v_1d(v_1d<_type> v, string xlabel = "", string ylabel = "", string 
 	plt::title(name);
 };
 #define SCATTER_V1D(v, x, y, n) plot_v_1d(v, x, y, n)
+
 void inline save_fig(string name, bool show = false) {
 	plt::save(name);
 	if (show) plt::show();
 	plt::close();
 }
-#define SAVEFIG(name, show) save_fig(name, show)
+	#define SAVEFIG(name, show) save_fig(name, show)
+	#define SHOWFIG plt::show();plt::close()
 #else 
-#define PLOT_V1D(v, x, y, n)
-#define SCATTER_V1D(v, x, y, n)
-#define SAVEFIG(name, show)
+	#define PLOT_V1D(v, x, y, n)
+	#define SCATTER_V1D(v, x, y, n)
+	#define SAVEFIG(name, show)
+	#define SHOWFIG
 #endif
 
 // maximal ed size to compare
@@ -97,7 +99,7 @@ constexpr int maxed = 20;
 // -------------------------------------------------------- Make a User interface class --------------------------------------------------------
 
 template<typename _hamtype>
-void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
+double calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
 	// compare ED
 	auto Ns = hamiltonian->lattice->get_Ns();
 	auto maxNs = 14;
@@ -112,10 +114,11 @@ void calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHami
 		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
 		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
 		stout << "\t\t\t\t->" << VEQP(ground_ed, 7) << "\t" << VEQP(ground_rbm, 7) << "\t" << VEQP(relative_error, 5) << "%" << EL;
+		return relative_error;
 	}
-	else {
+	else
 		stout << "\t\t\t\t->skipping ed" << EL;
-	}
+	return 0.0;
 }
 
 // --------------------------------------------------------  				 HUBBARD USER INTERFACE 					  --------------------------------------------------------
@@ -249,11 +252,15 @@ namespace rbm_ui {
 	
 	private:
 		// INNER METHODS
-		
+
 		// ####################### SYMMETRIES #######################
+		
 		void symmetries_cpx(clk::time_point start);
 		void symmetries_double(clk::time_point start);
 
+		// ####################### CLASSICAL ########################
+		
+		void make_mc_classical_angles(double Jdot = 0.0);
 
 	public:
 		// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
@@ -272,8 +279,8 @@ namespace rbm_ui {
 
 		// #######################		     RBMs               #######################
 		void make_mc_classical();
+		void make_mc_angles_sweep();
 		void make_simulation() override;
-
 		// #######################        SYMMETRIES            #######################
 		void make_simulation_symmetries();
 		void make_simulation_symmetries_sweep();

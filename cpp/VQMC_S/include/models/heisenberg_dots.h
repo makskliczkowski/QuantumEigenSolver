@@ -55,7 +55,7 @@ public:
 	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		string name = sep + \
-			"_hei_dots,dN=" + STRP(this->dot_num, 2) + ",Ns=" + STR(this->Ns) + \
+			"_hei_dot,dN=" + STRP(this->dot_num, 2) + ",Ns=" + STR(this->Ns) + \
 			",J=" + STRP(this->J, prec) + \
 			",Jx=" + STRP(this->J_dot(0), prec) + \
 			",Jy=" + STRP(this->J_dot(1), prec) + \
@@ -311,17 +311,17 @@ void Heisenberg_dots<_type>::hamiltonian() {
 						this->setHamiltonianElem(k, 0.5 * interaction, flip(flip(k, this->Ns - 1 - nei), this->Ns - 1 - j));
 
 					// dot - dot interaction
-					if (this->positions[j] > 0 && this->positions[nei] > 0)
+					if (this->J_dot_dot != 0.0 && this->positions[j] >= 0 && this->positions[nei] >= 0)
 						this->H(k, k) += this->J_dot_dot * this->cos_thetas(this->positions[j]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 				}
 			}
 			// handle the dot
-			if (this->positions[j] > 0) {
+			if (this->positions[j] >= 0) {
 				const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, positions[j]);
 				// set sz_int
 				this->H(k, k) += s_z_i;
 				// set sy_int
-				this->setHamiltonianElem(k, -s_y_i, new_idx);
+				this->setHamiltonianElem(k, s_y_i, new_idx);
 				// set sx_int 
 				this->setHamiltonianElem(k, s_x_i, new_idx);
 			}
@@ -369,12 +369,12 @@ inline cpx Heisenberg_dots<_type>::locEnergy(u64 _id, uint site, std::function<c
 				changedVal += f2(tmp) * 0.5 * interaction;
 
 			// dot - dot interaction
-			if (this->positions[site] > 0 && this->positions[nei] > 0)
+			if (this->J_dot_dot != 0.0 && this->positions[site] >= 0 && this->positions[nei] >= 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 		}
 	}
 	// handle the dot
-	if (auto i = this->positions[site]; i > 0) {
+	if (auto i = this->positions[site]; i >= 0) {
 		const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, i);
 		// set sz_int
 		localVal += s_z_i;
@@ -430,12 +430,12 @@ inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::funct
 				flipV(tmp, nei);
 			}
 			// dot - dot interaction
-			if (this->positions[site] > 0 && this->positions[nei] > 0)
+			if (this->J_dot_dot != 0.0 && this->positions[site] >= 0 && this->positions[nei] >= 0)
 				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
 		}
 	}
 	// handle the dot
-	if (auto i = positions[site]; i > 0) {
+	if (auto i = positions[site]; i >= 0) {
 		const auto [s_x_i, s_y_i, s_z_i] = this->get_dot_int_return(si, i);
 		// set sz_int
 		localVal += s_z_i;

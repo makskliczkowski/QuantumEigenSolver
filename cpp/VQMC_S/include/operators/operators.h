@@ -12,7 +12,7 @@
 #include <queue>
 
 namespace operators {
-	constexpr double _SPIN = 0.5;
+	constexpr double _SPIN = 1.0;
 }
 
 
