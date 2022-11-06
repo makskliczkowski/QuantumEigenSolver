@@ -683,7 +683,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 			// ------------------- calculator ed -------------------
 			double ground_ed = -1.0;
 			avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
-#pragma omp single
+#pragma omp critical
 			if (Ns <= 14) {
 				auto relative_error = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
