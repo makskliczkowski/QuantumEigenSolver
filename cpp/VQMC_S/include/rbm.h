@@ -11,7 +11,7 @@
 
 //#define DEBUG
 #ifdef USE_SR
-//#define PINV
+#define PINV
 #define S_REGULAR
 #endif
 

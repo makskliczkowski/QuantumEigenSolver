@@ -1,1 +1,1 @@
--fun 12 -mod 2 -bc 0 -l 0 -m 600 -lr 0.01 -lm 2 -nb 200 -bs 12 -d 2 -lx 2 -ly 2 -J -1.0 -th 16 -dir rC/
+-fun 12 -mod 2 -bc 0 -l 0 -m 500 -lr 0.01 -lm 2 -nb 200 -bs 14 -d 2 -lx 4 -ly 2 -J -1.0 -th 1 -dir rC/

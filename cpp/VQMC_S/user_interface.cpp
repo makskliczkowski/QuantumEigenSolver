@@ -594,9 +594,13 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 	vec thetas = arma::vec(Ns, arma::fill::ones) / 2.0;
 
 	// set the allowed angles
-	v_1d<double> allowed_angles(int(Ns/2.0) + 1);
-	for (int i = 0; i < allowed_angles.size(); i++)
-		allowed_angles[i] = (i) / double(Ns);
+	v_1d<double> allowed_angles_x(int(lat->get_Lx() / 2.0) + 1);
+	v_1d<double> allowed_angles_y(int(lat->get_Ly() / 2.0) + 1);
+	for (int i = 0; i < allowed_angles_x.size(); i++)
+		allowed_angles_x[i] = (i) / double(Ns);
+	for (int i = 0; i < allowed_angles_y.size(); i++)
+		allowed_angles_y[i] = (i) / double(Ns);
+
 
 	// open file for saving the energies and the angles
 	auto hamiltonian_rbm = std::make_shared<Heisenberg_dots<cpx>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, Jd, 0.0, this->J_dot_dot);
@@ -620,124 +624,130 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 
 	// iterate through all angles
 	std::string dir_start = dir;
-	int iter = 0;
-	for (auto angle : allowed_angles) {
-		dir = dir_start;
-		log << "\t\t\t->DOING " << VEQ(angle) << "->" << STR(iter) + "/" + STR(Ns) << "PI" << EL << EL;
 
-		// set the angles accordingly
-		for (int site = 0; site < Ns; site++){
-			auto x = lat->get_coordinates(site, 0);
-			auto y = lat->get_coordinates(site, 1);
-			phis(site) = x * angle + y * angle;
-		}
-		vec sin_phis = sin(phis * TWOPI);
-		vec cos_phis = cos(phis * TWOPI);
-		vec sin_thetas = sin(thetas * PI);
-		vec cos_thetas = cos(thetas * PI);
-		log << "\t\t\t\tsin_phi: " << sin_phis.t();
-		log << "\t\t\t\tcos_phi: " << cos_phis.t();
-		log << "\t\t\t\tsin_theta: " << sin_thetas.t();
-		log << "\t\t\t\tcos_theta: " << cos_thetas.t() << EL;
+	for (int iter = 0; iter < allowed_angles_x.size(); iter++) {
+		double angle = allowed_angles_x[iter];
+		for (int iter2 = 0; iter2 < allowed_angles_y.size(); iter2++) {
+			if (lat->get_Lx() == lat->get_Ly() && iter2 < iter) continue;
+			double angle2 = allowed_angles_y[iter2];
+			dir = dir_start;
+			log << "\t\t\t->DOING " << VEQ(angle) << "," << VEQ(angle2);
+			log << "\n\t\t\t\t->a_x" << STR(iter) + "/" + STR(Ns) << "PI";
+			log << "\n\t\t\t\t->a_y" << STR(iter2) + "/" + STR(Ns) << "PI" << EL << EL;
 
-		// create Hamiltonians
-		auto hamiltonian_ed = std::make_shared<Heisenberg_dots<cpx>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, Jd, 0.0, this->J_dot_dot);
-		hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
-		hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
-		model_info = hamiltonian_rbm->get_info();
-		ph->init();
+			// set the angles accordingly
+			for (int site = 0; site < Ns; site++) {
+				auto x = lat->get_coordinates(site, 0);
+				auto y = lat->get_coordinates(site, 1);
+				phis(site) = x * angle + y * angle2;
+			}
+			vec sin_phis = sin(phis * TWOPI);
+			vec cos_phis = cos(phis * TWOPI);
+			vec sin_thetas = sin(thetas * PI);
+			vec cos_thetas = cos(thetas * PI);
+			log << "\t\t\t\tsin_phi: " << sin_phis.t();
+			log << "\t\t\t\tcos_phi: " << cos_phis.t();
+			log << "\t\t\t\tsin_theta: " << sin_thetas.t();
+			log << "\t\t\t\tcos_theta: " << cos_thetas.t() << EL;
 
-		log << "\t\t\t\t-> " << VEQ(model_info) << EL;
+			// create Hamiltonians
+			auto hamiltonian_ed = std::make_shared<Heisenberg_dots<cpx>>(J, 0.0, 0.0, 0.0, 0.0, 0.0, delta, lat, positions, Jd, 0.0, this->J_dot_dot);
+			hamiltonian_ed->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
+			hamiltonian_rbm->set_angles(sin_phis, sin_thetas, cos_phis, cos_thetas);
+			model_info = hamiltonian_rbm->get_info();
+			ph->init();
 
-		std::string angle_str = STR(iter) + "_" + STR(Ns);
-		dir = dir + angle_str + kPS;
-		fs::create_directories(dir);
-		dir = dir + model_info + kPS;
-		createDirs(dir);
+			log << "\t\t\t\t-> " << VEQ(model_info) << EL;
 
-		std::string dir_ed = dir + "ed" + kPS;
-		fs::create_directories(dir_ed);
+			std::string angle_str = "ax=" + STR(iter) + "," + "ay=" + STR(iter2);
+			dir = dir + angle_str + kPS;
+			fs::create_directories(dir);
+			dir = dir + model_info + kPS;
+			createDirs(dir);
 
-		std::ofstream fileSave;
-		// ------------------- calculator rbm -------------------
-		// monte carlo for energy
-		auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips, dir);
-		auto energies_tail = energies.tail(block_size);
-		double max_rbm = arma::max(arma::real(energies));
-		double ground_rbm = std::real(arma::mean(energies_tail));
-		double rbm_difference = max_rbm - ground_rbm;
-		double var_rbm = std::real(arma::var(energies_tail));
-		
-		// save the log of energies
+			std::string dir_ed = dir + "ed" + kPS;
+			fs::create_directories(dir_ed);
 
-		// ------------------- calculator ed -------------------
-		double ground_ed = -1.0;
-		avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
+			std::ofstream fileSave;
+			// ------------------- calculator rbm -------------------
+			// monte carlo for energy
+			auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips, dir);
+			auto energies_tail = energies.tail(block_size);
+			double max_rbm = arma::max(arma::real(energies));
+			double ground_rbm = std::real(arma::mean(energies_tail));
+			double rbm_difference = max_rbm - ground_rbm;
+			double var_rbm = std::real(arma::var(energies_tail));
+
+			// save the log of energies
+
+			// ------------------- calculator ed -------------------
+			double ground_ed = -1.0;
+			avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
 #pragma omp single
-		if (Ns <= 14) {
-			auto relative_error = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
+			if (Ns <= 14) {
+				auto relative_error = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
-			plt::axhline(ground_ed);
-			plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
-			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
-			SAVEFIG(dir + "en.png", false);
+				plt::axhline(ground_ed);
+				plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
+				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+				SAVEFIG(dir + "en.png", false);
 #endif
-			Col<cpx> eigvec = hamiltonian_ed->get_eigenState(0);
-			Operators<cpx> op(lat);
-			op.calculate_operators(eigvec, av_operator, true);
-			// --------------------- compare sigma_z ---------------------
+				Col<cpx> eigvec = hamiltonian_ed->get_eigenState(0);
+				Operators<cpx> op(lat);
+				op.calculate_operators(eigvec, av_operator, true);
+				// --------------------- compare sigma_z ---------------------
+
+				// S_z at each site
+				std::string filename = dir_ed + "_sz_site";
+				openFile(fileSave, filename + ".dat", ios::out);
+				print_vector_1d(fileSave, av_operator.s_z_i);
+				fileSave.close();
+				PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+				SAVEFIG(dir + "_sz_site.png", false);
+
+				// S_z correlations
+				filename = dir_ed + "_sz_corr";
+				openFile(fileSave, filename + ".dat", ios::out);
+				print_mat(fileSave, av_operator.s_z_cor);
+				fileSave.close();
+			}
+			else {
+				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+				SAVEFIG(dir + "energy" + ".png", true);
+			}
+
+#pragma omp single
+			printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
+			// ------------------- sampling rbm -------------------
+			ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+			av_operator.reset();
+			av_operator = ph->get_op_av();
+
+			auto fileRbmEn_name = dir + "en";
+			std::ofstream fileRbmEn;
+			openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
+			for (auto i = 0; i < energies.size(); i++)
+				printSeparatedP(fileRbmEn, '\t', 14, true, 10, i, real(energies(i)));
+			fileRbmEn.close();
+
+			// other observables
+			string filename = "";
+			// --------------------- compare sigma_z
 
 			// S_z at each site
-			std::string filename = dir_ed + "_sz_site";
+			filename = dir + "_sz_site";
 			openFile(fileSave, filename + ".dat", ios::out);
 			print_vector_1d(fileSave, av_operator.s_z_i);
 			fileSave.close();
 			PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
-			SAVEFIG(dir + "_sz_site.png", false);
+			SAVEFIG(filename + ".png", false);
 
 			// S_z correlations
-			filename = dir_ed + "_sz_corr";
+			filename = dir + "_sz_corr";
 			openFile(fileSave, filename + ".dat", ios::out);
 			print_mat(fileSave, av_operator.s_z_cor);
 			fileSave.close();
 		}
-		else {
-			PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
-			SAVEFIG(dir + "energy" + ".png", true);
-		}
-
-#pragma omp single
-		printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
-		// ------------------- sampling rbm -------------------
-		ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-		av_operator.reset();
-		av_operator = ph->get_op_av();
-
-		auto fileRbmEn_name = dir + "en";
-		std::ofstream fileRbmEn;
-		openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
-		for (auto i = 0; i < energies.size(); i++)
-			printSeparatedP(fileRbmEn, '\t', 14, true, 10, i, real(energies(i)));
-		fileRbmEn.close();
-
-		// other observables
-		string filename = "";
-		// --------------------- compare sigma_z
-
-		// S_z at each site
-		filename = dir + "_sz_site";
-		openFile(fileSave, filename + ".dat", ios::out);
-		print_vector_1d(fileSave, av_operator.s_z_i);
-		fileSave.close();
-		PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
-		SAVEFIG(filename + ".png", false);
-
-		// S_z correlations
-		filename = dir + "_sz_corr";
-		openFile(fileSave, filename + ".dat", ios::out);
-		print_mat(fileSave, av_operator.s_z_cor);
-		fileSave.close();
-		iter++;
 	}
 
 	file.close();
