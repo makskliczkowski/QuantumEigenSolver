@@ -620,7 +620,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 	log << "\t->" << Jd.t() << EL;
 	log << "\t\t->" << VEQ(rbm_info) << EL;
 	
-	openFile(file, dir + "energies_log.dat", ios::app);
+	openFile(file, dir + "energies_log" + VEQP(Jdot, 3) + ".dat", ios::app);
 
 	// iterate through all angles
 	std::string dir_start = dir;
@@ -716,7 +716,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 				SAVEFIG(dir + "energy" + ".png", true);
 			}
 
-#pragma omp single
+#pragma omp critical
 			printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
 			// ------------------- sampling rbm -------------------
 			ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
@@ -1033,10 +1033,12 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::ofstream fileAv;
 
 	// save energies to check
-	openFile(file, dir + "energies," + name + ".dat");
-	for (u64 i = 0; i < N; i++)
-		file << this->ham_d->get_eigenEnergy(i) << EL;
-	file.close();
+	if (this->lat->get_Ns() <= 16) {
+		openFile(file, dir + "energies," + name + ".dat");
+		for (u64 i = 0; i < N; i++)
+			file << this->ham_d->get_eigenEnergy(i) << EL;
+		file.close();
+	}
 	this->ham_d->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
 	this->ham_d->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
 	this->ham_d->clear_energies();
@@ -1141,10 +1143,12 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	std::ofstream fileAv;
 
 	// save energies to check
-	openFile(file, dir + "energies," + name + ".dat");
-	for (u64 i = 0; i < N; i++)
-		file << this->ham_cpx->get_eigenEnergy(i) << EL;
-	file.close();
+	if (this->lat->get_Ns() <= 16) {
+		openFile(file, dir + "energies," + name + ".dat");
+		for (u64 i = 0; i < N; i++)
+			file << this->ham_cpx->get_eigenEnergy(i) << EL;
+		file.close();
+	}
 	this->ham_cpx->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
 	this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
 	this->ham_cpx->clear_energies();
