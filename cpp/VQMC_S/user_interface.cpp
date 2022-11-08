@@ -610,17 +610,17 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 	unique_ptr<rbmState<_type, cpx>> ph = std::make_unique<rbmState<_type, cpx>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, 1);
 	auto rbm_info = ph->get_info();
 
-	std::string dir = this->saving_dir + kPS + lat_info + kPS;
+	std::string dir = this->saving_dir + kPS + lat_info + rbm_info + kPS;
 	fs::create_directories(dir);
 	dir = dir + rbm_info + kPS;
 	fs::create_directories(dir);
 
-	openFile(log, dir + "log" + VEQP(Jdot, 3) + ".txt");
+	openFile(log, dir + "log_" + model_info + ".txt");
 	log << "->" << lat_info << EL;
 	log << "\t->" << Jd.t() << EL;
 	log << "\t\t->" << VEQ(rbm_info) << EL;
 	
-	openFile(file, dir + "energies_log" + VEQP(Jdot, 3) + ".dat", ios::app);
+	openFile(file, dir + "energies_log_" + model_info + ".dat", ios::app);
 
 	// iterate through all angles
 	std::string dir_start = dir;
@@ -662,8 +662,6 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 			std::string angle_str = "ax=" + STR(iter) + "," + "ay=" + STR(iter2);
 			dir = dir + angle_str + kPS;
 			fs::create_directories(dir);
-			dir = dir + model_info + kPS;
-			createDirs(dir);
 
 			std::string dir_ed = dir + "ed" + kPS;
 			fs::create_directories(dir_ed);
@@ -690,7 +688,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 				plt::axhline(ground_ed);
 				plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
 				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
-				SAVEFIG(dir + "en.png", false);
+				SAVEFIG(dir + "en_" + model_info + ".png", false);
 #endif
 				Col<cpx> eigvec = hamiltonian_ed->get_eigenState(0);
 				Operators<cpx> op(lat);
@@ -698,18 +696,14 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 				// --------------------- compare sigma_z ---------------------
 
 				// S_z at each site
-				std::string filename = dir_ed + "_sz_site";
-				openFile(fileSave, filename + ".dat", ios::out);
-				print_vector_1d(fileSave, av_operator.s_z_i);
-				fileSave.close();
+				std::string filename = dir_ed + "_sz_site_" + model_info;
+				av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site"));
 				PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
 				SAVEFIG(dir + "_sz_site.png", false);
 
 				// S_z correlations
 				filename = dir_ed + "_sz_corr";
-				openFile(fileSave, filename + ".dat", ios::out);
-				print_mat(fileSave, av_operator.s_z_cor);
-				fileSave.close();
+				av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_corr"));
 			}
 			else {
 				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
@@ -723,30 +717,23 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 			av_operator.reset();
 			av_operator = ph->get_op_av();
 
-			auto fileRbmEn_name = dir + "en";
-			std::ofstream fileRbmEn;
-			openFile(fileRbmEn, fileRbmEn_name + ".dat", ios::out);
-			for (auto i = 0; i < energies.size(); i++)
-				printSeparatedP(fileRbmEn, '\t', 14, true, 10, i, real(energies(i)));
-			fileRbmEn.close();
+			auto fileRbmEn_name = dir + "en_" + model_info;
+			Col<double> en_real = arma::real(energies);
+			en_real.save(arma::hdf5_name(fileRbmEn_name + ".h5", "energy"));
 
 			// other observables
 			string filename = "";
 			// --------------------- compare sigma_z
 
 			// S_z at each site
-			filename = dir + "_sz_site";
-			openFile(fileSave, filename + ".dat", ios::out);
-			print_vector_1d(fileSave, av_operator.s_z_i);
-			fileSave.close();
+			filename = dir + "_sz_site_" + model_info;
+			av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site"));
 			PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
 			SAVEFIG(filename + ".png", false);
 
 			// S_z correlations
 			filename = dir + "_sz_corr";
-			openFile(fileSave, filename + ".dat", ios::out);
-			print_mat(fileSave, av_operator.s_z_cor);
-			fileSave.close();
+			av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_cor"));
 		}
 	}
 
@@ -1027,20 +1014,21 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::string name = "spectrum_num=" + STR(N);
 	stout << "->middle_spectrum_size : " << name << EL;
 
-	std::string dir = this->saving_dir + kPS + this->ham_d->get_info() + kPS;
+	std::string dir = this->saving_dir + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
+	std::string model_info = this->ham_d->get_info();
 
 	// save energies to check
 	if (this->lat->get_Ns() <= 16) {
-		openFile(file, dir + "energies," + name + ".dat");
+		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_d->get_eigenEnergy(i) << EL;
 		file.close();
 	}
-	this->ham_d->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
-	this->ham_d->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
+	std::string filename = dir + model_info + "," + name;
+	this->ham_d->get_eigenvalues().save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
 	this->ham_d->clear_energies();
 	this->ham_d->clear_hamiltonian();
 
@@ -1069,25 +1057,22 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	}
 
 	// save binary file
-	std::string filename = dir + "entropies," + name + ".bin";
-	entropies.save(filename, arma::raw_binary);
-	entropies.save(arma::hdf5_name(dir + "entropies," + name + ".h5", "entropy"));
-	if (this->lat->get_Ns() < 16) {
-		filename = dir + "entropies," + name + ".txt";
-		entropies.save(filename, arma::arma_ascii);
-	}
+	entropies.save(filename + ".bin", arma::raw_binary);
+	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
+	if (this->lat->get_Ns() <= 16) 
+		entropies.save(filename + ".dat", arma::arma_ascii);
 
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 
 	// iterate through fractions
 	double mean200 = 0.0;
-	for (v_1d<double> fractions = { 0.5, 0.25, 0.1, 200 }; double frac : fractions) {
+	for (v_1d<double> fractions = { 0.25, 0.1, 200 }; double frac : fractions) {
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
 		name = "spectrum_num=" + STR(spectrum_num);
 		// define the window to calculate the entropy
 		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
 			continue;
-		openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+		openFile(fileAv, dir + "av" + model_info + "," + name + ".dat", ios::out);
 
 		auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
 		double mean = 0.0;
@@ -1102,7 +1087,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
-	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1), mean200);
+	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1), mean200, N);
 	fileAv.close();
 }
 
@@ -1137,20 +1122,21 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	std::string name = "spectrum_num=" + STR(N);
 	stout << "->middle_spectrum_size : " << name << EL;
 
-	std::string dir = this->saving_dir + kPS + this->ham_cpx->get_info() + kPS;
+	std::string dir = this->saving_dir + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
-
+	std::string model_info = this->ham_cpx->get_info();
 	// save energies to check
 	if (this->lat->get_Ns() <= 16) {
-		openFile(file, dir + "energies," + name + ".dat");
+		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_cpx->get_eigenEnergy(i) << EL;
 		file.close();
 	}
-	this->ham_cpx->get_eigenvalues().save(dir + "energies," + name + ".bin", arma::raw_binary);
-	this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(dir + "energies," + name + ".h5", "energy"));
+	
+	std::string filename = dir + model_info + "," + name;
+	this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
 	this->ham_cpx->clear_energies();
 	this->ham_cpx->clear_hamiltonian();
 
@@ -1165,7 +1151,6 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	auto global = this->ham_cpx->get_global_sym();
 	v_1d<u64> full_map = global.su2 ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
 	Mat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
-
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		stout << "\t->doing : " << VEQ(idx) << EL;
@@ -1179,25 +1164,22 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	}
 
 	// save binary file
-	std::string filename = dir + "entropies," + name + ".bin";
-	entropies.save(filename, arma::raw_binary);
-	entropies.save(arma::hdf5_name(dir + "entropies," + name + ".h5", "entropy"));
-	if (this->lat->get_Ns() < 16) {
-		filename = dir + "entropies," + name + ".txt";
-		entropies.save(filename, arma::arma_ascii);
-	}
+	entropies.save(filename + ".bin", arma::raw_binary);
+	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
+	if (this->lat->get_Ns() <= 16)
+		entropies.save(filename + ".dat", arma::arma_ascii);
 
 	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
 
 	// iterate through fractions
 	double mean200 = 0.0;
-	for (v_1d<double> fractions = { 0.5, 0.25, 0.1, 200 }; double frac : fractions) {
+	for (v_1d<double> fractions = { 0.25, 0.1, 200 }; double frac : fractions) {
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
 		name = "spectrum_num=" + STR(spectrum_num);
 		// define the window to calculate the entropy
 		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
 			continue;
-		openFile(fileAv, dir + "av_entropies," + name + ".dat", ios::out);
+		openFile(fileAv, dir + "av" + model_info + "," + name + ".dat", ios::out);
 
 		auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
 		double mean = 0.0;
@@ -1212,7 +1194,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
-	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_cpx->inf({}, "_", 4), maxima(bond_num - 1), mean200);
+	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_cpx->inf({}, "_", 4), maxima(bond_num - 1), mean200, N);
 	fileAv.close();
 }
 
@@ -1414,6 +1396,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	openFile(file, dir + "energies.dat");
 	for (u64 i = 0; i < this->ham_d->get_hilbert_size(); i++)
 		file << STRP(this->ham_d->get_eigenEnergy(i), 10) << EL;
+	this->ham_d->get_eigenvalues().save(arma::hdf5_name(dir + "en.h5", "energy", arma::hdf5_opts::append));
 	file << "\t\t->" << "saved energies: " << this->ham_d->get_info() << EL;
 	file.close();
 
@@ -1430,9 +1413,9 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 
 	// save binary file
 	std::string filename = dir + "entropies.bin";
-	std::string filenameh5 = dir + "entropies.h5";
 	entropies_mat.save(filename, arma::raw_binary);
-	entropies_mat.save(arma::hdf5_name(filenameh5, "entropy"));
+	entropies_mat.save(dir + "entropies.dat", arma::raw_ascii);
+	(arma::hdf5_name(dir + "en.h5", "energy", arma::hdf5_opts::append));
 
 	arma::mat ens_obc = this->ham_d->get_eigenvalues();
 	filename = dir + "energies.bin";
@@ -1544,7 +1527,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 
 						//file << "\t\t->" << VEQP(this->ham_cpx->get_eigenEnergy(i), 5) << "\t" << "after_trasform:" << arma::cdot(transformed_state, Hafter * transformed_state) << EL;
 					}
-				filenameh5 = dir_separated + VEQ(k) + "," + VEQ(p) + "," + VEQ(x) + "," + VEQ(su2) + ".h5";
+				std::string filenameh5 = dir_separated + VEQ(k) + "," + VEQ(p) + "," + VEQ(x) + "," + VEQ(su2) + ".h5";
 				this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(filenameh5, "energy", arma::hdf5_opts::append));
 				entro_inner.save(arma::hdf5_name(filenameh5, "entropy", arma::hdf5_opts::append));
 				} 
