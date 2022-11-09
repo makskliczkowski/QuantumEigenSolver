@@ -800,7 +800,7 @@ Col<_type> rbmState<_type, _hamtype>::mcSampling(uint n_samples, uint n_blocks, 
 	// start the timer!
 	auto start = std::chrono::high_resolution_clock::now();
 	// make the pbar!
-	this->pbar = pBar(20, n_samples);
+	this->pbar = pBar(50, n_samples);
 
 	// check if the batch is not bigger than the blocks number
 	const auto norm = n_blocks - n_therm;
@@ -897,7 +897,7 @@ inline std::map<u64, _type> rbmState<_type, _hamtype>::avSampling(uint n_samples
 	this->initAv();
 
 	// make the pbar!
-	this->pbar = pBar(25, n_samples);
+	this->pbar = pBar(50, n_samples);
 
 	// states to be returned
 	std::map<u64, _type> states;

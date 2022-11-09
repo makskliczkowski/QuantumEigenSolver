@@ -696,44 +696,43 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 				// --------------------- compare sigma_z ---------------------
 
 				// S_z at each site
-				std::string filename = dir_ed + "_sz_site_" + model_info;
-				av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site"));
+				std::string filename = dir_ed + "_sz_" + model_info;
+				av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site", arma::hdf5_opts::append));
 				PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
 				SAVEFIG(dir + "_sz_site.png", false);
 
 				// S_z correlations
-				filename = dir_ed + "_sz_corr";
-				av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_corr"));
+				av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_corr", arma::hdf5_opts::append));
 			}
 			else {
 				PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
 				SAVEFIG(dir + "energy" + ".png", true);
 			}
-
+				// ------------------- sampling rbm -------------------
+				ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 #pragma omp critical
-			printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
-			// ------------------- sampling rbm -------------------
-			ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
-			av_operator.reset();
-			av_operator = ph->get_op_av();
+			{
+				printSeparated(file, '\t', 30, true, model_info, angle_str, ground_rbm, var_rbm, ground_ed);
+				av_operator.reset();
+				av_operator = ph->get_op_av();
 
-			auto fileRbmEn_name = dir + "en_" + model_info;
-			Col<double> en_real = arma::real(energies);
-			en_real.save(arma::hdf5_name(fileRbmEn_name + ".h5", "energy"));
+				auto fileRbmEn_name = dir + "en_" + model_info;
+				Col<double> en_real = arma::real(energies);
+				en_real.save(arma::hdf5_name(fileRbmEn_name + ".h5", "energy"));
 
-			// other observables
-			string filename = "";
-			// --------------------- compare sigma_z
+				// other observables
+				string filename = "";
+				// --------------------- compare sigma_z
 
-			// S_z at each site
-			filename = dir + "_sz_site_" + model_info;
-			av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site"));
-			PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
-			SAVEFIG(filename + ".png", false);
+				// S_z at each site
+				filename = dir + "_sz_" + model_info;
+				av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site", arma::hdf5_opts::append));
+				PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+				SAVEFIG(filename + ".png", false);
 
-			// S_z correlations
-			filename = dir + "_sz_corr";
-			av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_cor"));
+				// S_z correlations
+				av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_cor", arma::hdf5_opts::append));
+			}
 		}
 	}
 
@@ -1021,7 +1020,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::string model_info = this->ham_d->get_info();
 
 	// save energies to check
-	if (this->lat->get_Ns() <= 16) {
+	if (this->lat->get_Ns() <= 12) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_d->get_eigenEnergy(i) << EL;
@@ -1128,7 +1127,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	std::ofstream fileAv;
 	std::string model_info = this->ham_cpx->get_info();
 	// save energies to check
-	if (this->lat->get_Ns() <= 16) {
+	if (this->lat->get_Ns() <= 12) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_cpx->get_eigenEnergy(i) << EL;
