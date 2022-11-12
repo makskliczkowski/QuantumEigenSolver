@@ -1280,12 +1280,11 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	stout << "->" << this->lat->get_info() << EL;
 	int Ns = this->lat->get_Ns();
 
-	// for SU(2) eta_a, eta_b needs to be set to 0.0, hz needs to be set to 0, we sweep delta_b outside
-	// for no SU(2) eta_a, eta_b need to be set 0.5, delta_b needs to be set to 0.9, we sweep hz outside
+	// for SU(2) eta_a, eta_b needs to be set to 0.0, hz = 0.0, hx = 0.0, sweep delta_a outside
+	// for no SU(2) eta_a, eta_b need to be set 0.5, delta_b = delta_a needs to be set to 0.9, we sweep hz outside, hx = 0.4
 
 
 	this->J = 1.0;
-	this->delta = 0.9;
 	this->J0 = 0.0;
 	//this->g = 0.0;
 
@@ -1297,6 +1296,8 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	v_1d<int> su2v = {};
 	if (this->eta_a == 0.0 && this->eta_b == 0.0) {
 		this->h = 0.0;
+		this->g = 0.0;
+		this->Delta_b = 0.3;
 		//for (int i = 0; i <= Ns; i++)
 		//	su2v.push_back(i);
 
@@ -1304,14 +1305,16 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 		su2v.push_back(int(Ns / 2.0));
 	}
 	else {
-		this->Delta_b = delta;
+		this->Delta_b = 0.9;
+		this->delta = 0.9;
+		this->g = 0.4;
 		su2v.push_back(-1);
 	}
 
 
 
 
-	double J2_max = 2.0;
+	double J2_max = 3.0;
 	double J2_min = 0.1;
 	double J2_step = 0.1;
 	int J2_num = abs(J2_max - J2_min) / J2_step;
