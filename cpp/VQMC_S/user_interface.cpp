@@ -1045,7 +1045,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
-		stout << "\t->doing : " << VEQ(idx) << EL;
+		//
 		Col<double> state = this->ham_d->get_eigenState(idx);
 		state = symmetryRotationMat * state;
 		for (int i = 1; i <= bond_num; i++) {
@@ -1053,8 +1053,11 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
+		if (idx % int(N / 10) == 0) {
+			stout << "\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+		}
 	}
-
+	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
 	// save binary file
 	entropies.save(filename + ".bin", arma::raw_binary);
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
@@ -1152,7 +1155,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	Mat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
-		stout << "\t->doing : " << VEQ(idx) << EL;
+		//stout << "\t->doing : " << VEQ(idx) << EL;
 		Col<cpx> state = this->ham_cpx->get_eigenState(idx);
 		state = symmetryRotationMat * state;
 		for (int i = 1; i <= bond_num; i++) {
@@ -1160,8 +1163,11 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
+		if (idx % int(N / 10) == 0) {
+			stout << "\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+		}
 	}
-
+	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
 	// save binary file
 	entropies.save(filename + ".bin", arma::raw_binary);
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
@@ -1281,7 +1287,7 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	this->J = 1.0;
 	this->delta = 0.9;
 	this->J0 = 0.0;
-	this->g = 0.0;
+	//this->g = 0.0;
 
 	this->w = 0.0;
 	this->g0 = 0.0;
