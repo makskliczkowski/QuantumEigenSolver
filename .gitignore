@@ -146,10 +146,12 @@ dmypy.json
 *armadillo*
 *V16/
 *v16/
-*.sh
 *.txt
 *.out
 *.bin
+*.h5
+*.csv
+
 
 *v17
 *FileContentIndex
