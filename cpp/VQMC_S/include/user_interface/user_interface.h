@@ -262,6 +262,11 @@ namespace rbm_ui {
 		
 		void make_mc_classical_angles(double Jdot = 0.0);
 
+		// ####################### KITAEV #######################
+
+		void make_mc_kitaev(t_3d<double> K);
+
+
 	public:
 		// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
 		ui() = default;
@@ -278,9 +283,17 @@ namespace rbm_ui {
 		void define_models();
 
 		// #######################		     RBMs               #######################
+		
+		// ########## CLASSICAL
 		void make_mc_classical();
 		void make_mc_angles_sweep();
+
+		// ########## KITAEV
+		void make_mc_kitaev_sweep();
+
+		// ########## TEST 
 		void make_simulation() override;
+
 		// #######################        SYMMETRIES            #######################
 		void make_simulation_symmetries();
 		void make_simulation_symmetries_sweep();

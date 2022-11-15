@@ -12,8 +12,9 @@
 #include <queue>
 
 namespace operators {
-	constexpr double _SPIN = 0.5;
+	constexpr double _SPIN = 1.0;
 	//constexpr double _SPIN = 1.0;
+	constexpr double _SPIN_RBM = 1.0;
 }
 
 
@@ -85,6 +86,12 @@ public:
 		//else if (lat_type == "hexagonal") {
 		//	corr_vec = SPACE_VEC_D(Lx, 2 * Ly, Lz);
 		//}
+		this->s_x = 0.0;
+		this->s_x_nei = 0.0;
+		this->s_y = 0.0;
+		this->s_y_nei = 0.0;
+		this->s_z = 0.0;
+		this->s_z_nei = 0.0;
 
 		this->s_z_cor = mat(Ns, Ns, arma::fill::zeros);
 		this->s_z_i = arma::vec(Ns, arma::fill::zeros);
@@ -336,7 +343,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 	//stout << alfa << EL;
 #pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
-		if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) {
+		if (!(site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns)) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 			value += val * conj(alfa(new_idx)) * alfa(k);
 		}
@@ -560,8 +567,10 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// stout << av_op.s_z_i << EL;
 	// S_z correlations
 	for (auto i = 0; i < Ns; i++) {
-		int z_nei = this->lat->get_z_nn(i);
-		av_op.s_z_nei += std::real(this->av_operator(eigvec, this->sigma_z, i, z_nei));
+		auto z_nei = this->lat->get_z_nn(i);
+		if (z_nei >= 0)
+			av_op.s_z_nei += std::real(this->av_operator(eigvec, this->sigma_z, i, z_nei));
+
 		for (auto j = 0; j < Ns; j++) {
 			av_op.s_z_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_z, i, j));
 		}
@@ -579,7 +588,8 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_y correlations
 	for (auto i = 0; i < Ns; i++) {
 		int y_nei = this->lat->get_y_nn(i);
-		av_op.s_y_nei += std::real(this->av_operator(eigvec, this->sigma_y, i, y_nei));
+		if (y_nei >= 0)
+			av_op.s_y_nei += std::real(this->av_operator(eigvec, this->sigma_y, i, y_nei));
 	}
 	av_op.s_y_nei /= Ns;
 	// --------------------- compare sigma_x ---------------------
@@ -594,7 +604,9 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 	// S_x correlations
 	for (auto i = 0; i < Ns; i++) {
 		int x_nei = this->lat->get_x_nn(i);
-		av_op.s_x_nei += std::real(this->av_operator(eigvec, this->sigma_x, i, x_nei));
+		if (x_nei >= 0)
+			av_op.s_x_nei += std::real(this->av_operator(eigvec, this->sigma_x, i, x_nei));
+
 		for (auto j = 0; j < Ns; j++) {
 			av_op.s_x_cor(i, j) += std::real(this->av_operator(eigvec, this->sigma_x, i, j));
 		}

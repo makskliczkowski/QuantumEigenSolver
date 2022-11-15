@@ -312,6 +312,10 @@ void rbm_ui::ui<_type, _hamtype>::functionChoice()
 		// check the minimum of energy when classical spins are varied with angle and with interaction
 		this->make_mc_angles_sweep();
 		break;
+	case 13:
+		// check the properties of Kitaev model when the interations are 
+		this->make_mc_kitaev_sweep();
+		break;
 	case 21:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		this->make_simulation_symmetries();
@@ -758,11 +762,146 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_angles_sweep()
 #pragma omp parallel for num_threads(this->thread_num)
 	for (int i = 0; i <= Jd_num; i++)
 	{
-		// use J0_dot for Jd
 		auto Jd = Jd_start + i * Jd_step;
 		this->make_mc_classical_angles(Jd);
 	}
 }
+
+/*
+* @brief make simulation for Kitaev Hamiltonian
+*/
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev(t_3d<double> K)
+{
+
+	// create files
+	std::ofstream file, log;
+	auto ran = randomGen();
+
+	// make the lattice
+	auto lat = std::make_shared<HexagonalLattice>(Lx, Ly, Lz, dim, _BC);
+	std::string lat_info = lat->get_info();
+	const auto Ns = lat->get_Ns();
+	auto nvisible = Ns;
+	auto nhidden = this->layer_mult * nvisible;
+
+	// open file for saving the energies and the angles
+	auto hamiltonian_rbm = std::make_shared<Heisenberg_kitaev<double>>(J, 0.0, 0.0, 0.0, h, 0.0, 1.0, K, 0.0, lat);
+	auto model_info = hamiltonian_rbm->get_info();
+
+	// rbm stuff
+	unique_ptr<rbmState<_type, double>> ph = std::make_unique<rbmState<_type, double>>(nhidden, nvisible, hamiltonian_rbm, lr, batch, 1);
+	auto rbm_info = ph->get_info();
+
+	std::string dir = this->saving_dir + kPS + lat_info + kPS;
+	fs::create_directories(dir);
+	dir = dir + rbm_info + kPS;
+	fs::create_directories(dir);
+	std::string dir_ed = dir + "ed" + kPS;
+	fs::create_directories(dir_ed);
+
+	openFile(log, dir + "log_" + ".txt", ios::app);
+	log << "->" << lat_info << EL;
+	log << "\t\t->" << VEQ(rbm_info) << EL;
+
+	openFile(file, dir + "energies_log_" + ".dat", ios::app);
+
+	// ------------------------------------------------------------------- CALCULATORS ------------------------------------------------------------------------------
+	// ------------------- calculator rbm -------------------
+	// monte carlo for energy
+	auto energies = ph->mcSampling(this->mcSteps, n_blocks, n_therm, block_size, n_flips, dir);
+	auto energies_tail = energies.tail(block_size);
+	double max_rbm = arma::max(arma::real(energies));
+	double ground_rbm = std::real(arma::mean(energies_tail));
+	double rbm_difference = max_rbm - ground_rbm;
+	double var_rbm = std::real(arma::var(energies_tail));
+
+	// save the log of energies
+
+	// ------------------- calculator ed -------------------
+	double ground_ed = -1.0;
+	double sz_nei_ed = -1.0; 
+	double sx_nei_ed = -1.0;
+	double sy_nei_ed = -1.0;
+	avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
+#pragma omp critical
+	if (Ns <= 14) {
+		auto relative_error = calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_rbm);
+#ifdef PLOT
+		plt::axhline(ground_ed);
+		plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
+		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+		SAVEFIG(dir + "en_" + model_info + ".png", false);
+#endif
+		Col<double> eigvec = hamiltonian_rbm->get_eigenState(0);
+		Operators<double> op(lat);
+		op.calculate_operators(eigvec, av_operator, true);
+		// --------------------- compare sigma_z ---------------------
+
+		// S_z at each site
+		std::string filename = dir_ed + "_sz_" + model_info;
+		av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site", arma::hdf5_opts::append));
+		PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+		SAVEFIG(dir + "_sz_site.png", false);
+
+		// S_z correlations
+		av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_corr", arma::hdf5_opts::append));
+		sz_nei_ed = av_operator.s_z_nei;
+		sy_nei_ed = real(av_operator.s_y_nei);
+		sx_nei_ed = av_operator.s_x_nei;
+	}
+	else {
+		PLOT_V1D(arma::conv_to< v_1d<double> >::from(arma::real(energies)), "#mcstep", "$<E_{est}>$", hamiltonian_rbm->get_info() + "\nrbm:" + ph->get_info());
+		SAVEFIG(dir + "energy" + ".png", true);
+	}
+	// ------------------- sampling rbm -------------------
+	ph->avSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
+#pragma omp critical
+	{
+		av_operator.reset();
+		av_operator = ph->get_op_av();
+
+		auto fileRbmEn_name = dir + "en_" + model_info;
+		Col<double> en_real = arma::real(energies);
+		en_real.save(arma::hdf5_name(fileRbmEn_name + ".h5", "energy"));
+
+		// other observables
+		string filename = "";
+		// --------------------- compare sigma_z
+
+		// S_z at each site
+		filename = dir + "_sz_" + model_info;
+		av_operator.s_z_i.save(arma::hdf5_name(filename + ".h5", "sz_site", arma::hdf5_opts::append));
+		PLOT_V1D(av_operator.s_z_i, "lat_site", "$S^z_i$", "$S^z_i$\n" + model_info + "\n");
+		SAVEFIG(filename + ".png", false);
+
+		// S_z correlations
+		av_operator.s_z_cor.save(arma::hdf5_name(filename + ".h5", "sz_cor", arma::hdf5_opts::append));
+		printSeparated(file, '\t', 30, true, model_info, ground_rbm,
+			var_rbm, ground_ed,
+			av_operator.s_z_nei, sz_nei_ed,
+			std::real(av_operator.s_y_nei), sy_nei_ed,
+			av_operator.s_x_nei, sx_nei_ed);
+	}
+
+}
+
+template<typename _type, typename _hamtype>
+void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev_sweep()
+{
+	double K_start = -2.0;
+	double K_end = 2.0;
+	double K_step = 0.1;
+	int K_num = abs(K_end - K_start) / K_step;
+
+#pragma omp parallel for num_threads(this->thread_num)
+	for (int i = 0; i <= K_num; i++)
+	{
+		auto k = K_start + i * K_step;
+		this->make_mc_kitaev(std::make_tuple(k, k, k));
+	}
+}
+
 // -------------------------------------------------------- HELPERS
 
 /*

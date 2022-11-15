@@ -48,7 +48,7 @@ public:
 	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
 	{
 		string name = sep + \
-			"hei_kitv,Ns=" + STR(this->Ns) + \
+			"hei_ktv,Ns=" + STR(this->Ns) + \
 			",J=" + STRP(this->J, prec) + \
 			",J0=" + STRP(this->J0, prec) + \
 			",d=" + STRP(this->delta, prec) + \
@@ -76,25 +76,24 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function
 	double localVal = 0;
 	cpx changedVal = 0.0;
 
-	const uint nn_number = this->lattice->get_nn_forward_num(site);
+	//const uint nn_number = this->lattice->get_nn_forward_num(site);
+	auto nns = this->lattice->get_nn_forward_number(site);
 
 	// true - spin up, false - spin down
-	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
+	const double si = checkBit(_id, this->Ns - site - 1) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field (SX) - HEISENBERG
-	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+	changedVal += f1(site, si) * operators::_SPIN_RBM * (this->g + this->dg(site));
 
 
 	// check the Siz Si+1z
-	for (auto nn = 0; nn < nn_number; nn++) {
-		// double checking neighbors
-		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+	for (auto n_num: nns) {
 		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 			// --------------------- HEISENBERG 
 
 			// diagonal elements setting  interaction field
@@ -107,7 +106,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function
 
 			// S+S- + S-S+
 			if (sisj < 0)
-				flip_val += 0.5 * interaction;
+				flip_val += 0.5 * interaction * operators::_SPIN_RBM * operators::_SPIN_RBM;
 
 			// --------------------- KITAEV
 			if (n_num == 0)
@@ -115,7 +114,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function
 			else if (n_num == 1)
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
-				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
+				flip_val += operators::_SPIN_RBM * operators::_SPIN_RBM * (this->Kx + this->dKx(site));
 
 			INT_TO_BASE_BIT(flip_idx_nn, tmp);
 			changedVal += flip_val * f2(tmp);
@@ -137,13 +136,13 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 	// perpendicular field (SZ) - HEISENBERG
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field (SX) - HEISENBERG
-	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
+	changedVal += f1(site, si) * operators::_SPIN_RBM * (this->g + this->dg(site));
 
 	tmp = v;
 	flipV(tmp, site);
@@ -154,7 +153,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			const double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBitV(v, nei) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 			// --------------------- HEISENBERG 
 
@@ -168,7 +167,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 
 			// S+S- + S-S+
 			if (sisj < 0)
-				flip_val += 0.5 * interaction;
+				flip_val += 0.5 * interaction * operators::_SPIN_RBM * operators::_SPIN_RBM;
 
 			// --------------------- KITAEV
 			if (n_num == 0)
@@ -176,7 +175,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 			else if (n_num == 1)
 				flip_val -= (this->Ky + this->dKy(site)) * sisj;
 			else if (n_num == 2)
-				flip_val += this->_SPIN * this->_SPIN * (this->Kx + this->dKx(site));
+				flip_val += operators::_SPIN_RBM * operators::_SPIN_RBM * (this->Kx + this->dKx(site));
 
 			flipV(tmp, nei);
 			changedVal += flip_val * f2(tmp);
@@ -196,52 +195,59 @@ template <typename _type>
 void Heisenberg_kitaev<_type>::hamiltonian() {
 
 	this->init_ham_mat();
+	auto Ns = this->lattice->get_Ns();
 
-	for (auto k = 0; k < this->N; k++) {
+	for (u64 k = 0; k < this->N; k++) {
+		// loop over all sites
+		u64 idx = 0;
+		cpx val = 0.0;
 		for (int i = 0; i < this->Ns; i++) {
 			// check all the neighbors
-			uint nn_number = this->lattice->get_nn_forward_num(i);
-
-			// true - spin up, false - spin down
-			double si = checkBit(k, this->Ns - i - 1) ? this->_SPIN : -this->_SPIN;
+			auto nns = this->lattice->get_nn_forward_number(i);
 
 			// perpendicular field (SZ) - HEISENBERG
-			this->H(k, k) += (this->h + this->dh(i)) * si;
+			std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { i });
+			this->H(idx, k) += (this->h + this->dh(i)) * real(val);
 
-			// HEISENBERG
-			const u64 new_idx = flip(k, this->Ns - 1 - i);
-			this->setHamiltonianElem(k, this->_SPIN * (this->g + this->dg(i)), new_idx);
+			// flip with S^x_i with the transverse field
+			std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { i });
+			this->setHamiltonianElem(k, (this->g + this->dg(i)) * real(val), idx);
 
 			// check the Siz Si+1z
-			for (auto nn = 0; nn < nn_number; nn++) {
-				// double checking neighbors
-				auto n_num = this->lattice->get_nn_forward_num(i, nn);
+			for (auto n_num : nns) {
 				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
-					// check Sz 
-					double sj = checkBit(k, this->Ns - 1 - nn) ? this->_SPIN : -this->_SPIN;
-
-					// --------------------- HEISENBERG 
+					// --------------------- HEISENBERG ---------------------
 
 					// diagonal elements setting  interaction field
 					double interaction = (this->J + this->dJ(i));
-					double sisj = si * sj;
+					auto [idx_z, val_z] = Operators<cpx>::sigma_z(k, Ns, { i });
+					auto [idx_z2, val_z2] = Operators<cpx>::sigma_z(idx_z, Ns, { nei });
 
 					// setting the neighbors elements
-					this->H(k, k) += interaction * this->delta * sisj;
+					this->H(idx_z2, k) += interaction * this->delta * real(val_z * val_z2);
 
-					const u64 flip_idx_nn = flip(new_idx, this->Ns - 1 - nn);
+					// setting the neighbors elements
+					auto [idx_x, val_x] = Operators<cpx>::sigma_x(k, Ns, { i });
+					auto [idx_x2, val_x2] = Operators<cpx>::sigma_x(idx_x, Ns, { nei });
 
 					// S+S- + S-S+ hopping
-					if (si * sj < 0)
-						this->setHamiltonianElem(k, 0.5 * interaction, flip_idx_nn);
+					if (real(val_z * val_z2) < 0)
+						this->setHamiltonianElem(k, 0.5 * interaction * real(val_x2 * val_x), idx_x2);
 
-					// --------------------- KITAEV
+					// --------------------- KITAEV ---------------------
+					
+					// z_bond
 					if (n_num == 0)
-						this->setHamiltonianElem(k, (this->Kz + this->dKz(i)) * sisj, k);
-					else if (n_num == 1)
-						this->setHamiltonianElem(k, -(this->Ky + this->dKy(i)) * sisj, flip_idx_nn);
+						this->setHamiltonianElem(k, (this->Kz + this->dKz(i)) * real(val_z * val_z2), idx_z2);
+					// y_bond
+					else if (n_num == 1) {
+						auto [idx_y, val_y] = Operators<cpx>::sigma_y(k, Ns, { i });
+						auto [idx_y2, val_y2] = Operators<cpx>::sigma_y(idx_y, Ns, { nei });
+						this->setHamiltonianElem(k, (this->Ky + this->dKy(i)) * real(val_y * val_y2), idx_y2);
+					}
+					// x_bond
 					else if (n_num == 2)
-						this->setHamiltonianElem(k, this->_SPIN * this->_SPIN * (this->Kx + this->dKx(i)), flip_idx_nn);
+						this->setHamiltonianElem(k, (this->Kx + this->dKx(i)) * real(val_x * val_x2), idx_x2);
 				}
 			}
 		}

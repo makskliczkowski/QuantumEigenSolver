@@ -7,7 +7,7 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-//#define PLOT
+#define PLOT
 
 //#define DEBUG
 #ifdef USE_SR
@@ -955,7 +955,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 	// calculate sigma_z 
 	double s_z = 0.0;
 	double s_z_nei = 0.0;
-#pragma omp parallel for reduction(+ : s_z) num_threads(this->thread_num)
+#pragma omp parallel for reduction(+ : s_z, s_z_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
 		this->op.s_z_i(i) += real(val);
@@ -964,8 +964,11 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 			const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, j }));
 			this->op.s_z_cor(i, j) += std::real(val);
 		}
-		const auto& [state_n, val_n] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_z_nn(i) }));
-		s_z_nei += real(val_n);
+		auto nei = this->hamil->lattice->get_z_nn(i);
+		if (nei >= 0) {
+			const auto& [state_n, val_n] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i, nei }));
+			s_z_nei += real(val_n);
+		}
 	}
 	this->op.s_z += real(s_z / double(Ns));
 	this->op.s_z_nei += real(s_z_nei / double(Ns));
@@ -977,7 +980,9 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 		const auto& [state, val] = Operators<double>::sigma_y(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_y_nn(i) }));
 		const int vid = this->get_vec_id();
 
-		s_y_nei += this->pRatioValChange(val, state, vid);
+		auto nei = this->hamil->lattice->get_y_nn(i);
+		if(nei >= 0)
+			s_y_nei += this->pRatioValChange(val, state, vid);
 	}
 	this->op.s_y_nei += real(s_y_nei / double(Ns));
 
@@ -994,8 +999,11 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 			const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, j }));
 			this->op.s_x_cor(i, j) += std::real(this->pRatioValChange(val, state, vid));
 		}
-		const auto& [state_n, val_n] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_x_nn(i) }));
-		s_x_nei += this->pRatioValChange(val_n, state_n, vid);
+		auto nei = this->hamil->lattice->get_x_nn(i);
+		if (nei >= 0) {
+			const auto& [state_n, val_n] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_x_nn(i) }));
+			s_x_nei += this->pRatioValChange(val_n, state_n, vid);
+		}
 	}
 	this->op.s_x_nei += real(s_x_nei / double(Ns));
 	this->op.s_x += real(s_x / double(Ns));
