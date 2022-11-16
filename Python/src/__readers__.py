@@ -17,8 +17,9 @@ def parse_model(model_string : str):
     return columns, values
 
 def get_log_file(directory, head = None):
-    df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t',
+    df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t', index_col=False,
                        header = None, names = ['model', 'max_ent', '200_ent', 'tmp']).drop(columns = ['tmp'], axis = 1).dropna()
+
     if head is not None:
         df = df.head(head)
     

@@ -280,19 +280,19 @@ namespace xyz_sym {
 						// Ising-like spin correlation
 						auto [idx_z, val_z] = Operators<cpx>::sigma_z(this->mapping[k], Ns, { j });
 						auto [idx_z2, val_z2] = Operators<cpx>::sigma_z(idx_z, Ns, { nei });
-						this->setHamiltonianElem(k, this->Jb * this->Delta_b * real(val_z * val_z2), idx_z2);
+						this->setHamiltonianElem(k, this->Ja * this->Delta_a * real(val_z * val_z2), idx_z2);
 
 						// sigma x
 						auto [idx_x, val_x] = Operators<cpx>::sigma_x(this->mapping[k], Ns, { j });
 						auto [idx_x2, val_x2] = Operators<cpx>::sigma_x(idx_x, Ns, { nei });
-						this->setHamiltonianElem(k, this->Jb * (1.0 - this->eta_b) * real(val_x * val_x2), idx_x2);
+						this->setHamiltonianElem(k, this->Ja * (1.0 - this->eta_a) * real(val_x * val_x2), idx_x2);
 						//this->H(idx_x2, k) += this->Ja * (1.0 - this->eta_a) * real(val_x * val_x2);
 						//this->setHamiltonianElem(k, this->_SPIN * this->_SPIN * this->Ja * (1.0 - this->eta_a), flip_idx_nn);
 
 						// sigma y
 						auto [idx_y, val_y] = Operators<cpx>::sigma_y(this->mapping[k], Ns, { j });
 						auto [idx_y2, val_y2] = Operators<cpx>::sigma_y(idx_y, Ns, { nei });
-						this->setHamiltonianElem(k, this->Jb * (1.0 + this->eta_b) * real(val_y * val_y2), idx_y2);
+						this->setHamiltonianElem(k, this->Ja * (1.0 + this->eta_a) * real(val_y * val_y2), idx_y2);
 						//this->H(idx_y2, k) += this->Ja * (1.0 + this->eta_a) * real(val_y * val_y2);
 						//this->setHamiltonianElem(k, -this->Ja * (1.0 + this->eta_a) * s_i * s_j, flip_idx_nn);
 					}
