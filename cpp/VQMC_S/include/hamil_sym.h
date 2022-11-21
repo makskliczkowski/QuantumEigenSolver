@@ -39,7 +39,7 @@ public:
 	void setHamiltonianElem(u64 k, _type value, u64 new_idx) override;																	// sets the Hamiltonian elements
 public:
 	Col<_type> symmetryRotation(u64 state, const v_1d<u64>& full_map = {}) const;
-	Mat<_type> symmetryRotationMat(const v_1d<u64>& full_map = {}) const override;
+	SpMat<_type> symmetryRotationMat(const v_1d<u64>& full_map = {}) const override;
 	// -------------------------------- GETTERS --------------------------------
 
 	auto get_normalization()											const RETURNS(this->normalisation);								// returns the normalization
@@ -159,11 +159,11 @@ inline _type SpinHamiltonianSym<_type>::get_symmetry_norm(u64 base_idx) const
 * @param full_map uses the map to transform only to global symmetry sector
 */
 template<typename _type>
-inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat(const v_1d<u64>& full_map) const
+inline SpMat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat(const v_1d<u64>& full_map) const
 {
 	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
 	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
-	Mat<cpx> U(max_dim, this->N, arma::fill::zeros);
+	SpMat<cpx> U(max_dim, this->N);
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {
@@ -171,18 +171,18 @@ inline Mat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat(const v_1d<u64>
 			// apply the mapping
 			idx = find_index(idx);
 			if (idx < max_dim) // only if exists in sector
-				U(idx, k) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
+				U(idx, k) += conj (this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
 		}
 	}
 	return U;
 }
 
 template<>
-inline Mat<double> SpinHamiltonianSym<double>::symmetryRotationMat(const v_1d<u64>& full_map) const
+inline SpMat<double> SpinHamiltonianSym<double>::symmetryRotationMat(const v_1d<u64>& full_map) const
 {
 	const u64 max_dim = full_map.empty() ? ULLPOW(this->Ns) : full_map.size();
 	auto find_index = [&](u64 idx) { return (!full_map.empty()) ? binary_search(full_map, 0, max_dim - 1, idx) : idx; };
-	Mat<double> U(max_dim, this->N, arma::fill::zeros);
+	SpMat<double> U(max_dim, this->N);
 
 	for (long int k = 0; k < this->N; k++) {
 		for (int i = 0; i < this->symmetry_group.size(); i++) {

@@ -825,7 +825,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev(t_3d<double> K)
 	double sy_nei_ed = -1.0;
 	avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
 #pragma omp critical
-	if (Ns <= 14) {
+	if (Ns <= 16) {
 		auto relative_error = calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_rbm);
 #ifdef PLOT
 		plt::axhline(ground_ed);
@@ -1180,7 +1180,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// check the symmetry rotation
 	auto global = this->ham_d->get_global_sym();
 	v_1d<u64> full_map = global.su2 ? this->ham_d->get_mapping_full() : v_1d<u64>();
-	arma::mat symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
+	arma::sp_mat symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
 
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
@@ -1291,7 +1291,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// check the symmetry rotation
 	auto global = this->ham_cpx->get_global_sym();
 	v_1d<u64> full_map = global.su2 ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
-	Mat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
+	SpMat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		//stout << "\t->doing : " << VEQ(idx) << EL;
@@ -1605,7 +1605,6 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	double entro = 0;
 	u64 Nh = pow(2, Ns);
 	u64 state_num = 0;
-	arma::cx_mat H(Nh, Nh, arma::fill::zeros);
 
 	v_1d<int> ps = {};
 	v_1d<int> sf = {};
@@ -1623,7 +1622,13 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	}
 	else
 		su2v.push_back(-1);
+	arma::sp_mat H0 = this->ham_d->get_hamiltonian();
+	auto lambda = [this](int k, int p, int x, SpMat<cpx>& U, std::shared_ptr<SpinHamiltonian<cpx>> model, arma::sp_cx_mat& H) {
+		arma::sp_cx_mat Hsym = model->get_hamiltonian();
+		H += U * Hsym * U.t();
+	};
 
+	arma::sp_cx_mat H(H0.n_rows, H0.n_cols);
 
 	for (auto su2 : su2v) {
 		for (int k = 0; k < Ns; k++) {
@@ -1653,7 +1658,10 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 					v_1d<u64> full_map = (this->eta_a == 0.0 && this->eta_b == 0.0) ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
 
 					// create rotation matrix
-					Mat<cpx> U = this->ham_cpx->symmetryRotationMat(full_map);
+					SpMat<cpx> U = this->ham_cpx->symmetryRotationMat(full_map);
+					if (!(this->eta_a == 0.0 && this->eta_b == 0.0))
+						lambda(k, p, x, U, this->ham_cpx, H);
+
 					state_num += this->ham_cpx->get_hilbert_size();
 					vec entro_inner(this->ham_cpx->get_hilbert_size());
 					for (u64 i = 0; i < this->ham_cpx->get_hilbert_size(); i++) {
@@ -1681,6 +1689,24 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 			}
 		}
 	}
+	/* PLOT MATRIX DIFFERENCES */
+	arma::sp_mat HH = arma::real(H);
+	auto N = H0.n_cols;
+	arma::sp_cx_mat res = arma::sp_cx_mat(HH - H0, arma::imag(H));
+	printSeparated(std::cout, '\t', 32, true, "index i", "index j", "difference", "original hamil", "symmetry hamil");
+	cpx x = 0;
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			cpx val = res(i, j);
+			if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
+				x += val;
+				printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
+			}
+		}
+	}
+	printSeparated(std::cout, '\t', 32, true, "Sum of suspicious elements: ", x);
+
+
 	entro /= double(entropies.size());
 	file << VEQ(Nh) << "\t" << VEQ(state_num) << EL;
 	// --------------------------- sort stuff ---------------------------

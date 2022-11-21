@@ -102,7 +102,7 @@ template<typename _hamtype>
 double calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
 	// compare ED
 	auto Ns = hamiltonian->lattice->get_Ns();
-	auto maxNs = 14;
+	auto maxNs = 16;
 	if (Ns <= maxNs) {
 		stout << "\t\t\t\t->calculating ed" << EL;
 		hamiltonian->hamiltonian();
