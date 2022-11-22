@@ -1188,7 +1188,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	arma::sp_mat symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
 
 	// set less number of bonds for quicker calculations
-	v_1d<uint> bonds = { 1, int(this->lat->get_Ns() / 4), int(this->lat->get_Ns() / 3), bond_num };
+	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(this->lat->get_Ns() / 3), static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		Col<double> state = this->ham_d->get_eigenState(idx);
@@ -1306,7 +1306,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	SpMat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
 
 	// set less number of bonds for quicker calculations
-	v_1d<uint> bonds = { 1, int(this->lat->get_Ns() / 4), int(this->lat->get_Ns() / 3), bond_num };
+	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(this->lat->get_Ns() / 3), static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		//stout << "\t->doing : " << VEQ(idx) << EL;
