@@ -7,7 +7,7 @@
 //#define USE_RMS
 
 #define RBM_ANGLES_UPD
-//#define PLOT
+#define PLOT
 
 //#define DEBUG
 #ifdef USE_SR

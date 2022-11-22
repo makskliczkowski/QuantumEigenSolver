@@ -316,6 +316,10 @@ void rbm_ui::ui<_type, _hamtype>::functionChoice()
 		// check the properties of Kitaev model when the interations are 
 		this->make_mc_kitaev_sweep();
 		break;
+	case 14:
+		// make simulation for a single model based on input parameters
+		this->make_simulation();
+		break;
 	case 21:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		this->make_simulation_symmetries();
@@ -339,12 +343,13 @@ template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 {
 	auto start = std::chrono::high_resolution_clock::now();
+	this->define_models();
 	stouts("STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: " + VEQ(thread_num), start);
 	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
 	// monte carlo
 	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 
-	std::string dir = this->saving_dir;// +this->lat->get_type() + kPS + this->ham->get_info() + kPS + this->phi->get_info() + kPS;
+	std::string dir = this->saving_dir + this->lat->get_type() + kPS + this->ham->get_info() + kPS + this->phi->get_info() + kPS;
 	fs::create_directories(dir);
 
 	// print energies
@@ -1182,32 +1187,36 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	v_1d<u64> full_map = global.su2 ? this->ham_d->get_mapping_full() : v_1d<u64>();
 	arma::sp_mat symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
 
+	// set less number of bonds for quicker calculations
+	v_1d<uint> bonds = { 1, int(this->lat->get_Ns() / 4), int(this->lat->get_Ns() / 3), bond_num };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
-		//
 		Col<double> state = this->ham_d->get_eigenState(idx);
 		state = symmetryRotationMat * state;
-		for (int i = 1; i <= bond_num; i++) {
+		for (auto i : bonds) {
 			// iterate through the state
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
 		if (idx % int(N / 10) == 0) {
-			stout << "\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+			stout << "\t->Done: " << int(idx / N) << "%\n";
+			stout << "\t\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
 	// save binary file
-	entropies.save(filename + ".bin", arma::raw_binary);
+	// entropies.save(filename + ".bin", arma::raw_binary);
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-	if (this->lat->get_Ns() <= 16) 
+	if (this->lat->get_Ns() <= 12) 
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
-
 	// iterate through fractions
-	double mean200 = 0.0;
-	for (v_1d<double> fractions = { 0.25, 0.1, 200 }; double frac : fractions) {
+	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
+	v_1d<double> mean_frac(7);
+	int iter = 0;
+	for (int iter = 0; iter < fractions.size(); iter++) {
+		double frac = fractions[iter];
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
 		name = "spectrum_num=" + STR(spectrum_num);
 		// define the window to calculate the entropy
@@ -1222,13 +1231,16 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 			printSeparated(fileAv, '\t', 18, false, i);
 			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
 		}
-		mean200 = mean;
+		mean_frac[iter] = mean;
 		fileAv.close();
 	}
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
-	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1), mean200, N);
+	printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1));
+	for(auto mean : mean_frac)
+		printSeparatedP(fileAv, '\t', 18, false, 12, mean);
+	printSeparatedP(fileAv, '\t', 18, true, 12, N);
 	fileAv.close();
 }
 
@@ -1292,32 +1304,38 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	auto global = this->ham_cpx->get_global_sym();
 	v_1d<u64> full_map = global.su2 ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
 	SpMat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
+
+	// set less number of bonds for quicker calculations
+	v_1d<uint> bonds = { 1, int(this->lat->get_Ns() / 4), int(this->lat->get_Ns() / 3), bond_num };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		//stout << "\t->doing : " << VEQ(idx) << EL;
 		Col<cpx> state = this->ham_cpx->get_eigenState(idx);
 		state = symmetryRotationMat * state;
-		for (int i = 1; i <= bond_num; i++) {
+		for (auto i : bonds) {
 			// iterate through the state
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
 		if (idx % int(N / 10) == 0) {
-			stout << "\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+			stout << "\t->Done: " << int(idx / N) << "%\n";
+			stout << "\t\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
 	// save binary file
-	entropies.save(filename + ".bin", arma::raw_binary);
+	// entropies.save(filename + ".bin", arma::raw_binary);
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-	if (this->lat->get_Ns() <= 16)
+	if (this->lat->get_Ns() <= 12)
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
-	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
-
+	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 	// iterate through fractions
-	double mean200 = 0.0;
-	for (v_1d<double> fractions = { 0.25, 0.1, 200 }; double frac : fractions) {
+	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
+	v_1d<double> mean_frac(7);
+	int iter = 0;
+	for (int iter = 0; iter < fractions.size(); iter++) {
+		double frac = fractions[iter];
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
 		name = "spectrum_num=" + STR(spectrum_num);
 		// define the window to calculate the entropy
@@ -1332,13 +1350,16 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 			printSeparated(fileAv, '\t', 18, false, i);
 			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
 		}
-		mean200 = mean;
+		mean_frac[iter] = mean;
 		fileAv.close();
 	}
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
-	printSeparatedP(fileAv, '\t', 18, true, 12, this->ham_cpx->inf({}, "_", 4), maxima(bond_num - 1), mean200, N);
+	printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1));
+	for (auto mean : mean_frac)
+		printSeparatedP(fileAv, '\t', 18, false, 12, mean);
+	printSeparatedP(fileAv, '\t', 18, true, 12, N);
 	fileAv.close();
 }
 
@@ -1353,57 +1374,45 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 	stout << "->" << this->lat->get_info() << EL;
 	auto Ns = this->lat->get_Ns();
 
-	// for SU(2) eta_a, eta_b needs to be set to 0.0, hz needs to be set to 0, we sweep delta_b outside
-	// for no SU(2) eta_a, eta_b need to be set 0.5, delta_b needs to be set to 0.9, we sweep hz outside
-
-
 	this->J = 1.0;
-	this->delta = 0.9;
 	this->J0 = 0.0;
-	this->g = 0.0;
-
 	this->w = 0.0;
 	this->g0 = 0.0;
 
 
-
 	v_1d<int> su2v = {};
 	if (this->eta_a == 0.0 && this->eta_b == 0.0) {
-		this->h = 0.0;
-		//for (int i = 0; i <= Ns; i++)
-		//	su2v.push_back(i);
-
-		// check only the sz=0
 		su2v.push_back(int(Ns / 2.0));
 	}
 	else {
-		this->Delta_b = delta;
 		su2v.push_back(-1);
 	}
 
+	// set momenta
+	v_1d<int> ks(Ns);
+	if (this->lat->get_BC() == 1)
+		this->k_sym = 0;
+
+	// set the parities
+	v_1d<int> ps = {};
+	// set the fields
+	v_1d<int> xs = {};
+	if (this->h != 0.0)
+		this->x_sym = 1;
 
 
-
-	double J2_max = 2.0;
-	double J2_min = 0.1;
-	double J2_step = 0.1;
-	int J2_num = abs(J2_max - J2_min) / J2_step;
-	// over next nearest interaction
-	for (int i = 0; i <= J2_num; i++) {
-		this->Jb = J2_min + J2_step * i;
-		// initialize hamiltonian
-		if (this->sym) {
-			for (auto su2 : su2v) {
-				this->su2 = su2;
-				if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
-					this->symmetries_double(start);
-				else
-					this->symmetries_cpx(start);
-			}
+	if (this->sym) {
+		for (auto su2 : su2v) {
+			this->su2 = su2;
+			if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
+				this->symmetries_double(start);
+			else
+				this->symmetries_cpx(start);
 		}
-		else
-			this->symmetries_double(start);
 	}
+	else
+		this->symmetries_double(start);
+
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
 
 }
@@ -1444,18 +1453,15 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 		su2v.push_back(int(Ns / 2.0));
 	}
 	else {
-		this->Delta_b = 0.9;
-		this->delta = 0.9;
+		this->Delta_b = this->delta;
 		this->g = 0.4;
 		su2v.push_back(-1);
 	}
 
 
-
-
-	double J2_max = 3.0;
+	double J2_max = 3.5;
 	double J2_min = 0.1;
-	double J2_step = 0.1;
+	double J2_step = 0.2;
 	int J2_num = abs(J2_max - J2_min) / J2_step;
 	// over next nearest interaction
 
