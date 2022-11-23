@@ -187,6 +187,7 @@ inline void Heisenberg_dots<_type>::set_angles(int position, double sin_phi, dou
 	//stout << "cos(phi)(" << position << ")" << EL << this->cos_phis(position) << EL;
 	//stout << "sin(phi)(" << position << ")" << EL << this->sin_phis(position) << EL;
 }
+
 // ----------------------------------------------------------------------------- DOT INTERACTION -----------------------------------------------------------------------------
 
 /*
@@ -344,7 +345,7 @@ inline cpx Heisenberg_dots<_type>::locEnergy(u64 _id, uint site, std::function<c
 	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	const double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
+	const double si = checkBit(_id, this->Ns - site - 1) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 	// perpendicular field
 	localVal += (this->h + this->dh(site)) * si;
@@ -357,20 +358,20 @@ inline cpx Heisenberg_dots<_type>::locEnergy(u64 _id, uint site, std::function<c
 		// double checking neighbors
 		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
 		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-			const double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBit(_id, this->Ns - 1 - nei) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 			const double interaction = this->J + this->dJ(site);
 			// diagonal elements setting  interaction field
 			localVal += this->delta * interaction * si * sj;
 
-			const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
-			INT_TO_BASE_BIT(flip_idx_nn, tmp);
 			// S+S- + S-S+
-			if (si * sj < 0)
-				changedVal += f2(tmp) * 0.5 * interaction;
-
+			if (si * sj < 0) {
+				const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
+				INT_TO_BASE_BIT(flip_idx_nn, tmp);	
+				changedVal += f2(tmp * operators::_SPIN_RBM) * 0.5 * interaction;
+			}
 			// dot - dot interaction
 			if (this->J_dot_dot != 0.0 && this->positions[site] >= 0 && this->positions[nei] >= 0)
-				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
+				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * operators::_SPIN_RBM * operators::_SPIN_RBM;
 		}
 	}
 	// handle the dot
@@ -399,13 +400,13 @@ inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::funct
 	const uint nn_number = this->lattice->get_nn_forward_num(site);
 
 	// true - spin up, false - spin down
-	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
+	const double si = checkBitV(v, site) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 	// perpendicular field
 	localVal += (this->h + this->dh(site)) * si;
 
 	// transverse field
-	_type single_flip_val = this->_SPIN * (this->g + this->dg(site));
+	_type single_flip_val = operators::_SPIN_RBM * (this->g + this->dg(site));
 
 	tmp = v;
 	flipV(tmp, site);
@@ -416,7 +417,7 @@ inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::funct
 		// double checking neighbors
 		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
-			const double sj = checkBitV(v, nn) > 0 ? this->_SPIN : -this->_SPIN;
+			const double sj = checkBitV(v, nn) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
 
 			const double interaction = (this->J + this->dJ(site));
 			// diagonal elements setting  interaction field
@@ -431,7 +432,7 @@ inline cpx Heisenberg_dots<_type>::locEnergy(const vec& v, uint site, std::funct
 			}
 			// dot - dot interaction
 			if (this->J_dot_dot != 0.0 && this->positions[site] >= 0 && this->positions[nei] >= 0)
-				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * this->_SPIN * this->_SPIN;
+				localVal += this->J_dot_dot * this->cos_thetas(this->positions[site]) * this->cos_thetas(this->positions[nei]) * operators::_SPIN_RBM * operators::_SPIN_RBM;
 		}
 	}
 	// handle the dot

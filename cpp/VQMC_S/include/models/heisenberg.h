@@ -137,7 +137,7 @@ inline cpx Heisenberg<_type>::locEnergy(u64 _id, uint site, std::function<cpx(in
 			if (si * sj < 0) {
 				const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
 				INT_TO_BASE_BIT(flip_idx_nn, tmp);
-				changedVal += 0.5 * interaction * f2(tmp) * operators::_SPIN_RBM * operators::_SPIN_RBM;
+				changedVal += 0.5 * interaction * f2(tmp * operators::_SPIN_RBM);
 			}
 		}
 	}
@@ -184,7 +184,7 @@ inline cpx Heisenberg<_type>::locEnergy(const vec& v, uint site, std::function<c
 			// S+S- + S-S+
 			if (sisj < 0) {
 				flipV(tmp, nei);
-				changedVal += 0.5 * interaction * f2(tmp) * operators::_SPIN_RBM * operators::_SPIN_RBM;
+				changedVal += 0.5 * interaction * f2(tmp);
 				flipV(tmp, nei);
 			}
 		}
@@ -232,7 +232,9 @@ void Heisenberg<_type>::hamiltonian() {
 					if (real(val_z * val_z2) < 0) {
 						auto [idx_x, val_x] = Operators<cpx>::sigma_x(k, Ns, { i });
 						auto [idx_x2, val_x2] = Operators<cpx>::sigma_x(idx_x, Ns, { nei });
-						this->setHamiltonianElem(k, 0.5 * interaction * real(val_x * val_x2), idx_x2);
+						double inter = 0.5 * interaction;
+						
+						this->setHamiltonianElem(k, inter, idx_x2);
 					}
 				}
 			}

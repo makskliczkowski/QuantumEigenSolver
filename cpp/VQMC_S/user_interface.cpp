@@ -1185,7 +1185,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// check the symmetry rotation
 	auto global = this->ham_d->get_global_sym();
 	v_1d<u64> full_map = global.su2 ? this->ham_d->get_mapping_full() : v_1d<u64>();
-	arma::sp_mat symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
+	SpMat<double> symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
 
 	// set less number of bonds for quicker calculations
 	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(this->lat->get_Ns() / 3), static_cast<uint>(bond_num) };
@@ -1200,7 +1200,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		}
 		if (idx % int(N / 10) == 0) {
 			stout << "\t->Done: " << int(idx / N) << "%\n";
-			stout << "\t\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
@@ -1213,26 +1213,23 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
-	v_1d<double> mean_frac(7);
-	int iter = 0;
+	v_1d<double> mean_frac(fractions.size());
 	for (int iter = 0; iter < fractions.size(); iter++) {
 		double frac = fractions[iter];
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
-		name = "spectrum_num=" + STR(spectrum_num);
+		name = "spectrum_num=" + STR(N);
 		// define the window to calculate the entropy
 		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
 			continue;
-		openFile(fileAv, dir + "av" + model_info + "," + name + ".dat", ios::out);
 
 		auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
-		double mean = 0.0;
-		for (int i = 1; i <= bond_num; i++) {
-			mean = arma::mean(subview.row(i - 1));
-			printSeparated(fileAv, '\t', 18, false, i);
-			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
-		}
-		mean_frac[iter] = mean;
-		fileAv.close();
+		vec bond_mean(bond_num, arma::fill::zeros);
+		for (int i = 1; i <= bond_num; i++)
+			bond_mean(i - 1) = arma::mean(subview.row(i - 1));
+		std::string filename = dir + "av_" + model_info + "," + name;
+		bond_mean.save(arma::hdf5_name(filename + ".h5", STRP(frac, 3), arma::hdf5_opts::append));
+
+		mean_frac[iter] = bond_mean(bond_num - 1);
 	}
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
@@ -1319,7 +1316,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 		}
 		if (idx % int(N / 10) == 0) {
 			stout << "\t->Done: " << int(idx / N) << "%\n";
-			stout << "\t\t->doing : " << VEQ(idx) << VEQ(model_info) << EL;
+			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
@@ -1332,26 +1329,23 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
-	v_1d<double> mean_frac(7);
-	int iter = 0;
+	v_1d<double> mean_frac(fractions.size());
 	for (int iter = 0; iter < fractions.size(); iter++) {
 		double frac = fractions[iter];
 		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
-		name = "spectrum_num=" + STR(spectrum_num);
+		name = "spectrum_num=" + STR(N);
 		// define the window to calculate the entropy
 		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
 			continue;
-		openFile(fileAv, dir + "av" + model_info + "," + name + ".dat", ios::out);
 
 		auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
-		double mean = 0.0;
-		for (int i = 1; i <= bond_num; i++) {
-			mean = arma::mean(subview.row(i - 1));
-			printSeparated(fileAv, '\t', 18, false, i);
-			printSeparatedP(fileAv, '\t', 18, true, 12, mean);
-		}
-		mean_frac[iter] = mean;
-		fileAv.close();
+		vec bond_mean(bond_num, arma::fill::zeros);
+		for (int i = 1; i <= bond_num; i++)
+			bond_mean(i - 1) = arma::mean(subview.row(i - 1));
+		std::string filename = dir + "av_" + model_info + "," + name;
+		bond_mean.save(arma::hdf5_name(filename + ".h5", STRP(frac, 3), arma::hdf5_opts::append));
+
+		mean_frac[iter] = bond_mean(bond_num-1);
 	}
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);

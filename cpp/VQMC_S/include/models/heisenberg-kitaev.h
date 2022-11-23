@@ -106,7 +106,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function
 
 			// S+S- + S-S+
 			if (sisj < 0)
-				flip_val += 0.5 * interaction * operators::_SPIN_RBM * operators::_SPIN_RBM;
+				flip_val += 0.5 * interaction;
 
 			// --------------------- KITAEV
 			if (n_num == 0)
@@ -117,7 +117,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function
 				flip_val += operators::_SPIN_RBM * operators::_SPIN_RBM * (this->Kx + this->dKx(site));
 
 			INT_TO_BASE_BIT(flip_idx_nn, tmp);
-			changedVal += flip_val * f2(tmp);
+			changedVal += flip_val * f2(tmp * operators::_SPIN_RBM);
 		}
 	}
 	return changedVal + localVal;
@@ -133,7 +133,8 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 	double localVal = 0;
 	cpx changedVal = 0.0;
 
-	const uint nn_number = this->lattice->get_nn_forward_num(site);
+	//const uint nn_number = this->lattice->get_nn_forward_num(site);
+	auto nns = this->lattice->get_nn_forward_number(site);
 
 	// true - spin up, false - spin down
 	const double si = checkBitV(v, site) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
@@ -148,9 +149,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 	flipV(tmp, site);
 
 	// check the Siz Si+1z
-	for (auto nn = 0; nn < nn_number; nn++) {
-		// double checking neighbors
-		const uint n_num = this->lattice->get_nn_forward_num(site, nn);
+	for (auto n_num : nns) {
 		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
 			// check Sz 
 			const double sj = checkBitV(v, nei) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
@@ -167,7 +166,7 @@ inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::fun
 
 			// S+S- + S-S+
 			if (sisj < 0)
-				flip_val += 0.5 * interaction * operators::_SPIN_RBM * operators::_SPIN_RBM;
+				flip_val += 0.5 * interaction;
 
 			// --------------------- KITAEV
 			if (n_num == 0)
@@ -232,7 +231,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 					// S+S- + S-S+ hopping
 					if (real(val_z * val_z2) < 0)
-						this->setHamiltonianElem(k, 0.5 * interaction * real(val_x2 * val_x), idx_x2);
+						this->setHamiltonianElem(k, 0.5 * interaction, idx_x2);
 
 					// --------------------- KITAEV ---------------------
 					

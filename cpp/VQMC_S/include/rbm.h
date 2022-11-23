@@ -199,6 +199,7 @@ public:
 	void pretty_print(std::map<u64, _type>& sample_states, double tol = 5e-2) const;
 
 	// ------------------------------------------- 				 SETTTERS				  -------------------------------------------
+	
 	// sets info
 	void set_info() { this->info = "nv=" + STR(n_visible) + ",nh=" + STR(n_hidden) + ",b=" + STR(batch) + "," + VEQP(lr,3); };
 
@@ -207,6 +208,7 @@ public:
 		this->current_state = state;
 
 		INT_TO_BASE_BIT(state, this->current_vector);
+		this->current_vector *= operators::_SPIN_RBM;
 
 #ifdef RBM_ANGLES_UPD
 		if (set)
@@ -375,8 +377,8 @@ void rbmState<_type, _hamtype>::allocate() {
 #endif
 	// allocate vectors
 	this->current_vector = Col<double>(this->n_visible, arma::fill::ones);
-	this->tmp_vector = Col<double>(this->n_visible, arma::fill::ones);
-	this->tmp_vectors = v_1d<Col<double>>(this->thread_num, Col<double>(this->n_visible, arma::fill::ones));
+	this->tmp_vector = Col<double>(this->n_visible, arma::fill::ones) * operators::_SPIN_RBM;
+	this->tmp_vectors = v_1d<Col<double>>(this->thread_num, Col<double>(this->n_visible, arma::fill::ones) * operators::_SPIN_RBM);
 }
 
 /*
@@ -630,6 +632,7 @@ template<typename _type, typename _hamtype>
 inline _type rbmState<_type, _hamtype>::pRatioValChange(_type v, u64 state, uint vid)
 {
 	INT_TO_BASE_BIT(state, this->tmp_vectors[vid]);
+	this->tmp_vectors[vid] *= operators::_SPIN_RBM;
 #ifndef RBM_ANGLES_UPD
 	return v * this->pRatio(this->current_vector, this->tmp_vectors[vid]);
 #else
@@ -778,7 +781,7 @@ void rbmState<_type, _hamtype>::blockSampling(uint b_size, u64 start_state, uint
 			this->tmp_vector(flip_place) = flip_spin;
 		}
 	}
-	this->current_state = BASE_TO_INT(this->current_vector);
+	this->current_state = BASE_TO_INT(vec(this->current_vector / operators::_SPIN_RBM));
 	// calculate the effective angles
 }
 
