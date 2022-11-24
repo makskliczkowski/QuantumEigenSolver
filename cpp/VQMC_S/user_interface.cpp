@@ -1326,7 +1326,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	if (this->lat->get_Ns() <= 12)
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
-	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
+	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
 	v_1d<double> mean_frac(fractions.size());
@@ -1350,7 +1350,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
-	printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1));
+	printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_cpx->inf({}, "_", 4), maxima(bond_num - 1));
 	for (auto mean : mean_frac)
 		printSeparatedP(fileAv, '\t', 18, false, 12, mean);
 	printSeparatedP(fileAv, '\t', 18, true, 12, N);
