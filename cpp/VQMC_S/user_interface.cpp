@@ -1143,7 +1143,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		if (this->model_name == 0)
 			this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
 		else
-			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, true);
+			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, false);
 		this->ham_d->hamiltonian();
 	}
 
@@ -1192,14 +1192,15 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		Col<double> state = this->ham_d->get_eigenState(idx);
-		state = symmetryRotationMat * state;
+		if (this->sym)
+			state = symmetryRotationMat * state;
 		for (auto i : bonds) {
 			// iterate through the state
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
 		if (idx % int(N / 10) == 0) {
-			stout << "\t->Done: " << int(idx / N) << "%\n";
+			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
@@ -1258,7 +1259,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 		if (this->model_name == 0)
 			this->ham_cpx = std::make_shared<IsingModel<cpx>>(J, J0, g, g0, h, w, lat);
 		else
-			this->ham_cpx = std::make_shared<XYZ<cpx>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, true);;
+			this->ham_cpx = std::make_shared<XYZ<cpx>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, false);;
 		this->ham_cpx->hamiltonian();
 	}
 
@@ -1308,14 +1309,15 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	for (u64 idx = 0; idx < N; idx++) {
 		//stout << "\t->doing : " << VEQ(idx) << EL;
 		Col<cpx> state = this->ham_cpx->get_eigenState(idx);
-		state = symmetryRotationMat * state;
+		if (this->sym)	
+			state = symmetryRotationMat * state;
 		for (auto i : bonds) {
 			// iterate through the state
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
 		if (idx % int(N / 10) == 0) {
-			stout << "\t->Done: " << int(idx / N) << "%\n";
+			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
@@ -1387,8 +1389,6 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 	if (this->lat->get_BC() == 1)
 		this->k_sym = 0;
 
-	// set the parities
-	v_1d<int> ps = {};
 	// set the fields
 	v_1d<int> xs = {};
 	if (this->h != 0.0)
