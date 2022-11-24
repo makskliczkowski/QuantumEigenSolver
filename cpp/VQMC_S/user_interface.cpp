@@ -808,6 +808,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev(t_3d<double> K)
 	openFile(log, dir + "log_" + ".txt", ios::app);
 	log << "->" << lat_info << EL;
 	log << "\t\t->" << VEQ(rbm_info) << EL;
+	log << "\t\t\t->" << VEQ(model_info) << EL;
 
 	openFile(file, dir + "energies_log_" + ".dat", ios::app);
 
