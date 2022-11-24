@@ -266,10 +266,10 @@ namespace xyz_sym {
 
 				// flip with S^x_i with the transverse field
 				const double transverse_val = this->hx;
-				if (!valueEqualsPrec(transverse_val, 0.0, 1e-8)) {
-					std::tie(idx, val) = Operators<cpx>::sigma_x(this->mapping[k], Ns, { j });
-					this->setHamiltonianElem(k, transverse_val * real(val), idx);
-				}
+				//if (!valueEqualsPrec(transverse_val, 0.0, 1e-12)) {
+				std::tie(idx, val) = Operators<cpx>::sigma_x(this->mapping[k], Ns, { j });
+				this->setHamiltonianElem(k, transverse_val * real(val), idx);
+				//}
 
 				// -------------- CHECK NN ---------------
 				for (auto nn = 0; nn < nn_number; nn++) {

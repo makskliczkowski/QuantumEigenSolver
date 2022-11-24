@@ -228,7 +228,6 @@ void XYZ<_type>::hamiltonian() {
 
 				}
 			}
-			if (this->parity_break && Ns < 10) stout << EL;
 		}
 	}
 }

@@ -1199,7 +1199,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
-		if (idx % int(N / 10) == 0) {
+		if ( N>10 && idx % int(N / 10) == 0) {
 			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
@@ -1316,7 +1316,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 			auto entro = op.entanglement_entropy(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
-		if (idx % int(N / 10) == 0) {
+		if (N > 10 && idx % int(N / 10) == 0) {
 			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
@@ -1397,7 +1397,7 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 
 	if (this->sym) {
 		for (auto su2 : su2v) {
-			this->su2 = su2;
+			//this->su2 = su2;
 			if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
 				this->symmetries_double(start);
 			else
@@ -1530,7 +1530,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 		this->ham_d = std::make_shared<IsingModel<double>>(J, 0.0, g, 0.0, h, 0.0, lat);
 	else
 		this->ham_d = std::make_shared<XYZ<double>>(lat, this->J, this->Jb, this->g, this->h,
-			this->delta, this->Delta_b, this->eta_a, this->eta_b, true);
+			this->delta, this->Delta_b, this->eta_a, this->eta_b, false);
 
 	this->ham_d->hamiltonian();
 	file << "\t->" << "finished building: " << this->ham_d->get_info() << EL;

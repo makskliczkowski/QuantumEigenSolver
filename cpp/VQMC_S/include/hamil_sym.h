@@ -171,7 +171,7 @@ inline SpMat<_type> SpinHamiltonianSym<_type>::symmetryRotationMat(const v_1d<u6
 			// apply the mapping
 			idx = find_index(idx);
 			if (idx < max_dim) // only if exists in sector
-				U(idx, k) += conj (this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
+				U(idx, k) += conj(this->symmetry_eigval[i] / (this->normalisation[k] * sqrt(double(this->symmetry_group.size()))));
 		}
 	}
 	return U;
