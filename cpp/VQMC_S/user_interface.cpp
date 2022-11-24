@@ -895,14 +895,14 @@ template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev_sweep()
 {
 	double K_start = -2.0;
-	double K_end = 2.0;
-	double K_step = 0.1;
-	int K_num = abs(K_end - K_start) / K_step;
+	double K_end = 1.0;
+	double K_step = -0.1;
+	int K_num = abs(K_end - K_start) / abs(K_step);
 
 #pragma omp parallel for num_threads(this->thread_num)
 	for (int i = 0; i <= K_num; i++)
 	{
-		auto k = K_start + i * K_step;
+		auto k = K_end + i * K_step;
 		this->make_mc_kitaev(std::make_tuple(k, k, k));
 	}
 }
@@ -1701,9 +1701,11 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 			if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
 				x += val;
 				printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
+				printSeparated(std::cout, '\t', 32, true, i, j, res);
 			}
 		}
 	}
+
 	printSeparated(std::cout, '\t', 32, true, "Sum of suspicious elements: ", x);
 
 
