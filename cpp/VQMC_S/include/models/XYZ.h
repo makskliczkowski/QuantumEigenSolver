@@ -177,12 +177,12 @@ void XYZ<_type>::hamiltonian() {
 
 			// diagonal elements setting the perpendicular field
 
-			const double perpendicular_val = ((j == Ns - 1) && this->parity_break) ? 0.1 : this->hz;
+			const double perpendicular_val = ((j == Ns - 1) && this->parity_break) ? 0.5 * this->hz : this->hz;
 			std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { j });
 			this->H(idx, k) += perpendicular_val * real(val);
 
 			// flip with S^x_i with the transverse field -> just one place to break
-			const double transverse_val = ((j == 0) && this->parity_break) ? 0.1 : this->hx;
+			const double transverse_val = ((j == 0) && this->parity_break) ? 0.5 * this->hx : this->hx;
 			std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { j });
 			this->setHamiltonianElem(k, transverse_val * real(val), idx);
 

@@ -791,7 +791,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev(t_3d<double> K)
 	auto nhidden = this->layer_mult * nvisible;
 
 	// open file for saving the energies and the angles
-	auto hamiltonian_rbm = std::make_shared<Heisenberg_kitaev<double>>(J, 0.0, 0.0, 0.0, h, 0.0, 1.0, K, 0.0, lat);
+	auto hamiltonian_rbm = std::make_shared<Heisenberg_kitaev<double>>(J, 0.0, 0.0, 0.0, h, 0.0, this->delta, K, 0.0, lat);
 	auto model_info = hamiltonian_rbm->get_info();
 
 	// rbm stuff
@@ -1144,7 +1144,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		if (this->model_name == 0)
 			this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
 		else
-			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, false);
+			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, true);
 		this->ham_d->hamiltonian();
 	}
 
@@ -1206,13 +1206,20 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
+	
 	// save binary file
-	// entropies.save(filename + ".bin", arma::raw_binary);
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
 	if (this->lat->get_Ns() <= 12) 
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
+
+	// save states near the mean energy index
+	if (!sym) {
+		int state_num = N / 10;
+		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N-1, av_energy_idx + int(state_num/2));
+		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
+	}
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
 	v_1d<double> mean_frac(fractions.size());

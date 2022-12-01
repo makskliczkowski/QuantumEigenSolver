@@ -214,7 +214,7 @@ void Heisenberg_kitaev<_type>::hamiltonian() {
 
 			// check the Siz Si+1z
 			for (auto n_num : nns) {
-				if (auto nei = this->lattice->get_nn(i, n_num); nei >= 0) {
+				if (int nei = this->lattice->get_nn(i, n_num); nei >= 0) {
 					// --------------------- HEISENBERG ---------------------
 
 					// diagonal elements setting  interaction field
