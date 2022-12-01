@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -N1" >> ${a}
-#SBATCH -c24" >> ${a}
-#SBATCH --mem=192gb" >> ${a}
-#SBATCH --time=299:59:59" >> ${a}
+#SBATCH -N1
+#SBATCH -c24
+#SBATCH --mem=192gb
+#SBATCH --time=299:59:59
 
 source /usr/local/sbin/modules.sh
 
