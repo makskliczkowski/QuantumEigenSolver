@@ -184,6 +184,7 @@ namespace rbm_ui {
 		bool sym = false;
 		int k_sym = 0;
 		bool p_sym = true;
+		bool p_break = false;
 		bool x_sym = true;
 		double su2 = 0.0;
 		long double spectrum_size = 0.2;

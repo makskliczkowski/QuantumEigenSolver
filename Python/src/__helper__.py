@@ -1,13 +1,18 @@
 from scipy.signal import savgol_filter
 import numpy as np
 import pandas as pd
-
+import os
 import itertools
 import random as random
 import shutil
+from scipy.special import psi
+from scipy.special import polygamma
+from scipy.special import erf, erfinv
+from scipy.optimize import curve_fit
 
-
-
+goe = 0.5307
+constant_page_correction = lambda n: (n * np.log(2.0) / 2.0) - 0.5 + ((0.5 - np.log(2.0)) / 2.0)
+page_val = lambda n : (n * np.log(2.0) / 2.0) - 0.5
 
 #################################### STATISTICS ####################################
 
@@ -30,22 +35,26 @@ def moving_average(df, window = 10):
 
 #################################### FINDERS ####################################
 
-def find_maximum(df):
+''' Find maximum index in a Dataframe'''
+def find_maximum(df : pd.DataFrame):
     return df.idxmax(axis=1)
 
-def find_nearest_idx(df, col, val):
+''' Find the nearest index to the value given in the DataFrame '''
+def find_nearest_idx(df : pd.DataFrame, col : str, val : float):
     return (df[col]-val).abs().idxmin()
 
+''' Find the nearest value to the value given in a numpy array'''
 def find_nearest_np(array, value):
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
+''' Find the index of a value closest to the given value in a numpy array'''
 def find_nearest_idx_np(array, value):
     return (np.abs(array - value)).argmin()
 
 
 # function cause i am foking stupid
-def crop_array(arr : np.array, av):
+def crop_array(arr, av):
     i = 0
     moved = abs(arr - av)
     for i in range(len(arr)-1):
@@ -71,7 +80,9 @@ def two_to_minus_x(x, a, c):
 
 ####################################################### VAL NUM #######################################################
 
-
+'''
+Returns the bounds around a given index
+'''
 def get_values_num(fraction, cols_to_take, L, idx):
     bad = False
     N = len(cols_to_take)
@@ -95,10 +106,12 @@ def get_values_num(fraction, cols_to_take, L, idx):
     
     return False, idx, lower, upper
 
-#################################### CALCULATORS ####################################
+####################################################### CALCULATORS #######################################################
 
-
-def gap_ratio(en, fraction = 0.3):
+'''
+Calculate the gap ratio around the mean energy in a sector
+'''
+def gap_ratio(en, fraction = 0.3, use_mean_lvl_spacing = True):
     mean = np.mean(en)
     mean_idx = find_nearest_idx_np(en, mean)
     #print(mean, en[mean_idx])
@@ -108,10 +121,57 @@ def gap_ratio(en, fraction = 0.3):
         return -1
     energies = en[lower:upper]
     #print(lower, upper, mean_idx, len(en), len(energies))
+    # delta energies
     d_en = energies[1:]-energies[:-1]
-
+    # if we use mean level spacing divide by it
+    if use_mean_lvl_spacing:
+        d_en /= np.mean(d_en)
+    
+    # calculate the gapratio
     gap_ratios = np.minimum(d_en[:-1], d_en[1:]) / np.maximum(d_en[:-1], d_en[1:])
-    #for i in np.arange(len(d_en) - 1):
-    #    gap_ratio.append(min(d_en[i], d_en[i+1])/max(d_en[i], d_en[i+1]))
-        
+            
     return np.mean(gap_ratios)
+
+'''
+Calculate the average entropy in a given DataFrame
+- df : DataFrame with entropies
+- row : row number (-1 for half division of a system)
+'''
+def mean_entropy(df : pd.DataFrame, row : int):
+    return np.mean(df.iloc[row])
+
+'''
+Calculate the gaussianity <|Oab|^2>/<|Oab|>^2 -> for normal == pi/2
+'''
+def gaussianity(arr : np.ndarray):
+    return np.mean(np.square(arr))/np.square(np.mean(arr))
+
+'''
+Calculate the modulus fidelity - should be 2/pi for gauss
+'''
+def modulus_fidelity(states : np.ndarray):
+
+    Ms = []
+    for i in range(0, states.shape[-1] - 1):
+        Ms.append(np.dot(states[:, i], states[:, i+1]))
+    return np.mean(Ms)
+
+####################################################### DATAFRAME PARSE #######################################################
+
+'''
+Parses the dataframe according to some given dictionary of parameters
+'''
+def parse_dataframe(df : pd.DataFrame, params : dict):
+    tmp = df.copy()
+    for key in params.keys():
+        tmp = tmp[tmp[key].isin(params[key])]
+    return tmp
+
+'''
+
+'''
+def print_dict(dic:dict):
+    r = ''
+    for key in dic.keys():
+        r += f'{key}={dic[key]},'
+    return r

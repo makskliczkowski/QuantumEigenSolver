@@ -244,6 +244,9 @@ inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>
 	// parity
 	this->set_option(this->p_sym, argv, "-ps", false);
 
+	// parity break
+	this->set_option(this->p_break, argv, "-pb", false);
+
 	// spin_flip
 	this->set_option(this->x_sym, argv, "-xs", false);
 
@@ -1144,7 +1147,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		if (this->model_name == 0)
 			this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
 		else
-			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, true);
+			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, this->p_break);
 		this->ham_d->hamiltonian();
 	}
 
@@ -1215,8 +1218,8 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 
 	// save states near the mean energy index
-	if (!sym) {
-		int state_num = N / 10;
+	if (!sym || k_sym == 0) {
+		int state_num = N / 20;
 		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N-1, av_energy_idx + int(state_num/2));
 		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
 	}
@@ -1337,6 +1340,12 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
 	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
+	if (!sym || k_sym == 1) {
+		int state_num = N / 20;
+		arma::cx_mat states = this->ham_cpx->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N - 1, av_energy_idx + int(state_num / 2));
+		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
+	}
+
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
 	v_1d<double> mean_frac(fractions.size());

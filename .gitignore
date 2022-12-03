@@ -151,6 +151,9 @@ dmypy.json
 *.bin
 *.h5
 *.csv
+*.hdf5
+*.pdf
+*tmp*
 
 
 *v17

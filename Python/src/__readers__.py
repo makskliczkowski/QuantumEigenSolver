@@ -1,11 +1,26 @@
 from .__entro_plot__ import *
+from .__models__ import *
 import h5py
+import tqdm
+import pandas as pd
+from numba import njit
+
+
 model_name = 'xyz'
-roll_number = 91
-sym = True
+roll_number = 31
+SYM = True
+
+# define the value taken for the middle of the spectrum
+#IDX_VAL = 'roll'
+IDX_VAL = 'mean'
+#IDX_VAL = 'max'
 
 ####################################################### GET LOG FILE #########################################################
 
+'''
+Parses the model according to a given string
+- model string : contains all the information about the model
+'''
 def parse_model(model_string : str):
     #print(model_string)
     model_split = model_string.split(',')
@@ -13,68 +28,260 @@ def parse_model(model_string : str):
     model_name = model_split[0]
     columns = [str(i.split('=')[0]) for i in model_split[1:]]
     values = [float(i.split('=')[-1]) for i in model_split[1:]]
-    
+    if SYM:
+        # find index of k
+        columns.append('sec')
+        k_index = columns.index('k')
+        Ns_index = columns.index('Ns')
+        k = int(values[k_index])
+        Ns = int(values[Ns_index])
+        if k==0 or k==Ns//2:
+            values.append('real')
+        else:
+            values.append('imag')
+        
     return columns, values
 
-def get_log_file(directory, head = None):
-    df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t', index_col=False,
-                       header = None, names = ['model', 'max_ent', '200_ent', 'tmp']).drop(columns = ['tmp'], axis = 1).dropna()
-
+'''
+Reads the entropies_log.dat file and creates a Dataframe out of it
+- directory : directory of the log file
+- head : if there is some predefined header
+'''
+def get_log_file(directory : str, head = None, read_log = True, su2 = False):
+    #df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t')
+    #print(df)
+    files = list(os.listdir(directory))[1:]
+    files = [file for file in files if file.startswith('_') and file.endswith('.h5')]
+    files = [file for file in files if 'sym' in file] if SYM else [file for file in files if 'sym' not in file]
+    files.sort()
+    df = pd.DataFrame()
+    if read_log:
+        df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t', index_col=False,
+                header = None, names = ['model', 'S_max', 'S_f=0.250', 'S_f=0.100', 'S_f=0.125', 'S_f=0.500', 'S_f=50.000', 'S_f=200.000', 'S_f=500.000', 'Nh']).sort_values('model').dropna(axis=1)
+        df['model_short'] = df['model'].apply(lambda x : str(x).replace('0000', '00').replace('000', '0'))
+    else:
+        df['model'] = files
+        df['model'] = df['model'].apply(lambda x : x[:-3])
+        df['model_short'] = df['model']
+    # check su2 
+    if su2:
+        df = df[df['model_short'].str.contains('su2')]
+    else:
+        df = df[~df['model_short'].str.contains('su2')]
+        
+    # check head
     if head is not None:
         df = df.head(head)
-    
     models = df['model'].to_list()
     value = []
-    columns = None
+    cols = None
     for i in models:
         columns, values = parse_model(i)
-        value.append(values)
-    df[columns] = value
-        #df.iloc[i][columns] = values
-    df['model_short'] = df['model'].apply(lambda x : str(x).replace('0000', '00').replace('000', '0'))
-    return df
-    
+        if len(columns) != 0:
+            cols = columns
+            value.append(values)
+    df[cols] = value
 
+    if not read_log:
+        df['Nh'] = df['spectrum_num'].astype(int)
+    if SYM:
+        df = df.sort_values(['k','p','x'])
+    return df
+
+'''
+Takes the log DataFrame and calculates a gap_ratio for each of the models in it
+- df : DataFrame of the log
+- directory : directory where all the h5 files are stored
+- use_mls : if we shall divide the gapratio by the `mean level spacing`
+'''
+def set_gap_ratios_df_log(df : pd.DataFrame, directory : str, use_mls = False):
+    df.loc[:,'gapratios'] = np.zeros(len(df))
+    # takes the Hilbert space sizes
+    hilbert_sizes = df.loc[:,'Nh'].to_list()
+    # takes the names of the models
+    model_shorts = df.loc[:,'model_short'].to_list()
+    #print(len(model_shorts), len(hilbert_sizes))
+    gapratios = []
+
+    for i, short in enumerate(tqdm.tqdm(model_shorts)):
+        # read the energy to calculate the gap ratio
+        #print(short, hilbert_sizes[i], df[df['model_short'] == short]['Nh'])
+        filename = short + '.h5'
+        if not 'spectrum' in short:
+            filename = short + ',spectrum_num=' + str(int(hilbert_sizes[i])) + '.h5'
+            
+        # read the energy from a given filename (h5 Database)
+        en = read_h5_file(directory, filename, 'energy')
+        #ent = read_h5_file(directory, filename, 'entropy')
+                
+        if len(en) == 0: 
+            gapratios.append(0)
+            continue
+        # calculate the gapratio
+        gap_rat = gap_ratio(np.array(en), 0.25, use_mean_lvl_spacing=use_mls)
+        #df.loc[short, 'gapratios'] = gap_rat
+        gapratios.append(gap_rat)
+    df['gapratios'] = gapratios
+
+'''
+Takes the log DataFrame and calculates the entropy fractions for each of the models in it
+- df : DataFrame of the log
+- directory : directory where all the h5 files are stored
+- use_mls : if we shall divide the gapratio by the `mean level spacing`
+'''
+def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0.1], set_max = False, verbose=True):
+    col = [f'S_f={i:.3f}' for i in fractions] + (['S_max'] if set_max else [])
+    df[col] = np.zeros((len(df), len(fractions)+ (1 if set_max else 0)))
+
+    # takes the Hilbert space sizes
+    hilbert_sizes = df.loc[:,'Nh'].to_list()
+    # takes the names of the models
+    model_shorts = df.loc[:,'model_short'].to_list()
+    
+    entropies = []
+   
+    for i, short in enumerate(tqdm.tqdm(model_shorts)):
+        if verbose: print("\t\t"+short)
+        # read the energy to calculate the gap ratio
+        filename = short + '.h5'
+        if not 'spectrum' in short:
+            filename = short + ',spectrum_num=' + str(int(hilbert_sizes[i])) + '.h5'
+            
+        # read all entropies
+        ent, av_idx, Nh, _, dictionary = read_entropies(directory, filename, 1.0, verbose=verbose)
+        # iterate fractions
+        means = []
+        for frac in fractions:
+            entropy = get_entropies(ent, av_idx, frac)
+            means.append(mean_entropy(entropy, -1) if not ent.empty else -1)
+        if set_max:
+            means.append(np.max(ent.iloc[-1]))
+        #df.loc[short, [f'S_f={i:.3f}' for i in fractions]] = np.array(means)   
+        entropies.append(np.array(means))
+    df.loc[:,col] = np.array(entropies)     
+
+'''
+Group the dataframe according to two parameters of the model
+'''
+def log_group_two_params(df : pd.DataFrame, col_a : str, col_b : str, fractions = [0.1]):
+    # perform averaging over sectors
+    col_S = [f'S_f={i:.3f}' for i in fractions] + ['S_max']
+    columns = col_S + ['gapratios']
+    tmp = df.copy()
+    
+    for col in columns:
+       tmp[col] = tmp[col] * tmp['Nh']
+
+    tmp = tmp.groupby([col_b,col_a])[columns + ['Nh']].sum().reset_index(col_b)
+    for col in columns:
+           tmp[col] = tmp[col] / tmp['Nh']
+    return tmp
+   
+####################################################### READ THE DATABASE SAVED FOR THE MODEL #######################################################
+
+'''
+Use 'energy' for energy reading and 'entropy' for entropy reading
+- directory : the directory to be read from
+- file : file to be read from
+- data_col : either `entropy` or 'energy' or 'states'
+'''
+def read_h5_file(directory, file, data_col : str):  
+    if not os.path.exists(directory):
+        print(directory, "doesn't exists")
+        return pd.DataFrame()
+    try:
+        with h5py.File(directory + file, "r") as f: 
+            
+            a_group_key = list(f.keys())
+            if data_col not in a_group_key:
+                raise Exception("Not in columns")
+            #print(a_group_key)
+            
+            array = f[data_col][()]
+            
+            array=np.array(array).T
+            if data_col == 'energy':
+                return pd.DataFrame(array, columns = [data_col])
+            elif data_col == 'entropy':
+                # read the number of lattice sites 
+                size_x = array.shape[0]
+                size_y = len(array.flatten())//size_x
+                return pd.DataFrame(array, index=np.arange(1, size_x+1), columns=np.arange(1, size_y+1))
+            elif data_col == 'states':
+                return np.array(array)
+            
+    except Exception as e:
+        print(e)
+        print(f"couldn't open {directory + file}")
+        return pd.DataFrame()
+    return pd.DataFrame()
+        
 ####################################################### READ ENTROPIES #######################################################
 
-def read_entropies(directory, L, fraction):
-    df = read_entro_h5(directory, L)
-    en = read_energy_h5(directory).to_numpy().flatten()
+'''
+Reads the entropies from a file with a given fraction of elements in the middle. Depends on index
+'''
+def read_entropies(directory : str, file : str, fraction : float, verbose = False):
+    df = read_h5_file(directory, file, 'entropy')
+    en = read_h5_file(directory, file, 'energy').to_numpy().flatten()
+    
     N = len(en)
+    # if there are no entropies -> return empty
     if len(df) == 0:
         return pd.DataFrame(), 1, 1, N, {}
 
     columns = df.columns
     cols_to_take = columns
     
+    # -------------- IDX MAX ----------------
     # find moving average
     df_roll = moving_average(df, roll_number)
-    # -------------- IDX MAX ----------------
-    idx_max = find_maximum(df_roll).iloc[-1]
-    #print( , df_roll[idx_max], np.max(df_roll))
+    idx_roll = find_maximum(df_roll).iloc[-1]
+
     # -------------- IDX MEAN ---------------
     idx_mean = find_nearest_idx_np(en, np.mean(en))
+    
     # -------------- IDX DOS ---------------
-    dos, bins = np.histogram(np.array(en).flatten(), bins=100)
+    dos, bins = np.histogram(en, bins=100)
     parameters, covariance = curve_fit(gauss, np.array(bins[1:]), np.array(dos, dtype=np.float32))
     idx_dos = find_nearest_idx_np(en, parameters[2])
     
-    idx_brute_max = find_maximum(df).iloc[-1] - 1
-    #print('L=',L, df.max(axis=1))
-    val_brute_max = en[idx_brute_max]
+    # -------------- IDX OUTLIER ---------------
+    idx_outlier = find_maximum(df).iloc[-1] - 1
+    val_outlier = en[idx_outlier]
     
-    print(f"\t\t\tidx_roll={idx_max},idx_mean={idx_mean},idx_dos={idx_dos},idx_max={idx_brute_max},we take {INDEX_VAL}")
-    print(f"\t\t\tE[idx_roll]={float(en[idx_max])},E[idx_mean]={float(en[idx_mean])},E[idx_dos]={float(en[idx_dos])},E[idx_max]={float(val_brute_max)}")
-    av_idx = idx_max if INDEX_VAL == 'roll' else (idx_mean if INDEX_VAL == 'mean' else (idx_brute_max if INDEX_VAL == 'max' else idx_dos))
-    print(f"\t\t\tEntropy[idx]={df[av_idx].iloc[-1]},Entropy_max={float(np.max(df.iloc[-1]))},entropy_roll_max={np.max(df_roll.iloc[-1])},entropy_roll_max[idx]={df_roll[av_idx].iloc[-1]}")
-    idx_dic = {'roll':(idx_max, en[idx_max]), 'mean':(idx_mean, en[idx_mean]), 'dos':(idx_dos, en[idx_dos]), 'idx':(av_idx, en[av_idx]), 'max':(idx_brute_max, en[idx_brute_max])}
+    ################ PRINT INFO ################
+    if verbose:
+        # indices
+        print(f"\t\t\tidx_roll={idx_roll},\tidx_mean={idx_mean},\tidx_dos={idx_dos},\tidx_outlier={idx_outlier}\t\t->we take {IDX_VAL}")
+        # energies
+        print("\t\tEnergies:")
+        for index in [idx_roll, idx_mean, idx_dos, idx_outlier]:
+            print(f"\t\t\tE[{index}]={float(en[index])}")
+        print("\t\tEntropies:")
+        for index in [idx_roll, idx_mean, idx_dos, idx_outlier]:
+            print(f"\t\t\tS[{index}]={float(df[index].iloc[-1])}")
+            
+    av_idx = idx_roll if (IDX_VAL == 'roll') else \
+        (idx_mean if (IDX_VAL == 'mean') else \
+            (idx_outlier if (IDX_VAL == 'max') else idx_dos))
+        
+    # create the dictionary of indices
+    idx_dic = {
+        'idx':(av_idx, en[av_idx]),
+        'roll':(idx_roll, en[idx_roll]),
+        'mean':(idx_mean, en[idx_mean]),
+        'dos':(idx_dos, en[idx_dos]),
+        'max':(idx_outlier, en[idx_outlier])
+        }
+    
     if fraction == 1.0:
         # if it is already the file that we wanted
-        print(f"\t\t\ttaking the whole dataframe")
-
+        if verbose:
+            print(f"\t\t\ttaking the whole dataframe")
         return df, av_idx, N, N, idx_dic
     else:
-        bad, av_idx, lower, upper = get_values_num(fraction, cols_to_take, L, av_idx)
+        bad, av_idx, lower, upper = get_values_num(fraction, cols_to_take, df.shape[0], av_idx)
         # ----------------------- use the maximal value to get that ------------------------
         
         if bad: 
@@ -84,7 +291,33 @@ def read_entropies(directory, L, fraction):
         cols_to_take = cols_to_take[lower : upper]
         return df.loc[:,cols_to_take], av_idx, len(cols_to_take), N, idx_dic
 
-####################################################### READ BINARY ENTROPIES #######################################################
+'''
+From full entropies DataFrame take the one corresponding to our fraction
+'''
+def get_entropies(df : pd.DataFrame, av_idx : int, fraction : float):
+    # if there are no entropies -> return empty
+    if len(df) == 0:
+        return pd.DataFrame()
+
+    columns = df.columns
+    cols_to_take = columns
+    
+    if fraction == 1.0:
+        # if it is already the file that we wanted
+        print(f"\t\t\ttaking the whole dataframe")
+        return df
+    else:
+        bad, av_idx, lower, upper = get_values_num(fraction, cols_to_take, df.shape[0], av_idx)
+        # ----------------------- use the maximal value to get that ------------------------
+        
+        if bad: 
+            print(f'\t\t->get_values_num() returned {bad, av_idx, lower, upper}')
+            return pd.DataFrame()    
+        
+        cols_to_take = cols_to_take[lower : upper]
+        return df.loc[:,cols_to_take]
+    
+####################################################### READ BINARY ENTROPIES 
 
 def read_binary(directory, L) -> pd.DataFrame:
     if not os.path.exists(directory):
@@ -119,7 +352,8 @@ def read_binary(directory, L) -> pd.DataFrame:
                 df.set_index('Ls',inplace=True)
     return df
 
-####################################################### READ HDF5 ENTROPIES #######################################################
+####################################################### READ HDF5 ENTROPIES 
+
 def read_entro_h5(directory, L) -> pd.DataFrame:
     if not os.path.exists(directory):
         print("directory does not exist")
@@ -161,8 +395,9 @@ def read_entro_h5(directory, L) -> pd.DataFrame:
         
     return df
 
-####################################################### READ ENERGIES #######################################################
+####################################################### ENERGIES #######################################################
 
+####################################################### READ ENERGIES 
 
 def read_energy(directory) -> pd.DataFrame:
     df = pd.DataFrame()
@@ -222,7 +457,6 @@ def read_energy_ising(directory) -> pd.DataFrame:
 
 ####################################################### READ ENERGIES BINARY #######################################################
 
-
 def read_energy_bin(directory) -> pd.DataFrame:
     df = pd.DataFrame()
 
@@ -259,45 +493,50 @@ def read_energy_bin(directory) -> pd.DataFrame:
 
 ####################################################### READ ENERGIES HDF5 #######################################################
 
-
-def read_energy_h5(directory) ->pd.DataFrame:
+def read_energy_h5(directory, file) ->pd.DataFrame:
     if not os.path.exists(directory):
         print("directory does not exist")
         return pd.DataFrame()
     
-    files = os.listdir(directory)
+    #files = os.listdir(directory)
     df = pd.DataFrame()
-    for file in files:
-        if file.startswith('energies') and file.endswith('h5'):
-            try:
-                with h5py.File(directory + file, "r") as f:
-                    # Print all root level object names (aka keys) 
-                    # these can be group or dataset names 
-                    #print("Keys: %s" % f.keys())
-                    # get first object name/key; may or may NOT be a group
-                    #a_group_key = list(f.keys())[0]
-                    
-                    # get the object type for a_group_key: usually group or dataset
-                    #print(type(f[a_group_key])) 
+    try:
+        with h5py.File(directory + file, "r") as f:
+            # Print all root level object names (aka keys) 
+            # these can be group or dataset names 
+            #print("Keys: %s" % f.keys())
+            # get first object name/key; may or may NOT be a group
+            #a_group_key = list(f.keys())[0]
+            
+            # get the object type for a_group_key: usually group or dataset
+            #print(type(f[a_group_key])) 
 
-                    # If a_group_key is a group name, 
-                    # this gets the object names in the group and returns as a list
-                    #data = list(f[a_group_key])
+            # If a_group_key is a group name, 
+            # this gets the object names in the group and returns as a list
+            #data = list(f[a_group_key])
 
-                    # If a_group_key is a dataset name, 
-                    # this gets the dataset values and returns as a list
-                    #data = list(f[a_group_key])
-                    # preferred methods to get dataset values:
-                    #ds_obj = f[a_group_key]      # returns as a h5py dataset object
-                    #ds_arr = f[a_group_key][()]  # returns as a numpy array
-                    #print(f['entropy'][()])
-                    array = np.array(f['energy'][()]).T
-                    df = pd.DataFrame(array, columns = ['energy'])
-            except:
-                print(f"couldn't open {directory + file}")
-                return pd.DataFrame()
+            # If a_group_key is a dataset name, 
+            # this gets the dataset values and returns as a list
+            #data = list(f[a_group_key])
+            # preferred methods to get dataset values:
+            #ds_obj = f[a_group_key]      # returns as a h5py dataset object
+            #ds_arr = f[a_group_key][()]  # returns as a numpy array
+            #print(f['entropy'][()])
+            array = np.array(f['energy'][()]).T
+            df = pd.DataFrame(array, columns = ['energy'])
+    except:
+        print(f"couldn't open {directory + file}")
+        return pd.DataFrame()
     if len(df) == 0:
         df = read_energy_bin(directory)
     return df
 
 
+####################################################### EIGENSTATES #######################################################
+
+'''
+From a given .h5 file extracts the eigenstates
+'''
+def get_eigenstates(directory : str, model_short : str):
+    eigs = read_h5_file(directory, model_short + '.h5', 'states')
+    return eigs
