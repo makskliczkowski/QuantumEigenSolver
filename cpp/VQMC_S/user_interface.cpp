@@ -1221,7 +1221,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	if (!sym || k_sym == 0) {
 		int state_num = N / 20;
 		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N-1, av_energy_idx + int(state_num/2));
-		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
+		states.save(arma::hdf5_name(filename + ".h5", "states_r", arma::hdf5_opts::append));
 	}
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
@@ -1343,7 +1343,10 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	if (!sym || k_sym == 1) {
 		int state_num = N / 20;
 		arma::cx_mat states = this->ham_cpx->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N - 1, av_energy_idx + int(state_num / 2));
-		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
+		arma::mat st_real = arma::real(states);
+		arma::mat st_imag = arma::imag(states);
+		st_real.save(arma::hdf5_name(filename + ".h5", "states_r", arma::hdf5_opts::append));
+		st_imag.save(arma::hdf5_name(filename + ".h5", "states_i", arma::hdf5_opts::append));
 	}
 
 	// iterate through fractions
