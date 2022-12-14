@@ -178,14 +178,16 @@ void XYZ<_type>::hamiltonian() {
 			// diagonal elements setting the perpendicular field
 
 			const double perpendicular_val = ((j == Ns - 1) && this->parity_break) ? 0.5 * this->hz : this->hz;
-			std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { j });
-			this->H(idx, k) += perpendicular_val * real(val);
-
+			if (!valueEqualsPrec(perpendicular_val, 0.0, 1e-9)) {
+				std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { j });
+				this->H(idx, k) += perpendicular_val * real(val);
+			}
 			// flip with S^x_i with the transverse field -> just one place to break
 			const double transverse_val = ((j == 0) && this->parity_break) ? 0.5 * this->hx : this->hx;
-			std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { j });
-			this->setHamiltonianElem(k, transverse_val * real(val), idx);
-
+			if (!valueEqualsPrec(transverse_val, 0.0, 1e-9)) {
+				std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { j });
+				this->setHamiltonianElem(k, transverse_val * real(val), idx);
+			}
 			// -------------- CHECK NN ---------------
 			for (auto nn = 0; nn < nn_number; nn++) {
 				auto n_num = this->lattice->get_nn_forward_num(j, nn);

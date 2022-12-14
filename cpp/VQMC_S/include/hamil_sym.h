@@ -255,14 +255,14 @@ inline void SpinHamiltonianSym<_type>::mapping_kernel(u64 start, u64 stop, v_1d<
 	for (u64 j = start; j < stop; j++) {
 
 		// check particle number conservation
-		if (this->global.check_su2(j))
+		if (!this->global.check_su(j))
 			continue;
 
 		const auto [SEC, some_value] = find_SEC_repr(j);
 		if (SEC == j) {
 			// normalisation condition -- check if state in basis
 			_type N = get_symmetry_norm(j);
-			if (std::abs(N) > 1e-6) {
+			if (std::abs(N) > 1e-4) {
 				map_thr.push_back(j);
 				norm_thr.push_back(N);
 			}
@@ -327,7 +327,7 @@ inline v_1d<u64> SpinHamiltonianSym<_type>::generate_full_map() const
 {
 	v_1d<u64> full_map;
 	for (u64 j = 0; j < (ULLPOW(this->Ns)); j++) {
-		if (!this->global.check_su2(j))
+		if (this->global.check_su(j))
 			full_map.push_back(j);
 	}
 	return full_map;

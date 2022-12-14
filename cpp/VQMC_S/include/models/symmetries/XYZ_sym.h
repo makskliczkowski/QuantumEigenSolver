@@ -42,9 +42,9 @@ namespace xyz_sym {
 	public:
 		~XYZSym() = default;
 		XYZSym() = default;
-		XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym = 0, bool p_sym = true, bool x_sym = true, double su2v = -INT_MAX, u32 thread_num = 1);
-		XYZSym(std::shared_ptr<Lattice> lat, u32 thread_num = 1, int k_sym = 0, bool p_sym = true, bool x_sym = true, double su2v = 0.0)
-			: XYZSym(lat, 1.0, 1.0, 0.2, 0.8, 0.9, 0.9, 0.5, 0.5, k_sym, p_sym, x_sym, su2v, thread_num) {};
+		XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym = 0, bool p_sym = true, bool x_sym = true, int su_val = -INT_MAX, u32 thread_num = 1);
+		XYZSym(std::shared_ptr<Lattice> lat, u32 thread_num = 1, int k_sym = 0, bool p_sym = true, bool x_sym = true, int su_val = -INT_MAX)
+			: XYZSym(lat, 1.0, 1.0, 0.2, 0.8, 0.9, 0.9, 0.5, 0.5, k_sym, p_sym, x_sym, su_val, thread_num) {};
 
 
 		// -------------------------------- GETTERS --------------------------------
@@ -72,7 +72,7 @@ namespace xyz_sym {
 				",k=" + STRP(this->symmetries.k_sym, 2) + \
 				",p=" + STRP(this->symmetries.p_sym, 2) + \
 				",x=" + STRP(this->symmetries.x_sym, 2) + \
-				(this->global.su2 ? (",su2=" + STRP(this->global.su2v, 2)) : "") + \
+				(this->global.su ? (",su=" + STR(this->global.su_val)) : "") + \
 				",bc=" + STR(this->lattice->get_BC());
 			return this->SpinHamiltonian<_type>::inf(name, skip, sep);
 		}
@@ -95,14 +95,14 @@ namespace xyz_sym {
 	* @brief standard constructor
 	*/
 	template<typename _type>
-	inline xyz_sym::XYZSym<_type>::XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym, bool p_sym, bool x_sym, double su2v, u32 thread_num)
+	inline xyz_sym::XYZSym<_type>::XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym, bool p_sym, bool x_sym, int su_val , u32 thread_num)
 	{
 		this->init(Ja, Jb, hx, hz, Delta_a, Delta_b, eta_a, eta_b);
 		this->lattice = lat;
 		this->thread_num = thread_num;
 		this->Ns = lat->get_Ns();
 
-		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns, this->_SPIN);
+		this->global.set_su(su_val, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns);
 
 		this->symmetries.p_sym = (p_sym) ? 1 : -1;
 		this->symmetries.x_sym = (x_sym) ? 1 : -1;
@@ -136,14 +136,14 @@ namespace xyz_sym {
 	}
 
 	template<>
-	inline xyz_sym::XYZSym<double>::XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym, bool p_sym, bool x_sym, double su2v, u32 thread_num)
+	inline xyz_sym::XYZSym<double>::XYZSym(std::shared_ptr<Lattice> lat, double Ja, double Jb, double hx, double hz, double Delta_a, double Delta_b, double eta_a, double eta_b, int k_sym, bool p_sym, bool x_sym, int su_val, u32 thread_num)
 	{
 		this->init(Ja, Jb, hx, hz, Delta_a, Delta_b, eta_a, eta_b);
 		this->lattice = lat;
 		this->thread_num = thread_num;
 		this->Ns = lat->get_Ns();
 
-		this->global.set_su2(su2v, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns, this->_SPIN);
+		this->global.set_su(su_val, (this->eta_a == 0.0 && this->eta_b == 0.0), this->Ns);
 
 		this->symmetries.p_sym = (p_sym) ? 1 : -1;
 		this->symmetries.x_sym = (x_sym) ? 1 : -1;
@@ -194,14 +194,15 @@ namespace xyz_sym {
 		function<u64(u64, int)> Z = static_cast<u64(*)(u64, int)>(&flipAll);				// spin flip operator (all spins)
 		function<u64(u64, int)> P = reverseBits;										// parity operator
 
-
+		bool su_0 = !this->global.su || (this->global.su && this->global.su_val == this->Ns / 2);
+		const bool include_sz_flip = su_0 && valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9);
 
 		// loop through all the possible states
 		if (this->lattice->get_BC() == 0) {
 			for (int k = 0; k < this->Ns; k++) {
 				this->symmetry_group.push_back(T);
 				this->symmetry_eigval.push_back(this->k_exponents[k]);
-				if (valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9)) {
+				if (include_sz_flip) {
 					this->symmetry_group.push_back(multiply_operators(Z, T));
 					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.x_sym));
 				}
@@ -209,7 +210,7 @@ namespace xyz_sym {
 				if (this->k_sector) {
 					this->symmetry_group.push_back(multiply_operators(P, T));
 					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym));
-					if (valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9)) {
+					if (include_sz_flip) {
 						this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
 						this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * this->symmetries.x_sym));
 					}
@@ -223,7 +224,7 @@ namespace xyz_sym {
 			this->symmetry_eigval.push_back(1.0);
 
 			// check if spin flip is eligable
-			if (valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9)) {
+			if (include_sz_flip) {
 				this->symmetry_group.push_back(multiply_operators(Z, T));
 				this->symmetry_eigval.push_back(double(this->symmetries.x_sym));
 			}
@@ -232,7 +233,7 @@ namespace xyz_sym {
 			this->symmetry_group.push_back(multiply_operators(P, T));
 			this->symmetry_eigval.push_back(double(this->symmetries.p_sym));
 			// furthermore add the spin flip
-			if (valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9)) {
+			if (include_sz_flip) {
 				this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
 				this->symmetry_eigval.push_back(double(this->symmetries.p_sym * (double)this->symmetries.x_sym));
 			}
@@ -261,15 +262,16 @@ namespace xyz_sym {
 
 				// diagonal elements setting the perpendicular field
 				const double perpendicular_val = this->hz;
-				std::tie(idx, val) = Operators<cpx>::sigma_z(this->mapping[k], Ns, { j });
-				this->setHamiltonianElem(k, perpendicular_val * real(val), idx);
-
+				if (!valueEqualsPrec(perpendicular_val, 0.0, 1e-9)) {
+					std::tie(idx, val) = Operators<cpx>::sigma_z(this->mapping[k], Ns, { j });
+					this->setHamiltonianElem(k, perpendicular_val * real(val), idx);
+				}
 				// flip with S^x_i with the transverse field
 				const double transverse_val = this->hx;
-				//if (!valueEqualsPrec(transverse_val, 0.0, 1e-12)) {
-				std::tie(idx, val) = Operators<cpx>::sigma_x(this->mapping[k], Ns, { j });
-				this->setHamiltonianElem(k, transverse_val * real(val), idx);
-				//}
+				if (!valueEqualsPrec(transverse_val, 0.0, 1e-9)) {
+					std::tie(idx, val) = Operators<cpx>::sigma_x(this->mapping[k], Ns, { j });
+					this->setHamiltonianElem(k, transverse_val * real(val), idx);
+				}
 
 				// -------------- CHECK NN ---------------
 				for (auto nn = 0; nn < nn_number; nn++) {

@@ -1130,6 +1130,9 @@ inline void rbm_ui::ui<_type, _hamtype>::save_operators(clk::time_point start, s
 
 // -------------------------------- HAMILTONIAN WITH SYMMETRIES --------------------------------
 
+/*
+* @brief calculates properties of the Hamiltonian with symmetries whenever the sector is real
+*/
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start)
 {
@@ -1188,11 +1191,11 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 	// check the symmetry rotation
 	auto global = this->ham_d->get_global_sym();
-	v_1d<u64> full_map = global.su2 ? this->ham_d->get_mapping_full() : v_1d<u64>();
+	v_1d<u64> full_map = global.su ? this->ham_d->get_mapping_full() : v_1d<u64>();
 	SpMat<double> symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
 
 	// set less number of bonds for quicker calculations
-	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(this->lat->get_Ns() / 3), static_cast<uint>(bond_num) };
+	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
 		Col<double> state = this->ham_d->get_eigenState(idx);
@@ -1215,13 +1218,13 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	if (this->lat->get_Ns() <= 12) 
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
+	// set the average energy index
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
 
 	// save states near the mean energy index
-	if (!sym || k_sym == 0) {
-		int state_num = N / 20;
-		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N-1, av_energy_idx + int(state_num/2));
-		states.save(arma::hdf5_name(filename + ".h5", "states_r", arma::hdf5_opts::append));
+	if (this->lat->get_Ns() == 20) {
+		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - 50, N-1, av_energy_idx + 50);
+		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
 	}
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
@@ -1253,6 +1256,9 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	fileAv.close();
 }
 
+/*
+* @brief calculates properties of the Hamiltonian with symmetries whenever the sector is complex
+*/
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 {
@@ -1311,14 +1317,13 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 
 	// check the symmetry rotation
 	auto global = this->ham_cpx->get_global_sym();
-	v_1d<u64> full_map = global.su2 ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
+	v_1d<u64> full_map = global.su ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
 	SpMat<cpx> symmetryRotationMat = this->ham_cpx->symmetryRotationMat(full_map);
 
 	// set less number of bonds for quicker calculations
-	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(this->lat->get_Ns() / 3), static_cast<uint>(bond_num) };
+	v_1d<uint> bonds = { 1, static_cast<uint>(this->lat->get_Ns() / 4), static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < N; idx++) {
-		//stout << "\t->doing : " << VEQ(idx) << EL;
 		Col<cpx> state = this->ham_cpx->get_eigenState(idx);
 		if (this->sym)	
 			state = symmetryRotationMat * state;
@@ -1339,15 +1344,15 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	if (this->lat->get_Ns() <= 12)
 		entropies.save(filename + ".dat", arma::arma_ascii);
 
+	// set the average energy index
 	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
-	if (!sym || k_sym == 1) {
-		int state_num = N / 20;
-		arma::cx_mat states = this->ham_cpx->get_eigenvectors().submat(0, av_energy_idx - int(state_num / 2), N - 1, av_energy_idx + int(state_num / 2));
-		arma::mat st_real = arma::real(states);
-		arma::mat st_imag = arma::imag(states);
-		st_real.save(arma::hdf5_name(filename + ".h5", "states_r", arma::hdf5_opts::append));
-		st_imag.save(arma::hdf5_name(filename + ".h5", "states_i", arma::hdf5_opts::append));
+
+	// save states near the mean energy index
+	if (this->lat->get_Ns() == 20) {
+		arma::cx_mat states = this->ham_cpx->get_eigenvectors().submat(0, av_energy_idx - 50, N - 1, av_energy_idx + 50);
+		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
 	}
+
 
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
@@ -1379,6 +1384,9 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	fileAv.close();
 }
 
+/*
+* @brief make simulation for symmetric case for single symmetry sector and parameters combination
+*/
 template<typename _type, typename _hamtype>
 inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 {
@@ -1405,12 +1413,10 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 	}
 
 	// set momenta
-	v_1d<int> ks(Ns);
 	if (this->lat->get_BC() == 1)
 		this->k_sym = 0;
 
 	// set the fields
-	v_1d<int> xs = {};
 	if (this->h != 0.0)
 		this->x_sym = 1;
 
@@ -1431,6 +1437,9 @@ inline void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries()
 
 }
 
+/*
+* @brief sweep symmetries for given parameters in given models 
+*/
 template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 {
@@ -1455,32 +1464,29 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 
 
 
-	v_1d<int> su2v = {};
-	if (this->eta_a == 0.0 && this->eta_b == 0.0) {
+	v_1d<int> su_val = {};
+	bool su = this->eta_a == 0.0 && this->eta_b == 0.0;
+	if (su) {
 		this->h = 0.0;
 		this->g = 0.0;
 		this->Delta_b = 0.3;
-		//for (int i = 0; i <= Ns; i++)
-		//	su2v.push_back(i);
-
-		// check only the sz=0
-		su2v.push_back(int(Ns / 2.0));
+		su_val.push_back(int(Ns / 2.0));
 	}
 	else {
 		this->Delta_b = this->delta;
 		this->g = 0.4;
-		su2v.push_back(-1);
+		su_val.push_back(-1);
 	}
 
 
-	double J2_max = 3.5;
+	double J2_max = 2.0;
 	double J2_min = 0.1;
-	double J2_step = 0.2;
+	double J2_step = 0.1;
 	int J2_num = abs(J2_max - J2_min) / J2_step;
 	// over next nearest interaction
 
 	// set momenta
-	v_1d<int> ks(Ns);
+	v_1d<int> ks(int(Ns/2) + 1);
 	if (this->lat->get_BC() == 0)
 		std::iota(ks.begin(), ks.end(), 0);
 	else
@@ -1489,29 +1495,34 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	v_1d<int> ps = {};
 	// set the fields
 	v_1d<int> xs = {};
-	if (this->h == 0.0 && this->g == 0.0)
-		xs = { 0, 1 };
-	else
-		xs = { 1 };
 
 	for (int i = 0; i <= J2_num; i++) {
 		this->Jb = J2_min + J2_step * i;
 		// initialize hamiltonian
 		if (this->sym) {
-			for (auto su2 : su2v) {
-				this->su2 = su2;
+			for (auto su_v : su_val) {
+				this->su2 = su_v;
 				for (auto k : ks) {
 					this->k_sym = k;
 					if (k == 0 || k == int(Ns / 2))
 						ps = { 0, 1 };
 					else
 						ps = { 1 };
+
+					bool su_0 = !su || (su && su_v == Ns / 2);
+					const bool include_sz_flip = su_0 && valueEqualsPrec(this->h, 0.0, 1e-9) && valueEqualsPrec(this->g, 0.0, 1e-9);
+
+					if (include_sz_flip)
+						xs = { 0, 1 };
+					else
+						xs = { 1 };
+
 					for (auto x : xs) {
 						this->x_sym = x;
 						for (auto p : ps)
 						{
 							this->p_sym = p;
-							if (this->k_sym == 0 || this->k_sym == this->lat->get_Ns() / 2)
+							if (this->k_sym == 0 || this->k_sym == (this->lat->get_Ns() / 2))
 								this->symmetries_double(start);
 							else
 								this->symmetries_cpx(start);
@@ -1526,6 +1537,9 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
 }
 
+/*
+* @brief Test the symmetries for given Hamiltonian. Checks all the possible combinations of symmetries in order to find the energies and compare them.
+*/
 template<typename _type, typename _hamtype>
 void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 {
@@ -1543,7 +1557,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	// eta needs to be set, delta_b needs to be set
 	this->J = 1.0;
 	//this->g = 0.0;
-	this->delta = 0.9;
+	this->delta = 0.3;
 	// for particle conservation symmetry
 
 	if (this->model_name == 0)
@@ -1557,7 +1571,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	this->ham_d->diag_h(false);
 	file << "\t->" << "finished diagonalizing: " << this->ham_d->get_info() << EL;
 
-
+	// Save the energies for calculating full Hamiltonian
 	std::string dir = this->saving_dir + kPS + this->ham_d->get_info() + kPS;
 	fs::create_directories(dir);
 	openFile(file, dir + "energies.dat");
@@ -1567,8 +1581,8 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	file << "\t\t->" << "saved energies: " << this->ham_d->get_info() << EL;
 	file.close();
 
+	// save the entropies for the full Hamiltonian
 	arma::mat entropies_mat(La, this->ham_d->get_hilbert_size(), arma::fill::zeros);
-
 #pragma omp parallel for num_threads(this->thread_num)
 	for (u64 idx = 0; idx < this->ham_d->get_hilbert_size(); idx++) {
 		const Col<double> state = this->ham_d->get_eigenStateFull(idx);
@@ -1579,23 +1593,19 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	}
 
 	// save binary file
-	std::string filename = dir + "entropies.bin";
-	entropies_mat.save(filename, arma::raw_binary);
 	entropies_mat.save(dir + "entropies.dat", arma::raw_ascii);
-	(arma::hdf5_name(dir + "en.h5", "energy", arma::hdf5_opts::append));
+	entropies_mat.save(arma::hdf5_name(dir + "en.h5", "energy", arma::hdf5_opts::append));
 
 	arma::mat ens_obc = this->ham_d->get_eigenvalues();
-	filename = dir + "energies.bin";
-	ens_obc.save(filename, arma::raw_binary);
 	// save binary file
 	if (this->lat->get_Ns() < 16) {
-		auto filename = dir + "entropies_obc" + ".txt";
+		auto filename = dir + "entropies_obc" + ".dat";
 		entropies_mat.save(filename, arma::arma_ascii);
 	}
 
-	// -------------------------------------------------------------------- calculate full ed pbc
+	// -------------------------------------------------------------------- calculate full ed pbc --------------------------------------------------------------------
 	this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, 1, 0);
-	file << "Doing->" << this->lat->get_info() << EL;
+	stout << "Doing->" << this->lat->get_info() << EL;
 
 	if (this->model_name == 0)
 		this->ham_d = std::make_shared<IsingModel<double>>(J, 0.0, g, 0.0, h, 0.0, lat);
@@ -1604,9 +1614,9 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 			this->delta, this->Delta_b, this->eta_a, this->eta_b, false);
 
 	this->ham_d->hamiltonian();
-	file << "\t->" << "finished building: " << this->ham_d->get_info() << EL;
+	stout << "\t->" << "finished building: " << this->ham_d->get_info() << EL;
 	this->ham_d->diag_h(false);
-	file << "\t->" << "finished diagonalizing: " << this->ham_d->get_info() << EL;
+	stout << "\t->" << "finished diagonalizing: " << this->ham_d->get_info() << EL;
 
 	// -------------------------------------------------------------------- calculate sym ed pbc
 
@@ -1620,42 +1630,55 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	std::string dir_separated = dir + "values" + kPS;
 	fs::create_directories(dir_separated);
 	openFile(file, dir + "log.dat");
-
+	
 
 	double entro = 0;
 	u64 Nh = pow(2, Ns);
 	u64 state_num = 0;
 
+	// parity
 	v_1d<int> ps = {};
+	// spin flip
 	v_1d<int> sf = {};
-	if (this->h == 0.0 && this->g == 0.0)
-		sf = { 0, 1 };
-	else 
-		sf = {1};
-	v_1d<int> su2v = {};
-	if (this->eta_a == 0.0 && this->eta_b == 0.0) {
+
+
+	// save particle sectors
+	v_1d<int> su_val = {};
+	bool su = this->eta_a == 0.0 && this->eta_b == 0.0;
+	if (su) {
 		int start = 0;
 		int end = Ns;
 		for (int i = start; i <= end; i++) {
-			su2v.push_back(i);
+			su_val.push_back(i);
 		}
 	}
 	else
-		su2v.push_back(-1);
+		su_val.push_back(-1);
+	// save the Hamiltonian without symmetries
 	arma::sp_mat H0 = this->ham_d->get_hamiltonian();
 	auto lambda = [this](int k, int p, int x, SpMat<cpx>& U, std::shared_ptr<SpinHamiltonian<cpx>> model, arma::sp_cx_mat& H) {
 		arma::sp_cx_mat Hsym = model->get_hamiltonian();
 		H += U * Hsym * U.t();
 	};
 
+	// create sparse matrix to compare the full hamiltonian
 	arma::sp_cx_mat H(H0.n_rows, H0.n_cols);
-
-	for (auto su2 : su2v) {
+	// go through all symmetries
+	for (auto su_v : su_val) {
 		for (int k = 0; k < Ns; k++) {
 			if (k == 0 || k == int(Ns / 2))
 				ps = { 0, 1 };
 			else
 				ps = { 1 };
+
+			bool su_0 = !su || (su && su_v == Ns / 2);
+			const bool include_sz_flip = su_0 && valueEqualsPrec(this->h, 0.0, 1e-9) && valueEqualsPrec(this->g, 0.0, 1e-9);
+
+			if (include_sz_flip)
+				sf = { 0, 1 };
+			else
+				sf = { 1 };
+
 			for (auto x : sf){
 				for (auto p : ps) {
 					if (this->model_name == 0)
@@ -1663,16 +1686,16 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 					else
 						this->ham_cpx = std::make_shared<xyz_sym::XYZSym<cpx>>(lat, this->J, this->Jb, this->g, this->h,
 							this->delta, this->Delta_b, this->eta_a, this->eta_b,
-							k, p, x, su2, this->thread_num);
+							k, p, x, su_v, this->thread_num);
 
-					file << "\tDoing: " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << ".\tHilbert size = " << this->ham_cpx->get_hilbert_size() << EL;
 					file << "\t->" << this->ham_cpx->get_info() << EL;
 					if (this->ham_cpx->get_hilbert_size() == 0)
 					{
-						file << "\t\t->EMPTY SECTOR" << EL;
+						file << "\t\t->EMPTY SECTOR : " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << EL;
 						continue;
 					}
 					this->ham_cpx->hamiltonian();
+					file << "\tDoing: " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << ".\tHilbert size = " << this->ham_cpx->get_hilbert_size() << EL;
 					this->ham_cpx->diag_h(false);
 
 					v_1d<u64> full_map = (this->eta_a == 0.0 && this->eta_b == 0.0) ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
@@ -1685,19 +1708,21 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 					state_num += this->ham_cpx->get_hilbert_size();
 					vec entro_inner(this->ham_cpx->get_hilbert_size());
 					for (u64 i = 0; i < this->ham_cpx->get_hilbert_size(); i++) {
+						// get the energy to push back
 						auto En = this->ham_cpx->get_eigenEnergy(i);
 						energies_sym.push_back(En);
+
+						// transform the state
 						Col<cpx> state = this->ham_cpx->get_eigenState(i);
 						Col<cpx> transformed_state = U * state;
 
+						// calculate the entanglement entropy
 						auto entropy = op.entanglement_entropy(transformed_state, La, full_map);
 						entro_inner(i) = entropy;
-						auto entropy_transform = op.entanglement_entropy(this->ham_cpx->get_eigenStateFull(i, full_map), La, full_map);
-						if (auto tmp = abs(entropy - entropy_transform); tmp > 1e-12)
-							stout << VEQ(entropy) << "\t" << VEQ(entropy_transform) << "\t" << VEQ(tmp) << EL;
 
-						entropies.push_back(entropy_transform);
-						entro += entropy_transform;
+						entropies.push_back(entropy);
+						entro += entropy;
+						// push back symmetry
 						sym.push_back(std::make_tuple(k, p, x, su2));
 
 						//file << "\t\t->" << VEQP(this->ham_cpx->get_eigenEnergy(i), 5) << "\t" << "after_trasform:" << arma::cdot(transformed_state, Hafter * transformed_state) << EL;
@@ -1710,24 +1735,25 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 		}
 	}
 	/* PLOT MATRIX DIFFERENCES */
-	arma::sp_mat HH = arma::real(H);
-	auto N = H0.n_cols;
-	arma::sp_cx_mat res = arma::sp_cx_mat(HH - H0, arma::imag(H));
-	printSeparated(std::cout, '\t', 32, true, "index i", "index j", "difference", "original hamil", "symmetry hamil");
-	cpx x = 0;
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++) {
-			cpx val = res(i, j);
-			if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
-				x += val;
-				printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
-				printSeparated(std::cout, '\t', 32, true, i, j, res);
+	if (!(this->eta_a == 0.0 && this->eta_b == 0.0)) {
+		arma::sp_mat HH = arma::real(H);
+		auto N = H0.n_cols;
+		arma::sp_cx_mat res = arma::sp_cx_mat(HH - H0, arma::imag(H));
+		printSeparated(std::cout, '\t', 32, true, "index i", "index j", "difference", "original hamil", "symmetry hamil");
+		cpx x = 0;
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				cpx val = res(i, j);
+				if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
+					x += val;
+					printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
+					printSeparated(std::cout, '\t', 32, true, i, j, res);
+				}
 			}
 		}
+
+		printSeparated(std::cout, '\t', 32, true, "Sum of suspicious elements: ", x);
 	}
-
-	printSeparated(std::cout, '\t', 32, true, "Sum of suspicious elements: ", x);
-
 
 	entro /= double(entropies.size());
 	file << VEQ(Nh) << "\t" << VEQ(state_num) << EL;
@@ -1752,6 +1778,7 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 	Operators<double> op_ed_pbc(this->lat);
 
 	for (u64 i = 0; i < this->ham_d->get_hilbert_size(); i++) {
+		// get the ed energy
 		auto E_ed = this->ham_d->get_eigenEnergy(i);
 		const Col<double> state = (this->ham_d->get_eigenState(i));
 		auto ent_ed = op_ed_pbc.entanglement_entropy(state, Ns / 2);

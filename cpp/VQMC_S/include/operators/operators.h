@@ -249,6 +249,9 @@ public:
 	void calculate_operators(const Col<_type>& alfa, avOperators& av_op, bool cal_entro = true);
 	//void calculate_operators(const Col<_type>& alfa, const Col<_type>& beta, avOperators& av_op);
 
+	// -----------------------------------------------  				   HISTOGRAMS 				    ----------------------------------------------
+	void calculate_histogram(const Mat<_type>& eigstates);
+
 };
 
 
@@ -618,4 +621,9 @@ inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOp
 }
 
 
+template<typename _type>
+inline void Operators<_type>::calculate_histogram(const Mat<_type>& eigstates)
+{
+
+}
 #endif // !OPERATORS_H

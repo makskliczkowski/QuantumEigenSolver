@@ -10,16 +10,24 @@
 namespace ham_sym {
 	struct global_sym {
 
-		// particle number conservation
-		bool su2 = false;
-		double su2v = 0.0;
-		bool check_su2(u64 state) const {
-			auto value = __builtin_popcountll(state);
-			return (this->su2 && double(value) != su2v);
+		// ################################ PARTICLE NUMBER CONSERVATION ################################
+
+		bool su = false;																				// su symmetry
+		int su_val = 0.0;																				// value of su symmetry
+
+		/*
+		* @brief Sets SU particle number conservation value
+		*/
+		void set_su(int su_val, bool outter_condition, int Ns) {
+			this->su_val = su_val;
+			this->su = (outter_condition && su_val >= 0 && su_val <= Ns) ? true : false;
 		}
-		void set_su2(double su2v, bool outter_condition, int Ns, double SPIN = 0.5) {
-			this->su2v = su2v;
-			this->su2 = (outter_condition && su2v >= 0 && su2v <= double(Ns)) ? true : false;
+
+		/*
+		* @brief Check if we have su symmetry value in the state
+		*/
+		bool check_su(u64 state) const {
+			return this->su && (__builtin_popcountll(state) == su_val);
 		}
 
 	};
