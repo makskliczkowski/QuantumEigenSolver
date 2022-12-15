@@ -1691,11 +1691,11 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 					file << "\t->" << this->ham_cpx->get_info() << EL;
 					if (this->ham_cpx->get_hilbert_size() == 0)
 					{
-						file << "\t\t->EMPTY SECTOR : " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << EL;
+						file << "\t\t->EMPTY SECTOR : " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su_v) << EL;
 						continue;
 					}
 					this->ham_cpx->hamiltonian();
-					file << "\tDoing: " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << ".\tHilbert size = " << this->ham_cpx->get_hilbert_size() << EL;
+					file << "\tDoing: " << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su_v) << ".\tHilbert size = " << this->ham_cpx->get_hilbert_size() << EL;
 					this->ham_cpx->diag_h(false);
 
 					v_1d<u64> full_map = (this->eta_a == 0.0 && this->eta_b == 0.0) ? this->ham_cpx->get_mapping_full() : v_1d<u64>();
@@ -1723,11 +1723,11 @@ void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
 						entropies.push_back(entropy);
 						entro += entropy;
 						// push back symmetry
-						sym.push_back(std::make_tuple(k, p, x, su2));
+						sym.push_back(std::make_tuple(k, p, x, su_v));
 
 						//file << "\t\t->" << VEQP(this->ham_cpx->get_eigenEnergy(i), 5) << "\t" << "after_trasform:" << arma::cdot(transformed_state, Hafter * transformed_state) << EL;
 					}
-				std::string filenameh5 = dir_separated + VEQ(k) + "," + VEQ(p) + "," + VEQ(x) + "," + VEQ(su2) + ".h5";
+				std::string filenameh5 = dir_separated + VEQ(k) + "," + VEQ(p) + "," + VEQ(x) + "," + VEQ(su_v) + ".h5";
 				this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(filenameh5, "energy", arma::hdf5_opts::append));
 				entro_inner.save(arma::hdf5_name(filenameh5, "entropy", arma::hdf5_opts::append));
 				} 
