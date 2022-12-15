@@ -1496,7 +1496,7 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	// set the fields
 	v_1d<int> xs = {};
 
-	for (int i = 0; i <= J2_num; i++) {
+	for (int i = 0; i <= 1; i++) {
 		this->Jb = J2_min + J2_step * i;
 		// initialize hamiltonian
 		if (this->sym) {
