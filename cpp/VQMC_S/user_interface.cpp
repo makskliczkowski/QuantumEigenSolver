@@ -1479,9 +1479,9 @@ void rbm_ui::ui<_type, _hamtype>::make_simulation_symmetries_sweep()
 	}
 
 
-	double J2_max = 2.0;
-	double J2_min = 0.1;
+	double J2_min = this->Jb;
 	double J2_step = 0.1;
+	double J2_max = this->Jb + 5 * J2_step;
 	int J2_num = abs(J2_max - J2_min) / J2_step;
 	// over next nearest interaction
 
