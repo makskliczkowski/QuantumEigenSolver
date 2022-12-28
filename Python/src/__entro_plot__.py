@@ -3,6 +3,8 @@ from .__models__ import *
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+
 plt.rcParams['axes.facecolor']='white'
 plt.rcParams['savefig.facecolor']='w'
 import matplotlib.colors as mcolors
@@ -19,11 +21,36 @@ markers_ls = ['o','s','v', '+', 'o', '*']
 markers = itertools.cycle(markers_ls)
 
 mpl.rcParams.update(mpl.rcParamsDefault)
-mpl.rcParams['figure.dpi'] = 400
+#mpl.rcParams['figure.dpi'] = 400
 #mpl.rcParams['figure.figsize'] = 400
 mpl.rcParams['lines.markersize']='4'
 from matplotlib.ticker import ScalarFormatter, NullFormatter
+# -------------------------------------------- PLOT HELPERS ------------------------------------
 
+'''
+Inserting inset with a specific format
+'''
+def add_subplot_axes(ax,rect):
+    fig = plt.gcf()
+    box = ax.get_position()
+    width = box.width
+    height = box.height
+    inax_position  = ax.transAxes.transform(rect[0:2])
+    transFigure = fig.transFigure.inverted()
+    infig_position = transFigure.transform(inax_position)    
+    x = infig_position[0]
+    y = infig_position[1]
+    width *= rect[2]
+    height *= rect[3]  # <= Typo was here
+    #subax = fig.add_axes([x,y,width,height],facecolor=facecolor)  # matplotlib 2.0+
+    subax = fig.add_axes([x,y,width,height])
+    x_labelsize = subax.get_xticklabels()[0].get_size()
+    y_labelsize = subax.get_yticklabels()[0].get_size()
+    x_labelsize *= rect[2]**0.15
+    y_labelsize *= rect[3]**0.15
+    subax.xaxis.set_tick_params(labelsize=x_labelsize)
+    subax.yaxis.set_tick_params(labelsize=y_labelsize)
+    return subax
 
 # -------------------------------------------- PAGE --------------------------------------------
 def page_result(d_a, d_b):
@@ -127,35 +154,6 @@ def plot_two_params_entro(pivot : pd.DataFrame, sample_num : int,
     plt.legend()
 
  
-'''
-Plot gap values in two parameter sweep
-- col_b : is the x_axis sweep value
-- title : sets the title for the plot
-- xlabel : sets the xlabel
-- label : sets the col_a label acctually
-'''
-def plot_two_params_gap(df : pd.DataFrame,
-                          col_b : str,
-                          title : str,
-                          xlabel : str, label : str
-                          ):
-    fig, ax = plt.subplots(2, figsize = (10, 10))
-    for a in df.index.unique():
-        # use col_b as x values and col_a as labels
-        ax[0].plot(df.loc[a, col_b], df.loc[a,'gapratios'], label = f'{label}$={a}$')
-    
-    # set the variance
-    var = df.groupby(col_b).var()['gapratios']
-    ax[1].scatter(df[col_b].unique(), var)
-
-    ax[0].axhline(goe, label = '$r_{GOE}$', linestyle = "--", color='black')
-    ax[0].set_xlabel(xlabel, size = 13)
-    ax[0].set_ylabel('<r>', size = 13)
-    ax[0].set_title(title)
-    ax[0].legend()
-
-    ax[1].set_xlabel(xlabel, size = 13)
-    ax[1].set_ylabel('$Var(r)$', size = 13)
     
 ########################################## PLOT FIT #################################################
 '''
@@ -197,11 +195,13 @@ def plot_fit(values, x, ax, label, color, fit_fun):
 Fits the change of the entanglement entropy in terms of fraction
 '''
 def fit_fractions(values, x, ax, label, color):
-    function = lambda x, a, b: np.exp(a*x**b)
-    popt, pcov = curve_fit(function, x, values)
-    xran = np.arange(0, np.min(x), 5e-3)
+    function = lambda x, a, b, c: c * np.exp(a*(np.power(x,b)))
+    param_bounds= ([0, 0, 0],[np.inf,np.inf,np.inf])
+    popt, pcov = curve_fit(function, x, values, bounds=param_bounds)
+    xran = np.arange(np.min(x), np.max(x), 1e-4)
     fit_val = function(xran, *popt)
-    ax.plot(xran, fit_val, '--', color = color, alpha = 0.5)
+    lbl = r'$%se^{%sx^%s}$'%(f'{popt[2]:.2f}', f'{popt[0]:.2f}', f'{popt[1]:.2f}')
+    ax.plot(xran, fit_val, '--', color = color, alpha = 0.5, label = label + f', fit: {lbl}')
     text = f'{label}:{popt}'
     return text, popt
 
@@ -222,11 +222,12 @@ Plots the difference between average entropy and a Page value
 - fit_frac_step : step of the constant fraction on [1][0]
 '''
 def plot_difference_log(L : list, fractions : list, directory : str,
+                    params : dict,
                     xscale = 'linear', yscale = 'linear',
                     fit_fun = fit_one_over_v, ylim = [1e-2, 1],
                     av_name = 'imag',
                     read_log = True, su2 = False, verbose = False,
-                    fit_frac_num = 100, fit_frac_step = 0.01
+                    fit_frac_num = 100, fit_frac_step = 0.01,
                     ):
     
     directory_l = lambda l: directory + f"{kPSep}resultsXYZ{l}{kPSep}"
@@ -311,6 +312,7 @@ def plot_difference_log(L : list, fractions : list, directory : str,
     for l in L:
         # read the log file
         df = get_log_file(directory=directory_l(l), read_log=read_log, su2=su2)
+        df = parse_dataframe(df, params)
         # set the gap ratio
         set_gap_ratios_df_log(df=df, directory=directory_l(l))
         # check the fractions that are not yet calculated and calculate them
@@ -379,28 +381,29 @@ def plot_difference_log(L : list, fractions : list, directory : str,
     if len(av_real) != 0:
         color = next(colors_ls_cyc)
         values = np.array([page_vals[i] - av_real[i] for i in range(len(L))]).flatten()
-        t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun)
-        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"real sectors, fit:{t}", markersize=marker_s)
-        fits['real']=popt
+        #t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun)
+        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"real sectors", markersize=marker_s)
+        #fits['real']=popt
     
     if len(av_imag) != 0:
         color = next(colors_ls_cyc)
         values = np.array([page_vals[i] - av_imag[i] for i in range(len(L))]).flatten()
-        t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun)
-        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"imaginary sectors, fit:{t}", markersize=marker_s)
-        fits['img']=popt
+        
+        #, fit:{t}t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun)
+        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"imaginary sectors", markersize=marker_s)
+        #fits['img']=popt
         
     if len(av_all) != 0:    
         color = next(colors_ls_cyc)
         values = np.array([page_vals[i] - av_all[i] for i in range(len(L))]).flatten()
-        t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun)
-        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"all sectors, fit:{t}", markersize=marker_s)
-        fits['all']=popt
+        #t, popt = plot_fit(values[np.isfinite(values)], inverse_L[np.isfinite(values)], ax[1][1], '', color, fit_fun), fit:{t}
+        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"all sectors", markersize=marker_s)
+        #fits['all']=popt
     
     if len(maxima) != 0:
         color = next(colors_ls_cyc)
         values = np.array([page_vals[i] - maxima[i] for i in range(len(L))]).flatten()
-        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"maximum", markersize=marker_s)
+        ax[1][1].plot(inverse_L, values, marker = next(markers), color = color, label = f"outliers", markersize=marker_s)
 
     # ------------------------------------- ALL FRACTIONS -----------------------------------
     print(frac_df)
@@ -412,11 +415,11 @@ def plot_difference_log(L : list, fractions : list, directory : str,
             limit = page_thermodynamic(1/2, l) - their_result(float(i), l)
             ax[0][1].plot(inverse_L, page_vals-np.array(row), marker = next(markers), color = color, label=f"ν={i}")
             t, popt = plot_fit(np.array(row), inverse_L, ax[0][1], '', color, fit_fun)
-            txt = f"limit : {limit:.4f},v={i}. fit: {popt}"
+            txt = f"limit : {limit:.4f},v={i}"
             ax[0][1].axhline(y=limit, color = color, linestyle='--', alpha = 0.3, label = txt)
             fits_av[i] = popt
         else:
-            ax[0][1].plot(inverse_L, page_vals-np.array(row), marker = next(markers), color = color, label=f"ν={i}")
+            ax[0][1].plot(inverse_L, page_vals-np.array(row), marker = next(markers), markersize = marker_s, color = color, label=f"ν={i}")
     
     
     # ------------------------------------- FRACTIONS FIT -----------------------------------
@@ -432,10 +435,11 @@ def plot_difference_log(L : list, fractions : list, directory : str,
         marker = next(markers)
         # read the log file
         df = get_log_file(directory=directory_l(l), read_log=read_log, su2=su2)
+        df = parse_dataframe(df, params)
         # constant fractions
         minim = df['Nh'].min() // 3
-        step = minim / 30
-        const_fractions_fit = [5] + [float(minim - step * i) for i in range(round(minim / step))]
+        step = minim / 25
+        const_fractions_fit = [20] + [float(minim - step * i) for i in range(round(minim / step))]
         const_fractions_lb = [f'S_f={fr:.3f}' for fr in const_fractions_fit]
         frac_together = np.array(fractions_fit + const_fractions_fit)
         # set the entropies
@@ -450,9 +454,9 @@ def plot_difference_log(L : list, fractions : list, directory : str,
             Nh = float(row['Nh'])
             df.loc[index, fractions_fit_lb] = row[fractions_fit_lb] * Nh / sum_hilbert_space
         const_frac_df = page_thermodynamic(1/2.0, l) - df[fractions_fit_lb].sum()
-        text, popt = fit_fractions(const_frac_df, fractions_fit, ax[1][0], '', color)
+        text, popt = fit_fractions(np.array(const_frac_df), np.array(fractions_fit), ax[1][0], f'L={l}', color)
     
-        r.append(ax[1][0].scatter(fractions_fit, np.array(const_frac_df), color=color, marker=marker))
+        r.append(ax[1][0].scatter(np.array(fractions_fit), np.array(const_frac_df), color=color, marker=marker))
         
         # set vanishing fractions
         vanish_frac_df = page_thermodynamic(1/2.0, l) - df[const_fractions_lb].mean(axis=0) 
@@ -469,7 +473,7 @@ def plot_difference_log(L : list, fractions : list, directory : str,
     lim = ax[0][0].axhline(y=limit, color='blue', linestyle='--', alpha = 0.8)
     ax[0][0].legend([real_plot, img_plot, lim], ['real sectors', 'imaginary sectors', text], fontsize = fontsize, loc = 'upper left')
     ax[0][1].legend(fontsize = fontsize, loc = 'best')
-    ax[1][0].legend(r, [str(l) for l in L], fontsize=fontsize)   
+    ax[1][0].legend(fontsize=fontsize, loc = 'lower right')   
     
     ax[1][1].axhline(y=limit, color='blue', linestyle='--', alpha = 0.8, label = text)
     ax[1][1].legend(fontsize = fontsize, loc='best')
@@ -500,7 +504,7 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
     
     # create axes
     textsize = 24
-    markersize = 45
+    markersize = 55
     fig, (ax, ax2, ax3) = plt.subplots(1, 3, figsize = (32, 10)) 
 
     ax_sub = ax.inset_axes([0.65,0.1,0.3,0.35])
@@ -531,14 +535,16 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
         for idx, row in log.iterrows():     
             short = row['model_short']
             print(short)
-            states = get_eigenstates(directory_l(l), short)
-            if len(states) == 0: break
+            states = get_eigenstates(directory_l(l), short, 'states')
+            
+            if len(states) == 0:
+                break
             if states.dtype == [('real', '<f8'), ('imag', '<f8')]: states = states.view('complex')
-            states = np.abs(states)
+            states = np.square(np.abs(states))
             states_num = states.shape[-1]
             # find modulus fidelity
             fidel_in = 1.0/modulus_fidelity(states)                        
-            states = states[:, states.shape[-1]//2-frac//2 : states.shape[-1]//2+frac//2].flatten()  * np.sqrt(row['Nh'])
+            states = states[:, states_num//2-frac//2 : states_num//2+frac//2].flatten()  * np.sqrt(row['Nh'])
             #if SYM:
             #    states=np.append(states, np.zeros(row['Nh']*states_num))
             
@@ -553,22 +559,22 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
             print(S)
             # plot the histogram
             lbl = f',{col_gauss}={row[col_gauss]}' if col_gauss is not None else ''
-            ax.plot(x_data[0:-1], hist, label = f'L={l}{lbl},r={log["gapratios"].iloc[0]:.4f},$S_p-S$={S:.4f}', linestyle = '--', linewidth=3.5)
+            ax.plot(x_data[0:-1], hist, label = f'$L={l}{lbl},<r>={row["gapratios"]:.4f},S_p-S={S:.4f}$', linestyle = '--', linewidth=3.5)
         
         
             ################## PLOTS #######################
             a, b, c = None, None, None
             if col_gauss is not None:
                 val = row[col_gauss]
-                a=ax2.scatter(val, fidel_in, marker = marker[i], color = colors[i], s=markersize)
+                a=ax2.scatter(val, fidel_in, marker = marker[i], color = colors[i], s=markersize + 15)
                              #, label = f'L={ls[i]},$1/M$')
-                b=ax3.scatter(val, gauss_in, marker = marker[i], color = colors[i], s=markersize)
+                b=ax3.scatter(val, gauss_in, marker = marker[i], color = colors[i], s=markersize + 15)
                              #, label = f'L={ls[i]},$\Gamma$')
                 c=ax_sub.scatter(1./l, S, color=color_param[j], s = markersize)#, label = f'{col_gauss}={params[col_gauss]}')
             else:
                 print("L")
-                a=ax2.scatter(1./l, fidel_in, color = color_param[j], label = '$1/M$', s = markersize)
-                b=ax3.scatter(1./l, gauss_in, color = color_param[j], label = '$\Gamma$', s = markersize)
+                a=ax2.scatter(1./l, fidel_in, color = color_param[j], label = '$1/M$', s = markersize + 15)
+                b=ax3.scatter(1./l, gauss_in, color = color_param[j], label = '$\Gamma$', s = markersize + 15)
                 c=ax_sub.scatter(1./l, S, color = color_param[j], s = markersize) 
             hand_entro.append(c)
             if j == 0 : 
@@ -579,17 +585,17 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
     
     # plot gaussian    
     g = function(x_data, 0.0, 1.0) * 0.82
-    ax.plot(x_data, g, label = 'Normal', color = 'black', linewidth=5.0, alpha = 0.3)
+    ax.plot(x_data, g, label = 'Normal', color = 'black', linewidth=5.5, alpha = 0.3)
     
     # plot limit of the entropies on subaxis
     limit = page_thermodynamic(1/2, 100) - their_result(100, 100)
-    ax_sub.axhline(limit, label = f'v={frac},limit={limit:.5f}', color = next(colors_ls_cyc))
+    ax_sub.axhline(limit, label = f'v={frac},Huang:{limit:.5f}', color = next(colors_ls_cyc))
 
     # plot 2 if is not None 
-    ax2.axhline(np.pi/2.0)
+    ax2.axhline(np.pi/2.0, label = '$\pi / 2$')
     #ax2.set_yticks([np.pi/2.0], ['$\pi/2$'])
     ax2.set_title('Modulus fidelity inverse', fontsize=textsize)
-    ax2.set_xlabel('1/V', fontsize=textsize)
+    ax2.set_xlabel('$1/h_z$', fontsize=textsize)
     ax2.set_ylabel('$1/<M>$', fontsize=textsize)
     if col_gauss is not None:
         ax2.set_xlim(0.1, np.max(params[col_gauss])+0.1)
@@ -599,7 +605,7 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
     # plot 2 if is not None 
     ax3.axhline(np.pi/2.0)
     #ax3.set_yticks([np.pi/2.0], ['$\pi/2$'])
-    ax3.set_xlabel('1/V', fontsize=textsize)
+    ax3.set_xlabel('1/$h_z$', fontsize=textsize)
     ax3.set_title('Gaussianity', fontsize=textsize)
     ax3.set_ylabel('$<\Gamma >$', fontsize=textsize)
     if col_gauss is not None:
@@ -616,7 +622,7 @@ def plot_eig_hist(L, frac : int, directory : str, params : dict, bins = 100, den
     ax.set_title(f'Normalized histogram for {int(frac)} eigenstates\n{print_dict(params)}', fontsize=textsize)
     ax.legend()
     if col_gauss is not None:
-        ax_sub.legend(hand_entro[0:len(L)], [f'{col_gauss}={i}' for i in params[col_gauss]])
+        ax_sub.legend(hand_entro[-len(params[col_gauss]):], [f'{col_gauss}={i}' for i in params[col_gauss]])
     plt.savefig(directory + f'gauss_xyz_{print_dict(params)}.png', facecolor='white')
     plt.savefig(directory + f'gauss_xyz_{print_dict(params)}.pdf', facecolor='white') 
         
@@ -650,8 +656,8 @@ def plot_df_together(L, dfs, energies_ls, directory, su2 : bool, xlim = [-10,15]
         ax[i].legend(fontsize = fontsize)
         ax[i].set_ylim([0,7.5])
         ax[i].set_xlim(xlim)
-    plt.savefig(directory + f"_rainbows,type={model_name},sym={sym},L={L},{'su2' if su2 else ''}.png", facecolor='white')
-    plt.savefig(directory + f"_rainbows,type={model_name},sym={sym},L={L},{'su2' if su2 else ''}.pdf", facecolor='white')
+    plt.savefig(directory + f"_rainbows,type={model_name},sym={SYM},L={L},{'su2' if su2 else ''}.png", facecolor='white')
+    plt.savefig(directory + f"_rainbows,type={model_name},sym={SYM},L={L},{'su2' if su2 else ''}.pdf", facecolor='white')
     
 '''
 
@@ -683,8 +689,8 @@ def plot_rescale_df(L, dfs, energies_ls, directory, su2 : bool):
         print(l, (res)/l)
         ax.axhline(res/l - maxima[i]/l, color = kolorki[i], label = f'$[Digamma-max(S_L(E/L))/L--L={l}$')
     ax.legend(fontsize = fontsize)
-    plt.savefig(directory + f"_rescale,type={model_name},sym={sym},L={L},{'su2' if su2 else ''}.png", facecolor='white')
-    plt.savefig(directory + f"_rescale,type={model_name},sym={sym},L={L},{'su2' if su2 else ''}.pdf", facecolor='white')
+    plt.savefig(directory + f"_rescale,type={model_name},sym={SYM},L={L},{'su2' if su2 else ''}.png", facecolor='white')
+    plt.savefig(directory + f"_rescale,type={model_name},sym={SYM},L={L},{'su2' if su2 else ''}.pdf", facecolor='white')
     
     
     

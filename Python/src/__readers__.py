@@ -47,7 +47,7 @@ Reads the entropies_log.dat file and creates a Dataframe out of it
 - directory : directory of the log file
 - head : if there is some predefined header
 '''
-def get_log_file(directory : str, head = None, read_log = True, su2 = False):
+def get_log_file(directory : str, head = None, read_log = True, su = False):
     #df = pd.read_csv(directory + 'entropies_log.dat', sep = '\t')
     #print(df)
     files = list(os.listdir(directory))[1:]
@@ -63,11 +63,12 @@ def get_log_file(directory : str, head = None, read_log = True, su2 = False):
         df['model'] = files
         df['model'] = df['model'].apply(lambda x : x[:-3])
         df['model_short'] = df['model']
-    # check su2 
-    if su2:
-        df = df[df['model_short'].str.contains('su2')]
+
+    # check su
+    if su:
+        df = df[df['model_short'].str.contains('su')]
     else:
-        df = df[~df['model_short'].str.contains('su2')]
+        df = df[~df['model_short'].str.contains('su')]
         
     # check head
     if head is not None:
@@ -86,6 +87,8 @@ def get_log_file(directory : str, head = None, read_log = True, su2 = False):
         df['Nh'] = df['spectrum_num'].astype(int)
     if SYM:
         df = df.sort_values(['k','p','x'])
+    df.reset_index(inplace=True)
+    df.drop(['index'], axis = 1, inplace=True)
     return df
 
 '''
@@ -118,7 +121,7 @@ def set_gap_ratios_df_log(df : pd.DataFrame, directory : str, use_mls = False):
             gapratios.append(0)
             continue
         # calculate the gapratio
-        gap_rat = gap_ratio(np.array(en), 0.25, use_mean_lvl_spacing=use_mls)
+        gap_rat = gap_ratio(np.array(en), 0.5, use_mean_lvl_spacing=use_mls)
         #df.loc[short, 'gapratios'] = gap_rat
         gapratios.append(gap_rat)
     df['gapratios'] = gapratios
@@ -161,20 +164,128 @@ def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0
     df.loc[:,col] = np.array(entropies)     
 
 '''
+Takes the log DataFrame and calculates the information entropy fractions for each of the models in it
+'''
+def set_info_entro_df_log(df : pd.DataFrame, directory : str, verbose=True):
+    df.loc[:,'S_info'] = np.zeros(len(df))
+    # takes the Hilbert space sizes
+    hilbert_sizes = df.loc[:,'Nh'].to_list()
+    # takes the names of the models
+    model_shorts = df.loc[:,'model_short'].to_list()
+    # takes the sectors
+    sectors = df.loc[:,'sec'].to_list()
+    #print(len(model_shorts), len(hilbert_sizes))
+    entropies = []
+
+    for i, short in enumerate(tqdm.tqdm(model_shorts)):
+        # read the states
+        filename = short + '.h5'
+        if not 'spectrum' in short:
+            filename = short + ',spectrum_num=' + str(int(hilbert_sizes[i])) + '.h5'
+            
+        # read the energy from a given filename (h5 Database)
+        states = read_h5_file(directory, filename, 'states')
+        if sectors[i] == 'imag':
+            states = states.view('complex')
+                
+        if len(states) == 0: 
+            entropies.append(0)
+            continue
+        
+        # calculate the gapratio
+        sinfo = info_entropy(states, short) / np.log(0.48 * float(hilbert_sizes[i]))
+        #df.loc[short, 'gapratios'] = gap_rat
+        entropies.append(sinfo)
+    df['S_info'] = entropies
+
+'''
+Takes the log dataframe and concatenates the eigenstates into one flat array
+'''
+def read_eigenstates_df_log(df : pd.DataFrame, directory : str, sec : str, verbose=True):
+    # takes the Hilbert space sizes
+    hilbert_sizes = df.loc[:,'Nh'].to_list()
+    # takes the names of the models
+    model_shorts = df.loc[:,'model_short'].to_list()
+    # save the states (to be flattened later)
+    states_saved = np.array([])
+    
+    for i, short in enumerate(tqdm.tqdm(model_shorts)):
+        # read the states
+        filename = short + '.h5'
+        if not 'spectrum' in short:
+            filename = short + ',spectrum_num=' + str(int(hilbert_sizes[i])) + '.h5'
+            
+        # read the energy from a given filename (h5 Database)
+        states = read_h5_file(directory, filename, 'states')
+        
+        if len(states) == 0: 
+            continue
+        states = states.flatten()
+        
+        # rescale by variance        
+        states = (states.view('complex') * np.sqrt(2.0 * hilbert_sizes[i])) if sec == 'imag' else (states * np.sqrt(hilbert_sizes[i]))
+
+        # append
+        states_saved = np.concatenate([states_saved, states])
+        
+        # count missing momenta twice
+        if sec == 'imag':
+            states_saved = np.concatenate([states_saved, states])
+
+    return states_saved
+
+'''
+Takes the log dataframe and concatenates the gap ratios into one flat array
+'''
+def read_gap_ratios_df_log(df : pd.DataFrame, directory : str, verbose=True):
+    # takes the Hilbert space sizes
+    hilbert_sizes = df.loc[:,'Nh'].to_list()
+    # takes the names of the models
+    model_shorts = df.loc[:,'model_short'].to_list()
+    # save the states (to be flattened later)
+    ratios_saved = np.array([])
+    
+    for i, short in enumerate(tqdm.tqdm(model_shorts)):
+        # read the states
+        filename = short + '.h5'
+        if not 'spectrum' in short:
+            filename = short + ',spectrum_num=' + str(int(hilbert_sizes[i])) + '.h5'
+            
+        # read the energy from a given filename (h5 Database)
+        en = read_h5_file(directory, filename, 'energy')
+                
+        if len(en) == 0: 
+            continue
+        # calculate the gapratio
+        gap_rat = gap_ratio(np.array(en), 0.5, use_mean_lvl_spacing=False, return_mean=False)
+        
+        ratios_saved = np.concatenate([ratios_saved, gap_rat])
+
+    return ratios_saved.flatten()
+       
+'''
 Group the dataframe according to two parameters of the model
 '''
-def log_group_two_params(df : pd.DataFrame, col_a : str, col_b : str, fractions = [0.1]):
-    # perform averaging over sectors
-    col_S = [f'S_f={i:.3f}' for i in fractions] + ['S_max']
-    columns = col_S + ['gapratios']
+def log_group_two_params(df : pd.DataFrame, col_a : str, col_b : str, columns, rescale = True):
+    # copy df not to destroy it
     tmp = df.copy()
     
-    for col in columns:
-       tmp[col] = tmp[col] * tmp['Nh']
+    # save ho;bert spaces
+    tmp['Nh2'] = tmp['Nh']
+    tmp[tmp['sec'] == 'imag']['Nh2'] *= 2
+    
+    # perform averaging over sectors
+    if rescale:
+        for col in columns:
+            tmp[col] = tmp[col] * tmp['Nh2']
+            tmp[tmp['sec'] == 'imag'][['Nh2',col]] *= 2.
 
-    tmp = tmp.groupby([col_b,col_a])[columns + ['Nh']].sum().reset_index(col_b)
-    for col in columns:
-           tmp[col] = tmp[col] / tmp['Nh']
+        # groupby to average
+        tmp = tmp.groupby([col_b,col_a])[columns + ['Nh', 'Nh2']].sum().reset_index(col_b)
+        for col in columns:
+            tmp[col] = tmp[col] / tmp['Nh2']
+    else:
+        return tmp.groupby([col_b,col_a])[columns + ['Nh']].mean().reset_index(col_b)    
     return tmp
    
 ####################################################### READ THE DATABASE SAVED FOR THE MODEL #######################################################
@@ -186,8 +297,12 @@ Use 'energy' for energy reading and 'entropy' for entropy reading
 - data_col : either `entropy` or 'energy' or 'states'
 '''
 def read_h5_file(directory, file, data_col : str):  
-    if not os.path.exists(directory):
-        print(directory, "doesn't exists")
+    if not os.path.exists(directory + file):
+        print(directory + file, "doesn't exists")
+        return pd.DataFrame()
+    if os.stat(directory + file).st_size == 0:
+        print(f"Removing : {directory + file}")
+        os.remove(directory + file)  
         return pd.DataFrame()
     try:
         with h5py.File(directory + file, "r") as f: 
@@ -195,7 +310,7 @@ def read_h5_file(directory, file, data_col : str):
             a_group_key = list(f.keys())
             if data_col not in a_group_key:
                 raise Exception("Not in columns")
-            #print(a_group_key)
+            
             
             array = f[data_col][()]
             
@@ -207,7 +322,7 @@ def read_h5_file(directory, file, data_col : str):
                 size_x = array.shape[0]
                 size_y = len(array.flatten())//size_x
                 return pd.DataFrame(array, index=np.arange(1, size_x+1), columns=np.arange(1, size_y+1))
-            elif data_col == 'states':
+            else:
                 return np.array(array)
             
     except Exception as e:
@@ -537,6 +652,7 @@ def read_energy_h5(directory, file) ->pd.DataFrame:
 '''
 From a given .h5 file extracts the eigenstates
 '''
-def get_eigenstates(directory : str, model_short : str):
-    eigs = read_h5_file(directory, model_short + '.h5', 'states')
+def get_eigenstates(directory : str, model_short : str, which = 'states_r'):
+    eigs = read_h5_file(directory, model_short + '.h5', which)
+    
     return eigs

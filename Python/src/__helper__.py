@@ -23,6 +23,28 @@ def gauss(x, H, A, x0, sigma):
     return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
 '''
+Folded normals sum giving the error function distribution
+'''
+def sum_of_folded_normals(bins, sig1, sig2):
+    sqrt_var = np.sqrt(sig1*sig1 + sig2*sig2)
+    val = np.sqrt(2.0/np.pi)/sqrt_var
+    val *= np.exp(-np.square(bins)/(2.0*sqrt_var*sqrt_var))
+    val *= (erf(sig1 * bins/np.sqrt(2.0) / sig2 / sqrt_var) + erf(sig2 * bins/np.sqrt(2.0) / sig1 / sqrt_var))
+    return val
+
+'''
+Chi2 distribution
+'''
+def sum_of_squares_normals(bins):
+    return np.exp(-bins/2.0)/2.0
+
+'''
+Chi distribution
+'''
+def sum_of_squares_normals_sqrt(bins):
+    return bins * np.exp(-np.square(bins)/2.0)
+
+'''
 Moving average
 '''
 def moving_average(df, window = 10):
@@ -106,12 +128,30 @@ def get_values_num(fraction, cols_to_take, L, idx):
     
     return False, idx, lower, upper
 
+####################################################### REDUCED DENSITY MATRIX #######################################################
+
+'''
+Calculate the reduced density matrix out of a state
+'''
+def reduced_density_matrix(state : np.ndarray, A_size : int, L : int):
+        dimA = int(( (2 **      A_size ) ));
+        dimB = int(( (2 ** (L - A_size)) ));
+        N = dimA * dimB;
+        rho = np.zeros((dimA, dimA))
+        for n in range(0, N, 1):					
+            counter = 0;
+            for m in range(n % dimB, N, dimB):
+                idx = n // dimB;
+                rho[idx, counter] += np.conj(state[n]) * state[m]
+                counter+=1
+        return rho
+
 ####################################################### CALCULATORS #######################################################
 
 '''
 Calculate the gap ratio around the mean energy in a sector
 '''
-def gap_ratio(en, fraction = 0.3, use_mean_lvl_spacing = True):
+def gap_ratio(en, fraction = 0.3, use_mean_lvl_spacing = True, return_mean = True):
     mean = np.mean(en)
     mean_idx = find_nearest_idx_np(en, mean)
     #print(mean, en[mean_idx])
@@ -130,7 +170,7 @@ def gap_ratio(en, fraction = 0.3, use_mean_lvl_spacing = True):
     # calculate the gapratio
     gap_ratios = np.minimum(d_en[:-1], d_en[1:]) / np.maximum(d_en[:-1], d_en[1:])
             
-    return np.mean(gap_ratios)
+    return np.mean(gap_ratios) if return_mean else gap_ratios.flatten()
 
 '''
 Calculate the average entropy in a given DataFrame
@@ -148,13 +188,27 @@ def gaussianity(arr : np.ndarray):
 
 '''
 Calculate the modulus fidelity - should be 2/pi for gauss
+- states : np.array of eigenstates
 '''
 def modulus_fidelity(states : np.ndarray):
-
     Ms = []
     for i in range(0, states.shape[-1] - 1):
         Ms.append(np.dot(states[:, i], states[:, i+1]))
     return np.mean(Ms)
+
+'''
+Calculate the information entropy for given states
+'''
+def info_entropy(states : np.ndarray, model_info : str):
+    try:
+        entropies = []
+        for state in states.T:
+            square = np.square(np.abs(state))
+            entropies.append(-np.sum(square * np.log(square)))
+        return np.mean(entropies)
+    except:
+        print(f'\nHave some problem in {model_info}\n')
+        return -1.0
 
 ####################################################### DATAFRAME PARSE #######################################################
 
@@ -175,3 +229,4 @@ def print_dict(dic:dict):
     for key in dic.keys():
         r += f'{key}={dic[key]},'
     return r
+
