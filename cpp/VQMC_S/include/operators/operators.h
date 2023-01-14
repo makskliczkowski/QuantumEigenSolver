@@ -400,7 +400,7 @@ inline arma::Col<_type> Operators<_type>::cast_state_to_full(const arma::Col<_ty
 * @return entanglement entropy
 */
 template<typename _type>
-inline double Operators<_type>::schmidt_decomposition(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}, int config = 2) const
+inline double Operators<_type>::schmidt_decomposition(const Col<_type>& state, int A_size, const v_1d<u64>& map, int config) const
 {
 	int num_of_bits = log2(config);
 	const long long dimA = (ULLPOW((num_of_bits * A_size)));
