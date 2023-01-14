@@ -240,7 +240,9 @@ public:
 
 	Mat<_type> red_dens_mat(const Col<_type>& state, int A_size) const;													// calculate the reduced density matrix
 	Mat<_type> red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size) const;
-	double entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}) const;												// entanglement entropy 
+
+	double schmidt_decomposition(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}, int config = 2) const;	// entanglement entropy via schmidt decomposition
+	double entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}) const;					// entanglement entropy 
 	double entanglement_entropy(const Mat<_type>& red_dens_mat) const;
 	vec entanglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
 
@@ -252,6 +254,9 @@ public:
 	// -----------------------------------------------  				   HISTOGRAMS 				    ----------------------------------------------
 	void calculate_histogram(const Mat<_type>& eigstates);
 
+	// -----------------------------------------------  				   STATE CASTING				    ----------------------------------------------
+
+	arma::Col<_type> cast_state_to_full(const Col<_type>& state, const std::vector<u64>& map, size_t dim_max) const;	// use global symmetry mapping to cast state to full hilbert space
 };
 
 
@@ -361,7 +366,63 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 }
 
 
+// ----------------------------   				   STATE TRANSFORMATION  				    ----------------------------------
+
+
+/*
+* @brief For global symmetries in the system, cast the state back to the original Hilbert space via mapping
+* @tparam _type input state type
+* @param state input state in reduced Hilbert size
+* @param map mapping to the full Hilbert space
+* @param dim_max maximal dimension we can get
+*/
+template <typename _type>
+inline arma::Col<_type> Operators<_type>::cast_state_to_full(const arma::Col<_type>& state, const std::vector<u64>& map, size_t dim_max) const {
+	if (map.empty())
+		return state;
+	else {
+		// cast full state to zeros
+		Col<_type> full_state(dim_max, arma::fill::zeros);
+		for (int i = 0; i < map.size(); i++)
+			full_state(map[i]) = state(i);
+		return full_state;
+	}
+};
+
 // ----------------------------   				   ENTROPY  				    ----------------------------------
+
+/*
+* @brief Calculates the entropy using the Schmidt decomposition of a wavefunction
+* @param _type input state type
+* @param state input state in Hilbert space
+* @param A_size subsystem size
+* @param config on-site configuration number (local hilbert space)
+* @return entanglement entropy
+*/
+template<typename _type>
+inline double Operators<_type>::schmidt_decomposition(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}, int config = 2) const
+{
+	int num_of_bits = log2(config);
+	const long long dimA = (ULLPOW((num_of_bits * A_size)));
+	const long long dimB = (ULLPOW((num_of_bits * (Ns - A_size))));
+	const long long full_dim = dimA * dimB;
+
+	// reshape array to matrix
+	arma::Mat<_type> rho = arma::reshape(cast_state_to_full(state, map, full_dim), dimA, dimB);
+
+	// get schmidt coefficients from singular-value-decomposition
+	arma::vec schmidt_coeff = arma::svd(rho);
+
+	// calculate entropy
+	double entropy = 0;
+	// #pragma omp parallel for reduction(+: entropy)
+	for (int i = 0; i < schmidt_coeff.size(); i++) {
+		const auto value = schmidt_coeff(i) * schmidt_coeff(i);
+		entropy += (abs(value) > 0) ? -value * std::log(value) : 0;
+	}
+	return entropy;
+}
+
 /*
 * @brief Calculates the reduced density matrix of the system via the mixed density matrix
 * @param state state to produce the density matrix
