@@ -120,8 +120,8 @@ public:
 	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
 	virtual auto get_eigenStateFull(u64 idx, v_1d<u64> map)			const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
 	virtual v_1d<u64> get_mapping_full()							const { return this->mapping; };								// returns the full mapping
-	const Col<_type>& get_eigenStateRef(u64 idx)					const { this->eigenvectors.col(idx); };							// get the reference to the eigenstate
-	auto get_info(const v_1d<string>& skip = {}, string sep = "_", int prec = 2)	const RETURNS(this->inf("", skip, sep));						// get the info about the model
+	const Col<_type>& get_eigenStateRef(u64 idx)					const { this->eigenvectors.col(idx); };					// get the reference to the eigenstate
+	auto get_info(const v_1d<string>& skip = {}, string sep = "_", int prec = 2)	const RETURNS(this->inf("", skip, sep));		// get the info about the model
 
 
 	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
@@ -131,7 +131,7 @@ public:
 	void diag_h(bool withoutEigenVec = false);																						// diagonalize the Hamiltonian
 	void diag_hs(bool withoutEigenVec = false);																						// diagonalize the Hamiltonian sparse
 	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000, \
-		double tol = 0, std::string form = "lm");																					// diagonalize the Hamiltonian using Lanczos' method
+		double tol = 0, std::string form = "sm");																					// diagonalize the Hamiltonian using Lanczos' method
 	void diag_h(bool withoutEigenVec, int k, _type sigma);																			// diagonalize the Hamiltonian using shift and inverse
 
 	// ------------------------------------------- 				        VQMC 				          -------------------------------------------
@@ -249,7 +249,6 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
 	}
 
 	// calculates the middle spectrum element
-	//double E_av = trace(eigenvalues) / double(N);
 	double E_av = arma::mean(eigenvalues);
 	// calculates the middle spectrum element
 	v_1d<double> vect(this->N, 0.0);
@@ -299,35 +298,88 @@ inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim
 		eigs_opts opts;
 		opts.tol = tol;
 		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;
-		stout << "\t\t\t->Using Lanczos" << EL;
-		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, k, "sa", opts);
-		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, k, "sa", opts);
+		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
+
+		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
+
+		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, Mat<T>(this->H));
+		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, Mat<T>(this->H));
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
 		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
+	E_av_idx = int(k / 2.0);
 }
 
+
 template <>
-inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
+{
 	try {
 		eigs_opts opts;
 		opts.tol = tol;
 		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? max(2 * int(k) + 1, 80) : subdim;
-		stout << "\t\t\t->Using Lanczos" << EL;
-		cx_vec eigval(this->N);
-		arma::eig_sym(this->eigenvalues, arma::Mat<cpx>(this->H));
-		this->eigenvalues = arma::real(eigval);
+		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
+
+		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
+
+		// create a temporary vector
+		cx_vec tmp;
+		if (form == "sg")
+		{
+			stout << "\t\t\t->Using sigma." << EL;
+			if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), 0.0, opts);
+			else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), 0.0, opts);
+		}
+		else
+		{
+			stout << "\t\t\t->Using standard." << EL;
+			if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), form.c_str(), opts);
+			else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), form.c_str(), opts);
+		}
+		// set the eigenvalues to be that temporary vector
+		this->eigenvalues = arma::real(tmp);
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
 		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
 		assert(false);
 	}
+	E_av_idx = int(k / 2.0);
+}
+
+template <>
+inline void SpinHamiltonian<double>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
+{
+	try {
+		eigs_opts opts;
+		opts.tol = tol;
+		opts.maxiter = maxiter;
+		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
+
+		stout << "\t\t\->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
+
+		if (form == "sg")
+		{
+			stout << "\t\t\t->Using sigma." << EL;
+			if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), 0.0, opts);
+			else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), 0.0, opts);
+		}
+		else
+		{
+			stout << "\t\t\t->Using standard." << EL;
+			if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str(), opts);
+			else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str(), opts);
+		}
+	}
+	catch (const std::bad_alloc& e) {
+		stout << "Memory exceeded" << e.what() << EL;
+		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
+		assert(false);
+	}
+	E_av_idx = int(k / 2.0);
 }
 
 /*

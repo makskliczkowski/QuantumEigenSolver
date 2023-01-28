@@ -1153,17 +1153,29 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, this->p_break);
 		this->ham_d->hamiltonian();
 	}
+	const u64 N = this->ham_d->get_hilbert_size();
+	bool use_s_i = false;
+	u64 state_num = N;
 
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_d->get_info() << EL;
-	this->ham_d->diag_h(false);
-
+	if (N < ULLPOW(8)){
+		stout << "\t->" << "using standard diagonalization" << EL;
+		this->ham_d->diag_h(false);
+	}
+	else
+	{
+		stout << "\t->" << "using S&I" << EL;
+		use_s_i = true;
+		state_num = 100;
+		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sg");
+	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
-	const u64 N = this->ham_d->get_hilbert_size();
 
 	std::string name = "spectrum_num=" + STR(N);
-	stout << "->middle_spectrum_size : " << name << EL;
+	stout << "->middle_spectrum_size : " << name << ".\n\t\t->Taking num states: " << state_num << EL;
 
+	// create the directories
 	std::string dir = this->saving_dir + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
@@ -1171,14 +1183,17 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::string model_info = this->ham_d->get_info();
 
 	// save energies to check
-	if (this->lat->get_Ns() <= 12) {
+	if (N < ULLPOW(8)) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_d->get_eigenEnergy(i) << EL;
 		file.close();
 	}
+	
+	// save energies
 	std::string filename = dir + model_info + "," + name;
-	this->ham_d->get_eigenvalues().save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
+	const vec& energies = this->ham_d->get_eigenvalues();
+	energies.save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
 	this->ham_d->clear_energies();
 	this->ham_d->clear_hamiltonian();
 
@@ -1187,7 +1202,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 	// iterate through bond cut
 	int bond_num = this->lat->get_Ns() / 2;
-	arma::mat entropies(bond_num, N, arma::fill::zeros);
+	arma::mat entropies(bond_num, state_num, arma::fill::zeros);
 
 	// check the symmetry rotation
 	auto global = this->ham_d->get_global_sym();
@@ -1197,7 +1212,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	// set less number of bonds for quicker calculations
 	v_1d<uint> bonds = { static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
-	for (u64 idx = 0; idx < N; idx++) {
+	for (u64 idx = 0; idx < state_num; idx++) {
 		Col<double> state = this->ham_d->get_eigenState(idx);
 		if (this->sym)
 			state = symmetryRotationMat * state;
@@ -1207,17 +1222,20 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 			auto entro = op.schmidt_decomposition(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
-		if ( N>10 && idx % int(N / 10) == 0) {
-			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
+		if (state_num > 10 && idx % int(state_num / 10) == 0) {
+			stout << "\t->Done: " << int(idx * 100.0 / state_num) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
 	
-	// save binary file
+	// save entropies file
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
 	if (this->lat->get_Ns() <= 12) 
 		entropies.save(filename + ".dat", arma::arma_ascii);
+
+	if (use_s_i)
+		return;
 
 	// set the average energy index
 	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
@@ -1227,6 +1245,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - 50, N-1, av_energy_idx + 50);
 		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
 	}
+
 	// iterate through fractions
 	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
 	v_1d<double> mean_frac(fractions.size());
@@ -1247,6 +1266,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 		mean_frac[iter] = bond_mean(bond_num - 1);
 	}
+	
 	// save maxima
 	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
 	vec maxima = arma::max(entropies, 1);
@@ -1280,24 +1300,38 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 			this->ham_cpx = std::make_shared<XYZ<cpx>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, false);;
 		this->ham_cpx->hamiltonian();
 	}
+	
+	// get Hilbert space info
+	const u64 N = this->ham_cpx->get_hilbert_size();
+	bool use_s_i = false;
+	u64 state_num = N;
 
+	// check whether this is already over our range
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_cpx->get_info() << EL;
-	this->ham_cpx->diag_h(false);
-
+	if (N < ULLPOW(8)) {
+		stout << "\t\t->" << "using standard diagonalization" << EL;
+		this->ham_cpx->diag_h(false);
+	}
+	else
+	{
+		use_s_i = true;
+		state_num = 100;
+		this->ham_cpx->diag_h(false, state_num, 0, 1000, 1e-5, "sg");
+	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
-	const u64 N = this->ham_cpx->get_hilbert_size();
 
 	std::string name = "spectrum_num=" + STR(N);
-	stout << "->middle_spectrum_size : " << name << EL;
+	stout << "->middle_spectrum_size : " << name << ".\n\t\t->Taking num states: " << state_num << EL;
 
+	// create the directories
 	std::string dir = this->saving_dir + kPS;
 	fs::create_directories(dir);
 	std::ofstream file;
 	std::ofstream fileAv;
 	std::string model_info = this->ham_cpx->get_info();
 	// save energies to check
-	if (this->lat->get_Ns() <= 12) {
+	if (N < ULLPOW(8)) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_cpx->get_eigenEnergy(i) << EL;
@@ -1305,7 +1339,8 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	}
 	
 	std::string filename = dir + model_info + "," + name;
-	this->ham_cpx->get_eigenvalues().save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
+	const vec& energies = this->ham_cpx->get_eigenvalues();
+	energies.save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
 	this->ham_cpx->clear_energies();
 	this->ham_cpx->clear_hamiltonian();
 
@@ -1314,7 +1349,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 
 	// iterate through bond cut
 	int bond_num = this->lat->get_Ns() / 2;
-	arma::mat entropies(bond_num, N, arma::fill::zeros);
+	arma::mat entropies(bond_num, state_num, arma::fill::zeros);
 
 	// check the symmetry rotation
 	auto global = this->ham_cpx->get_global_sym();
@@ -1324,7 +1359,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// set less number of bonds for quicker calculations
 	v_1d<uint> bonds = { static_cast<uint>(bond_num) };
 #pragma omp parallel for num_threads(this->thread_num)
-	for (u64 idx = 0; idx < N; idx++) {
+	for (u64 idx = 0; idx < state_num; idx++) {
 		Col<cpx> state = this->ham_cpx->get_eigenState(idx);
 		if (this->sym)	
 			state = symmetryRotationMat * state;
@@ -1334,17 +1369,21 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 			auto entro = op.schmidt_decomposition(state, i, full_map);
 			entropies(i - 1, idx) = entro;
 		}
-		if (N > 10 && idx % int(N / 10) == 0) {
-			stout << "\t->Done: " << int(idx * 100.0 / N) << "%\n";
+		if (state_num > 10 && idx % int(state_num / 10) == 0) {
+			stout << "\t->Done: " << int(idx * 100.0 / state_num) << "%\n";
 			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
 		}
 	}
 	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
-	// save binary file
-	// entropies.save(filename + ".bin", arma::raw_binary);
+
+	// save the entropies
 	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
 	if (this->lat->get_Ns() <= 12)
 		entropies.save(filename + ".dat", arma::arma_ascii);
+
+	// end when using s&i
+	if (use_s_i)
+		return;
 
 	// set the average energy index
 	const u64 av_energy_idx = this->ham_cpx->get_en_av_idx();
