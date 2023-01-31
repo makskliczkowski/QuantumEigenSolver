@@ -695,7 +695,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 			avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
 #pragma omp critical
 			if (Ns <= 14) {
-				auto relative_error = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
+				auto relative_err = calculate_ed<cpx>(ground_ed, ground_rbm, hamiltonian_ed);
 #ifdef PLOT
 				plt::axhline(ground_ed);
 				plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
@@ -835,7 +835,7 @@ void rbm_ui::ui<_type, _hamtype>::make_mc_kitaev(t_3d<double> K)
 	avOperators av_operator(Lx, Ly, Lz, Ns, lat->get_type());
 #pragma omp critical
 	if (Ns <= 16) {
-		auto relative_error = calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_rbm);
+		auto relative_err = calculate_ed<double>(ground_ed, ground_rbm, hamiltonian_rbm);
 #ifdef PLOT
 		plt::axhline(ground_ed);
 		plt::annotate(VEQP(ground_ed, 6) + ",\n" + VEQP(ground_rbm, 6) + ",\n" + VEQP(relative_error, 5), 0, max_rbm - (rbm_difference / 1.2));
@@ -1159,7 +1159,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_d->get_info() << EL;
-	if (N < ULLPOW(8)){
+	if (N < ULLPOW(16)){
 		stout << "\t->" << "using standard diagonalization" << EL;
 		this->ham_d->diag_h(false);
 	}
@@ -1183,7 +1183,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::string model_info = this->ham_d->get_info();
 
 	// save energies to check
-	if (N < ULLPOW(8)) {
+	if (N < ULLPOW(16)) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_d->get_eigenEnergy(i) << EL;
@@ -1317,7 +1317,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	{
 		use_s_i = true;
 		state_num = 100;
-		this->ham_cpx->diag_h(false, state_num, 0, 1000, 1e-5, "sg");
+		this->ham_cpx->diag_h(false, state_num, 0, 1000, 1e-5, "sm");
 	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 

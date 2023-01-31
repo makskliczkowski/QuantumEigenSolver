@@ -1,1 +1,2 @@
 C:\University\PHD\CODES\VariationalQMCandML\VarQMCSolver\cpp\VQMC_S\x64\Debug\VQMC_S.exe
+C:\University\PHD\CODES\VQMC\VarQMCSolver\cpp\VQMC_S\x64\Debug\VQMC_S.exe

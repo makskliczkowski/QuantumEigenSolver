@@ -120,7 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu\SRC;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.3\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -129,8 +129,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu_intel\x64\Debug;C:\LibrariesCpp\superlu-5.3.0\superlu_intel\x64\Release;C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>superlu_intel.lib;superlu.lib;python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
       <AdditionalOptions>-D_HDF5USEDLL_ %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -140,7 +140,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu\SRC;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -153,8 +153,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu_intel\x64\Release;C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>superlu.lib;python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
       <AdditionalOptions>-D_HDF5USEDLL_ %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
