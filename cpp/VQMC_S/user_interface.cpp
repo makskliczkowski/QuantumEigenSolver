@@ -1168,7 +1168,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		stout << "\t->" << "using S&I" << EL;
 		use_s_i = true;
 		state_num = 100;
-		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sg");
+		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sm");
 	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 
@@ -1183,7 +1183,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 	std::string model_info = this->ham_d->get_info();
 
 	// save energies to check
-	if (N < ULLPOW(16)) {
+	if (N < ULLPOW(8)) {
 		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
 		for (u64 i = 0; i < N; i++)
 			file << this->ham_d->get_eigenEnergy(i) << EL;
@@ -1309,7 +1309,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// check whether this is already over our range
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_cpx->get_info() << EL;
-	if (N < ULLPOW(8)) {
+	if (N < ULLPOW(16)) {
 		stout << "\t\t->" << "using standard diagonalization" << EL;
 		this->ham_cpx->diag_h(false);
 	}
