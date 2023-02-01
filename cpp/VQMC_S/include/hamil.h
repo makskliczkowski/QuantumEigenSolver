@@ -333,12 +333,12 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subd
 		//}
 		//else
 		//{
-		stout << "\t\t\t->Using standard." << EL;
-		if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sm");
-		else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sm");
+		//stout << "\t\t\t->Using standard." << EL;
+		//if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sm");
+		//else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sm");
 		//}
 		// set the eigenvalues to be that temporary vector
-		this->eigenvalues = arma::real(tmp);
+		//this->eigenvalues = arma::real(tmp);
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
