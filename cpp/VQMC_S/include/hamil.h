@@ -334,8 +334,8 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subd
 		//else
 		//{
 		//stout << "\t\t\t->Using standard." << EL;
-		if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sr");
-		else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sr");
+		//if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sr");
+		//else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sr");
 		//}
 		// set the eigenvalues to be that temporary vector
 		this->eigenvalues = arma::real(tmp);
@@ -357,7 +357,7 @@ inline void SpinHamiltonian<double>::diag_h(bool withoutEigenVec, uint k, uint s
 		opts.maxiter = maxiter;
 		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
 
-		stout << "\t\t\->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
+		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
 
 		//if (form == "sg")
 		//{

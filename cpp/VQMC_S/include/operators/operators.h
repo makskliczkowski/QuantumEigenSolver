@@ -434,7 +434,7 @@ inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, int A_
 {
 	// set subsytsems size
 	const long long dimA = ULLPOW(A_size);
-	const long long dimB = ULLPOW(Ns - A_size);
+	const long long dimB = ULLPOW((Ns - A_size));
 	const long long Nh = dimA * dimB;
 
 	Mat<_type> rho(dimA, dimA, arma::fill::zeros);
@@ -458,7 +458,7 @@ inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, int
 {
 	// set subsytsems size
 	const long long dimA = ULLPOW(A_size);
-	const long long dimB = ULLPOW(Ns - A_size);
+	const long long dimB = ULLPOW((Ns - A_size));
 	const long long Nh = dimA * dimB;
 
 	Mat<double> rho(dimA, dimA, arma::fill::zeros);
@@ -481,7 +481,7 @@ template<typename _type>
 inline Mat<_type> Operators<_type>::red_dens_mat(const Col<_type>& state, const v_1d<u64>& map, int A_size) const
 {
 	const long long dimA = ULLPOW(A_size);
-	const long long dimB = ULLPOW(Ns - A_size);
+	const long long dimB = ULLPOW((Ns - A_size));
 	const long long Nh = dimA * dimB;
 	const long long N = map.size();
 
@@ -509,7 +509,7 @@ template<>
 inline Mat<double> Operators<double>::red_dens_mat(const Col<double>& state, const v_1d<u64>& map, int A_size) const
 {
 	const long long dimA = ULLPOW(A_size);
-	const long long dimB = ULLPOW(Ns - A_size);
+	const long long dimB = ULLPOW((Ns - A_size));
 	const long long Nh = dimA * dimB;
 	const long long N = map.size();
 
