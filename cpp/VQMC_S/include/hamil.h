@@ -324,7 +324,7 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subd
 		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
 
 		// create a temporary vector
-		cx_dvec tmp;
+		cx_dvec tmp(k, arma::fill::zeros);
 		//if (form == "sg")
 		//{
 		//	stout << "\t\t\t->Using sigma." << EL;
@@ -334,11 +334,11 @@ inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subd
 		//else
 		//{
 		//stout << "\t\t\t->Using standard." << EL;
-		//if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sm");
-		//else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sm");
+		if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sr");
+		else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sr");
 		//}
 		// set the eigenvalues to be that temporary vector
-		//this->eigenvalues = arma::real(tmp);
+		this->eigenvalues = arma::real(tmp);
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
@@ -368,8 +368,8 @@ inline void SpinHamiltonian<double>::diag_h(bool withoutEigenVec, uint k, uint s
 		//else
 		//{
 		stout << "\t\t\t->Using standard." << EL;
-		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str(), opts);
-		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str(), opts);
+		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str());
+		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str());
 		//}
 	}
 	catch (const std::bad_alloc& e) {

@@ -1168,7 +1168,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start
 		stout << "\t->" << "using S&I" << EL;
 		use_s_i = true;
 		state_num = 100;
-		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sm");
+		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sa");
 	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 
@@ -1309,7 +1309,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	// check whether this is already over our range
 	stouts("\t->finished buiding Hamiltonian", start);
 	stout << "\t->" << this->ham_cpx->get_info() << EL;
-	if (N < ULLPOW(16)) {
+	if (N < ULLPOW(8)) {
 		stout << "\t\t->" << "using standard diagonalization" << EL;
 		this->ham_cpx->diag_h(false);
 	}
@@ -1317,7 +1317,7 @@ inline void rbm_ui::ui<_type, _hamtype>::symmetries_cpx(clk::time_point start)
 	{
 		use_s_i = true;
 		state_num = 100;
-		this->ham_cpx->diag_h(false, state_num, 0, 1000, 1e-5, "sm");
+		this->ham_cpx->diag_h(false, state_num, 0, 1000, 1e-5, "sr");
 	}
 	stouts("\t->finished diagonalizing Hamiltonian", start);
 

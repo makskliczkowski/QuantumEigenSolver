@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -120,7 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu\SRC;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.3\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu\SRC;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.3\include;C:\LibrariesCpp\arpack++\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
@@ -140,7 +140,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.3\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\LibrariesCpp\arpack++\include;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include\intel64;C:\LibrariesCpp\armadillo-11.4.3\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <CCppSupport>Cpp20Support</CCppSupport>
