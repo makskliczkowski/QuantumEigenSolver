@@ -154,6 +154,7 @@ dmypy.json
 *.hdf5
 *.pdf
 *tmp*
+*.npy
 
 
 *v17
