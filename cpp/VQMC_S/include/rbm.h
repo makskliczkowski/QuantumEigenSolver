@@ -958,7 +958,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 	// calculate sigma_z 
 	double s_z = 0.0;
 	double s_z_nei = 0.0;
-#pragma omp parallel for reduction(+ : s_z, s_z_nei) num_threads(this->thread_num)
+//#pragma omp parallel for reduction(+ : s_z, s_z_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_z(this->current_state, Ns, v_1d<int>({ i }));
 		this->op.s_z_i(i) += real(val);

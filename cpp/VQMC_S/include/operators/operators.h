@@ -280,7 +280,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 	for (auto& site : sites)
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
@@ -295,7 +295,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type
 {
 	if (site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
 		value += val * conj(alfa(new_idx)) * beta(k);
@@ -314,7 +314,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op)
 {
 	cpx value = 0;
 	//stout << alfa << EL;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
@@ -332,7 +332,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, std
 		if (site < 0 || site >= this->Ns) throw "Site index exceeds chain";
 	cpx value = 0;
 	//stout << alfa << EL;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		for (auto const& site : sites) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, site));
@@ -348,7 +348,7 @@ inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, op_type op, int
 {
 	cpx value = 0;
 	//stout << alfa << EL;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		if (!(site_a < 0 || site_b < 0 || site_a >= this->Ns || site_b >= this->Ns)) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>{site_a, site_b});
