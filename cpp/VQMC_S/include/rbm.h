@@ -662,7 +662,7 @@ inline _type rbmState<_type, _hamtype>::locEnKernelAll()
 
 	// loop over all lattice sites
 #ifndef DEBUG
-#pragma omp parallel for reduction(+ : energy) num_threads(this->thread_num)
+//#pragma omp parallel for reduction(+ : energy) num_threads(this->thread_num)
 #endif
 	for (uint i = 0; i < this->n_visible; i++) {
 		int vid = this->get_vec_id();
@@ -978,7 +978,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 
 	// calculate sigma_y
 	cpx s_y_nei = 0.0;
-#pragma omp parallel for reduction(+ : s_y_nei) num_threads(this->thread_num)
+//#pragma omp parallel for reduction(+ : s_y_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_y(this->current_state, Ns, v_1d<int>({ i, this->hamil->lattice->get_y_nn(i) }));
 		const int vid = this->get_vec_id();
@@ -992,7 +992,7 @@ inline void rbmState<_type, _hamtype>::collectAv(_type loc_en)
 	// calculate sigma_x
 	cpx s_x = 0.0;
 	cpx s_x_nei = 0.0;
-#pragma omp parallel for reduction(+ : s_x, s_x_nei) num_threads(this->thread_num)
+//#pragma omp parallel for reduction(+ : s_x, s_x_nei) num_threads(this->thread_num)
 	for (int i = 0; i < Ns; i++) {
 		const auto& [state, val] = Operators<double>::sigma_x(this->current_state, Ns, v_1d<int>({ i }));
 		const int vid = this->get_vec_id();

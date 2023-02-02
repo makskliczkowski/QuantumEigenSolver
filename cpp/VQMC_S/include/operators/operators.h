@@ -264,7 +264,7 @@ template<typename _type>
 inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type>& beta, op_type op)
 {
 	cpx value = 0;
-#pragma omp parallel for reduction (+: value)
+//#pragma omp parallel for reduction (+: value)
 	for (int k = 0; k < alfa.n_elem; k++) {
 		for (int j = 0; j < Ns; j++) {
 			const auto& [new_idx, val] = op(k, Ns, v_1d<int>(1, j));
