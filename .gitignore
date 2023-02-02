@@ -155,6 +155,8 @@ dmypy.json
 *.pdf
 *tmp*
 *.npy
+*.np*
+*plot_data/*
 
 
 *v17
