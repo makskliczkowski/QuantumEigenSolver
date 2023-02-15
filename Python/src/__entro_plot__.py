@@ -4,6 +4,8 @@ from .__models__ import *
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+# from scipy.stats import binom
+from scipy.special import binom, comb
 
 plt.rcParams['axes.facecolor']='white'
 plt.rcParams['savefig.facecolor']='w'
@@ -73,6 +75,20 @@ def their_result(fraction_h, V):
     val = (V-1.0)*np.log(2)/2.0
     val += 2.0 * (np.exp(-np.power(erfinv(frac), 2.0)) - 1.0) / (frac * np.pi)
     return  val + (-2.0 + 2.0 * frac + np.exp(-np.power(erfinv(frac), 2.0)))*erfinv(frac)/(2.0*frac*np.sqrt(np.pi)) 
+
+def page(d_a : int, d_b : int):
+    return psi(d_a * d_b + 1) - psi(d_b + 1) - (d_a - 1) / (2*d_b)
+
+def maximal_entropy(f, L):
+    S = 0
+    print(range(0, min(L//2, f*L)))
+    for na in range(0, min(L//2, int(f*L))):
+        da = binom(int(    f * L), na)
+        db = binom(int(L - f * L), L//2 - na)
+        dN = binom(L, L//2)
+        S += da * db / dN * ( page(da, db) + psi(dN + 1) - psi(da * db + 1) )
+    return S
+
 # -------------------------------------------- OTHER --------------------------------------------
 
 # standard maximum value

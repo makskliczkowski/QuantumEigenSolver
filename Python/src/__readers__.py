@@ -132,9 +132,9 @@ Takes the log DataFrame and calculates the entropy fractions for each of the mod
 - directory : directory where all the h5 files are stored
 - use_mls : if we shall divide the gapratio by the `mean level spacing`
 '''
-def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0.1], set_max = False, verbose=True):
-    col = [f'S_f={i:.3f}' for i in fractions] + (['S_max'] if set_max else [])
-    df[col] = np.zeros((len(df), len(fractions)+ (1 if set_max else 0)))
+def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0.1], set_max = False, set_min = False, verbose=True):
+    col = [f'S_f={i:.3f}' for i in fractions] + (['S_max'] if set_max else []) + ['S_min'] if set_min else []
+    df[col] = np.zeros((len(df), len(fractions)+ (1 if set_max else 0) + (1 if set_min else 0)))
 
     # takes the Hilbert space sizes
     hilbert_sizes = df.loc[:,'Nh'].to_list()
@@ -157,8 +157,10 @@ def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0
         for frac in fractions:
             entropy = get_entropies(ent, av_idx, frac)
             means.append(mean_entropy(entropy, -1) if not ent.empty else -1)
-        if set_max:
-            means.append(np.max(ent.iloc[-1]))
+            if set_max:
+                means.append(np.max(entropy.iloc[-1]))
+            if set_min:
+                means.append(np.min(entropy.iloc[-1]))
         #df.loc[short, [f'S_f={i:.3f}' for i in fractions]] = np.array(means)   
         entropies.append(np.array(means))
     df.loc[:,col] = np.array(entropies)     
