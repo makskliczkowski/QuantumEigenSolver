@@ -2,6 +2,20 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #import tensorflow as tf
+import traceback
+import logging
+import scienceplots
+import importlib
+SMALL_SIZE = 12
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 16
+#plt.rc('font', size=MEDIUM_SIZE)                            # controls default text sizes
+plt.rc('axes', titlesize=MEDIUM_SIZE, labelsize=MEDIUM_SIZE) # fontsize of the axes title
+plt.rc('xtick', labelsize=SMALL_SIZE, direction='in')       # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE, direction='in')       # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE, loc = 'best')                       # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)                     # fontsize of the figure title
+plt.style.use(['science', 'no-latex'])
 
 import time
 import os

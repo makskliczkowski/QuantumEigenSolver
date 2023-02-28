@@ -9,6 +9,9 @@ from scipy.special import psi
 from scipy.special import polygamma
 from scipy.special import erf, erfinv
 from scipy.optimize import curve_fit
+from scipy.linalg import svd
+
+
 
 goe = 0.5307
 constant_page_correction = lambda n: (n * np.log(2.0) / 2.0) - 0.5 + ((0.5 - np.log(2.0)) / 2.0)
@@ -146,6 +149,34 @@ def reduced_density_matrix(state : np.ndarray, A_size : int, L : int):
                 counter+=1
         return rho
 
+def entro_schmidt(state : np.ndarray, L : int, La : int):    
+	dimA = 2 ** La
+	dimB = 2 ** (L-La)
+	N = dimA * dimB
+
+	# reshape array to matrix
+	rho = state.reshape(dimA, dimB);
+
+	# get schmidt coefficients from singular-value-decomposition
+	U, schmidt_coeff, _ = svd(rho);
+
+	# calculate entropy
+	entropy = 0;
+	for i in range(len(schmidt_coeff)):
+		value = schmidt_coeff[i] * schmidt_coeff[i]
+		entropy += ((-value * np.log(value)) if (abs(value) > 0) else 0)
+	return entropy
+
+def entro_old_rho(rho : np.ndarray):
+    eig_sym = np.linalg.eigvals(rho)
+    ent = -np.multiply(eig_sym, np.log(eig_sym)).sum()
+    return ent
+
+def entro_old(state : np.ndarray, L, La):
+    rho = reduced_density_matrix(state, La, L)
+    eig_sym = np.linalg.eigvals(rho)
+    ent = -np.multiply(eig_sym, np.log(eig_sym)).sum()
+    return ent
 ####################################################### CALCULATORS #######################################################
 
 '''

@@ -3,7 +3,7 @@
 import pandas as pd
 import subprocess
 
-df = pd.read_csv('params_sweep.csv', index_col=0)
+df = pd.read_csv('params_sweep2.csv', index_col=0)
 df['p'] = (df['p'] + 1)/2
 df['x'] = (df['x'] + 1)/2
 with open("commands.txt",'w') as f:
