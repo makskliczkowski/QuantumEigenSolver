@@ -209,7 +209,10 @@ Calculate the average entropy in a given DataFrame
 - row : row number (-1 for half division of a system)
 '''
 def mean_entropy(df : pd.DataFrame, row : int):
-    return np.mean(df.iloc[row])
+    # return np.mean(df.loc[row] if row != -1 else df.iloc[row])
+    ent_np = df.to_numpy()
+    print(ent_np.shape)
+    return np.mean(ent_np[row])
 
 '''
 Calculate the gaussianity <|Oab|^2>/<|Oab|>^2 -> for normal == pi/2

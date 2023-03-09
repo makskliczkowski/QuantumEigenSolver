@@ -6,7 +6,7 @@ import subprocess
 df = pd.read_csv('params_sweep2.csv', index_col=0)
 df['p'] = (df['p'] + 1)/2
 df['x'] = (df['x'] + 1)/2
-with open("commands.txt",'w') as f:
+with open("commands2.txt",'w') as f:
     for i, row in df.iterrows():
         string = " ".join([ str(row['Ns']),
                             str(row['hz']),

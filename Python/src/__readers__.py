@@ -7,13 +7,14 @@ from numba import njit
 
 
 model_name = 'xyz'
-roll_number = 31
+roll_number = 4
 SYM = True
 
 # define the value taken for the middle of the spectrum
 #IDX_VAL = 'roll'
 IDX_VAL = 'mean'
-#IDX_VAL = 'max'
+# IDX_VAL = 'max'
+# IDX_VAL = 'dos'
 
 ####################################################### GET LOG FILE #########################################################
 
@@ -132,7 +133,7 @@ Takes the log DataFrame and calculates the entropy fractions for each of the mod
 - directory : directory where all the h5 files are stored
 - use_mls : if we shall divide the gapratio by the `mean level spacing`
 '''
-def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0.1], set_max = False, set_min = False, verbose=True):
+def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0.1], set_max = False, set_min = False, idx_e = -1, verbose=True):
     col = [f'S_f={i:.3f}' for i in fractions] + (['S_max'] if set_max else []) + ['S_min'] if set_min else []
     df[col] = np.zeros((len(df), len(fractions)+ (1 if set_max else 0) + (1 if set_min else 0)))
 
@@ -152,15 +153,24 @@ def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0
             
         # read all entropies
         ent, av_idx, Nh, _, dictionary = read_entropies(directory, filename, 1.0, verbose=verbose)
+        # print(ent)
+        if len(ent) == 0:
+            entropies.append(np.array([0 for i in fractions] + [0, 0]))
+            continue
+        
         # iterate fractions
         means = []
         for frac in fractions:
+            print(idx_e)
             entropy = get_entropies(ent, av_idx, frac)
-            means.append(mean_entropy(entropy, -1) if not ent.empty else -1)
-            if set_max:
-                means.append(np.max(entropy.iloc[-1]))
-            if set_min:
-                means.append(np.min(entropy.iloc[-1]))
+            if not entropy.empty:
+                means.append(mean_entropy(entropy, idx_e))
+                if set_max:
+                    means.append(np.max(entropy.iloc[idx_e]))
+                if set_min:
+                    means.append(np.min(entropy.iloc[idx_e]))
+            else:
+                means = means + [0, 0, 0]
         #df.loc[short, [f'S_f={i:.3f}' for i in fractions]] = np.array(means)   
         entropies.append(np.array(means))
     df.loc[:,col] = np.array(entropies)     
@@ -341,7 +351,7 @@ Reads the entropies from a file with a given fraction of elements in the middle.
 def read_entropies(directory : str, file : str, fraction : float, verbose = False):
     df = read_h5_file(directory, file, 'entropy')
     en = read_h5_file(directory, file, 'energy').to_numpy().flatten()
-    
+    # print(df)
     N = len(en)
     # if there are no entropies -> return empty
     if len(df) == 0:

@@ -81,8 +81,8 @@ def page(d_a : int, d_b : int):
 
 def maximal_entropy(f, L):
     S = 0
-    print(range(0, min(L//2, f*L)))
-    for na in range(0, min(L//2, int(f*L))):
+    # print(range(0, min(L//2, f*L)))
+    for na in range(0, min(L//2, int(f*L))+1):
         da = binom(int(    f * L), na)
         db = binom(int(L - f * L), L//2 - na)
         dN = binom(L, L//2)
