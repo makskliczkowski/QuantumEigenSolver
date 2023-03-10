@@ -172,15 +172,19 @@
     <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />
+    <ClInclude Include="source\src\binary.h" />
     <ClInclude Include="source\src\common.h" />
+    <ClInclude Include="source\src\Include\directories.h" />
+    <ClInclude Include="source\src\Include\files.h" />
+    <ClInclude Include="source\src\Include\math.h" />
+    <ClInclude Include="source\src\Include\random.h" />
+    <ClInclude Include="source\src\Include\statistical.h" />
+    <ClInclude Include="source\src\Include\str.h" />
     <ClInclude Include="source\src\lattices.h" />
     <ClInclude Include="source\src\Lattices\hexagonal.h" />
     <ClInclude Include="source\src\Lattices\square.h" />
-    <ClInclude Include="source\src\LinearAlgebra\alg.h" />
+    <ClInclude Include="source\src\lin_alg.h" />
     <ClInclude Include="source\src\progress.h" />
-    <ClInclude Include="source\src\random.h" />
-    <ClInclude Include="source\src\statistical.h" />
-    <ClInclude Include="source\src\str.h" />
     <ClInclude Include="source\src\UserInterface\ui.h" />
     <ClInclude Include="source\src\xoshiro_pp.h" />
   </ItemGroup>
@@ -193,6 +197,9 @@
     <ClCompile Include="source\cpp\statistical.cpp" />
     <ClCompile Include="source\cpp\ui.cpp" />
     <ClCompile Include="user_interface.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
