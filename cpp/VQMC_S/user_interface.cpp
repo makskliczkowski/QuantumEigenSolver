@@ -1,90 +1,31 @@
 #include "include/user_interface/user_interface.h"
 
-
-// --------------------------------------------------------   				 USER INTERFACE   				  --------------------------------------------------------
-
-/*
-* @param argc number of cmd parameters
-* @param argv cmd parameters
-*/
-template<typename _type, typename _hamtype>
-rbm_ui::ui<_type, _hamtype>::ui(int argc, char** argv)
-{
-	auto input = changeInpToVec(argc, argv);												// change standard input to vec of strings
-	input = std::vector<string>(input.begin()++, input.end());								// skip the first element which is the name of file
-
-	if (string option = this->getCmdOption(input, "-f"); option != "") {
-		input = this->parseInputFile(option);												// parse input from file
-	}
-	this->parseModel(input.size(), input);													// parse input from CMD directly
-}
-
 // -------------------------------------------------------- PARSERS
 
 /*
-* @brief Prints help for a Hubbard interface
+* @brief  Setting parameters to default
 */
-template<typename _type, typename _hamtype>
-void rbm_ui::ui<_type, _hamtype>::exit_with_help()
-{
-	printf(
-		"Usage: name [options] outputDir \n"
-		"options:\n"
-		" The input can be both introduced with [options] described below or with giving the input directory \n"
-		" (which also is the flag in the options) \n"
-		" options:\n"
-		"-f input file for all of the options : (default none) \n"
-		"-m monte carlo steps : bigger than 0 (default 300) \n"
-		"-d dimension : set dimension (default 2) \n"
-		"	1 -- 1D \n"
-		"	2 -- 2D \n"
-		"	3 -- 3D -> NOT IMPLEMENTED YET \n"
-		"-l lattice type : (default square) -> CHANGE NOT IMPLEMENTED YET \n"
-		"   square \n"
-		// SIMULATIONS STEPS
-		"\n"
-		"-q : 0 or 1 -> quiet mode (no outputs) (default false)\n"
-		"\n"
-		"-fun : function to be used in the calculations. There are predefined functions in the model that allow that:\n"
-		"   The options divide each other on different categories according to the first number _ \n"
-		"   -1 -- default option -> shows help \n"
-		"    0 -- this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)\n"	
-		"    1 -- this option utilizes the classical degrees of freedom with RBM\n"
-		"		11 -- check the difference between AF and FM classical spins configuration\n"
-		"		12 -- check the minimum of energy when classical spins are varied with angle and with interaction\n"
-		"    2 -- this option utilizes the Hamiltonian with symmetries calculation\n"
-		"		21 -- input the symmetries and the model information and a given block will be calculated\n"
-		"		22 -- input the symmetries and the model information and a given block will be calculated with a sweep in Jb (to be changed)\n"
-		"\n"
-		"-h - help\n"
-	);
-	std::exit(1);
-}
-
-/*
-* @brief  Setting Hubbard parameters to default
-*/
-template<typename _type, typename _hamtype>
-void rbm_ui::ui<_type, _hamtype>::set_default()
+void UI::setDefault()
 {
 
 	// lattice stuff
-	this->lattice_type = impDef::lattice_types::square; 													// for non_numeric data
-	this->dim = 1;
-	this->_BC = 0;
-	this->Lx = 10;
-	this->Ly = 1;
-	this->Lz = 1;
+	this->latP.typ = SQ; 													// for non_numeric data
+	this->latP.dim = 1;
+	this->latP._BC = 0;
+	this->latP.Lx = 10;
+	this->latP.Ly = 1;
+	this->latP.Lz = 1;
 
 	// symmetries stuff
-	this->k_sym = 0;
-	this->p_sym = true;
-	this->x_sym = true;
-	this->sym = false;
-	this->spectrum_size = 0.2;
+	this->symP.kSec = 0;
+	this->symP.pxSec = true;
+	this->symP.pySec = true;
+	this->symP.pzSec = true;
+	this->symP.xSec = true;
+	this->symP.U1Sec = 0;
 
 	// define basic model
-	this->model_name = impDef::ham_types::ising;
+	//this->model_name = impDef::ham_types::ising;
 	this->J = 1.0;
 	this->J0 = 0;
 	this->h = 0.1;
@@ -103,24 +44,26 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 
 	// heisenberg with classical dots stuff
 	this->positions = { 0 };
-	this->phis = vec({ 0 });
-	this->thetas = vec({ 1 });
+	this->phis = arma::vec({ 0 });
+	this->thetas = arma::vec({ 1 });
 	this->J_dot = { 0.0,0.0,-1.0 };
 	this->J0_dot = 0.0;
 	this->J_dot_dot = 1.0;
 
 	// others 
-	this->thread_num = 16;
+	this->thread_number = 1;
 
 	// rbm
-	this->batch = std::pow(2, 10);
-	this->mcSteps = 1000;
-	this->n_blocks = 500;
-	this->layer_mult = 2;
-	this->block_size = 8;
-	this->n_therm = uint(0.1 * this->n_blocks);
-	this->n_flips = 1;
-	this->lr = 1e-2;
+	this->nqsP.lr = 1e-2;
+	this->nqsP.blockSize = 8;
+	this->nqsP.nBlocks = 500;
+	this->nqsP.mcSteps = 1000;
+	this->nqsP.batch = std::pow(2, 10);
+	this->nqsP.nVisible = latP.lat->get_Ns();
+	this->nqsP.nHidden = 2ll * latP.lat->get_Ns();
+	this->nqsP.layersDim = { this->nqsP.nVisible , this->nqsP.nHidden };
+	this->nqsP.nTherm = uint(0.1 * this->nqsP.nBlocks);
+	this->nqsP.nFlips = 1;
 }
 
 /*
@@ -128,17 +71,17 @@ void rbm_ui::ui<_type, _hamtype>::set_default()
 * @param argc number of line arguments
 * @param argv line arguments
 */
-template<typename _type, typename _hamtype>
-inline void rbm_ui::ui<_type, _hamtype>::parseModel(int argc, const v_1d<string>& argv)
+inline void UI::parseModel(int argc, cmdArg& argv)
 {
-	this->set_default();
+	// set default at first
+	this->setDefault();
 
 	string choosen_option = "";
 
 	//---------- SIMULATION PARAMETERS
 
 	// monte carlo steps
-	this->set_option(this->mcSteps, argv, "-m");
+	this->setOption(this->mcSteps, argv, "-m");
 
 	// batch size
 	this->set_option(this->batch, argv, "-b");

@@ -34,9 +34,6 @@
     <Filter Include="Header Files\include\operators">
       <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\include\user_interface">
-      <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\source">
       <UniqueIdentifier>{fbb02f40-0eca-4911-8292-4f847505a9c2}</UniqueIdentifier>
     </Filter>
@@ -48,6 +45,9 @@
     </Filter>
     <Filter Include="Header Files\source\Include">
       <UniqueIdentifier>{704c53cc-d63b-48bf-9f68-e0dcd074df76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\include\UserInterface">
+      <UniqueIdentifier>{32a8215c-28e3-44fa-8103-aac3d52f3757}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -70,7 +70,7 @@
       <Filter>Header Files\include\models\symmetries</Filter>
     </ClInclude>
     <ClInclude Include="include\user_interface\user_interface.h">
-      <Filter>Header Files\include\user_interface</Filter>
+      <Filter>Header Files\include\UserInterface</Filter>
     </ClInclude>
     <ClInclude Include="include\hamil.h">
       <Filter>Header Files\include</Filter>
@@ -135,11 +135,11 @@
     <ClInclude Include="source\src\xoshiro_pp.h">
       <Filter>Header Files\source</Filter>
     </ClInclude>
+    <ClInclude Include="source\src\plotter.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="rbm.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -151,15 +151,6 @@
     </ClCompile>
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp">
       <Filter>Source Files\source\Lattices</Filter>
-    </ClCompile>
-    <ClCompile Include="source\cpp\common.cpp">
-      <Filter>Source Files\source</Filter>
-    </ClCompile>
-    <ClCompile Include="source\cpp\statistical.cpp">
-      <Filter>Source Files\source</Filter>
-    </ClCompile>
-    <ClCompile Include="source\cpp\ui.cpp">
-      <Filter>Source Files\source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

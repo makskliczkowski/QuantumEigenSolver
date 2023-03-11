@@ -184,18 +184,15 @@
     <ClInclude Include="source\src\Lattices\hexagonal.h" />
     <ClInclude Include="source\src\Lattices\square.h" />
     <ClInclude Include="source\src\lin_alg.h" />
+    <ClInclude Include="source\src\plotter.h" />
     <ClInclude Include="source\src\progress.h" />
     <ClInclude Include="source\src\UserInterface\ui.h" />
     <ClInclude Include="source\src\xoshiro_pp.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="rbm.cpp" />
-    <ClCompile Include="source\cpp\common.cpp" />
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp" />
     <ClCompile Include="source\cpp\Lattices\square.cpp" />
-    <ClCompile Include="source\cpp\statistical.cpp" />
-    <ClCompile Include="source\cpp\ui.cpp" />
     <ClCompile Include="user_interface.cpp" />
   </ItemGroup>
   <ItemGroup>
