@@ -70,7 +70,7 @@ constexpr int maxed = 20;
 // lattice stuff
 struct LatP {
 	LatticeTypes typ = SQ; 																					// for non_numeric data
-	int _BC = 0;
+	int bc = 0;
 	int dim = 1;
 	int Lx = 2;
 	int Ly = 1;
@@ -79,7 +79,7 @@ struct LatP {
 };
 
 struct SymP {
-	bool sym = false;
+	bool S = false;
 	int kSec = 0;									// translation symmetry sector
 	bool pxSec = true;								// x parity sector
 	bool pySec = true;								// y parity sector
@@ -112,51 +112,49 @@ struct NqsP {
 
 // ------------------------------------------- 				  CLASS				 -------------------------------------------
 
-std::string higherThanZero(std::string s) { if (stod(s) <= 0) return "must be higher than 0"; else ""; };
-
 class UI : public UserInterface {
 private:
 	// set the possible options
-	allVec all_params = {
-		std::make_tuple("m", &this->nqsP.mcSteps, "300", std::function(higherThanZero)),			// mcsteps	
-		std::make_tuple("b", &this->nqsP.batch, "100", std::function(higherThanZero)),				// batch
-		std::make_tuple("nb", &this->nqsP.nBlocks, "500", std::function(higherThanZero)),			// number of blocks	
-		std::make_tuple("bs", &this->nqsP.blockSize, "8", std::function(higherThanZero)),			// block size
-		std::make_tuple("nh", &this->nqsP.nHidden, "2", std::function(higherThanZero))				// hidden parameters
+	cmdMap default_params = {
+	//	std::make_tuple("m", &this->nqsP.mcSteps, "300", std::function(higherThanZero)),			// mcsteps	
+	//	std::make_tuple("b", &this->nqsP.batch, "100", std::function(higherThanZero)),				// batch
+	//	std::make_tuple("nb", &this->nqsP.nBlocks, "500", std::function(higherThanZero)),			// number of blocks	
+	//	std::make_tuple("bs", &this->nqsP.blockSize, "8", std::function(higherThanZero)),			// block size
+	//	std::make_tuple("nh", &this->nqsP.nHidden, "2", std::function(higherThanZero))				// hidden parameters
 		
-		//// lattice parameters
-		//{"d","1"},									// dimension
-		//{"lx","4"},
-		//{"ly","1"},
-		//{"lz","1"},
-		//{"bc","0"},									// boundary condition
-		//{"l","0"},									// lattice type (default square)
-		//{"f",""},									// file to read from directory
-		//// model parameters
-		//{"mod","0"},								// choose model
-		//{"J","1.0"},								// spin coupling
-		//{"J0","0.0"},								// spin coupling randomness maximum (-J0 to J0)
-		//{"h","0.1"},								// perpendicular magnetic field constant
-		//{"w","0.01"},								// disorder strength
-		//{"g","1.0"},								// transverse magnetic field constant
-		//{"g0","0.0"},								// transverse field randomness maximum (-g0 to g0)
-		//// heisenberg
-		//{"dlt", "1.0"},								// delta
-		//// xyz
-		//{"dlt2", "0.9"},							// delta2
-		//{"J2", "1.0"},								// J2
-		//{"eta", "0.0"},								// eta
-		//{"eta2", "0.0"},							// eta2
+		// lattice parameters
+		{"d", std::make_tuple("1", higherThanZero)  },				// dimension
+		{"lx",std::make_tuple("4", higherThanZero)  },
+		{"ly",std::make_tuple("1", higherThanZero)  },
+		{"lz",std::make_tuple("1", higherThanZero)  },
+		{"bc",std::make_tuple("0", higherThanZero)  },				// boundary condition
+		{"l", std::make_tuple("0", higherThanZero)  },				// lattice type (default square)
+		{"f", std::make_tuple("" , defaultReturn)   },				// file to read from directory
+		// model parameters
+		{"mod",std::make_tuple("0",higherThanZero)  },				// choose model
+		{"J",std::make_tuple("1.0",defaultReturn)   },				// spin coupling
+		{"J0",std::make_tuple("0.0",defaultReturn)  },				// spin coupling randomness maximum (-J0 to J0)
+		{"h",std::make_tuple("0.1",defaultReturn)   },				// perpendicular magnetic field constant
+		{"w",std::make_tuple("0.01",defaultReturn)  },				// disorder strength
+		{"g",std::make_tuple("1.0",defaultReturn)   },				// transverse magnetic field constant
+		{"g0",std::make_tuple("0.0",defaultReturn)  },				// transverse field randomness maximum (-g0 to g0)
+		// heisenberg
+		{"dlt",std::make_tuple("1.0",defaultReturn) },				// delta
+		// xyz
+		{"dlt2",std::make_tuple("0.9",defaultReturn)},				// delta2
+		{"J2",std::make_tuple("1.0",defaultReturn)	},				// J2
+		{"eta",std::make_tuple("0.0",defaultReturn) },				// eta
+		{"eta2",std::make_tuple("0.0",defaultReturn)},				// eta2
 
-		//// kitaev
-		//{"kx", "0.0"},								// kitaev x interaction
-		//{"ky", "0.0"},								// kitaev y interaction
-		//{"kz", "0.0"},								// kitaev z interaction
-		//{"k0", "0.0"},								// kitaev interaction disorder
-		//// other
-		//{"fun","-1"},								// choice of the function to be calculated
-		//{"th","1"},									// number of threads
-		//{"q","0"},									// quiet?
+		// kitaev
+		{"kx", std::make_tuple("0.0", defaultReturn)},				// kitaev x interaction
+		{"ky", std::make_tuple("0.0", defaultReturn)},				// kitaev y interaction
+		{"kz", std::make_tuple("0.0", defaultReturn)},				// kitaev z interaction
+		{"k0", std::make_tuple("0.0", defaultReturn)},				// kitaev interaction disorder
+		// other
+		{"fun",std::make_tuple("-1", defaultReturn) },				// choice of the function to be calculated
+		{"th",std::make_tuple("1", defaultReturn)	},				// number of threads
+		{"q",std::make_tuple("0", defaultReturn)	}				// quiet?
 	};
 
 	// lattice
@@ -214,8 +212,9 @@ private:
 	// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
 	//void compare_ed(double ground_rbm);
 	//void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-	
-private:
+protected:
+
+//private:
 	// INNER METHODS
 
 	// ####################### SYMMETRIES #######################
@@ -236,16 +235,10 @@ public:
 	// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
 	UI() = default;
 	UI(int argc, char** argv) {
-		for (auto [key, item, deflt, fun] : this->all_params) {
-			function_params.insert(key, fun);
-			default_params.insert(key, deflt);
-			connect_params.insert(key, item);
-		}
-
-		strVec input = fromPtr(argc, argv);												// change standard input to vec of strings
+		strVec input = fromPtr(argc, argv, 1);											// change standard input to vec of strings
 		//input = std::vector<string>(input.begin()++, input.end());					// skip the first element which is the name of file
 		if (std::string option = this->getCmdOption(input, "-f"); option != "")
-			input = this->parseInputFile(option);								// parse input from file
+			input = this->parseInputFile(option);										// parse input from file
 		this->parseModel(input.size(), input);
 	}
 

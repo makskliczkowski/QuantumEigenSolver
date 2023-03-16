@@ -161,6 +161,7 @@
   <ItemGroup>
     <ClInclude Include="include\hamil.h" />
     <ClInclude Include="include\hamil_sym.h" />
+    <ClInclude Include="include\hilbert.h" />
     <ClInclude Include="include\ml.h" />
     <ClInclude Include="include\models\heisenberg-kitaev.h" />
     <ClInclude Include="include\models\heisenberg.h" />

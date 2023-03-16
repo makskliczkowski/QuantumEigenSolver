@@ -211,7 +211,6 @@ Calculate the average entropy in a given DataFrame
 def mean_entropy(df : pd.DataFrame, row : int):
     # return np.mean(df.loc[row] if row != -1 else df.iloc[row])
     ent_np = df.to_numpy()
-    print(ent_np.shape)
     return np.mean(ent_np[row])
 
 '''

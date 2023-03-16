@@ -12,8 +12,8 @@ SYM = True
 
 # define the value taken for the middle of the spectrum
 #IDX_VAL = 'roll'
-IDX_VAL = 'mean'
-# IDX_VAL = 'max'
+# IDX_VAL = 'mean'
+IDX_VAL = 'max'
 # IDX_VAL = 'dos'
 
 ####################################################### GET LOG FILE #########################################################
@@ -161,7 +161,6 @@ def set_entropies_df_log(df : pd.DataFrame, directory : str, fractions = [200, 0
         # iterate fractions
         means = []
         for frac in fractions:
-            print(idx_e)
             entropy = get_entropies(ent, av_idx, frac)
             if not entropy.empty:
                 means.append(mean_entropy(entropy, idx_e))
@@ -230,12 +229,20 @@ def read_eigenstates_df_log(df : pd.DataFrame, directory : str, sec : str, verbo
         # read the energy from a given filename (h5 Database)
         states = read_h5_file(directory, filename, 'states')
         
-        if len(states) == 0: 
-            continue
         states = states.flatten()
+        if len(states) == 0:#or type(states[0]) == np.void: 
+            # states = states.view('complex')
+            continue 
+            # states_tmp = np.zeros_like(states, dtype=np.complex64)
+            # for i,st in enumerate(states):
+            #     states_tmp[i] = np.real(st[0]) + 1j*np.real(st[1])#np.float32(st[0]) + 1j*np.float32(st[1])
+            # states = states_tmp
+            # print(states)
+            # continue
+        # print(len(states), type(states[0]))
         
-        # rescale by variance        
-        states = (states.view('complex') * np.sqrt(2.0 * hilbert_sizes[i])) if sec == 'imag' else (states * np.sqrt(hilbert_sizes[i]))
+        # rescale by variance  
+        states = (states.view('complex') * np.complex64(np.sqrt(2.0 * hilbert_sizes[i]))) if (sec == 'imag' or type(states[0]) == np.void) else (states * np.sqrt(hilbert_sizes[i]))
 
         # append
         states_saved = np.concatenate([states_saved, states])
