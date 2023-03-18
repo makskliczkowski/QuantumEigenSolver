@@ -6,34 +6,6 @@
 #ifndef HAMIL_H
 #define HAMIL_H
 
-
-namespace ham_sym {
-	struct global_sym {
-
-		// ################################ PARTICLE NUMBER CONSERVATION ################################
-
-		bool su = false;																				// su symmetry
-		int su_val = 0.0;																				// value of su symmetry
-
-		/*
-		* @brief Sets SU particle number conservation value
-		*/
-		void set_su(int su_val, bool outter_condition, int Ns) {
-			this->su_val = su_val;
-			this->su = (outter_condition && su_val >= 0 && su_val <= Ns) ? true : false;
-		}
-
-		/*
-		* @brief Check if we have su symmetry value in the state
-		*/
-		bool check_su(u64 state) const {
-			return this->su && (__builtin_popcountll(state) == su_val);
-		}
-
-	};
-}
-
-
 using namespace std;
 template <typename _type>
 class SpinHamiltonian {
