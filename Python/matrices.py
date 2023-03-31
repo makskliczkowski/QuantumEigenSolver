@@ -238,4 +238,4 @@ def __main__():
     # np.save(folder + )
 
     
-__main__()
+# __main__()

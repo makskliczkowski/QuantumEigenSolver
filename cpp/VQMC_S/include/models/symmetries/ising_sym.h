@@ -95,11 +95,11 @@ namespace ising_sym {
 			this->k_exponents[l] = std::exp(-imn * this->symmetries.k_sym * double(l));
 
 		// calculate symmetry group
-		this->createSymmetryGroup();
+		//this->createSymmetryGroup();
 
-		this->mapping = v_1d<u64>();
-		this->normalisation = v_1d<cpx>();
-		this->generate_mapping();
+		//this->mapping = v_1d<u64>();
+		//this->normalisation = v_1d<cpx>();
+		//this->generate_mapping();
 		if (this->N <= 0) {
 			stout << "No states in Hilbert space" << EL;
 			return;

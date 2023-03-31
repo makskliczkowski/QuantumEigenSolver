@@ -75,9 +75,6 @@
     <ClInclude Include="include\hamil.h">
       <Filter>Header Files\include</Filter>
     </ClInclude>
-    <ClInclude Include="include\hamil_sym.h">
-      <Filter>Header Files\include</Filter>
-    </ClInclude>
     <ClInclude Include="include\ml.h">
       <Filter>Header Files\include</Filter>
     </ClInclude>
@@ -154,6 +151,9 @@
     </ClCompile>
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp">
       <Filter>Source Files\source\Lattices</Filter>
+    </ClCompile>
+    <ClCompile Include="hilbert.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

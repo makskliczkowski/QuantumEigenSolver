@@ -1,155 +1,165 @@
 #pragma once
-#ifndef  OPERATORS_H
-#include "./operators/operators.h"
-#endif // ! BINARY_H
+//#ifndef  OPERATORS_H
+//#include "./operators/operators.h"
+//#endif // ! BINARY_H
+#include "hilbert.h"
 
-#ifndef HAMIL_H
-#define HAMIL_H
+const std::string DEF_INFO_SEP = std::string("_");											// defalut separator in info about the model
 
-using namespace std;
-template <typename _type>
-class SpinHamiltonian {
+template <typename _T>
+class Hamiltonian {
 protected:
-	ham_sym::global_sym global;
+	//double _SPIN = operators::_SPIN;														// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
+	Hilbert::HilbertSpace<_T> hilbertSpace;
 
-	double _SPIN = operators::_SPIN;																								// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
+	// ------------------------------------------- CLASS FIELDS -------------------------------------------
+	double avEn											=									0.0;
+	u64 avEnIdx											=									-1;														
+	
+	arma::SpMat<_T> H_;																		// the Hamiltonian
+	arma::Mat<_T> eigVec_;																	// matrix of the eigenvectors in increasing order
+	arma::vec eigVal_;																		// eigenvalues vector
 public:
-	string info;																													// information about the model
-	randomGen ran;																													// consistent quick random number generator
+	randomGen ran_;																			// consistent quick random number generator
+	std::string info_;																		// information about the model
 
-	SpMat<_type> H;																													// the Hamiltonian
-	Mat<_type> eigenvectors;																										// matrix of the eigenvectors in increasing order
-	vec eigenvalues;																												// eigenvalues vector
-	u64 E_av_idx = -1;																												// average energy
+	//vec tmp_vec;																			// tmp vector for base states if the system is too big
+	//vec tmp_vec2;
+	//uint state_val_num;																		// basic number of state_values
 
-	u64 N = 1;																														// the Hilbert space size
-	u64 Ns = 1;																														// lattice sites number
-	mutex my_mute_button;																											// thread mutex
-	u32 thread_num = 1;																												// number of threads to be used
-	shared_ptr<Lattice> lattice;																									// contains all the information about the lattice
-
-	vec tmp_vec;																													// tmp vector for base states if the system is too big
-	vec tmp_vec2;
-	v_1d<u64> mapping;																												// mapping for the reduced Hilbert space
-	v_1d<_type> normalisation;																										// used for normalization in the symmetry case
-	uint state_val_num;																												// basic number of state_values
-
-	virtual u64 map(u64 index) const = 0;																							// function returning either the mapping(symmetries) or the input index (no-symmetry: 1to1 correspondance)
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
-// ------------------------------------------- 				          PRINTERS 				          -------------------------------------------
-	static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);															// converts a map to arma column (VQMC)
-	static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);											// pretty prints the base state
-	static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);												// pretty prints the eigenstate at a given idx
-	void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };											// prints the eigenstate at a given idx
+	// ------------------------------------------- PRINTERS -------------------------------------------
+	//static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);															// converts a map to arma column (VQMC)
+	//static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);											// pretty prints the base state
+	//static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);												// pretty prints the eigenstate at a given idx
+	//void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };											// prints the eigenstate at a given idx
 
-	// ------------------------------------------- 				        INFO 				          -------------------------------------------
+	// ------------------------------------------- INFO -------------------------------------------
+
+	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const = 0;
 
 	/*
 	* @brief sets and gets the information about the model
 	* @param skip vector of elements to be skipped in the info showcase
 	* @returns trimmed information about the model
 	*/
-	virtual string inf(string name = "", const v_1d<string>& skip = {}, string sep = "_") const {
-		auto tmp = (name == "") ? split_str(this->info, ",") : split_str(name, ",");
-		string tmp_str = "";
+	virtual std::string info(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_") const {
+		auto tmp = (name == "") ? splitStr(this->info_, ",") : splitStr(name, ",");
+		std::string tmp_str = "";
 		for (int i = 0; i < tmp.size(); i++) {
 			bool save = true;
 			for (auto& skip_param : skip)
 				// skip the element if we don't want it to be included in the info
-				save = !(split_str(tmp[i], "=")[0] == skip_param);
+				save = !(splitStr(tmp[i], "=")[0] == skip_param);
 			if (save) tmp_str += tmp[i] + ",";
 		}
 		tmp_str.pop_back();
 		return tmp_str;
 	};
-	virtual string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const = 0;
 
-	// -------------------------------------------				       SETTERS					      -------------------------------------------
-	void init_ham_mat() {
+	// -------------------------------------------	SETTERS	-------------------------------------------
+	
+	/*
+	* @brief Initialize Hamiltonian matrix
+	*/
+	void init() {
 		try {
-			this->H = SpMat<_type>(this->N, this->N);										//  hamiltonian memory reservation
+			//  hamiltonian memory reservation
+			this->H_ = arma::SpMat<_T>(this->getHilbertSize(), this->getHilbertSize());
 		}
 		catch (const std::bad_alloc& e) {
-			std::cout << "Memory exceeded" << e.what() << "\n";
-			assert(false);
+			stout << "Memory exceeded" << e.what() << "\n";
+			exit(-1);
 		}
 	};
 
-	// -------------------------------------------  				   GETTERS  					  -------------------------------------------
+	// ------------------------------------------- GETTERS -------------------------------------------
+	
+	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
+	auto getHilbertSize()								const -> u64						{ return this->hilbertSpace.getHilbertSize(); };			
+	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
+	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_; };								
+	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_; };							
+	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx); };			
+	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx); };				
+	auto getEigVal()									const -> arma::vec					{ return this->eigVal_; };						
+	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
+	auto getInfo(const v_1d<std::string>& skip = {}, 
+		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info("", skip, sep); };
 
-	auto get_en_av_idx()											const RETURNS(this->E_av_idx);									// return the index closest to the mean energy
-	auto get_hilbert_size()											const RETURNS(this->N);											// get the Hilbert space size 2^N
-	auto get_mapping()												const RETURNS(this->mapping);									// constant reference to the mapping
-	auto get_global_sym()											const RETURNS(this->global);									// returns global symmetries
-	auto get_hamiltonian()											const RETURNS(this->H);											// get the const reference to a Hamiltonian
-	auto get_eigenvectors()											const RETURNS(this->eigenvectors);								// get the const reference to the eigenvectors
-	auto get_eigenvalues()											const RETURNS(this->eigenvalues);								// get the const reference to eigenvalues
-	auto get_eigenEnergy(u64 idx)									const RETURNS(this->eigenvalues(idx));							// get eigenenergy at a given idx
-	auto get_eigenState(u64 idx)									const RETURNS(this->eigenvectors.col(idx));						// get an eigenstate at a given idx
-	auto get_eigenStateValue(u64 idx, u64 elem)						const RETURNS(this->eigenvectors(elem, idx));					// get an eigenstate at a given idx
-	virtual auto get_eigenStateFull(u64 idx)						const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
-	virtual auto get_eigenStateFull(u64 idx, v_1d<u64> map)			const RETURNS(Col<_type>(eigenvectors.col(idx)));				// get an eigenstate at a given idx but in symmetries it changes
-	virtual v_1d<u64> get_mapping_full()							const { return this->mapping; };								// returns the full mapping
-	const Col<_type>& get_eigenStateRef(u64 idx)					const { this->eigenvectors.col(idx); };					// get the reference to the eigenstate
-	auto get_info(const v_1d<string>& skip = {}, string sep = "_", int prec = 2)	const RETURNS(this->inf("", skip, sep));		// get the info about the model
+	// ------------------------------------------- 	SETTERS -------------------------------------------
+	
+	virtual void hamiltonian()							=									0;								
 
+	void setHElem(u64 k, _T val, u64 newIdx);												// sets the Hamiltonian elements in a virtual way
+	void diagH(bool woEigVec = false);														// diagonalize the Hamiltonian
+	void diagHs(bool woEigVec = false);														// diagonalize the Hamiltonian sparse
+	void diagH(bool woEigVec, uint k, uint subdim = 0, uint maxiter = 1000,
+		double tol = 0, std::string form = "sm");											// diagonalize the Hamiltonian using Lanczos' method
+	void calcAvEn();																		// calculate the average energy
 
-	// ------------------------------------------- 				   GENERAL METHODS  				  -------------------------------------------
-	virtual void hamiltonian() = 0;																									// pure virtual Hamiltonian creator
-	virtual void setHamiltonianElem(u64 k, _type value, u64 new_idx) = 0;															// sets the Hamiltonian elements in a virtual way
+	// ------------------------------------------- 	VQMC -------------------------------------------
+	
+	//virtual cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;		// returns the local energy for VQMC purposes
+	//virtual cpx locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;	// returns the local energy for VQMC purposes
 
-	void diag_h(bool withoutEigenVec = false);																						// diagonalize the Hamiltonian
-	void diag_hs(bool withoutEigenVec = false);																						// diagonalize the Hamiltonian sparse
-	void diag_h(bool withoutEigenVec, uint k, uint subdim = 0, uint maxiter = 1000, \
-		double tol = 0, std::string form = "sm");																					// diagonalize the Hamiltonian using Lanczos' method
-
-	// ------------------------------------------- 				        VQMC 				          -------------------------------------------
-	virtual cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;		// returns the local energy for VQMC purposes
-	virtual cpx locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;	// returns the local energy for VQMC purposes
-
-	void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
-	// -------------------------------------------				   FOR OTHER TYPES                    --------------------------------------------
-	virtual void update_info() = 0;
-
-	// -------------------------------------------                    OPERATORS						  --------------------------------------------
-
-	// -------------------------------------------
+	//void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
+	
+	// ------------------------------------------- FOR OTHER TYPES --------------------------------------------
+	virtual void updateInfo() = 0;
 public:
-	// -------------------------------------------					    CLEAR 						  -------------------------------------------
-	void clear_energies() { this->eigenvalues.reset(); };																			// resets the energy memory to 0
-	void clear_hamiltonian() { this->H.reset(); };																					// resets the hamiltonian memory to 0
+	// ------------------------------------------- CLEAR -------------------------------------------
+	void clearEigVal()									{ this->eigVal_.reset(); };																			// resets the energy memory to 0
+	void clearEigVec()									{ this->eigVec_.reset(); };
+	void clearH()										{ this->H_.reset(); };																					// resets the hamiltonian memory to 0
 
 	// -------------------------------------------					    OTHER 						  -------------------------------------------
 
 	// Heisenberg-dots
-	void set_angles() {};
-	void set_angles(const vec& phis, const vec& thetas) {};
-	void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
-	void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
-
-	virtual SpMat<_type> symmetryRotationMat(const v_1d<u64>& full_map = {}) const { return SpMat<_type>(); };
-	virtual Mat<_type> reduced_dens_mat(u64 state, int A_size) { return Mat<_type>(); };
+	//void set_angles() {};
+	//void set_angles(const vec& phis, const vec& thetas) {};
+	//void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
+	//void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
 };
 
-// ------------------------------------------------------------  				   PRINTERS 				    ------------------------------------------------------------
+// ################################################################################################################################################
+
+template<typename _T>
+inline void Hamiltonian<_T>::calcAvEn()
+{
+	// calculates the middle spectrum element
+	double Eav = arma::mean(this->eigVal_);
+
+	// calculates the middle spectrum element
+	u64 Nh = this->getHilbertSize();
+	v_1d<double> tmp(Nh, 0.0);
+	for (int i = 0; i < Nh; i++)
+		tmp[i] = std::abs(this->getEigVal(i) - Eav);
+
+	// get the iterator
+	v_1d<double>::iterator _it = std::min_element(std::begin(tmp), std::end(tmp));
+	this->avEnIdx = _it - std::begin(tmp);
+}
+
+// ################################################################################################################################################
 
 /*
 * @brief converts a map to armadillo column
 * @param mp map from state index to a given
 */
-template<typename _type>
-inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, int N_hilbert)
-{
-	Col<_type> tmp(N_hilbert, arma::fill::zeros);
-	for (auto const& [state, val] : mp)
-	{
-		tmp(state) = val;
-	}
-	tmp = arma::normalise(tmp);
-	return tmp;
-}
+//template<typename _type>
+//inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, int N_hilbert)
+//{
+//	Col<_type> tmp(N_hilbert, arma::fill::zeros);
+//	for (auto const& [state, val] : mp)
+//	{
+//		tmp(state) = val;
+//	}
+//	tmp = arma::normalise(tmp);
+//	return tmp;
+//}
 
 
 /*
@@ -159,16 +169,16 @@ inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, 
 * @param base_vector to be used as reference vector
 * @param tol tolerance of the coefficient absolute value
 */
-template<typename _type>
-inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol)
-{
-	string tmp = "";
-	intToBaseBit(state, base_vector);
-	if (!valueEqualsPrec(std::abs(val), 0.0, tol)) {
-		auto pm = val >= 0 ? "+" : "";
-		stout << pm << str_p(val, 3) << "*|" << base_vector << +">";
-	}
-}
+//template<typename _type>
+//inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol)
+//{
+//	string tmp = "";
+//	intToBaseBit(state, base_vector);
+//	if (!valueEqualsPrec(std::abs(val), 0.0, tol)) {
+//		auto pm = val >= 0 ? "+" : "";
+//		stout << pm << str_p(val, 3) << "*|" << base_vector << +">";
+//	}
+//}
 
 /*
 * @brief prints the base state in the braket notation - overwriten for complex numbers only
@@ -177,14 +187,14 @@ inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<
 * @param base_vector to be used as reference vector
 * @param tol tolerance of the coefficient absolute value
 */
-template<>
-inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>& base_vector, double tol)
-{
-	string tmp = "";
-	intToBase(state, base_vector, 2);
-	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
-		stout << print_cpx(val, 3) << "*|" << base_vector << +">";
-}
+//template<>
+//inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>& base_vector, double tol)
+//{
+//	string tmp = "";
+//	intToBase(state, base_vector, 2);
+//	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
+//		stout << print_cpx(val, 3) << "*|" << base_vector << +">";
+//}
 
 /*
 * @brief goes through the whole state and prints it in numerical basis
@@ -192,187 +202,135 @@ inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>
 * @param Ns number of lattice sites
 * @param tol tolerance of the coefficients absolute value
 */
-template<typename _type>
-inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, int Ns, double tol)
+//template<typename _type>
+//inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, int Ns, double tol)
+//{
+//	v_1d<int> base_vector(Ns);
+//	for (auto k = 0; k < state.size(); k++)
+//		print_base_state(k, state(k), base_vector, tol);
+//	stout << EL;
+//}
+
+// ################################################################################################################################################
+
+/*
+* @brief Sets the non-diagonal elements of the Hamimltonian matrix with symmetry sectors: therefore the matrix elements are summed over the SEC
+* @param k index of the basis state acted upon with the Hamiltonian
+* @param value value of the given matrix element to be set
+* @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
+*/
+template<typename _T>
+inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 {
-	v_1d<int> base_vector(Ns);
-	for (auto k = 0; k < state.size(); k++)
-		print_base_state(k, state(k), base_vector, tol);
-	stout << EL;
+	auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getSymNorm(k));
+	// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
+	this->H_(idx, k) += val * symEig;
 }
 
-// ------------------------------------------------------------  				    HAMILTONIAN  				    ------------------------------------------------------------
+// ################################################################################################################################################
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
-template <typename T>
-inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec) {
+template <typename _T>
+inline void Hamiltonian<_T>::diagH(bool woEigVec) {
 	try {
-		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, arma::Mat<T>(this->H));
-		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, arma::Mat<T>(this->H));
+		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
+		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_));
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
+		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
+		exit(-2);
 	}
-
-	// calculates the middle spectrum element
-	double E_av = arma::mean(eigenvalues);
-	// calculates the middle spectrum element
-	v_1d<double> vect(this->N, 0.0);
-	for (int i = 0; i < this->N; i++)
-		vect[i] = abs(eigenvalues(i) - E_av);
-
-	auto i = std::min_element(std::begin(vect), std::end(vect));
-	this->E_av_idx = i - std::begin(vect);
+	this->calcAvEn();
 }
 
 template <>
-inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec) {
+inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
 	try {
-		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, arma::Mat<cpx>(this->H));
-		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, arma::Mat<cpx>(this->H));
+		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<cpx>(this->H_));
+		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<cpx>(this->H_));
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
+		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
+		exit(-2);
 	}
-
-	// calculates the middle spectrum element
-	//double E_av = trace(eigenvalues) / double(N);
-	//auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
-	//	return abs(x - E_av) < abs(y - E_av);
-	//	});
-	double E_av = arma::mean(eigenvalues);
-	//this->E_av_idx = i - std::begin(eigenvalues);
-	v_1d<double> vect(this->N, 0.0);
-	for (int i = 0; i < this->N; i++)
-		vect[i] = abs(eigenvalues(i) - E_av);
-
-	auto i = std::min_element(std::begin(vect), std::end(vect));
-	this->E_av_idx = i - std::begin(vect);
-
-
+	this->calcAvEn();
 }
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
-template <typename T>
-inline void SpinHamiltonian<T>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+template <typename _T>
+inline void Hamiltonian<_T>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
 	try {
-		eigs_opts opts;
-		opts.tol = tol;
-		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
+		arma::eigs_opts opts;
+		opts.tol				= tol;
+		opts.maxiter			= maxiter;
+		opts.subdim				= (subdim == 0) ? (2 * int(k) + 1) : subdim;
 
 		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
 
-		if (withoutEigenVec) arma::eig_sym(this->eigenvalues, Mat<T>(this->H));
-		else				 arma::eig_sym(this->eigenvalues, this->eigenvectors, Mat<T>(this->H));
+		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
+		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_));
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
+		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
+		exit(-2);
 	}
-	E_av_idx = int(k / 2.0);
+	this->calAvEn();
 }
 
 template <>
-inline void SpinHamiltonian<cpx>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
+inline void Hamiltonian<double>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form)
 {
-	try {
-		eigs_opts opts;
-		opts.tol = tol;
-		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
+	//try {
+	//	eigs_opts opts;
+	//	opts.tol = tol;
+	//	opts.maxiter = maxiter;
+	//	opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
 
-		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
+	//	stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
 
-		// create a temporary vector
-		cx_dvec tmp(k, arma::fill::zeros);
-		//if (form == "sg")
-		//{
-		//	stout << "\t\t\t->Using sigma." << EL;
-		//	if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), 0.0, opts);
-		//	else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), 0.0, opts);
-		//}
-		//else
-		//{
-		//stout << "\t\t\t->Using standard." << EL;
-		//if (withoutEigenVec) arma::eigs_gen(tmp, this->H, uword(k), "sr");
-		//else				 arma::eigs_gen(tmp, this->eigenvectors, this->H, uword(k), "sr");
-		//}
-		// set the eigenvalues to be that temporary vector
-		this->eigenvalues = arma::real(tmp);
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
-	}
-	E_av_idx = int(k / 2.0);
-}
-
-template <>
-inline void SpinHamiltonian<double>::diag_h(bool withoutEigenVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
-{
-	try {
-		eigs_opts opts;
-		opts.tol = tol;
-		opts.maxiter = maxiter;
-		opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
-
-		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
-
-		//if (form == "sg")
-		//{
-		//	stout << "\t\t\t->Using sigma." << EL;
-		//	if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), 0.0, opts);
-		//	else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), 0.0, opts);
-		//}
-		//else
-		//{
-		stout << "\t\t\t->Using standard." << EL;
-		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str());
-		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str());
-		//}
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
-	}
-	E_av_idx = int(k / 2.0);
+	//	//if (form == "sg")
+	//	//{
+	//	//	stout << "\t\t\t->Using sigma." << EL;
+	//	//	if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), 0.0, opts);
+	//	//	else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), 0.0, opts);
+	//	//}
+	//	//else
+	//	//{
+	//	stout << "\t\t\t->Using standard." << EL;
+	//	if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str());
+	//	else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str());
+	//	//}
+	//}
+	//catch (const std::bad_alloc& e) {
+	//	stout << "Memory exceeded" << e.what() << EL;
+	//	stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
+	//	assert(false);
+	//}
+	//E_av_idx = int(k / 2.0);
 }
 
 template<typename _type>
-inline void SpinHamiltonian<_type>::diag_hs(bool withoutEigenVec)
+inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 {
 	try {
-		if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, this->N);
-		else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, this->N);
+		if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, this->getHilbertSize());
+		else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
 	}
 	catch (const std::bad_alloc& e) {
 		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-		assert(false);
+		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
+		exit(-2);
 	}
-
-	// calculates the middle spectrum element
-	//double E_av = trace(eigenvalues) / double(N);
-	//auto i = std::min_element(std::begin(eigenvalues), std::end(eigenvalues), [=](int x, int y) {
-	//	return abs(x - E_av) < abs(y - E_av);
-	//	});
-	//this->E_av_idx = i - std::begin(eigenvalues);
+	this->calcAvEn();
 }
 
-// ------------------------------------------------------------  				     PHYSICAL QUANTITES   				    ------------------------------------------------------------
-
-#endif
+// ################################################################################################################################################

@@ -12,8 +12,8 @@ SYM = True
 
 # define the value taken for the middle of the spectrum
 #IDX_VAL = 'roll'
-# IDX_VAL = 'mean'
-IDX_VAL = 'max'
+IDX_VAL = 'mean'
+# IDX_VAL = 'max'
 # IDX_VAL = 'dos'
 
 ####################################################### GET LOG FILE #########################################################
@@ -212,14 +212,16 @@ def set_info_entro_df_log(df : pd.DataFrame, directory : str, verbose=True):
 '''
 Takes the log dataframe and concatenates the eigenstates into one flat array
 '''
-def read_eigenstates_df_log(df : pd.DataFrame, directory : str, sec : str, verbose=True):
+def read_eigenstates_df_log(df : pd.DataFrame, directory : str, sec : str, rescale_type = 'var', verbose=True):
     # takes the Hilbert space sizes
     hilbert_sizes = df.loc[:,'Nh'].to_list()
     # takes the names of the models
     model_shorts = df.loc[:,'model_short'].to_list()
     # save the states (to be flattened later)
     states_saved = np.array([])
-    
+    # Jiaozi lambda function
+    bound = 0.02
+    Jiaozi = lambda dE: 1.0/bound if np.abs(dE) <= bound / 2.0 else 0.0
     for i, short in enumerate(tqdm.tqdm(model_shorts)):
         # read the states
         filename = short + '.h5'
@@ -228,21 +230,50 @@ def read_eigenstates_df_log(df : pd.DataFrame, directory : str, sec : str, verbo
             
         # read the energy from a given filename (h5 Database)
         states = read_h5_file(directory, filename, 'states')
-        
+        if (sec == 'imag' or type(states[0]) == np.void):
+            states = states.view('complex')
+            
+        # rescale if Jiaozi
+        if rescale_type == 'Jiaozi':
+            energies = np.array(read_h5_file(directory, filename, 'energy')).flatten()
+            av_en = np.mean(energies)
+            idx_mean = find_nearest_idx_np(energies, av_en)
+            energies = energies[idx_mean - 50 : idx_mean + 50]
+            # take 50 states less because we don't have left and right bounds
+            states = states.T
+            start = 25
+            state_num = 50
+            states_prime = np.zeros_like(states[start:start + state_num])
+            for alpha, _ in enumerate(states_prime):
+                # get current energy
+                E_alpha = energies[start + alpha]
+                av = np.zeros_like(states_prime[0])
+                norm = 0.
+                # iterate other states
+                for alpha_prime, E in enumerate(energies):
+                    state_prime = np.array(states[alpha_prime]).copy()
+                    # get energy difference
+                    dE = E - E_alpha
+                    tmp = Jiaozi(dE)
+                    # print(dE, "yes" if np.abs(dE) <= bound / 2.0 else "no!")
+                    if tmp != 0.0:
+                        av += tmp * np.square(np.abs(state_prime))
+                        norm += tmp
+                # print(norm*bound)
+                av = np.sqrt(av / norm)
+                states_prime[alpha] = np.divide(states[start + alpha], av) 
+            states = states_prime
+            
+        # continue on that states
         states = states.flatten()
-        if len(states) == 0:#or type(states[0]) == np.void: 
-            # states = states.view('complex')
+        if len(states) == 0:
             continue 
-            # states_tmp = np.zeros_like(states, dtype=np.complex64)
-            # for i,st in enumerate(states):
-            #     states_tmp[i] = np.real(st[0]) + 1j*np.real(st[1])#np.float32(st[0]) + 1j*np.float32(st[1])
-            # states = states_tmp
-            # print(states)
-            # continue
-        # print(len(states), type(states[0]))
-        
-        # rescale by variance  
-        states = (states.view('complex') * np.complex64(np.sqrt(2.0 * hilbert_sizes[i]))) if (sec == 'imag' or type(states[0]) == np.void) else (states * np.sqrt(hilbert_sizes[i]))
+            # rescale by variance  
+
+        if rescale_type == 'var':
+            states = (states * np.complex64(np.sqrt(2.0 * hilbert_sizes[i]))) if (sec == 'imag' or type(states[0]) == np.void) else (states * np.sqrt(hilbert_sizes[i]))
+            # var = np.var(states)
+            # states = states * np.complex128(var) if (sec == 'imag' or type(states[0]) == np.void) else (states * var)
 
         # append
         states_saved = np.concatenate([states_saved, states])
