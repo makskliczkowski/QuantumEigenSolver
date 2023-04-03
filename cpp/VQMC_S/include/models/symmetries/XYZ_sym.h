@@ -1,8 +1,4 @@
 #pragma once
-#ifndef HAMILSYM_H
-#include "../../hamil_sym.h"
-#endif // !HAMIL_H
-
 #include "../XYZ.h"
 
 namespace xyz_sym {

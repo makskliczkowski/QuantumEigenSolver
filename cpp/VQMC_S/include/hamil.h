@@ -283,7 +283,7 @@ inline void Hamiltonian<_T>::diagH(bool woEigVec, uint k, uint subdim, uint maxi
 		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
 		exit(-2);
 	}
-	this->calAvEn();
+	this->calcAvEn();
 }
 
 template <>

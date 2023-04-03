@@ -159,6 +159,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\algebra\operator_algebra.h" />
+    <ClInclude Include="include\algebra\symmetries.h" />
     <ClInclude Include="include\hamil.h" />
     <ClInclude Include="include\hilbert.h" />
     <ClInclude Include="include\ml.h" />

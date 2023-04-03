@@ -1,0 +1,144 @@
+#pragma once
+#include <complex>
+#include <functional>
+
+namespace Operators {
+	using u64 = unsigned long long;
+	using cpx = std::complex<double>;
+	typedef std::pair<u64, cpx> _OPCx;
+	typedef std::pair<u64, double> _OPRe;
+
+	/*
+	* @brief All possible correlators
+	*/
+	template <typename _RET>
+	struct _OP {
+		using RET		=		_RET;
+		using R			=		std::pair<u64, _RET>;
+		using GLB		=		std::function<R(u64)>;
+		using LOC		=		std::function<R(u64, int)>;
+		using COR		=		std::function<R(u64, int, int)>;
+
+		/*
+		* @brief contains all possible functions in a template
+		*/
+		template <typename... _T>
+		using INP		=		std::function<R(u64, _T...)>;
+	};
+	using _GLBC			=		_OP<cpx>::GLB;					//<! global function acting on whole product state
+	using _LOCC			=		_OP<cpx>::LOC;					//<! local function acting on single site
+	using _CORC			=		_OP<cpx>::COR;					//<! correlation function acting on pair of sites	
+#define _INPC _OP<cpx>::INP
+	using _GLBR			=		_OP<double>::GLB;				//<! global function acting on whole product state
+	using _LOCR			=		_OP<double>::LOC;				//<! local function acting on single site
+	using _CORR			=		_OP<double>::COR;				//<! correlation function acting on pair of sites
+#define _INPR _OP<double>::INP
+
+
+	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+	/*
+	* @brief Imitates the behavior f \dot g \equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter
+	*/
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPC<_T1...> f, _INPC<_T2...> g)
+	{
+		return [f, g](u64 s, _T1... a1, _T2... a2) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPR<_T1...> f, _INPR<_T2...> g)
+	{
+		return [f, g](u64 s, _T1... a1, _T2... a2) -> _OPRe
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPR<_T1...> f, _INPC<_T2...> g)
+	{
+		return [f, g](u64 s, _T1... a1, _T2... a2) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPC<_T1...> f, _INPR<_T2...> g)
+	{
+		return [f, g](u64 s, _T1... a1, _T2... a2) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+	template <typename... _T>
+	inline auto operator%(_INPC<_T...> f, _INPC<_T...> g)
+	{
+		return [f, g](u64 s, _T... a) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T>
+	inline auto operator%(_INPR<_T...> f, _INPR<_T...> g)
+	{
+		return [f, g](u64 s, _T... a) -> _OPRe
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T>
+	inline auto operator%(_INPR<_T...> f, _INPC<_T...> g)
+	{
+		return [f, g](u64 s, _T... a) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _T>
+	inline auto operator%(_INPC<_T...> f, _INPR<_T...> g)
+	{
+		return [f, g](u64 s, _T... a) -> _OPCx
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	// vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+	template <typename... _T>
+	inline _OP<cpx>::INP<_T...> castINP(_OP<double>::INP<_T...> _in) {
+		auto fun = [&](u64 s, _T...) {
+			auto [s, v] = std::apply(_in, _T...);
+			return std::make_pair(_in, cpx(v, 0.0));
+		};
+		return fun;
+	}
+};
