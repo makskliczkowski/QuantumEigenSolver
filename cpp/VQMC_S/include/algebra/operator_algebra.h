@@ -2,9 +2,10 @@
 #include <complex>
 #include <functional>
 
+using u64 = unsigned long long;
+using cpx = std::complex<double>;
+
 namespace Operators {
-	using u64 = unsigned long long;
-	using cpx = std::complex<double>;
 	typedef std::pair<u64, cpx> _OPCx;
 	typedef std::pair<u64, double> _OPRe;
 
@@ -33,7 +34,14 @@ namespace Operators {
 	using _LOCR			=		_OP<double>::LOC;				//<! local function acting on single site
 	using _CORR			=		_OP<double>::COR;				//<! correlation function acting on pair of sites
 #define _INPR _OP<double>::INP
-
+	template<typename _T>
+	using _GLB			=		_OP<_T>::GLB;				
+	template<typename _T>
+	using _LOC			=		_OP<_T>::LOC;
+	template<typename _T>
+	using _COR			=		_OP<_T>::COR;
+	template<typename _T, typename ..._Ts>
+	using _INP			=		_OP<_T>::INP(_T...);
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

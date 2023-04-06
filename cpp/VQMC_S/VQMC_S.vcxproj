@@ -42,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 2022</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseILP64Interfaces1A>false</UseILP64Interfaces1A>
     <UseInteloneMKL>Parallel</UseInteloneMKL>
@@ -120,8 +120,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\LibrariesCpp\superlu-5.3.0\superlu\SRC;C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.3\include;C:\LibrariesCpp\arpack++\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\include;C:\Users\maxgr\anaconda3\include;C:\LibrariesCpp;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\include;C:\LibrariesCpp\armadillo-11.4.3\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <OpenMP>GenerateParallelCode</OpenMP>
       <CCppSupport>Cpp20Support</CCppSupport>
       <EnableModules>true</EnableModules>
@@ -129,8 +129,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;C:\LibrariesCpp\superlu-5.3.0\superlu_intel\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib;superlu.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\HDF_Group\HDF5\1.12.2\lib;C:\Users\maxgr\anaconda3;C:\Users\maxgr\anaconda3\libs;C:\Program Files %28x86%29\Intel\oneAPI\mkl\2022.1.0\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>python39.lib;mkl_rt.lib;mkl_core.lib;mkl_sequential.lib;mkl_intel_lp64.lib;mkl_intel_ilp64.lib;libaec.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libszaec.lib;libz.lib</AdditionalDependencies>
       <AdditionalOptions>-D_HDF5USEDLL_ %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -159,6 +159,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\algebra\global_symmetries.h" />
+    <ClInclude Include="include\algebra\operators.h" />
     <ClInclude Include="include\algebra\operator_algebra.h" />
     <ClInclude Include="include\algebra\symmetries.h" />
     <ClInclude Include="include\hamil.h" />
@@ -168,10 +170,8 @@
     <ClInclude Include="include\models\heisenberg.h" />
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
-    <ClInclude Include="include\models\symmetries\ising_sym.h" />
     <ClInclude Include="include\models\symmetries\XYZ_sym.h" />
     <ClInclude Include="include\models\XYZ.h" />
-    <ClInclude Include="include\operators\operators.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />
     <ClInclude Include="source\src\binary.h" />
@@ -192,7 +192,7 @@
     <ClInclude Include="source\src\xoshiro_pp.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="hilbert.cpp" />
+    <ClCompile Include="include\hamil.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp" />
     <ClCompile Include="source\cpp\Lattices\square.cpp" />

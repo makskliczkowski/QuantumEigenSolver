@@ -5,10 +5,10 @@
 
 int main(const int argc, char* argv[]) {
 
-	auto ui = std::make_unique<rbm_ui::ui<cpx, double>>(argc, argv);
+	auto ui = std::make_unique<UI>(argc, argv);
 	//ui->define_models();
 	//ui->make_simulation();
-	ui->functionChoice();
+	ui->funChoice();
 
 	return 0;
 }

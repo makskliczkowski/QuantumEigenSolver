@@ -1,39 +1,10 @@
 #pragma once
+
+#ifndef SYMMETRIES_H
+#define SYMMETRIES_H
 #include "../hilbert.h"
-
-// ##########################################################################################################################################
-
-namespace GlobalSyms {
-
-	class GlobalSym {
-		typedef std::function<bool(u64, double)> repType;						// type returned for checking 
-	protected:
-		repType check_;															// function that check global sym
-	public:
-		double val_;															// value connected to global symmetry
-		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
-
-		// constructors
-		GlobalSym(std::shared_ptr<Lattice> _lat) : val_(0), lat_(_lat) {};
-
-		// ---------- SETTERS -----------
-		auto setFun(const repType& _fun) -> void { this->check_ = _fun; };
-		auto setFun(repType&& _fun) -> void { this->check_ = std::move(_fun); };
-
-		// ---------- CHECKER OVERLOAD ------------
-
-		virtual auto operator()(u64 state) const		-> bool { return this->check_(state, val_); };
-		virtual auto operator()(u64 state)				-> bool { return this->check_(state, val_); };
-
-		// ---------- check the symmetry existence ----------
-		auto check(u64 state, bool outCond) const		-> bool { return this->check_(state, val_) && outCond; };
-	};
-
-	/*
-	* @brief describes the global check of U(1) symmetry
-	*/
-	auto U1Sym(u64 _state, double _val) -> bool { return __builtin_popcountll(_state) == _val; };
-};
+#include "global_symmetries.h"
+#endif // !SYMMETRIES_H
 
 // ##########################################################################################################################################
 
@@ -46,17 +17,18 @@ namespace Hilbert {
 		void mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T> normThreaded, int t);
 
 	protected:
-		uint threadNum = 1;					// get number of threads
+		uint threadNum = 1;				// get number of threads
 		uint Ns = 1;					// number of lattice sites
 		uint Nhl = 2;					// number of local possibilities
 		uint Nint = 1;					// number of fermionic modes such that total V=L^D*N_int
-		u64 Nh = 1;					// number of states in the Hilbert space	
+		u64 Nh = 1;						// number of states in the Hilbert space	
 		u64 NhFull = 1;					// full Hilbert space
 		std::shared_ptr<Lattice> lat;
 
 		// ------------------------ symmetries ------------------------
 		v_1d<GlobalSyms::GlobalSym> symGroupGlobal_;							// stores the global symmetry group representatives
 		v_1d<Operators::Operator<_T>> symGroup_;								// stores the local symmetry group representatives
+		v_1d<std::pair<Operators::SymGenerators, int>> symGroupSec_;			// stores the local symmetry group and their sectors for convenience
 
 		// ------------------------ symmetry normalization and mapping to a reduced Hilbert space ------------------------
 		v_1d<_T> normalization_;												// stores the representative normalization
@@ -86,7 +58,7 @@ namespace Hilbert {
 			this->NhFull			=				std::pow(this->Nhl, this->Ns * this->Nint);
 
 			// set symmetry elements
-			this->symGroupGlobal_	=				v_1d<GlobalSyms::GlobalSym>();
+			this->symGroupGlobal_	=				_glob;
 			this->normalization_	=				v_1d<_T>();
 			this->symGroup_			=				v_1d<Operators::Operator<_T>>();
 			this->mapping_			=				v_1d<u64>();
@@ -104,27 +76,37 @@ namespace Hilbert {
 		}
 
 		// ------------------------ inner generators -------------------------
-		void generateSymGroup(v_1d<std::pair<Operators::SymGenerators, int>> g);// generates symmetry groups taking the comutation into account
-		void generateMapping();													// generates mapping from reduced hilbert space to original
+		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
+		void generateMapping();															// generates mapping from reduced hilbert space to original
 
-		std::pair<u64, _T> findRep(u64 baseIdx)			const;					// returns the representative index and symmetry return eigval
-		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;					// returns the representative and symmetry eigval taking the second symmetry sector beta
+		std::pair<u64, _T> findRep(u64 baseIdx)			const;							// returns the representative index and symmetry return eigval
+		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;							// returns the representative and symmetry eigval taking the second symmetry sector beta
 
 		// ------------------------ getters ------------------------
-		u64 getLatticeSize()							const { return this->Ns; };
-		u64 getHilbertSize()							const { return this->Nh; };
-		u64 getFullHilbertSize()						const { return this->NhFull; };
-		u64 getLocalHilbertSize()						const { return this->Nhl; };
-		std::shared_ptr<Lattice> getLattice()			const { return this->lat; };
-		auto getNorm()									const -> v_1d<_T> { return this->normalization_; };
-		auto getSymGroup()								const -> v_1d<Operators::Operator<_T>> { return this->symGroup_; };
-		auto getSymGroupGlob()							const -> v_1d<GlobalSyms::GlobalSym> { return this->symGroupGlobal_; };
+		int getBC()										const					{ return this->lat->get_BC(); };
+		std::shared_ptr<Lattice> getLattice()			const					{ return this->lat; };
+		u64 getLatticeSize()							const					{ return this->Ns; };
+		u64 getHilbertSize()							const					{ return this->Nh; };
+		u64 getFullHilbertSize()						const					{ return this->NhFull; };
+		u64 getLocalHilbertSize()						const					{ return this->Nhl; };
+		auto getNorm()									const -> v_1d<_T>		{ return this->normalization_; };
+		auto getMapping()								const -> v_1d<u64>		{ return this->mapping_; };
+		auto getMapping(u64 k)							const -> u64			{ return this->mapping_[k]; };
+		//auto getLattice()								const -> std::shared_ptr<Lattice>		{ return this->lat; };
+		auto getSymGroup()								const -> v_1d<Operators::Operator<_T>>	{ return this->symGroup_; };
+		auto getSymGroupGlob()							const -> v_1d<GlobalSyms::GlobalSym>	{ return this->symGroupGlobal_; };
 
-		v_1d<u64> getFullMap()							const;					// returns the full map taking global symmetries into account
+		v_1d<u64>		getFullMap()					const;					// returns the full map taking global symmetries into account
 		arma::SpMat<_T> getSymRot()						const;					// returns the symmetry rotation matrix
 		arma::SpMat<_T> getSymRot(const v_1d<u64>& fMap)const;					// returns the symmetry rotation matrix
-		_T getSymNorm(u64 baseIdx)						const;					// returns the symmetry normalization
+		_T				getSymNorm(u64 baseIdx)			const;					// returns the symmetry normalization
+		std::string		getSymInfo()					const;
 
+		// ------------------------ checkers ------------------------
+		bool			checkSym()						const					{ return this->Nh == this->NhFull; };
+		bool			checkLSym()						const					{ return this->symGroup_.size() != 0; };
+		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0; };
+		bool			checkU1()						const					{ for (auto g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
 	};
 
 	// ##########################################################################################################################################
@@ -134,29 +116,135 @@ namespace Hilbert {
 	* @param gen enum types generators
 	*/
 	template<typename _T>
-	inline void HilbertSpace<_T>::generateSymGroup(v_1d<std::pair<Operators::SymGenerators, int>> g)
+	inline void HilbertSpace<_T>::generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g)
 	{
-		v_1d<Operators::Operator<_T>>();
 		v_1d<std::pair<Operators::SymGenerators, int>> genIn = g;
+		// find translation symmetry and check its sector for the parity correspondence
+		Operators::Operator<_T> T	=			Operators::Operator<_T>(this->lat);
+		bool containsT_				=			false;
+		bool containsTCpx_			=			false;
 
-		// find translation symmetry and symmetry
-		bool containsTranslation_ = false;
-		for (const auto [gen, sec] : genIn)
-			if (static_cast<int>(gen) == Operators::SymGenerators::T && sec != 0 && sec != this->Ns / 2)
+		// check if contains U(1)
+		bool containsU1_			=			this->checkU1();
+
+		for (auto i = 0; i < genIn.size(); i++) {
+			const auto [gen, sec] = genIn[i];
+			
+			if (static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::T)
 			{
-				containsTranslation_ = true;
-				break;
+				// check if PBC, otherwise remove translation
+				containsT_ = (this->lat->get_BC() == 0);
+
+				// create the translation operator
+				this->symGroupSec_.push_back(genIn[i]);
+				T = Operators::symChoice<_T>(genIn[i], this->lat);
+
+				// erease the translation as we will include it later on
+				genIn.erase(genIn.begin() + i);
+
+				//  say something
+				if (!containsT_) {
+					stout << "Not using translation due to the boundary conditions - BC =  " << this->lat->get_BC() << EL;
+					continue;
+				}
+				
+				// otherwise check sectors
+				if ((sec != 0 && sec != this->Ns / 2))
+					containsTCpx_ = true;
 			}
+		}
 
 		// remove parity symmetry
 		for (auto i = 0; i < genIn.size(); i++)
 		{
 			const auto [gen, sec] = genIn[i];
-			if(static_cast<int>(gen) == Operators::SymGenerators::R ** containsTranslation_)
+			if(static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::R && containsTCpx_)
 				genIn.erase(genIn.begin() + i);
+
+			// check spin flip and U(1)
+			if (containsU1_) {
+				if (static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PX ||
+					static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PY)
+					genIn.erase(genIn.begin() + i);
+			}
 		}
 
+		// save all for convenience
+		for(auto g : genIn)
+			this->symGroupSec_.push_back(g);
 
+		// add neutral element
+		this->symGroup_.push_back(Operators::Operator<_T>(this->lat));
+
+		// go through all of the combinations
+		const auto SIZE_GEN = genIn.size();
+		for (auto i = 0; i <= SIZE_GEN; i++)
+		{
+			std::string bitmask(i, 1);              	// K leading 1's
+			bitmask.resize(SIZE_GEN, 0);   				// N - K trailing 0's
+
+			// go through all bitmask permutations
+			do
+			{
+				Operators::Operator<_T> OP_(this->lat);
+				for (int i = 0; i < SIZE_GEN; ++i) // [0..N-1] integers
+					if (bitmask[i]) {
+						// create operator based on the type
+						auto _OP = Operators::symChoice<_T>(genIn[i], this->lat);
+						OP_ = OP_ % _OP;
+					}
+				this->symGroup_.push_back(OP_);
+			} while (std::prev_permutation(bitmask.begin(), bitmask.end())); // loop over all combinations with bitmask
+		}
+
+		// handle the translation
+		if (containsT_) {
+			v_1d<Operators::Operator<_T>> symGroupT_ = this->symGroup_;
+			for (auto i = 1; i < this->lat->get_Ns(); i++) {
+				// add combinations with other symmetries
+				for (auto Go : symGroupT_)
+					this->symGroup_.push_back(T % Go);
+				// move next translation
+				T = T % T;
+			}
+		}
+	}
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Creates the information string about the Hilbert space and symmetries
+	*/
+	template<typename _T>
+	inline std::string Hilbert::HilbertSpace<_T>::getSymInfo() const
+	{
+		std::string tmp = "";
+		if(this->checkLSym())
+			// start with local symmetries
+			for (auto g : this->symGroupSec_) {
+				auto [gen, val] = g;
+				tmp += SSTR(Operators::getSTR_SymGenerators(static_cast<Operators::SymGenerators>(gen)));
+				tmp += ",";
+				tmp += STR(val);
+				tmp += ",";
+			}
+		if(this->checkGSym())
+			// start wit global symmetries
+			for (auto g : this->symGroupGlobal_) {
+				auto name = g.getName();
+				auto val = g.getVal();
+				tmp += SSTR(GlobalSyms::getSTR_GlobalSymGenerators(static_cast<GlobalSyms::GlobalSymGenerators>(name)));
+				tmp += ",";
+				tmp += STRP(val, 2);
+				tmp += ",";
+			}
+
+		// remove last ","
+		if(!tmp.empty())
+			tmp.pop_back();
+		
+		// return the name string
+		return tmp;
 	}
 
 	// ##########################################################################################################################################

@@ -15,22 +15,31 @@
 #include <mutex>
 #endif
 
-// symmetric models 
-#include "../models/symmetries/ising_sym.h"
-#include "../models/symmetries/XYZ_sym.h"
+// ######################### RBM ############################
+#ifndef RBM_H											 // #
+#include "../rbm.h"										 // #
+#endif													 // #
+// ##########################################################
 
-// RBM
-#ifndef RBM_H
-#include "../rbm.h"
-#endif
 
-#ifndef SQUARE_H
-#include "../../source/src/Lattices/square.h"
-#endif
-#ifndef HEXAGONAL_H
-#include "../../source/src/Lattices/hexagonal.h"
-#endif
+// ######################### MODELS #########################
+#ifndef ISING_H											 // #
+#include "../models/ising.h"							 // #
+#endif // !ISING_H										 // #
+// MODELS												 // #
+#ifndef XYZ_H											 // #
+#include "../models/xyz.h"								 // #
+#endif // !XYZ_H										 // #
+// ##########################################################
 
+// ###################### LATTICES ##########################
+#ifndef SQUARE_H										 // #
+#include "../../source/src/Lattices/square.h"			 // #
+#endif													 // #
+#ifndef HEXAGONAL_H										 // #
+#include "../../source/src/Lattices/hexagonal.h"		 // #
+#endif													 // #
+// ##########################################################
 
 
 // maximal ed size to compare
@@ -123,38 +132,38 @@ private:
 	//	std::make_tuple("nh", &this->nqsP.nHidden, "2", std::function(higherThanZero))				// hidden parameters
 		
 		// lattice parameters
-		{"d", std::make_tuple("1", higherThanZero)  },				// dimension
-		{"lx",std::make_tuple("4", higherThanZero)  },
-		{"ly",std::make_tuple("1", higherThanZero)  },
-		{"lz",std::make_tuple("1", higherThanZero)  },
-		{"bc",std::make_tuple("0", higherThanZero)  },				// boundary condition
-		{"l", std::make_tuple("0", higherThanZero)  },				// lattice type (default square)
-		{"f", std::make_tuple("" , defaultReturn)   },				// file to read from directory
+		{"d",	std::make_tuple("1"		, higherThanZero)	},				// dimension
+		{"lx",	std::make_tuple("4"		, higherThanZero)	},
+		{"ly",	std::make_tuple("1"		, higherThanZero)	},
+		{"lz",	std::make_tuple("1"		, higherThanZero)	},
+		{"bc",	std::make_tuple("0"		, higherThanZero)	},				// boundary condition
+		{"l",	std::make_tuple("0"		, higherThanZero)	},				// lattice type (default square)
+		{"f",	std::make_tuple(""		, defaultReturn)	},				// file to read from directory
 		// model parameters
-		{"mod",std::make_tuple("0",higherThanZero)  },				// choose model
-		{"J",std::make_tuple("1.0",defaultReturn)   },				// spin coupling
-		{"J0",std::make_tuple("0.0",defaultReturn)  },				// spin coupling randomness maximum (-J0 to J0)
-		{"h",std::make_tuple("0.1",defaultReturn)   },				// perpendicular magnetic field constant
-		{"w",std::make_tuple("0.01",defaultReturn)  },				// disorder strength
-		{"g",std::make_tuple("1.0",defaultReturn)   },				// transverse magnetic field constant
-		{"g0",std::make_tuple("0.0",defaultReturn)  },				// transverse field randomness maximum (-g0 to g0)
-		// heisenberg
-		{"dlt",std::make_tuple("1.0",defaultReturn) },				// delta
+		{"mod",	std::make_tuple("0"		, higherThanZero)	},				// choose model
+		{"J",	std::make_tuple("1.0"	, defaultReturn)	},				// spin coupling
+		{"J0",	std::make_tuple("0.0"	, defaultReturn)	},				// spin coupling randomness maximum (-J0 to J0)
+		{"h",	std::make_tuple("0.1"	, defaultReturn)	},				// perpendicular magnetic field constant
+		{"w",	std::make_tuple("0.01"	, defaultReturn)	},				// disorder strength
+		{"g",	std::make_tuple("1.0"	, defaultReturn)	},				// transverse magnetic field constant
+		{"g0",  std::make_tuple("0.0"	, defaultReturn)	},				// transverse field randomness maximum (-g0 to g0)
+		// heisenberg	
+		{"dlt", std::make_tuple("1.0"	, defaultReturn)	},				// delta
 		// xyz
-		{"dlt2",std::make_tuple("0.9",defaultReturn)},				// delta2
-		{"J2",std::make_tuple("1.0",defaultReturn)	},				// J2
-		{"eta",std::make_tuple("0.0",defaultReturn) },				// eta
-		{"eta2",std::make_tuple("0.0",defaultReturn)},				// eta2
+		{"dlt2",std::make_tuple("0.9"	, defaultReturn)	},				// delta2
+		{"J2",  std::make_tuple("1.0"	, defaultReturn)	},				// J2
+		{"eta", std::make_tuple("0.0"	, defaultReturn)	},				// eta
+		{"eta2",std::make_tuple("0.0"	, defaultReturn)	},				// eta2
 
 		// kitaev
-		{"kx", std::make_tuple("0.0", defaultReturn)},				// kitaev x interaction
-		{"ky", std::make_tuple("0.0", defaultReturn)},				// kitaev y interaction
-		{"kz", std::make_tuple("0.0", defaultReturn)},				// kitaev z interaction
-		{"k0", std::make_tuple("0.0", defaultReturn)},				// kitaev interaction disorder
+		{"kx",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev x interaction
+		{"ky",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev y interaction
+		{"kz",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev z interaction
+		{"k0",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev interaction disorder
 		// other
-		{"fun",std::make_tuple("-1", defaultReturn) },				// choice of the function to be calculated
-		{"th",std::make_tuple("1", defaultReturn)	},				// number of threads
-		{"q",std::make_tuple("0", defaultReturn)	}				// quiet?
+		{"fun", std::make_tuple("-1"	, defaultReturn)	},				// choice of the function to be calculated
+		{"th",  std::make_tuple("1"		, defaultReturn)	},				// number of threads
+		{"q",   std::make_tuple("0"		, defaultReturn)	}				// quiet?
 	};
 
 	// lattice
@@ -168,8 +177,8 @@ private:
 
 	// define basic model
 	//shared_ptr<SpinHamiltonian<_hamtype>> ham;
-	shared_ptr<SpinHamiltonian<double>> ham_d;
-	shared_ptr<SpinHamiltonian<cpx>> ham_cpx;
+	std::shared_ptr<Hamiltonian<double>> hamDouble;
+	std::shared_ptr<Hamiltonian<cpx>> hamComplex;
 
 	//impDef::ham_types model_name;												// the name of the model for parser
 	double J = 1.0;																// spin exchange
@@ -207,7 +216,7 @@ private:
 	uint thread_number = 1;														// thread parameters
 
 	// averages from operators
-	avOperators av_op;
+	//avOperators av_op;
 
 	// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
 	//void compare_ed(double ground_rbm);

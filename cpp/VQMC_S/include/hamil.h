@@ -1,17 +1,25 @@
 #pragma once
-//#ifndef  OPERATORS_H
-//#include "./operators/operators.h"
-//#endif // ! BINARY_H
-#include "hilbert.h"
+#ifndef SYMMETRIES_H
+	#include "algebra/operators.h"
+#endif // !SYMMETRIES_H
 
-const std::string DEF_INFO_SEP = std::string("_");											// defalut separator in info about the model
+const std::string DEF_INFO_SEP		= std::string("_");										// defalut separator in info about the model
+#define DISORDER_EQUIV(type, param) type param		= 1;	\
+									type param##0	= 0;	\
+									arma::Col<type> d##param
+#define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
+#define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->##p, 2);	\
+									toSet += SSTR(",") + SSTR(#p) + SSTR("0=") +						\
+									((this->##p    != 0.0)   ? STRP(this->##p##0, 2) : "")	// gets the information about the disorder
 
 template <typename _T>
 class Hamiltonian {
 protected:
 	//double _SPIN = operators::_SPIN;														// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
+	int Ns												=									1;
+	int Nh												=									1;
 	Hilbert::HilbertSpace<_T> hilbertSpace;
-
+	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS FIELDS -------------------------------------------
 	double avEn											=									0.0;
 	u64 avEnIdx											=									-1;														
@@ -25,8 +33,15 @@ public:
 
 	//vec tmp_vec;																			// tmp vector for base states if the system is too big
 	//vec tmp_vec2;
-	//uint state_val_num;																		// basic number of state_values
+	//uint state_val_num;																	// basic number of state_values
 
+	Hamiltonian()											= default;
+	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
+		: hilbertSpace(hilbert), lat_(hilbert.getLattice()), Ns(lat_->get_Ns()), Nh(hilbert.getHilbertSize()) 
+	{};
+	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
+		: hilbertSpace(std::move(hilbert)), lat_(hilbertSpace.getLattice()), Ns(lat_->get_Ns()), Nh(hilbertSpace.getHilbertSize()) 
+	{};
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
@@ -100,15 +115,20 @@ public:
 		double tol = 0, std::string form = "sm");											// diagonalize the Hamiltonian using Lanczos' method
 	void calcAvEn();																		// calculate the average energy
 
-	// ------------------------------------------- 	VQMC -------------------------------------------
+	// ------------------------------------------- 	LOCAL ENERGY -------------------------------------------
 	
-	//virtual cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;		// returns the local energy for VQMC purposes
-	//virtual cpx locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) = 0;	// returns the local energy for VQMC purposes
+	virtual void locEnergy(u64 _elemId, u64 _elem, uint _site)	= 0;
+	virtual cpx locEnergy(u64 _id, uint site, Operators::_OP<cpx>::INP<double> f1,
+											  std::function<cpx(const arma::vec&)> f2,
+											  arma::vec& tmp)	= 0;						// returns the local energy for VQMC purposes
+	virtual cpx locEnergy(const arma::vec& v, uint site, Operators::_OP<cpx>::INP<double> f1,
+											  std::function<cpx(const arma::vec&)> f2,
+											  arma::vec& tmp)	= 0;						// returns the local energy for VQMC purposes
 
 	//void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	
 	// ------------------------------------------- FOR OTHER TYPES --------------------------------------------
-	virtual void updateInfo() = 0;
+	virtual void updateInfo()							=									0;
 public:
 	// ------------------------------------------- CLEAR -------------------------------------------
 	void clearEigVal()									{ this->eigVal_.reset(); };																			// resets the energy memory to 0
@@ -224,7 +244,13 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 {
 	auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getSymNorm(k));
 	// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-	this->H_(idx, k) += val * symEig;
+	try {
+		this->H_(idx, k) += val * symEig;
+	}
+	catch (const std::exception& err) {
+		stout << "EXCEPTION" << err.what() << "\n";
+		printSeparated(stout, '\t', 15, true, VEQ(k), VEQ(val), VEQ(newIdx), VEQ(idx));
+	}
 }
 
 // ################################################################################################################################################

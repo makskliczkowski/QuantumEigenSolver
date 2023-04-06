@@ -76,7 +76,7 @@ inline void UI::parseModel(int argc, cmdArg& argv)
 	// set default at first
 	this->setDefault();
 
-	string choosen_option = "";
+	std::string choosen_option = "";
 
 	// -------------------- SIMULATION PARAMETERS --------------------
 
@@ -140,7 +140,7 @@ inline void UI::parseModel(int argc, cmdArg& argv)
 	this->setOption(this->thread_number, argv, "-th");
 	
 	// --------- HELP
-	if (string option = this->getCmdOption(argv, "-hlp"); option != "")
+	if (std::string option = this->getCmdOption(argv, "-hlp"); option != "")
 		exitWithHelp();
 
 	// later function choice
@@ -150,7 +150,7 @@ inline void UI::parseModel(int argc, cmdArg& argv)
 
 	bool set_dir = false;
 	choosen_option = "dir";
-	if (string option = this->getCmdOption(argv, "-"+choosen_option); option != "") {
+	if (std::string option = this->getCmdOption(argv, "-" + choosen_option); option != "") {
 		this->setOption(this->main_dir, argv, choosen_option);
 		set_dir = true;
 	}

@@ -31,9 +31,6 @@
     <Filter Include="Header Files\include\models\symmetries">
       <UniqueIdentifier>{71e01006-7309-4bcd-a319-d4c50b7c4629}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\include\operators">
-      <UniqueIdentifier>{8b421e3e-8d16-454c-a350-fb477ec7045b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\source">
       <UniqueIdentifier>{fbb02f40-0eca-4911-8292-4f847505a9c2}</UniqueIdentifier>
     </Filter>
@@ -65,12 +62,6 @@
     </ClInclude>
     <ClInclude Include="include\models\heisenberg-kitaev.h">
       <Filter>Header Files\include\models</Filter>
-    </ClInclude>
-    <ClInclude Include="include\operators\operators.h">
-      <Filter>Header Files\include\operators</Filter>
-    </ClInclude>
-    <ClInclude Include="include\models\symmetries\ising_sym.h">
-      <Filter>Header Files\include\models\symmetries</Filter>
     </ClInclude>
     <ClInclude Include="include\user_interface\user_interface.h">
       <Filter>Header Files\include\UserInterface</Filter>
@@ -147,6 +138,12 @@
     <ClInclude Include="include\algebra\symmetries.h">
       <Filter>Header Files\include\algebra</Filter>
     </ClInclude>
+    <ClInclude Include="include\algebra\global_symmetries.h">
+      <Filter>Header Files\include\algebra</Filter>
+    </ClInclude>
+    <ClInclude Include="include\algebra\operators.h">
+      <Filter>Header Files\include\algebra</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -161,7 +158,7 @@
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp">
       <Filter>Source Files\source\Lattices</Filter>
     </ClCompile>
-    <ClCompile Include="hilbert.cpp">
+    <ClCompile Include="include\hamil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

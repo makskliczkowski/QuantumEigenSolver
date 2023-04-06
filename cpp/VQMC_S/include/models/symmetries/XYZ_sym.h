@@ -174,68 +174,6 @@ namespace xyz_sym {
 		//this->hamiltonian();
 	}
 
-	// ---------------------------------------------------------------- SYMMETRY ELEMENTS ----------------------------------------------------------------
-
-	/*
-	* @brief creates the symmetry group operators
-	*/
-	template<typename _type>
-	inline void xyz_sym::XYZSym<_type>::createSymmetryGroup()
-	{
-		this->symmetry_group = v_1d<function<u64(u64, int)>>();
-		this->symmetry_eigval = v_1d<_type>();
-
-		function<u64(u64, int)> e = [](u64 n, int L) {return n; };						// neutral element
-		function<u64(u64, int)> T = e;													// in 1st iteration is neutral element
-		function<u64(u64, int)> Z = static_cast<u64(*)(u64, int)>(&flipAll);				// spin flip operator (all spins)
-		function<u64(u64, int)> P = reverseBits;										// parity operator
-
-		bool su_0 = !this->global.su || (this->global.su && this->global.su_val == this->Ns / 2);
-		const bool include_sz_flip = su_0 && valueEqualsPrec(this->hz, 0.0, 1e-9) && valueEqualsPrec(this->hx, 0.0, 1e-9);
-
-		// loop through all the possible states
-		if (this->lattice->get_BC() == 0) {
-			for (int k = 0; k < this->Ns; k++) {
-				this->symmetry_group.push_back(T);
-				this->symmetry_eigval.push_back(this->k_exponents[k]);
-				if (include_sz_flip) {
-					this->symmetry_group.push_back(multiply_operators(Z, T));
-					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.x_sym));
-				}
-				// if parity can be applied
-				if (this->k_sector) {
-					this->symmetry_group.push_back(multiply_operators(P, T));
-					this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym));
-					if (include_sz_flip) {
-						this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
-						this->symmetry_eigval.push_back(this->k_exponents[k] * double(this->symmetries.p_sym * this->symmetries.x_sym));
-					}
-				}
-				T = multiply_operators(function<u64(u64, int)>(rotateLeft), T);
-			}
-		}
-		else if (this->lattice->get_BC() == 1) {
-			// neutral element
-			this->symmetry_group.push_back(T);
-			this->symmetry_eigval.push_back(1.0);
-
-			// check if spin flip is eligable
-			if (include_sz_flip) {
-				this->symmetry_group.push_back(multiply_operators(Z, T));
-				this->symmetry_eigval.push_back(double(this->symmetries.x_sym));
-			}
-
-			// if parity can be applied
-			this->symmetry_group.push_back(multiply_operators(P, T));
-			this->symmetry_eigval.push_back(double(this->symmetries.p_sym));
-			// furthermore add the spin flip
-			if (include_sz_flip) {
-				this->symmetry_group.push_back(multiply_operators(multiply_operators(P, Z), T));
-				this->symmetry_eigval.push_back(double(this->symmetries.p_sym * (double)this->symmetries.x_sym));
-			}
-		}
-	}
-
 	// ----------------------------------------------------------- 				 BUILDING HAMILTONIAN 				 -----------------------------------------------------------
 
 	/*
