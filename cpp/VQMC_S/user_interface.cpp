@@ -71,7 +71,7 @@ void UI::setDefault()
 * @param argc number of line arguments
 * @param argv line arguments
 */
-inline void UI::parseModel(int argc, cmdArg& argv)
+void UI::parseModel(int argc, cmdArg& argv)
 {
 	// set default at first
 	this->setDefault();

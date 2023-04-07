@@ -1,7 +1,6 @@
 
 
 #include "include/user_interface/user_interface.h"
-#include "user_interface.cpp"
 
 int main(const int argc, char* argv[]) {
 

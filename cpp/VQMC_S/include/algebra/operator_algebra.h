@@ -1,7 +1,9 @@
 #pragma once
+#ifndef OPALG_H
+#define OPALG_H
+
 #include <complex>
 #include <functional>
-
 using u64 = unsigned long long;
 using cpx = std::complex<double>;
 
@@ -150,3 +152,5 @@ namespace Operators {
 		return fun;
 	}
 };
+
+#endif

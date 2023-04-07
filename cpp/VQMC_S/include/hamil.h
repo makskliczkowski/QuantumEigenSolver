@@ -3,6 +3,9 @@
 	#include "algebra/operators.h"
 #endif // !SYMMETRIES_H
 
+#ifndef HAMIL_H
+#define HAMIL_H
+
 const std::string DEF_INFO_SEP		= std::string("_");										// defalut separator in info about the model
 #define DISORDER_EQUIV(type, param) type param		= 1;	\
 									type param##0	= 0;	\
@@ -360,3 +363,4 @@ inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 }
 
 // ################################################################################################################################################
+#endif

@@ -1,5 +1,10 @@
 #pragma once
+#ifndef GLOBALSYM_H
+#define GLOBALSYM_H
+
+#ifndef LATTICE_H
 #include "../../source/src/lattices.h"
+#endif // !LATTICE_H
 
 namespace GlobalSyms {
 	enum GlobalSymGenerators { U1, OTHER };
@@ -43,5 +48,7 @@ namespace GlobalSyms {
 	/*
 	* @brief describes the global check of U(1) symmetry
 	*/
-	auto U1Sym(u64 _state, double _val)					-> bool					{ return std::popcount(_state) == _val; };
+	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val; };
 };
+
+#endif

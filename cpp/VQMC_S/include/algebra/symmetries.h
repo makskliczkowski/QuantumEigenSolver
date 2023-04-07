@@ -2,9 +2,13 @@
 
 #ifndef SYMMETRIES_H
 #define SYMMETRIES_H
-#include "../hilbert.h"
-#include "global_symmetries.h"
-#endif // !SYMMETRIES_H
+
+#ifndef HILBERT_H
+	#include "../hilbert.h"
+#endif
+#ifndef GLOBALSYM_H
+	#include "global_symmetries.h"
+#endif
 
 // ##########################################################################################################################################
 
@@ -599,3 +603,6 @@ namespace Hilbert {
 	}
 
 };
+
+
+#endif // !SYMMETRIES_H

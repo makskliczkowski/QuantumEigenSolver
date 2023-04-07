@@ -161,3 +161,5 @@ dmypy.json
 
 *v17
 *FileContentIndex
+/cpp/VQMC_S/x64/Debug/vc143.idb
+/cpp/VQMC_S/x64/Debug/VQMC_S.vcxproj.FileListAbsolute.txt

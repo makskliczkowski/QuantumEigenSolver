@@ -3,8 +3,8 @@
 #include "../hamil.h"
 #endif // !HAMIL_H
 
-#ifndef ISINGMODEL
-#define ISINGMODEL
+#ifndef ISING_H
+#define ISING_H
 
 template <typename _T>
 class IsingModel : public Hamiltonian<_T> {

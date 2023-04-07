@@ -170,7 +170,6 @@
     <ClInclude Include="include\models\heisenberg.h" />
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
-    <ClInclude Include="include\models\symmetries\XYZ_sym.h" />
     <ClInclude Include="include\models\XYZ.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />
@@ -187,15 +186,17 @@
     <ClInclude Include="source\src\Lattices\square.h" />
     <ClInclude Include="source\src\lin_alg.h" />
     <ClInclude Include="source\src\plotter.h" />
-    <ClInclude Include="source\src\progress.h" />
     <ClInclude Include="source\src\UserInterface\ui.h" />
     <ClInclude Include="source\src\xoshiro_pp.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="include\hamil.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="operators.cpp" />
+    <ClCompile Include="source\cpp\common.cpp" />
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp" />
     <ClCompile Include="source\cpp\Lattices\square.cpp" />
+    <ClCompile Include="source\cpp\str.cpp" />
+    <ClCompile Include="source\cpp\ui.cpp" />
     <ClCompile Include="user_interface.cpp" />
   </ItemGroup>
   <ItemGroup>

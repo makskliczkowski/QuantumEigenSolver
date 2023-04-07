@@ -1,7 +1,7 @@
 #pragma once
 #ifndef HILBERT_H
 #define HILBERT_H
-#endif // !HILBERT_H
+
 
 /*******************************
 * Definitions for the operators 
@@ -9,10 +9,17 @@
 * the symmetries etc.
 *******************************/
 
-#include "../source/src/common.h"
+#ifndef LATTICE_H
 #include "../source/src/lattices.h"
+#endif
+
+#ifndef BINARY_H
 #include "../source/src/binary.h"
+#endif
+
+#ifndef OPALG_H
 #include "./algebra/operator_algebra.h"
+#endif
 
 // ##########################################################################################################################################
 
@@ -22,6 +29,7 @@ namespace Operators {
 	* @brief Implemented symmetry types
 	*/
 	enum SymGenerators { E, T, Tr, R, PX, PY, PZ, OTHER, SX, SY, SZ };
+	
 	BEGIN_ENUM(SymGenerators)
 	{
 		DECL_ENUM_ELEMENT(E),
@@ -227,7 +235,7 @@ namespace Operators {
 	* @param base base of the Hilbert space
 	*/
 	template <typename _T>
-	Operator<_T> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky = 0, int kz = 0, int8_t dim = 1) {
+	inline Operator<_T> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky = 0, int kz = 0, int8_t dim = 1) {
 		auto Kx = TWOPI * kx / double(lat->get_Lx());
 		auto Ky = TWOPI * ky / double(lat->get_Ly());
 		auto Kz = TWOPI * kz / double(lat->get_Lz());
@@ -241,7 +249,7 @@ namespace Operators {
 	}
 
 	template <>
-	Operator<double> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky, int kz, int8_t dim) {
+	inline Operator<double> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky, int kz, int8_t dim) {
 		auto Kx = TWOPI * kx / double(lat->get_Lx());
 		auto Ky = TWOPI * ky / double(lat->get_Ly());
 		auto Kz = TWOPI * kz / double(lat->get_Lz());
@@ -313,7 +321,7 @@ namespace Operators {
 	* @brief Parity with \sigma^x
 	*/
 	template <typename _T>
-	Operator<_T> makeFlipX(std::shared_ptr<Lattice>& lat, int sec) {
+	inline Operator<_T> makeFlipX(std::shared_ptr<Lattice>& lat, int sec) {
 		_GLB<_T> fX = flipX<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fX, SymGenerators::PX);
 	};
@@ -322,7 +330,7 @@ namespace Operators {
 	* @brief Parity with \sigma^y
 	*/
 	template <typename _T>
-	Operator<_T> makeFlipY(std::shared_ptr<Lattice>& lat, int sec) {
+	inline Operator<_T> makeFlipY(std::shared_ptr<Lattice>& lat, int sec) {
 		_GLB<_T> fY = flipY<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fY, SymGenerators::PY);
 	};
@@ -331,7 +339,7 @@ namespace Operators {
 	* @brief Parity with \sigma^z
 	*/
 	template <typename _T>
-	Operator<_T> makeFlipZ(std::shared_ptr<Lattice>& lat, int sec) {
+	inline Operator<_T> makeFlipZ(std::shared_ptr<Lattice>& lat, int sec) {
 		_GLB<_T> fZ = flipZ<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fZ, SymGenerators::PZ);
 	};
@@ -339,7 +347,7 @@ namespace Operators {
 	// ############################
 
 	template <typename _T>
-	Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice>& _lat) {
+	inline Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice>& _lat) {
 		auto [gen, eig] = _g;
 		switch (gen) {
 		case SymGenerators::T:
@@ -366,3 +374,5 @@ namespace Operators {
 		};
 	};
 }
+
+#endif // !HILBERT_H
