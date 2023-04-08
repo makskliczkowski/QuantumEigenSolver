@@ -141,29 +141,6 @@ namespace Entropy {
 				SCHMIDT
 			};
 
-			template <typename _T>
-			arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, uint _sizeA, 
-				const Hilbert::HilbertSpace<_T>& _hilb, RHO_METHODS _ch = RHO_METHODS::SCHMIDT) 
-			{
-				switch (_ch) {
-				case RHO_METHODS::STANDARD:
-					return redDensMatStandard<_T>(_s, _sizeA, _hilb);
-					break;
-				case RHO_METHODS::STANDARD_CAST:
-					if (!_hilb.checkGSym())
-						return redDensMatStandard(_s, _sizeA, _hilb);
-					else
-						return redDensMatStandard(castToFullHilbert(_s, _hilb), _hilb.getLatticeSize(), _sizeA, _hilb.getNum());
-					break;
-				case RHO_METHODS::SCHMIDT:
-					return redDensMatSchmidt(...)
-					break;
-				default:
-					return redDensMatSchmidt(...)
-					break;
-				}
-			}
-
 			/*
 			* @brief Calculates the bipartite reduced density matrix of the system via the state mixing
 			* @param _s state to construct the density matrix from
@@ -173,11 +150,11 @@ namespace Entropy {
 			* @returns the bipartite reduced density matrix
 			*/
 			template <typename _T>
-			arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _Ns, uint _sizeA, uint _Nint) {
+			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _Ns, uint _sizeA, uint _Nint) {
 				// set subsystems size
 				int bitNum					=			std::log2(_Nint);
 				const u64 dimA				=			ULLPOW(bitNum * _sizeA);
-				const u64 dimB				=			ULLPOW((_Ns - bitNum * A_size));
+				const u64 dimB				=			ULLPOW((_Ns - bitNum * _sizeA));
 				const u64 Nh				=			dimA * dimB;
 
 				arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
@@ -188,7 +165,7 @@ namespace Entropy {
 					for (u64 m = n % dimB; m < Nh; m += dimB) {
 						// find index of state with same B-side (by dividing the last bits are discarded)
 						u64 idx				=			n / dimB;
-						rho(idx, counter)	+=			algebra::conjugate(state(n)) * state(m);
+						rho(idx, counter)	+=			algebra::conjugate(_s(n)) * _s(m);
 						// increase counter to move along reduced basis
 						counter++;
 					}
@@ -204,89 +181,123 @@ namespace Entropy {
 			* @returns the bipartite reduced density matrix
 			*/
 			template <typename _T>
-			arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
+			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
 				// set subsystems size
 				uint Ns						=			_hilb.getLatticeSize();
 				uint Nint					=			_hilb.getNum();
 				uint bitNum					=			std::log2(Nint);
 				const u64 dimA				=			ULLPOW(bitNum * _sizeA);
-				const u64 dimB				=			ULLPOW((Ns - bitNum * A_size));
+				const u64 dimB				=			ULLPOW((Ns - bitNum * _sizeA));
 				const u64 Nh				=			dimA * dimB;
 				if (!_hilb.checkGSym())		return		Entropy::Entanglement::Bipartite::redDensMatStandard<_T>(_s, Ns, _sizeA, Nint);
 
-				const u64 N					=			_hilb.getFullHilbertSize();
 				auto map					=			_hilb.getFullMap();
+				const u64 N					=			map.size();
 				// otherwise find in mapping
 				auto find_index				=			[&](u64 _idx) { return binarySearch(map, 0, Nh - 1, _idx); };
 
 				arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
 				for (u64 n = 0; n < N; n++) {
 					// loop over configurational basis
-					u64 counter				=			0;
+					u64 ctr					=			0;
 					u64 true_n				=			map[n];
 					for (u64 m = true_n % dimB; m < Nh; m += dimB) {
 						// pick out state with same B side (last L-A_size bits)
 						u64 idx				=			true_n / dimB;
 						u64 j				=			find_index(m);
-						if (j >= 0)			rho(idx, counter) += algebra::conjugate(state(n)) * state(j);
+						if (j >= 0)			
+							rho(idx, ctr)	+=			algebra::conjugate(_s(n)) * _s(j);
 						// increase counter to move along reduced basis
-						counter++;
+						ctr++;
 					}
 				}
 				return rho;
 			};
-		
-		};
-		
-		// ############## CALCULATOR VIA SCHMIDT DECOMPOSITION ##############
-		template <typename _T>
-		double schmidt_decomposition(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
-			int num_of_bits = log2(config);
-			const long long dimA = (ULLPOW((num_of_bits * A_size)));
-			const long long dimB = (ULLPOW((num_of_bits * (Ns - A_size))));
-			const long long full_dim = dimA * dimB;
-
-			// reshape array to matrix
-			arma::Mat<_type> rho = arma::reshape(cast_state_to_full(state, map, full_dim), dimA, dimB);
-
-			// get schmidt coefficients from singular-value-decomposition
-			arma::vec schmidt_coeff = arma::svd(rho);
-
-			// calculate entropy
-			double entropy = 0;
-			// #pragma omp parallel for reduction(+: entropy)
-			for (int i = 0; i < schmidt_coeff.size(); i++) {
-				const auto value = schmidt_coeff(i) * schmidt_coeff(i);
-				entropy += (abs(value) > 0) ? -value * std::log(value) : 0;
+			
+			/*
+			* @brief Using reshape method to calculate the reduced density matrix
+			* @param _s state to construct the density matrix from
+			* @param _sizeA subsystem size
+			* @param _hilb used Hilbert space - contains the mapping
+			* @returns the bipartite reduced density matrix
+			*/
+			template<typename _T>
+			inline arma::Mat<_T> redDensMatSchmidt(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
+				// set subsystems size
+				uint Ns						=			_hilb.getLatticeSize();
+				uint Nint					=			_hilb.getNum();
+				uint bitNum					=			std::log2(Nint);
+				const u64 dimA				=			ULLPOW(bitNum * _sizeA);
+				const u64 dimB				=			ULLPOW((Ns - bitNum * _sizeA));
+				return arma::reshape(_s, dimA, dimB);
 			}
-			return entropy;
-		}
+		
+			/*
+			* @brief Calculates the reduced density matrix with one of the methods
+			* @param _s state to construct the density matrix from
+			* @param _sizeA subsystem size
+			* @param _hilb used Hilbert space - contains the mapping
+			* @param _ch method choice
+			* @returns the bipartite reduced density matrix
+			*/
+			template <typename _T>
+			inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, uint _sizeA,
+				Hilbert::HilbertSpace<_T>& _hilb,
+				RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
+			{
+				switch (_ch) {
+				case RHO_METHODS::STANDARD:
+					return redDensMatStandard<_T>(_s, _sizeA, _hilb);
+					break;
+				case RHO_METHODS::STANDARD_CAST:
+					return redDensMatStandard<_T>(_hilb.castToFull(_s), _hilb.getLatticeSize(), _sizeA, _hilb.getNum());
+					break;
+				case RHO_METHODS::SCHMIDT:
+					return redDensMatSchmidt<_T>(_hilb.castToFull(_s), _sizeA, _hilb);
+					break;
+				default:
+					return redDensMatSchmidt<_T>(_hilb.castToFull(_s), _sizeA, _hilb);
+					break;
+				}
+			}
 
+			// ##########################################################################################################################################
+
+			/*
+			* @brief Calculates the von Neuman entropy
+			* @param _s state to construct the density matrix from
+			* @param _sizeA subsystem size
+			* @param _hilb used Hilbert space - contains the mapping
+			* @param _ch method choice
+			* @returns the bipartite entanglement entropy
+			*/
+			template <typename _T>
+			double vonNeuman(const arma::Col<_T>& _s, uint _sizeA,
+							Hilbert::HilbertSpace<_T>& _hilb,
+							RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
+			{
+				// get the reduced density matrix
+				auto rho					=			redDensMat<_T>(_s, _sizeA, _hilb, _ch);
+				// get the values
+				arma::vec vals;
+				if (_ch == RHO_METHODS::SCHMIDT)
+				{
+					vals					=			arma::svd(rho);
+					vals					=			vals * vals;
+				}
+				else
+					arma::eig_sym(vals, rho);
+
+				// calculate entropy
+				double entropy				=			0.0;
+				// #pragma omp parallel for reduction(+: entropy)
+				for (auto i = 0; i < vals.size(); i++)
+					entropy					+=			(std::abs(vals(i)) > 0) ? -vals(i) * std::log(vals(i)) : 0.0;
+				return entropy;
+			};
+		};
 	};
 };
-
-
-
-		// -----------------------------------------------  				   ENTROPY 				    ----------------------------------------------
-
-
-
-		//double entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map = {}) const;					// entanglement entropy 
-		//double entanglement_entropy(const Mat<_type>& red_dens_mat) const;
-		//vec entanglement_entropy_sweep(const Col<_type>& state) const;														// entanglement entropy sweep over bonds
-
-
-		//// helpers
-		//void calculate_operators(const Col<_type>& alfa, avOperators& av_op, bool cal_entro = true);
-		////void calculate_operators(const Col<_type>& alfa, const Col<_type>& beta, avOperators& av_op);
-
-		//// -----------------------------------------------  				   HISTOGRAMS 				    ----------------------------------------------
-		//void calculate_histogram(const Mat<_type>& eigstates);
-
-		// -----------------------------------------------  				   STATE CASTING				    ----------------------------------------------
-
-	//	arma::Col<_type> cast_state_to_full(const Col<_type>& state, const std::vector<u64>& map, size_t dim_max) const;	// use global symmetry mapping to cast state to full hilbert space
-
 
 //template<typename _type>
 //inline cpx Operators<_type>::av_operator(const Col<_type>& alfa, const Col<_type>& beta, op_type op)
@@ -394,125 +405,6 @@ namespace Entropy {
 //}
 
 
-// ----------------------------   				   STATE TRANSFORMATION  				    ----------------------------------
-
-
-/*
-* @brief For global symmetries in the system, cast the state back to the original Hilbert space via mapping
-* @tparam _type input state type
-* @param state input state in reduced Hilbert size
-* @param map mapping to the full Hilbert space
-* @param dim_max maximal dimension we can get
-*/
-//template <typename _type>
-//inline arma::Col<_type> Operators<_type>::cast_state_to_full(const arma::Col<_type>& state, const std::vector<u64>& map, size_t dim_max) const {
-//	if (map.empty())
-//		return state;
-//	else {
-//		// cast full state to zeros
-//		Col<_type> full_state(dim_max, arma::fill::zeros);
-//		for (int i = 0; i < map.size(); i++)
-//			full_state(map[i]) = state(i);
-//		return full_state;
-//	}
-//};
-//
-//// ----------------------------   				   ENTROPY  				    ----------------------------------
-//
-///*
-//* @brief Calculates the entropy using the Schmidt decomposition of a wavefunction
-//* @param _type input state type
-//* @param state input state in Hilbert space
-//* @param A_size subsystem size
-//* @param config on-site configuration number (local hilbert space)
-//* @return entanglement entropy
-//*/
-//template<typename _type>
-//inline double Operators<_type>::schmidt_decomposition(const Col<_type>& state, int A_size, const v_1d<u64>& map, int config) const
-
-//}
-//
-//}
-//
-//// ---- ENTROPY ----
-//
-///*
-//*  @brief Calculates the entropy of the system via the mixed density matrix
-//*  @param state state to produce the density matrix
-//*  @param A_size size of subsystem
-//*  @returns entropy of considered systsem
-//*/
-//template<typename _type>
-//inline double Operators<_type>::entanglement_entropy(const Col<_type>& state, int A_size, const v_1d<u64>& map) const {
-//	Mat<_type> rho = !map.empty() ? this->red_dens_mat(state, map, A_size) : this->red_dens_mat(state, A_size);
-//	vec probabilities;
-//	// diagonalize to find probabilities and calculate trace in rho's eigenbasis
-//	eig_sym(probabilities, rho);
-//
-//	double entropy = 0;
-//	//#pragma omp parallel for reduction(+: entropy)
-//	for (auto i = 0; i < probabilities.size(); i++) {
-//		const auto value = probabilities(i);
-//		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));;
-//	}
-//	//double entropy = -real(trace(rho * real(logmat(rho))));
-//	return entropy;
-//}
-//
-//template<>
-//inline double Operators<cpx>::entanglement_entropy(const Col<cpx>& state, int A_size, const v_1d<u64>& map) const {
-//
-//	Mat<cpx> rho = !map.empty() ? this->red_dens_mat(state, map, A_size) : this->red_dens_mat(state, A_size);
-//	vec probabilities;
-//	//// diagonalize to find probabilities and calculate trace in rho's eigenbasis
-//	eig_sym(probabilities, rho);
-//
-//	double entropy = 0;
-//	//#pragma omp parallel for reduction(+: entropy)
-//	for (auto i = 0; i < probabilities.size(); i++) {
-//		const auto value = probabilities(i);
-//		entropy += (abs(value) < 1e-10) ? 0 : -value * log(abs(value));
-//	}
-//	return entropy;
-//	// return -real(trace(rho * (logmat(rho))));
-//}
-//
-///*
-//* @brief entanglement entropy using the precalculated reduced density matrix
-//*/
-//template<typename _type>
-//inline double Operators<_type>::entanglement_entropy(const Mat<_type>& rho) const
-//{
-//	vec probabilities;
-//	eig_sym(probabilities, rho);
-//
-//	double entropy = 0;
-//	//#pragma omp parallel for reduction(+: entropy)
-//	for (auto i = 0; i < probabilities.size(); i++) {
-//		const auto value = probabilities(i);
-//		entropy += (abs(value) < 1e-17) ? 0 : -value * log(abs(value));
-//	}
-//	//double entropy = -real(trace(rho * real(logmat(rho))));
-//	return entropy;
-//}
-//// ---- SWEEP ----
-//
-///*
-//* @brief Calculates the entropy of the system via the mixed density matrix
-//* @param state state vector to produce the density matrix
-//* @returns entropy of considered systsem for different subsystem sizes
-//*/
-//template<typename _type>
-//inline vec Operators<_type>::entanglement_entropy_sweep(const Col<_type>& state) const
-//{
-//	vec entropy(this->Ns - 1, arma::fill::zeros);
-//#pragma omp parallel for
-//	for (int i = 0; i < this->Ns - 1; i++)
-//		entropy(i) = entanglement_entropy(state, i + 1);
-//	//stout << EL << EL << entropy << EL << EL;
-//	return entropy;
-//}
-//
 //// -----------------   				   HELPERS  				    -------------------
 //template<typename _type>
 //inline void Operators<_type>::calculate_operators(const Col<_type>& eigvec, avOperators& av_op, bool cal_entro)

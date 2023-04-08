@@ -45,10 +45,6 @@
 // maximal ed size to compare
 constexpr int maxed = 20;
 
-
-
-
-
 // -------------------------------------------------------- Make a User interface class --------------------------------------------------------
 
 //template<typename _hamtype>
@@ -74,48 +70,60 @@ constexpr int maxed = 20;
 //	return 0.0;
 //}
 
-// --------------------------------------------------------  				 HUBBARD USER INTERFACE 					  --------------------------------------------------------
+namespace UI_PARAMS {
+	struct ModP {
+		MY_MODELS modelType = MY_MODELS::ISING_M;
 
-// lattice stuff
-struct LatP {
-	LatticeTypes typ = SQ; 																					// for non_numeric data
-	int bc = 0;
-	int dim = 1;
-	int Lx = 2;
-	int Ly = 1;
-	int Lz = 1;
-	std::shared_ptr<Lattice> lat;
+		// ############### ISING ###############
+		//UI_PARAM_STEP(double, J);
+		double J = 1.0;																// spin exchange
+		double J0 = 0;																// spin exchange coefficient disorder
+		double h = 0.0;																// perpendicular magnetic field
+		double w = 0.0;																// the distorder strength to set dh in (-disorder_strength, disorder_strength)
+		double g = 0.0;																// transverse magnetic field
+		double g0 = 0.0;															// disorder in the system - deviation from a constant g0 value
+	};
+
+	// lattice stuff
+	struct LatP {
+		LatticeTypes typ = SQ; 																					// for non_numeric data
+		int bc = 0;
+		int dim = 1;
+		int Lx = 2;
+		int Ly = 1;
+		int Lz = 1;
+		std::shared_ptr<Lattice> lat;
+	};
+
+	struct SymP {
+		bool S = false;
+		int kSec = 0;									// translation symmetry sector
+		bool pxSec = true;								// x parity sector
+		bool pySec = true;								// y parity sector
+		bool pzSec = true;								// z parity sector
+		bool xSec = true;								// spin flip sector
+		int U1Sec = 0;									// particle number conservation sector
+	};
+
+	// !TODO 
+	// Neural network quantum states params
+	struct NqsP {
+		//unique_ptr<rbmState<_type, _hamtype>> phi;
+		u64 nHidden = 1;
+		u64 nVisible = 1;
+		uint nLayers = 2;
+		v_1d<u64> layersDim;
+
+		// single time flips
+		uint nFlips = 1;
+		double lr = 1e-2;
+		uint nBlocks = 500;
+		uint blockSize = 8;
+		uint mcSteps = 1000;
+		uint nTherm = uint(0.1 * nBlocks);
+		u64 batch = (u64)std::pow(2, 10);
+	};
 };
-
-struct SymP {
-	bool S = false;
-	int kSec = 0;									// translation symmetry sector
-	bool pxSec = true;								// x parity sector
-	bool pySec = true;								// y parity sector
-	bool pzSec = true;								// z parity sector
-	bool xSec = true;								// spin flip sector
-	int U1Sec = 0;									// particle number conservation sector
-};
-
-// !TODO 
-// Neural network quantum states params
-struct NqsP {
-	//unique_ptr<rbmState<_type, _hamtype>> phi;
-	u64 nHidden = 1;
-	u64 nVisible = 1;
-	uint nLayers = 2;
-	v_1d<u64> layersDim;
-
-	// single time flips
-	uint nFlips = 1;
-	double lr = 1e-2;
-	uint nBlocks = 500;
-	uint blockSize = 8;
-	uint mcSteps = 1000;
-	uint nTherm = uint(0.1 * nBlocks);
-	u64 batch	= (u64)std::pow(2, 10);
-};
-
 
 // --------------------------------------------------------  				 MAP OF DEFAULTS FOR HUBBARD 				  --------------------------------------------------------
 
@@ -167,13 +175,13 @@ private:
 	};
 
 	// lattice
-	LatP latP;
+	UI_PARAMS::LatP latP;
 
 	// symmetry params
-	SymP symP;
+	UI_PARAMS::SymP symP;
 
 	// NQS params
-	NqsP nqsP;
+	UI_PARAMS::NqsP nqsP;
 
 	// define basic model
 	//shared_ptr<SpinHamiltonian<_hamtype>> ham;

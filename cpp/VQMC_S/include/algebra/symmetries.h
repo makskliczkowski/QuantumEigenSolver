@@ -21,12 +21,12 @@ namespace Hilbert {
 		void mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T> normThreaded, int t);
 
 	protected:
-		uint threadNum = 1;				// get number of threads
-		uint Ns = 1;					// number of lattice sites
-		uint Nhl = 2;					// number of local possibilities
-		uint Nint = 1;					// number of fermionic modes such that total V=L^D*N_int
-		u64 Nh = 1;						// number of states in the Hilbert space	
-		u64 NhFull = 1;					// full Hilbert space
+		uint threadNum										= 1;				// get number of threads
+		uint Ns												= 1;				// number of lattice sites
+		uint Nhl											= 2;				// number of local possibilities
+		uint Nint											= 1;				// number of fermionic modes such that total V=L^D*N_int
+		u64 Nh												= 1;				// number of states in the Hilbert space	
+		u64 NhFull											= 1;				// full Hilbert space
 		std::shared_ptr<Lattice> lat;
 
 		// ------------------------ symmetries ------------------------
@@ -35,9 +35,9 @@ namespace Hilbert {
 		v_1d<std::pair<Operators::SymGenerators, int>> symGroupSec_;			// stores the local symmetry group and their sectors for convenience
 
 		// ------------------------ symmetry normalization and mapping to a reduced Hilbert space ------------------------
-		v_1d<_T> normalization_;												// stores the representative normalization
-		v_1d<u64> mapping_;														// stores the symmetry representative mapping
-
+		v_1d<_T> normalization_								= {};				// stores the representative normalization
+		v_1d<u64> mapping_									= {};				// stores the symmetry representative mapping
+		v_1d<u64> fullMap_									= {};
 	public:
 
 		// ------------------------ constructors etc -------------------------
@@ -79,14 +79,19 @@ namespace Hilbert {
 				stoutd("\t\t\t->No states in the Hilbert space\n");
 		}
 
-		// ------------------------ inner generators -------------------------
+		// ------------------------ INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
 		void generateMapping();															// generates mapping from reduced hilbert space to original
+		void generateFullMap();															// generates full map if a global symmetry is present
 
 		std::pair<u64, _T> findRep(u64 baseIdx)			const;							// returns the representative index and symmetry return eigval
 		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;							// returns the representative and symmetry eigval taking the second symmetry sector beta
 
-		// ------------------------ getters ------------------------
+		// ------------------------ FULL HILBERT SPACE ------------------------
+
+		arma::Col<_T> castToFull(arma::Col<_T> _s)		const;
+
+		// ------------------------ GETTERS ------------------------
 		int getBC()										const					{ return this->lat->get_BC(); };
 		std::shared_ptr<Lattice> getLattice()			const					{ return this->lat; };
 		u64 getLatticeSize()							const					{ return this->Ns; };
@@ -298,30 +303,7 @@ namespace Hilbert {
 		idx = binarySearch(this->mapping_, 0, static_cast<ull>(this->Ns) - 1, min);
 
 		// if is in range
-		if (idx < static_cast<u64>(this->Ns * this->Nint)) return std::make_pair(idx, this->normalization_[idx] / nB * std::conj(symEig));
-
-		// haven't found the representative - different block sector
-		return std::make_pair(u64(0), 0.0);
-	}
-
-	template <>
-	inline std::pair<u64, double> Hilbert::HilbertSpace<double>::findRep(u64 baseIdx, double nB) const
-	{
-		if (this->mapping_.empty())
-			return std::make_pair(baseIdx, 1.0);
-
-		// found representative already in the mapping
-		u64 idx = binarySearch(this->mapping_, 0, static_cast<ull>(this->Ns) - 1, baseIdx);
-
-		// if is in range
-		if (idx < this->Ns) return std::make_pair(idx, this->normalization_[idx] / nB);
-
-		// need to find the representative by acting
-		auto [min, symEig] = this->findRep(baseIdx);
-		idx = binarySearch(this->mapping_, 0, static_cast<ull>(this->Ns) - 1, min);
-
-		// if is in range
-		if (idx < this->Ns) return std::make_pair(idx, this->normalization_[idx] / nB * symEig);
+		if (idx < static_cast<u64>(this->Ns * this->Nint)) return std::make_pair(idx, this->normalization_[idx] / nB * algebra::conjugate(symEig));
 
 		// haven't found the representative - different block sector
 		return std::make_pair(u64(0), 0.0);
@@ -337,19 +319,6 @@ namespace Hilbert {
 	inline _T Hilbert::HilbertSpace<_T>::getSymNorm(u64 baseIdx) const
 	{
 		_T norm = 0.0;
-		for (auto& G : this->symGroup_) {
-			// if we return to the same state by acting with symmetry group operators
-			const auto [newIdx, val] = G(baseIdx);
-			if (newIdx == baseIdx)
-				norm += val;
-		}
-		return std::sqrt(norm);
-	}
-
-	template<>
-	inline double Hilbert::HilbertSpace<double>::getSymNorm(u64 baseIdx) const
-	{
-		double norm = 0.0;
 		for (auto& G : this->symGroup_) {
 			// if we return to the same state by acting with symmetry group operators
 			const auto [newIdx, val] = G(baseIdx);
@@ -392,39 +361,7 @@ namespace Hilbert {
 				auto idxM = find_index(idx);
 				// use only if exists in sector
 				if (idxM < maxDim)
-					U(idxM, k) += std::conj(val / (this->normalization_[k] * std::sqrt(double(symSize))));
-			}
-		return U;
-	}
-
-	template<>
-	inline arma::SpMat<double> HilbertSpace<double>::getSymRot(const v_1d<u64>& fMap) const
-	{
-		// check the maximal dimension of the Hilbert space (if we have global symmetries)
-		const u64 maxDim = fMap.empty() ? ULLPOW(this->Ns) : fMap.size();
-
-		// find index helping function
-		auto find_index = [&](u64 idx) { return (!fMap.empty()) ? binarySearch(fMap, 0, maxDim - 1, idx) : idx; };
-
-		// generate sparse mapping
-		arma::SpMat<double> U(maxDim, this->Nh);
-
-		// iterate states
-		auto symSize = this->symGroup_.size();
-
-		// if no symmetries return empty
-		if (symSize == 0)
-			return U;
-
-		for (u64 k = 0; k < this->Nh; k++)
-			for (auto& G : this->symGroup_) {
-				// find new corresponding state from the generators
-				auto [idx, val] = G(this->mapping_[k]);
-				// apply the mapping
-				idx = find_index(idx);
-				// use only if exists in sector
-				if (idx < maxDim)
-					U(idx, k) += (val / (this->normalization_[k] * std::sqrt(double(symSize))));
+					U(idxM, k) += algebra::conjugate(val / (this->normalization_[k] * std::sqrt(double(symSize))));
 			}
 		return U;
 	}
@@ -460,40 +397,7 @@ namespace Hilbert {
 				idx = find_index(idx);
 				// use only if exists in sector
 				if (idx < maxDim)
-					U(idx, k) += std::conj(val / (this->normalization_[k] * std::sqrt(double(symSize))));
-			}
-		return U;
-	}
-
-	template<>
-	inline arma::SpMat<double> HilbertSpace<double>::getSymRot() const
-	{
-		// check the maximal dimension of the Hilbert space (if we have global symmetries)
-		v_1d<u64> fMap = (this->symGroupGlobal_.empty()) ? v_1d<u64>() : this->getFullMap();
-		const u64 maxDim = fMap.empty() ? this->NhFull : fMap.size();
-
-		// find index helping function
-		auto find_index = [&](u64 idx) { return (!fMap.empty()) ? binarySearch(fMap, 0, maxDim - 1, idx) : idx; };
-
-		// generate sparse mapping
-		arma::SpMat<double> U(maxDim, this->Nh);
-
-		// iterate states
-		auto symSize = this->symGroup_.size();
-
-		// if no symmetries return empty
-		if (symSize == 0)
-			return U;
-
-		for (u64 k = 0; k < this->Nh; k++)
-			for (auto& G : this->symGroup_) {
-				// find new corresponding state from the generators
-				auto [idx, val] = G(this->mapping_[k]);
-				// apply the mapping
-				idx = find_index(idx);
-				// use only if exists in sector
-				if (idx < maxDim)
-					U(idx, k) += (val / (this->normalization_[k] * std::sqrt(double(symSize))));
+					U(idx, k) += algebra::conjugate(val / (this->normalization_[k] * std::sqrt(double(symSize))));
 			}
 		return U;
 	}
@@ -589,18 +493,59 @@ namespace Hilbert {
 	*/
 	template<typename _T>
 	inline v_1d<u64> HilbertSpace<_T>::getFullMap() const {
+		if (!this->fullMap_.empty()) return this->fullMap_;
+
 		v_1d<u64> fullMap = {};
 		if (!this->symGroupGlobal_.empty())
 			for (u64 j = 0; j < this->Nh; j++) {
 				// check globales
 				bool globalChecker = true;
 				for (auto& Glob : this->symGroupGlobal_)
-					globalChecker = globalChecker & Glob(j);
+					globalChecker = globalChecker && Glob(j);
 				// if is in, goomb
 				if (globalChecker)
 					fullMap.push_back(j);
 			}
 		return fullMap;
+	}
+
+	template<typename _T>
+	inline void Hilbert::HilbertSpace<_T>::generateFullMap()
+	{
+		this->fullMap_ = {};
+		if (!this->symGroupGlobal_.empty())
+			for (u64 j = 0; j < this->Nh; j++) {
+				// check globales
+				bool globalChecker = true;
+				for (auto& Glob : this->symGroupGlobal_)
+					globalChecker = globalChecker && Glob(j);
+				// if is in, goomb
+				if (globalChecker)
+					this->fullMap_.push_back(j);
+			}
+	}
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Calculates the cast to the full Hilbert space when global symmetry is present
+	* @param _s state to be transformed
+	* @returns if global symmetry is present, we transform the state; otherwise we return the same state
+	*/
+	template<typename _T>
+	inline arma::Col<_T> Hilbert::HilbertSpace<_T>::castToFull(arma::Col<_T> _s) const
+	{
+		if (!this->checkGSym())
+			return _s;
+		else {
+			arma::Col<_T> fS(this->NhFull, arma::fill::zeros);
+			// if not exist, generate a full map
+			if (this->fullMap_.empty()) this->generateFullMap();
+			// create new vector state
+			for (int i = 0; i < this->fullMap_.size(); i++)
+				fS(this->fullMap_[i]) = _s(i);
+			return fS;
+		}
 	}
 };
 

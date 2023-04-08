@@ -6,6 +6,18 @@
 #ifndef HAMIL_H
 #define HAMIL_H
 
+// ######################### EXISTING MODELS ############################
+enum MY_MODELS {													 // #
+	ISING_M, XYZ_M													 // #
+};																	 // #
+BEGIN_ENUM(MY_MODELS)												 // #
+{																	 // #
+	DECL_ENUM_ELEMENT(ISING_M), DECL_ENUM_ELEMENT(XYZ_M)			 // #
+}																	 // #
+END_ENUM(MY_MODELS)                                                  // #	
+// ######################################################################
+
+
 const std::string DEF_INFO_SEP		= std::string("_");										// defalut separator in info about the model
 #define DISORDER_EQUIV(type, param) type param		= 1;	\
 									type param##0	= 0;	\
@@ -49,10 +61,11 @@ public:
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
 	// ------------------------------------------- PRINTERS -------------------------------------------
-	//static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);															// converts a map to arma column (VQMC)
-	//static void print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol);											// pretty prints the base state
-	//static void print_state_pretty(const Col<_type>& state, int Ns, double tol = 0.05);												// pretty prints the eigenstate at a given idx
-	//void print_state(u64 _id)					const { this->eigenvectors(_id).print(); };											// prints the eigenstate at a given idx
+	//static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);														// converts a map to arma column (VQMC)
+	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);					// pretty prints the base state
+	static void prettyPrint(	std::ostream& output,	const arma::Col<_T>& state, uint Ns,double _tol = 5e-2);					// pretty prints the state
+	void print(u64 _id)									const								{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n"); };
+	void print()										const								{ this->H_.print("H=\n"); };
 
 	// ------------------------------------------- INFO -------------------------------------------
 
@@ -169,55 +182,22 @@ inline void Hamiltonian<_T>::calcAvEn()
 // ################################################################################################################################################
 
 /*
-* @brief converts a map to armadillo column
-* @param mp map from state index to a given
+* @brief prints the base state in the BRAKET notation
+* @param _s base state to be printed in the integer form
+* @param _val coefficient before the state
+* @param _tmpVec to be used as reference vector
+* @param _tol tolerance of the coefficient absolute value
 */
-//template<typename _type>
-//inline Col<_type> SpinHamiltonian<_type>::map_to_state(std::map<u64, _type> mp, int N_hilbert)
-//{
-//	Col<_type> tmp(N_hilbert, arma::fill::zeros);
-//	for (auto const& [state, val] : mp)
-//	{
-//		tmp(state) = val;
-//	}
-//	tmp = arma::normalise(tmp);
-//	return tmp;
-//}
-
-
-/*
-* @brief prints the base state in the braket notation
-* @param state base state to be printed in the integer form
-* @param val coefficient before the state
-* @param base_vector to be used as reference vector
-* @param tol tolerance of the coefficient absolute value
-*/
-//template<typename _type>
-//inline void SpinHamiltonian<_type>::print_base_state(u64 state, _type val, v_1d<int>& base_vector, double tol)
-//{
-//	string tmp = "";
-//	intToBaseBit(state, base_vector);
-//	if (!valueEqualsPrec(std::abs(val), 0.0, tol)) {
-//		auto pm = val >= 0 ? "+" : "";
-//		stout << pm << str_p(val, 3) << "*|" << base_vector << +">";
-//	}
-//}
-
-/*
-* @brief prints the base state in the braket notation - overwriten for complex numbers only
-* @param state base state to be printed in the integer form
-* @param val coefficient before the state
-* @param base_vector to be used as reference vector
-* @param tol tolerance of the coefficient absolute value
-*/
-//template<>
-//inline void SpinHamiltonian<cpx>::print_base_state(u64 state, cpx val, v_1d<int>& base_vector, double tol)
-//{
-//	string tmp = "";
-//	intToBase(state, base_vector, 2);
-//	if (!valueEqualsPrec(std::abs(val), 0.0, tol))
-//		stout << print_cpx(val, 3) << "*|" << base_vector << +">";
-//}
+template<typename _T>
+inline void Hamiltonian<_T>::printBaseState(std::ostream& output, u64 _s, _T val, v_1d<int>& _tmpVec, double _tol)
+{
+	INT_TO_BASE(_s, _tmpVec);
+	if (!EQP(std::abs(val), 0.0, _tol)) 
+	{
+		auto pm				=			(val >= 0) ? "+" : "";
+		output				<< pm << val << "*|" << _tmpVec << +">";
+	}
+}
 
 /*
 * @brief goes through the whole state and prints it in numerical basis
@@ -225,14 +205,14 @@ inline void Hamiltonian<_T>::calcAvEn()
 * @param Ns number of lattice sites
 * @param tol tolerance of the coefficients absolute value
 */
-//template<typename _type>
-//inline void SpinHamiltonian<_type>::print_state_pretty(const Col<_type>& state, int Ns, double tol)
-//{
-//	v_1d<int> base_vector(Ns);
-//	for (auto k = 0; k < state.size(); k++)
-//		print_base_state(k, state(k), base_vector, tol);
-//	stout << EL;
-//}
+template<typename _T>
+inline void Hamiltonian<_T>::prettyPrint(std::ostream& output, const arma::Col<_T>& state, uint Ns, double tol)
+{
+	v_1d<int> tmpVec(Ns);
+	for (u64 k = 0; k < state.size(); k++)
+		printBaseState(output, k, state(k), tmpVec, tol);
+	output << EL;
+}
 
 // ################################################################################################################################################
 
