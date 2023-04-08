@@ -94,7 +94,7 @@ struct SymP {
 	bool pySec = true;								// y parity sector
 	bool pzSec = true;								// z parity sector
 	bool xSec = true;								// spin flip sector
-	int U1Sec = 0.0;								// particle number conservation sector
+	int U1Sec = 0;									// particle number conservation sector
 };
 
 // !TODO 
@@ -112,8 +112,8 @@ struct NqsP {
 	uint nBlocks = 500;
 	uint blockSize = 8;
 	uint mcSteps = 1000;
-	uint batch = std::pow(2, 10);
 	uint nTherm = uint(0.1 * nBlocks);
+	u64 batch	= (u64)std::pow(2, 10);
 };
 
 
@@ -248,7 +248,7 @@ public:
 		//input = std::vector<string>(input.begin()++, input.end());					// skip the first element which is the name of file
 		if (std::string option = this->getCmdOption(input, "-f"); option != "")
 			input = this->parseInputFile(option);										// parse input from file
-		this->parseModel(input.size(), input);
+		this->parseModel((int)input.size(), input);
 	}
 
 	// -----------------------------------------------   	 PARSER FOR HELP  		-------------------------------------------

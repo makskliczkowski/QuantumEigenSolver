@@ -21,6 +21,13 @@
 #include "./algebra/operator_algebra.h"
 #endif
 
+// ############################################### FORWARD DECLARATIONS
+
+namespace Hilbert {
+	template <typename _T>
+	class HilbertSpace;
+};
+
 // ##########################################################################################################################################
 
 namespace Operators {
@@ -43,7 +50,7 @@ namespace Operators {
 		DECL_ENUM_ELEMENT(OTHER),
 		DECL_ENUM_ELEMENT(SX),
 		DECL_ENUM_ELEMENT(SY),
-		DECL_ENUM_ELEMENT(SZ),
+		DECL_ENUM_ELEMENT(SZ)
 
 	}
 	END_ENUM(SymGenerators);
@@ -59,65 +66,81 @@ namespace Operators {
 		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
 		_T eigVal_										= 1.0;					// eigenvalue for symmetry generator (if there is inner value)
 		repType fun_									= E;					// function allowing to use symmetry
-		SymGenerators name_								= SymGenerators::E;
+		SymGenerators name_ = SymGenerators::E;
 	public:
-		Operator()										{ init(); };
-		Operator(std::shared_ptr<Lattice>& _lat) 
-			: lat_(_lat)								{ init(); };
-		Operator(std::shared_ptr<Lattice>& _lat, _T _eigVal) 
-			: lat_(_lat), eigVal_(_eigVal)				{ init(); };
+		Operator() { init(); };
+		Operator(std::shared_ptr<Lattice>& _lat)
+			: lat_(_lat) {
+			init();
+		};
+		Operator(std::shared_ptr<Lattice>& _lat, _T _eigVal)
+			: lat_(_lat), eigVal_(_eigVal) {
+			init();
+		};
 		Operator(std::shared_ptr<Lattice>& _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E)
 			: lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name)
-														{ init(); };
+		{
+			init();
+		};
 		//Operator(std::shared_ptr<Lattice>& _lat, _T _eigVal, repType&& _fun)
 		//	: lat_(_lat), eigVal_(_eigVal),
 		//	fun_(std::move(_fun))					{ init(); };
 		Operator(const Operator<_T, _Ts...>& o)
 			: eigVal_(o.eigVal_), fun_(o.fun_),
-			lat_(o.lat_)								{ init(); };
+			lat_(o.lat_) {
+			init();
+		};
 		Operator(Operator<_T, _Ts...>&& o)
-			: eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_)), lat_(std::move(o.lat_)) 
-														{ init(); };
+			: eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_)), lat_(std::move(o.lat_))
+		{
+			init();
+		};
 
 		// ----------------------------------------------------------------------------------------------------
 
 		Operator& operator=(const Operator& _other)
 		{
-			this->lat_				=				_other.lat_;
-			this->fun_				=				_other.fun_;
-			this->eigVal_			=				_other.eigVal_;
+			this->lat_ = _other.lat_;
+			this->fun_ = _other.fun_;
+			this->eigVal_ = _other.eigVal_;
 			return *this;
 		}
 
 		Operator& operator=(const Operator&& _other)
 		{
-			this->lat_				=				std::move(_other.lat_);
-			this->fun_				=				std::move(_other.fun_);
-			this->eigVal_			=				std::move(_other.eigVal_);
+			this->lat_ = std::move(_other.lat_);
+			this->fun_ = std::move(_other.fun_);
+			this->eigVal_ = std::move(_other.eigVal_);
 			return *this;
 		}
 
 		// ---------- override operators -----------
-		virtual auto operator()(u64 s, _Ts... a)		const -> _OP<_T>::R			{ auto [s2, _val] = this->fun_(s); return std::make_pair(s2, eigVal_ * _val); };
-		virtual auto operator()(u64 s, _Ts... a)		-> _OP<_T>::R				{ auto [s2, _val] = this->fun_(s); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		const -> _OP<_T>::R { auto [s2, _val] = this->fun_(s); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		-> _OP<_T>::R { auto [s2, _val] = this->fun_(s); return std::make_pair(s2, eigVal_ * _val); };
 
 		// ----------------------------------------------------------------------------------------------------
 
 		// ---------- STATIC ----------
-		static auto E(u64 s, _Ts...)					-> _OP<_T>::R				{ std::make_pair(s, _T(1.0)); };
+		static auto E(u64 s, _Ts...)					-> _OP<_T>::R			{ std::make_pair(s, _T(1.0)); };
+
+		// calculates the matrix element of operator
+		template <typename _T1, typename _T2>
+		static _T avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
+		template <typename _T1>
+		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
 
 		// ---------- virtual functions to override ----------
 		virtual void init() {};
 
 		// ---------- SETTERS -----------
-		auto setFun(const repType& _fun)				-> void						{ this->fun_ = _fun; };
-		auto setFun(repType&& _fun)						-> void						{ this->fun_ = std::move(_fun); };
-		auto setName(SymGenerators _name)				-> void						{ this->name_ = _name; };
+		auto setFun(const repType& _fun) -> void { this->fun_ = _fun; };
+		auto setFun(repType&& _fun) -> void { this->fun_ = std::move(_fun); };
+		auto setName(SymGenerators _name) -> void { this->name_ = _name; };
 
 		// ---------- GETTERS -----------
-		auto getVal()									const -> _T					{ return this->eigVal_; };
-		auto getFun()									const -> repType			{ return this->fun_; };
-		auto getName()									const -> SymGenerators		{ return this->name_; };
+		auto getVal()									const -> _T				{ return this->eigVal_; };
+		auto getFun()									const -> repType		{ return this->fun_; };
+		auto getName()									const -> SymGenerators	{ return this->name_; };
 
 		// ----------------------------------------------------------------------------------------------------
 
@@ -129,23 +152,11 @@ namespace Operators {
 			return Operator< _T2, _Ts..., _T2s... >(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ * op.fun_);
 		}
 
-		//template<typename _T1, typename _T2, typename ..._T1s, typename ..._T2s>
-		//friend Operator<_T2, _T1s..., _T2s...> operator*(const Operator<_T1, _T2s...>& A, const Operator<_T2, _T2s...>& B) {
-		//	Operator<_T2, _T1s..., _T2s...> op(A.lat_, A.eigVal_ * B.eigVal_, A.fun_ * B.fun_);
-		//	return op;
-		//};
-
 		template <typename _T2, typename..._T2s>
 		Operator<_T2, _Ts..., _T2s...> operator%(const Operator<_T2, _T2s...>& op) const
 		{
 			return Operator< _T2, _Ts..., _T2s... >(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ % op.fun_);
 		}
-
-		//template<typename _T1, typename _T2, typename ..._T1s, typename ..._T2s>
-		//friend Operator<_T2, _T1s..., _T2s...> operator%(const Operator<_T1, _T2s...>& A, const Operator<_T2, _T2s...>& B) {
-		//	Operator<_T2, _T1s..., _T2s...> op(A.lat_, A.eigVal_ * B.eigVal_, A.fun_ % B.fun_);
-		//	return op;
-		//};
 
 		// ---------- OPERATORS CAST ----------
 		template <class _TOut>
@@ -167,7 +178,7 @@ namespace Operators {
 		*/
 		friend _T chi(const Operator& _op) {
 			return _op.eigVal_;
-		}
+		};
 
 		/*
 		* @brief calculate operator acting on state num eigenvalue
@@ -175,18 +186,33 @@ namespace Operators {
 		friend _T chi(const Operator& _op, u64 _s, _Ts... _a) {
 			auto [state, val] = _op(_s, std::forward<_Ts>(_a)...);
 			return val * _op.eigVal_;
-		}
+		};
 	};
 };
 
 // ##########################################################################################################################################
 
-namespace Operators {
+template<typename _T, typename ..._Ts>
+template<typename _T1, typename _T2>
+inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
+{
+	return _T();
+}
 
+template<typename _T, typename ..._Ts>
+template<typename _T1>
+inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
+{
+	return _T();
+}
+
+// ##########################################################################################################################################
+
+namespace Operators {
 	// ##########################################################################################################################################
 	
 	template<typename _T>
-	inline auto translation(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> translation(std::shared_ptr<Lattice>& lat)
 	{
 		// cyclic shift function with boundary preservation
 		_GLB<_T> cyclicShift;
@@ -266,7 +292,7 @@ namespace Operators {
 	// ##########################################################################################################################################
 
 	template<typename _T>
-	inline auto reflection(std::shared_ptr<Lattice>& lat, int base)
+	inline _GLB<_T> reflection(std::shared_ptr<Lattice>& lat, int base)
 	{
 		_GLB<_T> fun = [lat, base](u64 state) {
 			return std::make_pair(revBits(state, lat->get_Ns(), base), _T(1.0));
@@ -286,7 +312,7 @@ namespace Operators {
 	// ##########################################################################################################################################
 
 	template<typename _T>
-	inline auto flipZ(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipZ(std::shared_ptr<Lattice>& lat)
 	{
 		_GLB<_T> fun = [lat](u64 state) {
 			int spinUps = lat->get_Ns() - std::popcount(state);
@@ -296,7 +322,7 @@ namespace Operators {
 	};
 
 	template<typename _T>
-	inline auto flipY(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipY(std::shared_ptr<Lattice>& lat)
 	{
 		_GLB<_T> fun = [lat](u64 state)
 		{
@@ -308,7 +334,7 @@ namespace Operators {
 	};
 
 	template<typename _T>
-	inline auto flipX(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipX(std::shared_ptr<Lattice>& lat)
 	{
 		_GLB<_T> fun = [lat](u64 state)
 		{
@@ -373,6 +399,6 @@ namespace Operators {
 			break;
 		};
 	};
-}
+};
 
 #endif // !HILBERT_H

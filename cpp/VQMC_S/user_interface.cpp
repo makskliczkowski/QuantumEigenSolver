@@ -58,7 +58,7 @@ void UI::setDefault()
 	this->nqsP.blockSize = 8;
 	this->nqsP.nBlocks = 500;
 	this->nqsP.mcSteps = 1000;
-	this->nqsP.batch = std::pow(2, 10);
+	this->nqsP.batch = (u64)std::pow(2, 10);
 	this->nqsP.nVisible = latP.lat->get_Ns();
 	this->nqsP.nHidden = 2ll * latP.lat->get_Ns();
 	this->nqsP.layersDim = { this->nqsP.nVisible , this->nqsP.nHidden };

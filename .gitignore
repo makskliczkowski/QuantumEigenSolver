@@ -157,6 +157,10 @@ dmypy.json
 *.npy
 *.np*
 *plot_data/*
+*.ionide
+*.vs
+*.vscode
+*DATA
 
 
 *v17

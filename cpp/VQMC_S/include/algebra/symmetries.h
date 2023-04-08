@@ -13,7 +13,7 @@
 // ##########################################################################################################################################
 
 namespace Hilbert {
-	constexpr int SYM_NORM_THRESHOLD = 1e-4;
+	constexpr double SYM_NORM_THRESHOLD = 1e-4;
 
 	template <typename _T>
 	class HilbertSpace {
@@ -92,7 +92,8 @@ namespace Hilbert {
 		u64 getLatticeSize()							const					{ return this->Ns; };
 		u64 getHilbertSize()							const					{ return this->Nh; };
 		u64 getFullHilbertSize()						const					{ return this->NhFull; };
-		u64 getLocalHilbertSize()						const					{ return this->Nhl; };
+		auto getLocalHilbertSize()						const -> uint			{ return this->Nhl; };
+		auto getNum()									const -> uint			{ return this->Nint; };
 		auto getNorm()									const -> v_1d<_T>		{ return this->normalization_; };
 		auto getMapping()								const -> v_1d<u64>		{ return this->mapping_; };
 		auto getMapping(u64 k)							const -> u64			{ return this->mapping_[k]; };
@@ -601,7 +602,6 @@ namespace Hilbert {
 			}
 		return fullMap;
 	}
-
 };
 
 
