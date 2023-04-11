@@ -7,11 +7,10 @@
 */
 void UI::setDefault()
 {
-
 	// lattice stuff
-	this->latP.typ = SQ; 													// for non_numeric data
-	this->latP.dim = 1;
+	this->latP.typ_ = LatticeTypes::SQ; 													// for non_numeric data
 	this->latP.bc = 0;
+	this->latP.dim = 1;
 	this->latP.Lx = 10;
 	this->latP.Ly = 1;
 	this->latP.Lz = 1;

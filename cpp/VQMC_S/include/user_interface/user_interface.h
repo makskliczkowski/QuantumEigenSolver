@@ -71,38 +71,60 @@ constexpr int maxed = 20;
 //}
 
 namespace UI_PARAMS {
+	
+	/*
+	* @brief Defines parameters used later for the models
+	*/
 	struct ModP {
-		MY_MODELS modelType = MY_MODELS::ISING_M;
-
+		// ############### TYPE ################
+		MY_MODELS modelType_ = MY_MODELS::ISING_M;
 		// ############### ISING ###############
-		//UI_PARAM_STEP(double, J);
-		double J = 1.0;																// spin exchange
-		double J0 = 0;																// spin exchange coefficient disorder
-		double h = 0.0;																// perpendicular magnetic field
-		double w = 0.0;																// the distorder strength to set dh in (-disorder_strength, disorder_strength)
-		double g = 0.0;																// transverse magnetic field
-		double g0 = 0.0;															// disorder in the system - deviation from a constant g0 value
+		UI_PARAM_STEP(double, J, 1.0);					// spin exchange
+		UI_PARAM_STEP(double, hz, 1.0);					// perpendicular field
+		UI_PARAM_STEP(double, hx, 1.0);					// transverse field
+		// ############### XYZ #################		
+		UI_PARAM_STEP(double, J2, 2.0);					// next nearest neighbors exchange
+		UI_PARAM_STEP(double, eta1, 0.5);				
+		UI_PARAM_STEP(double, eta2, 0.5);
+		UI_PARAM_STEP(double, dlt1, 0.3);
+		UI_PARAM_STEP(double, dlt2, 0.3);
 	};
 
-	// lattice stuff
+	/*
+	* @brief Defines lattice used later for the models
+	*/
 	struct LatP {
-		LatticeTypes typ = SQ; 																					// for non_numeric data
-		int bc = 0;
-		int dim = 1;
-		int Lx = 2;
-		int Ly = 1;
-		int Lz = 1;
+		LatticeTypes typ_		=		LatticeTypes::SQ; 																					// for non_numeric data
+		BoundaryConditions bc_	=		BoundaryConditions::PBC;
+		int dim_				=		1;
+		int Lx_					=		2;
+		int Ly_					=		1;
+		int Lz_					=		1;
 		std::shared_ptr<Lattice> lat;
 	};
 
+	/*
+	* @brief Defines a container for symmetry eigenvalues.
+	* @warning By default, the parameters are -maximal integer in order to tell that no symmetry is used
+	*/
 	struct SymP {
-		bool S = false;
-		int kSec = 0;									// translation symmetry sector
-		bool pxSec = true;								// x parity sector
-		bool pySec = true;								// y parity sector
-		bool pzSec = true;								// z parity sector
-		bool xSec = true;								// spin flip sector
-		int U1Sec = 0;									// particle number conservation sector
+		UI_PARAM_CREATE_DEFAULT(S	, bool	, false		);
+		UI_PARAM_CREATE_DEFAULT(k	, int	, -INT_MAX	);
+		UI_PARAM_CREATE_DEFAULT(px	, int	, -INT_MAX	);
+		UI_PARAM_CREATE_DEFAULT(py	, int	, -INT_MAX	);
+		UI_PARAM_CREATE_DEFAULT(pz	, int	, -INT_MAX	);
+		UI_PARAM_CREATE_DEFAULT(x	, int	, -INT_MAX	);
+		UI_PARAM_CREATE_DEFAULT(U1	, int	, -INT_MAX	);
+		
+		void setDefault() {
+			UI_PARAM_SET_DEFAULT(S);
+			UI_PARAM_SET_DEFAULT(k);
+			UI_PARAM_SET_DEFAULT(px);
+			UI_PARAM_SET_DEFAULT(py);
+			UI_PARAM_SET_DEFAULT(pz);
+			UI_PARAM_SET_DEFAULT(x);
+			UI_PARAM_SET_DEFAULT(U1);
+		}
 	};
 
 	// !TODO 
@@ -125,12 +147,12 @@ namespace UI_PARAMS {
 	};
 };
 
-// --------------------------------------------------------  				 MAP OF DEFAULTS FOR HUBBARD 				  --------------------------------------------------------
-
-// ------------------------------------------- 				  CLASS				 -------------------------------------------
-
+/*
+* @brief
+*/
 class UI : public UserInterface {
-private:
+
+protected:
 	// set the possible options
 	cmdMap default_params = {
 	//	std::make_tuple("m", &this->nqsP.mcSteps, "300", std::function(higherThanZero)),			// mcsteps	
@@ -139,89 +161,66 @@ private:
 	//	std::make_tuple("bs", &this->nqsP.blockSize, "8", std::function(higherThanZero)),			// block size
 	//	std::make_tuple("nh", &this->nqsP.nHidden, "2", std::function(higherThanZero))				// hidden parameters
 		
-		// lattice parameters
-		{"d",	std::make_tuple("1"		, higherThanZero)	},				// dimension
-		{"lx",	std::make_tuple("4"		, higherThanZero)	},
-		{"ly",	std::make_tuple("1"		, higherThanZero)	},
-		{"lz",	std::make_tuple("1"		, higherThanZero)	},
-		{"bc",	std::make_tuple("0"		, higherThanZero)	},				// boundary condition
-		{"l",	std::make_tuple("0"		, higherThanZero)	},				// lattice type (default square)
-		{"f",	std::make_tuple(""		, defaultReturn)	},				// file to read from directory
-		// model parameters
-		{"mod",	std::make_tuple("0"		, higherThanZero)	},				// choose model
-		{"J",	std::make_tuple("1.0"	, defaultReturn)	},				// spin coupling
-		{"J0",	std::make_tuple("0.0"	, defaultReturn)	},				// spin coupling randomness maximum (-J0 to J0)
-		{"h",	std::make_tuple("0.1"	, defaultReturn)	},				// perpendicular magnetic field constant
-		{"w",	std::make_tuple("0.01"	, defaultReturn)	},				// disorder strength
-		{"g",	std::make_tuple("1.0"	, defaultReturn)	},				// transverse magnetic field constant
-		{"g0",  std::make_tuple("0.0"	, defaultReturn)	},				// transverse field randomness maximum (-g0 to g0)
-		// heisenberg	
-		{"dlt", std::make_tuple("1.0"	, defaultReturn)	},				// delta
-		// xyz
-		{"dlt2",std::make_tuple("0.9"	, defaultReturn)	},				// delta2
-		{"J2",  std::make_tuple("1.0"	, defaultReturn)	},				// J2
-		{"eta", std::make_tuple("0.0"	, defaultReturn)	},				// eta
-		{"eta2",std::make_tuple("0.0"	, defaultReturn)	},				// eta2
-
-		// kitaev
-		{"kx",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev x interaction
-		{"ky",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev y interaction
-		{"kz",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev z interaction
-		{"k0",  std::make_tuple("0.0"	, defaultReturn)	},				// kitaev interaction disorder
-		// other
-		{"fun", std::make_tuple("-1"	, defaultReturn)	},				// choice of the function to be calculated
-		{"th",  std::make_tuple("1"		, defaultReturn)	},				// number of threads
-		{"q",   std::make_tuple("0"		, defaultReturn)	}				// quiet?
+		{"f",	std::make_tuple(""		, FHANDLE_PARAM_DEFAULT			)},	// file to read from directory
+		// ---------------- lattice parameters ----------------
+		UI_OTHER_MAP(d			, this->latP._dim , FHANDLE_PARAM_BETWEEN(1, 3)	),	
+		UI_OTHER_MAP(bc			, this->latP._dim , FHANDLE_PARAM_BETWEEN(0, 3)	),
+		UI_OTHER_MAP(l			, 1.0	, FHANDLE_PARAM_BETWEEN(0, 1)	),
+		UI_OTHER_MAP(l			, 1.0	, FHANDLE_PARAM_BETWEEN(0, 1)	),
+		UI_OTHER_MAP(lx			, 2.0	, FHANDLE_PARAM_HIGHER0			),
+		UI_OTHER_MAP(ly			, 1.0	, FHANDLE_PARAM_HIGHER0			),
+		UI_OTHER_MAP(lz			, 1.0	, FHANDLE_PARAM_HIGHER0			),
+		// ---------------- model parameters ----------------
+		UI_OTHER_MAP(mod		, 0.0	, FHANDLE_PARAM_BETWEEN(0, 2)	),
+		// -------- ising
+		UI_PARAM_MAP(J			, 1.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(hx			, 1.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(hy			, 1.0	, FHANDLE_PARAM_DEFAULT			),
+		// -------- heisenberg	
+		UI_PARAM_MAP(d1			, 0.3	, FHANDLE_PARAM_DEFAULT			),
+		// -------- xyz
+		UI_PARAM_MAP(j2			, 2.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(e1			, 0.5	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(e2			, 0.5	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(d2			, 0.3	, FHANDLE_PARAM_DEFAULT			),
+		// -------- kitaev --------
+		UI_PARAM_MAP(kx			, 0.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(ky			, 0.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(kz			, 0.0	, FHANDLE_PARAM_DEFAULT			),
+		// ---------------- symmetries ----------------
+		UI_PARAM_MAP(ks			, symP.	, FHANDLE_PARAM_HIGHER0			),
+		UI_PARAM_MAP(pxs		, 0.0	, FHANDLE_PARAM_BETWEEN()		),
+		UI_PARAM_MAP(pys		, 0.0	, FHANDLE_PARAM_BETWEEN()		),
+		UI_PARAM_MAP(pzs		, 0.0	, FHANDLE_PARAM_BETWEEN()		),
+		UI_PARAM_MAP(xs			, 0.0	, FHANDLE_PARAM_BETWEEN()		),
+		UI_PARAM_MAP(u1s		, 0.0	, FHANDLE_PARAM_DEFAULT			),
+		UI_PARAM_MAP(SYM		, 0.0	, FHANDLE_PARAM_BETWEEN(0, 1)	),	// even use symmetries?
+		// ---------------- other ----------------
+		UI_OTHER_MAP(fun		, -1.	, FHANDLE_PARAM_HIGHERV(-1.0)	),	// choice of the function to be calculated
+		UI_OTHER_MAP(th			, 1.0	, FHANDLE_PARAM_HIGHER0			),	// number of threads
+		UI_OTHER_MAP(q			, 0.0	, FHANDLE_PARAM_DEFAULT			),	// quiet?
 	};
 
-	// lattice
+	// LATTICE params
 	UI_PARAMS::LatP latP;
 
-	// symmetry params
+	// SYMMETRY params
 	UI_PARAMS::SymP symP;
 
 	// NQS params
 	UI_PARAMS::NqsP nqsP;
 
-	// define basic model
-	//shared_ptr<SpinHamiltonian<_hamtype>> ham;
-	std::shared_ptr<Hamiltonian<double>> hamDouble;
-	std::shared_ptr<Hamiltonian<cpx>> hamComplex;
-
-	//impDef::ham_types model_name;												// the name of the model for parser
-	double J = 1.0;																// spin exchange
-	double J0 = 0;																// spin exchange coefficient disorder
-	double h = 0.0;																// perpendicular magnetic field
-	double w = 0.0;																// the distorder strength to set dh in (-disorder_strength, disorder_strength)
-	double g = 0.0;																// transverse magnetic field
-	double g0 = 0.0;															// disorder in the system - deviation from a constant g0 value
-
-	// heisenberg stuff
-	double delta = 0.00;														// 
-
-	// kitaev-heisenberg 
-	double Kx = 1;
-	double Ky = 1;
-	double Kz = 1;
-	double K0 = 0.0;
+	// define basic models
+	std::shared_ptr<Hamiltonian<double>>	hamDouble;
+	std::shared_ptr<Hamiltonian<cpx>>		hamComplex;
 
 	// heisenberg with classical dots stuff
-	v_1d<int> positions = {};
-	arma::vec phis = arma::vec({});
-	arma::vec thetas = arma::vec({});
-	arma::vec J_dot = { 1.0,0.0,-1.0 };
-	double J0_dot = 0.0;
-	double J_dot_dot = 1.0;														// dot - dot  classical interaction
-
-	// xyz parameters
-	double Jb = 1.0;																						// next nearest neighbors J	
-	double Delta_b = 0.9;																					// sigma_z*sigma_z next nearest neighbors
-	double eta_a = 0.5;
-	double eta_b = 0.5;
-
-	// others 
-	bool quiet;																	// bool flags	
-	uint thread_number = 1;														// thread parameters
+	//v_1d<int> positions = {};
+	//arma::vec phis = arma::vec({});
+	//arma::vec thetas = arma::vec({});
+	//arma::vec J_dot = { 1.0,0.0,-1.0 };
+	//double J0_dot = 0.0;
+	//double J_dot_dot = 1.0;														// dot - dot  classical interaction
 
 	// averages from operators
 	//avOperators av_op;
@@ -229,14 +228,13 @@ private:
 	// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
 	//void compare_ed(double ground_rbm);
 	//void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-protected:
 
-//private:
+private:
 	// INNER METHODS
-
 	// ####################### SYMMETRIES #######################
-		
-	//void symmetries_cpx(clk::time_point start);
+	template<typename _T>
+	void symmetries(clk::time_point start);
+
 	//void symmetries_double(clk::time_point start);
 
 	// ####################### CLASSICAL ########################
@@ -250,14 +248,10 @@ protected:
 
 public:
 	// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
-	UI() = default;
-	UI(int argc, char** argv) {
-		strVec input = fromPtr(argc, argv, 1);											// change standard input to vec of strings
-		//input = std::vector<string>(input.begin()++, input.end());					// skip the first element which is the name of file
-		if (std::string option = this->getCmdOption(input, "-f"); option != "")
-			input = this->parseInputFile(option);										// parse input from file
-		this->parseModel((int)input.size(), input);
-	}
+	~UI()									= default;
+	UI()									= default;
+	UI(int argc, char** argv)
+		: UserInterface(argc, argv)			{};
 
 	// -----------------------------------------------   	 PARSER FOR HELP  		-------------------------------------------
 	void exitWithHelp() override {
@@ -294,14 +288,14 @@ public:
 		);
 		std::exit(1);
 	}
-		
+	
 	// -----------------------------------------------    	   REAL PARSER          -------------------------------------------
 	// the function to parse the command line
-	void funChoice() final;
+	void funChoice()						final;
 	void parseModel(int argc, cmdArg& argv) final;
 
 	// ----------------------------------------------- 			HELPERS  			-------------------------------------------
-	void setDefault() override;
+	void setDefault()						final;
 
 	// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
 	//void define_models();
@@ -324,3 +318,8 @@ public:
 	//void make_symmetries_test(int l = -1);
 
 };
+
+template<typename _T>
+void UI::symmetries(clk::time_point start) {
+
+}
