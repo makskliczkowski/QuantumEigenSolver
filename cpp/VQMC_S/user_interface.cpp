@@ -1,68 +1,33 @@
 #include "include/user_interface/user_interface.h"
 
-// -------------------------------------------------------- PARSERS
-
 /*
-* @brief  Setting parameters to default
+* @brief  Setting parameters to default.
 */
 void UI::setDefault()
 {
 	// lattice stuff
-	this->latP.typ_ = LatticeTypes::SQ; 													// for non_numeric data
-	this->latP.bc = 0;
-	this->latP.dim = 1;
-	this->latP.Lx = 10;
-	this->latP.Ly = 1;
-	this->latP.Lz = 1;
+	this->latP.setDefault();
 
 	// symmetries stuff
-	this->symP.kSec = 0;
-	this->symP.pxSec = true;
-	this->symP.pySec = true;
-	this->symP.pzSec = true;
-	this->symP.xSec = true;
-	this->symP.U1Sec = 0;
+	this->symP.setDefault();
 
 	// define basic model
-	//this->model_name = impDef::ham_types::ising;
-	this->J = 1.0;
-	this->J0 = 0;
-	this->h = 0.1;
-	this->w = 0.05;
-	this->g = 0.2;
-	this->g0 = 0.0;
-
-	// heisenberg stuff
-	this->delta = 0.00;
-
-	// kitaev-heisenberg 
-	this->Kx = 1;
-	this->Ky = 1;
-	this->Kz = 1;
-	this->K0 = 0.0;
-
-	// heisenberg with classical dots stuff
-	this->positions = { 0 };
-	this->phis = arma::vec({ 0 });
-	this->thetas = arma::vec({ 1 });
-	this->J_dot = { 0.0,0.0,-1.0 };
-	this->J0_dot = 0.0;
-	this->J_dot_dot = 1.0;
+	this->modP.setDefault();
 
 	// others 
-	this->thread_number = 1;
+	this->threadNum = 1;
 
 	// rbm
-	this->nqsP.lr = 1e-2;
-	this->nqsP.blockSize = 8;
-	this->nqsP.nBlocks = 500;
-	this->nqsP.mcSteps = 1000;
-	this->nqsP.batch = (u64)std::pow(2, 10);
-	this->nqsP.nVisible = latP.lat->get_Ns();
-	this->nqsP.nHidden = 2ll * latP.lat->get_Ns();
-	this->nqsP.layersDim = { this->nqsP.nVisible , this->nqsP.nHidden };
-	this->nqsP.nTherm = uint(0.1 * this->nqsP.nBlocks);
-	this->nqsP.nFlips = 1;
+	//this->nqsP.lr = 1e-2;
+	//this->nqsP.blockSize = 8;
+	//this->nqsP.nBlocks = 500;
+	//this->nqsP.mcSteps = 1000;
+	//this->nqsP.batch = (u64)std::pow(2, 10);
+	//this->nqsP.nVisible = latP.lat->get_Ns();
+	//this->nqsP.nHidden = 2ll * latP.lat->get_Ns();
+	//this->nqsP.layersDim = { this->nqsP.nVisible , this->nqsP.nHidden };
+	//this->nqsP.nTherm = uint(0.1 * this->nqsP.nBlocks);
+	//this->nqsP.nFlips = 1;
 }
 
 /*
@@ -72,139 +37,85 @@ void UI::setDefault()
 */
 void UI::parseModel(int argc, cmdArg& argv)
 {
+	// --------- HELP
+	if (std::string option = this->getCmdOption(argv, "-hlp"); option != "")
+		this->exitWithHelp();
+
 	// set default at first
 	this->setDefault();
 
 	std::string choosen_option = "";
 
 	// -------------------- SIMULATION PARAMETERS --------------------
-
-	this->setOption(this->nqsP.mcSteps, argv, "m");
-	this->setOption(this->nqsP.batch, argv, "b");
-	this->setOption(this->nqsP.nBlocks, argv, "nb"); this->nqsP.nTherm = uint(0.1 * nqsP.nBlocks);
-	this->setOption(this->nqsP.blockSize, argv, "bs");
-	this->setOption(this->nqsP.nHidden, argv, "nh");
-	SETOPTION(this->nqsP, lr);
+	SETOPTIONV(nqsP	, nMcSteps	,	"m"	);
+	SETOPTIONV(nqsP	, batch		,	"b"	);
+	SETOPTIONV(nqsP	, nBlocks	,	"nb");
+	SETOPTIONV(nqsP	, blockSize	,	"bs");
+	SETOPTIONV(nqsP	, nHidden	,	"nh");
+	SETOPTION( nqsP	, lr				);
+	this->nqsP.nTherm_			=	uint(0.1 * nqsP.nBlocks_);
 	
-	// -------------------- Lattice --------------------
+	// ---------- LATTICE ----------
+	SETOPTIONV(latP	, typ, "l"			);
+	SETOPTIONV(latP	, dim, "d"			);
+	SETOPTION( latP	, Lx				);
+	SETOPTION( latP	, Ly				);
+	SETOPTION( latP	, Lz				);
+	SETOPTION( latP	, bc				);
+	int Ns = latP.Lx_ * latP.Ly_ * latP.Lz_;
 
-	this->setOption(this->latP.typ, argv, "-l");
-	this->setOption(this->latP.dim, argv, "-d");
-	SETOPTION(this->latP, Lx);
-	SETOPTION(this->latP, Ly);
-	SETOPTION(this->latP, Lz);
-	SETOPTION(this->latP, bc);
-	int Ns = latP.Lx * latP.Ly * latP.Lz;
-
-	// ---------- model
+	// ---------- MODEL ----------
 
 	// model type
-	//this->setOption(this->model_name, argv, "-mod", false);
-	this->setOption(this->J, argv, "-J");
-	this->setOption(this->J0, argv, "-J0");
-	this->setOption(this->J_dot_dot, argv, "-Jd");
-	this->setOption(this->g, argv, "-g");
-	this->setOption(this->g0, argv, "-g0");
-	this->setOption(this->h, argv, "-h");
-	this->setOption(this->w, argv, "-w");
-
+	SETOPTIONV(		modP, modTyp, "mod"	);
+	// --- ising ---
+	SETOPTION_STEP(	modP, J				);
+	SETOPTION_STEP(	modP, hx			);
+	SETOPTION_STEP(	modP, hz			);
 	// --- heisenberg ---
-	this->setOption(this->delta, argv, "-dlt");
-	
-	// --- XYZ --- 
-	this->setOption(this->Delta_b, argv, "-dlt2");
-	this->setOption(this->Jb, argv, "-J2");
-	this->setOption(this->eta_a, argv, "-eta");
-	this->setOption(this->eta_b, argv, "-eta2");
-	
+	SETOPTION_STEP(	modP, dlt1			);
+	// --- xyz ---
+	SETOPTION_STEP(	modP, J2			);
+	SETOPTION_STEP(	modP, dlt2			);
+	SETOPTION_STEP(	modP, eta1			);
+	SETOPTION_STEP(	modP, eta2			);
 	// --- kitaev ---
-	this->setOption(this->Kx, argv, "-kx");
-	this->setOption(this->Ky, argv, "-ky");
-	this->setOption(this->Kz, argv, "-kz");
-	this->setOption(this->K0, argv, "-k0");
+	SETOPTION_STEP(modP, kx				);
+	SETOPTION_STEP(modP, ky				);
+	SETOPTION_STEP(modP, kz				);
 
-	//---------- SYMMETRIES
-	
-	// translation
-	SETOPTION(this->symP, kSec);
-	SETOPTION(this->symP, pxSec);
-	SETOPTION(this->symP, pySec);
-	SETOPTION(this->symP, pzSec);
-	SETOPTION(this->symP, xSec);
-	SETOPTION(this->symP, U1Sec);
-	SETOPTION(this->symP, S);
+	// ---------- SYMMETRIES ----------
+	SETOPTION(symP, k);
+	SETOPTION(symP, px);
+	SETOPTION(symP, py);
+	SETOPTION(symP, pz);
+	SETOPTION(symP, x);
+	SETOPTION(symP, U1);
+	SETOPTION(symP, S);
 
 	// ---------- OTHERS
-	this->setOption(this->quiet, argv, "-q");
-	this->setOption(this->thread_number, argv, "-th");
-	
-	// --------- HELP
-	if (std::string option = this->getCmdOption(argv, "-hlp"); option != "")
-		exitWithHelp();
+	this->setOption(this->quiet		, argv, "q"		);
+	this->setOption(this->threadNum	, argv, "th"	);
 
 	// later function choice
-	this->setOption(this->chosen_funtion, argv, "-fun");
+	this->setOption(this->chosenFun	, argv, "fun"	);
 
 	//---------- DIRECTORY
 
 	bool set_dir = false;
 	choosen_option = "dir";
-	if (std::string option = this->getCmdOption(argv, "-" + choosen_option); option != "") {
-		this->setOption(this->main_dir, argv, choosen_option);
+	if (std::string option = this->getCmdOption(argv, "-" + choosen_option); option != "")
+	{
+		this->setOption(this->mainDir, argv, choosen_option);
 		set_dir = true;
 	}
 	if (!set_dir)
-		this->main_dir = fs::current_path().string() + kPS + "results" + kPS;
+		this->mainDir = fs::current_path().string() + kPS + "results" + kPS;
 
 	// create the directories
-	createDir(this->main_dir);
+	createDir(this->mainDir);
 }
 
-/*
-* @brief chooses the method to be used later based on input -fun argument
-*/
-void UI::funChoice()
-{
-	switch (this->chosen_funtion)
-	{
-	case -1:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
-	//case 0:
-	//	// test
-	//	this->make_symmetries_test();
-	//	break;
-	//case 11:
-	//	// calculate the simulation with classical degrees of freedom
-	//	this->make_mc_classical();
-	//	break;
-	//case 12:
-	//	// check the minimum of energy when classical spins are varied with angle and with interaction
-	//	this->make_mc_angles_sweep();
-	//	break;
-	//case 13:
-	//	// check the properties of Kitaev model when the interations are 
-	//	this->make_mc_kitaev_sweep();
-	//	break;
-	//case 14:
-	//	// make simulation for a single model based on input parameters
-	//	this->make_simulation();
-	//	break;
-	//case 21:
-	//	// this option utilizes the Hamiltonian with symmetries calculation
-	//	this->make_simulation_symmetries();
-	//	break;
-	//case 22:
-	//	// this option utilizes the Hamiltonian with symmetries calculation - sweep!
-	//	this->make_simulation_symmetries_sweep();
-	//	break;
-	default:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
-	}
-}
 // -------------------------------------------------------- SIMULATIONS
 
 /*
@@ -1004,145 +915,6 @@ void UI::funChoice()
 //template<typename _type, typename _hamtype>
 //inline void rbm_ui::ui<_type, _hamtype>::symmetries_double(clk::time_point start)
 //{
-//	stout << "->using real" << EL;
-//	if (sym) {
-//		if (this->model_name == 0)
-//			this->ham_d = std::make_shared<ising_sym::IsingModelSym<double>>(J, g, h, lat, k_sym, p_sym, x_sym, this->thread_num);
-//		else
-//			this->ham_d = std::make_shared<xyz_sym::XYZSym<double>>(lat, this->J, this->Jb, this->g, this->h,
-//				this->delta, this->Delta_b, this->eta_a, this->eta_b,
-//				k_sym, p_sym, x_sym, su2, this->thread_num);
-//		this->ham_d->hamiltonian();
-//	}
-//	else {
-//		if (this->model_name == 0)
-//			this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
-//		else
-//			this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, this->p_break);
-//		this->ham_d->hamiltonian();
-//	}
-//	const u64 N = this->ham_d->get_hilbert_size();
-//	bool use_s_i = false;
-//	u64 state_num = N;
-//
-//	stouts("\t->finished buiding Hamiltonian", start);
-//	stout << "\t->" << this->ham_d->get_info() << EL;
-//	if (N < ULLPOW(8)){
-//		stout << "\t->" << "using standard diagonalization" << EL;
-//		this->ham_d->diag_h(false);
-//	}
-//	else
-//	{
-//		stout << "\t->" << "using S&I" << EL;
-//		use_s_i = true;
-//		state_num = 100;
-//		this->ham_d->diag_h(false, state_num, 0, 1000, 1e-5, "sa");
-//	}
-//	stouts("\t->finished diagonalizing Hamiltonian", start);
-//
-//	std::string name = "spectrum_num=" + STR(N);
-//	stout << "->middle_spectrum_size : " << name << ".\n\t\t->Taking num states: " << state_num << EL;
-//
-//	// create the directories
-//	std::string dir = this->saving_dir + kPS;
-//	fs::create_directories(dir);
-//	std::ofstream file;
-//	std::ofstream fileAv;
-//	std::string model_info = this->ham_d->get_info();
-//
-//	// save energies to check
-//	if (N < ULLPOW(16)) {
-//		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
-//		for (u64 i = 0; i < state_num; i++)
-//			file << this->ham_d->get_eigenEnergy(i) << EL;
-//		file.close();
-//	}
-//	
-//	// save energies
-//	std::string filename = dir + model_info + "," + name;
-//	const vec& energies = this->ham_d->get_eigenvalues();
-//	energies.save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
-//	this->ham_d->clear_energies();
-//	this->ham_d->clear_hamiltonian();
-//
-//	// calculate the reduced density matrices
-//	Operators<double> op(this->lat);
-//
-//	// iterate through bond cut
-//	int bond_num = this->lat->get_Ns() / 2;
-//	arma::mat entropies(bond_num, state_num, arma::fill::zeros);
-//
-//	// check the symmetry rotation
-//	auto global = this->ham_d->get_global_sym();
-//	v_1d<u64> full_map = global.su ? this->ham_d->get_mapping_full() : v_1d<u64>();
-//	SpMat<double> symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
-//
-//	// set less number of bonds for quicker calculations
-//	v_1d<uint> bonds = { static_cast<uint>(bond_num) };
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (u64 idx = 0; idx < state_num; idx++) {
-//		Col<double> state = this->ham_d->get_eigenState(idx);
-//		if (this->sym)
-//			state = symmetryRotationMat * state;
-//		for (auto i : bonds) {
-//			// iterate through the state
-//			//auto entro = op.entanglement_entropy(state, i, full_map);
-//			auto entro = op.schmidt_decomposition(state, i, full_map);
-//			entropies(i - 1, idx) = entro;
-//		}
-//		if (state_num > 10 && idx % int(state_num / 10) == 0) {
-//			stout << "\t->Done: " << int(idx * 100.0 / state_num) << "%\n";
-//			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
-//		}
-//	}
-//	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
-//	
-//	// save entropies file
-//	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-//	if (this->lat->get_Ns() <= 12) 
-//		entropies.save(filename + ".dat", arma::arma_ascii);
-//
-//	if (use_s_i)
-//		return;
-//
-//	// set the average energy index
-//	const u64 av_energy_idx = this->ham_d->get_en_av_idx();
-//
-//	// save states near the mean energy index
-//	if (this->lat->get_Ns() == 20) {
-//		arma::mat states = this->ham_d->get_eigenvectors().submat(0, av_energy_idx - 50, N-1, av_energy_idx + 50);
-//		states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
-//	}
-//
-//	// iterate through fractions
-//	v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
-//	v_1d<double> mean_frac(fractions.size());
-//	for (int iter = 0; iter < fractions.size(); iter++) {
-//		double frac = fractions[iter];
-//		u64 spectrum_num = frac <= 1.0 ? frac * N : static_cast<u64>(frac);
-//		name = "spectrum_num=" + STR(N);
-//		// define the window to calculate the entropy
-//		if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
-//			continue;
-//
-//		auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
-//		vec bond_mean(bond_num, arma::fill::zeros);
-//		for (int i = 1; i <= bond_num; i++)
-//			bond_mean(i - 1) = arma::mean(subview.row(i - 1));
-//		std::string filename = dir + "av_" + model_info + "," + name;
-//		bond_mean.save(arma::hdf5_name(filename + ".h5", STRP(frac, 3), arma::hdf5_opts::append));
-//
-//		mean_frac[iter] = bond_mean(bond_num - 1);
-//	}
-//	
-//	// save maxima
-//	openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
-//	vec maxima = arma::max(entropies, 1);
-//	printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1));
-//	for(auto mean : mean_frac)
-//		printSeparatedP(fileAv, '\t', 18, false, 12, mean);
-//	printSeparatedP(fileAv, '\t', 18, true, 12, N);
-//	fileAv.close();
 //}
 //
 ///*
