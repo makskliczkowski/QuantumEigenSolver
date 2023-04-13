@@ -117,13 +117,13 @@
     <ClInclude Include="source\src\plotter.h">
       <Filter>Header Files\source</Filter>
     </ClInclude>
-    <ClInclude Include="include\hilbert.h">
+    <ClInclude Include="include\hilbert_sym.h">
       <Filter>Header Files\include</Filter>
     </ClInclude>
     <ClInclude Include="include\algebra\operator_algebra.h">
       <Filter>Header Files\include\algebra</Filter>
     </ClInclude>
-    <ClInclude Include="include\algebra\symmetries.h">
+    <ClInclude Include="include\algebra\hilbert.h">
       <Filter>Header Files\include\algebra</Filter>
     </ClInclude>
     <ClInclude Include="include\algebra\global_symmetries.h">
@@ -131,6 +131,21 @@
     </ClInclude>
     <ClInclude Include="include\algebra\operators.h">
       <Filter>Header Files\include\algebra</Filter>
+    </ClInclude>
+    <ClInclude Include="include\algebra\general_operator.h">
+      <Filter>Header Files\include\algebra</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\flog.h">
+      <Filter>Header Files\source</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\Include\signatures.h">
+      <Filter>Header Files\source\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\Include\time.h">
+      <Filter>Header Files\source\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="source\src\Include\exceptions.h">
+      <Filter>Header Files\source\Include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -157,6 +172,12 @@
     </ClCompile>
     <ClCompile Include="source\cpp\ui.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\cpp\directories.cpp">
+      <Filter>Source Files\source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\cpp\exceptions.cpp">
+      <Filter>Source Files\source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

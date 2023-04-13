@@ -31,10 +31,10 @@ public:
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override final;
 	cpx locEnergy(u64 _id, uint site, Operators::_OP<cpx>::INP<double> f1,
 		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final {};
+		arma::vec& tmp)									override final { return 0; };
 	cpx locEnergy(const arma::vec& v, uint site, Operators::_OP<cpx>::INP<double> f1,
 		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final {};
+		arma::vec& tmp)									override final { return 0; };
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -106,7 +106,7 @@ template<typename _T>
 inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
 	// get number of forward nn
-	uint NUM_OF_NN = this->lat_->get_nn_ForwardNum(_site);
+	uint NUM_OF_NN = (uint)this->lat_->get_nn_ForwardNum(_site);
 	u64 newIdx	= 0;
 	_T newVal	= 0;
 
@@ -121,7 +121,7 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	}
 
 	// -------------- CHECK NN ---------------
-	for (auto nn = 0; nn < NUM_OF_NN; nn++) {
+	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
 		auto N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
 		if (auto nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) {
 			// Ising-like spin correlation

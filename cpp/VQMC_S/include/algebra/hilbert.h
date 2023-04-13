@@ -1,10 +1,10 @@
 #pragma once
 
-#ifndef SYMMETRIES_H
-#define SYMMETRIES_H
-
 #ifndef HILBERT_H
-	#include "../hilbert.h"
+#define HILBERT_H
+
+#ifndef HILBERTSYM_H
+	#include "../hilbert_sym.h"
 #endif
 #ifndef GLOBALSYM_H
 	#include "global_symmetries.h"
@@ -59,7 +59,7 @@ namespace Hilbert {
 			: lat(_lat), Nhl(_Nhl), Nint(_Nint)
 		{
 			this->Ns				=				this->lat->get_Ns();
-			this->NhFull			=				std::pow(this->Nhl, this->Ns * this->Nint);
+			this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
 
 			// set symmetry elements
 			this->symGroupGlobal_	=				_glob;
@@ -72,12 +72,12 @@ namespace Hilbert {
 			this->generateMapping();
 
 			if (this->Nh == this->NhFull)
-				stoutd("\t\t\t->Produced the full Hilbert space\n");
+				stout << "\t\t\t->Produced the full Hilbert space\n";
 
 			// no states in Hilbert space
 			if (this->Nh <= 0)
-				stoutd("\t\t\t->No states in the Hilbert space\n");
-		}
+				stout << "\t\t\t->No states in the Hilbert space\n";
+		};
 
 		// ------------------------ INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
@@ -94,7 +94,7 @@ namespace Hilbert {
 		// ------------------------ GETTERS ------------------------
 		int getBC()										const					{ return this->lat->get_BC(); };
 		std::shared_ptr<Lattice> getLattice()			const					{ return this->lat; };
-		u64 getLatticeSize()							const					{ return this->Ns; };
+		uint getLatticeSize()							const					{ return this->Ns; };
 		u64 getHilbertSize()							const					{ return this->Nh; };
 		u64 getFullHilbertSize()						const					{ return this->NhFull; };
 		auto getLocalHilbertSize()						const -> uint			{ return this->Nhl; };
@@ -116,7 +116,7 @@ namespace Hilbert {
 		bool			checkSym()						const					{ return this->Nh == this->NhFull; };
 		bool			checkLSym()						const					{ return this->symGroup_.size() != 0; };
 		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0; };
-		bool			checkU1()						const					{ for (auto g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
+		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
 	};
 
 	// ##########################################################################################################################################
@@ -138,7 +138,7 @@ namespace Hilbert {
 		bool containsU1_			=			this->checkU1();
 
 		for (auto i = 0; i < genIn.size(); i++) {
-			const auto [gen, sec] = genIn[i];
+			const auto& [gen, sec] = genIn[i];
 			
 			if (static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::T)
 			{
@@ -167,7 +167,7 @@ namespace Hilbert {
 		// remove parity symmetry
 		for (auto i = 0; i < genIn.size(); i++)
 		{
-			const auto [gen, sec] = genIn[i];
+			const auto& [gen, sec] = genIn[i];
 			if(static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::R && containsTCpx_)
 				genIn.erase(genIn.begin() + i);
 
@@ -180,7 +180,7 @@ namespace Hilbert {
 		}
 
 		// save all for convenience
-		for(auto g : genIn)
+		for(auto& g : genIn)
 			this->symGroupSec_.push_back(g);
 
 		// add neutral element
@@ -210,7 +210,7 @@ namespace Hilbert {
 		// handle the translation
 		if (containsT_) {
 			v_1d<Operators::Operator<_T>> symGroupT_ = this->symGroup_;
-			for (auto i = 1; i < this->lat->get_Ns(); i++) {
+			for (uint i = 1; i < this->lat->get_Ns(); i++) {
 				// add combinations with other symmetries
 				for (auto Go : symGroupT_)
 					this->symGroup_.push_back(T % Go);
@@ -231,8 +231,8 @@ namespace Hilbert {
 		std::string tmp = "";
 		if(this->checkLSym())
 			// start with local symmetries
-			for (auto g : this->symGroupSec_) {
-				auto [gen, val] = g;
+			for (auto& g : this->symGroupSec_) {
+				auto& [gen, val] = g;
 				tmp += SSTR(Operators::getSTR_SymGenerators(static_cast<Operators::SymGenerators>(gen)));
 				tmp += ",";
 				tmp += STR(val);
@@ -240,7 +240,7 @@ namespace Hilbert {
 			}
 		if(this->checkGSym())
 			// start wit global symmetries
-			for (auto g : this->symGroupGlobal_) {
+			for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) {
 				auto name = g.getName();
 				auto val = g.getVal();
 				tmp += SSTR(GlobalSyms::getSTR_GlobalSymGenerators(static_cast<GlobalSyms::GlobalSymGenerators>(name)));
@@ -412,7 +412,7 @@ namespace Hilbert {
 			// check all global conservation
 			bool globalChecker = true;
 			for (auto& Glob : this->symGroupGlobal_)
-				globalChecker = globalChecker & Glob(j);
+				globalChecker = globalChecker && Glob(j);
 
 			// if is not conserved
 			if (!globalChecker)

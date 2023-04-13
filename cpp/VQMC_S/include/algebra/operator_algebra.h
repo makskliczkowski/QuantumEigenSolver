@@ -8,8 +8,10 @@ using u64 = unsigned long long;
 using cpx = std::complex<double>;
 
 namespace Operators {
-	typedef std::pair<u64, cpx> _OPCx;
-	typedef std::pair<u64, double> _OPRe;
+	template <typename _T>
+	using _OPx = std::pair<u64, _T>;
+	typedef _OPx<cpx> _OPCx;
+	typedef _OPx<double> _OPRe;
 
 	/*
 	* @brief All possible correlators
@@ -43,9 +45,19 @@ namespace Operators {
 	template<typename _T>
 	using _COR			=		_OP<_T>::COR;
 	template<typename _T, typename ..._Ts>
-	using _INP			=		_OP<_T>::INP(_T...);
+	using _INP			=		_OP<_T>::INP<_Ts...>;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+	//template <typename _T, typename _T2, typename ..._Ts, typename ..._T2s>
+	//inline auto operator*(_INP<_T, _Ts...> f, _INP<_T2, _T2s...> g) {
+	//	return [f, g](u64 s, _Ts... a1, _T2s... a2)
+	//		{
+	//			auto [s1, v1] = g(s, a2...);
+	//			auto [s2, v2] = f(s1, a1...);
+	//			return std::make_pair(s2, v1 * v2);
+	//		};
+	//};
 
 	/*
 	* @brief Imitates the behavior f \dot g \equiv f(g(n,...),...) 
@@ -96,11 +108,32 @@ namespace Operators {
 	};
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-	template <typename... _T>
-	inline auto operator%(_INPC<_T...> f, _INPC<_T...> g)
+	template <typename _T, typename _T2, typename... _Ts, typename _OPL = _OP<_T>::INP<_Ts...>, typename _OPR = _OP<_T2>::INP<_Ts...>>
+	inline auto operator%(_OPL f, _OPR g)
 	{
-		return [f, g](u64 s, _T... a) -> _OPCx
+		return [f, g](u64 s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, static_cast<_T2>(v1 * v2));
+		};
+	};
+	
+	template <typename... _Ts>
+	inline auto operator%(_OP<double>::INP<_Ts...> f, _OP<double>::INP<_Ts...> g)
+	{
+		return [f, g](u64 s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, static_cast<double>(v1 * v2));
+		};
+	};
+
+	template <typename... _Ts>
+	inline auto operator%(_OP<cpx>::INP<_Ts...> f, _OP<double>::INP<_Ts...> g)
+	{
+		return [f, g](u64 s, _Ts... a)
 		{
 			auto [s1, v1] = g(s, a...);
 			auto [s2, v2] = f(s1, a...);
@@ -108,10 +141,10 @@ namespace Operators {
 		};
 	};
 
-	template <typename... _T>
-	inline auto operator%(_INPR<_T...> f, _INPR<_T...> g)
+	template <typename... _Ts>
+	inline auto operator%(_OP<cpx>::INP<_Ts...> f, _OP<cpx>::INP<_Ts...> g)
 	{
-		return [f, g](u64 s, _T... a) -> _OPRe
+		return [f, g](u64 s, _Ts... a)
 		{
 			auto [s1, v1] = g(s, a...);
 			auto [s2, v2] = f(s1, a...);
@@ -119,21 +152,10 @@ namespace Operators {
 		};
 	};
 
-	template <typename... _T>
-	inline auto operator%(_INPR<_T...> f, _INPC<_T...> g)
+	template <typename... _Ts>
+	inline auto operator%(_OP<double>::INP<_Ts...> f, _OP<cpx>::INP<_Ts...> g)
 	{
-		return [f, g](u64 s, _T... a) -> _OPCx
-		{
-			auto [s1, v1] = g(s, a...);
-			auto [s2, v2] = f(s1, a...);
-			return std::make_pair(s2, v1 * v2);
-		};
-	};
-
-	template <typename... _T>
-	inline auto operator%(_INPC<_T...> f, _INPR<_T...> g)
-	{
-		return [f, g](u64 s, _T... a) -> _OPCx
+		return [f, g](u64 s, _Ts... a)
 		{
 			auto [s1, v1] = g(s, a...);
 			auto [s2, v2] = f(s1, a...);

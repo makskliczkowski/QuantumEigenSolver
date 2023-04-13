@@ -11,7 +11,7 @@ namespace GlobalSyms {
 
 	BEGIN_ENUM(GlobalSymGenerators)
 	{
-		DECL_ENUM_ELEMENT(U1),
+		DECL_ENUM_ELEMENT(U1)
 	}
 	END_ENUM(GlobalSymGenerators);
 
@@ -26,7 +26,9 @@ namespace GlobalSyms {
 
 		// constructors
 		GlobalSym(std::shared_ptr<Lattice> _lat, GlobalSymGenerators _name = GlobalSymGenerators::OTHER)
-			: val_(0), lat_(_lat), name_(_name)									{};
+			: val_(0), lat_(_lat), name_(_name)									{};		
+		GlobalSym(double _val, std::shared_ptr<Lattice> _lat, GlobalSymGenerators _name = GlobalSymGenerators::OTHER)
+			: val_(_val), lat_(_lat), name_(_name)								{};
 
 		// ---------- SETTERS -----------
 		auto setFun(const repType& _fun)				-> void					{ this->check_ = _fun; };
@@ -34,8 +36,8 @@ namespace GlobalSyms {
 		auto setName(GlobalSymGenerators _name)			-> void					{ this->name_ = _name; };
 
 		// ---------- GETTERS -----------
-		auto getName()									-> GlobalSymGenerators	{ return this->name_; };
-		auto getVal()									-> double				{ return this->val_; };
+		auto getName()							const -> GlobalSymGenerators	{ return this->name_; };
+		auto getVal()									const -> double			{ return this->val_; };
 		// ---------- CHECKER OVERLOAD ------------
 
 		virtual auto operator()(u64 state) const		-> bool					{ return this->check_(state, val_); };
@@ -49,6 +51,7 @@ namespace GlobalSyms {
 	* @brief describes the global check of U(1) symmetry
 	*/
 	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val; };
+	inline GlobalSym getU1Sym(std::shared_ptr<Lattice>& _lat, double _val)		{ return GlobalSym(_val, _lat, GlobalSymGenerators::U1); };
 };
 
 #endif

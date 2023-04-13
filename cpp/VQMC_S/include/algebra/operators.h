@@ -1,9 +1,9 @@
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
-#ifndef SYMMETRIES_H
-#include "symmetries.h"
-#endif // !SYMMETRIES_H
+#ifndef HILBERT_H
+#include "hilbert.h"
+#endif // !HILBERT_H
 
 namespace Operators 
 {

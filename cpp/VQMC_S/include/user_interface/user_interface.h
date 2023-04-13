@@ -44,8 +44,9 @@
 
 // maximal ed size to compare
 constexpr int maxed = 20;
+#define UI_CHECK_SYM(val, gen)									if(this->##val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::##gen, this->##val##_));
 
-// -------------------------------------------------------- Make a User interface class --------------------------------------------------------
+// -------------------------------------------------------- make an USER INTERFACE class --------------------------------------------------------
 
 //template<typename _hamtype>
 //double calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
@@ -158,6 +159,16 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT(x);
 			UI_PARAM_SET_DEFAULT(U1);
 		}
+
+		v_1d<std::pair<Operators::SymGenerators, int>> getLocGenerator() {
+			v_1d<std::pair<Operators::SymGenerators, int>> syms = {};
+			UI_CHECK_SYM(k, T);
+			UI_CHECK_SYM(px, PX);
+			UI_CHECK_SYM(py, PY);
+			UI_CHECK_SYM(pz, PZ);
+			UI_CHECK_SYM(x, R);
+			return syms;
+		}
 	};
 
 	// !TODO 
@@ -197,52 +208,6 @@ namespace UI_PARAMS {
 class UI : public UserInterface {
 
 protected:
-	// set the possible options
-	cmdMap default_params = {
-	//	std::make_tuple("m", &this->nqsP.mcSteps, "300", std::function(higherThanZero)),			// mcsteps	
-	//	std::make_tuple("b", &this->nqsP.batch, "100", std::function(higherThanZero)),				// batch
-	//	std::make_tuple("nb", &this->nqsP.nBlocks, "500", std::function(higherThanZero)),			// number of blocks	
-	//	std::make_tuple("bs", &this->nqsP.blockSize, "8", std::function(higherThanZero)),			// block size
-	//	std::make_tuple("nh", &this->nqsP.nHidden, "2", std::function(higherThanZero))				// hidden parameters
-		
-		{			"f"			, std::make_tuple("", FHANDLE_PARAM_DEFAULT)		},				// file to read from directory
-		// ---------------- lattice parameters ----------------
-		UI_OTHER_MAP(d			, this->latP._dim	, FHANDLE_PARAM_BETWEEN(1, 3)	),	
-		UI_OTHER_MAP(bc			, this->latP._bc	, FHANDLE_PARAM_BETWEEN(0, 3)	),
-		UI_OTHER_MAP(l			, this->latP._typ	, FHANDLE_PARAM_BETWEEN(0, 1)	),
-		UI_OTHER_MAP(lx			, this->latP._Lx	, FHANDLE_PARAM_HIGHER0			),
-		UI_OTHER_MAP(ly			, this->latP._Ly	, FHANDLE_PARAM_HIGHER0			),
-		UI_OTHER_MAP(lz			, this->latP._Lz	, FHANDLE_PARAM_HIGHER0			),
-		// ---------------- model parameters ----------------
-		UI_OTHER_MAP(mod		, this->modP._modTyp, FHANDLE_PARAM_BETWEEN(0, 2)	),
-		// -------- ising
-		UI_PARAM_MAP(J			, this->modP._J		, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(hx			, this->modP._hx	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(hz			, this->modP._hz	, FHANDLE_PARAM_DEFAULT			),
-		// -------- heisenberg	
-		UI_PARAM_MAP(dlt1		, this->modP._dlt1	, FHANDLE_PARAM_DEFAULT			),
-		// -------- xyz
-		UI_PARAM_MAP(J2			, this->modP._J2	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(eta1		, this->modP._eta1	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(eta2		, this->modP._eta2	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(dlt2		, this->modP._dlt2	, FHANDLE_PARAM_DEFAULT			),
-		// -------- kitaev --------
-		UI_PARAM_MAP(kx			, 0.0	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(ky			, 0.0	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(kz			, 0.0	, FHANDLE_PARAM_DEFAULT			),
-		// ---------------- symmetries ----------------
-		UI_PARAM_MAP(ks			, this->symP._k		, FHANDLE_PARAM_HIGHER0			),
-		UI_PARAM_MAP(pxs		, this->symP._px	, FHANDLE_PARAM_BETWEEN()		),
-		UI_PARAM_MAP(pys		, this->symP._py	, FHANDLE_PARAM_BETWEEN()		),
-		UI_PARAM_MAP(pzs		, this->symP._pz	, FHANDLE_PARAM_BETWEEN()		),
-		UI_PARAM_MAP(xs			, this->symP._x		, FHANDLE_PARAM_BETWEEN()		),
-		UI_PARAM_MAP(u1s		, this->symP._U1	, FHANDLE_PARAM_DEFAULT			),
-		UI_PARAM_MAP(SYM		, this->symP._S		, FHANDLE_PARAM_BETWEEN(0, 1)	),	// even use symmetries?
-		// ---------------- other ----------------
-		UI_OTHER_MAP(fun		, -1.	, FHANDLE_PARAM_HIGHERV(-1.0)	),	// choice of the function to be calculated
-		UI_OTHER_MAP(th			, 1.0	, FHANDLE_PARAM_HIGHER0			),	// number of threads
-		UI_OTHER_MAP(q			, 0.0	, FHANDLE_PARAM_DEFAULT			),	// quiet?
-	};
 
 	// LATTICE params
 	UI_PARAMS::LatP latP;
@@ -257,7 +222,10 @@ protected:
 	UI_PARAMS::ModP modP;
 
 	// define basic models
+	bool isComplex_							= false;
+	Hilbert::HilbertSpace<double>			hilDouble;
 	std::shared_ptr<Hamiltonian<double>>	hamDouble;
+	Hilbert::HilbertSpace<cpx>				hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>		hamComplex;
 
 	// heisenberg with classical dots stuff
@@ -271,10 +239,58 @@ protected:
 	// averages from operators
 	//avOperators av_op;
 
+	void setDefaultMap()					final override {
+		this->defaultParams = {
+			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0			),			// mcsteps	
+			UI_OTHER_MAP(b			, this->nqsP.batch_		, FHANDLE_PARAM_HIGHER0			),			// batch
+			UI_OTHER_MAP(nb			, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0			),			// number of blocks
+			UI_OTHER_MAP(bs			, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0			),			// block size
+
+			{			"f"			, std::make_tuple(""	, FHANDLE_PARAM_DEFAULT)		},			// file to read from directory
+			// ---------------- lattice parameters ----------------
+			UI_OTHER_MAP(d			, this->latP._dim		, FHANDLE_PARAM_BETWEEN(1., 3.)	),	
+			UI_OTHER_MAP(bc			, this->latP._bc		, FHANDLE_PARAM_BETWEEN(0., 3.)	),
+			UI_OTHER_MAP(l			, this->latP._typ		, FHANDLE_PARAM_BETWEEN(0., 1.)	),
+			UI_OTHER_MAP(lx			, this->latP._Lx		, FHANDLE_PARAM_HIGHER0			),
+			UI_OTHER_MAP(ly			, this->latP._Ly		, FHANDLE_PARAM_HIGHER0			),
+			UI_OTHER_MAP(lz			, this->latP._Lz		, FHANDLE_PARAM_HIGHER0			),
+			// ---------------- model parameters ----------------
+			UI_OTHER_MAP(mod		, this->modP._modTyp	, FHANDLE_PARAM_BETWEEN(0., 2.)	),
+			// -------- ising
+			UI_PARAM_MAP(J			, this->modP._J			, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(hx			, this->modP._hx		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(hz			, this->modP._hz		, FHANDLE_PARAM_DEFAULT			),
+			// -------- heisenberg		
+			UI_PARAM_MAP(dlt1		, this->modP._dlt1		, FHANDLE_PARAM_DEFAULT			),
+			// -------- xyz
+			UI_PARAM_MAP(J2			, this->modP._J2		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(eta1		, this->modP._eta1		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(eta2		, this->modP._eta2		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(dlt2		, this->modP._dlt2		, FHANDLE_PARAM_DEFAULT			),
+			// -------- kitaev --------
+			UI_PARAM_MAP(kx			, 0.0					, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(ky			, 0.0					, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(kz			, 0.0					, FHANDLE_PARAM_DEFAULT			),
+			// ---------------- symmetries ----------------
+			UI_PARAM_MAP(ks			, this->symP._k			, FHANDLE_PARAM_HIGHER0			),
+			UI_PARAM_MAP(pxs		, this->symP._px		, FHANDLE_PARAM_BETWEEN()		),
+			UI_PARAM_MAP(pys		, this->symP._py		, FHANDLE_PARAM_BETWEEN()		),
+			UI_PARAM_MAP(pzs		, this->symP._pz		, FHANDLE_PARAM_BETWEEN()		),
+			UI_PARAM_MAP(xs			, this->symP._x			, FHANDLE_PARAM_BETWEEN()		),
+			UI_PARAM_MAP(u1s		, this->symP._U1		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(SYM		, this->symP._S			, FHANDLE_PARAM_BETWEEN(0., 1.)	),			// even use symmetries?
+			// ---------------- other ----------------
+			UI_OTHER_MAP(fun		, -1.					, FHANDLE_PARAM_HIGHERV(-1.0)	),			// choice of the function to be calculated
+			UI_OTHER_MAP(th			, 1.0					, FHANDLE_PARAM_HIGHER0			),			// number of threads
+			UI_OTHER_MAP(q			, 0.0					, FHANDLE_PARAM_DEFAULT			),			// quiet?
+			UI_OTHER_MAP(dir		, "DEFALUT"				, FHANDLE_PARAM_DEFAULT			),
+		};
+	};
+
 	// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
 	//void compare_ed(double ground_rbm);
 	//void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-
+	
 private:
 	// INNER METHODS
 	// ####################### SYMMETRIES #######################
@@ -291,13 +307,15 @@ private:
 
 	//void make_mc_kitaev(t_3d<double> K);
 
-
+	void defineModels();
 public:
 	// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
 	~UI()									= default;
 	UI()									= default;
-	UI(int argc, char** argv)
-		: UserInterface(argc, argv)			{};
+	UI(int argc, char** argv){
+		this->setDefaultMap();
+		this->init(argc, argv);
+	};
 
 	// -----------------------------------------------   	 PARSER FOR HELP  		-------------------------------------------
 	void exitWithHelp() override {
@@ -337,14 +355,14 @@ public:
 	
 	// -----------------------------------------------    	   REAL PARSER          -------------------------------------------
 	// the function to parse the command line
-	void funChoice()						final;
-	void parseModel(int argc, cmdArg& argv) final;
+	void funChoice()						final override;
+	void parseModel(int argc, cmdArg& argv) final override;
 
 	// ----------------------------------------------- 			HELPERS  			-------------------------------------------
-	void setDefault()						final;
+	void setDefault()						final override;
 
 	// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
-	//void define_models();
+
 
 	// #######################		     RBMs               #######################
 		
@@ -359,7 +377,7 @@ public:
 	//void make_simulation() override;
 
 	// #######################        SYMMETRIES            #######################
-	void makeSimSymmetries() {};
+	void makeSimSymmetries() { this->defineModels(); };
 	//void make_simulation_symmetries_sweep();
 	//void make_symmetries_test(int l = -1);
 
@@ -453,7 +471,7 @@ inline void UI::symmetries(clk::time_point start)
 			//auto entro = op.entanglement_entropy(state, i, full_map);
 			auto entro = Entropy::Entanglement::Bipartite::vonNeuman(state, i);
 				//schmidt_decomposition(state, i, full_map);
-			entropies(i - 1, idx) = entro;
+			entropies(static_cast<arma::uword>(i) - 1, idx) = entro;
 		}
 		if (stateNum > 10 && idx % int(stateNum / 10) == 0) {
 			stout << "\t->Done: " << int(idx * 100.0 / stateNum) << "%\n";
@@ -510,48 +528,3 @@ inline void UI::symmetries(clk::time_point start)
 	//fileAv.close();
 }
 
-/*
-* @brief chooses the method to be used later based on input -fun argument
-*/
-inline void UI::funChoice()
-{
-	switch (this->chosenFun)
-	{
-	case -1:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
-		//case 0:
-		//	// test
-		//	this->make_symmetries_test();
-		//	break;
-		//case 11:
-		//	// calculate the simulation with classical degrees of freedom
-		//	this->make_mc_classical();
-		//	break;
-		//case 12:
-		//	// check the minimum of energy when classical spins are varied with angle and with interaction
-		//	this->make_mc_angles_sweep();
-		//	break;
-		//case 13:
-		//	// check the properties of Kitaev model when the interations are 
-		//	this->make_mc_kitaev_sweep();
-		//	break;
-		//case 14:
-		//	// make simulation for a single model based on input parameters
-		//	this->make_simulation();
-		//	break;
-	case 21:
-		//	// this option utilizes the Hamiltonian with symmetries calculation
-		this->makeSimSymmetries();
-		//	break;
-		//case 22:
-		//	// this option utilizes the Hamiltonian with symmetries calculation - sweep!
-		//	this->make_simulation_symmetries_sweep();
-		//	break;
-	default:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
-	}
-}

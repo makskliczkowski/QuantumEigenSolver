@@ -159,12 +159,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="include\algebra\general_operator.h" />
     <ClInclude Include="include\algebra\global_symmetries.h" />
     <ClInclude Include="include\algebra\operators.h" />
     <ClInclude Include="include\algebra\operator_algebra.h" />
-    <ClInclude Include="include\algebra\symmetries.h" />
+    <ClInclude Include="include\algebra\hilbert.h" />
     <ClInclude Include="include\hamil.h" />
-    <ClInclude Include="include\hilbert.h" />
+    <ClInclude Include="include\hilbert_sym.h" />
     <ClInclude Include="include\ml.h" />
     <ClInclude Include="include\models\heisenberg-kitaev.h" />
     <ClInclude Include="include\models\heisenberg.h" />
@@ -175,12 +176,16 @@
     <ClInclude Include="include\user_interface\user_interface.h" />
     <ClInclude Include="source\src\binary.h" />
     <ClInclude Include="source\src\common.h" />
+    <ClInclude Include="source\src\flog.h" />
     <ClInclude Include="source\src\Include\directories.h" />
+    <ClInclude Include="source\src\Include\exceptions.h" />
     <ClInclude Include="source\src\Include\files.h" />
     <ClInclude Include="source\src\Include\math.h" />
     <ClInclude Include="source\src\Include\random.h" />
+    <ClInclude Include="source\src\Include\signatures.h" />
     <ClInclude Include="source\src\Include\statistical.h" />
     <ClInclude Include="source\src\Include\str.h" />
+    <ClInclude Include="source\src\Include\time.h" />
     <ClInclude Include="source\src\lattices.h" />
     <ClInclude Include="source\src\Lattices\hexagonal.h" />
     <ClInclude Include="source\src\Lattices\square.h" />
@@ -193,6 +198,8 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="operators.cpp" />
     <ClCompile Include="source\cpp\common.cpp" />
+    <ClCompile Include="source\cpp\directories.cpp" />
+    <ClCompile Include="source\cpp\exceptions.cpp" />
     <ClCompile Include="source\cpp\Lattices\hexagonal.cpp" />
     <ClCompile Include="source\cpp\Lattices\square.cpp" />
     <ClCompile Include="source\cpp\str.cpp" />

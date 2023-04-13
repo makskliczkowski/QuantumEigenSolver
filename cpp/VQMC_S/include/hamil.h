@@ -32,7 +32,7 @@ class Hamiltonian {
 protected:
 	//double _SPIN = operators::_SPIN;														// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
 	int Ns												=									1;
-	int Nh												=									1;
+	u64 Nh												=									1;
 	Hilbert::HilbertSpace<_T> hilbertSpace;
 	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS FIELDS -------------------------------------------

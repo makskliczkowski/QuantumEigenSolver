@@ -47,21 +47,21 @@ void UI::parseModel(int argc, cmdArg& argv)
 	std::string choosen_option = "";
 
 	// -------------------- SIMULATION PARAMETERS --------------------
-	SETOPTIONV(nqsP	, nMcSteps	,	"m"	);
-	SETOPTIONV(nqsP	, batch		,	"b"	);
-	SETOPTIONV(nqsP	, nBlocks	,	"nb");
-	SETOPTIONV(nqsP	, blockSize	,	"bs");
-	SETOPTIONV(nqsP	, nHidden	,	"nh");
-	SETOPTION( nqsP	, lr				);
-	this->nqsP.nTherm_			=	uint(0.1 * nqsP.nBlocks_);
+	SETOPTIONV(		nqsP, nMcSteps	,"m" );
+	SETOPTIONV(		nqsP, batch		,"b" );
+	SETOPTIONV(		nqsP, nBlocks	,"nb");
+	SETOPTIONV(		nqsP, blockSize	,"bs");
+	SETOPTIONV(		nqsP, nHidden	,"nh");
+	SETOPTION(		nqsP, lr			 );
+	this->nqsP.nTherm_	= uint(0.1 * nqsP.nBlocks_);
 	
 	// ---------- LATTICE ----------
-	SETOPTIONV(latP	, typ, "l"			);
-	SETOPTIONV(latP	, dim, "d"			);
-	SETOPTION( latP	, Lx				);
-	SETOPTION( latP	, Ly				);
-	SETOPTION( latP	, Lz				);
-	SETOPTION( latP	, bc				);
+	SETOPTIONV(		latP, typ, "l"		);
+	SETOPTIONV(		latP, dim, "d"		);
+	SETOPTION(		latP, Lx			);
+	SETOPTION(		latP, Ly			);
+	SETOPTION(		latP, Lz			);
+	SETOPTION(		latP, bc			);
 	int Ns = latP.Lx_ * latP.Ly_ * latP.Lz_;
 
 	// ---------- MODEL ----------
@@ -80,21 +80,21 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTION_STEP(	modP, eta1			);
 	SETOPTION_STEP(	modP, eta2			);
 	// --- kitaev ---
-	SETOPTION_STEP(modP, kx				);
-	SETOPTION_STEP(modP, ky				);
-	SETOPTION_STEP(modP, kz				);
+	SETOPTION_STEP( modP, kx			);
+	SETOPTION_STEP( modP, ky			);
+	SETOPTION_STEP( modP, kz			);
 
 	// ---------- SYMMETRIES ----------
-	SETOPTION(symP, k);
-	SETOPTION(symP, px);
-	SETOPTION(symP, py);
-	SETOPTION(symP, pz);
-	SETOPTION(symP, x);
-	SETOPTION(symP, U1);
-	SETOPTION(symP, S);
+	SETOPTION(		symP, k				);
+	SETOPTION(		symP, px			);
+	SETOPTION(		symP, py			);
+	SETOPTION(		symP, pz			);
+	SETOPTION(		symP, x				);
+	SETOPTION(		symP, U1			);
+	SETOPTION(		symP, S				);
 
 	// ---------- OTHERS
-	this->setOption(this->quiet		, argv, "q"		);
+	this->setOption(this->quiet		, argv, "q"	);
 	this->setOption(this->threadNum	, argv, "th"	);
 
 	// later function choice
@@ -102,19 +102,159 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 	//---------- DIRECTORY
 
-	bool set_dir = false;
-	choosen_option = "dir";
-	if (std::string option = this->getCmdOption(argv, "-" + choosen_option); option != "")
-	{
-		this->setOption(this->mainDir, argv, choosen_option);
-		set_dir = true;
-	}
-	if (!set_dir)
-		this->mainDir = fs::current_path().string() + kPS + "results" + kPS;
+	bool setDir		=	this->setOption(this->mainDir, argv, "dir");
+	this->mainDir	=	fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
 
 	// create the directories
 	createDir(this->mainDir);
 }
+
+/*
+* @brief chooses the method to be used later based on input -fun argument
+*/
+void UI::funChoice()
+{
+	switch (this->chosenFun)
+	{
+	case -1:
+		// default case of showing the help
+		this->exitWithHelp();
+		break;
+		//case 0:
+		//	// test
+		//	this->make_symmetries_test();
+		//	break;
+		//case 11:
+		//	// calculate the simulation with classical degrees of freedom
+		//	this->make_mc_classical();
+		//	break;
+		//case 12:
+		//	// check the minimum of energy when classical spins are varied with angle and with interaction
+		//	this->make_mc_angles_sweep();
+		//	break;
+		//case 13:
+		//	// check the properties of Kitaev model when the interations are 
+		//	this->make_mc_kitaev_sweep();
+		//	break;
+		//case 14:
+		//	// make simulation for a single model based on input parameters
+		//	this->make_simulation();
+		//	break;
+	case 21:
+		// this option utilizes the Hamiltonian with symmetries calculation
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetries();
+		break;
+		//case 22:
+		//	// this option utilizes the Hamiltonian with symmetries calculation - sweep!
+		//	this->make_simulation_symmetries_sweep();
+		//	break;
+	default:
+		// default case of showing the help
+		this->exitWithHelp();
+		break;
+	}
+}
+
+/*
+* @brief defines the models based on the input parameters
+*/
+void UI::defineModels() {
+
+	// create lattice
+	switch (this->latP.typ_)
+	{
+	case LatticeTypes::SQ:
+		this->latP.lat	=	std::make_shared<SquareLattice>		(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+																this->latP.dim_, this->latP.bc_);
+		break;
+	case LatticeTypes::HEX:
+		this->latP.lat	=	std::make_shared<HexagonalLattice>	(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+																this->latP.dim_, this->latP.bc_);
+		break;
+	default:
+		this->latP.lat	=	std::make_shared<SquareLattice>		(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+																this->latP.dim_, this->latP.bc_);
+		break;
+	};
+
+	v_1d<GlobalSyms::GlobalSym> _glbSyms					= {};
+	v_1d<std::pair<Operators::SymGenerators, int>> _locSyms = {};
+	// check the symmetries and check the complex plane
+	if (this->symP.S_ == true)
+	{
+		// create Hilbert space
+		if (this->symP.k_ != -INT_MAX && !(this->symP.k_ == 0 || this->symP.k_ == this->latP.lat->get_Ns() / 2))
+			this->isComplex_ = true;
+		// ------ LOCAL ------
+		_locSyms = this->symP.getLocGenerator();
+		// ------ GLOBAL ------
+		// check U1
+		if (this->symP.U1_ != -INT_MAX) _glbSyms.push_back(GlobalSyms::getU1Sym(this->latP.lat, this->symP.U1_));
+	}
+
+	// check if is complex
+	if (this->isComplex_)
+	{
+		this->hilComplex = Hilbert::HilbertSpace<cpx>(this->latP.lat, _locSyms, _glbSyms);
+		switch (this->modP.modTyp_)
+		{
+		case MY_MODELS::ISING_M:
+			this->hamComplex = std::make_shared<IsingModel<cpx>>(std::move(this->hilComplex),
+					this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
+			break;
+		case MY_MODELS::XYZ_M:
+			this->hamComplex = std::make_shared<XYZ<cpx>>(std::move(this->hilComplex),
+				this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+				this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+				this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+				this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+				false);
+			break;
+		default:
+			this->hamComplex = std::make_shared<XYZ<cpx>>(std::move(this->hilComplex),
+				this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+				this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_, 
+				this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+				this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+				false);
+			break;
+		}
+	}
+	else
+	{
+		this->hilDouble = Hilbert::HilbertSpace<double>(this->latP.lat, _locSyms, _glbSyms);
+		switch (this->modP.modTyp_)
+		{
+		case MY_MODELS::ISING_M:
+			this->hamDouble = std::make_shared<IsingModel<double>>(std::move(this->hilDouble),
+				this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
+			break;
+		case MY_MODELS::XYZ_M:
+			this->hamDouble = std::make_shared<XYZ<double>>(std::move(this->hilDouble),
+				this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+				this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+				this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+				this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+				false);
+
+			break;
+		default:
+			this->hamDouble = std::make_shared<XYZ<double>>(std::move(this->hilDouble),
+				this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+				this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+				this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+				this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+				false);
+			break;
+		}
+	}
+
+}
+
+
+
+
 
 // -------------------------------------------------------- SIMULATIONS
 
