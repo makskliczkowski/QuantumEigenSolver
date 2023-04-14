@@ -43,6 +43,9 @@
     <Filter Include="Header Files\include\algebra">
       <UniqueIdentifier>{5f00b356-bec0-4bbb-a646-41faa3b515f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\include\NQS">
+      <UniqueIdentifier>{17d6f153-bf96-4b25-8c29-081a31a1b337}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\models\ising.h">
@@ -146,6 +149,12 @@
     </ClInclude>
     <ClInclude Include="source\src\Include\exceptions.h">
       <Filter>Header Files\source\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\nqs.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\NQS\rbm.h">
+      <Filter>Header Files\include\NQS</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,24 +1,20 @@
-//#pragma once
-//#ifndef RBM_H
-//#define RBM_H
-//
-//#define USE_SR
-////#define USE_ADAM
-////#define USE_RMS
-//
-//#define RBM_ANGLES_UPD
-////#define PLOT
-//
-////#define DEBUG
-//#ifdef USE_SR
-//#define PINV
-//#define S_REGULAR
-//#endif
-//
-//
-//
-//#include "../source/src/progress.h"
-//
+#pragma once
+#ifndef RBM_H
+#define RBM_H
+
+#define USE_SR
+//#define USE_ADAM
+//#define USE_RMS
+
+#define RBM_ANGLES_UPD
+//#define PLOT
+
+//#define DEBUG
+#ifdef USE_SR
+#define PINV
+#define S_REGULAR
+#endif
+
 //#ifndef XYZ_H
 //#include "models/XYZ.h"
 //#endif // !TESTER_H
@@ -31,293 +27,88 @@
 //#ifndef ISINGMODEL
 //#include "models/ising.h"
 //#endif
-//
-//#ifndef OPERATORS_H
-//#include "operators/operators.h"
-//#endif
-//
-//#ifndef ML_H
-//#include "../include/ml.h"
-//#endif
-//
-//
-//#ifdef PINV
-//constexpr auto pinv_tol = 1e-5;
-//#ifdef S_REGULAR
-//#undef S_REGULAR
-//#endif
-//#elif defined S_REGULAR 
-//
-//#ifdef PINV
-//#undef PINV
-//#endif
-//#endif
-//
-//
-//
-//constexpr double lambda_0_reg = 100;
-//constexpr double b_reg = 0.95;
-//constexpr double lambda_min_reg = 1e-4;
-//
-//
-//
-//
-//
-//template <typename _type, typename _hamtype>
-//class rbmState {
-//
-//private:
-//
-//	avOperators op;
-//
-//	// debug bools
-//	bool dbg_lcen = false;
-//	bool dbg_grad = false;
-//	bool dbg_samp = false;
-//	bool dbg_drvt = false;
-//	bool dbg_updt = false;
-//	bool dbg_thrm = false;
-//	bool dbg_blck = false;
-//
-//	// general parameters
-//	string info;                                                // info about the model
-//	uint batch;													// batch size for stochastic
-//	uint n_visible;												// visible neurons
-//	uint n_hidden;												// hidden neurons
-//	uint full_size;												// full size of the parameters
-//	uint hilbert_size;											// hilbert space size
-//	uint thread_num;											// thread number
-//	double lr;                                                  // learning rate
-//#ifdef S_REGULAR
-//	double b_reg_mult = b_reg;                                  // starting parameter for regularisation
-//#endif
-//	double current_b_reg = 0;                                   // parameter for regularisation, changes with Monte Carlo steps
-//
-//
-//	pBar pbar;                                                  // progress bar
-//
-//	// network weights
-//	Mat<_type> W;                                               // weight matrix
-//	Col<_type> b_v;                                             // visible bias
-//	Col<_type> b_h;                                             // hidden bias
-//
-//	// variational derivatives                                  
-//	Col<_type> thetas;                                          // effective angles
-//	Col<_type> O_flat;                                          // flattened output for easier calculation of the covariance
-//	Mat<_type> S;                                               // positive semi-definite covariance matrix
-//	Col<_type> F;                                               // forces
-//
-//	// the Hamiltonian
-//	std::shared_ptr<SpinHamiltonian<_hamtype>> hamil;           // unique ptr to a general Hamiltonian of the spin system
-//
-//	// optimizer
-//	std::unique_ptr<Adam<_type>> adam;                          // use the Adam optimizer for GD
-//	std::unique_ptr<RMSprop_mod<_type>> rms;                    // use the RMS optimizer for GD
-//
-//	// saved training parameters
-//	u64 current_state;                                          // current state during the simulation
-//	Col<double> current_vector;                                 // current state vector during the simulation
-//	Col<double> tmp_vector;                                     // tmp state vector during the simulation
-//	v_1d<Col<double>> tmp_vectors;                              // tmp vectors for omp 
-//	map<u64, _type> mostCommonStates;                           // save most common states energy to save the time
-//
-//
-//	void rescale_covariance();                                  // 
-//public:
-//	~rbmState() = default;
-//	rbmState() = default;
-//	rbmState(uint nH, uint nV, std::shared_ptr<SpinHamiltonian<_hamtype>> const& hamiltonian,
-//		double lr, uint batch, uint thread_num
-//	)
-//		: n_hidden(nH), n_visible(nV)
-//		, lr(lr)
-//		, batch(batch)
-//	{
-//#ifdef DEBUG
-//		this->thread_num = 1;
-//#else
-//		this->thread_num = thread_num;
-//#endif // DEBUG
-//
-//		// checks for the debug info
-//		this->debug_check();
-//		// creates the hamiltonian class
-//		this->hamil = hamiltonian;
-//		this->hilbert_size = hamil->get_hilbert_size();
-//		this->full_size = n_hidden + n_visible + n_hidden * n_visible;
-//		this->adam = std::make_unique<Adam<_type>>(lr, full_size);
-//#ifdef USE_ADAM
-//		this->adam = std::make_unique<Adam<_type>>(lr, full_size);
-//#elif defined USE_RMS
-//		this->rms = std::make_unique<RMSprop_mod<_type>>(lr, full_size);
-//#endif
-//
-//		this->set_info();
-//		// allocate memory
-//		this->allocate();
-//		this->initAv();
-//		// initialize random state
-//		this->init();
-//		this->set_rand_state();
-//	};
-//	// -------------------------------------------				 HELPERS				 -------------------------------------------
-//
-//	// debug checker
-//	void debug_check() const {
-//#ifdef DEBUG
-//		//      
-//		//#else
-//#ifdef DEBUG_RBM_SAMP
-//		this->dbg_samp = true;
-//#endif // DEBUG_RBM_SAMP
-//#ifdef DEBUG_RBM_LCEN
-//		this->dbg_lcen = true;
-//#endif // DEBUG_RBM_LCEN
-//#ifdef DEBUG_RBM_GRAD
-//		this->dbg_grad = true;
-//#endif // DEBUG_RBM_GRAD
-//#ifdef DEBUG_RBM_DRVT
-//		this->dbg_drvt = true;
-//#endif // DEBUG_RBM_DRVT
-//#ifdef DEBUG_RBM_UPDT
-//		this->dbg_updt = true;
-//#endif // DEBUG_RBM_UPDT
-//#ifdef DEBUG_RBM_THRM
-//		this->dbg_thrm = true;
-//#endif // DEBUG_RBM_THRM
-//#ifdef DEBUG_RBM_BLCK
-//		this->dbg_blck = true;
-//#endif // DEBUG_RBM_THRM
-//#else 
-//		omp_set_num_threads(this->thread_num);                  // Use threads for all consecutive parallel regions
-//#endif // !DEBUG
-//	};
-//
-//	// ------------------------------------------- 				 PRINTERS				  -------------------------------------------
-//
-//	// pretty print the state sampled
-//	void pretty_print(std::map<u64, _type>& sample_states, double tol = 5e-2) const;
-//
-//	// ------------------------------------------- 				 SETTTERS				  -------------------------------------------
-//	
-//	// sets info
-//	void set_info() { this->info = "nv=" + STR(n_visible) + ",nh=" + STR(n_hidden) + ",b=" + STR(batch) + "," + VEQP(lr,3); };
-//
-//	// sets the current state
-//	void set_state(u64 state, bool set = false) {
-//		this->current_state = state;
-//
-//		INT_TO_BASE_BIT(state, this->current_vector);
-//		this->current_vector *= operators::_SPIN_RBM;
-//
-//#ifdef RBM_ANGLES_UPD
-//		if (set)
-//			this->set_angles();
-//#endif
-//	}
-//
-//	// set the current state to random
-//	void set_rand_state();
-//
-//	// set weights
-//	void set_weights();
-//
-//	// set effective angles
-//	void set_angles();
-//	void set_angles(const Col<double>& v);
-//	// ------------------------------------------- 				 UPDATERS				  -----------------------------------------
-//	void update_angles(int flip_place, double flipped_spin);
-//	void update_angles(const Col<double>& v, int flip_place);
-//
-//	// ------------------------------------------- 				 GETTERS				  ------------------------------------------
-//	auto get_info()                                                     const RETURNS(this->info);
-//	auto get_op_av()                                                    const RETURNS(this->op);
-//	int get_vec_id() {
-//#ifndef DEBUG
-//		if (this->thread_num == 1)
-//			return 0;
-//		else
-//			return omp_get_thread_num() % this->thread_num;
-//#else
-//		return 0;
-//#endif
-//	}
-//
-//	// ------------------------------------------- 				 INITIALIZERS				  ------------------------------------------
-//
-//	// allocate the memory for the biases and weights
-//	void allocate();
-//	// initialize all
-//	void init();
-//	void initAv();
-//	// ------------------------------------------- 				 AMPLITUDES AND ANSTATZ REPRESENTATION				  -------------------------------------------
-//
-//	// the hiperbolic cosine of the parameters
-//	Col<_type> Fs(const Col<double>& v)                                 const { return arma::cosh(this->b_h + this->W * v); };
-//
-//	// get the current amplitude given vector
-//	auto coeff(const Col<double>& v, int tn = 1)                        const { return (exp(dotm(this->b_v, v, tn)) * arma::prod(Fs(v))) / sqrt(this->hamil->lattice->get_Ns()); };//* std::pow(2.0, this->n_hidden)
-//
-//	// get probability ratio for a reference state v1 and v2 state
-//	_type pRatio(int tn = 1) const;
-//	_type pRatio(int flip_place, double flipped_spin) const;
-//	_type pRatio(const Col<double>& v, int tn = 1)                      const { return exp(dotm(this->b_v, Col<double>(v - this->current_vector), tn) + sum(log(Fs(v) / cosh(this->thetas)))); };
-//	_type pRatio(const Col<double>& v1, const Col<double>& v2\
-//		, int tn = 1)                                                   const {
-//		return exp(dotm(this->b_v, Col<double>(v2 - v1), tn) + sum(log(Fs(v2) / Fs(v1))));
-//	};
-//
-//	// get local energies
-//	void locEnKernel(uint start, uint stop, Col<_type>& energies, uint tid);
-//	_type locEnKernelAll();
-//	_type locEn();
-//	_type pRatioValChange(_type v, u64 state, uint vid);
-//
-//	// variational derivative calculation
-//	void calcVarDeriv(const Col<double>& v);
-//
-//	// update weights after gradient descent
-//	void updVarDerivSR(int current_step);
-//	// ------------------------------------------- 				 SAMPLING				  -------------------------------------------
-//
-//	// sample block
-//	void blockSampling(uint b_size, u64 start_stae, uint n_flips = 1, bool thermalize = true);
-//
-//	// sample the probabilistic space
-//	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1, std::string dir = "", bool save_weights = false);
-//
-//
-//	// average collection
-//	void collectAv(_type loc_en);
-//	map<u64, _type> avSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1);
-//
-//};
+
+
+
+
+
+
+
+
+template <typename _type, typename _hamtype>
+class rbmState {
+
+private:
+
+	avOperators op;
+
+	// optimizer
+	std::unique_ptr<Adam<_type>> adam;                          // use the Adam optimizer for GD
+	std::unique_ptr<RMSprop_mod<_type>> rms;                    // use the RMS optimizer for GD
+
+	// saved training parameters
+	Col<double> tmp_vector;                                     // tmp state vector during the simulation
+	v_1d<Col<double>> tmp_vectors;                              // tmp vectors for omp 
+	map<u64, _type> mostCommonStates;                           // save most common states energy to save the time
+
+
+	// ------------------------------------------- 				 GETTERS				  ------------------------------------------
+	auto get_op_av()                                                    const RETURNS(this->op);
+	int get_vec_id() {
+#ifndef DEBUG
+		if (this->thread_num == 1)
+			return 0;
+		else
+			return omp_get_thread_num() % this->thread_num;
+#else
+		return 0;
+#endif
+	}
+
+	// ------------------------------------------- 				 INITIALIZERS				  ------------------------------------------
+
+	// initialize all
+	void initAv();
+	// ------------------------------------------- 				 AMPLITUDES AND ANSTATZ REPRESENTATION				  -------------------------------------------
+
+	// get probability ratio for a reference state v1 and v2 state
+	_type pRatio(int tn = 1) const;
+	_type pRatio(int flip_place, double flipped_spin) const;
+
+
+	// get local energies
+	void locEnKernel(uint start, uint stop, Col<_type>& energies, uint tid);
+	_type locEnKernelAll();
+	_type locEn();
+	_type pRatioValChange(_type v, u64 state, uint vid);
+
+	// ------------------------------------------- 				 SAMPLING				  -------------------------------------------
+
+	// sample block
+	void blockSampling(uint b_size, u64 start_stae, uint n_flips = 1, bool thermalize = true);
+
+	// sample the probabilistic space
+	Col<_type> mcSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1, std::string dir = "", bool save_weights = false);
+
+
+	// average collection
+	void collectAv(_type loc_en);
+	map<u64, _type> avSampling(uint n_samples, uint n_blocks, uint n_therm, uint b_size, uint n_flips = 1);
+
+};
 //
 //
 //// ------------------------------------------------- 				 pValues				  -------------------------------------------------
 //
-///*
-//* @brief computes Log Psi'/Psi, where Psi' is the state with certain flipped spins - only one working for now
-//* Look-up tables are used for speed; the vector flips tells us which are flipped
-//*/
-//template<typename _type, typename _hamtype>
-//inline _type rbmState<_type, _hamtype>::pRatio(int flip_place, double flipped_spin) const
-//{
-//	// set the first value of b_visible
-//#ifdef SPIN
-//	_type value = -2.0 * flipped_spin;
-//#else
-//	//need to check that
-//	_type value = (1.0 - 2.0 * flipped_spin);
-//#endif
-//	// use value as the change already
-//#ifdef RBM_ANGLES_UPD
-//	value = value * this->b_v(flip_place) + sum(log(cosh(this->thetas + value * this->W.col(flip_place)) / cosh(this->thetas)));
-//#else
-//	value = value * this->b_v(flip_place) + sum(log(Fs(this->tmp_vector) / Fs(this->current_vector)));
-//#endif
-//	return exp(value);
-//}
+/*
+* @brief computes Log Psi'/Psi, where Psi' is the state with certain flipped spins - only one working for now
+* Look-up tables are used for speed; the vector flips tells us which are flipped
+*/
+template<typename _type, typename _hamtype>
+inline _type rbmState<_type, _hamtype>::pRatio(int flip_place, double flipped_spin) const
+{
+
+}
 //
 ///*
 //* @brief computes Log Psi'/Psi, where Psi' is the state with certain flipped spins - only one working for now
@@ -355,107 +146,7 @@
 //
 //}
 //
-//// ------------------------------------------------- 				 INITIALIZERS 				 -------------------------------------------------
-///*
-//* allocates memory for arma objects
-//*/
-//template<typename _type, typename _hamtype>
-//void rbmState<_type, _hamtype>::allocate() {
-//	auto Ns = this->hamil->lattice->get_Ns();
-//	// initialize biases
-//	this->b_v = Col<_type>(this->n_visible, arma::fill::randn) / double(Ns);
-//	this->b_h = Col<_type>(this->n_hidden, arma::fill::randn) / double(Ns);
-//	this->W = Mat<_type>(this->n_hidden, this->n_visible, arma::fill::randn) / double(Ns);
-//	// allocate gradients
-//	this->O_flat = Col<_type>(this->full_size, arma::fill::zeros);
-//	this->thetas = Col<_type>(this->n_hidden, arma::fill::zeros);
-//
-//	// allocate covariance and forces
-//	this->F = Col<_type>(this->full_size, arma::fill::zeros);
-//#ifdef USE_SR
-//	this->S = Mat<_type>(this->full_size, this->full_size, arma::fill::zeros);
-//#endif
-//	// allocate vectors
-//	this->current_vector = Col<double>(this->n_visible, arma::fill::ones);
-//	this->tmp_vector = Col<double>(this->n_visible, arma::fill::ones) * operators::_SPIN_RBM;
-//	this->tmp_vectors = v_1d<Col<double>>(this->thread_num, Col<double>(this->n_visible, arma::fill::ones) * operators::_SPIN_RBM);
-//}
-//
-///*
-//* @brief Initialize the weights
-//*/
-//template<typename _type, typename _hamtype>
-//void rbmState<_type, _hamtype>::init() {
-//	// initialize random state
-//	this->set_rand_state();
-//	auto Ns = this->hamil->lattice->get_Ns();
-//	// initialize biases visible
-//	for (int i = 0; i < this->n_visible; i++)
-//		//this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//		this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// hidden
-//	for (int i = 0; i < this->n_hidden; i++)
-//		//this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-//		this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// matrix
-//	for (int i = 0; i < this->W.n_rows; i++)
-//		for (int j = 0; j < this->W.n_cols; j++)
-//			//this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//			this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//}
-//
-///*
-//* @brief Intialize the weights, overwritten for complex weights
-//*/
-//template<>
-//inline void rbmState<cpx, double>::init() {
-//	// initialize random state
-//	this->set_rand_state();
-//	auto Ns = this->hamil->lattice->get_Ns();
-//	// initialize biases visible
-//	for (int i = 0; i < this->n_visible; i++)
-//		//this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//		this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// hidden
-//	for (int i = 0; i < this->n_hidden; i++)
-//		//this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-//		this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// matrix
-//	for (int i = 0; i < this->W.n_rows; i++)
-//		for (int j = 0; j < this->W.n_cols; j++)
-//			//this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//			this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//}
-//
-///*
-//* @brief Intialize the weights, overwritten for complex weights and complex Hamiltonian
-//*/
-//template<>
-//inline void rbmState<cpx, cpx>::init() {
-//	// initialize random state
-//	this->set_rand_state();
-//	auto Ns = this->hamil->lattice->get_Ns();
-//	// initialize biases visible
-//	for (int i = 0; i < this->n_visible; i++)
-//		//this->b_v(i) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//		this->b_v(i) = 0.1 * this->hamil->ran.randomReal_uni(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_v(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// hidden
-//	for (int i = 0; i < this->n_hidden; i++)
-//		//this->b_h(i) = this->hamil->ran.xavier_uni(this->n_hidden, 1, 6) + imn * this->hamil->ran.xavier_uni(this->n_hidden, 1, 6);
-//		this->b_h(i) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//	//this->b_h(i) = (this->hamil->ran.randomReal_uni(-0.5, 0.5) + imn * this->hamil->ran.randomReal_uni(-0.5, 0.5));
-//// matrix
-//	for (int i = 0; i < this->W.n_rows; i++)
-//		for (int j = 0; j < this->W.n_cols; j++)
-//			//this->W(i, j) = this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6) + imn * this->hamil->ran.xavier_uni(this->n_visible, this->n_hidden, 6);
-//			this->W(i, j) = 0.1 * this->hamil->ran.random_real_normal(0.0, 1) + imn * 0.1 * this->hamil->ran.random_real_normal(0.0, 1);
-//}
-//
+
 ///*
 //* @brief initialize operators average to be saved
 //*/
@@ -469,157 +160,7 @@
 //	this->op = avOperators(Lx, Ly, Lz, Ns, this->hamil->lattice->get_type());
 //}
 //
-//// ------------------------------------------------- 				 UPDATERS				  ------------------------------------------------
-//
-///*
-//* @brief update angles with the flipped spin (before the flip - hence -)
-//* @param flip_place place of the flip
-//* @param flipped_spin spin that would be flipped
-//*/
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::update_angles(int flip_place, double flipped_spin)
-//{
-//#ifdef SPIN
-//	this->thetas -= (2.0 * flipped_spin) * this->W.col(flip_place);
-//	//setConstTimesCol(this->thetas, (2.0 * flipped_spin), this->W.col(flip_place), false, false);
-//#else
-//	this->thetas += (1.0 - 2.0 * flipped_spin) * this->W.col(flip_place);
-//	//setConstTimesCol(this->thetas, (1.0 - 2.0 * flipped_spin), this->W.col(flip_place), true, false);
-//#endif
-//}
-//
-///*
-//* @brief update angles with the vector (after the flip - hence +)
-//* @param v vector after flip
-//* @param flip_place place of the flip
-//*/
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::update_angles(const Col<double>& v, int flip_place)
-//{
-//#ifdef SPIN
-//	this->thetas += (2.0 * v(flip_place)) * this->W.col(flip_place);
-//	//setConstTimesCol(this->thetas, (2.0 * v(flip_place)), this->W.col(flip_place), true, false);
-//#else
-//	this->thetas -= (1.0 - 2.0 * v(flip_place)) * this->W.col(flip_place);
-//	//setConstTimesCol(this->thetas, (1.0 - 2.0 * v(flip_place)), this->W.col(flip_place), false, false);
-//#endif
-//}
-//
-//// -------------------------------------------------				  SETTERS				  -------------------------------------------------
-//
-///*
-//* @brief sets the current state to uniform random
-//*/
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::set_rand_state()
-//{
-//	this->set_state(this->hamil->ran.randomInt_uni(0, this->hilbert_size), true);
-//}
-//
-///*
-//* @brief sets the current angles vector according to arXiv:1606.02318v1
-//*/
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::set_angles()
-//{
-//	this->thetas = this->b_h + this->W * this->current_vector;
-//}
-//
-///*
-//* @brief sets the current angles vector according to arXiv:1606.02318v1
-//* @param v replaces current vector
-//*/
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::set_angles(const Col<double>& v)
-//{
-//	this->thetas = this->b_h + this->W * v;
-//}
-//
-///*
-//* @brief sets the weights according to the gradient descent - uses this->grad vector to update them
-//*/
-//template<typename _type, typename _hamtype>
-//void rbmState<_type, _hamtype>::set_weights() {
-//	// update weights accordingly
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_visible; i++)
-//		this->b_v(i) -= this->F(i);
-//
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_hidden; i++)
-//		this->b_h(i) -= this->F(i + this->n_visible);
-//
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_hidden; i++)
-//		for (auto j = 0; j < this->n_visible; j++)
-//			this->W(i, j) -= this->F((this->n_visible + this->n_hidden) + i + j * this->n_hidden);
-//
-//}
-//
-//// ------------------------------------------------- 				 CALCULATORS				  -------------------------------------------------
-//
-//template<typename _type, typename _hamtype>
-//inline void rbmState<_type, _hamtype>::rescale_covariance()
-//{
-//	auto lambda_p = lambda_0_reg * this->current_b_reg;
-//	//stout << VEQ(lambda_p) << EL;
-//	if (lambda_p < lambda_min_reg) lambda_p = lambda_min_reg;
-//	this->S.diag() += lambda_p;
-//}
-//
-///*
-//* @brief calculates the variational derivative analytically
-//* @param v the base vector we want to calculate derivatives from
-//*/
-//template<typename _type, typename _hamtype>
-//void rbmState<_type, _hamtype>::calcVarDeriv(const Col<double>& v) {
-//	auto var_deriv_time = std::chrono::high_resolution_clock::now();
-//
-//#ifndef RBM_ANGLES_UPD
-//	this->set_angles(v);
-//#endif
-//	// calculate the flattened part
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_visible; i++)
-//		this->O_flat(i) = v(i);
-//
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_hidden; i++)
-//		this->O_flat(i + this->n_visible) = std::tanh(this->thetas(i));
-//
-//#pragma omp parallel for num_threads(this->thread_num)
-//	for (auto i = 0; i < this->n_hidden; i++)
-//		for (auto j = 0; j < this->n_visible; j++)
-//			this->O_flat((this->n_visible + this->n_hidden) + i + j * this->n_hidden) = this->O_flat(i + this->n_visible) * v(j);
-//
-//
-//	PRT(var_deriv_time, this->dbg_drvt)
-//}
-//
-///*
-//* @brief updates the weights using stochastic gradient descent
-//* @param current_step if we would like to optimize according to current mcstep
-//*/
-//template<typename _type, typename _hamtype>
-//void rbmState<_type, _hamtype>::updVarDerivSR(int current_step) {
-//	auto var_deriv_time_upd = std::chrono::high_resolution_clock::now();
-//
-//	// update flat vector
-//#ifdef PINV
-//	this->F = this->lr * (arma::pinv(this->S, pinv_tol) * this->F);
-//	//else
-//	//    this->grad = this->lr * arma::solve(this->S, this->F);
-//#elif defined S_REGULAR 
-//	this->rescale_covariance();
-//	this->F = this->lr * arma::solve(this->S, this->F);
-//#else 
-//	this->S.diag() = this->S.diag() + (1e-4 * arma::ones(this->S.n_rows));
-//	this->F = this->lr * arma::solve(this->S, this->F);
-//#endif 
-//	PRT(var_deriv_time_upd, this->dbg_updt);
-//}
-//
-//
+
 //// ------------------------------------------------- LOCAL ENERGY AND OPERATORS ------------------------------------------------------
 //
 //
@@ -1015,4 +556,4 @@
 //}
 //
 //
-//#endif // !RBM_H
+#endif // !RBM_H

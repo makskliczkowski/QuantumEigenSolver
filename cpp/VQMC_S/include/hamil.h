@@ -50,13 +50,17 @@ public:
 	//vec tmp_vec2;
 	//uint state_val_num;																	// basic number of state_values
 
-	Hamiltonian()											= default;
+	Hamiltonian() : ran_(randomGen())					= default;
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
 		: hilbertSpace(hilbert), lat_(hilbert.getLattice()), Ns(lat_->get_Ns()), Nh(hilbert.getHilbertSize()) 
-	{};
+	{
+		this->ran_ = randomGen();
+	};
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
 		: hilbertSpace(std::move(hilbert)), lat_(hilbertSpace.getLattice()), Ns(lat_->get_Ns()), Nh(hilbertSpace.getHilbertSize()) 
-	{};
+	{
+		this->ran_ = randomGen();
+	};
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
@@ -119,6 +123,9 @@ public:
 	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
 	auto getInfo(const v_1d<std::string>& skip = {}, 
 		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info("", skip, sep); };
+	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_; };
+	auto getNs()										const -> uint						{ return this->lat_->get_Ns(); };
+	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC(); };
 
 	// ------------------------------------------- 	SETTERS -------------------------------------------
 	

@@ -1,12 +1,19 @@
 
-#define DEBUG
+// %%%%%%%%%%%%% L O G %%%%%%%%%%%%%%%
+#define DEBUG						//
+//#define LOG_FILE					//
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+// %%%%%%%%%%%%% N Q S %%%%%%%%%%%%%%%
+#define NQS_RBM_USESR				//
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #include "include/user_interface/user_interface.h"
 
 int main(const int argc, char* argv[]) {
-	#ifdef LOG_FILE
-		SET_LOG_TIME();
-	#endif
+
+	SET_LOG_TIME();
 
 	auto ui = std::make_unique<UI>(argc, argv);
 	//ui->make_simulation();

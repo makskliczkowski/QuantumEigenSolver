@@ -237,7 +237,6 @@ void UI::defineModels() {
 				this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 				this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 				false);
-
 			break;
 		default:
 			this->hamDouble = std::make_shared<XYZ<double>>(std::move(this->hilDouble),

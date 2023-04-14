@@ -172,6 +172,8 @@
     <ClInclude Include="include\models\heisenberg_dots.h" />
     <ClInclude Include="include\models\ising.h" />
     <ClInclude Include="include\models\XYZ.h" />
+    <ClInclude Include="include\nqs.h" />
+    <ClInclude Include="include\NQS\rbm.h" />
     <ClInclude Include="include\rbm.h" />
     <ClInclude Include="include\user_interface\user_interface.h" />
     <ClInclude Include="source\src\binary.h" />
