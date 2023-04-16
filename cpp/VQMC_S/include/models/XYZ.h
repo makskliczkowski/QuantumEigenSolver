@@ -1,4 +1,10 @@
 #pragma once
+
+/***********************************
+* Is an instance of the XYZ model.
+* Derives from a general Hamiltonian.
+************************************/
+
 #ifndef HAMIL_H
 #include "../hamil.h"
 #endif // !HAMIL_H
@@ -138,6 +144,7 @@ inline XYZ<_T>::XYZ(const Hilbert::HilbertSpace<_T>& hilbert, double _Ja, double
 	this->ddB			= ZEROV(this->Ns);
 	this->deA			= ZEROV(this->Ns);
 	this->deB			= ZEROV(this->Ns);
+	this->type_			= MY_MODELS::XYZ_M;
 
 	//change info
 	this->info_ = this->info();
@@ -159,6 +166,7 @@ inline XYZ<_T>::XYZ(Hilbert::HilbertSpace<_T>&& hilbert, double _Ja, double _Jb,
 	this->ddB = ZEROV(this->Ns);
 	this->deA = ZEROV(this->Ns);
 	this->deB = ZEROV(this->Ns);
+	this->type_ = MY_MODELS::XYZ_M;
 
 	//change info
 	this->info_ = this->info();
@@ -349,9 +357,11 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 template <typename _T>
 void XYZ<_T>::hamiltonian() {
 	this->init();
-	for (u64 k = 0; k < this->Nh; k++)
-		for (int site_ = 0; site_ <= this->Ns - 1; site_++)
-			this->locEnergy(k, this->hilbertSpace.getMapping(k), site_);
+	for (u64 k = 0; k < this->Nh; k++) {
+		u64 kMap = this->hilbertSpace.getMapping(k);
+		for (uint site_ = 0; site_ <= this->Ns - 1; site_++)
+			this->locEnergy(k, kMap, site_);
+	}
 }
 
 #endif // !XYZ_H

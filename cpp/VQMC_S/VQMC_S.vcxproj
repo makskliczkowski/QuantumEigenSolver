@@ -164,6 +164,7 @@
     <ClInclude Include="include\algebra\operators.h" />
     <ClInclude Include="include\algebra\operator_algebra.h" />
     <ClInclude Include="include\algebra\hilbert.h" />
+    <ClInclude Include="include\algebra\quantities\entropy.h" />
     <ClInclude Include="include\hamil.h" />
     <ClInclude Include="include\hilbert_sym.h" />
     <ClInclude Include="include\ml.h" />

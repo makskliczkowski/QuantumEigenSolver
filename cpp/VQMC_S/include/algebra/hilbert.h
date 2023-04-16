@@ -1,5 +1,12 @@
 #pragma once
 
+/***********************************
+* Defines the Hilbert space with the
+* usage of Local and Global symmetry.
+* It is a base for further Hamiltonian
+* developments.
+***********************************/
+
 #ifndef HILBERT_H
 #define HILBERT_H
 
@@ -72,11 +79,10 @@ namespace Hilbert {
 			this->generateMapping();
 
 			if (this->Nh == this->NhFull)
-				stout << "\t\t\t->Produced the full Hilbert space\n";
+				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 3);
 
-			// no states in Hilbert space
 			if (this->Nh <= 0)
-				stout << "\t\t\t->No states in the Hilbert space\n";
+				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 3);
 		};
 
 		// ------------------------ INNER GENERATORS -------------------------

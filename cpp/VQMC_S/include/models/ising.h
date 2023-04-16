@@ -1,4 +1,11 @@
 #pragma once
+
+/***********************************
+* Is an instance of the Transverse
+* Field Ising model. 
+* Derives from a general Hamiltonian.
+************************************/
+
 #ifndef HAMIL_H
 #include "../hamil.h"
 #endif // !HAMIL_H
@@ -33,7 +40,7 @@ public:
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override final;
 	cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
 		const NQSFunMultiple& f2,
-		arma::Col<double>& tmp)							override final { return 0; };
+		arma::Col<double>& tmp)							override final;
 	cpx locEnergy(const arma::Col<double>& v, uint site,
 		const NQSFunSingle& f1,
 		const NQSFunMultiple& f2,
@@ -74,13 +81,15 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);			// creates random disorder vector
+	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);		// creates random disorder vector
 	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
 	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
+	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info
 	this->info_			=			this->info();
 	this->updateInfo();
+	LOGINFO("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
 }
 
 template <typename _T>
@@ -92,10 +101,12 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);			// creates random disorder vector
 	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
 	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
+	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info
 	this->info_			=			this->info();
 	this->updateInfo();
+	LOGINFO("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
 }
 
 // ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
@@ -111,27 +122,27 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	u64 newIdx	= 0;
 	_T newVal	= 0;
 
-	stout << EL << "____________________________" << EL;
-	stout << VEQ(_elemId) << EL;
-	stout << VEQ(_site) << EL;
-	stout << VEQ(_elem) << EL;
-	arma::Col<int> tmp(4, arma::fill::zeros);
-	intToBase(_elem, tmp);
-	stout << tmp.t() << EL << EL;
+	//stout << EL << "____________________________" << EL;
+	//stout << VEQ(_elemId) << EL;
+	//stout << VEQ(_site) << EL;
+	//stout << VEQ(_elem) << EL;
+	//arma::Col<int> tmp(4, arma::fill::zeros);
+	//intToBase(_elem, tmp);
+	//stout << tmp.t() << EL << EL;
 
 	// -------------- perpendicular field --------------
 	std::tie(newIdx, newVal) = Operators::sigma_z(_elem, this->Ns, { _site });
-	stout << "Z:" << newIdx << ":" << newVal << EL;
-	intToBase(newIdx, tmp);
-	stout << tmp.t() << EL << EL;
+	//stout << "Z:" << newIdx << ":" << newVal << EL;
+	//intToBase(newIdx, tmp);
+	//stout << tmp.t() << EL << EL;
 	this->setHElem(_elemId, PARAM_W_DISORDER(h, _site) * newVal, newIdx);
 
 	// -------------- transverse field --------------
 	if (!EQP(this->g, 0.0, 1e-9)) {
 		std::tie(newIdx, newVal) = Operators::sigma_x(_elem, this->Ns, { _site });
-		stout << "X:" << newIdx << ":" << newVal << EL;
-		intToBase(newIdx, tmp);
-		stout << tmp.t() << EL << EL;
+		//stout << "X:" << newIdx << ":" << newVal << EL;
+		//intToBase(newIdx, tmp);
+		//stout << tmp.t() << EL << EL;
 		this->setHElem(_elemId, PARAM_W_DISORDER(g, _site) * newVal, newIdx);
 	}
 
@@ -142,49 +153,52 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			// Ising-like spin correlation
 			auto [idx_z, val_z]			=		Operators::sigma_z(_elem, this->Ns, { _site });
 			auto [idx_z2, val_z2]		=		Operators::sigma_z(idx_z, this->Ns, { (uint)nei });
-			stout << "NEI:" << idx_z2 << ":" << val_z2 * val_z << EL;
-			intToBase(idx_z2, tmp);
-			stout << tmp.t() << EL << EL;
+			//stout << "NEI:" << idx_z2 << ":" << val_z2 * val_z << EL;
+			//intToBase(idx_z2, tmp);
+			//stout << tmp.t() << EL << EL;
 			this->setHElem(_elemId, 
 								PARAM_W_DISORDER(J, _site) * (val_z * val_z2), 
 								idx_z2);
 		}
 	}
-	stout << "____________________________" << EL << EL;
+	//stout << "____________________________" << EL << EL;
 }
 
-/*
-* Calculate the local energy end return the corresponding vectors with the value
-* @param _id base state index
-*/
+// -----------------------------------------------------------------------------
 
-//template <typename _type>
-//cpx IsingModel<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
-//	// sumup the value of non-changed state
-//	double localVal = 0.0;
-//	cpx changedVal = 0.0;
-//	const uint nn_number = this->lattice->get_nn_forward_num(site);
-//
-//	// true - spin up, false - spin down
-//	double si = checkBit(_id, this->Ns - site - 1) ? this->_SPIN : -this->_SPIN;
-//
-//	// diagonal elements setting the perpendicular field
-//	localVal += (this->h + dh(site)) * si;
-//
-//	// check the Siz Si+1z
-//	for (auto nn = 0; nn < nn_number; nn++) {
-//		const auto n_num = this->lattice->get_nn_forward_num(site, nn);
-//		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-//			double sj = checkBit(_id, this->Ns - 1 - nei) ? this->_SPIN : -this->_SPIN;
-//			localVal += (this->J + this->dJ(site)) * si * sj;
-//		}
-//	}
-//
-//	// flip with S^x_i with the transverse field
-//	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
-//
-//	return changedVal + localVal;
-//}
+/*
+* Calculate the local energy for the NQS purpose.
+*/
+template<typename _T>
+inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, const NQSFunSingle& f1, const NQSFunMultiple& f2, arma::Col<double>& tmp)
+{
+	double _locVal		=	0.0;			// unchanged state value
+	cpx _changedVal		=	0.0;			// changed state value			
+
+	// get number of forward nn
+	uint NUM_OF_NN		=	(uint)this->lat_->get_nn_ForwardNum(site);
+
+	// check spin at a given site
+	double _Si			=	checkBit<u64>(_id, this->Ns - site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+
+	// add to a local value
+	_locVal				+=	PARAM_W_DISORDER(h, site) * _Si;
+
+	// check the S_i^z * S_{i+1}^z
+	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
+		auto N_NUMBER = this->lat_->get_nn_ForwardNum(site, nn);
+		if (auto nei = this->lat_->get_nn(site, N_NUMBER); nei >= 0) {
+			double _Sj	=	checkBit<u64>(_id, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			_locVal		+=	PARAM_W_DISORDER(J, site) * _Si * _Sj;
+		}
+	}
+	// -----------------------------------------------------------
+	_changedVal			+=	f1(site, _Si) * Operators::_SPIN_RBM * PARAM_W_DISORDER(g, site);
+
+	// -----------------------------------------------------------
+	return _changedVal + _locVal;
+}
+
 //
 ///*
 //* Calculate the local energy end return the corresponding vectors with the value
@@ -227,10 +241,15 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 */
 template <typename _T>
 void IsingModel<_T>::hamiltonian() {
+	if (this->Nh == 0)
+	{
+		LOGINFO("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
+		return;
+	}
 	this->init();
 	for (u64 k = 0; k < this->Nh; k++) {
 		u64 kMap = this->hilbertSpace.getMapping(k);
-		for (int site_ = 0; site_ <= this->Ns - 1; site_++)
+		for (uint site_ = 0; site_ <= this->Ns - 1; site_++)
 			this->locEnergy(k, kMap, site_);
 	}
 }

@@ -1,3 +1,13 @@
+#pragma once
+/***************************************
+* Defines a class for a general operator.
+* It can be later expanded for some more
+* complicated operators acting on Hiblert
+* space.
+* APRIL 2023. UNDER CONSTANT DEVELOPMENT
+* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
+***************************************/
+
 #ifndef LATTICE_H
 #include "../../source/src/lattices.h"
 #endif
@@ -17,7 +27,7 @@ namespace Hilbert {
 	class HilbertSpace;
 };
 
-// ##########################################################################################################################################
+// ####################################### D E F I N I T I O N S   O F   I M P L E M E N T A T I O N ###############################################################
 
 namespace Operators {
 

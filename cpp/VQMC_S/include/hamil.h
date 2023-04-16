@@ -1,4 +1,13 @@
 #pragma once
+
+/***************************************
+* Defines the generic lattice Hamilt
+* class. Allows for later inhertiance
+* for a fine model specialization. 
+* APRIL 2023. UNDER CONSTANT DEVELOPMENT
+* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
+***************************************/
+
 #ifndef SYMMETRIES_H
 	#include "algebra/operators.h"
 #endif // !SYMMETRIES_H
@@ -45,7 +54,8 @@ public:
 	Hilbert::HilbertSpace<_T> hilbertSpace;
 
 protected:
-	int Ns												=									1;
+	MY_MODELS type_;
+	uint Ns												=									1;
 	u64 Nh												=									1;
 	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS FIELDS -------------------------------------------
@@ -119,14 +129,10 @@ public:
 	* @brief Initialize Hamiltonian matrix
 	*/
 	void init() {
-		try {
-			//  hamiltonian memory reservation
+		// hamiltonian memory reservation
+		BEGIN_CATCH_HANDLER
 			this->H_ = arma::SpMat<_T>(this->Nh, this->Nh);
-		}
-		catch (const std::bad_alloc& e) {
-			stout << "Memory exceeded" << e.what() << "\n";
-			exit(-1);
-		}
+		END_CATCH_HANDLER("Memory exceeded");
 	};
 
 	// ------------------------------------------- GETTERS -------------------------------------------
@@ -140,16 +146,17 @@ public:
 	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx); };			
 	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx); };				
 	auto getEigVec(std::string _dir, u64 _mid, 
-		HAM_SAVE_EXT _typ)								const -> void;
+		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	auto getEigVal()									const -> arma::vec					{ return this->eigVal_; };						
-	auto getEigVal(std::string _dir, HAM_SAVE_EXT _typ)	const -> void;
+	auto getEigVal(std::string _dir,
+				HAM_SAVE_EXT _typ, bool _app = false)	const -> void;
 	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
 	auto getInfo(const v_1d<std::string>& skip = {}, 
 		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info("", skip, sep); };
+	auto getType()										const -> std::string				{ return SSTR(getSTR_MY_MODELS(this->type_)); };
 	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_; };
 	auto getNs()										const -> uint						{ return this->lat_->get_Ns(); };
 	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC(); };
-
 	// ------------------------------------------- 	SETTERS -------------------------------------------
 	
 	virtual void hamiltonian()							=									0;								
@@ -256,24 +263,21 @@ inline void Hamiltonian<_T>::prettyPrint(std::ostream& output, const arma::Col<_
 template<typename _T>
 inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 {
-	try 
-	{
-		if (true)//this->hilbertSpace.getMapping(k) != newIdx)
+	u64 kMap = this->hilbertSpace.getMapping(k);
+	BEGIN_CATCH_HANDLER
+		if (kMap != newIdx)
 		{
 			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
 			// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-			arma::Col<int> tmp(4, arma::fill::zeros);
-			intToBase(this->hilbertSpace.getMapping(idx), tmp);
-			stout << "\t->REPR: " << this->hilbertSpace.getMapping(idx) << "PLACE: " << idx << EL;
-			stout << "\t->" << tmp.t() << EL;
+			//arma::Col<int> tmp(4, arma::fill::zeros);
+			//intToBase(this->hilbertSpace.getMapping(idx), tmp);
+			//stout << "\t->REPR: " << this->hilbertSpace.getMapping(idx) << "PLACE: " << idx << EL;
+			//stout << "\t->" << tmp.t() << EL;
 			this->H_(idx, k) += val * symEig;
 		}
 		else
 			this->H_(k, k) += val;
-	}
-	catch (const std::exception& err) {
-		stout << "EXCEPTION" << err.what() << "\n";
-	}
+	END_CATCH_HANDLER("Exception in setting the Hamiltonian elements: " + VEQ(k) + "," + VEQ(kMap) + "," + VEQ(newIdx));
 }
 
 // ################################################################################################################################################
@@ -388,22 +392,29 @@ inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 * @brief Prints the eigenvalues into some file "energies" in some directory
 * @param _dir directory to be saved onto
 * @param _typ type of the file extension (dat, h5 or other).
+* @param _app shall append?
 */
 template<typename _T>
-inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ) const -> void
+inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	std::ofstream file;
 	switch (_typ)
 	{
 	case HAM_SAVE_EXT::dat:
-		openFile(file, _dir + "energy" + this->getInfo() + extension);
+		if(_app)
+			openFile(file, _dir + "energy" + this->getInfo() + extension, std::ios::app);
+		else
+			openFile(file, _dir + "energy" + this->getInfo() + extension);
 		for (auto i = 0; i < this->eigVal_.size(); i++)
 			file << this->eigVal_(i) << EL;
 		file.close();
 		break;
 	case HAM_SAVE_EXT::h5:
-		this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy", arma::hdf5_opts::append));
+		if(_app)
+			this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy", arma::hdf5_opts::append));
+		else
+			this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy"));
 		break;
 	default:
 		LOGINFO("Wrong extension, not saving a file. Available are [.dat, .h5]", LOG_TYPES::WARNING, 1);
@@ -411,8 +422,17 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ) cons
 	}
 }
 
+// ################################################################################################################################################
+
+/*
+* @brief Prints the eigenvectors into some file "energies" in some directory
+* @param _dir directory to be saved onto
+* @param _mid how many states to be saved
+* @param _typ type of the file extension (dat, h5 or other).
+* @param _app shall append?
+*/
 template<typename _T>
-inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ) const -> void
+inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
 	arma::Mat<_T> states = this->eigVec_.submat(0, this->avEnIdx - _mid / 2, this->Nh - 1, this->avEnIdx + _mid / 2);
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
@@ -422,7 +442,10 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 		states.save(_dir + "states" + this->getInfo() + extension, arma::arma_ascii);
 		break;
 	case HAM_SAVE_EXT::h5:
-		states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states", arma::hdf5_opts::append));
+		if (_app)
+			states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states", arma::hdf5_opts::append));
+		else
+			states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states"));
 		break;
 	default:
 		states.save(_dir + "states" + this->getInfo() + ".dat", arma::arma_ascii);

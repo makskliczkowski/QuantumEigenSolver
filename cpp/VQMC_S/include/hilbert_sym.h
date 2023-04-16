@@ -37,8 +37,8 @@ namespace Operators {
 			cyclicShift = std::function(
 				[Lx, Ns](u64 state)
 				{
-					auto tmpState = state;
-					for (auto i = 0; i < Lx; i++)
+					u64 tmpState = state;
+					for (uint i = 0; i < Lx; i++)
 						tmpState = rotateLeft(state, Ns);
 					return std::make_pair(tmpState, _T(1.0));
 				}
@@ -48,8 +48,8 @@ namespace Operators {
 			cyclicShift = std::function(
 				[Lx, Ly, Ns](u64 state)
 				{
-					auto tmpState = state;
-					for (auto i = 0; i < Lx * Ly; i++)
+					u64 tmpState = state;
+					for (uint i = 0; i < Lx * Ly; i++)
 						tmpState = rotateLeft(state, Ns);
 					return std::make_pair(tmpState, _T(1.0));
 				}
@@ -138,6 +138,8 @@ namespace Operators {
 		return fun;
 	};
 
+	// ###################################################################
+
 	template<typename _T>
 	inline _GLB<_T> flipY(std::shared_ptr<Lattice>& lat)
 	{
@@ -150,6 +152,8 @@ namespace Operators {
 		};
 		return fun;
 	};
+
+	// ###################################################################
 
 	template<>
 	inline _GLB<double> flipY<double>(std::shared_ptr<Lattice>& lat)
@@ -164,6 +168,8 @@ namespace Operators {
 		return fun;
 	};
 
+	// ###################################################################
+
 	template<typename _T>
 	inline _GLB<_T> flipX(std::shared_ptr<Lattice>& lat)
 	{
@@ -175,6 +181,8 @@ namespace Operators {
 		return fun;
 	};
 
+	// ###################################################################
+
 	/*
 	* @brief Parity with \sigma^x
 	*/
@@ -184,6 +192,8 @@ namespace Operators {
 		_GLB<_T> fX = flipX<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fX, SymGenerators::PX);
 	};
+
+	// ###################################################################
 
 	/*
 	* @brief Parity with \sigma^y
@@ -195,6 +205,8 @@ namespace Operators {
 		return Operator<_T>(lat, _T(sec), fY, SymGenerators::PY);
 	};
 
+	// ###################################################################
+
 	/*
 	* @brief Parity with \sigma^z
 	*/
@@ -204,7 +216,7 @@ namespace Operators {
 		return Operator<_T>(lat, _T(sec), fZ, SymGenerators::PZ);
 	};
 
-	// ############################
+	// ##########################################################################################################################################
 
 	template <typename _T>
 	inline Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice>& _lat) {

@@ -19,6 +19,8 @@ Operators::Operator<double> Operators::makeSigmaX(std::shared_ptr<Lattice>& lat,
 	return Operator<double>(lat, 1.0, fun_, SymGenerators::SX);
 }
 
+// ##############################################################################################################################
+
 /*
 * @brief multiplication of sigma_yi | state >
 * @param L lattice dimensionality (base vector length)
@@ -41,6 +43,8 @@ Operators::Operator<cpx> Operators::makeSigmaY(std::shared_ptr<Lattice>& lat, ui
 	return Operator<cpx>(lat, 1.0, fun_, SymGenerators::SY);
 }
 
+// ##############################################################################################################################
+
 /*
 * @brief multiplication of sigma_zi | state >
 * @param L lattice dimensionality (base vector length)
@@ -58,3 +62,5 @@ Operators::Operator<double> Operators::makeSigmaZ(std::shared_ptr<Lattice>& lat,
 	_OP<double>::GLB fun_ = [&](u64 state) { return Operators::sigma_z(state, lat->get_Ns(), { site }); };
 	return Operator<double>(lat, 1.0, fun_, SymGenerators::SZ);
 }
+
+// ##############################################################################################################################

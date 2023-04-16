@@ -46,6 +46,9 @@
     <Filter Include="Header Files\include\NQS">
       <UniqueIdentifier>{17d6f153-bf96-4b25-8c29-081a31a1b337}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\include\algebra\quantities">
+      <UniqueIdentifier>{0fc931a1-df3e-47d0-9266-0db7ddf5dea3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\models\ising.h">
@@ -155,6 +158,9 @@
     </ClInclude>
     <ClInclude Include="include\NQS\rbm.h">
       <Filter>Header Files\include\NQS</Filter>
+    </ClInclude>
+    <ClInclude Include="include\algebra\quantities\entropy.h">
+      <Filter>Header Files\include\algebra\quantities</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
