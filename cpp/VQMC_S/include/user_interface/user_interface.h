@@ -44,6 +44,12 @@
 
 // maximal ed size to compare
 constexpr int maxed = 20;
+// ###################### LIMITS ############################
+constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(16);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(11);
+constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
+constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
+// ##########################################################
 #define UI_CHECK_SYM(val, gen)									if(this->##val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::##gen, this->##val##_));
 
 // -------------------------------------------------------- make an USER INTERFACE class --------------------------------------------------------
@@ -294,10 +300,8 @@ protected:
 private:
 	// INNER METHODS
 	// ####################### SYMMETRIES #######################
-	template<typename _T>
-	void symmetries(clk::time_point start);
-
-	//void symmetries_double(clk::time_point start);
+	template<typename _T>//, std::enable_if_t<is_complex<_T>{}>* = nullptr>
+	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H);
 
 	// ####################### CLASSICAL ########################
 		
@@ -377,154 +381,103 @@ public:
 	//void make_simulation() override;
 
 	// #######################        SYMMETRIES            #######################
-	void makeSimSymmetries() { this->defineModels(); };
+	void makeSimSymmetries();
 	//void make_simulation_symmetries_sweep();
 	//void make_symmetries_test(int l = -1);
 
 };
 
 template<typename _T>
-inline void UI::symmetries(clk::time_point start)
+inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H)
 {
-	stout << "->Using real secotrs" << EL;
-	//if (symP) {
-	//	if (this->model_name == 0)
-	//		this->ham_d = std::make_shared<ising_sym::IsingModelSym<double>>(J, g, h, lat, k_sym, p_sym, x_sym, this->thread_num);
-	//	else
-	//		this->ham_d = std::make_shared<xyz_sym::XYZSym<double>>(lat, this->J, this->Jb, this->g, this->h,
-	//			this->delta, this->Delta_b, this->eta_a, this->eta_b,
-	//			k_sym, p_sym, x_sym, su2, this->thread_num);
-	//	this->ham_d->hamiltonian();
-	//}
-	//else {
-	//	if (this->model_name == 0)
-	//		this->ham_d = std::make_shared<IsingModel<double>>(J, J0, g, g0, h, w, lat);
-	//	else
-	//		this->ham_d = std::make_shared<XYZ<double>>(lat, J, Jb, g, h, delta, Delta_b, eta_a, eta_b, this->p_break);
-	//	this->ham_d->hamiltonian();
-	//}
-	u64 Nh					=		this->hamDouble->getHilbertSize();
-	u64 Ns					=		this->latP.lat->get_Ns();
-	u64 stateNum			=		Nh;
-	bool useShiftAndInvert	=		false;
+	// set the Hamiltonian
+	_H->hamiltonian();
+	// set the parameters
+	u64 Nh = _H->getHilbertSize();
+	u64 Ns = _H->getNs();
+	u64 stateNum = Nh;
+	bool useShiftAndInvert = false;
+	std::string infoH = _H->getInfo();
 
-	//stouts("\t->finished buiding Hamiltonian", start);
-	stout << "\t->"			<<		this->hamDouble->getInfo() << EL;
-	if (Nh < ULLPOW(8)){
-		stout << "\t->" << "using standard diagonalization" << EL;
-		this->hamDouble->diagH(false);
+	//stouts("\t->", start);
+	LOGINFO("Finished buiding Hamiltonian" + infoH, LOG_TYPES::TRACE, 1);
+	if (Nh < UI_LIMITS_MAXFULLED) {
+		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
+		_H->diagH(false);
 	}
 	else
 	{
-		stout << "\t->" << "using S&I" << EL;
-		useShiftAndInvert	=		true;
-		stateNum			=		100;
-		this->hamDouble->diagH(false, stateNum, 0, 1000, 1e-5, "sa");
+		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
+		useShiftAndInvert = true;
+		stateNum = UI_LIMITS_SI_STATENUM;
+		_H->diagH(false, stateNum, 0, 1000, 1e-5, "sa");
 	}
-	//stouts("\t->finished diagonalizing Hamiltonian", start);
+	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
+	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
 
-	std::string name = "spectrum_num=" + STR(Nh);
-	stout << "->middle_spectrum_size : " << name << ".\n\t\t->Taking num states: " << stateNum << EL;
+	std::string name = VEQ(Nh);
+	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states: " + STR(stateNum), LOG_TYPES::TRACE, 2);
 
-	// create the directories
+	// --- create the directories ---
 	std::string dir = this->mainDir + kPS;
 	fs::create_directories(dir);
-	std::ofstream file;
-	std::ofstream fileAv;
-	std::string model_info = this->hamDouble->getInfo();
 
-	// save energies to check
-	if (Nh < ULLPOW(12)) {
-		openFile(file, dir + "energies" + model_info + "," + name + ".dat");
-		for (u64 i = 0; i < stateNum; i++)
-			file << this->hamDouble->getEigVal(i) << EL;
-		file.close();
-	}
-	
-	// save energies
-	std::string filename = dir + model_info + "," + name;
-	const auto& energies = this->hamDouble->getEigVal();
-	energies.save(arma::hdf5_name(filename + ".h5", "energy", arma::hdf5_opts::append));
-	this->hamDouble->clearEigVal();
-	this->hamDouble->clearH();
+	// --- use those files --- 
+	std::string modelInfo = _H->getInfo();
 
-	// calculate the reduced density matrices
-	//Operators<double> op(this->lat);
+	// --- save energies txt check ---
+	std::string filename = dir + infoH;
+	if (Nh < UI_LIMITS_MAXPRINT)
+		_H->getEigVal(dir, HAM_SAVE_EXT::dat);
+	_H->getEigVal(dir, HAM_SAVE_EXT::h5);
+
+	// clear energies
+	_H->clearEigVal();
+	_H->clearH();
 
 	// iterate through bond cut
-	int bond_num = this->latP.lat->get_Ns() / 2;
-	arma::mat entropies(bond_num, stateNum, arma::fill::zeros);
+	const uint maxBondNum = Ns / 2;
+	arma::mat ENTROPIES(maxBondNum, stateNum, arma::fill::zeros);
 
-	// check the symmetry rotation
-	//v_1d<u64> full_map = global.su ? this->ham_d->get_mapping_full() : v_1d<u64>();
-	//SpMat<double> symmetryRotationMat = this->ham_d->symmetryRotationMat(full_map);
+	// get the symmetry rotation matrix
+	auto _symRot = _H->getSymRot();
+	bool usesSym = _H->hilbertSpace.checkSym();
 
-	// set less number of bonds for quicker calculations
-	v_1d<uint> bonds = { static_cast<uint>(bond_num) };
+	// set which bonds we want to cut in bipartite
+	v_1d<uint> _bonds = { maxBondNum };
+	auto beforeEntro = clk::now();
 #pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < stateNum; idx++) {
-		arma::Col<double> state = this->hamDouble->getEigVec(idx);
-		if (this->symP.S_)
-			//state = symmetryRotationMat * state;
-		for (auto i : bonds) {
+		// get the eigenstate
+		arma::Col<_T> state = _H->getEigVec(idx);
+		if (usesSym)
+			state = _symRot * state;
+		// go through bonds
+		for (auto i : _bonds) {
 			// iterate through the state
-			//auto entro = op.entanglement_entropy(state, i, full_map);
-			auto entro = Entropy::Entanglement::Bipartite::vonNeuman(state, i);
-				//schmidt_decomposition(state, i, full_map);
-			entropies(static_cast<arma::uword>(i) - 1, idx) = entro;
+			auto entro = Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace);
+			// save the entropy
+			ENTROPIES(i - 1, idx) = entro;
 		}
-		if (stateNum > 10 && idx % int(stateNum / 10) == 0) {
-			stout << "\t->Done: " << int(idx * 100.0 / stateNum) << "%\n";
-			stout << "\t\t->doing : " << VEQ(idx) << "\t" << VEQ(model_info) << EL;
-		}
+		if (stateNum > 10 && idx % int(stateNum / 10) == 0)
+			LOGINFO("Finished: " + STR(int(idx * 100.0 / stateNum)) + "%", LOG_TYPES::TRACE, 3);
 	}
-	stout << "\t->" << VEQ(model_info) << "\t : FINISHED ENTROPIES" << EL;
-	
+	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
+	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
+
 	// save entropies file
-	entropies.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-	if (Ns <= 12) 
-		entropies.save(filename + ".dat", arma::arma_ascii);
+	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
+	if (Ns <= UI_LIMITS_MAXPRINT)
+		ENTROPIES.save(filename + ".dat", arma::arma_ascii);
 
 	if (useShiftAndInvert)
 		return;
 
 	// set the average energy index
-	const u64 av_energy_idx = this->hamDouble->getEnAvIdx();
+	const u64 avEnIdx = _H->getEnAvIdx();
 
-	//// save states near the mean energy index
-	//if (Ns == 20) {
-	//	arma::mat states = this->hamDouble->getEigVec().submat(0, av_energy_idx - 50, Nh-1, av_energy_idx + 50);
-	//	states.save(arma::hdf5_name(filename + ".h5", "states", arma::hdf5_opts::append));
-	//}
-
-	//// iterate through fractions
-	//v_1d<double> fractions = { 0.25, 0.1, 0.125, 0.5, 50, 200, 500 };
-	//v_1d<double> mean_frac(fractions.size());
-	//for (int iter = 0; iter < fractions.size(); iter++) {
-	//	double frac = fractions[iter];
-	//	u64 spectrum_num = frac <= 1.0 ? frac * Nh : static_cast<u64>(frac);
-	//	name = "spectrum_num=" + STR(Nh);
-	//	// define the window to calculate the entropy
-	//	if (long(av_energy_idx) - long(spectrum_num / 2) < 0 || av_energy_idx + u64(spectrum_num / 2) >= N)
-	//		continue;
-
-	//	auto subview = entropies.submat(0, av_energy_idx - long(spectrum_num / 2), bond_num - 1, av_energy_idx + u64(spectrum_num / 2));
-	//	vec bond_mean(bond_num, arma::fill::zeros);
-	//	for (int i = 1; i <= bond_num; i++)
-	//		bond_mean(i - 1) = arma::mean(subview.row(i - 1));
-	//	std::string filename = dir + "av_" + model_info + "," + name;
-	//	bond_mean.save(arma::hdf5_name(filename + ".h5", STRP(frac, 3), arma::hdf5_opts::append));
-
-	//	mean_frac[iter] = bond_mean(bond_num - 1);
-	//}
-	//
-	//// save maxima
-	//openFile(fileAv, this->saving_dir + kPS + "entropies_log" + ".dat", ios::out | ios::app);
-	//vec maxima = arma::max(entropies, 1);
-	//printSeparatedP(fileAv, '\t', 18, false, 12, this->ham_d->inf({}, "_", 4), maxima(bond_num - 1));
-	//for(auto mean : mean_frac)
-	//	printSeparatedP(fileAv, '\t', 18, false, 12, mean);
-	//printSeparatedP(fileAv, '\t', 18, true, 12, N);
-	//fileAv.close();
-}
-
+	// save states near the mean energy index
+	if (Ns == 20)
+		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM, HAM_SAVE_EXT::h5);
+};

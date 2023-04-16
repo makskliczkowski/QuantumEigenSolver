@@ -17,6 +17,16 @@ BEGIN_ENUM(MY_MODELS)												 // #
 END_ENUM(MY_MODELS)                                                  // #	
 // ######################################################################
 
+// ######################### SAVING EXTENSIONS ##########################
+enum HAM_SAVE_EXT {													 // #
+	dat, h5															 // #
+};																	 // #
+BEGIN_ENUM(HAM_SAVE_EXT)											 // #
+{																	 // #
+	DECL_ENUM_ELEMENT(dat), DECL_ENUM_ELEMENT(h5)					 // #
+}																	 // #
+END_ENUM(HAM_SAVE_EXT)                                               // #	
+// ######################################################################
 
 const std::string DEF_INFO_SEP		= std::string("_");										// defalut separator in info about the model
 #define DISORDER_EQUIV(type, param) type param		= 1;	\
@@ -24,16 +34,19 @@ const std::string DEF_INFO_SEP		= std::string("_");										// defalut separato
 									arma::Col<type> d##param
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
 #define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->##p, 2);	\
-									toSet += SSTR(",") + SSTR(#p) + SSTR("0=") +						\
-									((this->##p    != 0.0)   ? STRP(this->##p##0, 2) : "")	// gets the information about the disorder
+									toSet += ((this->##p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->##p##0, 2))
+										// gets the information about the disorder
 
 template <typename _T>
 class Hamiltonian {
+public:
+	using NQSFunSingle									=									std::function<_T(uint, double)>;
+	using NQSFunMultiple								=									std::function<_T(const arma::vec&)>;
+	Hilbert::HilbertSpace<_T> hilbertSpace;
+
 protected:
-	//double _SPIN = operators::_SPIN;														// spin value used in calculations (can be 1/2 for spin 1/2 but 1 is ok)
 	int Ns												=									1;
 	u64 Nh												=									1;
-	Hilbert::HilbertSpace<_T> hilbertSpace;
 	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS FIELDS -------------------------------------------
 	double avEn											=									0.0;
@@ -50,16 +63,22 @@ public:
 	//vec tmp_vec2;
 	//uint state_val_num;																	// basic number of state_values
 
-	Hamiltonian() : ran_(randomGen())					= default;
+	Hamiltonian() : ran_(randomGen()) {};
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
-		: hilbertSpace(hilbert), lat_(hilbert.getLattice()), Ns(lat_->get_Ns()), Nh(hilbert.getHilbertSize()) 
+		: hilbertSpace(hilbert)
 	{
 		this->ran_ = randomGen();
+		this->lat_ = this->hilbertSpace.getLattice();
+		this->Ns = this->lat_->get_Ns();
+		this->Nh = this->hilbertSpace.getHilbertSize();
 	};
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
-		: hilbertSpace(std::move(hilbert)), lat_(hilbertSpace.getLattice()), Ns(lat_->get_Ns()), Nh(hilbertSpace.getHilbertSize()) 
+		: hilbertSpace(std::move(hilbert))
 	{
-		this->ran_ = randomGen();
+		this->ran_	=	randomGen();
+		this->lat_	=	this->hilbertSpace.getLattice();
+		this->Ns	=	this->lat_->get_Ns();
+		this->Nh	=	this->hilbertSpace.getHilbertSize();
 	};
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
@@ -102,7 +121,7 @@ public:
 	void init() {
 		try {
 			//  hamiltonian memory reservation
-			this->H_ = arma::SpMat<_T>(this->getHilbertSize(), this->getHilbertSize());
+			this->H_ = arma::SpMat<_T>(this->Nh, this->Nh);
 		}
 		catch (const std::bad_alloc& e) {
 			stout << "Memory exceeded" << e.what() << "\n";
@@ -116,10 +135,14 @@ public:
 	auto getHilbertSize()								const -> u64						{ return this->hilbertSpace.getHilbertSize(); };			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
 	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_; };								
+	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot(); };
 	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_; };							
 	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx); };			
 	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx); };				
+	auto getEigVec(std::string _dir, u64 _mid, 
+		HAM_SAVE_EXT _typ)								const -> void;
 	auto getEigVal()									const -> arma::vec					{ return this->eigVal_; };						
+	auto getEigVal(std::string _dir, HAM_SAVE_EXT _typ)	const -> void;
 	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
 	auto getInfo(const v_1d<std::string>& skip = {}, 
 		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info("", skip, sep); };
@@ -140,13 +163,14 @@ public:
 
 	// ------------------------------------------- 	LOCAL ENERGY -------------------------------------------
 	
-	virtual void locEnergy(u64 _elemId, u64 _elem, uint _site)	= 0;
-	virtual cpx locEnergy(u64 _id, uint site, Operators::_OP<cpx>::INP<double> f1,
-											  std::function<cpx(const arma::vec&)> f2,
-											  arma::vec& tmp)	= 0;						// returns the local energy for VQMC purposes
-	virtual cpx locEnergy(const arma::vec& v, uint site, Operators::_OP<cpx>::INP<double> f1,
-											  std::function<cpx(const arma::vec&)> f2,
-											  arma::vec& tmp)	= 0;						// returns the local energy for VQMC purposes
+	virtual void locEnergy(u64 _elemId, u64 _elem, uint _site)	= 0; 
+	virtual cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
+											  const NQSFunMultiple& f2,
+											  arma::Col<double>& tmp)	= 0;				// returns the local energy for VQMC purposes
+	virtual cpx locEnergy(const arma::Col<double>& v, uint site,
+											  const NQSFunSingle& f1,
+											  const NQSFunMultiple& f2,
+											  arma::Col<double>& tmp)	= 0;				// returns the local energy for VQMC purposes
 
 	//void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
 	
@@ -232,14 +256,23 @@ inline void Hamiltonian<_T>::prettyPrint(std::ostream& output, const arma::Col<_
 template<typename _T>
 inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 {
-	auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getSymNorm(k));
-	// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-	try {
-		this->H_(idx, k) += val * symEig;
+	try 
+	{
+		if (true)//this->hilbertSpace.getMapping(k) != newIdx)
+		{
+			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
+			// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
+			arma::Col<int> tmp(4, arma::fill::zeros);
+			intToBase(this->hilbertSpace.getMapping(idx), tmp);
+			stout << "\t->REPR: " << this->hilbertSpace.getMapping(idx) << "PLACE: " << idx << EL;
+			stout << "\t->" << tmp.t() << EL;
+			this->H_(idx, k) += val * symEig;
+		}
+		else
+			this->H_(k, k) += val;
 	}
 	catch (const std::exception& err) {
 		stout << "EXCEPTION" << err.what() << "\n";
-		printSeparated(stout, '\t', 15, true, VEQ(k), VEQ(val), VEQ(newIdx), VEQ(idx));
 	}
 }
 
@@ -350,4 +383,51 @@ inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 }
 
 // ################################################################################################################################################
+
+/*
+* @brief Prints the eigenvalues into some file "energies" in some directory
+* @param _dir directory to be saved onto
+* @param _typ type of the file extension (dat, h5 or other).
+*/
+template<typename _T>
+inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ) const -> void
+{
+	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
+	std::ofstream file;
+	switch (_typ)
+	{
+	case HAM_SAVE_EXT::dat:
+		openFile(file, _dir + "energy" + this->getInfo() + extension);
+		for (auto i = 0; i < this->eigVal_.size(); i++)
+			file << this->eigVal_(i) << EL;
+		file.close();
+		break;
+	case HAM_SAVE_EXT::h5:
+		this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy", arma::hdf5_opts::append));
+		break;
+	default:
+		LOGINFO("Wrong extension, not saving a file. Available are [.dat, .h5]", LOG_TYPES::WARNING, 1);
+		break;
+	}
+}
+
+template<typename _T>
+inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ) const -> void
+{
+	arma::Mat<_T> states = this->eigVec_.submat(0, this->avEnIdx - _mid / 2, this->Nh - 1, this->avEnIdx + _mid / 2);
+	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
+	switch (_typ)
+	{
+	case HAM_SAVE_EXT::dat:
+		states.save(_dir + "states" + this->getInfo() + extension, arma::arma_ascii);
+		break;
+	case HAM_SAVE_EXT::h5:
+		states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states", arma::hdf5_opts::append));
+		break;
+	default:
+		states.save(_dir + "states" + this->getInfo() + ".dat", arma::arma_ascii);
+		break;
+	}
+}
+
 #endif

@@ -18,6 +18,8 @@ protected:
 	//vec tmp_vec2;
 
 public:
+	using NQSFunSingle									= Hamiltonian<_T>::NQSFunSingle;
+	using NQSFunMultiple								= Hamiltonian<_T>::NQSFunMultiple;
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
 	~IsingModel()										= default;
 	IsingModel()										= default;
@@ -29,12 +31,13 @@ public:
 	// -------------------------------------------				METHODS				-------------------------------------------
 	void hamiltonian()									override final;
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override final;
-	cpx locEnergy(u64 _id, uint site, Operators::_OP<cpx>::INP<double> f1,
-		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final { return 0; };
-	cpx locEnergy(const arma::vec& v, uint site, Operators::_OP<cpx>::INP<double> f1,
-		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final { return 0; };
+	cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
+		const NQSFunMultiple& f2,
+		arma::Col<double>& tmp)							override final { return 0; };
+	cpx locEnergy(const arma::Col<double>& v, uint site,
+		const NQSFunSingle& f1,
+		const NQSFunMultiple& f2,
+		arma::Col<double>& tmp)							override final { return 0; };
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -47,7 +50,7 @@ public:
 		PARAMS_S_DISORDER(g, name);
 		PARAMS_S_DISORDER(h, name);
 		name += this->hilbertSpace.getSymInfo();
-		name +=	VEQ(BC);
+		name += "," + VEQ(BC);
 		return this->Hamiltonian<_T>::info(name, skip, sep);
 	}
 	void updateInfo()									override final { this->info_ = this->info(); };
@@ -71,7 +74,6 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->Nh			=			ULLPOW(this->Ns);									
 	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);			// creates random disorder vector
 	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
 	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
@@ -87,7 +89,6 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->Nh			=			ULLPOW(this->Ns);
 	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);			// creates random disorder vector
 	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
 	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
@@ -110,13 +111,27 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	u64 newIdx	= 0;
 	_T newVal	= 0;
 
+	stout << EL << "____________________________" << EL;
+	stout << VEQ(_elemId) << EL;
+	stout << VEQ(_site) << EL;
+	stout << VEQ(_elem) << EL;
+	arma::Col<int> tmp(4, arma::fill::zeros);
+	intToBase(_elem, tmp);
+	stout << tmp.t() << EL << EL;
+
 	// -------------- perpendicular field --------------
 	std::tie(newIdx, newVal) = Operators::sigma_z(_elem, this->Ns, { _site });
+	stout << "Z:" << newIdx << ":" << newVal << EL;
+	intToBase(newIdx, tmp);
+	stout << tmp.t() << EL << EL;
 	this->setHElem(_elemId, PARAM_W_DISORDER(h, _site) * newVal, newIdx);
 
 	// -------------- transverse field --------------
 	if (!EQP(this->g, 0.0, 1e-9)) {
 		std::tie(newIdx, newVal) = Operators::sigma_x(_elem, this->Ns, { _site });
+		stout << "X:" << newIdx << ":" << newVal << EL;
+		intToBase(newIdx, tmp);
+		stout << tmp.t() << EL << EL;
 		this->setHElem(_elemId, PARAM_W_DISORDER(g, _site) * newVal, newIdx);
 	}
 
@@ -127,11 +142,15 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			// Ising-like spin correlation
 			auto [idx_z, val_z]			=		Operators::sigma_z(_elem, this->Ns, { _site });
 			auto [idx_z2, val_z2]		=		Operators::sigma_z(idx_z, this->Ns, { (uint)nei });
+			stout << "NEI:" << idx_z2 << ":" << val_z2 * val_z << EL;
+			intToBase(idx_z2, tmp);
+			stout << tmp.t() << EL << EL;
 			this->setHElem(_elemId, 
 								PARAM_W_DISORDER(J, _site) * (val_z * val_z2), 
 								idx_z2);
 		}
 	}
+	stout << "____________________________" << EL << EL;
 }
 
 /*
@@ -209,9 +228,11 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 template <typename _T>
 void IsingModel<_T>::hamiltonian() {
 	this->init();
-	for (u64 k = 0; k < this->Nh; k++)
+	for (u64 k = 0; k < this->Nh; k++) {
+		u64 kMap = this->hilbertSpace.getMapping(k);
 		for (int site_ = 0; site_ <= this->Ns - 1; site_++)
-			this->locEnergy(k, this->hilbertSpace.getMapping(k), site_);
+			this->locEnergy(k, kMap, site_);
+	}
 }
 
 

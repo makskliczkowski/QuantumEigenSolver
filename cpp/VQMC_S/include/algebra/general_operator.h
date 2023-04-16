@@ -104,6 +104,7 @@ namespace Operators{
 			this->lat_		=		_other.lat_;
 			this->fun_		=		_other.fun_;
 			this->eigVal_	=		_other.eigVal_;
+			this->name_		=		_other.name_;
 			return *this;
 		}
 
@@ -112,6 +113,7 @@ namespace Operators{
 			this->lat_		=		std::move(_other.lat_);
 			this->fun_		=		std::move(_other.fun_);
 			this->eigVal_	=		std::move(_other.eigVal_);
+			this->name_		=		std::move(_other.name_);
 			return *this;
 		}
 

@@ -226,7 +226,7 @@ namespace Entropy {
 				// set subsystems size
 				uint Ns						=			_hilb.getLatticeSize();
 				uint Nint					=			_hilb.getNum();
-				uint bitNum					=			std::log2(Nint);
+				uint bitNum					=			std::log2(_hilb.getLocalHilbertSize());
 				const u64 dimA				=			ULLPOW(bitNum * _sizeA);
 				const u64 dimB				=			ULLPOW((Ns - bitNum * _sizeA));
 				return arma::reshape(_s, dimA, dimB);
@@ -283,7 +283,7 @@ namespace Entropy {
 				if (_ch == RHO_METHODS::SCHMIDT)
 				{
 					vals					=			arma::svd(rho);
-					vals					=			vals * vals;
+					vals					=			arma::square(vals);
 				}
 				else
 					arma::eig_sym(vals, rho);

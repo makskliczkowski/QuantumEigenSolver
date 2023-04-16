@@ -252,7 +252,14 @@ void UI::defineModels() {
 }
 
 
-
+void UI::makeSimSymmetries()
+{
+	this->defineModels();
+	if (this->isComplex_)
+		this->symmetries(clk::now(), this->hamComplex);
+	else
+		this->symmetries(clk::now(), this->hamDouble);
+}
 
 
 // -------------------------------------------------------- SIMULATIONS
@@ -833,64 +840,7 @@ void UI::defineModels() {
 //
 ///*
 //*/
-//template<typename _type, typename _hamtype>
-//inline void rbm_ui::ui<_type, _hamtype>::define_models()
-//{
-//	// define the lattice
-//	switch (this->lattice_type)
-//	{
-//	case impDef::lattice_types::square:
-//		this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
-//		break;
-//	case impDef::lattice_types::hexagonal:
-//		this->lat = std::make_shared<HexagonalLattice>(Lx, Ly, Lz, dim, _BC);
-//		break;
-//	default:
-//		this->lat = std::make_shared<SquareLattice>(Lx, Ly, Lz, dim, _BC);
-//		break;
-//	}
-//	auto lat_type = lat->get_type();
-//	auto lat_info = lat->get_info();
-//	auto Ns = lat->get_Ns();
-//	stout << "\t\t-> " << VEQ(lat_info) << EL;
-//	//stout << "\t\t-> " << VEQ(lat_type) << EL;
-//	// create operator averages
-//	this->av_op = avOperators(Lx, Ly, Lz, this->lat->get_Ns(), lat_type);
-//
-//	// define the hamiltonian
-//	//stout << static_cast<int>(this->model_name) << EL;
-//	switch (static_cast<int>(this->model_name))
-//	{
-//	case impDef::ham_types::ising:
-//		this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
-//		break;
-//	case impDef::ham_types::heisenberg:
-//		this->ham = std::make_shared<Heisenberg<_hamtype>>(J, J0, g, g0, h, w, delta, lat);
-//		break;
-//	case impDef::ham_types::heisenberg_dots:
-//		this->ham = std::make_shared<Heisenberg_dots<_hamtype>>(J, J0, g, g0, h, w, delta, lat, positions, J_dot, J0_dot);
-//		ham->set_angles(phis, thetas);
-//		break;
-//	case impDef::ham_types::kitaev_heisenberg:
-//		this->ham = std::make_shared<Heisenberg_kitaev<_hamtype>>(J, J0, g, g0, h, w, delta, make_tuple(Kx, Ky, Kz), K0, lat);
-//		break;
-//	default:
-//		this->ham = std::make_shared<IsingModel<_hamtype>>(J, J0, g, g0, h, w, lat);
-//		break;
-//	}
-//	auto model_info = this->ham->get_info();
-//	stout << "\t\t-> " << VEQ(model_info) << EL;
-//
-//
-//	// rbm stuff
-//	this->nvisible = Ns;
-//	this->nhidden = this->layer_mult * this->nvisible;
-//	this->phi = std::make_unique<rbmState<_type, _hamtype>>(nhidden, nvisible, ham, lr, batch, thread_num);
-//	auto rbm_info = phi->get_info();
-//	stout << "\t\t-> " << VEQ(rbm_info) << EL;
-//
-//}
-//
+
 ///*
 //* if it is possible to do so we can test the exact diagonalization states for comparison
 //*/

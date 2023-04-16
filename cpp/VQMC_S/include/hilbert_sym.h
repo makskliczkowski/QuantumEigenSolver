@@ -18,35 +18,48 @@ namespace Operators {
 	{
 		// cyclic shift function with boundary preservation
 		_GLB<_T> cyclicShift;
-		switch (lat->get_Dim())
+		uint dim	= lat->get_Dim();
+		uint Lx		= lat->get_Lx();
+		uint Ly		= lat->get_Ly();
+		uint Lz		= lat->get_Lz();
+		uint Ns		= lat->get_Ns();
+		switch (dim)
 		{
 		case 1:
 			cyclicShift = std::function(
-				[lat](u64 state)
+				[Ns](u64 state)
 				{
-					return std::make_pair(rotateLeft(state, lat->get_Ns()), _T(1.0));
+					return std::make_pair(rotateLeft(state, Ns), _T(1.0));
 				}
 			);
 			break;
 		case 2:
 			cyclicShift = std::function(
-				[lat](u64 state)
+				[Lx, Ns](u64 state)
 				{
 					auto tmpState = state;
-					for (auto i = 0; i < lat->get_Lx(); i++)
-						tmpState = rotateLeft(state, lat->get_Ns());
+					for (auto i = 0; i < Lx; i++)
+						tmpState = rotateLeft(state, Ns);
 					return std::make_pair(tmpState, _T(1.0));
 				}
 			);
 			break;
 		case 3:
 			cyclicShift = std::function(
-				[lat](u64 state)
+				[Lx, Ly, Ns](u64 state)
 				{
 					auto tmpState = state;
-					for (auto i = 0; i < lat->get_Lx() * lat->get_Ly(); i++)
-						tmpState = rotateLeft(state, lat->get_Ns());
+					for (auto i = 0; i < Lx * Ly; i++)
+						tmpState = rotateLeft(state, Ns);
 					return std::make_pair(tmpState, _T(1.0));
+				}
+			);
+			break;
+		default:
+			cyclicShift = std::function(
+				[Ns](u64 state)
+				{
+					return std::make_pair(rotateLeft(state, Ns), _T(1.0));
 				}
 			);
 			break;
@@ -96,8 +109,9 @@ namespace Operators {
 	template<typename _T>
 	inline _GLB<_T> reflection(std::shared_ptr<Lattice>& lat, int base)
 	{
-		_GLB<_T> fun = [lat, base](u64 state) {
-			return std::make_pair(revBits(state, lat->get_Ns(), base), _T(1.0));
+		auto Ns = lat->get_Ns();
+		_GLB<_T> fun = [Ns, base](u64 state) {
+			return std::make_pair(revBits(state, Ns, base), _T(1.0));
 		};
 		return fun;
 	};
@@ -116,8 +130,9 @@ namespace Operators {
 	template<typename _T>
 	inline _GLB<_T> flipZ(std::shared_ptr<Lattice>& lat)
 	{
-		_GLB<_T> fun = [lat](u64 state) {
-			int spinUps = lat->get_Ns() - std::popcount(state);
+		auto Ns = lat->get_Ns();
+		_GLB<_T> fun = [Ns](u64 state) {
+			int spinUps = Ns - std::popcount(state);
 			return std::make_pair(state, _T(spinUps % 2 == 0 ? 1.0 : -1.0));
 		};
 		return fun;
@@ -126,11 +141,12 @@ namespace Operators {
 	template<typename _T>
 	inline _GLB<_T> flipY(std::shared_ptr<Lattice>& lat)
 	{
-		_GLB<_T> fun = [lat](u64 state)
+		auto Ns = lat->get_Ns();
+		_GLB<_T> fun = [Ns](u64 state)
 		{
-			int spinUps		=	lat->get_Ns() - std::popcount(state);
-			_T _val			=	double(spinUps % 2 == 0 ? 1.0 : -1.0) * std::pow(I, lat->get_Ns());
-			return std::make_pair(flipAll(state, lat->get_Ns()), _val);
+			int spinUps		=	Ns - std::popcount(state);
+			_T _val			=	double(spinUps % 2 == 0 ? 1.0 : -1.0) * std::pow(I, Ns);
+			return std::make_pair(flipAll(state, Ns), _val);
 		};
 		return fun;
 	};
@@ -138,11 +154,12 @@ namespace Operators {
 	template<>
 	inline _GLB<double> flipY<double>(std::shared_ptr<Lattice>& lat)
 	{
-		_GLB<double> fun = [lat](u64 state)
+		auto Ns = lat->get_Ns();
+		_GLB<double> fun = [Ns](u64 state)
 		{
-			int spinUps = lat->get_Ns() - std::popcount(state);
-			double _val = double(spinUps % 2 == 0 ? 1.0 : -1.0) * std::real(std::pow(I, lat->get_Ns()));
-			return std::make_pair(flipAll(state, lat->get_Ns()), _val);
+			int spinUps = Ns - std::popcount(state);
+			double _val = double(spinUps % 2 == 0 ? 1.0 : -1.0) * std::real(std::pow(I, Ns));
+			return std::make_pair(flipAll(state, Ns), _val);
 		};
 		return fun;
 	};
@@ -150,9 +167,10 @@ namespace Operators {
 	template<typename _T>
 	inline _GLB<_T> flipX(std::shared_ptr<Lattice>& lat)
 	{
-		auto fun = [lat](u64 state)
+		auto Ns = lat->get_Ns();
+		auto fun = [Ns](u64 state)
 		{
-			return std::make_pair(flipAll(state, lat->get_Ns()), _T(1.0));
+			return std::make_pair(flipAll(state, Ns), _T(1.0));
 		};
 		return fun;
 	};

@@ -34,8 +34,7 @@ class RBM_S : public NQS<_T, _Ht>
 public:
 	using NQSS						=					NQS<_T, _Ht>::NQSS;
 	using NQSB						=					NQS<_T, _Ht>::NQSB;
-	using NQSW						=					arma::Mat<_T>;
-
+	using NQSW						=					NQS<_T, _Ht>::NQSW;
 protected:
 	uint nHid_						=					1;
 	// general parameters
@@ -49,7 +48,6 @@ protected:
 	NQSW W_;															// weight matrix
 	NQSB bV_;															// visible bias
 	NQSB bH_;															// hidden bias
-	NQSB bFlat_;														// flattened gradient
 	NQSB F_;															// forces
 	
 	// ------------------------- A N G L E S -----------------------------
@@ -82,16 +80,25 @@ protected:
 	void rescaleS() {
 		this->S.diag() += (regLambda0 < regLambdaMin) ? regLambdaMin : (regLambda0 * this->regBCurrent);
 	};
+
 #endif
-	void grad(const NQSS& _v)							override final;
+	void grad(const NQSS& _v, uint _plc)				override final;
+	void collectGrad(const NQSB& _energies)				override final;
 	void updateWeights()								override final;
+	void saveWeights(std::string _dir)					override final;
+
 	void derivativeSR(int step);
 
 	// ------------------------- P R O B A B I L I T Y --------------------------
-	auto pRatio()					const -> _T;
-	auto pRatio(const NQSS& _v)		const -> _T;
+	auto pRatio()					const -> _T			override final;
+	auto pRatio(uint fP, float fV)  const -> _T			override final;
+	auto pRatio(uint nFlips)		const -> _T			override final;
+	auto pRatio(const NQSS& _v)		const -> _T			override final;
 	auto pRatio(const NQSS& _v1,
-				const NQSS& _v2)	const -> _T;
+				const NQSS& _v2)	const -> _T			override final;
+	auto pRatioChange(_T _val, 
+					  u64 _state, 
+					  uint _vid)	-> _T				override final;
 
 	// -------------------------------------------------------------------
 public:
@@ -105,13 +112,11 @@ public:
 	// --------------------- S E T T E R S ---------------------
 	void init()											override final;
 	void init(const std::string& _p)					override final {};
-	void setRandomState()								override final;
 
 	// --------------------- G E T T E R S ---------------------
 	auto getNhid()					const -> uint		{ return this->nHid_; };
 	
-	// --------------------- F I N A L E ---------------------
-	
+	// --------------------- F I N A L E -----------------------
 	/*
 	* @brief reproduces the RBM NQS ANSATZ
 	*/
@@ -119,13 +124,80 @@ public:
 	{
 		return (std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->hiperbolicF(_in))) / std::sqrt(this->nVis_); //* std::pow(2.0, this->n_hidden)
 	};
+
+	// --------------------- S A M P L I N G -------------------
+	
+	arma::Col<_T> train(uint nSam, uint nThrm,
+		uint nBlck, uint bSize,
+		uint nFlip = 1, uint progPrc = 25)
+	{
+		const int _stps = nBlck - nThrm;
+#ifdef NQS_RBM_SREG
+		this->regBCurrent = this->regBMult;
+#endif
+		this->Derivatives_.resize(_stps, this->fullSize_);
+		return NQS<_T, _Ht>::train(nSam, nThrm, nBlck, bSize, nFlip, progPrc);
+	};
 };
 
 // ##############################################################################################################################################
 
-//! WORK ON THAT
+
+/*
+* @brief Calculates the probability ratio whenever we use only one flip
+*/
 template<typename _T, typename _Ht>
 inline auto RBM_S<_T, _Ht>::pRatio() const -> _T
+{
+	// preset the value
+#ifdef NQS_RBM_ANGLES_UPD
+	auto hiperbolic	= this->hiperbolicF();
+#else
+	auto hiperbolic = this->hiperbolicF(this->curVec);
+#endif
+	uint flipPlace	=	this->flipPlaces_[0];
+	uint flipVal	=	this->flipVals_[0];
+	// set the first value of b_visible
+#ifdef SPIN
+	_T val			=	(-2.0 * flipVal);
+#else
+	_T val			=	(1.0 - 2.0 * flipVal);
+#endif
+		// use value as the change already
+#ifdef NQS_RBM_ANGLES_UPD
+	val = val * this->bV_(flipPlace) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(flipPlace)) / hiperbolic));
+#else
+	val = val * this->bV_(flipPlace) + arma::sum(arma::log(this->hiperbolicF(this->tmpVec) / hiperbolic));
+#endif
+	return exp(val);
+}
+
+template<typename _T, typename _Ht>
+inline auto RBM_S<_T, _Ht>::pRatio(uint fP, float fV) const -> _T
+{
+	// preset the value
+#ifdef NQS_RBM_ANGLES_UPD
+	auto hiperbolic = this->hiperbolicF();
+#else
+	auto hiperbolic = this->hiperbolicF(this->curVec);
+#endif
+	// set the first value of b_visible
+#ifdef SPIN
+	_T val = (-2.0 * fV);
+#else
+	_T val = (1.0 - 2.0 * fV);
+#endif
+	// use value as the change already
+#ifdef NQS_RBM_ANGLES_UPD
+	val = val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / hiperbolic));
+#else
+	val = val * this->bV_(fP) + arma::sum(arma::log(this->hiperbolicF(this->tmpVec) / hiperbolic));
+#endif
+	return exp(val);
+}
+
+template<typename _T, typename _Ht>
+inline auto RBM_S<_T, _Ht>::pRatio(uint nFlips) const -> _T
 {
 	_T val = 0;
 	// preset the value
@@ -137,8 +209,8 @@ inline auto RBM_S<_T, _Ht>::pRatio() const -> _T
 	// iterate through the flips
 	for (uint i = 0; i < this->flipVals_.size(); i++)
 	{
-		uint flipPlace	=	this->flipPlaces_[i];
-		uint flipVal	=	this->flipVals_[i];
+		uint flipPlace = this->flipPlaces_[i];
+		uint flipVal = this->flipVals_[i];
 		// set the first value of b_visible
 #ifdef SPIN
 		val += (-2.0 * flipVal);
@@ -163,6 +235,9 @@ inline auto RBM_S<_T, _Ht>::pRatio(const NQSS& _v) const -> _T
 	return std::exp(val);
 }
 
+/*
+* @brief computes Log Psi'/Psi, where Psi' is the state with certain flipped spins
+*/
 template<typename _T, typename _Ht>
 inline auto RBM_S<_T, _Ht>::pRatio(const NQSS& _v1, const NQSS& _v2) const -> _T
 {
@@ -173,10 +248,20 @@ inline auto RBM_S<_T, _Ht>::pRatio(const NQSS& _v1, const NQSS& _v2) const -> _T
 
 // ##############################################################################################################################################
 
+/*
+* @brief probability ratio change due to the state change
+* @param v value of the ratio
+* @param state the state that we change onto
+*/
 template<typename _T, typename _Ht>
-inline void RBM_S<_T, _Ht>::setRandomState()
+inline auto RBM_S<_T, _Ht>::pRatioChange(_T _val, u64 _state, uint _vid) -> _T
 {
-	this->setState(this->ran_.randomInt<u64>(0, this->Nh), true);
+	INT_TO_BASE(_state, this->tmpVecs[_vid], Operators::_SPIN_RBM);
+#ifndef NQS_RBM_ANGLES_UPD
+	return _val * this->pRatio(this->curVec, this->tmpVecs[_vid]);
+#else
+	return _val * this->pRatio(this->tmpVecs[_vid]);
+#endif
 }
 
 // ##############################################################################################################################################
@@ -184,8 +269,9 @@ inline void RBM_S<_T, _Ht>::setRandomState()
 template<typename _T, typename _Ht>
 inline void RBM_S<_T, _Ht>::setState(NQSS _st, bool _set)
 {
-	this->curVec = _st * Operators::_SPIN_RBM;
-	this->curState = BASE_TO_INT<u64>(_st);
+	// make sure it is the same base
+	this->curVec			=			_st / _st(0) * Operators::_SPIN_RBM;
+	this->curState			=			BASE_TO_INT<u64>(_st, Operators::_SPIN_RBM);
 #ifdef NQS_RBM_ANGLES_UPD
 	if (_set)
 		this->setAngles();
@@ -195,16 +281,15 @@ inline void RBM_S<_T, _Ht>::setState(NQSS _st, bool _set)
 template<typename _T, typename _Ht>
 inline void RBM_S<_T, _Ht>::setState(NQSS _st)
 {
-	this->curVec			=			_st * Operators::_SPIN_RBM;
-	this->curState			=			BASE_TO_INT<u64>(_st);
+	this->curVec			=			_st / _st(0) * Operators::_SPIN_RBM;
+	this->curState			=			BASE_TO_INT<u64>(_st, Operators::_SPIN_RBM);
 }
 
 template<typename _T, typename _Ht>
 inline void RBM_S<_T, _Ht>::setState(u64 _st, bool _set)
 {
 	this->curState			=			_st;
-	INT_TO_BASE(_st, this->curVec);
-	this->curVec			*=			Operators::_SPIN_RBM;
+	INT_TO_BASE(_st, this->curVec, Operators::_SPIN_RBM);
 #ifdef NQS_RBM_ANGLES_UPD
 	if (_set)
 		this->setAngles();
@@ -215,7 +300,7 @@ template<typename _T, typename _Ht>
 inline void RBM_S<_T, _Ht>::setState(u64 _st)
 {
 	this->curState			=			_st;
-	INT_TO_BASE(_st, this->curVec);
+	INT_TO_BASE(_st, this->curVec, Operators::_SPIN_RBM);
 	this->curVec			*=			Operators::_SPIN_RBM;
 }
 
@@ -229,7 +314,6 @@ inline void RBM_S<_T, _Ht>::allocate()
 	this->bH_.resize(		this->nHid_);
 	this->theta_.resize(	this->nHid_);
 	this->W_.resize(		this->nHid_,		this->nVis_);
-	this->bFlat_.resize(	this->fullSize_);
 	// allocate gradients
 	this->F_.resize(		this->fullSize_);
 #ifdef NQS_RBM_USESR
@@ -276,7 +360,7 @@ inline void RBM_S<_T, _Ht>::setInfo()
 // ##############################################################################################################################################
 
 template<typename _T, typename _Ht>
-inline void RBM_S<_T, _Ht>::grad(const NQSS& _v)
+inline void RBM_S<_T, _Ht>::grad(const NQSS& _v, uint _plc)
 {
 	// update the angles if it is necessary
 #ifndef NQS_RBM_ANGLES_UPD
@@ -284,19 +368,43 @@ inline void RBM_S<_T, _Ht>::grad(const NQSS& _v)
 #endif
 
 	// calculate the flattened part
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (uint i = 0; i < this->nVis_; i++)
-		this->bFlat_(i) = _v(i);
+		this->Derivatives_(_plc, i) = _v(i);
 
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (uint i = 0; i < this->nHid_; i++)
-		this->bFlat_(i + this->nVis_) = std::tanh(this->theta_(i));
+		this->Derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
 
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (uint i = 0; i < this->nHid_; i++)
 		for (auto j = 0; j < this->nVis_; j++)
-			this->bFlat_((this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->bFlat_(i + this->nVis_) * _v(j);
+			this->Derivatives_(_plc, (this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->Derivatives_(_plc, i + this->nVis_) * _v(j);
 
+}
+
+// ##############################################################################################################################################
+
+/*
+* @brief Based on energies collected in steps, calculates the derivatives
+*/
+template<typename _T, typename _Ht>
+inline void RBM_S<_T, _Ht>::collectGrad(const NQSB& _energies)
+{
+	this->F_ = arma::cov(arma::conj(this->Derivatives_), _energies);
+#ifdef NQS_RBM_USE_SR
+	this->S_ = arma::cov(arma::conj(this->Derivatives_), this->Derivatives_);
+	
+	// update model
+	this->derivativeSR(0);
+
+	#ifdef NQS_RBM_SREG
+	this->regBCurrent *= regBMult;
+	#endif // S_REGULAR
+#else
+	// standard updater
+	this->F_ *= this->lr_;
+#endif
 }
 
 // ##############################################################################################################################################
@@ -308,15 +416,15 @@ inline void RBM_S<_T, _Ht>::grad(const NQSS& _v)
 template<typename _T, typename _Ht>
 inline void RBM_S<_T, _Ht>::updateWeights()
 {
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (auto i = 0; i < this->nVis_; i++)
 		this->bV_(i) -= this->F_(i);
 
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (auto i = 0; i < this->nHid_; i++)
 		this->bH_(i) -= this->F_(i + this->nVis_);
 
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum_)
 	for (auto i = 0; i < this->nHid_; i++)
 		for (auto j = 0; j < this->nVis_; j++)
 			this->W_(i, j) -= this->F_((this->nVis_ + this->nHid_) + i + j * this->nHid_);
@@ -391,6 +499,19 @@ inline void RBM_S<_T, _Ht>::derivativeSR(int step)
 	this->S_.diag() = this->S_.diag() + (this->lr_ * arma::ones(this->S_.n_rows));
 #endif 
 	this->F_ = this->lr_ * arma::solve(this->S_, this->F_);
+}
+
+// ##############################################################################################################################################
+
+template<typename _T, typename _Ht>
+inline void RBM_S<_T, _Ht>::saveWeights(std::string _dir)
+{
+	std::string dir = _dir + kPS + "RBM" + kPS;
+	std::string filename = dir + "weights_" + prettyTime(clk::now()) + ".h5";
+	createDir(dir);
+	this->W_.save(arma::hdf5_name(filename, "W"));
+	this->bH_.save(arma::hdf5_name(filename, "hidden", arma::hdf5_opts::append));
+	this->bV_.save(arma::hdf5_name(filename, "visible", arma::hdf5_opts::append));
 }
 
 #endif

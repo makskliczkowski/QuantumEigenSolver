@@ -8,6 +8,9 @@
 
 template <typename _T>
 class XYZ : public Hamiltonian<_T> {
+public:
+	using NQSFunSingle									= Hamiltonian<_T>::NQSFunSingle;
+	using NQSFunMultiple								= Hamiltonian<_T>::NQSFunMultiple;
 protected:
 	// ------------------------------------------- MODEL BASED PARAMETERS -------------------------------------------
 	DISORDER_EQUIV(double, Ja);
@@ -88,12 +91,13 @@ public:
 	// -------------------------------------------				METHODS				-------------------------------------------
 	void hamiltonian()									override final;
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override final;
-	cpx locEnergy(u64 _id, uint site, Operators::_OP<cpx>::INP<double> f1,
-		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final { return 0; };
-	cpx locEnergy(const arma::vec& v, uint site, Operators::_OP<cpx>::INP<double> f1,
-		std::function<cpx(const arma::vec&)> f2,
-		arma::vec& tmp)									override final { return 0; };
+	cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
+		const NQSFunMultiple& f2,
+		arma::Col<double>& tmp)							override final { return 0; };
+	cpx locEnergy(const arma::Col<double>& v, uint site,
+		const NQSFunSingle& f1,
+		const NQSFunMultiple& f2,
+		arma::Col<double>& tmp)							override final { return 0; };
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -112,7 +116,7 @@ public:
 		PARAMS_S_DISORDER(eB, name);
 		name += ",pb=" + STR(this->parityBreak_);
 		name += this->hilbertSpace.getSymInfo();
-		name += VEQ(BC);
+		name += "," + VEQ(BC);
 		return	this->Hamiltonian<_T>::info(name, skip, sep);
 	}
 	void updateInfo()									override final { this->info_ = this->info(); };
