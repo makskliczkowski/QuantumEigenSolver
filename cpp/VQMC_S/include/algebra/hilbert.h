@@ -124,7 +124,7 @@ namespace Hilbert {
 		bool			checkLSym()						const					{ return this->symGroup_.size() != 0; };
 		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0; };
 		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
-		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return g.getVal(); return -INT_MAX; };
+		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
 
 	// ##########################################################################################################################################
