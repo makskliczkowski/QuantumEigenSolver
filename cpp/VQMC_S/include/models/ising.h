@@ -89,7 +89,7 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 	//change info
 	this->info_			=			this->info();
 	this->updateInfo();
-	LOGINFO("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
+	LOGINFOG("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
 }
 
 template <typename _T>
@@ -106,7 +106,7 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 	//change info
 	this->info_			=			this->info();
 	this->updateInfo();
-	LOGINFO("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
+	LOGINFOG("I am Transverse Field Ising: " + this->info_, LOG_TYPES::CHOICE, 2);
 }
 
 // ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
@@ -148,8 +148,8 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 
 	// -------------- CHECK NN ---------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
-		auto N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
-		if (auto nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) {
+		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) {
 			// Ising-like spin correlation
 			auto [idx_z, val_z]			=		Operators::sigma_z(_elem, this->Ns, { _site });
 			auto [idx_z2, val_z2]		=		Operators::sigma_z(idx_z, this->Ns, { (uint)nei });
@@ -243,7 +243,7 @@ template <typename _T>
 void IsingModel<_T>::hamiltonian() {
 	if (this->Nh == 0)
 	{
-		LOGINFO("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
+		LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
 		return;
 	}
 	this->init();

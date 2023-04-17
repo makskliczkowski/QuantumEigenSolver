@@ -114,6 +114,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 */
 void UI::funChoice()
 {
+	LASTLVL = 0;
 	switch (this->chosenFun)
 	{
 	case -1:
@@ -1097,116 +1098,4 @@ void UI::makeSimSymmetries()
 //			this->symmetries_double(start);
 //	}
 //	stouts("FINISHED THE CALCULATIONS FOR QUANTUM ISING HAMILTONIAN: ", start);
-//}
-
-///*
-//* @brief Test the symmetries for given Hamiltonian. Checks all the possible combinations of symmetries in order to find the energies and compare them.
-//*/
-//template<typename _type, typename _hamtype>
-//void rbm_ui::ui<_type, _hamtype>::make_symmetries_test(int l)
-//{
-//
-//	// -------------------------------------------------------------------- calculate sym ed pbc
-//
-//	Operators<cpx> op(this->lat);
-//	dir = this->saving_dir + kPS + this->ham_d->get_info() + kPS;
-//	fs::create_directories(dir);
-//	std::string dir_separated = dir + "values" + kPS;
-//	fs::create_directories(dir_separated);
-//	openFile(file, dir + "log.dat");
-//	
-//
-//	double entro = 0;
-//	u64 Nh = pow(2, Ns);
-//	u64 state_num = 0;
-//
-//	// parity
-//	v_1d<int> ps = {};
-//	// spin flip
-//	v_1d<int> sf = {};
-//
-//
-//	// create sparse matrix to compare the full hamiltonian
-//	arma::sp_cx_mat H(H0.n_rows, H0.n_cols);
-//
-//	/* PLOT MATRIX DIFFERENCES */
-//	if (!(this->eta_a == 0.0 && this->eta_b == 0.0)) {
-//		arma::sp_mat HH = arma::real(H);
-//		auto N = H0.n_cols;
-//		arma::sp_cx_mat res = arma::sp_cx_mat(HH - H0, arma::imag(H));
-//		printSeparated(std::cout, '\t', 32, true, "index i", "index j", "difference", "original hamil", "symmetry hamil");
-//		cpx x = 0;
-//		for (int i = 0; i < N; i++) {
-//			for (int j = 0; j < N; j++) {
-//				cpx val = res(i, j);
-//				if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
-//					x += val;
-//					printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
-//					printSeparated(std::cout, '\t', 32, true, i, j, res);
-//				}
-//			}
-//		}
-//
-//		printSeparated(std::cout, '\t', 32, true, "Sum of suspicious elements: ", x);
-//	}
-//
-//	entro /= double(entropies.size());
-//	file << VEQ(Nh) << "\t" << VEQ(state_num) << EL;
-//	// --------------------------- sort stuff ---------------------------
-//	v_1d<int> index(energies_sym.size(), 0);
-//	for (int i = 0; i != index.size(); i++) {
-//		index[i] = i;
-//	}
-//	sort(index.begin(), index.end(),
-//		[&](const int& a, const int& b) {
-//			return (energies_sym[a] < energies_sym[b]);
-//		}
-//	);
-//
-//	// -------------------------- check the ed with symmeties --------------------------
-//	double entro_ed = 0;
-//
-//	openFile(file2, dir + "all_compare.dat");
-//	openFile(states, dir + "states_ed.dat");
-//	file2 << this->ham_d->get_info() << EL;
-//	printSeparated(file2, '\t', 15, true, "E_ed", "E_sym", "Symmetry", "S_ed", "S_sym");
-//	Operators<double> op_ed_pbc(this->lat);
-//
-//	for (u64 i = 0; i < this->ham_d->get_hilbert_size(); i++) {
-//		// get the ed energy
-//		auto E_ed = this->ham_d->get_eigenEnergy(i);
-//		const Col<double> state = (this->ham_d->get_eigenState(i));
-//		auto ent_ed = op_ed_pbc.entanglement_entropy(state, Ns / 2);
-//
-//		// sort
-//		auto sort_i = index[i];
-//		auto E_sym = energies_sym[sort_i];
-//		const auto [k, p, x, su2] = sym[sort_i];
-//		auto ent_sym = entropies[sort_i];
-//
-//		if (i <= 24) {
-//			states << VEQ(k) << "," << VEQ(p) << "," << VEQ(x) << "," << VEQ(su2) << "," << VEQ(E_ed) << ":-:" << VEQ(E_sym) << ":\t";
-//			for (int z = 0; z < Nh; z++) {
-//				states << state(z) << "\t";
-//			}
-//			states << EL;
-//		}
-//		printSeparatedP(file2, '\t', 15, true, 7, E_ed, E_sym, STR(k) + "," + STR(p) + "," + STR(x) + "," + STR(su2), ent_ed, ent_sym);
-//		entro_ed += ent_ed;
-//	}
-//	entro_ed /= double(entropies.size());
-//	file << VEQP(entro, 6) << "\t<-sym\t" << VEQP(entro_ed, 6) << "\t<-ed\t" << EL;
-//	file2.close();
-//	states.close();
-//	// compare Hamiltonians
-//
-//	//
-//	//auto H0 = arma::mat(this->ham_d->get_hamiltonian());
-//	//auto N = H0.n_cols;
-//	//Mat<cpx> res = H - (H0);
-//	//for (int i = 0; i < N; i++)
-//	//	for (int j = 0; j < N; j++)
-//	//		if (abs(res(i, j)) > 1e-15)
-//	//			printSeparated(file, '\t', 32, true, i, j, res(i, j), H0(i, j));
-//	file.close();
 //}

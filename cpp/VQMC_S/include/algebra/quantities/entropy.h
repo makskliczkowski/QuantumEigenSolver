@@ -114,11 +114,11 @@ namespace Entropy {
 			template<typename _T>
 			inline arma::Mat<_T> redDensMatSchmidt(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
 				// set subsystems size
-				uint Ns = _hilb.getLatticeSize();
-				uint Nint = _hilb.getNum();
-				uint bitNum = (int)std::log2(_hilb.getLocalHilbertSize());
-				const u64 dimA = ULLPOW(bitNum * _sizeA);
-				const u64 dimB = ULLPOW((Ns - bitNum * _sizeA));
+				uint Ns			= _hilb.getLatticeSize();
+				uint Nint		= _hilb.getNum();
+				uint bitNum		= (uint)std::log2(_hilb.getLocalHilbertSize());
+				const u64 dimA	= ULLPOW(bitNum * _sizeA);
+				const u64 dimB	= ULLPOW(bitNum * (Ns - _sizeA));
 				return arma::reshape(_s, dimA, dimB);
 			}
 			

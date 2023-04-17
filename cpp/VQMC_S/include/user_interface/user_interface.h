@@ -546,6 +546,10 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief Tests the currently implemented symmetries based on specific model parameters
+* @param start the timer start
+*/
 inline void UI::symmetriesTest(clk::time_point start)
 {
 	v_1d<double> entFULL								=		{};
@@ -556,6 +560,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	u64 Nh												=		1;
 	uint La												=		Ns / 2;
 	std::string dir										=		"";
+	arma::mat ENTROPIES;
 	// ---------------------------------- DIAG HAMILTONIAN WITHOUT SYMMETRIES ---------------------------------
 	for (auto bc: {1, 0}) {
 		this->latP.bc_									=		bc == 0 ? BoundaryConditions::PBC : BoundaryConditions::OBC;
@@ -565,7 +570,8 @@ inline void UI::symmetriesTest(clk::time_point start)
 		Ns												=		this->latP.lat->get_Ns();
 		La												=		Ns / 2;
 
-		LOGINFO("Started buiding full Hamiltonian", LOG_TYPES::TRACE, 1);
+		LOGINFO("Started building full Hamiltonian", LOG_TYPES::TRACE, 1);
+		LASTLVL = 2;
 		this->hamDouble->hamiltonian();
 		dir = this->mainDir + kPS + this->hamDouble->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
 		std::string infoHFull = this->hamDouble->getInfo();
@@ -583,11 +589,11 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 		LOGINFO("Started entropies for full Hamiltonian", LOG_TYPES::TRACE, 1);
 		// Save the entropies 
-		arma::mat ENTROPIES(La, Nh, arma::fill::zeros);
+		ENTROPIES.zeros(La, Nh);
 		for (u64 idx = 0; idx < Nh; idx++) {
 			// get the eigenstate
 			arma::Col<double> state = this->hamDouble->getEigVec(idx);
-			for (uint i = 1; i < La; i++) {
+			for (uint i = 1; i <= La; i++) {
 				// iterate through the state
 				auto entro = Entropy::Entanglement::Bipartite::vonNeuman<double>(state, i, this->hamDouble->hilbertSpace);
 				// save the entropy
@@ -599,51 +605,60 @@ inline void UI::symmetriesTest(clk::time_point start)
 		ENTROPIES.save(filename + ".dat", arma::arma_ascii);
 		LOGINFO("--------------------------- FINISHED ---------------------------\n", LOG_TYPES::FINISH, 0);
 	};
-	std::ofstream file;
+	
+	std::ofstream file, file2;
 	openFile(file, dir + "log.dat");
-	std::string infoSym =	"";
+	openFile(file2, dir + "logCompare.dat");
+	std::string infoSym			=		"";
 
 	// parameters
-	v_1d<int> parities	=	{};
-	v_1d<int> spinFlip	=	{};
-	v_1d<int> u1Values	=	{};
+	v_1d<int> parities			=		{};
+	v_1d<int> spinFlip			=		{};
+	v_1d<int> u1Values			=		{};
 
-	bool useU1			=	(this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	if (useU1) for (int i = 0; i <= Ns; i++) u1Values.push_back(i);
+	bool useU1					=	(this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	if (useU1) for (uint i = 0; i <= Ns; i++) u1Values.push_back(i);
 	else u1Values.push_back(-INT_MAX);
 
 	// save the Hamiltonian without symmetries
 	arma::sp_mat H0 = this->hamDouble->getHamiltonian();
 	// unitary transformation function
 	auto unitaryTransform = [this](arma::SpMat<cpx>& U, std::shared_ptr<Hamiltonian<cpx>> _H, arma::sp_cx_mat& H) {
-		arma::sp_cx_mat _Hsym = _H->getHamiltonian();
-		H += U * _Hsym * U.t();
+		arma::sp_cx_mat _Hsym	=		_H->getHamiltonian();
+		H						+=		U * _Hsym * U.t();
 	};
 
 	// create sparse matrix to compare with the full hamiltonian
 	arma::sp_cx_mat H(H0.n_rows, H0.n_cols);
 	arma::SpMat<cpx> U;
-	u64 calcStates = 0;
+	u64 calcStates				=		0;
+	this->symP.S_				=		true;
 	// go through all symmetries
 	for (auto U1 : u1Values) {
-		this->symP.U1_ = U1;
-		for (int k = 0; k < Ns; k++) {
-			this->symP.k_ = k;
+		this->symP.U1_			=		U1;
+		for (uint k = 0; k < Ns; k++) {
+			this->symP.k_		=		k;
 
 			// set the parities
 			if (k == 0 || k == int(Ns / 2))
-				parities = { -1, 1 };
+				parities		=		{ -1, 1 };
 			else
-				parities = { -INT_MAX };
-			bool includeSpinFlip = (this->symP.U1_ == Ns / 2) &&  && (this->modP.hx_ == 0.0);
+				parities		=		{ -INT_MAX };
+			bool includeSpinFlip = false;
+			if (!useU1 && (this->modP.hz_ == 0.0))
+				includeSpinFlip = true;
+			else if (useU1 && (this->symP.U1_ == Ns / 2) && (this->modP.hz_ == 0.0) && (this->modP.hx_ == 0.0))
+				includeSpinFlip = true;
 
+			// check the spin flip sector
 			if (includeSpinFlip)
-				spinFlip = { -1, 1 };
+				spinFlip		=		{ -1, 1 };
 			else
-				spinFlip = { -INT_MAX };
+				spinFlip		=		{ -INT_MAX };
 
 			// go through all
 			LOGINFO("STARTING ALL SECTORS", LOG_TYPES::INFO, 2);
+			LASTLVL = 2;
 			for (auto flip : spinFlip) {
 				this->symP.px_ = flip;
 				for (auto reflection : parities) {
@@ -665,6 +680,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 					if (Nh == 0)
 					{
 						LOGINFO("EMPTY SECTOR: " + sI, LOG_TYPES::TRACE, 3);
+						LOGINFO("-------------------", LOG_TYPES::TRACE, 2);
 						file << "\t\t->EMPTY SECTOR : " << sI << EL;
 						continue;
 					}
@@ -675,10 +691,10 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 					// create rotation matrix
 					U = this->hamComplex->hilbertSpace.getSymRot();
-					if (!includeSpinFlip)
+					if (!useU1)
 						unitaryTransform(U, this->hamComplex, H);
 
-					calcStates += Nh;
+					calcStates		+=		Nh;
 
 					arma::vec entroInner(Nh);
 					for (u64 i = 0; i < Nh; i++) {
@@ -697,20 +713,68 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 						// push back symmetry
 						_symmetries.push_back(std::make_tuple(kS, pS, xS, U1s));
-
-						//file << "\t\t->" << VEQP(this->ham_cpx->get_eigenEnergy(i), 5) << "\t" << "after_trasform:" << arma::cdot(transformed_state, Hafter * transformed_state) << EL;
 					}
-					std::string filename = dir + infoSym;
+					std::string filename = dir + infoSym + ".h5";
 					this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 					entroInner.save(arma::hdf5_name(filename, "entropy", arma::hdf5_opts::append));
+					LOGINFO("------------------- Finished: " + sI + "---------------------------\n", LOG_TYPES::FINISH, 3);
 				}
 			}
 		}
 	}
+	LOGINFO("Finished building symmetries", LOG_TYPES::TRACE, 2);
+	LOGINFO(VEQ(this->hamDouble->getHilbertSize()) + "\t" + VEQ(calcStates), LOG_TYPES::TRACE, 2);
 
 
+	LOGINFO("PRINTING DIFFERENT ELEMENTS: \n", LOG_TYPES::TRACE, 2);
+	// --------------- PLOT MATRIX DIFFERENCES ---------------
+	if (!useU1) {
+		auto N = H0.n_cols;
+		arma::sp_mat HH = arma::real(H);
+		arma::sp_cx_mat res = arma::sp_cx_mat(HH - H0, arma::imag(H));
 
-	// ---------------------------------- DIAG HAMILTONIAN WITH SYMMETRIES ---------------------------------
+		printSeparated(std::cout, '\t', 32, true, "index i", "index j", "difference", "original hamiltonian", "symmetry hamiltonian");
+		cpx x = 0;
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				cpx val = res(i, j);
+				if (res(i, j).real() > 1e-13 || res(i, j).imag() > 1e-13) {
+					x += val;
+					printSeparated(std::cout, '\t', 32, true, i, j, res(i, j), H0(i, j), H(i, j));
+					printSeparated(std::cout, '\t', 32, true, i, j, res);
+				}
+			}
+		}
+		printSeparated(std::cout, '\t', 32, true, "Sum of the suspicious elements: ", x, "\n");
+	}
 
+	// --------------- GET THE RIGHT INDICES ---------------
+	v_1d<uint> idxs(enSYMS.size(), 0);
+	for (int i = 0; i != idxs.size(); i++)
+		idxs[i] = i;
 
+	std::sort(idxs.begin(), idxs.end(),
+		[&](const int& a, const int& b) {
+			return (enSYMS[a] < enSYMS[b]);
+		}
+	);
+
+	LOGINFO("SORTING AND SO ON.", LOG_TYPES::TRACE, 2);
+	// --------------- PRINT OUT THE COMPARISON ---------------
+	printSeparated(file2, '\t', 15, true, "E_FULL", "E_SYMS", "Symmetry", "S_FULL", "S_SYMS");
+	for (u64 i = 0; i < this->hamDouble->getHilbertSize(); i++) {
+		// get the ed energy
+		auto SORTIDX				=		idxs[i];
+		auto EED					=		this->hamDouble->getEigVal(i);
+		auto ENTED					=		ENTROPIES(La - 1, i);
+
+		// sort
+		auto ESYM					=		enSYMS[SORTIDX];
+		const auto [k, p, x, u1]	=		_symmetries[SORTIDX];
+		auto ENTSYM					=		entSYMS[SORTIDX];
+
+		printSeparatedP(file2, '\t', 15, true, 7, EED, ESYM, STR(k) + "," + STR(p) + "," + STR(x) + "," + STR(u1), ENTED, ENTSYM);
+	}
+	LASTLVL = 0;
+	LOGINFO("FINISHED ALL.", LOG_TYPES::TRACE, 0);
 }

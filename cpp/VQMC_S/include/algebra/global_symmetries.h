@@ -51,7 +51,7 @@ namespace GlobalSyms {
 	* @brief describes the global check of U(1) symmetry
 	*/
 	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val; };
-	inline GlobalSym getU1Sym(std::shared_ptr<Lattice>& _lat, double _val)		{ return GlobalSym(_val, _lat, GlobalSymGenerators::U1); };
+	inline GlobalSym getU1Sym(std::shared_ptr<Lattice>& _lat, double _val)		{ auto g = GlobalSym(_val, _lat, GlobalSymGenerators::U1); g.setFun(U1Sym); return g; };
 };
 
 #endif

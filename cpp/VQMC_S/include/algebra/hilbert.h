@@ -124,6 +124,7 @@ namespace Hilbert {
 		bool			checkLSym()						const					{ return this->symGroup_.size() != 0; };
 		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0; };
 		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
+		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return g.getVal(); return -INT_MAX; };
 	};
 
 	// ##########################################################################################################################################
@@ -165,40 +166,65 @@ namespace Hilbert {
 
 				//  say something
 				if (!containsT_) {
-					LOGINFO("Not using translation due to the boundary conditions - BC", LOG_TYPES::WARNING, 1);
+					LOGINFOG("Not using translation due to the boundary conditions - BC", LOG_TYPES::WARNING, 1);
 					continue;
 				}
 				
 				// otherwise check sectors
 				if ((sec != 0 && sec != this->Ns / 2))
 					containsTCpx_ = true;
+				break;
 			}
 		}
 		if (containsT_) {
-			LOGINFO("Using translation!", LOG_TYPES::INFO, 1);
+			LOGINFOG("Using translation!", LOG_TYPES::INFO, 1);
 			if(containsTCpx_)
-				LOGINFO("In complex sector!", LOG_TYPES::INFO, 2);
+				LOGINFOG("In complex sector!", LOG_TYPES::INFO, 2);
 		}
 
 		// remove parity symmetry
 		for (auto i = 0; i < genIn.size(); i++)
 		{
-			const auto& [gen, sec] = genIn[i];
-			if(static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::R && containsTCpx_)
+			const auto [gen, sec] = genIn[i];
+			if (static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::R && containsTCpx_) {
 				genIn.erase(genIn.begin() + i);
-
-			// check spin flip and U(1)
-			if (containsU1_) {
-				if (static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PX ||
-					static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PY)
-					genIn.erase(genIn.begin() + i);
-				LOGINFO("Using U(1)!", LOG_TYPES::INFO, 1);
+				break;
 			}
 		}
-
+		// check spin flip and U(1)
+		if (containsU1_) {
+			uint removed = 0;
+			LOGINFOG("Using U(1)!", LOG_TYPES::INFO, 1);
+			for (auto i = 0; i < genIn.size(); i++)
+			{
+				const auto [gen, sec] = genIn[i];
+				if ((static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PX ||
+					static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PY) &&
+					this->checkU1Val() != this->Ns / 2
+					)
+				{
+					genIn.erase(genIn.begin() + (i - removed));
+					removed++;
+					LOGINFOG("Removing parity in X and/or Y direction", LOG_TYPES::INFO, 1);
+				}
+			}
+		}
+		
 		// save all for convenience
 		for(auto& g : genIn)
 			this->symGroupSec_.push_back(g);
+		// --------------------------------------------------------------------------------
+		LOGINFOG("Using local: ", LOG_TYPES::INFO, 0);
+		for (auto& g : genIn) {
+			const auto [gen, sec] = g;
+			LOGINFOG(SSTR(Operators::getSTR_SymGenerators(gen)) + ":" + VEQ(sec), LOG_TYPES::INFO, 1);
+		}
+		if (containsT_)
+			LOGINFOG(SSTR(Operators::getSTR_SymGenerators(Operators::SymGenerators::T)) + ":" + VEQ(T.getVal()), LOG_TYPES::INFO, 1);
+		LOGINFOG("Using global: ", LOG_TYPES::INFO, 0);
+		for (auto& g : this->symGroupGlobal_) {
+			LOGINFOG(SSTR(GlobalSyms::getSTR_GlobalSymGenerators(g.getName())) + ":" + VEQ(g.getVal()), LOG_TYPES::INFO, 1);
+		}
 
 		// add neutral element
 		// this->symGroup_.push_back(Operators::Operator<_T>(this->lat));
@@ -395,13 +421,17 @@ namespace Hilbert {
 		const u64 maxDim = fMap.empty() ? this->NhFull : fMap.size();
 
 		// find index helping function
-		auto find_index = [&](u64 idx) { return (!fMap.empty()) ? binarySearch(fMap, 0, maxDim - 1, idx) : idx; };
+		std::function<u64(u64)> find_index;
+		if(fMap.empty()) 
+			find_index = [&](u64 idx) { return idx; };
+		else
+			find_index = [&](u64 idx) { return binarySearch(fMap, 0, maxDim - 1, idx); };
 
 		// generate sparse mapping
 		arma::SpMat<_T> U(maxDim, this->Nh);
 
 		// iterate states
-		auto symSize = this->symGroup_.size();
+		double symSize = (double)this->symGroup_.size();
 
 		// if no symmetries return empty
 		if (symSize == 0)
@@ -415,7 +445,7 @@ namespace Hilbert {
 				idx = find_index(idx);
 				// use only if exists in sector
 				if (idx < maxDim)
-					U(idx, k) += algebra::conjugate(val / (this->normalization_[k] * std::sqrt(double(symSize))));
+					U(idx, k) += algebra::conjugate(val / (this->normalization_[k] * std::sqrt(symSize)));
 			}
 		return U;
 	}
@@ -518,7 +548,7 @@ namespace Hilbert {
 
 		v_1d<u64> fullMap = {};
 		if (!this->symGroupGlobal_.empty())
-			for (u64 j = 0; j < this->Nh; j++) {
+			for (u64 j = 0; j < this->NhFull; j++) {
 				// check globales
 				bool globalChecker = true;
 				for (auto& Glob : this->symGroupGlobal_)
@@ -535,7 +565,7 @@ namespace Hilbert {
 	{
 		this->fullMap_ = {};
 		if (!this->symGroupGlobal_.empty())
-			for (u64 j = 0; j < this->Nh; j++) {
+			for (u64 j = 0; j < this->NhFull; j++) {
 				// check globales
 				bool globalChecker = true;
 				for (auto& Glob : this->symGroupGlobal_)
