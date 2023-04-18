@@ -164,6 +164,7 @@ namespace Entropy {
 			* @returns the bipartite entanglement entropy
 			*/
 			template <typename _T>
+			[[nodiscard]]
 			double vonNeuman(const arma::Col<_T>& _s, uint _sizeA,
 				Hilbert::HilbertSpace<_T>& _hilb,
 				RHO_METHODS _ch = RHO_METHODS::SCHMIDT)

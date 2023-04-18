@@ -15,8 +15,8 @@
 template <typename _T>
 class XYZ : public Hamiltonian<_T> {
 public:
-	using NQSFunSingle									= Hamiltonian<_T>::NQSFunSingle;
-	using NQSFunMultiple								= Hamiltonian<_T>::NQSFunMultiple;
+	using NQSFunSingle									= typename Hamiltonian<_T>::NQSFunSingle;
+	using NQSFunMultiple								= typename Hamiltonian<_T>::NQSFunMultiple;
 protected:
 	// ------------------------------------------- MODEL BASED PARAMETERS -------------------------------------------
 	DISORDER_EQUIV(double, Ja);

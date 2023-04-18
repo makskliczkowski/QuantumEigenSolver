@@ -65,7 +65,7 @@ namespace Operators{
 	*/
 	template<typename _T, typename ..._Ts>
 	class Operator {
-		typedef _OP<_T>::INP<_Ts...> repType;									// type returned for representing, what it does with state and value it returns
+		typedef typename _OP<_T>::INP<_Ts...> repType;							// type returned for representing, what it does with state and value it returns
 		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
 		_T eigVal_											=			1.0;	// eigenvalue for symmetry generator (if there is inner value)
 		repType fun_										=			E;		// function allowing to use symmetry
@@ -129,34 +129,31 @@ namespace Operators{
 
 		// ---------- override operators -----------
 		
-		virtual auto operator()(u64 s, _Ts... a)		const -> _OP<_T>::R			{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
-		virtual auto operator()(u64 s, _Ts... a)		-> _OP<_T>::R				{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		const -> typename _OP<_T>::R{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		-> typename _OP<_T>::R		{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
+		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)	const	{ return std::bind(this->fun_, s, std::placeholders::_1); };
+		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)			{ return std::bind(this->fun_, s, std::placeholders::_1); };
 
 		// ----------------------------------------------------------------------------------------------------
 
 		// ---------- STATIC ----------
-		static auto E(u64 s, _Ts...)					-> _OP<_T>::R				{ return std::make_pair(s, _T(1.0)); };
-
-		// calculates the matrix element of operator
-		template <typename _T1, typename _T2>
-		static _T avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
-		template <typename _T1>
-		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
+		static auto E(u64 s, _Ts...)					-> typename _OP<_T>::R		{ return std::make_pair(s, _T(1.0)); };
 
 		// ---------- virtual functions to override ----------
 		virtual void init() {};
 
 		// ---------- SETTERS -----------
-		auto setFun(const repType& _fun) -> void { this->fun_ = _fun; };
-		auto setFun(repType&& _fun) -> void { this->fun_ = std::move(_fun); };
-		auto setName(SymGenerators _name) -> void { this->name_ = _name; };
+		auto setFun(const repType& _fun)				-> void						{ this->fun_ = _fun; };
+		auto setFun(repType&& _fun)						-> void						{ this->fun_ = std::move(_fun); };
+		auto setName(SymGenerators _name)				-> void						{ this->name_ = _name; };
+		auto setVal(_T _val)							-> void						{ this->eigVal_ = _val; };
 
 		// ---------- GETTERS -----------
 		auto getVal()									const -> _T					{ return this->eigVal_; };
 		auto getFun()									const -> repType			{ return this->fun_; };
 		auto getName()									const -> SymGenerators		{ return this->name_; };
 
-		// ----------------------------------------------------------------------------------------------------
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		template <typename T_ = _T, 
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
@@ -177,7 +174,7 @@ namespace Operators{
 			return Operators::Operator<cpx, _Ts...>(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ % op.fun_, Operators::SymGenerators::OTHER);
 		}
 
-		// ----------------------------------------------------------------------------------------------------
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C O N C A T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		template <typename T_ = _T, typename ..._T2s,
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
@@ -199,16 +196,11 @@ namespace Operators{
 			return Operators::Operator<cpx, _Ts..., _T2s...>(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ * op.fun_, Operators::SymGenerators::OTHER);
 		}
 
-		// ----------------------------------------------------------------------------------------------------
-
-		// ---------- OPERATORS CAST ----------
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		template <typename T_ = _T,
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
-		operator Operator<cpx, _Ts...>()
-		{
-			return *this;
-		};
+		operator Operator<cpx, _Ts...>()											{ return *this; };
 
 		template <typename T_ = _T,
 			typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr>
@@ -221,23 +213,62 @@ namespace Operators{
 			return Operator<cpx, _Ts...>(this->lat_, cpx(this->eigVal_), _fun);
 		};
 
-		
-		// ---------- FRIENDS ----------
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		/*
+		* @brief operator to the N'th power
+		*/
+		template <typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type* = nullptr>
+		[[nodiscard]]
+		Operator<_T, _Ts...> operator^(_T1 _n) 
+		{
+			if (_n == 0)
+				return Operator<_T, _Ts...>(this->lat_, 1.0, Operators::Operator<_T, _Ts...>::E);
+			else if (_n == 1)
+				return *this;
+
+			auto _f = [_n, this](u64 _s, _Ts... _args) {
+				_T val = 1.0;
+				do {
+					auto [newS, newV] = this->operator()(_s, _args...);
+					_s = newS;
+					val *= newV;
+					--_n;
+				} while (_n);
+				return std::make_tuple(_s, val);
+			};
+			return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
+		}
+			
+
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
 		* @brief representative eigenvalue calculator
 		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op) {
-			return _op.eigVal_;
-		};
+		friend _T chi(const Operator<_T, _Ts...>& _op)								{ return _op.eigVal_;};
 
 		/*
 		* @brief calculate operator acting on state num eigenvalue
 		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a) {
-			auto [state, val] = _op(_s, std::forward<_Ts>(_a)...);
-			return val * _op.eigVal_;
-		};
+		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)			{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
+	
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		arma::SpMat<_T> generateMat(u64 _dim, _Ts... _arg) const;
+		template<typename _T1>
+		arma::SpMat<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts... _arg) const;
+		template<typename _T1, typename _T2>
+		arma::SpMat<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts... _arg);
+
+
+		// calculates the matrix element of operator given a single state
+
+		template <typename _T1, typename _T2>
+		[[deprecated]]
+		static _T avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
+		template <typename _T1>
+		[[deprecated]]
+		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
+
 	};
 };
 
@@ -257,4 +288,74 @@ inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, con
 	return _T();
 }
 
-// ##########################################################################################################################################
+// ################################################ M A T R I X   G E N E R A T I O N ##############################################################
+
+/*
+* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space (offdiagonal but still ok :))
+* @brief _dim A dimension of the Hilbert space
+*/
+template<typename _T, typename ..._Ts> 
+inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
+{
+	arma::SpMat<_T> op(_dim, _dim);
+	for (u64 _base = 0; _base < _dim; _base++) {
+		auto [_idx, _val]		=	this->operator()(_base, _arg...);
+		op(_idx, _base)			+=	_val;
+	}
+	return op;
+}
+
+/*
+* @brief Creates an operator matrix whenever the operator is not transforming the state to a different symmetry sector (offdiagonal but still ok :))
+* @param _Hil the Hilbert space in which we operate
+*/
+template<typename _T, typename ..._Ts>
+template<typename _T1>
+inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts ..._arg) const
+{
+	u64 Nh							=	_Hil.getHilbertSize();
+	arma::SpMat<_T> op(Nh, Nh);
+	for (u64 _idx = 0; _idx < Nh; _idx++)
+	{
+		auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
+
+		// why even bother?
+		[[unlikely]] if (EQP(std::abs(_val), 0.0, 1e-14))
+			continue;
+
+		auto [_newIdx, _eigval]		=	_Hil.findRep(_newState, _Hil.getNorm(_idx));
+		if(_newIdx < Nh)
+			op(_newIdx, _idx)			+=	_val * _eigval;
+	}
+	return op;
+}
+
+/*
+* @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
+* @param _Hil the Hilbert space in which we operate
+* @warning (takes into account that we are going to a different symmetry sector so matrix is not square)
+* @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
+*/
+template<typename _T, typename ..._Ts>
+template<typename _T1, typename _T2>
+inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts ..._arg)
+{
+	u64 NhA										=	_Hil1.getHilbertSize();
+	u64 NhB										=	_Hil2.getHilbertSize();
+	arma::SpMat<_T> op(NhA, NhB);
+	for (u64 _idxB = 0; _idxB < NhB; _idxB++) {
+		// act with an operator on beta sector (right)
+		auto [_newStateB, _valB]				=	this->operator()(_Hil2.getMapping(_idxB), _arg...);
+
+		// why even bother?
+		[[unlikely]] if (EQP(std::abs(_valB), 0.0, 1e-14))
+			continue;
+
+		// find the corresponding index and value in the A sector (left)
+		auto [newIdxA, symValA]					=	_Hil1.findRep(_newStateB, _Hil2.getNorm(_idxB));
+
+		// check if the state is there
+		if (newIdxA < NhA)
+			op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
+	}
+}

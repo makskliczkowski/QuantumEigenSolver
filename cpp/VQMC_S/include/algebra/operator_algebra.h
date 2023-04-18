@@ -30,22 +30,22 @@ namespace Operators {
 		template <typename... _T>
 		using INP		=		std::function<R(u64, _T...)>;
 	};
-	using _GLBC			=		_OP<cpx>::GLB;					//<! global function acting on whole product state
-	using _LOCC			=		_OP<cpx>::LOC;					//<! local function acting on single site
-	using _CORC			=		_OP<cpx>::COR;					//<! correlation function acting on pair of sites	
+	using _GLBC			=		typename _OP<cpx>::GLB;			//<! global function acting on whole product state
+	using _LOCC			=		typename _OP<cpx>::LOC;			//<! local function acting on single site
+	using _CORC			=		typename _OP<cpx>::COR;			//<! correlation function acting on pair of sites	
 #define _INPC _OP<cpx>::INP
-	using _GLBR			=		_OP<double>::GLB;				//<! global function acting on whole product state
-	using _LOCR			=		_OP<double>::LOC;				//<! local function acting on single site
-	using _CORR			=		_OP<double>::COR;				//<! correlation function acting on pair of sites
+	using _GLBR			=		typename _OP<double>::GLB;		//<! global function acting on whole product state
+	using _LOCR			=		typename _OP<double>::LOC;		//<! local function acting on single site
+	using _CORR			=		typename _OP<double>::COR;		//<! correlation function acting on pair of sites
 #define _INPR _OP<double>::INP
 	template<typename _T>
-	using _GLB			=		_OP<_T>::GLB;				
+	using _GLB			=		typename _OP<_T>::GLB;				
 	template<typename _T>
-	using _LOC			=		_OP<_T>::LOC;
+	using _LOC			=		typename _OP<_T>::LOC;
 	template<typename _T>
-	using _COR			=		_OP<_T>::COR;
+	using _COR			=		typename _OP<_T>::COR;
 	template<typename _T, typename ..._Ts>
-	using _INP			=		_OP<_T>::INP<_Ts...>;
+	using _INP			=		typename _OP<_T>::INP<_Ts...>;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -108,16 +108,16 @@ namespace Operators {
 	};
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	template <typename _T, typename _T2, typename... _Ts, typename _OPL = _OP<_T>::INP<_Ts...>, typename _OPR = _OP<_T2>::INP<_Ts...>>
-	inline auto operator%(_OPL f, _OPR g)
-	{
-		return [f, g](u64 s, _Ts... a)
-		{
-			auto [s1, v1] = g(s, a...);
-			auto [s2, v2] = f(s1, a...);
-			return std::make_pair(s2, static_cast<_T2>(v1 * v2));
-		};
-	};
+	//template <typename _T, typename _T2, typename... _Ts, typename _OPL = _OP<_T>::INP<_Ts...>, typename _OPR = _OP<_T2>::INP<_Ts...>>
+	//inline auto operator%(_OPL f, _OPR g)
+	//{
+	//	return [f, g](u64 s, _Ts... a)
+	//	{
+	//		auto [s1, v1] = g(s, a...);
+	//		auto [s2, v2] = f(s1, a...);
+	//		return std::make_pair(s2, static_cast<_T2>(v1 * v2));
+	//	};
+	//};
 	
 	template <typename... _Ts>
 	inline auto operator%(_OP<double>::INP<_Ts...> f, _OP<double>::INP<_Ts...> g)

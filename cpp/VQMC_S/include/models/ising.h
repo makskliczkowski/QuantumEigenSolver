@@ -25,8 +25,8 @@ protected:
 	//vec tmp_vec2;
 
 public:
-	using NQSFunSingle									= Hamiltonian<_T>::NQSFunSingle;
-	using NQSFunMultiple								= Hamiltonian<_T>::NQSFunMultiple;
+	using NQSFunSingle									= typename Hamiltonian<_T>::NQSFunSingle;
+	using NQSFunMultiple								= typename Hamiltonian<_T>::NQSFunMultiple;
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
 	~IsingModel()										= default;
 	IsingModel()										= default;

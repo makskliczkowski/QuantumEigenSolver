@@ -50,7 +50,7 @@ constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(11);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
-#define UI_CHECK_SYM(val, gen)									if(this->##val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::##gen, this->##val##_));
+#define UI_CHECK_SYM(val, gen)									if(this->val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::gen, this->val##_));
 
 // -------------------------------------------------------- make an USER INTERFACE class --------------------------------------------------------
 
@@ -510,7 +510,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	v_1d<uint> _bonds = { maxBondNum };
 	auto beforeEntro = clk::now();
 #pragma omp parallel for num_threads(this->threadNum)
-	for (u64 idx = 0; idx < stateNum; idx++) {
+	for (long long idx = 0; idx < stateNum; idx++) {
 		// get the eigenstate
 		arma::Col<_T> state = _H->getEigVec(idx);
 		if (usesSym)
@@ -565,6 +565,8 @@ inline void UI::symmetriesTest(clk::time_point start)
 	for (auto bc: {1, 0}) {
 		this->latP.bc_									=		bc == 0 ? BoundaryConditions::PBC : BoundaryConditions::OBC;
 		this->symP.S_									=		false;
+		if (this->hamDouble)
+			this->hamDouble.reset();
 		this->defineModels();
 		Nh												=		this->hamDouble->getHilbertSize();
 		Ns												=		this->latP.lat->get_Ns();
@@ -665,6 +667,8 @@ inline void UI::symmetriesTest(clk::time_point start)
 					this->symP.x_ = reflection;
 
 					// create the models
+					if (this->hamComplex)
+						this->hamComplex.reset();
 					this->defineModel<cpx>(std::move(this->hilComplex), this->hamComplex);
 					infoSym			=		this->hamComplex->getInfo();
 					Nh				=		this->hamComplex->getHilbertSize();
@@ -761,7 +765,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 	LOGINFO("SORTING AND SO ON.", LOG_TYPES::TRACE, 2);
 	// --------------- PRINT OUT THE COMPARISON ---------------
-	printSeparated(file2, '\t', 15, true, "E_FULL", "E_SYMS", "Symmetry", "S_FULL", "S_SYMS");
+	printSeparated(file2, '\t', 15, true, "E_FULL", "E_SYMS", "T,R,PX,U1", "S_FULL", "S_SYMS");
 	for (u64 i = 0; i < this->hamDouble->getHilbertSize(); i++) {
 		// get the ed energy
 		auto SORTIDX				=		idxs[i];
@@ -770,7 +774,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 		// sort
 		auto ESYM					=		enSYMS[SORTIDX];
-		const auto [k, p, x, u1]	=		_symmetries[SORTIDX];
+		const auto& [k, p, x, u1]	=		_symmetries[SORTIDX];
 		auto ENTSYM					=		entSYMS[SORTIDX];
 
 		printSeparatedP(file2, '\t', 15, true, 7, EED, ESYM, STR(k) + "," + STR(p) + "," + STR(x) + "," + STR(u1), ENTED, ENTSYM);

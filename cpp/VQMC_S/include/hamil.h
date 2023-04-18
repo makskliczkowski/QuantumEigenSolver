@@ -42,8 +42,8 @@ const std::string DEF_INFO_SEP		= std::string("_");										// defalut separato
 									type param##0	= 0;	\
 									arma::Col<type> d##param
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
-#define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->##p, 2);	\
-									toSet += ((this->##p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->##p##0, 2))
+#define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 2);	\
+									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 2))
 										// gets the information about the disorder
 
 template <typename _T>
@@ -314,6 +314,8 @@ inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
 	this->calcAvEn();
 }
 
+// ################################################################################################################################################
+
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
@@ -370,6 +372,8 @@ inline void Hamiltonian<double>::diagH(bool woEigVec, uint k, uint subdim, uint 
 	//}
 	//E_av_idx = int(k / 2.0);
 }
+
+// ################################################################################################################################################
 
 template<typename _type>
 inline void Hamiltonian<_type>::diagHs(bool woEigVec)
