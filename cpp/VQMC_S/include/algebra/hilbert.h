@@ -98,7 +98,7 @@ namespace Hilbert {
 		arma::Col<_T> castToFull(const arma::Col<_T>& _s);
 
 		// ------------------------ GETTERS ------------------------
-		int getBC()										const					{ return this->lat->get_BC(); };
+		BoundaryConditions getBC()						const					{ return this->lat->get_BC(); };
 		std::shared_ptr<Lattice> getLattice()			const					{ return this->lat; };
 		uint getLatticeSize()							const					{ return this->Ns; };
 		u64 getHilbertSize()							const					{ return this->Nh; };

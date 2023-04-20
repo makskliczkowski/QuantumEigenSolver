@@ -49,8 +49,7 @@ const std::string DEF_INFO_SEP		= std::string("_");										// defalut separato
 template <typename _T>
 class Hamiltonian {
 public:
-	using NQSFunSingle									=									std::function<_T(uint, double)>;
-	using NQSFunMultiple								=									std::function<_T(const arma::vec&)>;
+	using NQSFun										=									std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
 	Hilbert::HilbertSpace<_T> hilbertSpace;
 
 protected:
@@ -168,18 +167,16 @@ public:
 		double tol = 0, std::string form = "sm");											// diagonalize the Hamiltonian using Lanczos' method
 	void calcAvEn();																		// calculate the average energy
 
+public:
 	// ------------------------------------------- 	LOCAL ENERGY -------------------------------------------
-	
-	virtual void locEnergy(u64 _elemId, u64 _elem, uint _site)	= 0; 
-	virtual cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
-											  const NQSFunMultiple& f2,
-											  arma::Col<double>& tmp)	= 0;				// returns the local energy for VQMC purposes
-	virtual cpx locEnergy(const arma::Col<double>& v, uint site,
-											  const NQSFunSingle& f1,
-											  const NQSFunMultiple& f2,
-											  arma::Col<double>& tmp)	= 0;				// returns the local energy for VQMC purposes
 
-	//void set_loc_en_elem(int i, u64 state, _type value) { this->locEnergies[i] = std::make_pair(state, value); };		// sets given element of local energies to state, value pair
+	virtual void locEnergy(u64 _elemId, 
+						   u64 _elem, uint _site)		=									0; 
+	virtual cpx locEnergy(u64 _id, uint s, NQSFun f1)	= 0;								// returns the local energy for VQMC purposes
+	virtual cpx locEnergy(const arma::Col<double>& v, 
+						  uint site,
+						  NQSFun f1,
+						  arma::Col<double>& tmp)		= 0;								// returns the local energy for VQMC purposes
 	
 	// ------------------------------------------- FOR OTHER TYPES --------------------------------------------
 	virtual void updateInfo()							=									0;
@@ -288,29 +285,19 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 */
 template <typename _T>
 inline void Hamiltonian<_T>::diagH(bool woEigVec) {
-	try {
+	BEGIN_CATCH_HANDLER
 		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
 		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_));
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
-		exit(-2);
-	}
+	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes");
 	this->calcAvEn();
 }
 
 template <>
 inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
-	try {
+	BEGIN_CATCH_HANDLER
 		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<cpx>(this->H_));
 		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<cpx>(this->H_));
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
-		exit(-2);
-	}
+	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes");
 	this->calcAvEn();
 }
 
@@ -322,27 +309,29 @@ inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
 */
 template <typename _T>
 inline void Hamiltonian<_T>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
-	try {
+	BEGIN_CATCH_HANDLER
 		arma::eigs_opts opts;
 		opts.tol				= tol;
 		opts.maxiter			= maxiter;
 		opts.subdim				= (subdim == 0) ? (2 * int(k) + 1) : subdim;
-
-		stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
-
-		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
-		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_));
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
-		exit(-2);
-	}
-	this->calcAvEn();
+		
+		LOGINFO("Diagonalizing Hamiltonian. Using: " + SSTR((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I"), 
+				LOG_TYPES::INFO, 3);
+		if (form == "sg")
+		{
+			if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), 0.0, opts);
+			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), 0.0, opts);
+		}
+		else
+		{
+			if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
+			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), form.c_str());
+		}
+	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes");
 }
 
 template <>
-inline void Hamiltonian<double>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form)
+inline void Hamiltonian<cpx>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form)
 {
 	//try {
 	//	eigs_opts opts;
@@ -378,15 +367,10 @@ inline void Hamiltonian<double>::diagH(bool woEigVec, uint k, uint subdim, uint 
 template<typename _type>
 inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 {
-	try {
+	BEGIN_CATCH_HANDLER
 		if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, this->getHilbertSize());
 		else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
-	}
-	catch (const std::bad_alloc& e) {
-		stout << "Memory exceeded" << e.what() << EL;
-		stout << "dim(H) = " << H_.size() * sizeof(H_(0, 0)) << "bytes" << EL;
-		exit(-2);
-	}
+	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes");
 	this->calcAvEn();
 }
 
@@ -443,7 +427,7 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 	switch (_typ)
 	{
 	case HAM_SAVE_EXT::dat:
-		states.save(_dir + "states" + this->getInfo() + extension, arma::arma_ascii);
+		states.save(_dir + "states" + this->getInfo() + extension, arma::raw_ascii);
 		break;
 	case HAM_SAVE_EXT::h5:
 		if (_app)
@@ -452,7 +436,7 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 			states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states"));
 		break;
 	default:
-		states.save(_dir + "states" + this->getInfo() + ".dat", arma::arma_ascii);
+		states.save(_dir + "states" + this->getInfo() + ".dat", arma::raw_ascii);
 		break;
 	}
 }

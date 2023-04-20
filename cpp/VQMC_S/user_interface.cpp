@@ -52,6 +52,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTIONV(		nqsP, nBlocks	,"nb");
 	SETOPTIONV(		nqsP, blockSize	,"bs");
 	SETOPTIONV(		nqsP, nHidden	,"nh");
+	SETOPTIONV(		nqsP, nFlips	,"nf");
 	SETOPTION(		nqsP, lr			 );
 	this->nqsP.nTherm_	= uint(0.1 * nqsP.nBlocks_);
 	
@@ -69,7 +70,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	// model type
 	SETOPTIONV(		modP, modTyp, "mod"	);
 	// --- ising ---
-	SETOPTION_STEP(	modP, J				);
+	SETOPTION_STEP(	modP, J1			);
 	SETOPTION_STEP(	modP, hx			);
 	SETOPTION_STEP(	modP, hz			);
 	// --- heisenberg ---
@@ -137,13 +138,14 @@ void UI::funChoice()
 		//	// check the properties of Kitaev model when the interations are 
 		//	this->make_mc_kitaev_sweep();
 		//	break;
-		//case 14:
-		//	// make simulation for a single model based on input parameters
-		//	this->make_simulation();
-		//	break;
+		case 11:
+			// this option utilizes the Hamiltonian with NQS ansatz calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
+			this->makeSimNQS();
+			break;
 	case 20:
-		// this option utilizes the Hamiltonian with symmetries calculation - TEST ALL SECTORS ON XYZ example
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - TEST ON XXZ - ALL SECTORS", LOG_TYPES::CHOICE, 1);
+		// this option utilizes the Hamiltonian with symmetries calculation
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
 		this->symmetriesTest(clk::now());
 		break;
 	case 21:
@@ -195,6 +197,9 @@ void UI::defineModels() {
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief A placeholder for making the simulation with symmetries.
+*/
 void UI::makeSimSymmetries()
 {
 	this->defineModels();
@@ -204,26 +209,35 @@ void UI::makeSimSymmetries()
 		this->symmetries(clk::now(), this->hamDouble);
 }
 
+/*
+* @brief A placeholder for making the simulation with NQS.
+*/
+void UI::makeSimNQS()
+{
+	this->defineModels();
+	if (this->isComplex_) {
+		this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
+		this->nqsSingle(clk::now(), this->nqsCpx);
+	}
+	else {
+		this->defineNQS<double>(this->hamDouble, this->nqsDouble);
+		this->nqsSingle(clk::now(), this->nqsDouble);
+	}
+}
 
 
 // -------------------------------------------------------- SIMULATIONS
 
 
 
-/*
-*
-*/
+///*
+//*
+//*/
 //template<typename _type, typename _hamtype>
 //void rbm_ui::ui<_type, _hamtype>::ui::make_simulation()
 //{
-//	auto start = std::chrono::high_resolution_clock::now();
-//	this->define_models();
-//	stouts("STARTING THE SIMULATION FOR GROUNDSTATE SEEK AND USING: " + VEQ(thread_num), start);
-//	printSeparated(stout, ',', 5, true, VEQ(mcSteps), VEQ(n_blocks), VEQ(n_therm), VEQ(block_size));
 //	// monte carlo
-//	auto energies = this->phi->mcSampling(mcSteps, n_blocks, n_therm, block_size, n_flips);
 //
-//	std::string dir = this->saving_dir + this->lat->get_type() + kPS + this->ham->get_info() + kPS + this->phi->get_info() + kPS;
 //	fs::create_directories(dir);
 //
 //	// print energies
@@ -261,7 +275,7 @@ void UI::makeSimSymmetries()
 //	stouts("FINISHED EVERY THREAD", start);
 //	stout << "\t\t\t->" << VEQ(ground_rbm) << "+-" << standard_dev << EL;
 //}
-//
+
 //template<typename _type, typename _hamtype>
 //inline void rbm_ui::ui<_type, _hamtype>::make_mc_classical()
 //{
@@ -446,7 +460,7 @@ void UI::makeSimSymmetries()
 //	}
 //	file.close();
 //}
-//
+////
 //template<typename _type, typename _hamtype>
 //void rbm_ui::ui<_type, _hamtype>::make_mc_classical_angles(double Jdot)
 //{

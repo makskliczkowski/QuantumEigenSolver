@@ -17,18 +17,29 @@
 #endif // !ML_H				 // #
 // ##############################
 
-#include "omp.h"
+// ######### NQS TYPES ##########
+enum NQSTYPES {				 // #
+	RBM						 // #
+};							 // #
+							 // #
+BEGIN_ENUM(NQSTYPES)		 // #
+{							 // #
+	DECL_ENUM_ELEMENT(RBM)	 // #
+}							 // #
+END_ENUM(NQSTYPES)			 // #
+// ##############################
 
 #ifdef NQS_SAVE_WEIGHTS
 	#define NQS_SAVE_DIR "DATA" + kPS + "NQS" + kPS + "WEIGHTS" + kPS
 #endif
 
-template <typename _T, typename _Ht>
+template <typename _Ht, typename _T>
 class NQS {
 public:
 	using NQSS							=		arma::Col<double>;
 	using NQSB							=		arma::Col<_T>;
 	using NQSW							=		arma::Mat<_T>;
+	std::shared_ptr<Hamiltonian<_Ht>> H_;									// pointer to the Hamiltonian
 
 protected:
 	std::string info_;
@@ -41,7 +52,6 @@ protected:
 	double lr_							=		0.0;						// specific learnign rate
 
 	// Hamiltonian
-	std::shared_ptr<Hamiltonian<_Ht>> H_;									// pointer to the Hamiltonian
 
 	// Hilbert space info
 	u64 Nh_								=		1;
@@ -61,45 +71,20 @@ protected:
 	NQSS tmpVec;
 	v_1d<NQSS> tmpVecs;
 	// --------------------------------------------------------------
-public:
-	/*
-	* @brief interface constructor for Neural Network Quantum State
-	*/
-	NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _batch, uint _threadNum, double _lr)
-		: batch_(_batch), lr_(_lr)
-	{
-		this->H_					=			_H;
-		this->nVis_					=			_H->getNs();
-		this->Nh_					=			_H->getHilbertSize();
-		this->ran_					=			_H->ran_;
-#ifdef DEBUG
-		this->threadNum_			=			1;
-#else
-		this->threadNum_			=			_threadNum;
-#endif // DEBUG
-		// Use threads for all consecutive parallel regions
-		omp_set_num_threads(this->threadNum_);                  
-
-		// set corresponding things
-		this->allocate();
-		this->setInfo();
-		this->init();
-		this->setRandomState(true);
-	};
-	NQS()							=			default;
-
 protected:
 	// --------------------- S T A R T E R S ---------------------
 	virtual void setInfo()							=						0;
 	virtual void allocate()							=						0;
 	
 	// --------------------- P R O B A B I L I T Y ---------------
-	virtual auto pRatio()							const->_T =				0;
-	virtual auto pRatio(uint fP, float fV)			const->_T =				0;
-	virtual auto pRatio(uint nFlips)				const->_T =				0;
-	virtual auto pRatio(const NQSS& _v)				const->_T =				0;
+	virtual auto pRatio()							->_T =					0;
+	virtual auto pRatio(uint fP, float fV)			->_T =					0;
+	virtual auto pRatio(std::initializer_list<int>,
+					std::initializer_list<double>)	->_T =					0;
+	virtual auto pRatio(uint nFlips)				->_T =					0;
+	virtual auto pRatio(const NQSS& _v)				->_T =					0;
 	virtual auto pRatio(const NQSS& _v1,
-						const NQSS& _v2)			const->_T =				0;
+						const NQSS& _v2)			->_T =					0;
 	virtual auto pRatioChange(_T _val,
 							  u64 _state,
 							  uint _vid)			-> _T =					0;
@@ -119,33 +104,27 @@ protected:
 	virtual void collectGrad(const NQSB& _energies)	=						0;
 
 	// --------------------- E N E R G Y -------------------------
-	auto changeKernelS(uint fP, float fV)			-> _T					{ return this->pRatio(fP, fV); };
-	auto changeKernelM(const NQSS& v)				-> _T					
-	{ 
-#ifndef NQS_RBM_ANGLES_UPD
-		return this->pRatio(this->curVec, v);
-#else
-		return this->pRatio(v);
-#endif
-	};
+	auto chKernel(std::initializer_list<int>  fP,
+				  std::initializer_list<double> fV)	-> _T					{ return this->pRatio(fP, fV); };
 	_T locEnKernel();
 
 	// -----------------------------------------------------------
 public:
 	// --------------------- S E T T E R S -----------------------
-	virtual void init()								=						0;
-	virtual void init(const std::string& _p)		=						0;
+	virtual	void init()								=						0; 
+	virtual	void update()							=						0; 
 	virtual void setRandomState(bool _upd = true)							{ this->setState(this->ran_.randomInt<u64>(0, this->Nh_), _upd); };
 	
 	// --------------------- F L I P S ---------------------------
 	virtual void chooseRandomFlips();
 	template<bool _TMP>
-	void applyFlips(typename std::enable_if<_TMP, int>::type _tmp = 0)		{ for (auto& i : this->flipPlaces_) flip(this->tmpVec, i); };
+	void applyFlips(typename std::enable_if<_TMP, int>::type _tmp = 0)		{ for (auto& i : this->flipPlaces_) flip(this->tmpVec, i, 0, Operators::_SPIN_RBM); };
 	template<bool _TMP>
-	void applyFlips(typename std::enable_if<!_TMP, int>::type _tmp = 0)		{ for (auto& i : this->flipPlaces_) flip(this->curVec, i); };
+	void applyFlips(typename std::enable_if<!_TMP, int>::type _tmp = 0)		{ for (auto& i : this->flipPlaces_) flip(this->curVec, i, 0, Operators::_SPIN_RBM); };
 
 	// --------------------- G E T T E R S -----------------------
 	auto getInfo()								    const -> std::string	{ return this->info_; };
+	auto getHilbertSize()							const -> u64			{ return this->Nh_; };
 	auto getNvis()									const -> uint			{ return this->nVis_; };
 	auto getOMPID()									const -> uint
 	{
@@ -175,11 +154,36 @@ public:
 
 	// --------------------- F I N A L E -------------------------
 	virtual auto ansatz(const NQSS& _in)			const ->_T =			0;
+
+
+	// ------------------ C O N S T R U C T -------------------------
+
+	public:
+
+	/*
+	* @brief interface constructor for Neural Network Quantum State
+	*/
+	NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _batch, uint _threadNum, double _lr)
+		: batch_(_batch), lr_(_lr)
+	{
+		this->H_					=			_H;
+		this->nVis_					=			_H->getNs();
+		this->Nh_					=			_H->getHilbertSize();
+		this->ran_					=			_H->ran_;
+#ifdef DEBUG
+		this->threadNum_			=			1;
+#else
+		this->threadNum_			=			_threadNum;
+#endif // DEBUG
+		// Use threads for all consecutive parallel regions
+		omp_set_num_threads(this->threadNum_);                  
+	};
+	NQS()							=			default;
 };
 // ##############################################################################################################################################
 
-template<typename _T, typename _Ht>
-inline void NQS<_T, _Ht>::chooseRandomFlips()
+template<typename _Ht, typename _T>
+inline void NQS<_Ht, _T>::chooseRandomFlips()
 {
 	for (uint i = 0; i < this->flipPlaces_.size(); i++) {
 		this->flipPlaces_[i]	=		this->ran_.randomInt<uint>(0, this->nVis_);
@@ -195,10 +199,10 @@ inline void NQS<_T, _Ht>::chooseRandomFlips()
 * @param _start the state to start from
 * @param _nFlip number of flips in a single step
 */
-template<typename _T, typename _Ht>
-inline void NQS<_T, _Ht>::blockSample(uint _bSize, u64 _start, uint _nFlip, bool _therm)
+template<typename _Ht, typename _T>
+inline void NQS<_Ht, _T>::blockSample(uint _bSize, u64 _start, uint _nFlip, bool _therm)
 {
-	if (_start != this->curState)
+	if (_start != this->curState || _therm)
 		this->setState(_start, _therm);
 
 	// set the temporary state
@@ -211,19 +215,17 @@ inline void NQS<_T, _Ht>::blockSample(uint _bSize, u64 _start, uint _nFlip, bool
 		this->applyFlips<true>();
 
 		// check the probability
-#ifndef RBM_ANGLES_UPD
+#ifndef NQS_RBM_ANGLES_UPD
 		double proba = std::abs(this->pRatio(this->curVec, this->tmpVec));
 #else
-		double proba = std::abs(this->pRatio(this->tmpVec));
+		double proba = std::abs(this->pRatio(_nFlip));
 #endif
 		if (this->ran_.random<float>() <= proba * proba) {
 			// update current state and vector
 			this->curVec = this->tmpVec;
 
 			// update angles if needed
-#ifdef RBM_ANGLES_UPD
-			this->updTheta();
-#endif
+			this->update();
 		}
 		// set the vector back to normal
 		else
@@ -231,42 +233,43 @@ inline void NQS<_T, _Ht>::blockSample(uint _bSize, u64 _start, uint _nFlip, bool
 	}
 }
 
-template<typename _T, typename _Ht>
-inline void NQS<_T, _Ht>::blockSample(uint _bSize, u64 _start, bool _therm)
+template<typename _Ht, typename _T>
+inline void NQS<_Ht, _T>::blockSample(uint _bSize, u64 _start, bool _therm)
 {
-	if (_start != this->curState)
+	if (_start != this->curState || _therm)
 		this->setState(_start, _therm);
 
 	// set the temporary state
 	this->tmpVec = this->curVec;
 	for (uint bStep = 0; bStep < _bSize; bStep++)
 	{
-		this->flipPlaces_[0] = this->ran_.randomInt<uint>(0, this->nVis_);
-		this->flipVals_[0] = this->tmpVec(this->flipPlaces_[0]);
+		this->flipPlaces_[0]	=	this->ran_.randomInt<uint>(0, this->nVis_);
+		this->flipVals_[0]		=	this->tmpVec(this->flipPlaces_[0]);
 
 		// flip the vector
-		this->tmpVec(this->flipPlaces_[0]) = this->flipVals_[0];
+		flip(this->tmpVec, this->flipPlaces_[0], 0, Operators::_SPIN_RBM);
 
 		// check the probability
-#ifndef RBM_ANGLES_UPD
+#ifndef NQS_RBM_ANGLES_UPD
 		double proba = std::abs(this->pRatio(this->curVec, this->tmpVec));
 #else
-		double proba = std::abs(this->pRatio());
+		auto proba = std::abs(this->pRatio(this->flipPlaces_[0], this->flipVals_[0]));
 #endif
 		if (this->ran_.random<float>() <= proba * proba) {
 			// update current state and vector
 			this->curVec(this->flipPlaces_[0]) = this->tmpVec(this->flipPlaces_[0]);
 
 			// update angles if needed
-#ifdef RBM_ANGLES_UPD
-			this->updTheta();
-#endif
+			this->update();
 		}
 		// set the vector back to normal
 		else
 			this->tmpVec(this->flipPlaces_[0]) = this->curVec(this->flipPlaces_[0]);
 	}
 	this->curState = BASE_TO_INT<u64>(this->curVec, Operators::_SPIN_RBM);
+#ifndef NQS_RBM_ANGLES_UPD
+	this->setState(this->curState, true);
+#endif
 }
 
 // ##############################################################################################################################################
@@ -274,31 +277,49 @@ inline void NQS<_T, _Ht>::blockSample(uint _bSize, u64 _start, bool _therm)
 /*
 * @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP
 */
-template<typename _T, typename _Ht>
-inline _T NQS<_T, _Ht>::locEnKernel()
+template<typename _Ht, typename _T>
+inline _T NQS<_Ht, _T>::locEnKernel()
 {
-	_T energy = 0.0;
-	for(uint i = 0; i < this->nVis_; i++)
+	double energyR = 0.0;
+	double energyI = 0.0;
 #ifndef DEBUG
-	#pragma omp parallel for reduction(+ : energy) num_threads(this->threadNum_)
+	#pragma omp parallel for reduction(+ : energyR, energyI) num_threads(this->threadNum_)
 #endif
-	for (uint site = 0; site < this->nVis_; site++) {
-		uint vid = this->getOMPID();
-		energy += this->H_->locEnergy(this->curState, site,
-			std::bind(NQS::changeKernelS, this, std::placeholders::_1, std::placeholders::_2),
-			std::bind(NQS::changeKernelM, this, std::placeholders::_1), 
-			this->tmpVecs[vid]);
+	for (int site = 0; site < this->nVis_; site++) {
+		//uint vid	=	this->getOMPID();			// gets the current vector id for the openMP
+		auto energy	=	this->H_->locEnergy(this->curState, site, 
+											std::bind(&NQS<_Ht, _T>::chKernel, 
+												this,
+												std::placeholders::_1,
+												std::placeholders::_2
+												)
+											);
+		energyR		+=	algebra::real(energy);
+		energyI		+=	algebra::imag(energy);
 	};
-	return energy;
+
+	return toType<_T>(energyR, energyI);
 }
 
 // ##############################################################################################################################################
 
-template<typename _T, typename _Ht>
-inline arma::Col<_T> NQS<_T, _Ht>::train(uint nSam, uint nThrm, uint nBlck, uint bSize, uint nFlip, uint progPrc)
+template<typename _Ht, typename _T>
+inline arma::Col<_T> NQS<_Ht, _T>::train(uint nSam, uint nThrm, uint nBlck, uint bSize, uint nFlip, uint progPrc)
 {
+	std::string outstr = "";
+
 	// start the timer!
 	auto _start = std::chrono::high_resolution_clock::now();
+
+	// set the info about training
+	strSeparatedP(outstr, '\t', 2,
+		VEQV("mc", nSam),
+		VEQV("mcTherm", nThrm),
+		VEQV("nb", nBlck),
+		VEQV("bs", bSize),
+		VEQV("bs", nFlip)
+	);
+	LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
 
 	// make the pbar!
 	this->pBar_ = pBar(progPrc, nSam);
@@ -307,7 +328,7 @@ inline arma::Col<_T> NQS<_T, _Ht>::train(uint nSam, uint nThrm, uint nBlck, uint
 	const int _stps = nBlck - nThrm;
 	if (_stps < 0)
 	{
-		LOGINFO("Number of steps is too small - thermalisaton too high!", LOG_TYPES::ERROR, 0);
+		LOGINFOG("Number of steps is too small - thermalisaton too high!", LOG_TYPES::ERROR, 0);
 		return {};
 	};
 
@@ -317,29 +338,32 @@ inline arma::Col<_T> NQS<_T, _Ht>::train(uint nSam, uint nThrm, uint nBlck, uint
 	//NQSS derivatives(, arma::fill::zeros);
 
 	this->setRandomState();
+	this->flipPlaces_.resize(nFlip);
+	this->flipVals_.resize(nFlip);
 	for (uint i = 0; i < nSam; i++) {
-
+		//this->setRandomState();
 		// thermalize!
 		if(nFlip == 1)
-			this->blockSample(nThrm * bSize, this->curState, true);
+			this->blockSample(nThrm, this->curState, true);
 		else
-			this->blockSample(nThrm * bSize, this->curState, nFlip, true);
+			this->blockSample(nThrm, this->curState, nFlip, true);
 
 		// iterate blocks
-		for (uint _taken = 0; _taken < _stps; _taken++) {
+		for (int _taken = 0; _taken < _stps; _taken++) {
 
 			// sample them guys!
 			if (nFlip == 1)
-				this->blockSample(nThrm * bSize, this->curState, true);
+				this->blockSample(bSize, this->curState, false);
 			else
-				this->blockSample(nThrm * bSize, this->curState, nFlip, true);
-
-			// energy
-			En(_taken) = this->locEnKernel();
+				this->blockSample(bSize, this->curState, nFlip, false);
 
 			// calculate the gradient!
 			this->grad(this->curVec, _taken);
+
+			// energy
+			En(_taken) = this->locEnKernel();
 		}
+		//this->Derivatives_.print();
 		this->collectGrad(En);
 		this->updateWeights();
 		// save the mean energy
@@ -353,6 +377,8 @@ inline arma::Col<_T> NQS<_T, _Ht>::train(uint nSam, uint nThrm, uint nBlck, uint
 #endif // NQS_SAVE_WEIGHTS
 		}
 	}
+	LOGINFOG("FINISHED NQS TRAIN. TIME: " + TMS(_start), LOG_TYPES::TIME, 1);
+	LOGINFOG("--- FINISHED NQS TRAIN ---", LOG_TYPES::FINISH, 1);
 	return meanEn;
 }
 

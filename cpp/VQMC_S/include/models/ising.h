@@ -25,8 +25,7 @@ protected:
 	//vec tmp_vec2;
 
 public:
-	using NQSFunSingle									= typename Hamiltonian<_T>::NQSFunSingle;
-	using NQSFunMultiple								= typename Hamiltonian<_T>::NQSFunMultiple;
+	using NQSFun										= typename Hamiltonian<_T>::NQSFun;
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
 	~IsingModel()										= default;
 	IsingModel()										= default;
@@ -38,13 +37,11 @@ public:
 	// -------------------------------------------				METHODS				-------------------------------------------
 	void hamiltonian()									override final;
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override final;
-	cpx locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
-		const NQSFunMultiple& f2,
-		arma::Col<double>& tmp)							override final;
-	cpx locEnergy(const arma::Col<double>& v, uint site,
-		const NQSFunSingle& f1,
-		const NQSFunMultiple& f2,
-		arma::Col<double>& tmp)							override final { return 0; };
+	cpx locEnergy(u64 _id, uint site, NQSFun f1)		override final;
+	cpx locEnergy(const arma::Col<double>& v,
+				  uint site,
+				  NQSFun f1,
+				  arma::Col<double>& tmp)				override final { return 0; };
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -57,7 +54,7 @@ public:
 		PARAMS_S_DISORDER(g, name);
 		PARAMS_S_DISORDER(h, name);
 		name += this->hilbertSpace.getSymInfo();
-		name += "," + VEQ(BC);
+		name += ",BC=" + SSTR(getSTR_BoundaryConditions(BC));
 		return this->Hamiltonian<_T>::info(name, skip, sep);
 	}
 	void updateInfo()									override final { this->info_ = this->info(); };
@@ -98,7 +95,7 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);			// creates random disorder vector
+	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);		// creates random disorder vector
 	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
 	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
 	this->type_			=			MY_MODELS::ISING_M;
@@ -170,7 +167,7 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 * Calculate the local energy for the NQS purpose.
 */
 template<typename _T>
-inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, const NQSFunSingle& f1, const NQSFunMultiple& f2, arma::Col<double>& tmp)
+inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, NQSFun f1)
 {
 	double _locVal		=	0.0;			// unchanged state value
 	cpx _changedVal		=	0.0;			// changed state value			
@@ -193,7 +190,8 @@ inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, const NQSFunSingle& f1,
 		}
 	}
 	// -----------------------------------------------------------
-	_changedVal			+=	f1(site, _Si) * Operators::_SPIN_RBM * PARAM_W_DISORDER(g, site);
+	_changedVal			+=	f1(std::initializer_list<int>({ (int)site }),
+							   std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, site) * Operators::_SPIN_RBM;
 
 	// -----------------------------------------------------------
 	return _changedVal + _locVal;

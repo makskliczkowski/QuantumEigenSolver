@@ -16,8 +16,13 @@
 #endif
 
 // ######################### RBM ############################
+// definitions											 // #
+#define NQS_RBM_ANGLES_UPD							 // #
+#define NQS_RBM_USESR									 // #
+#define NQS_RBM_PINV									 // #
+//#define NQS_RBM_SREG									 // #
 #ifndef RBM_H											 // #
-#include "../rbm.h"										 // #
+#include "../NQS/rbm.h"									 // #
 #endif													 // #
 // ##########################################################
 
@@ -43,8 +48,12 @@
 
 
 // maximal ed size to compare
-constexpr int maxed = 20;
 // ###################### LIMITS ############################
+#define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
+constexpr int UI_LIMITS_NQS_ED									= ULLPOW(16);
+constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
+
+
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(16);
 constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(11);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
@@ -87,7 +96,7 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(modTyp		, MY_MODELS	, MY_MODELS::ISING_M);
 
 		// ############### ISING ###############
-		UI_PARAM_STEP(double				, J			, 1.0				);	// spin exchange
+		UI_PARAM_STEP(double				, J1		, 1.0				);	// spin exchange
 		UI_PARAM_STEP(double				, hz		, 1.0				);	// perpendicular field
 		UI_PARAM_STEP(double				, hx		, 1.0				);	// transverse field
 		// ############### XYZ #################		
@@ -104,7 +113,7 @@ namespace UI_PARAMS {
 		void setDefault() {
 			UI_PARAM_SET_DEFAULT(modTyp);
 			// ising
-			UI_PARAM_SET_DEFAULT_STEP(J);
+			UI_PARAM_SET_DEFAULT_STEP(J1);
 			UI_PARAM_SET_DEFAULT_STEP(hz);
 			UI_PARAM_SET_DEFAULT_STEP(hx);
 			// xyz
@@ -182,16 +191,17 @@ namespace UI_PARAMS {
 	struct NqsP {
 		//unique_ptr<rbmState<_type, _hamtype>> phi;
 		v_1d<u64> layersDim;
-		UI_PARAM_CREATE_DEFAULT	(nHidden	, uint	, 1					);
-		UI_PARAM_CREATE_DEFAULT	(nVisible	, uint	, 1					);
-		UI_PARAM_CREATE_DEFAULT	(nLayers	, uint	, 2					);
-		UI_PARAM_CREATE_DEFAULT	(nFlips		, uint	, 1					);
-		UI_PARAM_CREATE_DEFAULT	(blockSize	, uint	, 8					);
-		UI_PARAM_CREATE_DEFAULT	(nTherm		, uint	, 50				);
-		UI_PARAM_CREATE_DEFAULT	(nBlocks	, uint	, 500				);
-		UI_PARAM_CREATE_DEFAULT	(nMcSteps	, uint	, 1000				);
-		UI_PARAM_CREATE_DEFAULT	(batch		, u64	, 1024				);
-		UI_PARAM_CREATE_DEFAULTD(lr			, uint	, 1					);
+		UI_PARAM_CREATE_DEFAULT	(type		, NQSTYPES	, NQSTYPES::RBM		);
+		UI_PARAM_CREATE_DEFAULT	(nHidden	, uint		, 1					);
+		UI_PARAM_CREATE_DEFAULT	(nVisible	, uint		, 1					);
+		UI_PARAM_CREATE_DEFAULT	(nLayers	, uint		, 2					);
+		UI_PARAM_CREATE_DEFAULT	(nFlips		, uint		, 1					);
+		UI_PARAM_CREATE_DEFAULT	(blockSize	, uint		, 8					);
+		UI_PARAM_CREATE_DEFAULT	(nTherm		, uint		, 50				);
+		UI_PARAM_CREATE_DEFAULT	(nBlocks	, uint		, 500				);
+		UI_PARAM_CREATE_DEFAULT	(nMcSteps	, uint		, 1000				);
+		UI_PARAM_CREATE_DEFAULT	(batch		, u64		, 1024				);
+		UI_PARAM_CREATE_DEFAULTD(lr			, double	, 1					);
 		
 		void setDefault() {
 			UI_PARAM_SET_DEFAULT(nHidden);
@@ -234,6 +244,10 @@ protected:
 	Hilbert::HilbertSpace<cpx>				hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>		hamComplex;
 
+	// define the NQS
+	std::shared_ptr<NQS<cpx,cpx>>			nqsCpx;
+	std::shared_ptr<NQS<double,cpx>>		nqsDouble;
+
 	// heisenberg with classical dots stuff
 	//v_1d<int> positions = {};
 	//arma::vec phis = arma::vec({});
@@ -247,10 +261,13 @@ protected:
 
 	void setDefaultMap()					final override {
 		this->defaultParams = {
+			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT			),			// type of the NQS state	
 			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0			),			// mcsteps	
 			UI_OTHER_MAP(b			, this->nqsP.batch_		, FHANDLE_PARAM_HIGHER0			),			// batch
 			UI_OTHER_MAP(nb			, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0			),			// number of blocks
 			UI_OTHER_MAP(bs			, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0			),			// block size
+			UI_OTHER_MAP(nh			, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0			),			// hidden params
+			UI_OTHER_MAP(nf			, this->nqsP.nFlips_	, FHANDLE_PARAM_HIGHER0			),			// hidden params
 
 			{			"f"			, std::make_tuple(""	, FHANDLE_PARAM_DEFAULT)		},			// file to read from directory
 			// ---------------- lattice parameters ----------------
@@ -263,7 +280,7 @@ protected:
 			// ---------------- model parameters ----------------
 			UI_OTHER_MAP(mod		, this->modP._modTyp	, FHANDLE_PARAM_BETWEEN(0., 2.)	),
 			// -------- ising
-			UI_PARAM_MAP(J			, this->modP._J			, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(J1			, this->modP._J1		, FHANDLE_PARAM_DEFAULT			),
 			UI_PARAM_MAP(hx			, this->modP._hx		, FHANDLE_PARAM_DEFAULT			),
 			UI_PARAM_MAP(hz			, this->modP._hz		, FHANDLE_PARAM_DEFAULT			),
 			// -------- heisenberg		
@@ -300,16 +317,17 @@ protected:
 private:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
-	// ####################### SYMMETRIES #######################
+	// ############# S Y M M E T R I E S   E D #############
 	template<typename _T>//, std::enable_if_t<is_complex<_T>{}>* = nullptr>
 	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H);
 	void symmetriesTest(clk::time_point start);
 
-	// ####################### CLASSICAL ########################
-		
+	// ####################### N Q S #######################
+	template<typename _T>
+	void nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T, cpx>> _NQS);
 	//void make_mc_classical_angles(double Jdot = 0.0);
 
-	// ####################### KITAEV #######################
+	// ###################### KITAEV #######################
 
 	//void make_mc_kitaev(t_3d<double> K);
 
@@ -318,6 +336,9 @@ private:
 
 	template<typename _T>
 	void defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
+
+	template<typename _T>
+	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS);
 
 public:
 	// -----------------------------------------------        CONSTRUCTORS  		-------------------------------------------
@@ -374,9 +395,9 @@ public:
 
 	// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
 
+	// ####################### N Q S #######################
+	void makeSimNQS();
 
-	// #######################		     RBMs               #######################
-		
 	// ########## CLASSICAL
 	//void make_mc_classical();
 	//void make_mc_angles_sweep();
@@ -418,23 +439,46 @@ inline void UI::defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Ha
 	{
 	case MY_MODELS::ISING_M:
 		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
-			this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
+			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
 		break;
 	case MY_MODELS::XYZ_M:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
 			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
 			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
+		break;
+	}
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief Based on a given type, it creates a NQS
+*/
+template<typename _T>
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS)
+{
+	switch (this->nqsP.type_)
+	{
+	case NQSTYPES::RBM:
+		_NQS = std::make_shared<RBM_S<_T, cpx>>(_H,
+												 this->nqsP.nHidden_,
+												 this->nqsP.batch_,
+												 this->threadNum,
+												 this->nqsP.lr_);
+		break;
+	default:
+		LOGINFO("I don't know any other NQS types :<", LOG_TYPES::INFO, 1);
 		break;
 	}
 }
@@ -453,13 +497,13 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	// set the Hamiltonian
 	_H->hamiltonian();
 	// set the parameters
-	u64 Nh = _H->getHilbertSize();
+	u64 Nh					=			_H->getHilbertSize();
 	if (Nh == 0)
 		return;
 	uint Ns = _H->getNs();
 	u64 stateNum = Nh;
 	bool useShiftAndInvert = false;
-	std::string infoH = _H->getInfo();
+	std::string infoH		=			_H->getInfo();
 
 	//stouts("\t->", start);
 	LOGINFO("Finished buiding Hamiltonian" + infoH, LOG_TYPES::TRACE, 1);
@@ -470,26 +514,26 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	else
 	{
 		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
-		useShiftAndInvert = true;
+		useShiftAndInvert	=			true;
 		stateNum = UI_LIMITS_SI_STATENUM;
 		_H->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
 	}
 	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
 	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
 
-	std::string name = VEQ(Nh);
+	std::string name		=			VEQ(Nh);
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num states: " + STR(stateNum), LOG_TYPES::TRACE, 2);
 
 	// --- create the directories ---
-	std::string dir = this->mainDir + kPS + _H->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
+	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
 	fs::create_directories(dir);
 
 	// --- use those files --- 
-	std::string modelInfo = _H->getInfo();
+	std::string modelInfo	=			_H->getInfo();
 
 	// --- save energies txt check ---
-	std::string filename = dir + infoH;
+	std::string filename	=			dir + infoH;
 	if (Nh < UI_LIMITS_MAXPRINT)
 		_H->getEigVal(dir, HAM_SAVE_EXT::dat, false);
 	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
@@ -499,26 +543,26 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	_H->clearH();
 
 	// iterate through bond cut
-	const uint maxBondNum = Ns / 2;
+	const uint maxBondNum	=			Ns / 2;
 	arma::mat ENTROPIES(maxBondNum, stateNum, arma::fill::zeros);
 
 	// get the symmetry rotation matrix
-	auto _symRot = _H->getSymRot();
-	bool usesSym = _H->hilbertSpace.checkSym();
+	auto _symRot			=			_H->getSymRot();
+	bool usesSym			=			_H->hilbertSpace.checkSym();
 
 	// set which bonds we want to cut in bipartite
-	v_1d<uint> _bonds = { maxBondNum };
-	auto beforeEntro = clk::now();
+	v_1d<uint> _bonds		=			{ maxBondNum };
+	auto beforeEntro		=			clk::now();
 #pragma omp parallel for num_threads(this->threadNum)
-	for (long long idx = 0; idx < stateNum; idx++) {
+	for (long long idx = 0; idx < (long long)stateNum; idx++) {
 		// get the eigenstate
-		arma::Col<_T> state = _H->getEigVec(idx);
+		arma::Col<_T> state =			_H->getEigVec(idx);
 		if (usesSym)
-			state = _symRot * state;
+			state			=			_symRot * state;
 		// go through bonds
 		for (auto i : _bonds) {
 			// iterate through the state
-			auto entro = Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace);
+			auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace);
 			// save the entropy
 			ENTROPIES(i - 1, idx) = entro;
 		}
@@ -537,7 +581,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		return;
 
 	// set the average energy index
-	const u64 avEnIdx = _H->getEnAvIdx();
+	const u64 avEnIdx		=			_H->getEnAvIdx();
 
 	// save states near the mean energy index
 	if (Ns == 20)
@@ -781,4 +825,49 @@ inline void UI::symmetriesTest(clk::time_point start)
 	}
 	LASTLVL = 0;
 	LOGINFO("FINISHED ALL.", LOG_TYPES::TRACE, 0);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T>
+inline void UI::nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T,cpx>> _NQS)
+{
+	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
+	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
+	LASTLVL					=		2;
+	std::string dir			=		this->mainDir;
+	dir						+=		this->latP.lat->get_info() + kPS;
+
+	std::string nqsInfo		=		_NQS->getInfo();
+	std::string modelInfo   =		_NQS->H_->getInfo();
+	dir						+=		modelInfo + kPS;
+	createDir(dir);
+
+	// calculate ED to compare with Lanczos
+	u64 Nh					=		_NQS->getHilbertSize();
+	if (Nh <= UI_LIMITS_NQS_ED) {
+		_NQS->H_->hamiltonian();
+		if (UI_LIMITS_NQS_LANCZOS_STATENUM < Nh)
+			_NQS->H_->diagH(false, UI_LIMITS_NQS_LANCZOS_STATENUM, 0, 1000, 0.0, "sa");
+		else
+			_NQS->H_->diagH(false);
+		LOGINFOG("Found the ED groundstate to be EED_0 = " + STRP(_NQS->H_->getEigVal(0), 7), 
+				 LOG_TYPES::TRACE, 2);
+	}
+
+	// start the simulation
+	arma::Col<cpx> _ENS		=		_NQS->train(this->nqsP.nMcSteps_,
+												this->nqsP.nTherm_,
+												this->nqsP.nBlocks_,
+												this->nqsP.blockSize_,
+												this->nqsP.nFlips_);
+	arma::Mat<double> _ENSM(_ENS.size(), 2, arma::fill::zeros);
+	_ENSM.col(0)			=		arma::real(_ENS);
+	_ENSM.col(1)			=		arma::imag(_ENS);
+
+	double ENQS_0			=		arma::mean(_ENSM.col(0).tail(10));
+	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
+	_ENSM.save(dir + "en_" + nqsInfo + ".dat", arma::raw_ascii);
+
+
 }
