@@ -1,0 +1,3 @@
+[submodule "cpp/library/source"]
+	path = cpp/library/source
+	url = https://github.com/makskliczkowski/general_cpp
