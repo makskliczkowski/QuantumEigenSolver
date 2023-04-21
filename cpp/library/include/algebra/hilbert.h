@@ -171,7 +171,7 @@ namespace Hilbert {
 				}
 				
 				// otherwise check sectors
-				if ((sec != 0 && sec != this->Ns / 2))
+				if ((sec != 0 && !(sec == this->Ns / 2 && this->Ns % 2 == 0)))
 					containsTCpx_ = true;
 				break;
 			}
@@ -191,6 +191,7 @@ namespace Hilbert {
 				break;
 			}
 		}
+		
 		// check spin flip and U(1)
 		if (containsU1_) {
 			uint removed = 0;
@@ -198,9 +199,10 @@ namespace Hilbert {
 			for (auto i = 0; i < genIn.size(); i++)
 			{
 				const auto [gen, sec] = genIn[i];
+				// remove if not in the half-filling or uneven system sizes
 				if ((static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PX ||
 					static_cast<Operators::SymGenerators>(gen) == Operators::SymGenerators::PY) &&
-					this->checkU1Val() != this->Ns / 2
+					((this->checkU1Val() != this->Ns / 2) || (this->Ns % 2 != 0))
 					)
 				{
 					genIn.erase(genIn.begin() + (i - removed));

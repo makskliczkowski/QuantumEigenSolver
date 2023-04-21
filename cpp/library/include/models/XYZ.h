@@ -56,18 +56,24 @@ public:
 														bool _parityBreak = false)
 		: XYZ<_T>(hilbert, _Ja, _Jb, _hx, _hz, _dA, _dB, _eA, _eB, _parityBreak)
 	{
-		this->Ja0 = _Ja0; this->Jb0 = _Jb0; this->hx0 = _hx0;
-		this->hz0 = _hz0; this->dA0 = _dA0; this->dB0 = _dB0;
-		this->eA0 = _eA0; this->eB0 = _eB0;
-		this->dJa = this->ran_.createRanVec(this->Ns, this->Ja0);
-		this->dJb = this->ran_.createRanVec(this->Ns, this->Jb0);
-		this->dhx = this->ran_.createRanVec(this->Ns, this->hx0);
-		this->dhz = this->ran_.createRanVec(this->Ns, this->hz0);
-		this->ddA = this->ran_.createRanVec(this->Ns, this->dA0);
-		this->ddB = this->ran_.createRanVec(this->Ns, this->dB0);
-		this->deA = this->ran_.createRanVec(this->Ns, this->eA0);
-		this->deB = this->ran_.createRanVec(this->Ns, this->eB0);
+		this->Ja0	= _Ja0; this->Jb0 = _Jb0; this->hx0 = _hx0;
+		this->hz0	= _hz0; this->dA0 = _dA0; this->dB0 = _dB0;
+		this->eA0	= _eA0; this->eB0 = _eB0;
+		this->dJa	= this->ran_.createRanVec(this->Ns, this->Ja0);
+		this->dJb	= this->ran_.createRanVec(this->Ns, this->Jb0);
+		this->dhx	= this->ran_.createRanVec(this->Ns, this->hx0);
+		this->dhz	= this->ran_.createRanVec(this->Ns, this->hz0);
+		this->ddA	= this->ran_.createRanVec(this->Ns, this->dA0);
+		this->ddB	= this->ran_.createRanVec(this->Ns, this->dB0);
+		this->deA	= this->ran_.createRanVec(this->Ns, this->eA0);
+		this->deB	= this->ran_.createRanVec(this->Ns, this->eB0);
 		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 2);
+		double Jx	= this->Ja * (1 - this->eA);
+		double Jy	= this->Ja * (1 + this->eA);
+		double Jz	= this->Ja * this->dA;
+		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 3);
+		auto SUSY	= Jx * Jy + Jy * Jz + Jx * Jz;
+		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 3);
 	};
 
 	XYZ(Hilbert::HilbertSpace<_T>&& hilbert,			double _Ja, double _Jb,
@@ -81,18 +87,24 @@ public:
 														bool _parityBreak = false)
 		: XYZ<_T>(std::move(hilbert), _Ja, _Jb, _hx, _hz, _dA, _dB, _eA, _eB, _parityBreak)
 	{
-		this->Ja0 = _Ja0; this->Jb0 = _Jb0; this->hx0 = _hx0;
-		this->hz0 = _hz0; this->dA0 = _dA0; this->dB0 = _dB0;
-		this->eA0 = _eA0; this->eB0 = _eB0;
-		this->dJa = this->ran_.createRanVec(this->Ns, this->Ja0);
-		this->dJb = this->ran_.createRanVec(this->Ns, this->Jb0);
-		this->dhx = this->ran_.createRanVec(this->Ns, this->hx0);
-		this->dhz = this->ran_.createRanVec(this->Ns, this->hz0);
-		this->ddA = this->ran_.createRanVec(this->Ns, this->dA0);
-		this->ddB = this->ran_.createRanVec(this->Ns, this->dB0);
-		this->deA = this->ran_.createRanVec(this->Ns, this->eA0);
-		this->deB = this->ran_.createRanVec(this->Ns, this->eB0);
+		this->Ja0	= _Ja0; this->Jb0 = _Jb0; this->hx0 = _hx0;
+		this->hz0	= _hz0; this->dA0 = _dA0; this->dB0 = _dB0;
+		this->eA0	= _eA0; this->eB0 = _eB0;
+		this->dJa	= this->ran_.createRanVec(this->Ns, this->Ja0);
+		this->dJb	= this->ran_.createRanVec(this->Ns, this->Jb0);
+		this->dhx	= this->ran_.createRanVec(this->Ns, this->hx0);
+		this->dhz	= this->ran_.createRanVec(this->Ns, this->hz0);
+		this->ddA	= this->ran_.createRanVec(this->Ns, this->dA0);
+		this->ddB	= this->ran_.createRanVec(this->Ns, this->dB0);
+		this->deA	= this->ran_.createRanVec(this->Ns, this->eA0);
+		this->deB	= this->ran_.createRanVec(this->Ns, this->eB0);
 		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 2);
+		double Jx	= this->Ja * (1 - this->eA);
+		double Jy	= this->Ja * (1 + this->eA);
+		double Jz	= this->Ja * this->dA;
+		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 3);
+		auto SUSY	= Jx * Jy + Jy * Jz + Jx * Jz;
+		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 3);
 	};
 
 	// -------------------------------------------				METHODS				-------------------------------------------
