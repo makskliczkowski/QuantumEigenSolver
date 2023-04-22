@@ -42,8 +42,8 @@ const std::string DEF_INFO_SEP		= std::string("_");										// defalut separato
 									type param##0	= 0;	\
 									arma::Col<type> d##param
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
-#define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 2);	\
-									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 2))
+#define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 3);	\
+									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 3))
 										// gets the information about the disorder
 
 template <typename _T>
@@ -136,6 +136,7 @@ public:
 
 	// ------------------------------------------- GETTERS -------------------------------------------
 	
+	auto getDegeneracies()								const -> std::map<int, int>;
 	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
 	auto getHilbertSize()								const -> u64						{ return this->hilbertSpace.getHilbertSize(); };			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
@@ -439,6 +440,40 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 		states.save(_dir + "states" + this->getInfo() + ".dat", arma::raw_ascii);
 		break;
 	}
+}
+
+// ################################################################################################################################################
+
+/*
+* @brief Calculates the degeneracy histogram of the eigenvalues.
+* @returns The degeneracy histogram of the degeneracies in the eigenspectrum.
+*/
+template<typename _T>
+inline auto Hamiltonian<_T>::getDegeneracies() const -> std::map<int, int>
+{
+	std::map<int, int> _degMap;
+	double _prevE		=	INT_MAX;
+	int _counter		=	0;
+	for (auto& _E : this->eigVal_) 
+	{
+		// check if previous E is yet different than current
+		if (!EQP(_prevE, _E, 1e-15))
+		{
+			if (_counter != 0) {
+				if (_degMap.count(_counter + 1))
+					_degMap[_counter + 1]	+=	1;
+				else
+					_degMap[_counter + 1]	=	1;
+			}
+			_counter						=	0;
+		}
+		else
+			_counter++;
+
+		// check counter and set previous energy
+		_prevE = _E;
+	}
+	return _degMap;
 }
 
 #endif

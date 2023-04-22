@@ -595,16 +595,20 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 * @param start the timer start
 */
 inline void UI::symmetriesTest(clk::time_point start)
-{
+{	
+	using symTuple										=		std::tuple<int, int, int, int, int, int>;
 	v_1d<double> entFULL								=		{};
 	v_1d<double> entSYMS								=		{};
 	v_1d<double> enSYMS									=		{};
-	v_1d<std::tuple<int, int, 
-					int, int, int>> _symmetries			=		{};
+	v_1d<symTuple> _symmetries							=		{};
+	v_1d<u64> _sizesSyms								=		{};
+	v_1d<std::pair<symTuple, std::map<int, int>>> _degs =		{};
+	v_1d<u64> _sizes									=		{};
 	uint Ns												=		1;
 	u64 Nh												=		1;
 	uint La												=		Ns / 2;
 	std::string dir										=		"";
+	std::string infoHFull								=		"";
 	arma::mat ENTROPIES;
 	// ---------------------------------- DIAG HAMILTONIAN WITHOUT SYMMETRIES ---------------------------------
 	for (auto bc: {1, 0}) {
@@ -621,7 +625,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 		LASTLVL = 2;
 		this->hamDouble->hamiltonian();
 		dir = this->mainDir + kPS + this->hamDouble->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
-		std::string infoHFull = this->hamDouble->getInfo();
+		infoHFull = this->hamDouble->getInfo();
 		std::string filename = dir + infoHFull;
 
 		LOGINFO("Finished buiding Hamiltonian" + infoHFull, LOG_TYPES::TRACE, 2);
@@ -653,20 +657,24 @@ inline void UI::symmetriesTest(clk::time_point start)
 		LOGINFO("--------------------------- FINISHED ---------------------------\n", LOG_TYPES::FINISH, 0);
 	};
 	
-	std::ofstream file, file2;
-	openFile(file, dir + "log.dat");
-	openFile(file2, dir + "logCompare.dat");
+	std::ofstream file, file2, file3;
+	openFile(file, dir + "log_" + STR(Ns) + ".dat");
+	openFile(file2, dir + "logCompare_" + STR(Ns) + ".dat");
+	openFile(file3, dir + "logDeg_" + STR(Ns) + ".dat");
 	std::string infoSym			=		"";
 
 	// parameters
 	v_1d<int> paritiesSz		=		{};
+	v_1d<int> paritiesSy		=		{};
 	v_1d<int> parities			=		{};
 	v_1d<int> spinFlip			=		{};
 	v_1d<int> u1Values			=		{};
 
 	bool useU1					=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
 	bool useSzParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useSyParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 	if (useSzParity)			paritiesSz = { -1, 1 }; else paritiesSz = { -INT_MAX };
+	if (useSzParity)			paritiesSy = { -1, 1 }; else paritiesSy = { -INT_MAX };
 	if (useU1)					for (uint i = 0; i <= Ns; i++) u1Values.push_back(i);
 	else						u1Values.push_back(-INT_MAX);
 
@@ -711,64 +719,71 @@ inline void UI::symmetriesTest(clk::time_point start)
 					this->symP.x_ = reflection;
 					for (auto parZ : paritiesSz){
 						this->symP.pz_ = parZ;
+						for (auto parY : paritiesSy) {
+							this->symP.py_ = parY;
+							// create the models
+							if (this->hamComplex)
+								this->hamComplex.reset();
+							this->defineModel<cpx>(std::move(this->hilComplex), this->hamComplex);
+							infoSym			=		this->hamComplex->getInfo();
+							Nh				=		this->hamComplex->getHilbertSize();
+							LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
+							file << "\t->" << infoSym << EL;
 
-						// create the models
-						if (this->hamComplex)
-							this->hamComplex.reset();
-						this->defineModel<cpx>(std::move(this->hilComplex), this->hamComplex);
-						infoSym			=		this->hamComplex->getInfo();
-						Nh				=		this->hamComplex->getHilbertSize();
-						LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
-						file << "\t->" << infoSym << EL;
+							// print sectors
+							int kS			=		k;
+							int xS			=		flip		!= -INT_MAX ? flip			: 0;
+							int xSy			=		parY		!= -INT_MAX ? parY			: 0;
+							int xSz			=		parZ		!= -INT_MAX ? parZ			: 0;
+							int pS			=		reflection	!= -INT_MAX ? reflection	: 0;
+							int U1s			=		U1			!= -INT_MAX ? U1			: 0;
+							symTuple _tup	=		std::make_tuple(kS, pS, xS, xSy, xSz, U1s);
+							std::string sI  =		VEQ(kS) + "," + VEQ(pS) + "," + VEQ(xS) + "," + VEQ(xSy) + "," + VEQ(xSz) + "," + VEQ(U1s);
+							if (Nh == 0)
+							{
+								LOGINFO("EMPTY SECTOR: " + sI, LOG_TYPES::TRACE, 3);
+								LOGINFO("-------------------", LOG_TYPES::TRACE, 2);
+								file << "\t\t->EMPTY SECTOR : " << sI << EL;
+								continue;
+							}
+							this->hamComplex->hamiltonian();
+							LOGINFO("Finished building Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
+							this->hamComplex->diagH(false);
+							LOGINFO("Finished diagonalizing Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
+							_degs.push_back(std::make_pair(_tup, this->hamComplex->getDegeneracies()));
+							_sizes.push_back(Nh);
 
-						// print sectors
-						int kS			=		k;
-						int xS			=		flip != -INT_MAX ? flip : 0;
-						int xSz			=		parZ != -INT_MAX ? parZ : 0;
-						int pS			=		reflection != -INT_MAX ? reflection : 0;
-						int U1s			=		U1 != -INT_MAX ? U1 : 0;
-						std::string sI  =		VEQ(kS) + "," + VEQ(pS) + "," + VEQ(xS) + "," + VEQ(U1s);
-						if (Nh == 0)
-						{
-							LOGINFO("EMPTY SECTOR: " + sI, LOG_TYPES::TRACE, 3);
-							LOGINFO("-------------------", LOG_TYPES::TRACE, 2);
-							file << "\t\t->EMPTY SECTOR : " << sI << EL;
-							continue;
+							// create rotation matrix
+							U = this->hamComplex->hilbertSpace.getSymRot();
+							if (!useU1)
+								unitaryTransform(U, this->hamComplex, H);
+
+							calcStates		+=		Nh;
+
+							arma::vec entroInner(Nh);
+							for (u64 i = 0; i < Nh; i++) {
+								// get the energy to push back
+								auto En = this->hamComplex->getEigVal(i);
+								enSYMS.push_back(En);
+
+								// transform the state
+								arma::Col<cpx> state = this->hamComplex->getEigVec(i);
+								arma::Col<cpx> transformed_state = U * state;
+
+								// calculate the entanglement entropy
+								auto entropy = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(transformed_state, La, this->hamComplex->hilbertSpace);
+								entroInner(i) = entropy;
+								entSYMS.push_back(entropy);
+
+								// push back symmetry
+								_sizesSyms.push_back(Nh);
+								_symmetries.push_back(_tup);
+							}
+							std::string filename = dir + infoSym + ".h5";
+							this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+							entroInner.save(arma::hdf5_name(filename, "entropy", arma::hdf5_opts::append));
+							LOGINFO("------------------- Finished: " + sI + "---------------------------\n", LOG_TYPES::FINISH, 3);
 						}
-						this->hamComplex->hamiltonian();
-						LOGINFO("Finished building Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
-						this->hamComplex->diagH(false);
-						LOGINFO("Finished diagonalizing Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
-
-						// create rotation matrix
-						U = this->hamComplex->hilbertSpace.getSymRot();
-						if (!useU1)
-							unitaryTransform(U, this->hamComplex, H);
-
-						calcStates		+=		Nh;
-
-						arma::vec entroInner(Nh);
-						for (u64 i = 0; i < Nh; i++) {
-							// get the energy to push back
-							auto En = this->hamComplex->getEigVal(i);
-							enSYMS.push_back(En);
-
-							// transform the state
-							arma::Col<cpx> state = this->hamComplex->getEigVec(i);
-							arma::Col<cpx> transformed_state = U * state;
-
-							// calculate the entanglement entropy
-							auto entropy = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(transformed_state, La, this->hamComplex->hilbertSpace);
-							entroInner(i) = entropy;
-							entSYMS.push_back(entropy);
-
-							// push back symmetry
-							_symmetries.push_back(std::make_tuple(kS, pS, xS, xSz, U1s));
-						}
-						std::string filename = dir + infoSym + ".h5";
-						this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
-						entroInner.save(arma::hdf5_name(filename, "entropy", arma::hdf5_opts::append));
-						LOGINFO("------------------- Finished: " + sI + "---------------------------\n", LOG_TYPES::FINISH, 3);
 					}
 				}
 			}
@@ -813,7 +828,10 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 	LOGINFO("SORTING AND SO ON.", LOG_TYPES::TRACE, 2);
 	// --------------- PRINT OUT THE COMPARISON ---------------
-	printSeparated(file2, '\t', 15, true, "E_FULL", "E_SYMS", "T,R,PX,PZ,U1", "S_FULL", "S_SYMS");
+	printSeparated(file2, '\t', 15, true, infoHFull);
+	printSeparated(file2, '\t', 15, false, "E_FULL", "E_SYMS", "S_FULL", "S_SYMS");
+	printSeparated(file2, ',', 3, true, "T", "R", "PX", "PY", "PZ", "U1", "NH");
+
 	for (u64 i = 0; i < this->hamDouble->getHilbertSize(); i++) {
 		// get the ed energy
 		auto SORTIDX				=		idxs[i];
@@ -822,11 +840,34 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 		// sort
 		auto ESYM					=		enSYMS[SORTIDX];
-		const auto& [k,p,x,xZ,u1]	=		_symmetries[SORTIDX];
+		const auto& [k,p,x,xY,xZ,u1]=		_symmetries[SORTIDX];
 		auto ENTSYM					=		entSYMS[SORTIDX];
 
-		printSeparatedP(file2, '\t', 15, true, 7, EED, ESYM, STR(k) + "," + STR(p) + "," + STR(x) + "," + STR(xZ) + "," + STR(u1), ENTED, ENTSYM);
+		printSeparatedP(file2, '\t', 15, false, 7, EED, ESYM, ENTED, ENTSYM);
+		printSeparatedP(file2, ',', 3, true, 7, STR(k), STR(p), STR(x), STR(xY), STR(xZ), STR(u1), STR(_sizesSyms[i]));
 	}
+
+	// --------------- PRINT OUT THE DEGENERACIES ---------------
+	printSeparated(file3, '\t', 15, true, infoHFull);
+	printSeparated(file3, ',', 4, false, "T", "R", "PX", "PY", "PZ", "U1", "NH");
+	printSeparated(file3, ',', 15, true, "DEG");
+	for (uint i = 0; i < _degs.size(); i++)
+	{
+		auto [_syms, _degM]				=		_degs[i];
+		const auto& [k,p,x,xY,xZ,u1]	=		_syms;
+		printSeparatedP(file3, ',', 4, false, 7, STR(k), STR(p), STR(x), STR(xY), STR(xZ), STR(u1), STR(_sizes[i]));
+
+		// degeneracy
+		int _degC = 0;
+		for (auto it = _degM.begin(); it != _degM.end(); it++)
+			_degC						+=		it->first * it->second;
+		LOGINFO(VEQ(_degC), LOG_TYPES::TRACE, 4);
+		printSeparatedP(file3, ',', 15, true, 5, _degC);
+	}
+
+	file.close();
+	file2.close();
+	file3.close();
 	LASTLVL = 0;
 	LOGINFO("FINISHED ALL.", LOG_TYPES::TRACE, 0);
 }

@@ -210,10 +210,10 @@ template<typename _T>
 inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
 	// get number of forward nn
-	uint NUM_OF_NN	= (uint)this->lat_->get_nn_ForwardNum(_site);
-	uint NUM_OF_NNN = (uint)this->lat_->get_nnn_ForwardNum(_site);
-	u64 newIdx = 0;
-	_T newVal = 0;
+	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
+	uint NUM_OF_NNN		= (uint)this->lat_->get_nnn_ForwardNum(_site);
+	u64 newIdx			= 0;
+	_T newVal			= 0;
 
 	// -------------- perpendicular field --------------
 	std::tie(newIdx, newVal) = Operators::sigma_z(_elem, this->Ns, { _site });
@@ -248,7 +248,7 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			auto [idx_x, val_x]		= Operators::sigma_x(_elem, this->Ns,	{ _site });
 			auto [idx_x2, val_x2]	= Operators::sigma_x(idx_x, this->Ns,	{ (uint)nei });
 			this->setHElem(_elemId,
-							PARAM_W_DISORDER(Ja, _site) * (1.0 + PARAM_W_DISORDER(eA, _site)) * val_x * val_x2,
+							PARAM_W_DISORDER(Ja, _site) * (1.0 - PARAM_W_DISORDER(eA, _site)) * val_x * val_x2,
 							idx_x2);
 		}
 	}
@@ -273,7 +273,7 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			auto [idx_x, val_x]		= Operators::sigma_x(_elem, this->Ns,	{ _site });
 			auto [idx_x2, val_x2]	= Operators::sigma_x(idx_x, this->Ns,	{ (uint)nei });
 			this->setHElem(_elemId,
-							PARAM_W_DISORDER(Jb, _site) * (1.0 + PARAM_W_DISORDER(eB, _site)) * val_x * val_x2,
+							PARAM_W_DISORDER(Jb, _site) * (1.0 - PARAM_W_DISORDER(eB, _site)) * val_x * val_x2,
 							idx_x2);
 		}
 	}
