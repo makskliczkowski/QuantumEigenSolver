@@ -167,9 +167,9 @@ namespace Operators {
 
 	template <typename... _T>
 	inline _OP<cpx>::INP<_T...> castINP(_OP<double>::INP<_T...> _in) {
-		auto fun = [&](u64 s, _T...) {
-			auto [s, v] = std::apply(_in, _T...);
-			return std::make_pair(_in, cpx(v, 0.0));
+		auto fun = [&](u64 s, _T a...) {
+			auto [sn, v] = std::apply(_in, a...);
+			return std::make_pair(sn, cpx(v, 0.0));
 		};
 		return fun;
 	}
