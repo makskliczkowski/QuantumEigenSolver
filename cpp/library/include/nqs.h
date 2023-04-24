@@ -113,7 +113,7 @@ public:
 	// --------------------- S E T T E R S -----------------------
 	virtual	void init()								=						0; 
 	virtual	void update()							=						0; 
-	virtual void setRandomState(bool _upd = true)							{ this->setState(this->ran_.randomInt<u64>(0, this->Nh_), _upd); };
+	virtual void setRandomState(bool _upd = true)							{ this->setState(this->ran_.template randomInt<u64>(0, this->Nh_), _upd); };
 	
 	// --------------------- F L I P S ---------------------------
 	virtual void chooseRandomFlips();
@@ -220,7 +220,7 @@ inline void NQS<_Ht, _T>::blockSample(uint _bSize, u64 _start, uint _nFlip, bool
 #else
 		double proba = std::abs(this->pRatio(_nFlip));
 #endif
-		if (this->ran_.random<float>() <= proba * proba) {
+		if (this->ran_.template random<float>() <= proba * proba) {
 			// update current state and vector
 			this->curVec = this->tmpVec;
 
@@ -243,7 +243,7 @@ inline void NQS<_Ht, _T>::blockSample(uint _bSize, u64 _start, bool _therm)
 	this->tmpVec = this->curVec;
 	for (uint bStep = 0; bStep < _bSize; bStep++)
 	{
-		this->flipPlaces_[0]	=	this->ran_.randomInt<uint>(0, this->nVis_);
+		this->flipPlaces_[0]	=	this->ran_.template randomInt<uint>(0, this->nVis_);
 		this->flipVals_[0]		=	this->tmpVec(this->flipPlaces_[0]);
 
 		// flip the vector
@@ -255,7 +255,7 @@ inline void NQS<_Ht, _T>::blockSample(uint _bSize, u64 _start, bool _therm)
 #else
 		auto proba = std::abs(this->pRatio(this->flipPlaces_[0], this->flipVals_[0]));
 #endif
-		if (this->ran_.random<float>() <= proba * proba) {
+		if (this->ran_.template random<float>() <= proba * proba) {
 			// update current state and vector
 			this->curVec(this->flipPlaces_[0]) = this->tmpVec(this->flipPlaces_[0]);
 

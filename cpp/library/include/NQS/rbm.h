@@ -32,9 +32,9 @@ template <typename _Ht, typename _T>
 class RBM_S : public NQS<_Ht, _T>
 {
 public:
-	using NQSS						=						NQS<_Ht, _T>::NQSS;
-	using NQSB						=						NQS<_Ht, _T>::NQSB;
-	using NQSW						=						NQS<_Ht, _T>::NQSW;
+	using NQSS						=						NQS<_Ht, _T>::template NQSS;
+	using NQSB						=						NQS<_Ht, _T>::template NQSB;
+	using NQSW						=						NQS<_Ht, _T>::template NQSW;
 protected:
 	uint nHid_						=						1;
 	// general parameters
@@ -393,14 +393,14 @@ inline void RBM_S<_Ht, _T>::init()
 {
 	// initialize biases visible
 	for (uint i = 0; i < this->nVis_; i++)
-		this->bV_(i) = 0.1 * (this->ran_.random<double>() + I * this->ran_.randomNormal<double>());
+		this->bV_(i) = 0.1 * (this->ran_.template random<double>() + I * this->ran_.template randomNormal<double>());
 	// initialize biases hidden
 	for (uint i = 0; i < this->nHid_; i++)
-		this->bH_(i) = 0.1 * (this->ran_.random<double>() + I * this->ran_.randomNormal<double>());
+		this->bH_(i) = 0.1 * (this->ran_.template random<double>() + I * this->ran_.template randomNormal<double>());
 	// weights matrix
 	for (uint i = 0; i < this->W_.n_rows; i++)
 		for (uint j = 0; j < this->W_.n_cols; j++)
-			this->W_(i, j) = 0.1 * (this->ran_.random<double>() + I * this->ran_.randomNormal<double>());
+			this->W_(i, j) = 0.1 * (this->ran_.template random<double>() + I * this->ran_.template randomNormal<double>());
 	// initialize with a random state
 	this->setRandomState();
 }

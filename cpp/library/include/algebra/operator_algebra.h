@@ -33,11 +33,11 @@ namespace Operators {
 	using _GLBC			=		typename _OP<cpx>::GLB;			//<! global function acting on whole product state
 	using _LOCC			=		typename _OP<cpx>::LOC;			//<! local function acting on single site
 	using _CORC			=		typename _OP<cpx>::COR;			//<! correlation function acting on pair of sites	
-#define _INPC _OP<cpx>::INP
+#define _INPC _OP<cpx>::template INP
 	using _GLBR			=		typename _OP<double>::GLB;		//<! global function acting on whole product state
 	using _LOCR			=		typename _OP<double>::LOC;		//<! local function acting on single site
 	using _CORR			=		typename _OP<double>::COR;		//<! correlation function acting on pair of sites
-#define _INPR _OP<double>::INP
+#define _INPR _OP<double>::template INP
 	template<typename _T>
 	using _GLB			=		typename _OP<_T>::GLB;				
 	template<typename _T>
@@ -45,7 +45,7 @@ namespace Operators {
 	template<typename _T>
 	using _COR			=		typename _OP<_T>::COR;
 	template<typename _T, typename ..._Ts>
-	using _INP			=		typename _OP<_T>::INP<_Ts...>;
+	using _INP			=		typename _OP<_T>::template INP<_Ts...>;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -167,7 +167,7 @@ namespace Operators {
 
 	template <typename... _T>
 	inline _OP<cpx>::INP<_T...> castINP(_OP<double>::INP<_T...> _in) {
-		auto fun = [&](u64 s, _T a...) {
+		auto fun = [&](u64 s, _T... a) {
 			auto [sn, v] = std::apply(_in, a...);
 			return std::make_pair(sn, cpx(v, 0.0));
 		};
