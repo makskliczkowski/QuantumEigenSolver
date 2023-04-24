@@ -186,7 +186,7 @@ template<typename _Ht, typename _T>
 inline void NQS<_Ht, _T>::chooseRandomFlips()
 {
 	for (uint i = 0; i < this->flipPlaces_.size(); i++) {
-		this->flipPlaces_[i]	=		this->ran_.randomInt<uint>(0, this->nVis_);
+		this->flipPlaces_[i]	=		this->ran_.template randomInt<uint>(0, this->nVis_);
 		this->flipVals_[i]		=		this->tmpVec(this->flipPlaces_[i]);
 	}
 }
