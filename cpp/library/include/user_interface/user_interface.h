@@ -33,7 +33,7 @@
 #endif // !ISING_H										 // #
 // MODELS												 // #
 #ifndef XYZ_H											 // #
-#include "../models/xyz.h"								 // #
+#include "../models/XYZ.h"								 // #
 #endif // !XYZ_H										 // #
 // ##########################################################
 

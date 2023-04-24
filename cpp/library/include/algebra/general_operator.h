@@ -65,7 +65,7 @@ namespace Operators{
 	*/
 	template<typename _T, typename ..._Ts>
 	class Operator {
-		typedef typename _OP<_T>::INP<_Ts...> repType;							// type returned for representing, what it does with state and value it returns
+		typedef typename _OP<_T>::template INP<_Ts...> repType;					// type returned for representing, what it does with state and value it returns
 		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
 		_T eigVal_											=			1.0;	// eigenvalue for symmetry generator (if there is inner value)
 		repType fun_										=			E;		// function allowing to use symmetry
