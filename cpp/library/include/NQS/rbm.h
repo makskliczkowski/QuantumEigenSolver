@@ -32,9 +32,9 @@ template <typename _Ht, typename _T>
 class RBM_S : public NQS<_Ht, _T>
 {
 public:
-	using NQSS						=						NQS<_Ht, _T>::template NQSS;
-	using NQSB						=						NQS<_Ht, _T>::template NQSB;
-	using NQSW						=						NQS<_Ht, _T>::template NQSW;
+	using NQSS						=						arma::Col<double>;
+	using NQSB						=						arma::Col<_T>;
+	using NQSW						=						arma::Mat<_T>;
 protected:
 	uint nHid_						=						1;
 	// general parameters
