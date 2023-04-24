@@ -526,7 +526,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	LOGINFO("Taking num states: " + STR(stateNum), LOG_TYPES::TRACE, 2);
 
 	// --- create the directories ---
-	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
+	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
 	fs::create_directories(dir);
 
 	// --- use those files --- 
