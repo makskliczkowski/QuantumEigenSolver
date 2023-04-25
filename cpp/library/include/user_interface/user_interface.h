@@ -410,6 +410,7 @@ public:
 
 	// #######################        SYMMETRIES            #######################
 	void makeSimSymmetries();
+	void makeSimSymmetriesSweep();
 	//void make_simulation_symmetries_sweep();
 	//void make_symmetries_test(int l = -1);
 
