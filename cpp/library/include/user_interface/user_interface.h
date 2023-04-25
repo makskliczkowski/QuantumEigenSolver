@@ -55,7 +55,7 @@ constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
 
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(16);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(11);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(10);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
@@ -551,7 +551,9 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	bool usesSym			=			_H->hilbertSpace.checkSym();
 
 	// set which bonds we want to cut in bipartite
-	v_1d<uint> _bonds		=			{ maxBondNum };
+	v_1d<uint> _bonds		=			{};
+	for (int i = 1; i <= maxBondNum; i++)
+		_bonds.push_back(i);
 	auto beforeEntro		=			clk::now();
 #pragma omp parallel for num_threads(this->threadNum)
 	for (long long idx = 0; idx < (long long)stateNum; idx++) {
