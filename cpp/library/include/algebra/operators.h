@@ -20,13 +20,13 @@ namespace Operators
 	// ##########################################################################################################################################
 
 	std::pair<u64, double> sigma_x(u64 base_vec, int L, const v_1d<uint>& sites);
-	Operators::Operator<double> makeSigmaX(std::shared_ptr<Lattice>& lat, uint site); 
+	Operators::Operator<double> makeSigmaX(std::shared_ptr<Lattice> lat, uint site); 
 
 	std::pair<u64, cpx> sigma_y(u64 base_vec, int L, const v_1d<uint>& sites);
-	Operators::Operator<cpx> makeSigmaY(std::shared_ptr<Lattice>& lat, uint site);
+	Operators::Operator<cpx> makeSigmaY(std::shared_ptr<Lattice> lat, uint site);
 
 	std::pair<u64, double> sigma_z(u64 base_vec, int L, const v_1d<uint>& sites);
-	Operators::Operator<double> makeSigmaZ(std::shared_ptr<Lattice>& lat, uint site);
+	Operators::Operator<double> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site);
 
 	// ##########################################################################################################################################
 };

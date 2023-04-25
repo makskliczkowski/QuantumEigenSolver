@@ -48,7 +48,12 @@ namespace Hilbert {
 	public:
 
 		// ------------------------ constructors etc -------------------------
-
+		~HilbertSpace()
+		{
+			this->fullMap_.clear();
+			this->mapping_.clear();
+			this->normalization_.clear();
+		}
 		HilbertSpace() = default;
 
 		/*

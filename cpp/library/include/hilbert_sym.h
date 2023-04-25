@@ -76,7 +76,7 @@ namespace Operators {
 	* @param base base of the Hilbert space
 	*/
 	template <typename _T>
-	inline Operator<_T> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky = 0, int kz = 0, int8_t dim = 1) {
+	inline Operator<_T> makeTranslation(std::shared_ptr<Lattice> lat, int kx, int ky = 0, int kz = 0, int8_t dim = 1) {
 		auto Kx = TWOPI * kx / double(lat->get_Lx());
 		auto Ky = TWOPI * ky / double(lat->get_Ly());
 		auto Kz = TWOPI * kz / double(lat->get_Lz());
@@ -90,7 +90,7 @@ namespace Operators {
 	}
 
 	template <>
-	inline Operator<double> makeTranslation(std::shared_ptr<Lattice>& lat, int kx, int ky, int kz, int8_t dim) {
+	inline Operator<double> makeTranslation(std::shared_ptr<Lattice> lat, int kx, int ky, int kz, int8_t dim) {
 		auto Kx = TWOPI * kx / double(lat->get_Lx());
 		auto Ky = TWOPI * ky / double(lat->get_Ly());
 		auto Kz = TWOPI * kz / double(lat->get_Lz());
@@ -107,7 +107,7 @@ namespace Operators {
 	// ##########################################################################################################################################
 
 	template<typename _T>
-	inline _GLB<_T> reflection(std::shared_ptr<Lattice>& lat, int base)
+	inline _GLB<_T> reflection(std::shared_ptr<Lattice> lat, int base)
 	{
 		auto Ns = lat->get_Ns();
 		_GLB<_T> fun = [Ns, base](u64 state) {
@@ -120,7 +120,7 @@ namespace Operators {
 	* @brief Reflection symmetry
 	*/
 	template <typename _T>
-	Operator<_T> makeReflection(std::shared_ptr<Lattice>& lat, int sec, int base = 2) {
+	Operator<_T> makeReflection(std::shared_ptr<Lattice> lat, int sec, int base = 2) {
 		auto reflect = reflection<_T>(lat, base);
 		return Operator<_T>(lat, _T(sec), reflect, SymGenerators::R);
 	};
@@ -128,7 +128,7 @@ namespace Operators {
 	// ##########################################################################################################################################
 
 	template<typename _T>
-	inline _GLB<_T> flipZ(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipZ(std::shared_ptr<Lattice> lat)
 	{
 		auto Ns = lat->get_Ns();
 		_GLB<_T> fun = [Ns](u64 state) {
@@ -141,7 +141,7 @@ namespace Operators {
 	// ###################################################################
 
 	template<typename _T>
-	inline _GLB<_T> flipY(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipY(std::shared_ptr<Lattice> lat)
 	{
 		auto Ns = lat->get_Ns();
 		_GLB<_T> fun = [Ns](u64 state)
@@ -156,7 +156,7 @@ namespace Operators {
 	// ###################################################################
 
 	template<>
-	inline _GLB<double> flipY<double>(std::shared_ptr<Lattice>& lat)
+	inline _GLB<double> flipY<double>(std::shared_ptr<Lattice> lat)
 	{
 		auto Ns = lat->get_Ns();
 		_GLB<double> fun = [Ns](u64 state)
@@ -171,7 +171,7 @@ namespace Operators {
 	// ###################################################################
 
 	template<typename _T>
-	inline _GLB<_T> flipX(std::shared_ptr<Lattice>& lat)
+	inline _GLB<_T> flipX(std::shared_ptr<Lattice> lat)
 	{
 		auto Ns = lat->get_Ns();
 		auto fun = [Ns](u64 state)
@@ -187,7 +187,7 @@ namespace Operators {
 	* @brief Parity with \sigma^x
 	*/
 	template <typename _T>
-	inline Operator<_T> makeFlipX(std::shared_ptr<Lattice>& lat, int sec) 
+	inline Operator<_T> makeFlipX(std::shared_ptr<Lattice> lat, int sec) 
 	{
 		_GLB<_T> fX = flipX<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fX, SymGenerators::PX);
@@ -199,7 +199,7 @@ namespace Operators {
 	* @brief Parity with \sigma^y
 	*/
 	template <typename _T>
-	inline Operator<_T> makeFlipY(std::shared_ptr<Lattice>& lat, int sec) 
+	inline Operator<_T> makeFlipY(std::shared_ptr<Lattice> lat, int sec) 
 	{
 		_GLB<_T> fY = flipY<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fY, SymGenerators::PY);
@@ -211,7 +211,7 @@ namespace Operators {
 	* @brief Parity with \sigma^z
 	*/
 	template <typename _T>
-	inline Operator<_T> makeFlipZ(std::shared_ptr<Lattice>& lat, int sec) {
+	inline Operator<_T> makeFlipZ(std::shared_ptr<Lattice> lat, int sec) {
 		_GLB<_T> fZ = flipZ<_T>(lat);
 		return Operator<_T>(lat, _T(sec), fZ, SymGenerators::PZ);
 	};
@@ -219,7 +219,7 @@ namespace Operators {
 	// ##########################################################################################################################################
 
 	template <typename _T>
-	inline Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice>& _lat) {
+	inline Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice> _lat) {
 		auto [gen, eig] = _g;
 		switch (gen) {
 		case SymGenerators::T:
