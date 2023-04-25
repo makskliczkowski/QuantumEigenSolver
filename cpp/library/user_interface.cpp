@@ -153,10 +153,11 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetries();
 		break;
-		//case 22:
-		//	// this option utilizes the Hamiltonian with symmetries calculation - sweep!
-		//	this->make_simulation_symmetries_sweep();
-		//	break;
+	case 22:
+		// this option utilizes the Hamiltonian with symmetries calculation - sweep!
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SWEEP ALL", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetriesSweep();
+		break;
 	default:
 		// default case of showing the help
 		this->exitWithHelp();
@@ -202,11 +203,77 @@ void UI::defineModels() {
 */
 void UI::makeSimSymmetries()
 {
+	// reset Hamiltonians - memory release
+	if (this->hamComplex)
+		this->hamComplex.reset();
+	if (this->hamDouble)
+		this->hamDouble.reset();
+
+	// define the models
 	this->defineModels();
 	if (this->isComplex_)
 		this->symmetries(clk::now(), this->hamComplex);
 	else
 		this->symmetries(clk::now(), this->hamDouble);
+}
+
+/*
+* @brief A placeholder for making the simulation with symmetries, sweeping them all
+*/
+void UI::makeSimSymmetriesSweep()
+{
+	this->defineModels();
+	uint Ns				= this->latP.lat->get_Ns();
+	auto BC				= this->latP.lat->get_BC();
+	u64 Nh				= 1;
+
+	// parameters
+	v_1d<int> kS		= {};
+	v_1d<int> Rs		= {};
+	v_1d<int> Szs		= {};
+	v_1d<int> Sys		= {};
+	v_1d<int> U1s		= {};
+	v_1d<int> Sxs		= {};
+
+	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+
+	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
+	if (useSzParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
+	if (useU1)			for (uint i = 0; i <= Ns; i++) U1s.push_back(i); else U1s.push_back(-INT_MAX);
+	if (BC == PBC)		for (uint i = 0; i <= int(Ns / 2) + 1; i++) kS.push_back(i); else kS.push_back(-INT_MAX);
+
+	// go through all
+	LOGINFO("STARTING ALL SECTORS", LOG_TYPES::INFO, 1);
+	LASTLVL = 1;
+	for (auto k : kS)
+	{
+		this->symP.k_ = k;
+		// check Reflection
+		if (k == 0 || (k == int(Ns / 2) && (Ns % 2) == 0))
+			Rs = { -1, 1 };
+		else
+			Rs = { -INT_MAX };
+		for (auto r : Rs) {
+			this->symP.x_ = r;
+			for (auto pz : Szs) {
+				this->symP.pz_ = pz;
+				for (auto u1 : U1s) {
+					this->symP.U1_ = u1;
+					// check Parity X
+					if ((!useU1 && (this->modP.hz_ == 0.0)) || (useU1 && (Ns % 2 == 0) && (this->symP.U1_ == Ns / 2) && (this->modP.hz_ == 0.0) && (this->modP.hx_ == 0.0)))
+						Sxs = { -1, 1 };
+					else
+						Sxs = { -INT_MAX };
+					for (auto px : Sxs) {
+						this->symP.px_ = px;
+						this->makeSimSymmetries();
+					}
+				}
+			}
+		}
+	}
 }
 
 /*
