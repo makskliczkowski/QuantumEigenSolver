@@ -55,7 +55,7 @@ constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
 
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(16);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(10);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(7);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
@@ -577,7 +577,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 	// save entropies file
 	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-	if (Ns <= UI_LIMITS_MAXPRINT)
+	if (Ns < UI_LIMITS_MAXPRINT)
 		ENTROPIES.save(filename + ".dat", arma::arma_ascii);
 
 	if (useShiftAndInvert)
@@ -587,7 +587,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	const u64 avEnIdx		=			_H->getEnAvIdx();
 
 	// save states near the mean energy index
-	if (Ns == 20)
+	if (Ns == 17)
 		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM, HAM_SAVE_EXT::h5, true);
 };
 
