@@ -175,6 +175,7 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT(U1);
 		}
 
+
 		v_1d<std::pair<Operators::SymGenerators, int>> getLocGenerator() {
 			v_1d<std::pair<Operators::SymGenerators, int>> syms = {};
 			UI_CHECK_SYM(k, T);
@@ -321,6 +322,7 @@ private:
 	template<typename _T>//, std::enable_if_t<is_complex<_T>{}>* = nullptr>
 	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H);
 	void symmetriesTest(clk::time_point start);
+	std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> createSymmetries();
 
 	// ####################### N Q S #######################
 	template<typename _T>
@@ -332,7 +334,7 @@ private:
 	//void make_mc_kitaev(t_3d<double> K);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	void defineModels();
+	void defineModels(bool _createLat = true);
 
 	template<typename _T>
 	void defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
@@ -421,19 +423,7 @@ public:
 template<typename _T>
 inline void UI::defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
-	v_1d<GlobalSyms::GlobalSym> _glbSyms = {};
-	v_1d<std::pair<Operators::SymGenerators, int>> _locSyms = {};
-	if (this->symP.S_ == true)
-	{
-		// create Hilbert space
-		if (this->symP.k_ != -INT_MAX && !(this->symP.k_ == 0 || this->symP.k_ == this->latP.lat->get_Ns() / 2))
-			this->isComplex_ = true;
-		// ------ LOCAL ------
-		_locSyms = this->symP.getLocGenerator();
-		// ------ GLOBAL ------
-		// check U1
-		if (this->symP.U1_ != -INT_MAX) _glbSyms.push_back(GlobalSyms::getU1Sym(this->latP.lat, this->symP.U1_));
-	};
+	auto [_glbSyms, _locSyms] = this->createSymmetries();
 
 	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
 	switch (this->modP.modTyp_)
@@ -495,12 +485,13 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 template<typename _T>
 inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H)
 {
-	// set the Hamiltonian
-	_H->hamiltonian();
-	// set the parameters
+	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
 	u64 Nh					=			_H->getHilbertSize();
 	if (Nh == 0)
 		return;
+	// set the Hamiltonian
+	_H->hamiltonian();
+	// set the parameters
 	uint Ns = _H->getNs();
 	u64 stateNum = Nh;
 	bool useShiftAndInvert = false;

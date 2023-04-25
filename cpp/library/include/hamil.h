@@ -71,7 +71,12 @@ public:
 	//vec tmp_vec;																			// tmp vector for base states if the system is too big
 	//vec tmp_vec2;
 	//uint state_val_num;																	// basic number of state_values
-
+	~Hamiltonian() {
+		this->hilbertSpace.~HilbertSpace();
+		this->H_.reset();
+		this->eigVal_.reset();
+		this->eigVec_.reset();
+	}
 	Hamiltonian() : ran_(randomGen()) {};
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
 		: hilbertSpace(hilbert)

@@ -168,24 +168,27 @@ void UI::funChoice()
 /*
 * @brief defines the models based on the input parameters
 */
-void UI::defineModels() {
+void UI::defineModels(bool _createLat) {
 
 	// create lattice
-	switch (this->latP.typ_)
+	if (_createLat || !this->latP.lat)
 	{
-	case LatticeTypes::SQ:
-		this->latP.lat	=	std::make_shared<SquareLattice>		(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-																this->latP.dim_, this->latP.bc_);
-		break;
-	case LatticeTypes::HEX:
-		this->latP.lat	=	std::make_shared<HexagonalLattice>	(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-																this->latP.dim_, this->latP.bc_);
-		break;
-	default:
-		this->latP.lat	=	std::make_shared<SquareLattice>		(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-																this->latP.dim_, this->latP.bc_);
-		break;
-	};
+		switch (this->latP.typ_)
+		{
+		case LatticeTypes::SQ:
+			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		case LatticeTypes::HEX:
+			this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		default:
+			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		};
+	}
 
 	// check if is complex and define the Hamiltonian
 	if (this->isComplex_)
@@ -197,6 +200,24 @@ void UI::defineModels() {
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> UI::createSymmetries()
+{
+	v_1d<GlobalSyms::GlobalSym> _glbSyms = {};
+	v_1d<std::pair<Operators::SymGenerators, int>> _locSyms = {};
+	if (this->symP.S_ == true)
+	{
+		// create Hilbert space
+		if (this->symP.k_ != -INT_MAX && !(this->symP.k_ == 0 || this->symP.k_ == this->latP.lat->get_Ns() / 2))
+			this->isComplex_ = true;
+		// ------ LOCAL ------
+		_locSyms = this->symP.getLocGenerator();
+		// ------ GLOBAL ------
+		// check U1
+		if (this->symP.U1_ != -INT_MAX) _glbSyms.push_back(GlobalSyms::getU1Sym(this->latP.lat, this->symP.U1_));
+	};
+	return std::make_pair(_glbSyms, _locSyms);
+}
 
 /*
 * @brief A placeholder for making the simulation with symmetries.
@@ -210,7 +231,7 @@ void UI::makeSimSymmetries()
 		this->hamDouble.reset();
 
 	// define the models
-	this->defineModels();
+	this->defineModels(true);
 	if (this->isComplex_)
 		this->symmetries(clk::now(), this->hamComplex);
 	else
@@ -222,7 +243,7 @@ void UI::makeSimSymmetries()
 */
 void UI::makeSimSymmetriesSweep()
 {
-	this->defineModels();
+	this->defineModels(true);
 	uint Ns				= this->latP.lat->get_Ns();
 	auto BC				= this->latP.lat->get_BC();
 	u64 Nh				= 1;
@@ -268,6 +289,7 @@ void UI::makeSimSymmetriesSweep()
 						Sxs = { -INT_MAX };
 					for (auto px : Sxs) {
 						this->symP.px_ = px;
+						this->createSymmetries();
 						this->makeSimSymmetries();
 					}
 				}
