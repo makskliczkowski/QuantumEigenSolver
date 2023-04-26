@@ -192,9 +192,9 @@ void UI::defineModels(bool _createLat) {
 
 	// check if is complex and define the Hamiltonian
 	if (this->isComplex_)
-		this->defineModel(std::move(this->hilComplex), this->hamComplex);
+		this->defineModel(this->hilComplex, this->hamComplex);
 	else
-		this->defineModel(std::move(this->hilDouble), this->hamDouble);
+		this->defineModel(this->hilDouble, this->hamDouble);
 
 
 }

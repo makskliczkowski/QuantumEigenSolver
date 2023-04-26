@@ -337,7 +337,7 @@ private:
 	void defineModels(bool _createLat = true);
 
 	template<typename _T>
-	void defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
+	void defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
 
 	template<typename _T>
 	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS);
@@ -421,7 +421,7 @@ public:
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 template<typename _T>
-inline void UI::defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
+inline void UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
 	auto [_glbSyms, _locSyms] = this->createSymmetries();
 
@@ -723,7 +723,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 							// create the models
 							if (this->hamComplex)
 								this->hamComplex.reset();
-							this->defineModel<cpx>(std::move(this->hilComplex), this->hamComplex);
+							this->defineModel<cpx>(this->hilComplex, this->hamComplex);
 							infoSym			=		this->hamComplex->getInfo();
 							Nh				=		this->hamComplex->getHilbertSize();
 							LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
