@@ -426,6 +426,11 @@ inline void UI::defineModel(Hilbert::HilbertSpace<_T>&& _Hil, std::shared_ptr<Ha
 	auto [_glbSyms, _locSyms] = this->createSymmetries();
 
 	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
+	if (_Hil.getHilbertSize() == 0)
+	{
+		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 1);
+		return;
+	}
 	switch (this->modP.modTyp_)
 	{
 	case MY_MODELS::ISING_M:
