@@ -334,10 +334,10 @@ private:
 	//void make_mc_kitaev(t_3d<double> K);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	void defineModels(bool _createLat = true);
+	bool defineModels(bool _createLat = true);
 
 	template<typename _T>
-	void defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
+	bool defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
 
 	template<typename _T>
 	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS);
@@ -421,7 +421,7 @@ public:
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 template<typename _T>
-inline void UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
+inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
 	auto [_glbSyms, _locSyms] = this->createSymmetries();
 
@@ -429,7 +429,8 @@ inline void UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 	if (_Hil.getHilbertSize() == 0)
 	{
 		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 1);
-		return;
+		_Hil.~HilbertSpace();
+		return false;
 	}
 	switch (this->modP.modTyp_)
 	{
@@ -454,6 +455,7 @@ inline void UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			false);
 		break;
 	}
+	return true;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
