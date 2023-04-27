@@ -168,7 +168,7 @@ void UI::funChoice()
 /*
 * @brief defines the models based on the input parameters
 */
-void UI::defineModels(bool _createLat) {
+bool UI::defineModels(bool _createLat) {
 
 	// create lattice
 	if (_createLat || !this->latP.lat)
@@ -191,11 +191,13 @@ void UI::defineModels(bool _createLat) {
 	}
 
 	// check if is complex and define the Hamiltonian
+	bool _ok;
 	if (this->isComplex_)
-		this->defineModel(this->hilComplex, this->hamComplex);
+		_ok = this->defineModel(this->hilComplex, this->hamComplex);
 	else
-		this->defineModel(this->hilDouble, this->hamDouble);
+		_ok = this->defineModel(this->hilDouble, this->hamDouble);
 
+	return _ok;
 
 }
 
@@ -231,7 +233,7 @@ void UI::makeSimSymmetries()
 		this->hamDouble.reset();
 
 	// define the models
-	this->defineModels(true);
+	if (!this->defineModels(true)) return;
 	if (this->isComplex_)
 		this->symmetries(clk::now(), this->hamComplex);
 	else
