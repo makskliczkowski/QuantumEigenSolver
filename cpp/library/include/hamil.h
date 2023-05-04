@@ -71,8 +71,8 @@ public:
 	//vec tmp_vec;																			// tmp vector for base states if the system is too big
 	//vec tmp_vec2;
 	//uint state_val_num;																	// basic number of state_values
-	~Hamiltonian() {
-		this->hilbertSpace.~HilbertSpace();
+	virtual ~Hamiltonian() {
+		LOGINFO("Base Hamiltonian destructor called.", LOG_TYPES::INFO, 3);
 		this->H_.reset();
 		this->eigVal_.reset();
 		this->eigVec_.reset();
@@ -113,7 +113,7 @@ public:
 	* @param skip vector of elements to be skipped in the info showcase
 	* @returns trimmed information about the model
 	*/
-	virtual std::string info(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_") const {
+	std::string info(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_") const {
 		auto tmp = (name == "") ? splitStr(this->info_, ",") : splitStr(name, ",");
 		std::string tmp_str = "";
 		for (int i = 0; i < tmp.size(); i++) {
@@ -157,7 +157,7 @@ public:
 				HAM_SAVE_EXT _typ, bool _app = false)	const -> void;
 	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
 	auto getInfo(const v_1d<std::string>& skip = {}, 
-		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info("", skip, sep); };
+		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info_; };
 	auto getType()										const -> std::string				{ return SSTR(getSTR_MY_MODELS(this->type_)); };
 	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_; };
 	auto getNs()										const -> uint						{ return this->lat_->get_Ns(); };

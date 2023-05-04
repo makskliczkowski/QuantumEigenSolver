@@ -159,7 +159,7 @@ public:
 	// ------------------ C O N S T R U C T -------------------------
 
 	public:
-
+	virtual ~NQS()					=			default;
 	/*
 	* @brief interface constructor for Neural Network Quantum State
 	*/

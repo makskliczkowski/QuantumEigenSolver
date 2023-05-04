@@ -21,7 +21,7 @@ namespace Operators {
 		uint dim	= lat->get_Dim();
 		uint Lx		= lat->get_Lx();
 		uint Ly		= lat->get_Ly();
-		uint Lz		= lat->get_Lz();
+		//uint Lz		= lat->get_Lz();
 		uint Ns		= lat->get_Ns();
 		switch (dim)
 		{

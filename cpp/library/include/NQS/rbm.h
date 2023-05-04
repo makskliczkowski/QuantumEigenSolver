@@ -106,7 +106,10 @@ protected:
 
 	// -------------------------------------------------------------------
 public:
-	~RBM_S()							=					default;
+	~RBM_S()												
+	{
+		LOGINFO(this->info_ + " - destructor called.", LOG_TYPES::INFO, 4);
+	};
 	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, uint _batch, uint _threadNum, double _lr)
 		: NQS<_Ht, _T>(_H, _batch, _threadNum, _lr), nHid_(_nHid)
 	{
@@ -142,7 +145,7 @@ public:
 	
 	arma::Col<_T> train(uint nSam, uint nThrm,
 		uint nBlck, uint bSize,
-		uint nFlip = 1, uint progPrc = 25)
+		uint nFlip = 1, uint progPrc = 25) override
 	{
 		const int _stps = nBlck - nThrm;
 #ifdef NQS_RBM_SREG
