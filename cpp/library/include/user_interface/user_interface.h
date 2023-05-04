@@ -617,7 +617,9 @@ inline void UI::symmetriesTest(clk::time_point start)
 		this->symP.S_									=		false;
 		if (this->hamDouble)
 			this->hamDouble.reset();
-		this->defineModels();
+		if (this->latP.lat)
+			this->latP.lat.reset();
+		this->defineModels(true);
 		Nh												=		this->hamDouble->getHilbertSize();
 		Ns												=		this->latP.lat->get_Ns();
 		La												=		Ns / 2;
@@ -625,9 +627,9 @@ inline void UI::symmetriesTest(clk::time_point start)
 		LOGINFO("Started building full Hamiltonian", LOG_TYPES::TRACE, 1);
 		LOGINFO_CH_LVL(2);
 		this->hamDouble->hamiltonian();
-		dir = this->mainDir + kPS + this->hamDouble->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
-		infoHFull = this->hamDouble->getInfo();
-		std::string filename = dir + infoHFull;
+		dir						= this->mainDir + kPS + this->hamDouble->getType() + kPS + VEQ(Ns) + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
+		infoHFull				= this->hamDouble->getInfo();
+		std::string filename	= dir + infoHFull;
 
 		LOGINFO("Finished buiding Hamiltonian" + infoHFull, LOG_TYPES::TRACE, 2);
 		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 3);
@@ -673,7 +675,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 	bool useU1					=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
 	bool useSzParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
-	bool useSyParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useSyParity			=		false;//(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 	if (useSzParity)			paritiesSz = { -1, 1 }; else paritiesSz = { -INT_MAX };
 	if (useSyParity)			paritiesSy = { -1, 1 }; else paritiesSy = { -INT_MAX };
 	if (useU1)					for (uint i = 0; i <= Ns; i++) u1Values.push_back(i);
@@ -691,6 +693,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	arma::sp_cx_mat H(H0.n_rows, H0.n_cols);
 	arma::SpMat<cpx> U;
 	u64 calcStates				=		0;
+
 	this->symP.S_				=		true;
 	// go through all symmetries
 	for (auto U1 : u1Values) {
@@ -725,28 +728,32 @@ inline void UI::symmetriesTest(clk::time_point start)
 							// create the models
 							if (this->hamComplex)
 								this->hamComplex.reset();
-							this->defineModel<cpx>(this->hilComplex, this->hamComplex);
-							infoSym			=		this->hamComplex->getInfo();
-							Nh				=		this->hamComplex->getHilbertSize();
-							LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
-							file << "\t->" << infoSym << EL;
 
 							// print sectors
-							int kS			=		k;
-							int xS			=		flip		!= -INT_MAX ? flip			: 0;
-							int xSy			=		parY		!= -INT_MAX ? parY			: 0;
-							int xSz			=		parZ		!= -INT_MAX ? parZ			: 0;
-							int pS			=		reflection	!= -INT_MAX ? reflection	: 0;
-							int U1s			=		U1			!= -INT_MAX ? U1			: 0;
-							symTuple _tup	=		std::make_tuple(kS, pS, xS, xSy, xSz, U1s);
-							std::string sI  =		VEQ(kS) + "," + VEQ(pS) + "," + VEQ(xS) + "," + VEQ(xSy) + "," + VEQ(xSz) + "," + VEQ(U1s);
-							if (Nh == 0)
+							int kS			=	k;
+							int xS			=	flip != -INT_MAX ? flip : 0;
+							int xSy			=	parY != -INT_MAX ? parY : 0;
+							int xSz			=	parZ != -INT_MAX ? parZ : 0;
+							int pS			=	reflection != -INT_MAX ? reflection : 0;
+							int U1s			=	U1 != -INT_MAX ? U1 : 0;
+							std::string sI	=	VEQ(kS) + "," + VEQ(pS) + "," + VEQ(xS) + "," + VEQ(xSy) + "," + VEQ(xSz) + "," + VEQ(U1s);
+							symTuple _tup	=	std::make_tuple(kS, pS, xS, xSy, xSz, U1s);
+
+							// define and check
+							if (!this->defineModel<cpx>(this->hilComplex, this->hamComplex))
 							{
 								LOGINFO("EMPTY SECTOR: " + sI, LOG_TYPES::TRACE, 3);
 								LOGINFO("-------------------", LOG_TYPES::TRACE, 2);
 								file << "\t\t->EMPTY SECTOR : " << sI << EL;
 								continue;
 							}
+
+							// info me pls
+							infoSym			=		this->hamComplex->getInfo();
+							Nh				=		this->hamComplex->getHilbertSize();
+							LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
+							file << "\t->" << infoSym << EL;
+
 							this->hamComplex->hamiltonian();
 							LOGINFO("Finished building Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
 							this->hamComplex->diagH(false);
