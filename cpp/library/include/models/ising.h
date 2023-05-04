@@ -27,7 +27,10 @@ protected:
 public:
 	using NQSFun										= typename Hamiltonian<_T>::NQSFun;
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
-	~IsingModel()										= default;
+	~IsingModel()										
+	{
+		LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 4);
+	};
 	IsingModel()										= default;
 	IsingModel(const Hilbert::HilbertSpace<_T>& hilbert,double J, double g, double h, 
 														double J0 = 0, double g0 = 0, double h0 = 0);
@@ -74,7 +77,7 @@ public:
 */
 template <typename _T>
 IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, double g, double h, double J0, double g0, double h0)
-	: Hamiltonian<_T>(hilbert), J(J), g(g), h(h), h0(h0), J0(J0), g0(g0)
+	: Hamiltonian<_T>(hilbert), J(J), J0(J0), g(g), g0(g0), h(h), h0(h0)
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
@@ -91,7 +94,7 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 
 template <typename _T>
 IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double g, double h, double J0, double g0, double h0)
-	: Hamiltonian<_T>(std::move(hilbert)), J(J), g(g), h(h), h0(h0), J0(J0), g0(g0)
+	: Hamiltonian<_T>(std::move(hilbert)), J(J), J0(J0), g(g), g0(g0), h(h), h0(h0)
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();

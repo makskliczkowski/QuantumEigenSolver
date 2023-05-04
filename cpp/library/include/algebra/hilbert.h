@@ -50,6 +50,7 @@ namespace Hilbert {
 		// ------------------------ constructors etc -------------------------
 		~HilbertSpace()
 		{
+			LOGINFO("Hilbert space destructor called.", LOG_TYPES::INFO, 4);
 			this->fullMap_.clear();
 			this->mapping_.clear();
 			this->normalization_.clear();
@@ -68,7 +69,7 @@ namespace Hilbert {
 			v_1d<std::pair<Operators::SymGenerators, int>> _gen = {},
 			v_1d<GlobalSyms::GlobalSym> _glob = {},
 			uint _Nhl = 2, uint _Nint = 1)
-			: lat(_lat), Nhl(_Nhl), Nint(_Nint)
+			: Nhl(_Nhl), Nint(_Nint), lat(_lat)
 		{
 			this->Ns				=				this->lat->get_Ns();
 			this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
@@ -89,6 +90,22 @@ namespace Hilbert {
 			if (this->Nh <= 0)
 				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 3);
 		};
+
+		/*
+		* @brief Assign constructor
+		*/
+		HilbertSpace(const HilbertSpace<_T>& _H) {
+			this->Ns				=				_H.Ns;
+			this->Nh				=				_H.Nh;
+			this->NhFull			=				_H.NhFull;
+			this->symGroupGlobal_	=				_H.symGroupGlobal_;
+			this->symGroupSec_		=				_H.symGroupSec_;
+			this->normalization_	=				_H.normalization_;
+			this->symGroup_			=				_H.symGroup_;
+			this->mapping_			=				_H.mapping_;
+			this->fullMap_			=				_H.fullMap_;
+			this->lat				=				_H.lat;
+		}
 
 		// ------------------------ INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account

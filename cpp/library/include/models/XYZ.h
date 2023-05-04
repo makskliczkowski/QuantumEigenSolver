@@ -30,9 +30,11 @@ protected:
 
 public:
 	// ------------------------------------------- 				 Constructors				  -------------------------------------------
-	~XYZ()												= default;
+	~XYZ() 
+	{
+		LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 3);
+	};
 	XYZ()												= default;
-
 	XYZ(const Hilbert::HilbertSpace<_T>& hilbert,		double _Ja, double _Jb, 
 														double _hx, double _hz, 
 														double _dA, double _dB, 
@@ -67,13 +69,13 @@ public:
 		this->ddB	= this->ran_.createRanVec(this->Ns, this->dB0);
 		this->deA	= this->ran_.createRanVec(this->Ns, this->eA0);
 		this->deB	= this->ran_.createRanVec(this->Ns, this->eB0);
-		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 2);
+		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 1);
 		double Jx	= this->Ja * (1 - this->eA);
 		double Jy	= this->Ja * (1 + this->eA);
 		double Jz	= this->Ja * this->dA;
-		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 3);
+		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 1);
 		auto SUSY	= Jx * Jy + Jy * Jz + Jx * Jz;
-		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 3);
+		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 1);
 	};
 
 	XYZ(Hilbert::HilbertSpace<_T>&& hilbert,			double _Ja, double _Jb,
@@ -98,13 +100,13 @@ public:
 		this->ddB	= this->ran_.createRanVec(this->Ns, this->dB0);
 		this->deA	= this->ran_.createRanVec(this->Ns, this->eA0);
 		this->deB	= this->ran_.createRanVec(this->Ns, this->eB0);
-		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 2);
+		LOGINFOG("I am XYZ model: " + this->info_, LOG_TYPES::CHOICE, 1);
 		double Jx	= this->Ja * (1 - this->eA);
 		double Jy	= this->Ja * (1 + this->eA);
 		double Jz	= this->Ja * this->dA;
-		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 3);
+		LOGINFOG(VEQ(Jx) + "," + VEQ(Jy) + "," + VEQ(Jz), LOG_TYPES::CHOICE, 1);
 		auto SUSY	= Jx * Jy + Jy * Jz + Jx * Jz;
-		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 3);
+		LOGINFOG(VEQ(SUSY), LOG_TYPES::CHOICE, 1);
 	};
 
 	// -------------------------------------------				METHODS				-------------------------------------------
@@ -120,7 +122,6 @@ public:
 
 	std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
-		auto Ns = this->hilbertSpace.getLatticeSize();
 		auto BC = this->hilbertSpace.getBC();
 		std::string name = sep + "xyz,Ns=" + STR(this->Ns);
 		PARAMS_S_DISORDER(Ja, name);
@@ -136,7 +137,7 @@ public:
 		name += "," + VEQ(BC);
 		return	this->Hamiltonian<_T>::info(name, skip, sep);
 	}
-	void updateInfo()									override final { this->info_ = this->info(); };
+	void updateInfo()									override final { this->info_ = this->info({}, ",", 3); };
 };
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------

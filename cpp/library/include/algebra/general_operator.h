@@ -74,6 +74,7 @@ namespace Operators{
 	// ----------------------------------------------------------------------------------------------------
 	
 	public:
+		virtual ~Operator()									=			default;
 		Operator() 
 		{ 
 			init(); 
@@ -97,12 +98,12 @@ namespace Operators{
 		//	: lat_(_lat), eigVal_(_eigVal),
 		//	fun_(std::move(_fun))					{ init(); };
 		Operator(const Operator<_T, _Ts...>& o)
-			: eigVal_(o.eigVal_), fun_(o.fun_), lat_(o.lat_)
+			: lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_)
 		{
 			init();
 		};
 		Operator(Operator<_T, _Ts...>&& o)
-			: eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_)), lat_(std::move(o.lat_))
+			: lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_))
 		{
 			init();
 		};
@@ -199,12 +200,12 @@ namespace Operators{
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		template <typename T_ = _T,
-			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
-		operator Operator<cpx, _Ts...>()											{ return *this; };
+			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
+		[[maybe_unused]] operator Operator<cpx, _Ts...>()							{ return *this; };
 
 		template <typename T_ = _T,
-			typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr>
-		operator Operator<cpx, _Ts...>()
+			typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr> 
+		[[maybe_unused]] operator Operator<cpx, _Ts...>()
 		{
 			auto _fun = [&](u64 s, _Ts... args) {
 				const auto [s1, v1] = this->fun_(s, args...);

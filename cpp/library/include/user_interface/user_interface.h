@@ -424,14 +424,14 @@ template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
 	auto [_glbSyms, _locSyms] = this->createSymmetries();
-
 	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
 	if (_Hil.getHilbertSize() == 0)
 	{
-		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 1);
-		_Hil.~HilbertSpace();
+		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 3);
 		return false;
 	}
+	else
+		LOGINFO(VEQVS(HilbertSize, _Hil.getHilbertSize()), LOG_TYPES::INFO, 3);
 	switch (this->modP.modTyp_)
 	{
 	case MY_MODELS::ISING_M:
@@ -555,7 +555,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		_bonds.push_back(i);
 	auto beforeEntro		=			clk::now();
 #pragma omp parallel for num_threads(this->threadNum)
-	for (long long idx = 0; idx < (long long)stateNum; idx++) {
+	for (auto idx = 0LL; idx < stateNum; idx++) {
 		// get the eigenstate
 		arma::Col<_T> state =			_H->getEigVec(idx);
 		if (usesSym)
@@ -582,10 +582,10 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		return;
 
 	// set the average energy index
-	const u64 avEnIdx		=			_H->getEnAvIdx();
+	//const u64 avEnIdx		=			_H->getEnAvIdx();
 
 	// save states near the mean energy index
-	if (Ns == 17)
+	if (Ns == 16)
 		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM, HAM_SAVE_EXT::h5, true);
 };
 
@@ -623,7 +623,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 		La												=		Ns / 2;
 
 		LOGINFO("Started building full Hamiltonian", LOG_TYPES::TRACE, 1);
-		LASTLVL = 2;
+		LOGINFO_CH_LVL(2);
 		this->hamDouble->hamiltonian();
 		dir = this->mainDir + kPS + this->hamDouble->getType() + kPS + getSTR_BoundaryConditions(this->latP.bc_) + kPS;
 		infoHFull = this->hamDouble->getInfo();
@@ -675,14 +675,14 @@ inline void UI::symmetriesTest(clk::time_point start)
 	bool useSzParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 	bool useSyParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 	if (useSzParity)			paritiesSz = { -1, 1 }; else paritiesSz = { -INT_MAX };
-	if (useSzParity)			paritiesSy = { -1, 1 }; else paritiesSy = { -INT_MAX };
+	if (useSyParity)			paritiesSy = { -1, 1 }; else paritiesSy = { -INT_MAX };
 	if (useU1)					for (uint i = 0; i <= Ns; i++) u1Values.push_back(i);
 	else						u1Values.push_back(-INT_MAX);
 
 	// save the Hamiltonian without symmetries
 	arma::sp_mat H0 = this->hamDouble->getHamiltonian();
 	// unitary transformation function
-	auto unitaryTransform = [this](arma::SpMat<cpx>& U, std::shared_ptr<Hamiltonian<cpx>> _H, arma::sp_cx_mat& H) {
+	auto unitaryTransform = [](arma::SpMat<cpx>& U, std::shared_ptr<Hamiltonian<cpx>> _H, arma::sp_cx_mat& H) {
 		arma::sp_cx_mat _Hsym	=		_H->getHamiltonian();
 		H						+=		U * _Hsym * U.t();
 	};
@@ -713,7 +713,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 
 			// go through all
 			LOGINFO("STARTING ALL SECTORS", LOG_TYPES::INFO, 2);
-			LASTLVL = 2;
+			LOGINFO_CH_LVL(2);
 			for (auto flip : spinFlip) {
 				this->symP.px_ = flip;
 				for (auto reflection : parities) {
@@ -854,7 +854,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	printSeparated(file3, ',', 15, true, "DEG");
 	for (uint i = 0; i < _degs.size(); i++)
 	{
-		auto [_syms, _degM]				=		_degs[i];
+		auto& [_syms, _degM] = _degs[i];
 		const auto& [k,p,x,xY,xZ,u1]	=		_syms;
 		printSeparatedP(file3, ',', 4, false, 7, STR(k), STR(p), STR(x), STR(xY), STR(xZ), STR(u1), STR(_sizes[i]));
 
@@ -869,7 +869,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	file.close();
 	file2.close();
 	file3.close();
-	LASTLVL = 0;
+	LOGINFO_CH_LVL(0);
 	LOGINFO("FINISHED ALL.", LOG_TYPES::TRACE, 0);
 }
 
@@ -880,7 +880,7 @@ inline void UI::nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T,cpx>> _N
 {
 	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
 	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
-	LASTLVL					=		2;
+	LOGINFO_CH_LVL(2);
 	std::string dir			=		this->mainDir;
 	dir						+=		this->latP.lat->get_info() + kPS;
 

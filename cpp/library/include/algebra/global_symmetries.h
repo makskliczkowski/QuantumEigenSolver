@@ -25,10 +25,11 @@ namespace GlobalSyms {
 		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
 
 		// constructors
+		virtual ~GlobalSym()							=						default;
 		GlobalSym(std::shared_ptr<Lattice> _lat, GlobalSymGenerators _name = GlobalSymGenerators::OTHER)
-			: val_(0), name_(_name), lat_(_lat)									{};
+			: name_(_name), val_(0), lat_(_lat)									{};
 		GlobalSym(double _val, std::shared_ptr<Lattice> _lat, GlobalSymGenerators _name = GlobalSymGenerators::OTHER)
-			: val_(_val), name_(_name), lat_(_lat)								{};
+			: name_(_name), val_(_val), lat_(_lat)								{};
 
 		// ---------- SETTERS -----------
 		auto setFun(const repType& _fun)				-> void					{ this->check_ = _fun; };

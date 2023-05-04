@@ -1,4 +1,5 @@
 #include "include/user_interface/user_interface.h"
+int LASTLVL = 0;
 
 /*
 * @brief  Setting parameters to default.
@@ -63,7 +64,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTION(		latP, Ly			);
 	SETOPTION(		latP, Lz			);
 	SETOPTION(		latP, bc			);
-	int Ns = latP.Lx_ * latP.Ly_ * latP.Lz_;
+	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 
 	// ---------- MODEL ----------
 
@@ -103,7 +104,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 	//---------- DIRECTORY
 
-	bool setDir		=	this->setOption(this->mainDir, argv, "dir");
+	bool setDir		[[maybe_unused]] =	this->setOption(this->mainDir, argv, "dir");
 	this->mainDir	=	fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
 
 	// create the directories
@@ -115,7 +116,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 */
 void UI::funChoice()
 {
-	LASTLVL = 0;
+	LOGINFO_CH_LVL(0);
 	switch (this->chosenFun)
 	{
 	case -1:
@@ -169,9 +170,8 @@ void UI::funChoice()
 * @brief defines the models based on the input parameters
 */
 bool UI::defineModels(bool _createLat) {
-
 	// create lattice
-	if (_createLat || !this->latP.lat)
+	if (_createLat && !this->latP.lat)
 	{
 		switch (this->latP.typ_)
 		{
@@ -245,10 +245,11 @@ void UI::makeSimSymmetries()
 */
 void UI::makeSimSymmetriesSweep()
 {
+	LOGINFO_CH_LVL(3);
 	this->defineModels(true);
 	uint Ns				= this->latP.lat->get_Ns();
 	auto BC				= this->latP.lat->get_BC();
-	u64 Nh				= 1;
+	u64 Nh				[[maybe_unused]] = 1;
 
 	// parameters
 	v_1d<int> kS		= {};
@@ -263,13 +264,12 @@ void UI::makeSimSymmetriesSweep()
 	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
-	if (useSzParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
+	if (useSyParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
 	if (useU1)			for (uint i = 0; i <= Ns; i++) U1s.push_back(i); else U1s.push_back(-INT_MAX);
 	if (BC == PBC)		for (uint i = 0; i <= int(Ns / 2) + 1; i++) kS.push_back(i); else kS.push_back(-INT_MAX);
 
 	// go through all
 	LOGINFO("STARTING ALL SECTORS", LOG_TYPES::INFO, 1);
-	LASTLVL = 1;
 	for (auto k : kS)
 	{
 		this->symP.k_ = k;
@@ -293,6 +293,7 @@ void UI::makeSimSymmetriesSweep()
 						this->symP.px_ = px;
 						this->createSymmetries();
 						this->makeSimSymmetries();
+						LOGINFO("-----------------------------------", LOG_TYPES::TRACE, 0);
 					}
 				}
 			}
