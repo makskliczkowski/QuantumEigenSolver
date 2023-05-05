@@ -554,6 +554,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	for (int i = 1; i <= maxBondNum; i++)
 		_bonds.push_back(i);
 	auto beforeEntro		=			clk::now();
+	_H->generateFullMap();
 #pragma omp parallel for num_threads(this->threadNum)
 	for (auto idx = 0LL; idx < stateNum; idx++) {
 		// get the eigenstate
@@ -586,7 +587,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 	// save states near the mean energy index
 	if (Ns == 16)
-		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM, HAM_SAVE_EXT::h5, true);
+		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM < stateNum ? UI_LIMITS_MIDDLE_SPEC_STATENUM : stateNum, HAM_SAVE_EXT::h5, true);
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

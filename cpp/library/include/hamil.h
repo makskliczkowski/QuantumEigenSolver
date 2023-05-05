@@ -97,14 +97,14 @@ public:
 
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
-	// ------------------------------------------- PRINTERS -------------------------------------------
+	// ------------------------------------------- PRINTERS ---------------------------------------------------
 	//static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);														// converts a map to arma column (VQMC)
 	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);					// pretty prints the base state
 	static void prettyPrint(	std::ostream& output,	const arma::Col<_T>& state, uint Ns,double _tol = 5e-2);					// pretty prints the state
 	void print(u64 _id)									const								{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n"); };
 	void print()										const								{ this->H_.print("H=\n"); };
 
-	// ------------------------------------------- INFO -------------------------------------------
+	// ------------------------------------------- INFO -------------------------------------------------------
 
 	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const = 0;
 
@@ -127,7 +127,7 @@ public:
 		return tmp_str;
 	};
 
-	// -------------------------------------------	SETTERS	-------------------------------------------
+	// -------------------------------------------	SETTERS	---------------------------------------------------
 	
 	/*
 	* @brief Initialize Hamiltonian matrix
@@ -139,7 +139,7 @@ public:
 		END_CATCH_HANDLER("Memory exceeded");
 	};
 
-	// ------------------------------------------- GETTERS -------------------------------------------
+	// ------------------------------------------- GETTERS -----------------------------------------------------
 	
 	auto getDegeneracies()								const -> std::map<int, int>;
 	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
@@ -162,7 +162,7 @@ public:
 	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_; };
 	auto getNs()										const -> uint						{ return this->lat_->get_Ns(); };
 	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC(); };
-	// ------------------------------------------- 	SETTERS -------------------------------------------
+	// ------------------------------------------- 	SETTERS ---------------------------------------------------
 	
 	virtual void hamiltonian()							=									0;								
 
@@ -174,7 +174,7 @@ public:
 	void calcAvEn();																		// calculate the average energy
 
 public:
-	// ------------------------------------------- 	LOCAL ENERGY -------------------------------------------
+	// ------------------------------------------- 	LOCAL ENERGY ----------------------------------------------
 
 	virtual void locEnergy(u64 _elemId, 
 						   u64 _elem, uint _site)		=									0; 
@@ -187,7 +187,9 @@ public:
 	// ------------------------------------------- FOR OTHER TYPES --------------------------------------------
 	virtual void updateInfo()							=									0;
 public:
-	// ------------------------------------------- CLEAR -------------------------------------------
+	void generateFullMap()								{ this->hilbertSpace.generateFullMap(); };
+
+	// ------------------------------------------- CLEAR ------------------------------------------------------
 	void clearEigVal()									{ this->eigVal_.reset(); };																			// resets the energy memory to 0
 	void clearEigVec()									{ this->eigVec_.reset(); };
 	void clearH()										{ this->H_.reset(); };																					// resets the hamiltonian memory to 0
