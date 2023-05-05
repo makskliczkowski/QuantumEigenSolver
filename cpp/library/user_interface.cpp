@@ -164,6 +164,7 @@ void UI::funChoice()
 		this->exitWithHelp();
 		break;
 	}
+	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 }
 
 /*

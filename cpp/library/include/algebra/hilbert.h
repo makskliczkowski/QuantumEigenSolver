@@ -17,6 +17,9 @@
 	#include "global_symmetries.h"
 #endif
 
+#include <mutex>
+#include <shared_mutex>
+
 // ##########################################################################################################################################
 
 namespace Hilbert {
@@ -28,6 +31,10 @@ namespace Hilbert {
 		void mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T>& normThreaded, int t);
 
 	protected:
+		using MutexType										= std::shared_timed_mutex;
+		using ReadLock										= std::shared_lock<MutexType>;
+		using WriteLock										= std::unique_lock<MutexType>;
+		mutable MutexType Mutex;
 		uint threadNum										= 1;				// get number of threads
 		uint Ns												= 1;				// number of lattice sites
 		uint Nhl											= 2;				// number of local possibilities
@@ -50,7 +57,7 @@ namespace Hilbert {
 		// ------------------------ constructors etc -------------------------
 		~HilbertSpace()
 		{
-			LOGINFO("Hilbert space destructor called.", LOG_TYPES::INFO, 4);
+			LOGINFO("Hilbert space destructor called.", LOG_TYPES::INFO, 3);
 			this->fullMap_.clear();
 			this->mapping_.clear();
 			this->normalization_.clear();
@@ -94,18 +101,44 @@ namespace Hilbert {
 		/*
 		* @brief Assign constructor
 		*/
-		HilbertSpace(const HilbertSpace<_T>& _H) {
-			this->Ns				=				_H.Ns;
-			this->Nh				=				_H.Nh;
-			this->NhFull			=				_H.NhFull;
-			this->symGroupGlobal_	=				_H.symGroupGlobal_;
-			this->symGroupSec_		=				_H.symGroupSec_;
-			this->normalization_	=				_H.normalization_;
-			this->symGroup_			=				_H.symGroup_;
-			this->mapping_			=				_H.mapping_;
-			this->fullMap_			=				_H.fullMap_;
-			this->lat				=				_H.lat;
-		}
+		HilbertSpace(const HilbertSpace<_T>& _H)
+			: Ns(_H.Ns), Nhl(_H.Nhl), Nint(_H.Nint), Nh(_H.Nh), NhFull(_H.NhFull), lat(_H.lat),
+			  symGroupGlobal_(_H.symGroupGlobal_), symGroup_(_H.symGroup_), symGroupSec_(_H.symGroupSec_),
+			  normalization_(_H.normalization_), 
+			  mapping_(_H.mapping_), fullMap_(_H.fullMap_)
+			  
+		{
+				WriteLock lhs_lk(this->Mutex, std::defer_lock);
+				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
+				std::lock(lhs_lk, rhs_lk);
+		};
+
+
+	// ---------------------------- ASSIGN OPERATOR ------------------------
+		HilbertSpace<_T>& operator=(const HilbertSpace<_T>& _H)
+		{
+			if (this != &_H) 
+			{
+				WriteLock lhs_lk(this->Mutex, std::defer_lock);
+				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
+				std::lock(lhs_lk, rhs_lk);
+
+				this->Ns				= _H.Ns;
+				this->Nh				= _H.Nh;
+				this->Nhl				= _H.Nhl;
+				this->Nint				= _H.Nint;
+				this->NhFull			= _H.NhFull;
+				this->symGroupGlobal_	= _H.symGroupGlobal_;
+				this->symGroupSec_		= _H.symGroupSec_;
+				this->normalization_	= _H.normalization_;
+				this->symGroup_			= _H.symGroup_;
+				this->mapping_			= _H.mapping_;
+				this->fullMap_			= _H.fullMap_;
+				this->lat				= _H.lat;
+			}
+			return *this;
+		};
+
 
 		// ------------------------ INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
@@ -584,11 +617,16 @@ namespace Hilbert {
 		return fullMap;
 	}
 
+	/*
+	* @brief Generates full mapping to the full Hilbert space using global symmetries.
+	*/
 	template<typename _T>
 	inline void Hilbert::HilbertSpace<_T>::generateFullMap()
 	{
 		this->fullMap_ = {};
 		if (!this->symGroupGlobal_.empty())
+			WriteLock lock(this->Mutex);
+			LOGINFOG("Creating full global symmetry map!", LOG_TYPES::INFO, 1);
 			for (u64 j = 0; j < this->NhFull; j++) {
 				// check globales
 				bool globalChecker = true;
