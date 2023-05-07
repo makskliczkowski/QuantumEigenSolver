@@ -192,6 +192,7 @@ bool UI::defineModels(bool _createLat) {
 	}
 	// check if is complex
 	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
+
 	// check if is complex and define the Hamiltonian
 	bool _ok;
 	if (this->isComplex_)
@@ -261,7 +262,7 @@ void UI::makeSimSymmetriesSweep()
 	v_1d<int> Sxs		= {};
 
 	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
 	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };

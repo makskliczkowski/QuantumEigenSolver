@@ -631,6 +631,8 @@ inline void UI::symmetriesTest(clk::time_point start)
 		if (this->latP.lat)
 			this->latP.lat.reset();
 		this->defineModels(true);
+		this->isComplex_ = false;
+		this->defineModel(this->hilDouble, this->hamDouble);
 		Nh												=		this->hamDouble->getHilbertSize();
 		Ns												=		this->latP.lat->get_Ns();
 		La												=		Ns / 2;
@@ -685,7 +687,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	v_1d<int> u1Values			=		{};
 
 	bool useU1					=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useSzParity			=		(this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
 	bool useSyParity			=		false;//(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 	if (useSzParity)			paritiesSz = { -1, 1 }; else paritiesSz = { -INT_MAX };
 	if (useSyParity)			paritiesSy = { -1, 1 }; else paritiesSy = { -INT_MAX };
@@ -706,6 +708,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	u64 calcStates				=		0;
 
 	this->symP.S_				=		true;
+	this->isComplex_			=		true;
 	// go through all symmetries
 	for (auto U1 : u1Values) {
 		this->symP.U1_			=		U1;
