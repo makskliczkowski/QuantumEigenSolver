@@ -190,7 +190,8 @@ bool UI::defineModels(bool _createLat) {
 			break;
 		};
 	}
-
+	// check if is complex
+	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
 	// check if is complex and define the Hamiltonian
 	bool _ok;
 	if (this->isComplex_)
@@ -211,8 +212,7 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 	if (this->symP.S_ == true)
 	{
 		// create Hilbert space
-		if (this->symP.k_ != -INT_MAX && !(this->symP.k_ == 0 || this->symP.k_ == this->latP.lat->get_Ns() / 2))
-			this->isComplex_ = true;
+		this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
 		// ------ LOCAL ------
 		_locSyms = this->symP.getLocGenerator();
 		// ------ GLOBAL ------
@@ -232,9 +232,9 @@ void UI::makeSimSymmetries()
 		this->hamComplex.reset();
 	if (this->hamDouble)
 		this->hamDouble.reset();
-
 	// define the models
-	if (!this->defineModels(true)) return;
+	if (!this->defineModels(true)) 
+		return;
 	if (this->isComplex_)
 		this->symmetries(clk::now(), this->hamComplex);
 	else

@@ -185,6 +185,16 @@ namespace UI_PARAMS {
 			UI_CHECK_SYM(x, R);
 			return syms;
 		}
+
+		/*
+		* @brief Checks if the symmetries make the Hamiltonian complex
+		* @param Ns lattice size
+		*/
+		bool checkComplex(int Ns) {
+			if (this->k_ == 0 || (this->k_ == Ns / 2 && Ns % 2 == 0) || this->py_ != -INT_MAX)
+				return false;
+			return true;
+		}
 	};
 
 	// !TODO 
