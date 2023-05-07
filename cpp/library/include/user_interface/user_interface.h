@@ -596,8 +596,8 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	//const u64 avEnIdx		=			_H->getEnAvIdx();
 
 	// save states near the mean energy index
-	if (Ns == 16)
-		_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM < stateNum ? UI_LIMITS_MIDDLE_SPEC_STATENUM : stateNum, HAM_SAVE_EXT::h5, true);
+	//if (Ns == 16)
+		//_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM < stateNum ? UI_LIMITS_MIDDLE_SPEC_STATENUM : stateNum, HAM_SAVE_EXT::h5, true);
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
