@@ -54,8 +54,8 @@ constexpr int UI_LIMITS_NQS_ED									= ULLPOW(16);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
 
-constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(16);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(7);
+constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
@@ -504,6 +504,19 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 {
 	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
 	u64 Nh					=			_H->getHilbertSize();
+		// --- create the directories ---
+	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
+	fs::create_directories(dir);
+
+	// --- use those files --- 
+	std::string modelInfo	=			_H->getInfo();
+
+	// --- save energies txt check ---
+	std::string filename	=			dir + modelInfo;
+	std::ofstream ofs(dir + "logDone.dat", std::ios_base::out | std::ios_base::app);
+	ofs						<<			modelInfo << "," << Nh << EL;
+	ofs.close();
+
 	if (Nh == 0)
 		return;
 	// set the Hamiltonian
@@ -534,15 +547,6 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num states: " + STR(stateNum), LOG_TYPES::TRACE, 2);
 
-	// --- create the directories ---
-	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
-	fs::create_directories(dir);
-
-	// --- use those files --- 
-	std::string modelInfo	=			_H->getInfo();
-
-	// --- save energies txt check ---
-	std::string filename	=			dir + infoH;
 	if (Nh < UI_LIMITS_MAXPRINT)
 		_H->getEigVal(dir, HAM_SAVE_EXT::dat, false);
 	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
