@@ -3,12 +3,6 @@
 
 #ifdef DEBUG
 //#define DEBUG_BINARY
-#ifdef DEBUG_RBM
-//#define DEBUG_RBM_SAMP
-//#define DEBUG_RBM_LCEN
-//#define DEBUG_RBM_GRAD
-//#define DEBUG_RBM_DRVT
-#endif
 #else
 //#define OMP_NUM_THREADS 16;
 #include <thread>
@@ -17,7 +11,7 @@
 
 // ######################### RBM ############################
 // definitions											 // #
-#define NQS_RBM_ANGLES_UPD							 // #
+#define NQS_RBM_ANGLES_UPD								 // #
 #define NQS_RBM_USESR									 // #
 #define NQS_RBM_PINV									 // #
 //#define NQS_RBM_SREG									 // #
@@ -62,29 +56,6 @@ constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 #define UI_CHECK_SYM(val, gen)									if(this->val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::gen, this->val##_));
 
 // -------------------------------------------------------- make an USER INTERFACE class --------------------------------------------------------
-
-//template<typename _hamtype>
-//double calculate_ed(double& ground_ed, double ground_rbm, std::shared_ptr<SpinHamiltonian<_hamtype>> hamiltonian) {
-//	// compare ED
-//	auto Ns = hamiltonian->lattice->get_Ns();
-//	auto maxNs = 16;
-//	if (Ns <= maxNs) {
-//		stout << "\t\t\t\t->calculating ed" << EL;
-//		hamiltonian->hamiltonian();
-//		if (Ns <= maxNs)
-//			hamiltonian->diag_h(false);
-//		else
-//			hamiltonian->diag_h(false, 3, 0, 1000);
-//
-//		ground_ed = std::real(hamiltonian->get_eigenEnergy(0));
-//		auto relative_error = abs(std::real(ground_ed - ground_rbm)) / abs(ground_ed) * 100.;
-//		stout << "\t\t\t\t->" << VEQP(ground_ed, 7) << "\t" << VEQP(ground_rbm, 7) << "\t" << VEQP(relative_error, 5) << "%" << EL;
-//		return relative_error;
-//	}
-//	else
-//		stout << "\t\t\t\t->skipping ed" << EL;
-//	return 0.0;
-//}
 
 namespace UI_PARAMS {
 	
@@ -326,11 +297,11 @@ protected:
 	//void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
 	
 private:
-	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 	// ############# S Y M M E T R I E S   E D #############
 	template<typename _T>//, std::enable_if_t<is_complex<_T>{}>* = nullptr>
-	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H);
+	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag = true);
 	void symmetriesTest(clk::time_point start);
 	std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> createSymmetries();
 
@@ -421,8 +392,9 @@ public:
 	//void make_simulation() override;
 
 	// #######################        SYMMETRIES            #######################
-	void makeSimSymmetries();
+	void makeSimSymmetries(bool _diag = true);
 	void makeSimSymmetriesSweep();
+	void makeSimSymmetriesSweepHilbert();
 	//void make_simulation_symmetries_sweep();
 	//void make_symmetries_test(int l = -1);
 
@@ -433,12 +405,13 @@ public:
 template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
-	auto [_glbSyms, _locSyms] = this->createSymmetries();
+	bool _isGood				=	true;
+	auto [_glbSyms, _locSyms]	=	this->createSymmetries();
 	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
 	if (_Hil.getHilbertSize() == 0)
 	{
 		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 3);
-		return false;
+		_isGood					=	false;
 	}
 	else
 		LOGINFO(VEQVS(HilbertSize, _Hil.getHilbertSize()), LOG_TYPES::INFO, 3);
@@ -465,7 +438,7 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			false);
 		break;
 	}
-	return true;
+	return _isGood;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -500,11 +473,11 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 * @info used in https://arxiv.org/abs/2303.13577
 */
 template<typename _T>
-inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H)
+inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag)
 {
 	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
 	u64 Nh					=			_H->getHilbertSize();
-		// --- create the directories ---
+	// --- create the directories ---
 	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
 	fs::create_directories(dir);
 
@@ -513,18 +486,24 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 	// --- save energies txt check ---
 	std::string filename	=			dir + modelInfo;
-	std::ofstream ofs(dir + "logDone.dat", std::ios_base::out | std::ios_base::app);
+	std::ofstream ofs(dir + "logHilbert.dat", std::ios_base::out | std::ios_base::app);
 	ofs						<<			modelInfo << "," << Nh << EL;
 	ofs.close();
 
-	if (Nh == 0)
+	// check Hilbert size or whether we should diagonalize and proceed further
+	if (Nh == 0 || !_diag)
+	{
+		LOGINFO("Skipping creation of the Hamiltonian due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2);
 		return;
+	}
+
 	// set the Hamiltonian
 	_H->hamiltonian();
+
 	// set the parameters
 	uint Ns = _H->getNs();
-	u64 stateNum = Nh;
-	bool useShiftAndInvert = false;
+	u64 stateNum			=			Nh;
+	bool useShiftAndInvert	=			false;
 	std::string infoH		=			_H->getInfo();
 
 	//stouts("\t->", start);
