@@ -15,21 +15,14 @@ void UI::setDefault()
 	// define basic model
 	this->modP.setDefault();
 
+	// rbm
+	this->nqsP.setDefault();
+
 	// others 
 	this->threadNum = 1;
-
-	// rbm
-	//this->nqsP.lr = 1e-2;
-	//this->nqsP.blockSize = 8;
-	//this->nqsP.nBlocks = 500;
-	//this->nqsP.mcSteps = 1000;
-	//this->nqsP.batch = (u64)std::pow(2, 10);
-	//this->nqsP.nVisible = latP.lat->get_Ns();
-	//this->nqsP.nHidden = 2ll * latP.lat->get_Ns();
-	//this->nqsP.layersDim = { this->nqsP.nVisible , this->nqsP.nHidden };
-	//this->nqsP.nTherm = uint(0.1 * this->nqsP.nBlocks);
-	//this->nqsP.nFlips = 1;
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief model parser
@@ -159,6 +152,11 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SWEEP ALL", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetriesSweep();
 		break;
+	case 23:
+		// this option creates a map between Hamiltonian type and the Hilbert space size with symmetries
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE ALL HILBERT", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetriesSweepHilbert();
+		break;
 	default:
 		// default case of showing the help
 		this->exitWithHelp();
@@ -166,6 +164,8 @@ void UI::funChoice()
 	}
 	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief defines the models based on the input parameters
@@ -190,6 +190,7 @@ bool UI::defineModels(bool _createLat) {
 			break;
 		};
 	}
+	
 	// check if is complex
 	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
 
@@ -225,8 +226,9 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 
 /*
 * @brief A placeholder for making the simulation with symmetries.
+* @param Should diagonalize and proceed with the simulation?
 */
-void UI::makeSimSymmetries()
+void UI::makeSimSymmetries(bool _diag)
 {
 	// reset Hamiltonians - memory release
 	if (this->hamComplex)
@@ -237,10 +239,12 @@ void UI::makeSimSymmetries()
 	if (!this->defineModels(true)) 
 		return;
 	if (this->isComplex_)
-		this->symmetries(clk::now(), this->hamComplex);
+		this->symmetries(clk::now(), this->hamComplex, _diag);
 	else
-		this->symmetries(clk::now(), this->hamDouble);
+		this->symmetries(clk::now(), this->hamDouble, _diag);
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief A placeholder for making the simulation with symmetries, sweeping them all
@@ -302,6 +306,90 @@ void UI::makeSimSymmetriesSweep()
 		}
 	}
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief A placeholder for making the simulation with symmetries, sweeping them all. Saves the Hilbert space sizes for future reference of what to run.
+*/
+void UI::makeSimSymmetriesSweepHilbert()
+{
+	LOGINFO_CH_LVL(3);
+	this->defineModels(true);
+	uint Ns				= this->latP.lat->get_Ns();
+	auto BC				= this->latP.lat->get_BC();
+	u64 Nh				[[maybe_unused]] = 0;
+
+	// parameters
+	v_1d<int> kS		= {};
+	v_1d<int> Rs		= {};
+	v_1d<int> Szs		= {};
+	v_1d<int> Sys		= {};
+	v_1d<int> U1s		= {};
+	v_1d<int> Sxs		= {};
+
+	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
+	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+
+	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
+	if (useSyParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
+	if (useU1)			for (uint i = 0; i <= Ns; i++) U1s.push_back(i); else U1s.push_back(-INT_MAX);
+	if (BC == PBC)		for (uint i = 0; i < Ns; i++) kS.push_back(i); else kS.push_back(-INT_MAX);
+
+	// go through all
+	LOGINFO("STARTING ALL SECTORS", LOG_TYPES::INFO, 1);
+	for (auto k : kS)
+	{
+		this->symP.k_ = k;
+		// check Reflection
+		if (k==-INT_MAX || k == 0 || (k == int(Ns / 2) && (Ns % 2) == 0))
+			Rs = { -1, 1 };
+		else
+			Rs = { -INT_MAX };
+		for (auto r : Rs) {
+			this->symP.x_ = r;
+			for (auto pz : Szs) {
+				this->symP.pz_ = pz;
+				for (auto u1 : U1s) 
+				{
+					this->symP.U1_ = u1;
+					// check Parity X
+					if ((!useU1 && (this->modP.hz_ == 0.0)) || (useU1 && (Ns % 2 == 0) && (this->symP.U1_ == Ns / 2) && (this->modP.hz_ == 0.0) && (this->modP.hx_ == 0.0)))
+						Sxs = { -1, 1 };
+					else
+						Sxs = { -INT_MAX };
+					for (auto px : Sxs) {
+						this->symP.px_ = px;
+						// create symmetries vectors
+						this->createSymmetries();
+						// reset Hamiltonians - memory release
+						if (this->hamComplex)
+							this->hamComplex.reset();
+						if (this->hamDouble)
+							this->hamDouble.reset();
+						// define the models
+						bool empty = this->defineModels(true);
+						// save the Hilbert space sizes
+						if (this->isComplex_)
+							this->symmetries(clk::now(), this->hamComplex, false);
+						else
+							this->symmetries(clk::now(), this->hamDouble, false);
+						// add Hilbert space size
+						if (this->hamComplex)
+							Nh += this->hamComplex->getHilbertSize();
+						if (this->hamDouble)
+							Nh += this->hamDouble->getHilbertSize();
+						LOGINFO("-----------------------------------", LOG_TYPES::TRACE, 0);
+					}
+				}
+			}
+		}
+	}
+	LOGINFO("------------------ " + VEQ(Nh) + " ------------------", LOG_TYPES::TRACE, 0);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief A placeholder for making the simulation with NQS.
