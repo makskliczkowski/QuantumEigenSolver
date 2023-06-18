@@ -40,6 +40,7 @@
 #endif													 // #
 // ##########################################################
 
+#define UI_HAAR_DIR std::string("G:\\My Drive\\Python\\Colab\\ProjectsData\\2023_Integrable_XYZ_XXZ\\DATA\\Haar_random\\")
 
 // maximal ed size to compare
 // ###################### LIMITS ############################
@@ -221,6 +222,7 @@ protected:
 
 	// define basic models
 	bool isComplex_							= false;
+	bool useComplex_						= false;
 	Hilbert::HilbertSpace<double>			hilDouble;
 	std::shared_ptr<Hamiltonian<double>>	hamDouble;
 	Hilbert::HilbertSpace<cpx>				hilComplex;
@@ -300,8 +302,11 @@ private:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 	// ############# S Y M M E T R I E S   E D #############
-	template<typename _T>//, std::enable_if_t<is_complex<_T>{}>* = nullptr>
-	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag = true);
+	template<typename _T>
+	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag = true, bool _states = false);
+
+	void symmetriesDeg(clk::time_point start);
+
 	void symmetriesTest(clk::time_point start);
 	std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> createSymmetries();
 
@@ -392,7 +397,8 @@ public:
 	//void make_simulation() override;
 
 	// #######################        SYMMETRIES            #######################
-	void makeSimSymmetries(bool _diag = true);
+	void makeSimSymmetries(bool _diag = true, bool _states = false);
+	void makeSimSymmetriesDeg();
 	void makeSimSymmetriesSweep();
 	void makeSimSymmetriesSweepHilbert();
 	//void make_simulation_symmetries_sweep();
@@ -473,7 +479,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 * @info used in https://arxiv.org/abs/2303.13577
 */
 template<typename _T>
-inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag)
+inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag, bool _states)
 {
 	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
 	u64 Nh					=			_H->getHilbertSize();
@@ -577,11 +583,152 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 	// set the average energy index
 	//const u64 avEnIdx		=			_H->getEnAvIdx();
-
+	if (_states)
+		_H->getEigVec(dir, stateNum, HAM_SAVE_EXT::h5, true);
 	// save states near the mean energy index
 	//if (Ns == 16)
 		//_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM < stateNum ? UI_LIMITS_MIDDLE_SPEC_STATENUM : stateNum, HAM_SAVE_EXT::h5, true);
 };
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+inline void UI::symmetriesDeg(clk::time_point start)
+{
+	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
+	u64 Nh					=			this->hamComplex->getHilbertSize();
+	// --- create the directories ---
+	std::string dir			=			this->mainDir + kPS + this->hamComplex->getType() + kPS + this->latP.lat->get_info() + kPS;
+	fs::create_directories(dir);
+
+	// --- use those files --- 
+	std::string modelInfo	=			this->hamComplex->getInfo();
+
+	// --- save energies txt check ---
+	std::string filename	=			dir + modelInfo;
+	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
+	ofs						<<			modelInfo << "," << Nh << EL;
+
+	// check Hilbert size or whether we should diagonalize and proceed further
+	if (Nh == 0)
+	{
+		LOGINFO("Skipping creation of the Hamiltonian due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2);
+		return;
+	}
+
+	// set the Hamiltonian
+	this->hamComplex->hamiltonian();
+
+	// set the parameters
+	uint Ns					=			this->hamComplex->getNs();
+	u64 stateNum			=			Nh;
+	bool useShiftAndInvert	=			false;
+	std::string infoH		=			this->hamComplex->getInfo();
+
+	//stouts("\t->", start);
+	LOGINFO("Finished buiding Hamiltonian" + infoH, LOG_TYPES::TRACE, 1);
+	if (Nh < UI_LIMITS_MAXFULLED) {
+		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
+		this->hamComplex->diagH(false);
+	}
+	else
+	{
+		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
+		useShiftAndInvert	=			true;
+		stateNum = UI_LIMITS_SI_STATENUM;
+		this->hamComplex->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
+	}
+	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
+	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
+
+	std::string name		=			VEQ(Nh);
+	LOGINFO("Spectrum size: "		+ STR(Nh)		, LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states: "	+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
+	this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+
+	// clear energies
+	this->hamComplex->clearH();
+
+	// degeneracies
+	v_2d<u64> degeneracyMap =			this->hamComplex->getDegeneracies();
+
+	// iterate through bond cut
+	const uint maxBondNum	=			Ns / 2;
+
+	// get the symmetry rotation matrix
+	auto _symRot			=			this->hamComplex->getSymRot();
+	bool usesSym			=			this->hamComplex->hilbertSpace.checkSym();
+	auto beforeEntro		=			clk::now();
+	this->hamComplex->generateFullMap();
+
+	// ------------------------------- load the Haar mats -------------------------------
+	v_2d<arma::Col<cpx>> _HM=			{};
+	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
+	{
+		int _trueDeg				= _deg + 1;
+		_HM.push_back(v_1d<arma::Col<cpx>>(100));
+//#pragma omp parallel for num_threads(this->threadNum)
+		for (int _realization = 1; _realization <= 100; ++_realization)
+		{
+			arma::Col<cpx> _state			= arma::Col<cpx>(_trueDeg, arma::fill::ones);
+			arma::mat _realHaar(_trueDeg, _trueDeg, arma::fill::zeros);
+			arma::mat _imagHaar(_trueDeg, _trueDeg, arma::fill::zeros);
+			_realHaar.load(UI_HAAR_DIR + "Real_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
+			_imagHaar.load(UI_HAAR_DIR + "Imag_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
+			arma::Mat<cpx> _matHaar			= _realHaar + std::complex<double>(0.0, 1.0) * _imagHaar;
+			arma::Col<cpx> _rCoeff			= _matHaar  * _state;
+			_HM[_deg - 1][_realization - 1] = _rCoeff;
+		}
+	}
+
+	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
+	auto _idx				=			this->hamComplex->getEnAvIdx();
+	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
+		LOGINFO("Doing: " + VEQ(_deg+1) + ". " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 1);
+
+	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
+	{
+		// get true degeneracy
+		int _trueDeg		=			_deg + 1;
+		v_1d<double> entropies(100, 0);
+		// go through degenerate states (there can be multiple of the same degeneracy)
+		for (int _degIn = 0; _degIn < degeneracyMap[_deg].size(); _degIn += _trueDeg)
+		{
+			LOGINFO("Doing: " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 3);
+			// iterate matrices realizations
+#pragma omp parallel for num_threads(this->threadNum)
+			for (int _realization = 1; _realization <= 100; ++_realization)
+			{
+				arma::Col<cpx> _state	=	arma::Col<cpx>(Nh, arma::fill::zeros);
+				// get the coefficients
+				for (int i = 0; i < _HM[_deg - 1][_realization - 1].size(); ++i)
+				{
+					auto _stateIdx		=	degeneracyMap[_deg][u64(_degIn + i)];
+					_state				=	_state + _HM[_deg - 1][_realization - 1](i) * this->hamComplex->getEigVec(_stateIdx);
+				}
+				_state					=   arma::normalise(_state, 2);
+
+				// rotate!
+				if (usesSym)
+					_state				=	_symRot * _state;
+				auto entro				=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+
+				entropies[_realization - 1] = entro;
+				if (_realization > 10 && _realization % 10 == 0)
+					LOGINFO("Finished: " + STR(_realization) + "%", LOG_TYPES::TRACE, 4);
+			}
+			for(auto& entro: entropies)
+				ofs						<< degeneracyMap[_deg][u64(_degIn)] << "\t" <<	degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)] 
+										<< "\t" << STRP(this->hamComplex->getEigVal(	degeneracyMap[_deg][u64(_degIn					)]), 10) 
+										<< "\t" << STRP(this->hamComplex->getEigVal(	degeneracyMap[_deg][u64(_degIn + _trueDeg - 1	)]), 10) 
+										<< "\t" << _trueDeg << "\t" << STRP(entro, 10) 
+										<< "\n";
+			LOGINFO("Finished: " + VEQ(_degIn), LOG_TYPES::TRACE, 3);
+		}
+		LOGINFO("Finished: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
+	}
+	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
+	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
+}
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -755,7 +902,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 							LOGINFO("Finished building Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
 							this->hamComplex->diagH(false);
 							LOGINFO("Finished diagonalizing Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
-							_degs.push_back(std::make_pair(_tup, this->hamComplex->getDegeneracies()));
+							//_degs.push_back(std::make_pair(_tup, this->hamComplex->getDegeneracies()));
 							_sizes.push_back(Nh);
 
 							// create rotation matrix

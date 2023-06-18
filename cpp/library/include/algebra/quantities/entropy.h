@@ -39,9 +39,9 @@ namespace Entropy {
 			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _Ns, uint _sizeA, uint _Nint) {
 				// set subsystems size
 				int bitNum = (int)std::log2(_Nint);
-				const u64 dimA = ULLPOW(bitNum * _sizeA);
-				const u64 dimB = ULLPOW((_Ns - bitNum * _sizeA));
-				const u64 Nh = dimA * dimB;
+				const u64 dimA	= ULLPOW(bitNum * _sizeA);
+				const u64 dimB	= ULLPOW((_Ns - bitNum * _sizeA));
+				const u64 Nh	= dimA * dimB;
 
 				arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
 				// loop over configurational basis
@@ -71,16 +71,16 @@ namespace Entropy {
 			template <typename _T>
 			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
 				// set subsystems size
-				uint Ns = _hilb.getLatticeSize();
-				uint Nint = _hilb.getNum();
-				uint bitNum = (uint)std::log2(Nint);
-				const u64 dimA = ULLPOW(bitNum * _sizeA);
-				const u64 dimB = ULLPOW((Ns - bitNum * _sizeA));
-				const u64 Nh = dimA * dimB;
+				uint Ns			= _hilb.getLatticeSize();
+				uint Nint		= _hilb.getNum();
+				uint bitNum		= (uint)std::log2(Nint);
+				const u64 dimA	= ULLPOW(bitNum * _sizeA);
+				const u64 dimB	= ULLPOW((Ns - bitNum * _sizeA));
+				const u64 Nh	= dimA * dimB;
 				if (!_hilb.checkGSym())		return		Entropy::Entanglement::Bipartite::redDensMatStandard<_T>(_s, Ns, _sizeA, Nint);
 
-				auto map = _hilb.getFullMap();
-				const u64 N = map.size();
+				auto map		= _hilb.getFullMap();
+				const u64 N		= map.size();
 				// otherwise find in mapping
 				auto find_index = [&](u64 _idx) { return binarySearch(map, 0, Nh - 1, _idx); };
 
@@ -92,7 +92,7 @@ namespace Entropy {
 					for (u64 m = true_n % dimB; m < Nh; m += dimB) {
 						// pick out state with same B side (last L-A_size bits)
 						u64 idx = true_n / dimB;
-						u64 j = find_index(m);
+						u64 j	= find_index(m);
 						if (j >= 0)
 							rho(idx, ctr) += algebra::conjugate(_s(n)) * _s(j);
 						// increase counter to move along reduced basis

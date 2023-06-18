@@ -141,7 +141,7 @@ public:
 
 	// ------------------------------------------- GETTERS -----------------------------------------------------
 	
-	auto getDegeneracies()								const -> std::map<int, int>;
+	auto getDegeneracies()								const -> v_2d<u64>;
 	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
 	auto getHilbertSize()								const -> u64						{ return this->hilbertSpace.getHilbertSize(); };			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
@@ -430,7 +430,7 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool
 template<typename _T>
 inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
-	arma::Mat<_T> states = this->eigVec_.submat(0, this->avEnIdx - _mid / 2, this->Nh - 1, this->avEnIdx + _mid / 2);
+	const arma::Mat<_T> states = (_mid == this->Nh) ? this->eigVec_ : this->eigVec_.submat(0, this->avEnIdx - _mid / 2, this->Nh - 1, this->avEnIdx + _mid / 2);
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	switch (_typ)
 	{
@@ -456,31 +456,36 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 * @returns The degeneracy histogram of the degeneracies in the eigenspectrum.
 */
 template<typename _T>
-inline auto Hamiltonian<_T>::getDegeneracies() const -> std::map<int, int>
+inline auto Hamiltonian<_T>::getDegeneracies() const -> v_2d<u64>
 {
-	std::map<int, int> _degMap;
-	double _prevE		=	INT_MAX;
-	int _counter		=	0;
-	for (auto& _E : this->eigVal_) 
-	{
-		// check if previous E is yet different than current
-		if (!EQP(_prevE, _E, 1e-15))
-		{
-			if (_counter != 0) {
-				if (_degMap.count(_counter + 1))
-					_degMap[_counter + 1]	+=	1;
-				else
-					_degMap[_counter + 1]	=	1;
-			}
-			_counter						=	0;
-		}
-		else
-			_counter++;
+	v_2d<u64> degeneracyMap = v_1d<v_1d<u64>>(Ns, v_1d<u64>(0));
+	v_1d<u64> degeneracyPlh = v_1d<u64>(0);
+	u64 _iter			=	0;
 
-		// check counter and set previous energy
-		_prevE = _E;
+	double _prevE		=	this->eigVal_[0];
+	double _E			=	this->eigVal_[0];
+	while (true)
+	{
+		int _counter				= -1;
+		while (true)
+		{
+			_E			= this->eigVal_[_iter];
+			if (!EQP(_E, _prevE, 1e-14))
+				break;
+			degeneracyPlh.push_back(_iter);
+			_counter++;
+			_iter++;
+		}
+		// append states to current degeneracy counter in map
+		for (auto& _item : degeneracyPlh)
+			degeneracyMap[_counter].push_back(_item);
+		degeneracyPlh.clear();
+
+		_prevE			= this->eigVal_[_iter];
+		if (_iter >= Nh)
+			break;
 	}
-	return _degMap;
+	return degeneracyMap;
 }
 
 #endif
