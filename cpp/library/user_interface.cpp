@@ -157,6 +157,16 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE ALL HILBERT", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetriesSweepHilbert();
 		break;
+	case 24:
+		// this option utilizes the Hamiltonian with symmetries calculation
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE STATES", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetries(true, true);
+		break;
+	case 25:
+		// this option utilizes the Hamiltonian with symmetries calculation
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE DEGENERACIES", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetriesDeg();
+		break;
 	default:
 		// default case of showing the help
 		this->exitWithHelp();
@@ -193,10 +203,11 @@ bool UI::defineModels(bool _createLat) {
 	
 	// check if is complex
 	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
+	LOGINFO("Making : " + std::string((this->isComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 2);
 
 	// check if is complex and define the Hamiltonian
 	bool _ok;
-	if (this->isComplex_)
+	if (this->isComplex_ || this->useComplex_)
 		_ok = this->defineModel(this->hilComplex, this->hamComplex);
 	else
 		_ok = this->defineModel(this->hilDouble, this->hamDouble);
@@ -228,7 +239,7 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 * @brief A placeholder for making the simulation with symmetries.
 * @param Should diagonalize and proceed with the simulation?
 */
-void UI::makeSimSymmetries(bool _diag)
+void UI::makeSimSymmetries(bool _diag, bool _states)
 {
 	// reset Hamiltonians - memory release
 	if (this->hamComplex)
@@ -239,9 +250,28 @@ void UI::makeSimSymmetries(bool _diag)
 	if (!this->defineModels(true)) 
 		return;
 	if (this->isComplex_)
-		this->symmetries(clk::now(), this->hamComplex, _diag);
+		this->symmetries(clk::now(), this->hamComplex, _diag, _states);
 	else
-		this->symmetries(clk::now(), this->hamDouble, _diag);
+		this->symmetries(clk::now(), this->hamDouble, _diag, _states);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief Use the simulation and Haar matrices to calculate the degeneracies and entropies
+*/
+void UI::makeSimSymmetriesDeg()
+{
+	// reset Hamiltonians - memory release
+	if (this->hamComplex)
+		this->hamComplex.reset();
+	if (this->hamDouble)
+		this->hamDouble.reset();
+	// define the models
+	this->useComplex_ = true;
+	if (!this->defineModels(true)) 
+		return;
+	this->symmetriesDeg(clk::now());
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
