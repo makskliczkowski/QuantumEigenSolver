@@ -1,7 +1,7 @@
 #pragma once
 
 /***************************************
-* Defines the generic lattice Hamilt
+* Defines the generic lattice Hamiltonian
 * class. Allows for later inhertiance
 * for a fine model specialization. 
 * APRIL 2023. UNDER CONSTANT DEVELOPMENT
@@ -17,11 +17,12 @@
 
 // ######################### EXISTING MODELS ############################
 enum MY_MODELS {													 // #
-	ISING_M, XYZ_M													 // #
+	ISING_M, XYZ_M, NONE 											 // #
 };																	 // #
 BEGIN_ENUM(MY_MODELS)												 // #
 {																	 // #
-	DECL_ENUM_ELEMENT(ISING_M), DECL_ENUM_ELEMENT(XYZ_M)			 // #
+	DECL_ENUM_ELEMENT(ISING_M), DECL_ENUM_ELEMENT(XYZ_M),			 // #
+	DECL_ENUM_ELEMENT(NONE)											 // #
 }																	 // #
 END_ENUM(MY_MODELS)                                                  // #	
 // ######################################################################
@@ -53,7 +54,7 @@ public:
 	Hilbert::HilbertSpace<_T> hilbertSpace;
 
 protected:
-	MY_MODELS type_;
+	MY_MODELS type_										=									MY_MODELS::NONE;
 	uint Ns												=									1;
 	u64 Nh												=									1;
 	std::shared_ptr<Lattice> lat_;

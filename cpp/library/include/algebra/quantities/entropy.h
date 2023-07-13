@@ -13,6 +13,68 @@
 #ifndef ENTROPY_H
 #define ENTROPY_H
 
+namespace SingleParticle {
+
+	/*
+	* @brief Transform vector of indices to full state
+	*/
+	arma::Col<double> transformIdxToState(int _Ns, const arma::uvec& _state)
+	{
+		arma::Col<double> _out(_Ns, arma::fill::zeros);
+		for (auto& i : _state)
+			_out(i) = 1;
+		return _out;
+	}
+
+	/*
+	* @brief Create correlation matrix for single state
+	*/
+	template<typename _T1, typename _T2>
+	arma::Mat<_T1> corrMatrixSingle(	
+								uint							_Ns,
+								const arma::Mat<_T2>&			_W_A, 
+								const arma::Mat<_T2>&			_W_A_CT, 
+								const arma::uvec&				_state, 
+								bool							_rawRho = false	
+		)
+	{
+		if (!_rawRho)
+		{
+			auto prefactors			= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto W_A_CT_P			= _W_A_CT;
+			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+				W_A_CT_P.row(_row)	= W_A_CT_P.row(_row) * prefactors;
+			return W_A_CT_P * _W_A;
+		}
+		return 2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state);
+	};
+
+	/*
+	* @brief Create correlation matrix for multiple states
+	*/
+	template<typename _T1, typename _T2>
+	arma::Mat<_T1> corrMatrixSingle(	
+								uint							_Ns,
+								const arma::Mat<_T2>&			_W_A, 
+								const arma::Mat<_T2>&			_W_A_CT, 
+								const arma::uvec&				_state, 
+								bool							_rawRho = false	
+		)
+	{
+		if (!_rawRho)
+		{
+			auto prefactors			= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto W_A_CT_P			= _W_A_CT;
+			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+				W_A_CT_P.row(_row)	= W_A_CT_P.row(_row) * prefactors;
+			return W_A_CT_P * _W_A;
+		}
+		return 2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state);
+	};
+
+};
+
+
 namespace Entropy {
 	namespace Entanglement {
 		namespace Bipartite {
@@ -187,6 +249,9 @@ namespace Entropy {
 					entropy += (std::abs(vals(i)) > 0) ? -vals(i) * std::log(vals(i)) : 0.0;
 				return entropy;
 			};
+
+			// ##########################################################################################################################################
+
 		};
 	};
 };
