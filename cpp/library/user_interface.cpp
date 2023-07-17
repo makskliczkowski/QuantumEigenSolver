@@ -236,7 +236,7 @@ bool UI::defineModels(bool _createLat) {
 bool UI::defineModelsQ(bool _createLat)
 {
 	// create lattice
-	LOGINFO("Making quardratic model!", LOG_TYPES::INFO, 1);
+	LOGINFO("Making quadratic model!", LOG_TYPES::INFO, 1);
 
 	BEGIN_CATCH_HANDLER
 		if (_createLat && !this->latP.lat)
@@ -266,9 +266,9 @@ bool UI::defineModelsQ(bool _createLat)
 	// check if is complex and define the Hamiltonian
 	bool _ok;
 	if (this->isComplex_ || this->useComplex_)
-		_ok = this->defineModel(this->hilComplex, this->hamComplex);
+		_ok = this->defineModelQ<cpx>(this->qhamComplex);
 	else
-		_ok = this->defineModel(this->hilDouble, this->hamDouble);
+		_ok = this->defineModelQ<double>(this->qhamDouble);
 
 	return _ok;
 
@@ -511,9 +511,9 @@ void UI::makeSimQuadratic()
 	if (!this->defineModelsQ(true))
 		return;
 	if (this->isComplex_)
-		this->quadraticStatesMix(clk::now(), this->qhamComplex);
+		this->quadraticStatesMix<cpx>(clk::now(), this->qhamComplex);
 	else
-		this->quadraticStatesMix(clk::now(), this->qhamDouble);
+		this->quadraticStatesMix<double>(clk::now(), this->qhamDouble);
 }
 // -------------------------------------------------------- SIMULATIONS
 

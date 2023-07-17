@@ -258,7 +258,7 @@ protected:
 	std::shared_ptr<QuadraticHamiltonian<double>>	qhamDouble;
 	Hilbert::HilbertSpace<cpx>						hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>				hamComplex;
-	std::shared_ptr<QuadraticHamiltonian<double>>	qhamComplex;
+	std::shared_ptr<QuadraticHamiltonian<cpx>>		qhamComplex;
 
 	// define the NQS
 	std::shared_ptr<NQS<cpx,cpx>>			nqsCpx;
@@ -519,6 +519,7 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
 		break;
 	case MY_MODELS_Q::SYK2_M:
 		_H = std::make_shared<SYK2<_T>>(this->latP.lat, 0.0);
+		break;
 	default:
 		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
 		break;
@@ -1168,8 +1169,6 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	// --- save energies txt check ---
 	std::string filename	=			dir + modelInfo;
 
-
-
 	// set the parameters
 	uint Ns					=			_H->getNs();
 	uint Nh					=			_H->getHilbertSize();
@@ -1179,6 +1178,13 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	u64 realizations		=			this->nqsP.nBlocks_;
 	// number of combinations to take from single particle states
 	u64 combinations		=			this->nqsP.blockSize_;
+
+	if (combinations < stateNum)
+	{
+		LOGINFO("Bad number of combinations. Must be bigger", LOG_TYPES::ERROR, 0);
+		throw std::runtime_error("BAD COMBINATIONS");
+	}
+
 
 	// check the model (if necessery to build hamil, do it)
 	arma::Mat<_T> W;
@@ -1199,8 +1205,8 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 
 	std::string name		=			VEQ(Nh);
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states:			" + STR(stateNum), LOG_TYPES::TRACE, 2);
-	LOGINFO("Taking num realizations:	" + STR(realizations), LOG_TYPES::TRACE, 2);
+	LOGINFO("Taking num states:	" + STR(stateNum), LOG_TYPES::TRACE, 2);
+	LOGINFO("Taking num realizations: " + STR(realizations), LOG_TYPES::TRACE, 2);
 
 	// save single particle energies
 	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
@@ -1210,55 +1216,57 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	arma::mat ENTROPIES(maxBondNum, realizations, arma::fill::zeros);
 
 	// set which bonds we want to cut in bipartite
-	v_1d<uint> _bonds		=			{};
-	for (int i = 1; i <= maxBondNum; i++)
-		_bonds.push_back(i);
+	v_1d<uint> _bonds		=			{ uint(Ns / 4), uint(Ns / 2)};
+	//for (int i = 1; i <= maxBondNum; i++)
+	//	_bonds.push_back(i);
 	auto beforeEntro		=			clk::now();
-	_H->generateFullMap();
 
 	// get the states to use later
-	auto [energies, orbs]	=			_H->getManyBodyEnergies(Ns/2, realizations);
+	auto [energies, orbs]	=			_H->getManyBodyEnergies(Ns/2, combinations);
 	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// make matrices
 	std::vector<arma::Mat<_T>> Ws;
 	std::vector<arma::Mat<_T>> WsC;
-	for (int i = 1; i <= maxBondNum; ++i)
+	for (int i = 0; i < _bonds.size(); ++i)
 	{
-		Ws.push_back(W.submat(0, 0, i, W.n_cols));
-		WsC.push_back(W.submat(0, 0, W.n_cols, i));
+		Ws.push_back(W.submat(0, 0, W.n_cols - 1, _bonds[i] - 1));
+		WsC.push_back(W.submat(0, 0, _bonds[i] - 1, W.n_rows - 1));
 	}
 
 	// indices of orbitals
 	std::vector<uint> idxs(combinations);
 	std::iota(idxs.begin(), idxs.end(), 0);
 
+	pBar pbar(5, realizations);
 	// calculate!
-#pragma omp parallel for num_threads(this->threadNum)
+//#pragma omp parallel for num_threads(this->threadNum)
 	for (auto idx = 0LL; idx < realizations; idx++) {
 		// create vector of orbitals
 		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
 		v_1d<arma::uvec> orbitals;
-		for (auto idxO : idxs)
+		for (auto idxO : orbitalIndices)
 			orbitals.push_back(orbs[idxO]);
 
 		// generate coefficients
 		auto coeff			= _H->ran_.createRanState(stateNum);
 
 		// go through bonds
+		uint _bondI = 0;
 		for (auto i : _bonds) {
 			// iterate through the state
-			auto J = SingleParticle::corrMatrix<_T>(Ns, W, WCT, orbitals, coeff, _H->ran_);
-			auto E = 0.0;
+			auto J = SingleParticle::corrMatrix<_T>(Ns, Ws[_bondI], WsC[_bondI], orbitals, coeff, _H->ran_);
+			auto E = Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
 			// save the entropy
 			ENTROPIES(i - 1, idx) = E;
+			_bondI++;
 		}
-		if (stateNum > 10 && idx % int(realizations / 10) == 0)
-			LOGINFO("Finished: " + STR(int(idx * 100.0 / realizations)) + "%", LOG_TYPES::TRACE, 3);
+		if (idx % pbar.percentageSteps == 0)
+			pbar.printWithTime(LOG_LVL3 + SSTR("PROGRESS"));
 	}
 	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
 	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// save entropies file
-	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
+	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy_" + STR(stateNum), arma::hdf5_opts::append));
 }

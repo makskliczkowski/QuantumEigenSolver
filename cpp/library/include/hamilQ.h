@@ -17,15 +17,15 @@
 
 // ######################### EXISTING MODELS ############################
 enum class MY_MODELS_Q{												 // #
-	NONE, FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M		 // #
+	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE		 // #
 };																	 // #
 BEGIN_ENUMC(MY_MODELS_Q)										     // #
 {																	 // #
-	DECL_ENUM_ELEMENT(NONE),										 // #
 	DECL_ENUM_ELEMENT(FREE_FERMIONS_M),								 // #
 	DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),								 // #
 	DECL_ENUM_ELEMENT(SYK2_M),										 // #
-	DECL_ENUM_ELEMENT(ANDERSON_M)									 // #
+	DECL_ENUM_ELEMENT(ANDERSON_M),									 // #
+	DECL_ENUM_ELEMENT(NONE)											 // #
 }																	 // #
 END_ENUMC(MY_MODELS_Q)												 // #	
 template <>															 // #
@@ -79,6 +79,7 @@ public:
 	virtual auto getTransMat()				-> arma::Mat<_T>		{ return this->eigVec_; };
 	virtual auto getSPEnMat()				-> arma::Col<double>	{ return this->eigVal_; };
 	auto getTypeI()							const -> uint			{ return (uint)this->type_; };
+	auto getType()							const -> std::string	{ return getSTR_MY_MODELS_Q(this->type_); };
 
 	// ########### OVERRIDE ##########
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override {};
@@ -199,9 +200,9 @@ inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getMany
 		// create combination
 		auto _combination		=	this->ran_.choice<uint_fast16_t>(orbitals, N);
 		// transform to uvec
-		arma::uvec _combinationV(N);
-		for (int j = 0; j < N; j++)
-			_combinationV(j)	=	_combination[i];
+		arma::uvec _combinationV(_combination.size());
+		for (int j = 0; j < _combination.size(); j++)
+			_combinationV(j)	=	_combination[j];
 		// append
 		manyBodyOrbitals.push_back(_combinationV);
 		// get energy

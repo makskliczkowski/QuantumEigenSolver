@@ -144,7 +144,7 @@ public:
 	
 	auto getDegeneracies()								const -> v_2d<u64>;
 	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
-	auto getHilbertSize()								const -> u64						{ return this->hilbertSpace.getHilbertSize(); };			
+	auto getHilbertSize()								const -> u64						{ return this->Nh; };			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
 	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_; };								
 	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot(); };

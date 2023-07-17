@@ -17,6 +17,7 @@ public:
 	FreeFermions(std::shared_ptr<Lattice> _lat, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true), t_(_t), t_0(_t0)
 	{
+		this->type_			=		MY_MODELS_Q::FREE_FERMIONS_M;
 		this->info_			=		this->info();
 		this->dt_			=		this->ran_.createRanVec(this->Ns, this->t_0);
 		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
@@ -43,8 +44,8 @@ public:
 	
 	std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
-		auto Ns = this->hilbertSpace.getLatticeSize();
-		auto BC = this->hilbertSpace.getBC();
+		auto Ns = this->lat_->get_Ns();
+		auto BC = this->lat_->get_BC();
 		std::string name = sep + "FF,Ns=" + STR(Ns);
 		PARAMS_S_DISORDER(t_, name);
 		name += ",BC=" + SSTR(getSTR_BoundaryConditions(BC));
@@ -87,6 +88,7 @@ inline arma::Col<double> FreeFermions<_T>::getSPEnMat()
 	this->eigVal_.zeros(this->Ns, this->Ns);
 	for (int k = 0; k < this->Ns; k++)
 		this->eigVal_(k) = 2.0 * PARAM_W_DISORDER(t_, k) * std::cos(double(k * TWOPI / this->Ns));
+	return this->eigVal_;
 }
 
 // ###################################################################################

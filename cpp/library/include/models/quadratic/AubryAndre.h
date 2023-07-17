@@ -29,9 +29,10 @@ public:
 												double _beta0		= 0.0,
 												double _phi0		= 0.0,
 												double _constant	= 0.0)
-		: QuadraticHamiltonian<_T>(_lat, _constant, true), J(_J), Ld(_disorder),
-		B(_beta), P(_phi), J0(_J0), Ld0(_l0), B0(_beta0), P0(_phi0)
+		: QuadraticHamiltonian<_T>(_lat, _constant, true), J(_J), J0(_J0),
+		B(_beta), B0(_beta0), P(_phi), P0(_phi0), Ld(_disorder), Ld0(_l0)
 	{
+		this->type_		= MY_MODELS_Q::AUBRY_ANDRE_M;
 		this->info_		= this->info();
 		this->dJ		= this->ran_.createRanVec(this->Ns, this->J0);
 		this->dB		= this->ran_.createRanVec(this->Ns, this->B0);
@@ -64,8 +65,8 @@ public:
 
 	std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
-		auto Ns = this->hilbertSpace.getLatticeSize();
-		auto BC = this->hilbertSpace.getBC();
+		auto Ns = this->lat_->get_Ns();
+		auto BC = this->lat_->get_BC();
 		std::string name = sep + "AUBRYANDRE,Ns=" + STR(Ns);
 		PARAMS_S_DISORDER(J, name);
 		PARAMS_S_DISORDER(B, name);

@@ -60,10 +60,10 @@ namespace SingleParticle
 	* @returns single particle correlation matrix for a single product state in quasiparticle basis
 	*/
 	template<typename _T1>
-	inline arma::Mat<_T1> corrMatrixSingle(	
+	inline arma::Mat<_T1> corrMatrixSingle(
 								uint							_Ns,
-								const arma::Mat<_T1>&			_W_A, 
-								const arma::Mat<_T1>&			_W_A_CT, 
+								const arma::Mat<double>&		_W_A, 
+								const arma::Mat<double>&		_W_A_CT,
 								const arma::uvec&				_state, 
 								bool							_rawRho = false	
 		)
@@ -71,7 +71,59 @@ namespace SingleParticle
 		if (!_rawRho)
 		{
 			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
-			arma::Mat<double> W_A_CT_P	= _W_A_CT;
+			arma::Mat<_T1> W_A_CT_P		= _W_A_CT;
+			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
+			return W_A_CT_P * _W_A;
+		}
+		// raw rho matrix (without delta_ij)
+		arma::Mat<double> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
+		arma::Mat<double> _left		=	_W_A_CT.cols(_state);
+		arma::Mat<double> _right	=	_W_A.rows(_state);
+		_J							=	(2.0 * _left * _right);
+		return _J;
+	};
+
+	template<>
+	inline arma::Mat<cpx> corrMatrixSingle(	
+								uint							_Ns,
+								const arma::Mat<double>&		_W_A,
+								const arma::Mat<double>&		_W_A_CT,
+								const arma::uvec&				_state, 
+								bool							_rawRho	
+		)
+	{
+		if (!_rawRho)
+		{
+			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			arma::Mat<cpx> W_A_CT_P;
+			W_A_CT_P.set_real(_W_A_CT);
+
+			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
+			return W_A_CT_P * _W_A;
+		}
+		// raw rho matrix (without delta_ij)
+		arma::Mat<cpx> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
+		arma::Mat<double> _left		= _W_A_CT.cols(_state);
+		arma::Mat<double> _right	= _W_A.rows(_state);
+		_J.set_real(2.0 * _left * _right);
+		return _J;
+	};
+
+	template<typename _T1>
+	inline arma::Mat<_T1> corrMatrixSingle(
+								uint							_Ns,
+								const arma::Mat<cpx>&			_W_A, 
+								const arma::Mat<cpx>&			_W_A_CT,
+								const arma::uvec&				_state, 
+								bool							_rawRho = false	
+		)
+	{
+		if (!_rawRho)
+		{
+			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			arma::Mat<_T1> W_A_CT_P		= _W_A_CT;
 			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
 				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
 			return W_A_CT_P * _W_A;
@@ -79,7 +131,30 @@ namespace SingleParticle
 		// raw rho matrix (without delta_ij)
 		auto _left						= _W_A_CT.cols(_state);
 		auto _right						= _W_A.rows(_state);
-		return arma::Mat<_T1>(2.0 * _left * _right);
+		return 2.0 * _left * _right;
+	};
+
+	template<>
+	inline arma::Mat<double> corrMatrixSingle(
+								uint							_Ns,
+								const arma::Mat<cpx>&			_W_A,
+								const arma::Mat<cpx>&			_W_A_CT,
+								const arma::uvec&				_state,
+								bool							_rawRho
+	)
+	{
+		if (!_rawRho)
+		{
+			auto prefactors					= 2 * transformIdxToState(_Ns, _state) - 1;
+			arma::Mat<cpx> W_A_CT_P			= _W_A_CT;
+			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+				W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
+			return arma::real(W_A_CT_P * _W_A);
+		}
+		// raw rho matrix (without delta_ij)
+		auto _left							= _W_A_CT.cols(_state);
+		auto _right							= _W_A.rows(_state);
+		return arma::real(2.0 * _left * _right);
 	};
 
 	// #######################################################
@@ -88,7 +163,7 @@ namespace SingleParticle
 	* @brief Create correlation matrix for multiple states
 	*/
 	template<typename _T1>
-	inline arma::Mat<cpx> corrMatrix(	
+	inline arma::Mat<cpx> corrMatrix(
 								uint							_Ns,
 								const arma::Mat<_T1>&			_W_A, 
 								const arma::Mat<_T1>&			_W_A_CT, 
@@ -117,29 +192,29 @@ namespace SingleParticle
 
 		// correlation atrix
 		uint La			=		_W_A.n_cols;
-		arma::Mat<cpx> J=		_rawRho ? arma::zeros(La, La) : -arma::eye(La, La);
+		arma::Mat<cpx> J=		_rawRho ? arma::Mat<cpx>(La, La, arma::fill::zeros) : -arma::Mat<cpx>(La, La, arma::fill::eye);
 
 		// ### E Q U A L ###
 		for (int mi = 0; mi < _gamma; ++mi)
-			J			+=		_coeff[mi] * algebra::conjugate(_coeff[mi]) * SingleParticle::corrMatrixSingle(_Ns, _W_A, _W_A_CT, _states[mi], true);
+			J			+=		_coeff[mi] * algebra::conjugate(_coeff[mi]) * SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[mi], true);
 
 		// ### U E Q U L ###
 		// go through states <m|
 		for (int mi = 0; mi < _gamma; ++mi)
 		{
-			const auto _m		=	_states[mi];
-			const auto _mb		=	transformIdxToBitset(_Ns, _m);
+			const auto& _m		=	_states[mi];
+			const auto& _mb		=	transformIdxToBitset(_Ns, _m);
 			// go through states |n> (higher than m)
-			for (int ni = mi; ni < _gamma; ++ni)
+			for (int ni = mi + 1; ni < _gamma; ++ni)
 			{
-				const auto _n	=	_states[ni];
-				const auto _nb	=	transformIdxToBitset(_Ns, _n);
+				const auto& _n	=	_states[ni];
+				const auto& _nb	=	transformIdxToBitset(_Ns, _n);
 
 				// xor to check the difference
 				auto x			=	_mb ^ _nb;
 				auto _counter	=	x.count();
 
-				if (_counter != 0)
+				if (_counter != 2)
 					continue;
 
 				v_1d<uint> qs;
@@ -147,7 +222,10 @@ namespace SingleParticle
 				x.iterate_bits_on([&](uint _pos) { qs.push_back(_pos); });
 
 				// go through occupied orbitals
-				for (auto [q1, q2] : { { qs[0], qs[1] }, {qs[1], qs[0] } })
+				std::tuple<uint, uint> qs_nor = {qs[0], qs[1]};
+				std::tuple<uint, uint> qs_rev = {qs[1], qs[0]};
+				v_1d<std::tuple<uint, uint>> qs_get = { qs_nor, qs_rev };
+				for (auto& [q1, q2] : qs_get)
 				{
 					if (!(_n[q1] || _m[q1]))
 						continue;
@@ -156,7 +234,7 @@ namespace SingleParticle
 						continue;
 
 					auto COEFF	=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
-					J			+=	_W_A_CT.col(q1) * (COEFF * _W_A.row(q2));
+					J			+= COEFF * (_W_A_CT.col(q1) * _W_A.row(q2));
 				}
 			}
 		}
@@ -345,7 +423,27 @@ namespace Entropy {
 			};
 
 			// ##########################################################################################################################################
+			
+			namespace SingleParticle
+			{
+				template<typename _T>
+				inline double vonNeuman(const arma::Mat<_T> _J)
+				{
+					auto Ns			=		_J.n_rows;
+					arma::Mat<_T> eigS;
+					arma::Col<double> eigV;
+					// diagonalize
+					arma::eig_sym(eigV, eigS, _J);
+					auto S = 0.0;
+					for (auto eV : eigV)
+					{
+						S += (eV > -1.0) ? ((1.0 + eV) * std::log((1.0 + eV) / 2.0)) : 0.0;
+						S += (eV < 1.0)  ? ((1.0 - eV) * std::log((1.0 - eV) / 2.0)) : 0.0;
 
+					}
+					return -0.5 * algebra::real(S);
+				}
+			}
 		};
 	};
 };
