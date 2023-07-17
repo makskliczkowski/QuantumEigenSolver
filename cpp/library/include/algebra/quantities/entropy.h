@@ -10,67 +10,161 @@
 #include "../hilbert.h"
 #endif // !HILBERT_H
 
+// dynamic bitset
+#include "../../DYNAMIC/dynamic_bitset.hpp"
+
 #ifndef ENTROPY_H
 #define ENTROPY_H
 
-namespace SingleParticle {
+// ################################## S I N G L E   P A R T I C L E ##################################
+namespace SingleParticle 
+{
 
 	/*
-	* @brief Transform vector of indices to full state
+	* @brief Transform vector of indices to full state in Fock real space basis.
+	* @param _Ns number of lattice sites
+	* @param _state single particle orbital indices
+	* @returns an Armadillo vector in the Fock basis
 	*/
-	arma::Col<double> transformIdxToState(int _Ns, const arma::uvec& _state)
+	inline arma::Col<double> transformIdxToState(uint _Ns, const arma::uvec& _state)
 	{
 		arma::Col<double> _out(_Ns, arma::fill::zeros);
 		for (auto& i : _state)
 			_out(i) = 1;
 		return _out;
 	}
+	
+	/*
+	* @brief Transform vector of indices to full state in Fock real space basis.
+	* @param _Ns number of lattice sites
+	* @param _state single particle orbital indices
+	* @returns an Armadillo vector in the Fock basis
+	*/
+	inline sul::dynamic_bitset<> transformIdxToBitset(uint _Ns, const arma::uvec& _state)
+	{
+		sul::dynamic_bitset<> _out(_Ns);
+		for (auto& i : _state)
+			_out[i] = true;
+		return _out;
+	}
+
+	// #######################################################
 
 	/*
-	* @brief Create correlation matrix for single state
+	* @brief Create single particle correlation matrix for a given Fock state in orbital basis
+	* @param _Ns number of lattice sites
+	* @param _W_A transformation matrix to quasiparticle operators reduced to subsystem fraction A
+	* @param _W_A_CT transformation matrix to quasiparticle operators reduced to subsystem fraction A - hermitian conjguate
+	* @param _state a vector of occupations in quasiparticle operators
+	* @param _rawRho shall return a raw rho 2*(c+c) correlation, or total correlation matrix ([c+,c])
+	* @returns single particle correlation matrix for a single product state in quasiparticle basis
 	*/
-	template<typename _T1, typename _T2>
-	arma::Mat<_T1> corrMatrixSingle(	
+	template<typename _T1>
+	inline arma::Mat<_T1> corrMatrixSingle(	
 								uint							_Ns,
-								const arma::Mat<_T2>&			_W_A, 
-								const arma::Mat<_T2>&			_W_A_CT, 
+								const arma::Mat<_T1>&			_W_A, 
+								const arma::Mat<_T1>&			_W_A_CT, 
 								const arma::uvec&				_state, 
 								bool							_rawRho = false	
 		)
 	{
 		if (!_rawRho)
 		{
-			auto prefactors			= 2 * transformIdxToState(_Ns, _state) - 1;
-			auto W_A_CT_P			= _W_A_CT;
+			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			arma::Mat<double> W_A_CT_P	= _W_A_CT;
 			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
-				W_A_CT_P.row(_row)	= W_A_CT_P.row(_row) * prefactors;
+				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
 			return W_A_CT_P * _W_A;
 		}
-		return 2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state);
+		// raw rho matrix (without delta_ij)
+		auto _left						= _W_A_CT.cols(_state);
+		auto _right						= _W_A.rows(_state);
+		return arma::Mat<_T1>(2.0 * _left * _right);
 	};
+
+	// #######################################################
 
 	/*
 	* @brief Create correlation matrix for multiple states
 	*/
-	template<typename _T1, typename _T2>
-	arma::Mat<_T1> corrMatrixSingle(	
+	template<typename _T1>
+	inline arma::Mat<cpx> corrMatrix(	
 								uint							_Ns,
-								const arma::Mat<_T2>&			_W_A, 
-								const arma::Mat<_T2>&			_W_A_CT, 
-								const arma::uvec&				_state, 
-								bool							_rawRho = false	
-		)
-	{
-		if (!_rawRho)
+								const arma::Mat<_T1>&			_W_A, 
+								const arma::Mat<_T1>&			_W_A_CT, 
+								const v_1d<arma::uvec>&			_states,
+								arma::Col<cpx>&					_coeff,
+								randomGen&						_gen,
+								bool							_rawRho = false
+							){
+		// get the number of states in the mixture
+		auto _gamma		=		_states.size();
+
+		if (_gamma == 0)
+			throw std::exception("Cannot create a correlation matrix out of no states, damnit...");
+
+		// if there is a single state only - go for it!
+		if (_gamma == 1)
+			if(!_rawRho)
+				return SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
+			else
+				return SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[0], true);
+
+		// check the size of coefficients, otherwise create if they are bad...
+		if(_coeff.n_elem != _gamma)
+			_coeff		=		_gen.createRanState(_gamma);
+		auto _coeffC	=		arma::conj(_coeff);
+
+		// correlation atrix
+		uint La			=		_W_A.n_cols;
+		arma::Mat<cpx> J=		_rawRho ? arma::zeros(La, La) : -arma::eye(La, La);
+
+		// ### E Q U A L ###
+		for (int mi = 0; mi < _gamma; ++mi)
+			J			+=		_coeff[mi] * algebra::conjugate(_coeff[mi]) * SingleParticle::corrMatrixSingle(_Ns, _W_A, _W_A_CT, _states[mi], true);
+
+		// ### U E Q U L ###
+		// go through states <m|
+		for (int mi = 0; mi < _gamma; ++mi)
 		{
-			auto prefactors			= 2 * transformIdxToState(_Ns, _state) - 1;
-			auto W_A_CT_P			= _W_A_CT;
-			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
-				W_A_CT_P.row(_row)	= W_A_CT_P.row(_row) * prefactors;
-			return W_A_CT_P * _W_A;
+			const auto _m		=	_states[mi];
+			const auto _mb		=	transformIdxToBitset(_Ns, _m);
+			// go through states |n> (higher than m)
+			for (int ni = mi; ni < _gamma; ++ni)
+			{
+				const auto _n	=	_states[ni];
+				const auto _nb	=	transformIdxToBitset(_Ns, _n);
+
+				// xor to check the difference
+				auto x			=	_mb ^ _nb;
+				auto _counter	=	x.count();
+
+				if (_counter != 0)
+					continue;
+
+				v_1d<uint> qs;
+				// add position orbitals that are occupied
+				x.iterate_bits_on([&](uint _pos) { qs.push_back(_pos); });
+
+				// go through occupied orbitals
+				for (auto [q1, q2] : { { qs[0], qs[1] }, {qs[1], qs[0] } })
+				{
+					if (!(_n[q1] || _m[q1]))
+						continue;
+
+					if (!(_n[q2] || _m[q2]))
+						continue;
+
+					auto COEFF	=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
+					J			+=	_W_A_CT.col(q1) * (COEFF * _W_A.row(q2));
+				}
+			}
 		}
-		return 2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state);
+		return J;
 	};
+	
+	// #######################################################
+
 
 };
 

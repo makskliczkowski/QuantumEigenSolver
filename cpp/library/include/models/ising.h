@@ -118,9 +118,9 @@ template<typename _T>
 inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
 	// get number of forward nn
-	uint NUM_OF_NN = (uint)this->lat_->get_nn_ForwardNum(_site);
-	u64 newIdx	= 0;
-	_T newVal	= 0;
+	uint NUM_OF_NN	= (uint)this->lat_->get_nn_ForwardNum(_site);
+	u64 newIdx		= 0;
+	_T newVal		= 0;
 
 	//stout << EL << "____________________________" << EL;
 	//stout << VEQ(_elemId) << EL;

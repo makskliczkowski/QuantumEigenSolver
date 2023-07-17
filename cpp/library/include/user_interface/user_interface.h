@@ -31,6 +31,18 @@
 #endif // !XYZ_H										 // #
 // ##########################################################
 
+// ######################## MODELS Q ########################
+#ifndef SYK2_M_H										 // #
+#include "../models/quadratic/SYK2.h"					 // #
+#endif // !SYK2											 // #
+#ifndef FF_M_H											 // #
+#include "../models/quadratic/FreeFermions.h"			 // #
+#endif // !SYK2											 // #
+#ifndef AUBRY_ANDRE_M_H									 // #
+#include "../models/quadratic/AubryAndre.h"				 // #
+#endif // !SYK2											 // #
+// ##########################################################
+
 // ###################### LATTICES ##########################
 #ifndef SQUARE_H										 // #
 #include "../../source/src/Lattices/square.h"			 // #
@@ -65,7 +77,8 @@ namespace UI_PARAMS {
 	*/
 	struct ModP {
 		// ############### TYPE ################
-		UI_PARAM_CREATE_DEFAULT(modTyp		, MY_MODELS	, MY_MODELS::ISING_M);
+		UI_PARAM_CREATE_DEFAULT(modTyp		, MY_MODELS		, MY_MODELS::ISING_M);
+		UI_PARAM_CREATE_DEFAULT(modTypQ		, MY_MODELS_Q	, MY_MODELS_Q::SYK2_M);
 
 		// ############### ISING ###############
 		UI_PARAM_STEP(double				, J1		, 1.0				);	// spin exchange
@@ -81,6 +94,10 @@ namespace UI_PARAMS {
 		UI_PARAM_STEP(double				, kx		, 1.0				);	// spin exchange
 		UI_PARAM_STEP(double				, ky		, 1.0				);	// spin exchange
 		UI_PARAM_STEP(double				, kz		, 1.0				);	// spin exchange
+		// ############ AUBRY_ANDRE ############
+		UI_PARAM_STEP(double				, Beta		, (1+std::sqrt(5))/2);	// phase mult
+		UI_PARAM_STEP(double				, Phi		, 1.0				);	// phase add
+
 
 		void setDefault() {
 			UI_PARAM_SET_DEFAULT(modTyp);
@@ -98,6 +115,19 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT_STEP(kx);
 			UI_PARAM_SET_DEFAULT_STEP(ky);
 			UI_PARAM_SET_DEFAULT_STEP(kz);
+			// aubry-andre
+			UI_PARAM_SET_DEFAULT_STEP(Beta);
+			UI_PARAM_SET_DEFAULT_STEP(Phi);
+		}
+
+		/*
+		* @brief Check whether the model itself is complex...
+		*/
+		bool checkComplex()
+		{
+			if (this->modTypQ_ == MY_MODELS_Q::FREE_FERMIONS_M)
+				return true;
+			return false;
 		}
 	};
 
@@ -221,12 +251,14 @@ protected:
 	UI_PARAMS::ModP modP;
 
 	// define basic models
-	bool isComplex_							= false;
-	bool useComplex_						= false;
-	Hilbert::HilbertSpace<double>			hilDouble;
-	std::shared_ptr<Hamiltonian<double>>	hamDouble;
-	Hilbert::HilbertSpace<cpx>				hilComplex;
-	std::shared_ptr<Hamiltonian<cpx>>		hamComplex;
+	bool isComplex_									= false;
+	bool useComplex_								= false;
+	Hilbert::HilbertSpace<double>					hilDouble;
+	std::shared_ptr<Hamiltonian<double>>			hamDouble;
+	std::shared_ptr<QuadraticHamiltonian<double>>	qhamDouble;
+	Hilbert::HilbertSpace<cpx>						hilComplex;
+	std::shared_ptr<Hamiltonian<cpx>>				hamComplex;
+	std::shared_ptr<QuadraticHamiltonian<double>>	qhamComplex;
 
 	// define the NQS
 	std::shared_ptr<NQS<cpx,cpx>>			nqsCpx;
@@ -278,6 +310,13 @@ protected:
 			UI_PARAM_MAP(kx			, 0.0					, FHANDLE_PARAM_DEFAULT			),
 			UI_PARAM_MAP(ky			, 0.0					, FHANDLE_PARAM_DEFAULT			),
 			UI_PARAM_MAP(kz			, 0.0					, FHANDLE_PARAM_DEFAULT			),
+			// ----------- model quadratic parameters ------------
+			UI_OTHER_MAP(mod		, this->modP._modTypQ	, FHANDLE_PARAM_BETWEEN(0., 3.)	),
+			// -------- aubry-andre
+			UI_PARAM_MAP(Beta		, this->modP._Beta		, FHANDLE_PARAM_DEFAULT			),
+			UI_PARAM_MAP(Phi		, this->modP._Phi		, FHANDLE_PARAM_DEFAULT			),
+
+
 			// ---------------- symmetries ----------------
 			UI_PARAM_MAP(ks			, this->symP._k			, FHANDLE_PARAM_HIGHER0			),
 			UI_PARAM_MAP(pxs		, this->symP._px		, FHANDLE_PARAM_BETWEEN()		),
@@ -318,12 +357,19 @@ private:
 	// ###################### KITAEV #######################
 
 	//void make_mc_kitaev(t_3d<double> K);
+	// #################### QUADRATIC ######################
+	template<typename _T>
+	void quadraticStatesMix(clk::time_point start, std::shared_ptr<QuadraticHamiltonian<_T>> _H);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineModels(bool _createLat = true);
+	bool defineModelsQ(bool _createLat = true);
 
 	template<typename _T>
 	bool defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
+
+	template<typename _T>
+	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H);
 
 	template<typename _T>
 	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS);
@@ -403,11 +449,16 @@ public:
 	void makeSimSymmetriesSweepHilbert();
 	//void make_simulation_symmetries_sweep();
 	//void make_symmetries_test(int l = -1);
+	// #######################         QUADRATIC            #######################
+	void makeSimQuadratic();
 
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief Defines the interacting model based on the input file...
+*/
 template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
@@ -442,6 +493,34 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
+		break;
+	}
+	return _isGood;
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief Defines the quadratic model based on the input file...
+*/
+template<typename _T>
+inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
+{
+	bool _isGood = true;
+
+	switch (this->modP.modTypQ_)
+	{
+	case MY_MODELS_Q::FREE_FERMIONS_M:
+		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
+		break;
+	case MY_MODELS_Q::AUBRY_ANDRE_M:
+		_H = std::make_shared<AubryAndre<_T>>(this->latP.lat, this->modP.J1_, this->modP.dlt1_, this->modP.Beta_, this->modP.Phi_,
+										this->modP.J10_, this->modP.dlt10_, this->modP.Beta0_, this->modP.Phi0_, 0.0);
+		break;
+	case MY_MODELS_Q::SYK2_M:
+		_H = std::make_shared<SYK2<_T>>(this->latP.lat, 0.0);
+	default:
+		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
 		break;
 	}
 	return _isGood;
@@ -592,6 +671,9 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief Allows to calculate how do the degeneracies look in case of symmetric Hamiltonians...
+*/
 inline void UI::symmetriesDeg(clk::time_point start)
 {
 	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
@@ -621,7 +703,7 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	// set the parameters
 	uint Ns					=			this->hamComplex->getNs();
 	u64 stateNum			=			Nh;
-	bool useShiftAndInvert	=			false;
+	bool useShiftAndInvert [[maybe_unused]] = false;
 	std::string infoH		=			this->hamComplex->getInfo();
 
 	//stouts("\t->", start);
@@ -681,7 +763,7 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	}
 
 	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
-	auto _idx				=			this->hamComplex->getEnAvIdx();
+	auto _idx [[maybe_unused]] = this->hamComplex->getEnAvIdx();
 	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
 		LOGINFO("Doing: " + VEQ(_deg+1) + ". " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 1);
 
@@ -1067,4 +1149,116 @@ inline void UI::nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T,cpx>> _N
 	_ENSM.save(dir + "en_" + nqsInfo + ".dat", arma::raw_ascii);
 
 
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T>
+inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<QuadraticHamiltonian<_T>> _H)
+{
+	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
+	
+	// --- create the directories ---
+	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
+	fs::create_directories(dir);
+
+	// --- use those files --- 
+	std::string modelInfo	=			_H->getInfo();
+
+	// --- save energies txt check ---
+	std::string filename	=			dir + modelInfo;
+
+
+
+	// set the parameters
+	uint Ns					=			_H->getNs();
+	uint Nh					=			_H->getHilbertSize();
+	// how many states to take for calculating the entropies
+	u64 stateNum			=			this->nqsP.nMcSteps_;
+	// how many states to take for the average
+	u64 realizations		=			this->nqsP.nBlocks_;
+	// number of combinations to take from single particle states
+	u64 combinations		=			this->nqsP.blockSize_;
+
+	// check the model (if necessery to build hamil, do it)
+	arma::Mat<_T> W;
+	arma::Mat<_T> WCT;
+	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
+	{
+		_H->hamiltonian();
+		LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
+		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
+		_H->diagH(false);
+		LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
+		LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
+	}
+	_H->getSPEnMat();
+	W	=	_H->getTransMat();
+	WCT	=	W.t();
+	LOGINFO("Finished creating matrices" + modelInfo, LOG_TYPES::TRACE, 1);
+
+	std::string name		=			VEQ(Nh);
+	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states:			" + STR(stateNum), LOG_TYPES::TRACE, 2);
+	LOGINFO("Taking num realizations:	" + STR(realizations), LOG_TYPES::TRACE, 2);
+
+	// save single particle energies
+	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+
+	// iterate through bond cut
+	const uint maxBondNum	=			Ns / 2;
+	arma::mat ENTROPIES(maxBondNum, realizations, arma::fill::zeros);
+
+	// set which bonds we want to cut in bipartite
+	v_1d<uint> _bonds		=			{};
+	for (int i = 1; i <= maxBondNum; i++)
+		_bonds.push_back(i);
+	auto beforeEntro		=			clk::now();
+	_H->generateFullMap();
+
+	// get the states to use later
+	auto [energies, orbs]	=			_H->getManyBodyEnergies(Ns/2, realizations);
+	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
+
+	// make matrices
+	std::vector<arma::Mat<_T>> Ws;
+	std::vector<arma::Mat<_T>> WsC;
+	for (int i = 1; i <= maxBondNum; ++i)
+	{
+		Ws.push_back(W.submat(0, 0, i, W.n_cols));
+		WsC.push_back(W.submat(0, 0, W.n_cols, i));
+	}
+
+	// indices of orbitals
+	std::vector<uint> idxs(combinations);
+	std::iota(idxs.begin(), idxs.end(), 0);
+
+	// calculate!
+#pragma omp parallel for num_threads(this->threadNum)
+	for (auto idx = 0LL; idx < realizations; idx++) {
+		// create vector of orbitals
+		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
+		v_1d<arma::uvec> orbitals;
+		for (auto idxO : idxs)
+			orbitals.push_back(orbs[idxO]);
+
+		// generate coefficients
+		auto coeff			= _H->ran_.createRanState(stateNum);
+
+		// go through bonds
+		for (auto i : _bonds) {
+			// iterate through the state
+			auto J = SingleParticle::corrMatrix<_T>(Ns, W, WCT, orbitals, coeff, _H->ran_);
+			auto E = 0.0;
+			// save the entropy
+			ENTROPIES(i - 1, idx) = E;
+		}
+		if (stateNum > 10 && idx % int(realizations / 10) == 0)
+			LOGINFO("Finished: " + STR(int(idx * 100.0 / realizations)) + "%", LOG_TYPES::TRACE, 3);
+	}
+	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
+	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
+
+	// save entropies file
+	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
 }

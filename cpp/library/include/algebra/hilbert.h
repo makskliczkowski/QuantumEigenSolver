@@ -1,5 +1,4 @@
 #pragma once
-
 /***********************************
 * Defines the Hilbert space with the
 * usage of Local and Global symmetry.
@@ -625,6 +624,7 @@ namespace Hilbert {
 	{
 		this->fullMap_ = {};
 		if (!this->symGroupGlobal_.empty())
+		{
 			WriteLock lock(this->Mutex);
 			LOGINFOG("Creating full global symmetry map!", LOG_TYPES::INFO, 1);
 			for (u64 j = 0; j < this->NhFull; j++) {
@@ -636,6 +636,7 @@ namespace Hilbert {
 				if (globalChecker)
 					this->fullMap_.push_back(j);
 			}
+		}
 	}
 
 	// ##########################################################################################################################################

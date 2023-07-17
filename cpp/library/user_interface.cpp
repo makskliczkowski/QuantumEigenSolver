@@ -50,7 +50,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTION(		nqsP, lr			 );
 	this->nqsP.nTherm_	= uint(0.1 * nqsP.nBlocks_);
 	
-	// ---------- LATTICE ----------
+	// ------------- LATTICE -------------
 	SETOPTIONV(		latP, typ, "l"		);
 	SETOPTIONV(		latP, dim, "d"		);
 	SETOPTION(		latP, Lx			);
@@ -59,7 +59,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTION(		latP, bc			);
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 
-	// ---------- MODEL ----------
+	// -------------- MODEL --------------
 
 	// model type
 	SETOPTIONV(		modP, modTyp, "mod"	);
@@ -79,7 +79,12 @@ void UI::parseModel(int argc, cmdArg& argv)
 	SETOPTION_STEP( modP, ky			);
 	SETOPTION_STEP( modP, kz			);
 
-	// ---------- SYMMETRIES ----------
+	// ----------- QUARDRATIC ------------
+	SETOPTIONV(		modP, modTypQ,"modQ");
+	SETOPTION_STEP(modP, Beta);
+	SETOPTION_STEP(modP, Phi);
+
+	// ----------- SYMMETRIES ------------
 	SETOPTION(		symP, k				);
 	SETOPTION(		symP, px			);
 	SETOPTION(		symP, py			);
@@ -97,8 +102,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 	//---------- DIRECTORY
 
-	bool setDir		[[maybe_unused]] =	this->setOption(this->mainDir, argv, "dir");
-	this->mainDir	=	fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
+	bool setDir		[[maybe_unused]]	=	this->setOption(this->mainDir, argv, "dir");
+	this->mainDir						=	fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
 
 	// create the directories
 	createDir(this->mainDir);
@@ -132,11 +137,13 @@ void UI::funChoice()
 		//	// check the properties of Kitaev model when the interations are 
 		//	this->make_mc_kitaev_sweep();
 		//	break;
-		case 11:
-			// this option utilizes the Hamiltonian with NQS ansatz calculation
-			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
-			this->makeSimNQS();
-			break;
+	// ------------------------------- NEURAL QST -------------------------------
+	case 11:
+		// this option utilizes the Hamiltonian with NQS ansatz calculation
+		LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
+		this->makeSimNQS();
+		break;
+	// ------------------------------- SYMMETRIES -------------------------------
 	case 20:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
@@ -167,6 +174,12 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE DEGENERACIES", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetriesDeg();
 		break;
+	// ------------------------------- QUADRATIC -------------------------------
+	case 30:
+		// this option utilizes the quadratic Hamiltonian calculation
+		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);
+		this->makeSimQuadratic();
+		break;
 	default:
 		// default case of showing the help
 		this->exitWithHelp();
@@ -181,6 +194,7 @@ void UI::funChoice()
 * @brief defines the models based on the input parameters
 */
 bool UI::defineModels(bool _createLat) {
+	BEGIN_CATCH_HANDLER
 	// create lattice
 	if (_createLat && !this->latP.lat)
 	{
@@ -200,9 +214,53 @@ bool UI::defineModels(bool _createLat) {
 			break;
 		};
 	}
-	
+	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
+
 	// check if is complex
 	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
+	LOGINFO("Making : " + std::string((this->isComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 2);
+
+	// check if is complex and define the Hamiltonian
+	bool _ok;
+	if (this->isComplex_ || this->useComplex_)
+		_ok = this->defineModelQ(this->qhamComplex);
+	else
+		_ok = this->defineModelQ(this->qhamDouble);
+
+	return _ok;
+
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+bool UI::defineModelsQ(bool _createLat)
+{
+	// create lattice
+	LOGINFO("Making quardratic model!", LOG_TYPES::INFO, 1);
+
+	BEGIN_CATCH_HANDLER
+		if (_createLat && !this->latP.lat)
+		{
+			switch (this->latP.typ_)
+			{
+			case LatticeTypes::SQ:
+				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			case LatticeTypes::HEX:
+				this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			default:
+				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			};
+		}
+	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
+
+	// check if is complex
+	this->isComplex_ = this->modP.checkComplex();
 	LOGINFO("Making : " + std::string((this->isComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 2);
 
 	// check if is complex and define the Hamiltonian
@@ -399,7 +457,7 @@ void UI::makeSimSymmetriesSweepHilbert()
 						if (this->hamDouble)
 							this->hamDouble.reset();
 						// define the models
-						bool empty = this->defineModels(true);
+						bool empty [[maybe_unused]] = this->defineModels(true);
 						// save the Hilbert space sizes
 						if (this->isComplex_)
 							this->symmetries(clk::now(), this->hamComplex, false);
@@ -437,7 +495,26 @@ void UI::makeSimNQS()
 	}
 }
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief make simulation with quadratic states mixing
+*/
+void UI::makeSimQuadratic()
+{
+	// reset Hamiltonians - memory release
+	if (this->qhamComplex)
+		this->qhamComplex.reset();
+	if (this->qhamDouble)
+		this->qhamDouble.reset();
+	// define the models
+	if (!this->defineModelsQ(true))
+		return;
+	if (this->isComplex_)
+		this->quadraticStatesMix(clk::now(), this->qhamComplex);
+	else
+		this->quadraticStatesMix(clk::now(), this->qhamDouble);
+}
 // -------------------------------------------------------- SIMULATIONS
 
 
