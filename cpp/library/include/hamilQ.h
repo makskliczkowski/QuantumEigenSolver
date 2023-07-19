@@ -143,7 +143,7 @@ template<typename _T>
 inline void QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num)
 {
 	if (this->Ns % 8 != 0)
-		throw std::exception("Method is not suitable for such system sizes...");
+		throw std::runtime_error(std::string("Method is not suitable for such system sizes..."));
 	
 	// create orbitals
 	std::vector<uint> orbitals;
@@ -158,7 +158,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, std::vecto
 	for (int i = 0; i < _num; ++i)
 		{
 			// create combination
-			auto _combinationTmp	=	this->ran_.choice<uint_fast16_t>(orbitals, int(N / 4));
+			auto _combinationTmp	=	this->ran_.choice(orbitals, int(N / 4));
 
 			// if we cannot create more combinations...
 			if (_combinationTmp.size() < int(N / 4))
@@ -206,7 +206,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, std::vector<do
 	for (int i = 0; i < _num; ++i)
 	{
 		// create combination
-		auto _combination		=	this->ran_.choice<uint_fast16_t>(orbitals, N);
+		auto _combination		=	this->ran_.choice(orbitals, N);
 		// transform to uvec
 		arma::uvec _combinationV(_combination.size());
 		for (int j = 0; j < _combination.size(); j++)

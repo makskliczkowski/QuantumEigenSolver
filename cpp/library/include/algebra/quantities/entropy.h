@@ -176,7 +176,7 @@ namespace SingleParticle
 		auto _gamma		=		_states.size();
 
 		if (_gamma == 0)
-			throw std::exception("Cannot create a correlation matrix out of no states, damnit...");
+			throw std::runtime_error(std::string("Cannot create a correlation matrix out of no states, damnit..."));
 
 		// if there is a single state only - go for it!
 		if (_gamma == 1)
