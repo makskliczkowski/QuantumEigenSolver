@@ -158,7 +158,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, std::vecto
 	for (int i = 0; i < _num; ++i)
 		{
 			// create combination
-			auto _combinationTmp	=	this->ran_.choice(orbitals, int(N / 4));
+			std::vector<uint_fast16_t> _combinationTmp	=  this->ran_.choice(orbitals, int(N / 4));
 
 			// if we cannot create more combinations...
 			if (_combinationTmp.size() < int(N / 4))
@@ -206,7 +206,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, std::vector<do
 	for (int i = 0; i < _num; ++i)
 	{
 		// create combination
-		auto _combination		=	this->ran_.choice(orbitals, N);
+		std::vector<uint_fast16_t> _combination		=	this->ran_.choice(orbitals, N);
 		// transform to uvec
 		arma::uvec _combinationV(_combination.size());
 		for (int j = 0; j < _combination.size(); j++)
