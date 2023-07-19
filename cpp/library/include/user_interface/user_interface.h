@@ -1245,7 +1245,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 
 	pBar pbar(5, realizations);
 	// calculate!
-//#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum)
 	for (auto idx = 0LL; idx < realizations; idx++) {
 		// create vector of orbitals
 		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
