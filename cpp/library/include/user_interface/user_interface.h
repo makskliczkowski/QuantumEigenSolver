@@ -1166,7 +1166,6 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	// --- use those files --- 
 	std::string modelInfo	=			_H->getInfo();
 
-
 	// set the parameters
 	uint Ns					=			_H->getNs();
 	uint Nh					=			_H->getHilbertSize();
@@ -1178,7 +1177,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	u64 combinations		=			this->nqsP.blockSize_;
 
 	// --- save energies txt check ---
-	std::string filename	=			dir + modelInfo + "_" + STR(stateNum);
+	std::string filename	=			dir + modelInfo + "_Gamma=" + STR(stateNum);
 
 	if (combinations < stateNum)
 	{
@@ -1186,10 +1185,15 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 		throw std::runtime_error("BAD COMBINATIONS");
 	}
 
+	auto _type				=			_H->getTypeI();
+
+	// check if we should append with realization (model may be random)
+	if(_type == (uint)MY_MODELS_Q::ANDERSON_M || _type == (uint)MY_MODELS_Q::SYK2_M)
+		filename			+=			"_R=" + STR(_H->ran_.randomInt(0,1000));
 
 	// check the model (if necessery to build hamil, do it)
 	arma::Mat<_T> W;
-	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
+	if (_type != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
 	{
 		_H->hamiltonian();
 		LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
@@ -1208,7 +1212,8 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	LOGINFO("Taking num realizations: " + STR(realizations),	LOG_TYPES::TRACE, 2);
 
 	// save single particle energies
-	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+	if(!fs::exists(dir + modelInfo + ".h5"))
+		_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// iterate through bond cut
 	v_1d<uint> _bonds		=			{ uint(Ns / 4), uint(Ns / 2)};
@@ -1226,7 +1231,6 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
 	else
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
-
 	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// make matrices
@@ -1246,7 +1250,8 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	pBar pbar(5, realizations);
 	// calculate!
 #pragma omp parallel for num_threads(this->threadNum)
-	for (auto idx = 0LL; idx < realizations; idx++) {
+	for (auto idx = 0LL; idx < realizations; idx++) 
+	{
 		// create vector of orbitals
 		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
 		v_1d<arma::uvec> orbitals;
@@ -1266,26 +1271,38 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 			ENTROPIES(_bondI, idx) = E;
 			_bondI++;
 		}
-		if (idx % pbar.percentageSteps == 0)
-			pbar.printWithTime(LOG_LVL3 + SSTR("PROGRESS"));
+		try {
+			if (idx % pbar.percentageSteps == 0)
+				pbar.printWithTime(LOG_LVL3 + SSTR("PROGRESS"));
+		}
+		catch(std::exception& e)
+		{
+			LOGINFO("Couldn't print progress: " + SSTR(e.what()), LOG_TYPES::WARNING, 3);
+		}
 	}
-
-	// save means
-	arma::Col<double> means(2, arma::fill::zeros);
-	std::ofstream ofs(dir + modelInfo + "_meanE.dat", std::ios_base::app);
-	for (int i = 0; i < _bonds.size(); i++)
-	{	
-		LOGINFO(STR(i) + ":" + STRP(arma::mean(ENTROPIES.row(i)), 12), LOG_TYPES::TRACE, 3);
-		LOGINFO(STRP(arma::mean(ENTROPIES.row(i)) / (_bonds[i] * std::log(2.0)), 12), LOG_TYPES::TRACE, 4);
-		ofs << arma::mean(ENTROPIES.row(i)) / (_bonds[i] * std::log(2.0)) << ",";
-	}
-	ofs << EL;
-	ofs.close();
-
-	// save entropies
-	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
-	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
-
 	// save entropies file
 	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy"));
-}
+
+	// save means
+	try {
+		arma::Col<double> means(2, arma::fill::zeros);
+		std::ofstream ofs(dir + modelInfo + "_meanE.dat", std::ios_base::app);
+		for (int i = 0; i < _bonds.size(); i++)
+		{
+			auto meanE		= arma::mean(ENTROPIES.row(i));
+			LOGINFO("Bond: " + STR(i) + "->Entropy: " + STRP(meanE, 12),	LOG_TYPES::TRACE, 3);
+			LOGINFO(STRP(meanE / (_bonds[i] * std::log(2.0)), 12),			LOG_TYPES::TRACE, 4);
+			ofs				<< stateNum << "," << meanE / (_bonds[i] * std::log(2.0)) << ",";
+		}
+		ofs					<< EL;
+		ofs.close();
+	}
+	catch (std::exception& e)
+	{
+		LOGINFO("Couldn't save the averages... No worries...", LOG_TYPES::WARNING, 1);
+	}
+
+	// save entropies
+	LOGINFO("Finished entropies! " + VEQ(stateNum) + ", " + VEQ(realizations),	LOG_TYPES::TRACE,	2);
+	LOGINFO(STR(t_ms(beforeEntro)) + " ms",										LOG_TYPES::TIME,	2);
+};
