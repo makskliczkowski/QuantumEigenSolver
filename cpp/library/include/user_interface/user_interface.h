@@ -1244,7 +1244,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	}
 
 	// indices of orbitals
-	std::vector<uint> idxs(combinations);
+	std::vector<uint> idxs(orbs.size());
 	std::iota(idxs.begin(), idxs.end(), 0);
 
 	pBar pbar(5, realizations);
