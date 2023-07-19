@@ -58,7 +58,8 @@ public:
 	void getManyBodyEnergies(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num = -1);
 	void getManyBodyEnergiesZero(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num = -1);
 
-	double getManyBodyEnergy(const std::vector<uint_fast16_t>& _state);
+	template<typename _T2>
+	double getManyBodyEnergy(const std::vector<_T2>& _state);
 	double getManyBodyEnergy(u64 _state);
 
 	~QuadraticHamiltonian()			= default;
@@ -79,7 +80,7 @@ public:
 	virtual auto getTransMat()				-> arma::Mat<_T>		{ return this->eigVec_; };
 	virtual auto getSPEnMat()				-> arma::Col<double>	{ return this->eigVal_; };
 	auto getTypeI()							const -> uint			{ return (uint)this->type_; };
-	auto getType()							const -> std::string	{ return getSTR_MY_MODELS_Q(this->type_); };
+	auto getType()							const -> std::string	{ return getSTR_MY_MODELS_Q((uint)this->type_); };
 
 	// ########### OVERRIDE ##########
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)	override {};
@@ -94,7 +95,8 @@ public:
 * @brief Given a set of single particle indices it creates a many body energy from single particle states
 */
 template<typename _T>
-inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const std::vector<uint_fast16_t>& _state)
+template<typename _T2>
+inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const std::vector<_T2>& _state)
 {
 	// if Hamiltonian conserves the number of particles the excitations are easy
 	if(this->particleConverving_)
@@ -158,7 +160,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, std::vecto
 	for (int i = 0; i < _num; ++i)
 		{
 			// create combination
-			std::vector<uint_fast16_t> _combinationTmp	=  this->ran_.template choice<uint_fast16_t>(orbitals, int(N / 4));
+			auto _combinationTmp	=  this->ran_.choice(orbitals, int(N / 4));
 
 			// if we cannot create more combinations...
 			if (_combinationTmp.size() < int(N / 4))
@@ -206,7 +208,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, std::vector<do
 	for (int i = 0; i < _num; ++i)
 	{
 		// create combination
-		std::vector<uint_fast16_t> _combination		=	this->ran_. template choice<uint_fast16_t>(orbitals, N);
+		auto _combination		=	this->ran_.choice(orbitals, N);
 		// transform to uvec
 		arma::uvec _combinationV(_combination.size());
 		for (int j = 0; j < _combination.size(); j++)
