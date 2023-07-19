@@ -223,9 +223,9 @@ bool UI::defineModels(bool _createLat) {
 	// check if is complex and define the Hamiltonian
 	bool _ok;
 	if (this->isComplex_ || this->useComplex_)
-		_ok = this->defineModelQ(this->qhamComplex);
+		_ok = this->defineModel(this->hilComplex, this->hamComplex);
 	else
-		_ok = this->defineModelQ(this->qhamDouble);
+		_ok = this->defineModel(this->hilDouble, this->hamDouble);
 
 	return _ok;
 
