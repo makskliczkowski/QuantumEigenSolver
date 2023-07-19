@@ -1258,7 +1258,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 
 		// go through bonds
 		uint _bondI = 0;
-		for (auto i : _bonds) {
+		for (auto i [[maybe_unused]] : _bonds) {
 			// iterate through the state
 			auto J = SingleParticle::corrMatrix<_T>(Ns, Ws[_bondI], WsC[_bondI], orbitals, coeff, _H->ran_);
 			auto E = Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
