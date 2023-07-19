@@ -1166,8 +1166,6 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	// --- use those files --- 
 	std::string modelInfo	=			_H->getInfo();
 
-	// --- save energies txt check ---
-	std::string filename	=			dir + modelInfo;
 
 	// set the parameters
 	uint Ns					=			_H->getNs();
@@ -1179,6 +1177,9 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	// number of combinations to take from single particle states
 	u64 combinations		=			this->nqsP.blockSize_;
 
+	// --- save energies txt check ---
+	std::string filename	=			dir + modelInfo + "_" + STR(stateNum);
+
 	if (combinations < stateNum)
 	{
 		LOGINFO("Bad number of combinations. Must be bigger", LOG_TYPES::ERROR, 0);
@@ -1188,41 +1189,44 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 
 	// check the model (if necessery to build hamil, do it)
 	arma::Mat<_T> W;
-	arma::Mat<_T> WCT;
 	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
 	{
 		_H->hamiltonian();
 		LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
 		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
 		_H->diagH(false);
-		LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
-		LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
+		LOGINFO("Finished the diagonalization",					LOG_TYPES::TRACE, 2);
+		LOGINFO(STR(t_ms(start)) + " ms",						LOG_TYPES::TIME, 2);
 	}
 	_H->getSPEnMat();
 	W	=	_H->getTransMat();
-	WCT	=	W.t();
-	LOGINFO("Finished creating matrices" + modelInfo, LOG_TYPES::TRACE, 1);
+	LOGINFO("Finished creating matrices" + modelInfo,			LOG_TYPES::TRACE, 1);
 
 	std::string name		=			VEQ(Nh);
-	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states:	" + STR(stateNum), LOG_TYPES::TRACE, 2);
-	LOGINFO("Taking num realizations: " + STR(realizations), LOG_TYPES::TRACE, 2);
+	LOGINFO("Spectrum size: "			+ STR(Nh),				LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states:	"		+ STR(stateNum),		LOG_TYPES::TRACE, 2);
+	LOGINFO("Taking num realizations: " + STR(realizations),	LOG_TYPES::TRACE, 2);
 
 	// save single particle energies
 	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// iterate through bond cut
-	const uint maxBondNum	=			Ns / 2;
-	arma::mat ENTROPIES(maxBondNum, realizations, arma::fill::zeros);
+	v_1d<uint> _bonds		=			{ uint(Ns / 4), uint(Ns / 2)};
+	arma::mat ENTROPIES(_bonds.size(), realizations, arma::fill::zeros);
 
 	// set which bonds we want to cut in bipartite
-	v_1d<uint> _bonds		=			{ uint(Ns / 4), uint(Ns / 2)};
 	//for (int i = 1; i <= maxBondNum; i++)
 	//	_bonds.push_back(i);
 	auto beforeEntro		=			clk::now();
 
+	std::vector<double> energies;
+	std::vector<arma::uvec> orbs;
 	// get the states to use later
-	auto [energies, orbs]	=			_H->getManyBodyEnergies(Ns/2, combinations);
+	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
+		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
+	else
+		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
+
 	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// make matrices
@@ -1230,8 +1234,9 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	std::vector<arma::Mat<_T>> WsC;
 	for (int i = 0; i < _bonds.size(); ++i)
 	{
-		Ws.push_back(W.submat(0, 0, W.n_cols - 1, _bonds[i] - 1));
-		WsC.push_back(W.submat(0, 0, _bonds[i] - 1, W.n_rows - 1));
+		arma::Mat<_T> _subM		=		W.submat(0, 0, W.n_rows - 1, _bonds[i] - 1);
+		Ws.push_back(_subM);
+		WsC.push_back(_subM.t());
 	}
 
 	// indices of orbitals
@@ -1258,15 +1263,29 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 			auto J = SingleParticle::corrMatrix<_T>(Ns, Ws[_bondI], WsC[_bondI], orbitals, coeff, _H->ran_);
 			auto E = Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
 			// save the entropy
-			ENTROPIES(i - 1, idx) = E;
+			ENTROPIES(_bondI, idx) = E;
 			_bondI++;
 		}
 		if (idx % pbar.percentageSteps == 0)
 			pbar.printWithTime(LOG_LVL3 + SSTR("PROGRESS"));
 	}
+
+	// save means
+	arma::Col<double> means(2, arma::fill::zeros);
+	std::ofstream ofs(dir + modelInfo + "_meanE.dat", std::ios_base::app);
+	for (int i = 0; i < _bonds.size(); i++)
+	{	
+		LOGINFO(STR(i) + ":" + STRP(arma::mean(ENTROPIES.row(i)), 12), LOG_TYPES::TRACE, 3);
+		LOGINFO(STRP(arma::mean(ENTROPIES.row(i)) / (_bonds[i] * std::log(2.0)), 12), LOG_TYPES::TRACE, 4);
+		ofs << arma::mean(ENTROPIES.row(i)) / (_bonds[i] * std::log(2.0)) << ",";
+	}
+	ofs << EL;
+	ofs.close();
+
+	// save entropies
 	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
 	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// save entropies file
-	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy_" + STR(stateNum), arma::hdf5_opts::append));
+	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy"));
 }

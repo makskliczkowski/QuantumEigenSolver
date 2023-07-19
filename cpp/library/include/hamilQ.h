@@ -55,8 +55,8 @@ protected:
 	
 	// ------------------ M A N Y   B O D Y ------------------
 public:
-	manyBodyTuple getManyBodyEnergies(uint N, int _num = -1);
-	manyBodyTuple getManyBodyEnergiesZero(uint N, int _num = -1);
+	void getManyBodyEnergies(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num = -1);
+	void getManyBodyEnergiesZero(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num = -1);
 
 	double getManyBodyEnergy(const std::vector<uint_fast16_t>& _state);
 	double getManyBodyEnergy(u64 _state);
@@ -140,22 +140,30 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(u64 _state)
 * @param _num number of combinations
 */
 template<typename _T>
-inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, int _num)
+inline void QuadraticHamiltonian<_T>::getManyBodyEnergiesZero(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num)
 {
 	if (this->Ns % 8 != 0)
 		throw std::exception("Method is not suitable for such system sizes...");
 	
-	std::vector<double> manyBodySpectrum;
-	std::vector<arma::uvec> manyBodyOrbitals;
-
 	// create orbitals
-	std::vector<uint> orbitals(int(this->Ns / 4));
-	std::iota(orbitals.begin(), orbitals.end(), 0);
+	std::vector<uint> orbitals;
+	for (int i = 1; i < (int(this->Ns / 4) - 1); ++i)
+		orbitals.push_back(i);
+
+	// resize
+	manyBodySpectrum = {};
+	manyBodyOrbitals = {};
+
 	// get through combinations!
 	for (int i = 0; i < _num; ++i)
 		{
 			// create combination
 			auto _combinationTmp	=	this->ran_.choice<uint_fast16_t>(orbitals, int(N / 4));
+
+			// if we cannot create more combinations...
+			if (_combinationTmp.size() < int(N / 4))
+				break;
+
 			auto _combination		=	_combinationTmp;
 
 			// push the rest...
@@ -169,14 +177,13 @@ inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getMany
 			// transform to uvec
 			arma::uvec _combinationV(N);
 			for (int j = 0; j < _combination.size(); j++)
-				_combinationV(j)	=	_combination[i];
+				_combinationV(j)	=	_combination[j];
 			// append
 			manyBodyOrbitals.push_back(_combinationV);
 			// get energy
 			double _manyBodyEn		=	this->getManyBodyEnergy(_combination);
 			manyBodySpectrum.push_back(_manyBodyEn);
 		}
-	return std::make_tuple(manyBodySpectrum, manyBodyOrbitals);
 }
 
 /*
@@ -185,10 +192,11 @@ inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getMany
 * @param _num number of combinations
 */
 template<typename _T>
-inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, int _num)
+inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, std::vector<double>& manyBodySpectrum, std::vector<arma::uvec>& manyBodyOrbitals, int _num)
 {
-	std::vector<double> manyBodySpectrum;
-	std::vector<arma::uvec> manyBodyOrbitals;
+	// resize
+	manyBodySpectrum = {};
+	manyBodyOrbitals = {};
 
 	// create orbitals
 	std::vector<uint> orbitals(this->Ns);
@@ -209,7 +217,6 @@ inline QuadraticHamiltonian<_T>::manyBodyTuple QuadraticHamiltonian<_T>::getMany
 		double _manyBodyEn		=	this->getManyBodyEnergy(_combination);
 		manyBodySpectrum.push_back(_manyBodyEn);
 	}
-	return std::make_tuple(manyBodySpectrum, manyBodyOrbitals);
 }
 
 // ################################################################################################################################################

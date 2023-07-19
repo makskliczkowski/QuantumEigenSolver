@@ -85,7 +85,7 @@ inline arma::Col<double> FreeFermions<_T>::getSPEnMat()
 {
 	if (!this->eigVal_.empty())
 		return this->eigVal_;
-	this->eigVal_.zeros(this->Ns, this->Ns);
+	this->eigVal_.zeros(this->Ns);
 	for (int k = 0; k < this->Ns; k++)
 		this->eigVal_(k) = 2.0 * PARAM_W_DISORDER(t_, k) * std::cos(double(k * TWOPI / this->Ns));
 	return this->eigVal_;

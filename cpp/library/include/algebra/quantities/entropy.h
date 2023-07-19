@@ -129,8 +129,8 @@ namespace SingleParticle
 			return W_A_CT_P * _W_A;
 		}
 		// raw rho matrix (without delta_ij)
-		auto _left						= _W_A_CT.cols(_state);
-		auto _right						= _W_A.rows(_state);
+		arma::Mat<cpx> _left			= _W_A_CT.cols(_state);
+		arma::Mat<cpx> _right			= _W_A.rows(_state);
 		return 2.0 * _left * _right;
 	};
 
@@ -180,10 +180,12 @@ namespace SingleParticle
 
 		// if there is a single state only - go for it!
 		if (_gamma == 1)
+		{
 			if(!_rawRho)
 				return SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
 			else
 				return SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[0], true);
+		}
 
 		// check the size of coefficients, otherwise create if they are bad...
 		if(_coeff.n_elem != _gamma)
@@ -196,7 +198,7 @@ namespace SingleParticle
 
 		// ### E Q U A L ###
 		for (int mi = 0; mi < _gamma; ++mi)
-			J			+=		_coeff[mi] * algebra::conjugate(_coeff[mi]) * SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[mi], true);
+			J			+=		_coeff[mi] * _coeffC[mi] * SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[mi], true);
 
 		// ### U E Q U L ###
 		// go through states <m|
@@ -234,7 +236,8 @@ namespace SingleParticle
 						continue;
 
 					auto COEFF	=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
-					J			+= COEFF * (_W_A_CT.col(q1) * _W_A.row(q2));
+					auto Mult	=	(_W_A_CT.col(q1) * _W_A.row(q2));
+					J			+=	COEFF * Mult;
 				}
 			}
 		}
@@ -429,7 +432,7 @@ namespace Entropy {
 				template<typename _T>
 				inline double vonNeuman(const arma::Mat<_T> _J)
 				{
-					auto Ns			=		_J.n_rows;
+					//auto Ns			=		_J.n_rows;
 					arma::Mat<_T> eigS;
 					arma::Col<double> eigV;
 					// diagonalize
