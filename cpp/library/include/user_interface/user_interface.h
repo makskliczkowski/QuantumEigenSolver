@@ -1222,7 +1222,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	std::vector<double> energies;
 	std::vector<arma::uvec> orbs;
 	// get the states to use later
-	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
+	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M || Ns % 8 != 0)
 		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
 	else
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
