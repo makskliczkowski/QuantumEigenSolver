@@ -15,28 +15,33 @@
 #ifndef HAMIL_QUADRATIC_H
 #define HAMIL_QUADRATIC_H
 
-// ######################### EXISTING MODELS ############################
-enum class MY_MODELS_Q{												 // #
-	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE		 // #
-};																	 // #
-BEGIN_ENUMC(MY_MODELS_Q)										     // #
-{																	 // #
-	DECL_ENUM_ELEMENT(FREE_FERMIONS_M),								 // #
-	DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),								 // #
-	DECL_ENUM_ELEMENT(SYK2_M),										 // #
-	DECL_ENUM_ELEMENT(ANDERSON_M),									 // #
-	DECL_ENUM_ELEMENT(NONE)											 // #
-}																	 // #
-END_ENUMC(MY_MODELS_Q)												 // #	
-template <>															 // #
-inline std::string str_p(const MY_MODELS_Q v, 						 // #
-						 const int n, 								 // #
-						 bool scientific)							 // #
-{																	 // #
-	return str_p(static_cast<std::underlying_type_t<MY_MODELS_Q>>(v),// # 
-				 n, scientific);									 // #
-}																	 // #
-// ######################################################################
+// ########################### EXISTING MODELS #############################
+enum class MY_MODELS_Q{													// #
+	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE			// #
+};																		// #
+BEGIN_ENUMC(MY_MODELS_Q)												// #
+{																		// #
+	DECL_ENUM_ELEMENT(FREE_FERMIONS_M),									// #
+	DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),									// #
+	DECL_ENUM_ELEMENT(SYK2_M),											// #
+	DECL_ENUM_ELEMENT(ANDERSON_M),										// #
+	DECL_ENUM_ELEMENT(NONE)												// #
+}																		// #
+END_ENUMC(MY_MODELS_Q)													// #	
+template <>																// #
+inline std::string str_p(const MY_MODELS_Q v, 							// #
+						 const int n, 									// #
+						 bool scientific)								// #
+{																		// #
+	return str_p(static_cast<std::underlying_type_t<MY_MODELS_Q>>(v),	// # 
+				 n, scientific);										// #
+}																		// #
+inline bool isQuadraticRandom(uint _type)								// #
+{																		// #
+	return	_type == (uint)MY_MODELS_Q::ANDERSON_M ||					// #
+			_type == (uint)MY_MODELS_Q::SYK2_M;							// #
+}																		// #
+// #########################################################################
 
 /*
 * @brief Allows one to construct a non-interacting Hamiltonian
@@ -209,12 +214,16 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, std::vector<do
 	{
 		// create combination
 		auto _combination		=	this->ran_.choice(orbitals, N);
+
 		// transform to uvec
 		arma::uvec _combinationV(_combination.size());
+
 		for (int j = 0; j < _combination.size(); j++)
 			_combinationV(j)	=	_combination[j];
+
 		// append
 		manyBodyOrbitals.push_back(_combinationV);
+
 		// get energy
 		double _manyBodyEn		=	this->getManyBodyEnergy(_combination);
 		manyBodySpectrum.push_back(_manyBodyEn);

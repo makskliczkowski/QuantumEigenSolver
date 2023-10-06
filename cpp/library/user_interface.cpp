@@ -515,6 +515,7 @@ void UI::makeSimQuadratic()
 	else
 		this->quadraticStatesMix<double>(clk::now(), this->qhamDouble);
 }
+
 // -------------------------------------------------------- SIMULATIONS
 
 

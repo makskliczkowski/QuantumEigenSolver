@@ -460,7 +460,7 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 template<typename _T>
 inline auto Hamiltonian<_T>::getDegeneracies() const -> v_2d<u64>
 {
-	v_2d<u64> degeneracyMap = v_1d<v_1d<u64>>(Ns, v_1d<u64>(0));
+	v_2d<u64> degeneracyMap = v_1d<v_1d<u64>>(Ns * 10, v_1d<u64>(0));
 	v_1d<u64> degeneracyPlh = v_1d<u64>(0);
 	u64 _iter			=	0;
 

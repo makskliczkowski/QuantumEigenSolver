@@ -19,6 +19,7 @@
 // ################################## S I N G L E   P A R T I C L E ##################################
 namespace SingleParticle 
 {
+	// #######################################################
 
 	/*
 	* @brief Transform vector of indices to full state in Fock real space basis.
@@ -172,7 +173,7 @@ namespace SingleParticle
 								randomGen&						_gen,
 								bool							_rawRho = false
 							){
-		// get the number of states in the mixture
+		// get the number of states in the mixture ($\gamma$)
 		auto _gamma		=		_states.size();
 
 		if (_gamma == 0)
@@ -187,16 +188,17 @@ namespace SingleParticle
 				return SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[0], true);
 		}
 
-		// check the size of coefficients, otherwise create if they are bad...
+		// check the size of coefficients, otherwise create new if they are bad...
 		if(_coeff.n_elem != _gamma)
 			_coeff		=		_gen.createRanState(_gamma);
+		// save the conjugate coefficients to be quicker
 		auto _coeffC	=		arma::conj(_coeff);
 
-		// correlation atrix
+		// correlation matrix
 		uint La			=		_W_A.n_cols;
 		arma::Mat<cpx> J=		_rawRho ? arma::Mat<cpx>(La, La, arma::fill::zeros) : -arma::Mat<cpx>(La, La, arma::fill::eye);
 
-		// ### E Q U A L ###
+		// ### E Q U A L    P A R T ###
 		for (int mi = 0; mi < _gamma; ++mi)
 			J			+=		_coeff[mi] * _coeffC[mi] * SingleParticle::corrMatrixSingle<cpx>(_Ns, _W_A, _W_A_CT, _states[mi], true);
 
@@ -229,6 +231,7 @@ namespace SingleParticle
 				v_1d<std::tuple<uint, uint>> qs_get = { qs_nor, qs_rev };
 				for (auto& [q1, q2] : qs_get)
 				{
+					// q1 has to be occupied in n or occupied in m (if occupied in n then for sure not occupied in m)
 					if (!(_n[q1] || _m[q1]))
 						continue;
 
@@ -245,7 +248,6 @@ namespace SingleParticle
 	};
 	
 	// #######################################################
-
 
 };
 

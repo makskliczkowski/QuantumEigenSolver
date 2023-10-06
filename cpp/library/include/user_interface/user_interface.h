@@ -744,13 +744,14 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	this->hamComplex->generateFullMap();
 
 	// ------------------------------- load the Haar mats -------------------------------
+	int realizations_		=			100;
 	v_2d<arma::Col<cpx>> _HM=			{};
-	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
+	for (int _deg = 1; _deg < std::min((int)degeneracyMap.size(), 10); ++_deg)
 	{
 		int _trueDeg				= _deg + 1;
-		_HM.push_back(v_1d<arma::Col<cpx>>(100));
+		_HM.push_back(v_1d<arma::Col<cpx>>(realizations_));
 //#pragma omp parallel for num_threads(this->threadNum)
-		for (int _realization = 1; _realization <= 100; ++_realization)
+		for (int _realization = 1; _realization <= realizations_; ++_realization)
 		{
 			arma::Col<cpx> _state			= arma::Col<cpx>(_trueDeg, arma::fill::ones);
 			arma::mat _realHaar(_trueDeg, _trueDeg, arma::fill::zeros);
@@ -758,56 +759,66 @@ inline void UI::symmetriesDeg(clk::time_point start)
 			_realHaar.load(UI_HAAR_DIR + "Real_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
 			_imagHaar.load(UI_HAAR_DIR + "Imag_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
 			arma::Mat<cpx> _matHaar			= _realHaar + std::complex<double>(0.0, 1.0) * _imagHaar;
-			arma::Col<cpx> _rCoeff			= _matHaar  * _state;
+			arma::Col<cpx> _rCoeff			= _matHaar  * _state / std::sqrt(_trueDeg);
 			_HM[_deg - 1][_realization - 1] = _rCoeff;
 		}
 	}
 
 	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
 	auto _idx [[maybe_unused]] = this->hamComplex->getEnAvIdx();
-	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
-		LOGINFO("Doing: " + VEQ(_deg+1) + ". " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 1);
 
-	for (int _deg = 1; _deg < degeneracyMap.size(); ++_deg)
+	// go through the degeneracies again
+	for (int _deg = 1; _deg < std::min((int)degeneracyMap.size(), 10); ++_deg)
 	{
-		// get true degeneracy
-		int _trueDeg		=			_deg + 1;
-		v_1d<double> entropies(100, 0);
-		// go through degenerate states (there can be multiple of the same degeneracy)
-		for (int _degIn = 0; _degIn < degeneracyMap[_deg].size(); _degIn += _trueDeg)
+		LOGINFO("Doing: " + VEQ(_deg + 1) + ". " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 1);
+
+		// get maximal true degeneracy
+		int _maxTrueDeg = _deg + 1;
+		
+		// go through the degeneracies
+	for (int _trueDeg = 2; _trueDeg <= _maxTrueDeg; _trueDeg++)
 		{
-			LOGINFO("Doing: " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 3);
-			// iterate matrices realizations
-#pragma omp parallel for num_threads(this->threadNum)
-			for (int _realization = 1; _realization <= 100; ++_realization)
+			LOGINFO("Doing: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
+			
+			v_1d<double> entropies(realizations_, 0);
+			// go through degenerate states (there can be multiple of the same degeneracy)
+			for (int _degIn = 0; _degIn < degeneracyMap[_deg].size(); _degIn += _trueDeg)
 			{
-				arma::Col<cpx> _state	=	arma::Col<cpx>(Nh, arma::fill::zeros);
-				// get the coefficients
-				for (int i = 0; i < _HM[_deg - 1][_realization - 1].size(); ++i)
+				LOGINFO("Doing: " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 3);
+				// iterate matrices realizations
+//#pragma omp parallel for num_threads(this->threadNum)
+				if (u64(_degIn + _trueDeg) >= degeneracyMap[_deg].size())
+					continue;
+				for (int _realization = 1; _realization <= realizations_; ++_realization)
 				{
-					auto _stateIdx		=	degeneracyMap[_deg][u64(_degIn + i)];
-					_state				=	_state + _HM[_deg - 1][_realization - 1](i) * this->hamComplex->getEigVec(_stateIdx);
+					arma::Col<cpx> _state = arma::Col<cpx>(Nh, arma::fill::zeros);
+					// get the coefficients
+					for (int i = 0; i < _HM[_trueDeg - 2][_realization - 1].size(); ++i)
+					{
+						auto _stateIdx = degeneracyMap[_deg][u64(_degIn + i)];
+						_state = _state + _HM[_trueDeg - 2][_realization - 1](i) * this->hamComplex->getEigVec(_stateIdx);
+					}
+					//_state = arma::normalise(_state, 2);
+
+					// rotate!
+					if (usesSym)
+						_state = _symRot * _state;
+					auto entro = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+
+					entropies[_realization - 1] = entro;
+					if (_realization > 10 && _realization % 10 == 0)
+						LOGINFO("Finished: " + STR(_realization) + "%", LOG_TYPES::TRACE, 4);
 				}
-				_state					=   arma::normalise(_state, 2);
-
-				// rotate!
-				if (usesSym)
-					_state				=	_symRot * _state;
-				auto entro				=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
-
-				entropies[_realization - 1] = entro;
-				if (_realization > 10 && _realization % 10 == 0)
-					LOGINFO("Finished: " + STR(_realization) + "%", LOG_TYPES::TRACE, 4);
+				for (auto& entro : entropies)
+					ofs << degeneracyMap[_deg][u64(_degIn)] << "\t" << degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)]
+					<< "\t" << STRP(this->hamComplex->getEigVal(degeneracyMap[_deg][u64(_degIn)]), 10)
+					<< "\t" << STRP(this->hamComplex->getEigVal(degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)]), 10)
+					<< "\t" << _trueDeg << "\t" << STRP(entro, 10)
+					<< "\n";
+				LOGINFO("Finished: " + VEQ(_degIn), LOG_TYPES::TRACE, 3);
 			}
-			for(auto& entro: entropies)
-				ofs						<< degeneracyMap[_deg][u64(_degIn)] << "\t" <<	degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)] 
-										<< "\t" << STRP(this->hamComplex->getEigVal(	degeneracyMap[_deg][u64(_degIn					)]), 10) 
-										<< "\t" << STRP(this->hamComplex->getEigVal(	degeneracyMap[_deg][u64(_degIn + _trueDeg - 1	)]), 10) 
-										<< "\t" << _trueDeg << "\t" << STRP(entro, 10) 
-										<< "\n";
-			LOGINFO("Finished: " + VEQ(_degIn), LOG_TYPES::TRACE, 3);
+			LOGINFO("Finished: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
 		}
-		LOGINFO("Finished: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
 	}
 	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
 	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
@@ -831,6 +842,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 	v_1d<u64> _sizes									=		{};
 	uint Ns												=		1;
 	u64 Nh												=		1;
+	u64 NhFull											=		1;
 	uint La												=		Ns / 2;
 	std::string dir										=		"";
 	std::string infoHFull								=		"";
@@ -847,6 +859,7 @@ inline void UI::symmetriesTest(clk::time_point start)
 		this->isComplex_ = false;
 		this->defineModel(this->hilDouble, this->hamDouble);
 		Nh												=		this->hamDouble->getHilbertSize();
+		NhFull											=		Nh;
 		Ns												=		this->latP.lat->get_Ns();
 		La												=		Ns / 2;
 
@@ -866,6 +879,11 @@ inline void UI::symmetriesTest(clk::time_point start)
 		createDir(dir);
 		this->hamDouble->getEigVal(dir, HAM_SAVE_EXT::dat, false);
 		this->hamDouble->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+		if (Ns < 10)
+		{
+			this->hamDouble->getEigVec(dir, Nh, HAM_SAVE_EXT::dat, false);
+			this->hamDouble->getEigVec(dir, Nh, HAM_SAVE_EXT::h5, false);
+		}
 
 		LOGINFO("Started entropies for full Hamiltonian", LOG_TYPES::TRACE, 1);
 		// Save the entropies 
@@ -994,7 +1012,9 @@ inline void UI::symmetriesTest(clk::time_point start)
 								unitaryTransform(U, this->hamComplex, H);
 
 							calcStates		+=		Nh;
-
+							arma::Mat<cpx> tStates;
+							if(Ns < 10)
+								tStates		=		arma::Mat<cpx>(NhFull, Nh);
 							arma::vec entroInner(Nh);
 							for (u64 i = 0; i < Nh; i++) {
 								// get the energy to push back
@@ -1002,12 +1022,13 @@ inline void UI::symmetriesTest(clk::time_point start)
 								enSYMS.push_back(En);
 
 								// transform the state
-								arma::Col<cpx> state = this->hamComplex->getEigVec(i);
+								arma::Col<cpx> state	= this->hamComplex->getEigVec(i);
 								arma::Col<cpx> transformed_state = U * state;
-
+								if(Ns < 10)
+									tStates.col(i)		= transformed_state;
 								// calculate the entanglement entropy
-								auto entropy = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(transformed_state, La, this->hamComplex->hilbertSpace);
-								entroInner(i) = entropy;
+								auto entropy			= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(transformed_state, La, this->hamComplex->hilbertSpace);
+								entroInner(i)			= entropy;
 								entSYMS.push_back(entropy);
 
 								// push back symmetry
@@ -1016,6 +1037,8 @@ inline void UI::symmetriesTest(clk::time_point start)
 							}
 							std::string filename = dir + infoSym + ".h5";
 							this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+							if (Ns < 10)
+								tStates.save(dir + infoSym + ".dat", arma::raw_ascii);
 							entroInner.save(arma::hdf5_name(filename, "entropy", arma::hdf5_opts::append));
 							LOGINFO("------------------- Finished: " + sI + "---------------------------\n", LOG_TYPES::FINISH, 3);
 						}
@@ -1160,10 +1183,11 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
 	
 	// --- create the directories ---
-	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
+	std::string dir			=			makeDirs(this->mainDir, _H->getType(), this->latP.lat->get_info());
+	//this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
 	fs::create_directories(dir);
 
-	// --- use those files --- 
+	// ------ use those files -------
 	std::string modelInfo	=			_H->getInfo();
 
 	// set the parameters
@@ -1181,17 +1205,17 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 
 	if (combinations < stateNum)
 	{
-		LOGINFO("Bad number of combinations. Must be bigger", LOG_TYPES::ERROR, 0);
+		LOGINFO("Bad number of combinations. Must be bigger than the number of states", LOG_TYPES::ERROR, 0);
 		throw std::runtime_error("BAD COMBINATIONS");
 	}
 
 	auto _type				=			_H->getTypeI();
 
 	// check if we should append with realization (model may be random)
-	if(_type == (uint)MY_MODELS_Q::ANDERSON_M || _type == (uint)MY_MODELS_Q::SYK2_M)
+	if(isQuadraticRandom(_type))
 		filename			+=			"_R=" + STR(_H->ran_.randomInt(0,1000));
 
-	// check the model (if necessery to build hamil, do it)
+	// check the model (if necessery to build hamilonian, do it)
 	arma::Mat<_T> W;
 	if (_type != (uint)MY_MODELS_Q::FREE_FERMIONS_M)
 	{
@@ -1202,14 +1226,15 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 		LOGINFO("Finished the diagonalization",					LOG_TYPES::TRACE, 2);
 		LOGINFO(STR(t_ms(start)) + " ms",						LOG_TYPES::TIME, 2);
 	}
+	// obtain the single particle energies
 	_H->getSPEnMat();
 	W	=	_H->getTransMat();
 	LOGINFO("Finished creating matrices" + modelInfo,			LOG_TYPES::TRACE, 1);
 
 	std::string name		=			VEQ(Nh);
-	LOGINFO("Spectrum size: "			+ STR(Nh),				LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states:	"		+ STR(stateNum),		LOG_TYPES::TRACE, 2);
-	LOGINFO("Taking num realizations: " + STR(realizations),	LOG_TYPES::TRACE, 2);
+	LOGINFO("Spectrum size:						  "	 + STR(Nh),				LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states (combinations):	  "  + STR(stateNum),		LOG_TYPES::TRACE, 2);
+	LOGINFO("Taking num realizations (averages): "  + STR(realizations),	LOG_TYPES::TRACE, 2);
 
 	// save single particle energies
 	if(!fs::exists(dir + modelInfo + ".h5"))
@@ -1233,8 +1258,9 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
 	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
-	// make matrices
+	// make matrices cut to a specific number of bonds
 	std::vector<arma::Mat<_T>> Ws;
+	// conjugate transpose it - to be used later
 	std::vector<arma::Mat<_T>> WsC;
 	for (int i = 0; i < _bonds.size(); ++i)
 	{
@@ -1252,16 +1278,16 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 #pragma omp parallel for num_threads(this->threadNum)
 	for (auto idx = 0LL; idx < realizations; idx++) 
 	{
-		// create vector of orbitals
+		// create vector of orbitals (combine two many-body states from our total number of combinations)
 		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
 		v_1d<arma::uvec> orbitals;
 		for (auto idxO : orbitalIndices)
 			orbitals.push_back(orbs[idxO]);
 
-		// generate coefficients
+		// generate coefficients (create random state consisting of stateNum = gamma states)
 		auto coeff			= _H->ran_.createRanState(stateNum);
 
-		// go through bonds
+		// go through bonds (La)
 		uint _bondI = 0;
 		for (auto i [[maybe_unused]] : _bonds) {
 			// iterate through the state
@@ -1290,7 +1316,7 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 		for (int i = 0; i < _bonds.size(); i++)
 		{
 			auto meanE		= arma::mean(ENTROPIES.row(i));
-			LOGINFO("Bond: " + STR(i) + "->Entropy: " + STRP(meanE, 12),	LOG_TYPES::TRACE, 3);
+			LOGINFO("Bond: " + STR(_bonds[i]) + "->Entropy: " + STRP(meanE, 12),	LOG_TYPES::TRACE, 3);
 			LOGINFO(STRP(meanE / (_bonds[i] * std::log(2.0)), 12),			LOG_TYPES::TRACE, 4);
 			ofs				<< stateNum << "," << meanE / (_bonds[i] * std::log(2.0)) << ",";
 		}
