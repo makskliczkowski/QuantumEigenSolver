@@ -6,7 +6,7 @@
 
 source /usr/local/sbin/modules.sh
 
-module load intel
+module load intel/2022b
 module load HDF5
 
 

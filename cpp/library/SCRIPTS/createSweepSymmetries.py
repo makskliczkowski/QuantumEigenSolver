@@ -25,11 +25,12 @@ elif Ns <= 23:
     TIM = "49:59:59"
     MEM = "64gb"
     CPU = 48
-elif Ns <= 24:
+elif Ns < 24:
     TIM = "99:59:59"
     MEM = "192gb"
     CPU = 48
 else:
+    print("WHAT")
     TIM = "199:59:59"
     MEM = "370gb"
     CPU = 48
@@ -46,10 +47,10 @@ pzs = [-1, 1] if useSz else [None]
 # u1s = [i for i in range(0, Ns + 1)] if useU1 else [None]
 u1s = ([i for i in range(0, Ns//2)] + [i for i in range(Ns//2 + 1, Ns + 1)]) if useU1 else [None]
 # u1s = [10, 11, 12, 13, 14]
-if Ns//2 not in u1s and Ns >= 24:
-    TIM = "99:59:59"
-    MEM = "192gb"
-    CPU = 48
+# if Ns//2 not in u1s and Ns >= 24:
+#     TIM = "99:59:59"
+#     MEM = "192gb"
+#     CPU = 48
 
 if Ns >= 25:
     u1s = [Ns // 4, Ns // 2]
