@@ -895,7 +895,7 @@ inline void UI::symmetriesCreateDeg(clk::time_point start)
 	this->hamComplex->generateFullMap();
 
 	// information about state combination
-	const int _realizations	=			200;
+	const int _realizations	=			this->nqsP.nBlocks_;
 	const v_1d<int> _gammas	=			{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50 };
 	v_2d<arma::Col<cpx>> _HM=			{};
 
@@ -957,8 +957,9 @@ inline void UI::symmetriesCreateDeg(clk::time_point start)
 			if (_r > 10 && _r % (_realizations / 10) == 0)
 				LOGINFO("Finished: " + STR(_r * 100.0 / _realizations) + "%. Entropy was: " + VEQ(entro / (log(2) * maxBondNum)), LOG_TYPES::TRACE, 4);
 
-			ofs << "," << STRP(entro, 10);
 		}
+		for (int _r = 0; _r < _realizations; _r++)
+			ofs << "," << STRP(entropies[_r], 10);
 		ofs << "\n";
 	}
 	ofs.close();
