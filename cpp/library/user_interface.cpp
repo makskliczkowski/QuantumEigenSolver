@@ -174,6 +174,11 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE DEGENERACIES", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetriesDeg();
 		break;
+	case 26:
+		// this option takes the Hamiltonian in a given symmetry sector and calculates entropy of combination of states
+		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - CREATE DEGENERACIES NEAR ZERO", LOG_TYPES::CHOICE, 1);
+		this->makeSimSymmetriesCreateDeg();
+		break;
 	// ------------------------------- QUADRATIC -------------------------------
 	case 30:
 		// this option utilizes the quadratic Hamiltonian calculation
@@ -330,6 +335,23 @@ void UI::makeSimSymmetriesDeg()
 	if (!this->defineModels(true)) 
 		return;
 	this->symmetriesDeg(clk::now());
+}
+
+/*
+* @brief Use the simulation and CUE matrices to calculate entanglement entropy of multiple degeneracies
+*/
+void UI::makeSimSymmetriesCreateDeg()
+{
+	// reset Hamiltonians - memory release
+	if (this->hamComplex)
+		this->hamComplex.reset();
+	if (this->hamDouble)
+		this->hamDouble.reset();
+	// define the models
+	this->useComplex_ = true;
+	if (!this->defineModels(true))
+		return;
+	this->symmetriesCreateDeg(clk::now());
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
