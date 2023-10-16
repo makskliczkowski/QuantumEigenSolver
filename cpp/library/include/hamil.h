@@ -460,20 +460,25 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 template<typename _T>
 inline auto Hamiltonian<_T>::getDegeneracies() const -> v_2d<u64>
 {
-	v_2d<u64> degeneracyMap = v_1d<v_1d<u64>>(Ns * 10, v_1d<u64>(0));
-	v_1d<u64> degeneracyPlh = v_1d<u64>(0);
-	u64 _iter			=	0;
+	// map of degeneracies (vector - V[degeneracy] = {indices in the manifold}
+	v_2d<u64> degeneracyMap		=	v_1d<v_1d<u64>>(Ns * 10, v_1d<u64>(0));
+	// placeholder for degeneracies
+	v_1d<u64> degeneracyPlh		=	v_1d<u64>(0);
+	u64 _iter					=	0;
 
-	double _prevE		=	this->eigVal_[0];
-	double _E			=	this->eigVal_[0];
+	double _prevE				=	this->eigVal_[0];
+	double _E					=	this->eigVal_[0];
 	while (true)
 	{
-		int _counter				= -1;
+		int _counter			=	0;
 		while (true)
 		{
-			_E			= this->eigVal_[_iter];
+			// read current energy
+			_E					= this->eigVal_[_iter];
+			// if this energy not equals the previous energy, vreak the loop
 			if (!EQP(_E, _prevE, 1e-14))
 				break;
+			// append the degeneracy placeholder
 			degeneracyPlh.push_back(_iter);
 			_counter++;
 			_iter++;
@@ -483,7 +488,7 @@ inline auto Hamiltonian<_T>::getDegeneracies() const -> v_2d<u64>
 			degeneracyMap[_counter].push_back(_item);
 		degeneracyPlh.clear();
 
-		_prevE			= this->eigVal_[_iter];
+		_prevE					=	this->eigVal_[_iter];
 		if (_iter >= Nh)
 			break;
 	}

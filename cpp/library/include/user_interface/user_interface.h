@@ -690,10 +690,9 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	// --- use those files --- 
 	std::string modelInfo	=			this->hamComplex->getInfo();
 
-	// --- save energies txt check ---
+	// --- save entropies txt check ---
 	std::string filename	=			dir + modelInfo;
 	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
-	ofs						<<			modelInfo << "," << Nh << EL;
 
 	// check Hilbert size or whether we should diagonalize and proceed further
 	if (Nh == 0)
@@ -707,12 +706,12 @@ inline void UI::symmetriesDeg(clk::time_point start)
 
 	// set the parameters
 	uint Ns					=			this->hamComplex->getNs();
-	u64 stateNum			=			Nh;
+	u64 stateNum			=			Nh / 10;
+	auto ran				=			this->hamComplex->ran_;
 	bool useShiftAndInvert [[maybe_unused]] = false;
-	std::string infoH		=			this->hamComplex->getInfo();
 
 	//stouts("\t->", start);
-	LOGINFO("Finished buiding Hamiltonian" + infoH, LOG_TYPES::TRACE, 1);
+	LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
 	if (Nh < UI_LIMITS_MAXFULLED) {
 		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
 		this->hamComplex->diagH(false);
@@ -728,8 +727,8 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
 
 	std::string name		=			VEQ(Nh);
-	LOGINFO("Spectrum size: "		+ STR(Nh)		, LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states: "	+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
+	LOGINFO("Spectrum size: "			+ STR(Nh)		, LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states: "		+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
 	this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// clear energies
@@ -748,84 +747,109 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	this->hamComplex->generateFullMap();
 
 	// ------------------------------- load the Haar mats -------------------------------
-	int realizations_		=			100;
+	// information about state combination
+	const int _realizations	=			this->nqsP.nBlocks_;
+	v_1d<int> _gammas		=			{ };
+	
+	// append gammas - to be sure that we use the correct ones
+	for (auto i = 0; i < degeneracyMap.size(); ++i)
+		if (degeneracyMap[i].size() != 0)
+			_gammas.push_back(i);
+
 	v_2d<arma::Col<cpx>> _HM=			{};
-	for (int _deg = 1; _deg < std::min((int)degeneracyMap.size(), 10); ++_deg)
+
+	// create random coeficients
+	for (int i = 0; i < _gammas.size(); ++i)
 	{
-		int _trueDeg				= _deg + 1;
-		_HM.push_back(v_1d<arma::Col<cpx>>(realizations_));
-//#pragma omp parallel for num_threads(this->threadNum)
-		for (int _realization = 1; _realization <= realizations_; ++_realization)
-		{
-			arma::Col<cpx> _state			= arma::Col<cpx>(_trueDeg, arma::fill::ones);
-			arma::mat _realHaar(_trueDeg, _trueDeg, arma::fill::zeros);
-			arma::mat _imagHaar(_trueDeg, _trueDeg, arma::fill::zeros);
-			_realHaar.load(UI_HAAR_DIR + "Real_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
-			_imagHaar.load(UI_HAAR_DIR + "Imag_Haar_size" + STR(_trueDeg) + "_" + STR(_realization) + ".txt");
-			arma::Mat<cpx> _matHaar			= _realHaar + std::complex<double>(0.0, 1.0) * _imagHaar;
-			arma::Col<cpx> _rCoeff			= _matHaar  * _state / std::sqrt(_trueDeg);
-			_HM[_deg - 1][_realization - 1] = _rCoeff;
-		}
+		if (_gammas[i] >= stateNum)
+			break;
+
+		_HM.push_back({});
+		// go through gammas
+		for (int j = 0; j < _realizations; ++j)
+			if(_gammas[i] > 1)
+				_HM[i].push_back(ran.createRanState(_gammas[i]));
+			else
+				_HM[i].push_back({ 1.0 });
 	}
 
 	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
-	auto _idx [[maybe_unused]] = this->hamComplex->getEnAvIdx();
+	// get index of the average energy
+	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
+	u64 _minIdx					= _idx - stateNum / 2;
+	u64 _maxIdx					= _idx + stateNum / 2;
+	// as many entropies as realizations
+	v_1d<double> entropies(_realizations);
 
 	// go through the degeneracies again
-	for (int _deg = 1; _deg < std::min((int)degeneracyMap.size(), 10); ++_deg)
+	for (int _ig = 0; _ig < _gammas.size(); ++_ig)
 	{
-		LOGINFO("Doing: " + VEQ(_deg + 1) + ". " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 1);
+		auto _gamma				= _gammas[_ig];
+		int _degSize			= degeneracyMap[_gamma].size();
+		if (_degSize == 0)
+			continue;
+		LOGINFO("Doing: " + VEQ(_gamma) + ". Size=" + VEQ(_degSize), LOG_TYPES::TRACE, 1);
 
-		// get maximal true degeneracy
-		int _maxTrueDeg = _deg + 1;
-		
-		// go through the degeneracies
-	for (int _trueDeg = 2; _trueDeg <= _maxTrueDeg; _trueDeg++)
-		{
-			LOGINFO("Doing: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
-			
-			v_1d<double> entropies(realizations_, 0);
-			// go through degenerate states (there can be multiple of the same degeneracy)
-			for (int _degIn = 0; _degIn < degeneracyMap[_deg].size(); _degIn += _trueDeg)
+		// check the start and end idx from middle spectrum
+		auto _idxStart			= _degSize;
+		auto _idxEnd			= 0;
+		for (auto i = 0; i < _degSize; i += _gamma)
+			if (degeneracyMap[_gamma][i] >= _minIdx)
 			{
-				LOGINFO("Doing: " + VEQ(degeneracyMap[_deg].size()), LOG_TYPES::TRACE, 3);
-				// iterate matrices realizations
-//#pragma omp parallel for num_threads(this->threadNum)
-				if (u64(_degIn + _trueDeg) >= degeneracyMap[_deg].size())
-					continue;
-				for (int _realization = 1; _realization <= realizations_; ++_realization)
-				{
-					arma::Col<cpx> _state = arma::Col<cpx>(Nh, arma::fill::zeros);
-					// get the coefficients
-					for (int i = 0; i < _HM[_trueDeg - 2][_realization - 1].size(); ++i)
-					{
-						auto _stateIdx = degeneracyMap[_deg][u64(_degIn + i)];
-						_state = _state + _HM[_trueDeg - 2][_realization - 1](i) * this->hamComplex->getEigVec(_stateIdx);
-					}
-					//_state = arma::normalise(_state, 2);
-
-					// rotate!
-					if (usesSym)
-						_state = _symRot * _state;
-					auto entro = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
-
-					entropies[_realization - 1] = entro;
-					if (_realization > 10 && _realization % 10 == 0)
-						LOGINFO("Finished: " + STR(_realization) + "%", LOG_TYPES::TRACE, 4);
-				}
-				for (auto& entro : entropies)
-					ofs << degeneracyMap[_deg][u64(_degIn)] << "\t" << degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)]
-					<< "\t" << STRP(this->hamComplex->getEigVal(degeneracyMap[_deg][u64(_degIn)]), 10)
-					<< "\t" << STRP(this->hamComplex->getEigVal(degeneracyMap[_deg][u64(_degIn + _trueDeg - 1)]), 10)
-					<< "\t" << _trueDeg << "\t" << STRP(entro, 10)
-					<< "\n";
-				LOGINFO("Finished: " + VEQ(_degIn), LOG_TYPES::TRACE, 3);
+				_idxStart		= i;
+				break;
 			}
-			LOGINFO("Finished: " + VEQ(_trueDeg), LOG_TYPES::TRACE, 2);
+		for (auto i = _degSize - _gamma; i >= 0; i -= _gamma)
+			if (degeneracyMap[_gamma][i] <= _maxIdx)
+			{
+				_idxEnd			= i;
+				break;
+			}
+		if (_idxStart >= _idxEnd)
+		{
+			LOGINFO("for: " + VEQ(_gamma) + ". Cannot find states in the middle of the spectrum", LOG_TYPES::TRACE, 1);
+			continue;
 		}
+		LOGINFO("Choosing from: [" + VEQ(_idxStart) + "," + VEQ(_idxEnd) + "]", LOG_TYPES::TRACE, 1);
+
+		// go through the degeneracies
+#pragma omp parallel for num_threads(this->threadNum)
+		for (int _r = 0; _r < _realizations; _r++)
+		{
+			// choose indices from degenerate states in the manifold
+			//auto indices				=	(gamma > 1) ? ran.choice(toChooseFrom, gamma) : v_1d<int>({ ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1) });
+			auto idx					=	ran.randomInt<int>(_idxStart, _idxEnd + 1);
+			auto idxState				=	degeneracyMap[_gamma][idx];
+
+			arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(idxState);
+			// append states
+			for (int id = 1; id < _gamma; id++)
+			{
+				idxState				=	degeneracyMap[_gamma][idx + id];
+				_state					+=	_HM[_ig][_r][id] * this->hamComplex->getEigVec(idxState);
+			}
+
+			// rotate!
+			if (usesSym)
+				_state					=	_symRot * _state;
+
+			// normalize state
+			//_state						=	_state / sqrt(arma::cdot(_state, _state));
+			auto entro					=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+
+			entropies[_r] = entro;
+			if (_r > 10 && _r % (_realizations / 10) == 0)
+				LOGINFO("Finished: " + STR(_r * 100.0 / _realizations) + "%. Entropy was: " + VEQ(entro / (log(2) * maxBondNum)), LOG_TYPES::TRACE, 4);
+
+		}
+		// print those guys
+		for (int _r = 0; _r < _realizations; _r++)
+			ofs << "," << STRP(entropies[_r], 10);
+		ofs << "\n";
 	}
 	LOGINFO("Finished entropies!", LOG_TYPES::TRACE, 2);
 	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
+	ofs.close();
 }
 
 /*
@@ -842,7 +866,7 @@ inline void UI::symmetriesCreateDeg(clk::time_point start)
 	// --- use those files --- 
 	std::string modelInfo	=			this->hamComplex->getInfo();
 
-	// --- save energies txt check ---
+	// --- save entropies txt check ---
 	std::string filename	=			dir + modelInfo;
 	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
 	
@@ -878,14 +902,14 @@ inline void UI::symmetriesCreateDeg(clk::time_point start)
 	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
 
 	std::string name		=			VEQ(Nh);
-	LOGINFO("Spectrum size: "		+ STR(Nh)		, LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states: "	+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
+	LOGINFO("Spectrum size: "			+ STR(Nh)		, LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states: "		+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
 	this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// clear energies
 	this->hamComplex->clearH();
 
-		// iterate through bond cut
+	// iterate through bond cut
 	const uint maxBondNum	=			Ns / 2;
 
 	// get the symmetry rotation matrix
@@ -913,6 +937,7 @@ inline void UI::symmetriesCreateDeg(clk::time_point start)
 			else
 				_HM[i].push_back({ 1.0 });
 	}
+
 	// get index of the average energy
 	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
 	u64 _minIdx					= _idx - stateNum / 2;
