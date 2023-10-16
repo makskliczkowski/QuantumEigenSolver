@@ -2,11 +2,9 @@ import os
 import subprocess
 import sys
 
-model   =   int(sys.argv[1])
-
 iter    =   0
-outp    =   open(f"output_SP_{model}.dat", "a+")
-with open(f"input_SP_{model}.ini", "r+") as f:
+outp    =   open(f"output_Manifold.dat", "a+")
+with open(f"input_Manifold.ini", "r+") as f:
     lines = f.readlines()
     for l in lines:
         tmp     = l.split("\n")[0]
@@ -28,7 +26,7 @@ with open(f"input_SP_{model}.ini", "r+") as f:
     lines = lines[iter:]
     f.writelines(lines)
 outp.close()
-if os.path.getsize(f"input_SP_{model}.ini") == 0:
-    print("REMOVING: ", f"input_SP_{model}.ini")
-    os.remove(f"input_SP_{model}.ini")
+if os.path.getsize(f"input_Manifold.ini") == 0:
+    print("REMOVING: ", f"input_Manifold.ini")
+    os.remove(f"input_Manifold.ini")
 
