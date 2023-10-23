@@ -706,7 +706,7 @@ inline void UI::symmetriesDeg(clk::time_point start)
 
 	// set the parameters
 	uint Ns					=			this->hamComplex->getNs();
-	u64 stateNum			=			Nh / 10;
+	u64 stateNum			=			Nh / 2;
 	auto ran				=			this->hamComplex->ran_;
 	bool useShiftAndInvert [[maybe_unused]] = false;
 

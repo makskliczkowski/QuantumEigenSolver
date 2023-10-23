@@ -4,6 +4,9 @@
 //#define LOG_FILE					//
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+#ifdef _DEBUG
+#include "vld.h"
+#endif
 
 // %%%%%%%%%%%%% N Q S %%%%%%%%%%%%%%%
 /*#define NQS_RBM_USESR*/				//
