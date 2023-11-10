@@ -376,7 +376,7 @@ void UI::makeSimSymmetriesSweep()
 	v_1d<int> Sxs		= {};
 
 	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
+	bool useSzParity	= false;//(this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
 	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };

@@ -577,7 +577,8 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	// --- save energies txt check ---
 	std::string filename	=			dir + modelInfo;
 	std::ofstream ofs(dir + "logHilbert.dat", std::ios_base::out | std::ios_base::app);
-	ofs						<<			modelInfo << "," << Nh << EL;
+	auto memory				=			_H->getHamiltonianSizeH();
+	ofs						<<			modelInfo << "," << Nh << "," << STRP(memory, 5) << EL;
 	ofs.close();
 
 	// check Hilbert size or whether we should diagonalize and proceed further

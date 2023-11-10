@@ -82,10 +82,10 @@ public:
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
 		: hilbertSpace(hilbert)
 	{
-		this->ran_ = randomGen();
-		this->lat_ = this->hilbertSpace.getLattice();
-		this->Ns = this->lat_->get_Ns();
-		this->Nh = this->hilbertSpace.getHilbertSize();
+		this->ran_	= randomGen();
+		this->lat_	= this->hilbertSpace.getLattice();
+		this->Ns	= this->lat_->get_Ns();
+		this->Nh	= this->hilbertSpace.getHilbertSize()
 	};
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
 		: hilbertSpace(std::move(hilbert))
@@ -147,6 +147,8 @@ public:
 	auto getHilbertSize()								const -> u64						{ return this->Nh; };			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
 	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_; };								
+	auto getHamiltonianSize()							const -> double						{ return this->H_.size() * sizeof(this->H_(0, 0)); };								
+	auto getHamiltonianSizeH()							const -> double						{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
 	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot(); };
 	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_; };							
 	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx); };			
@@ -295,19 +297,27 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 */
 template <typename _T>
 inline void Hamiltonian<_T>::diagH(bool woEigVec) {
+	auto memory				=	this->getHamiltonianSize();
+	auto method				=	(memory > 180) ? "std" : "dc";
+	std::string memoryStr	=	"DIM(H)= " + STRP(memory * 1e-6, 5) + "mb";
+	LOGINFO(memoryStr, LOG_TYPES::TRACE, 3);
 	BEGIN_CATCH_HANDLER
 		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
-		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_));
-	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
+		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_), method);
+	END_CATCH_HANDLER("Memory exceeded. " + memoryStr, ;);
 	this->calcAvEn();
 }
 
 template <>
 inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
+	auto memory				= this->getHamiltonianSize();
+	auto method				= (memory > 180) ? "std" : "dc";
+	std::string memoryStr	= "DIM(H)= " + STRP(memory * 1e-6, 5) + "gb";
+	LOGINFO(memoryStr, LOG_TYPES::TRACE, 3);
 	BEGIN_CATCH_HANDLER
 		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<cpx>(this->H_));
-		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<cpx>(this->H_));
-	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
+		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<cpx>(this->H_), method);
+	END_CATCH_HANDLER("Memory exceeded. " + memoryStr, ;);
 	this->calcAvEn();
 }
 
