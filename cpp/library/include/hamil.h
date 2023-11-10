@@ -85,7 +85,7 @@ public:
 		this->ran_	= randomGen();
 		this->lat_	= this->hilbertSpace.getLattice();
 		this->Ns	= this->lat_->get_Ns();
-		this->Nh	= this->hilbertSpace.getHilbertSize()
+		this->Nh	= this->hilbertSpace.getHilbertSize();
 	};
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
 		: hilbertSpace(std::move(hilbert))
