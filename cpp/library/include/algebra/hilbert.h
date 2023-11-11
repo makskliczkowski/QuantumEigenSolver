@@ -138,7 +138,6 @@ namespace Hilbert {
 			return *this;
 		};
 
-
 		// ------------------------ INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
 		void generateMapping();															// generates mapping from reduced hilbert space to original

@@ -54,10 +54,12 @@ public:
 	Hilbert::HilbertSpace<_T> hilbertSpace;
 
 protected:
+	// ------------------------------------------- CLASS TYPES --------------------------------------------
 	MY_MODELS type_										=									MY_MODELS::NONE;
 	uint Ns												=									1;
 	u64 Nh												=									1;
 	std::shared_ptr<Lattice> lat_;
+
 	// ------------------------------------------- CLASS FIELDS -------------------------------------------
 	double avEn											=									0.0;
 	u64 avEnIdx											=									-1;														
@@ -99,7 +101,6 @@ public:
 	// virtual ~SpinHamiltonian() = 0;																								// pure virtual destructor
 
 	// ------------------------------------------- PRINTERS ---------------------------------------------------
-	//static Col<_type> map_to_state(std::map<u64, _type> mp, int N_hilbert);														// converts a map to arma column (VQMC)
 	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);					// pretty prints the base state
 	static void prettyPrint(	std::ostream& output,	const arma::Col<_T>& state, uint Ns,double _tol = 5e-2);					// pretty prints the state
 	void print(u64 _id)									const								{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n"); };

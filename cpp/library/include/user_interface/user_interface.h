@@ -253,28 +253,22 @@ protected:
 	// define basic models
 	bool isComplex_									= false;
 	bool useComplex_								= false;
+	
+	// ^^^^^^^^^ FOR DOUBLE ^^^^^^^^^
 	Hilbert::HilbertSpace<double>					hilDouble;
 	std::shared_ptr<Hamiltonian<double>>			hamDouble;
 	std::shared_ptr<QuadraticHamiltonian<double>>	qhamDouble;
+
+	// ^^^^^^^^ FOR COMPLEX ^^^^^^^^^
 	Hilbert::HilbertSpace<cpx>						hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>				hamComplex;
 	std::shared_ptr<QuadraticHamiltonian<cpx>>		qhamComplex;
 
-	// define the NQS
+	// ^^^^^^^^^^^^^ NQS ^^^^^^^^^^^^
 	std::shared_ptr<NQS<cpx,cpx>>			nqsCpx;
 	std::shared_ptr<NQS<double,cpx>>		nqsDouble;
 
-	// heisenberg with classical dots stuff
-	//v_1d<int> positions = {};
-	//arma::vec phis = arma::vec({});
-	//arma::vec thetas = arma::vec({});
-	//arma::vec J_dot = { 1.0,0.0,-1.0 };
-	//double J0_dot = 0.0;
-	//double J_dot_dot = 1.0;														// dot - dot  classical interaction
-
-	// averages from operators
-	//avOperators av_op;
-
+	// ##############################
 	void setDefaultMap()					final override {
 		this->defaultParams = {
 			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT			),			// type of the NQS state	
@@ -333,14 +327,11 @@ protected:
 		};
 	};
 
-	// -------------------------------------------   		 HELPER FUNCTIONS  		-------------------------------------------
-	//void compare_ed(double ground_rbm);
-	//void save_operators(clk::time_point start, std::string name, double energy, double energy_error);
-	
 private:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 	// ############# S Y M M E T R I E S   E D #############
+
 	template<typename _T>
 	void symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag = true, bool _states = false);
 
@@ -351,13 +342,10 @@ private:
 	std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> createSymmetries();
 
 	// ####################### N Q S #######################
+
 	template<typename _T>
 	void nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T, cpx>> _NQS);
-	//void make_mc_classical_angles(double Jdot = 0.0);
 
-	// ###################### KITAEV #######################
-
-	//void make_mc_kitaev(t_3d<double> K);
 	// #################### QUADRATIC ######################
 	template<typename _T>
 	void quadraticStatesMix(clk::time_point start, std::shared_ptr<QuadraticHamiltonian<_T>> _H);
@@ -421,29 +409,22 @@ public:
 	}
 	
 	// -----------------------------------------------    	   REAL PARSER          -------------------------------------------
-	// the function to parse the command line
+
 	void funChoice()						final override;
 	void parseModel(int argc, cmdArg& argv) final override;
 
 	// ----------------------------------------------- 			HELPERS  			-------------------------------------------
+	
 	void setDefault()						final override;
 
 	// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
 
-	// ####################### N Q S #######################
+	// ############################      N Q S        #############################
+
 	void makeSimNQS();
 
-	// ########## CLASSICAL
-	//void make_mc_classical();
-	//void make_mc_angles_sweep();
-
-	// ########## KITAEV
-	//void make_mc_kitaev_sweep();
-
-	// ########## TEST 
-	//void make_simulation() override;
-
 	// #######################        SYMMETRIES            #######################
+
 	void makeSimSymmetries(bool _diag = true, bool _states = false);
 
 	void makeSimSymmetriesDeg();
@@ -451,9 +432,9 @@ public:
 
 	void makeSimSymmetriesSweep();
 	void makeSimSymmetriesSweepHilbert();
-	//void make_simulation_symmetries_sweep();
-	//void make_symmetries_test(int l = -1);
+
 	// #######################         QUADRATIC            #######################
+
 	void makeSimQuadratic();
 
 };
@@ -467,6 +448,7 @@ template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
 	bool _isGood				=	true;
+	// get the symmetries
 	auto [_glbSyms, _locSyms]	=	this->createSymmetries();
 	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
 	if (_Hil.getHilbertSize() == 0)
@@ -476,6 +458,8 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 	}
 	else
 		LOGINFO(VEQVS(HilbertSize, _Hil.getHilbertSize()), LOG_TYPES::INFO, 3);
+
+	// switch the model types
 	switch (this->modP.modTyp_)
 	{
 	case MY_MODELS::ISING_M:
@@ -512,6 +496,7 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
 {
 	bool _isGood = true;
 
+	// switch the type of quadratic model
 	switch (this->modP.modTypQ_)
 	{
 	case MY_MODELS_Q::FREE_FERMIONS_M:
@@ -565,20 +550,21 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 template<typename _T>
 inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T>> _H, bool _diag, bool _states)
 {
-	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
+	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	u64 Nh					=			_H->getHilbertSize();
 	// --- create the directories ---
-	std::string dir			=			this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
+	std::string dir			=			makeDirs(this->mainDir, _H->getType(), this->latP.lat->get_info());
 	fs::create_directories(dir);
 
 	// --- use those files --- 
 	std::string modelInfo	=			_H->getInfo();
-
+	std::string logMe		=			"";
 	// --- save energies txt check ---
 	std::string filename	=			dir + modelInfo;
 	std::ofstream ofs(dir + "logHilbert.dat", std::ios_base::out | std::ios_base::app);
 	auto memory				=			_H->getHamiltonianSizeH();
-	ofs						<<			modelInfo << "," << Nh << "," << STRP(memory, 5) << EL;
+	strSeparatedS(logMe, ',', modelInfo, Nh, STRP(memory, 5));
+	ofs						<< logMe << EL;
 	ofs.close();
 
 	// check Hilbert size or whether we should diagonalize and proceed further
@@ -592,13 +578,12 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	_H->hamiltonian();
 
 	// set the parameters
-	uint Ns = _H->getNs();
+	uint Ns					=			_H->getNs();
 	u64 stateNum			=			Nh;
 	bool useShiftAndInvert	=			false;
-	std::string infoH		=			_H->getInfo();
 
 	//stouts("\t->", start);
-	LOGINFO("Finished buiding Hamiltonian" + infoH, LOG_TYPES::TRACE, 1);
+	LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
 	if (Nh < UI_LIMITS_MAXFULLED) {
 		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
 		_H->diagH(false);
@@ -607,7 +592,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	{
 		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
 		useShiftAndInvert	=			true;
-		stateNum = UI_LIMITS_SI_STATENUM;
+		stateNum			=			UI_LIMITS_SI_STATENUM;
 		_H->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
 	}
 	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
@@ -616,9 +601,8 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	std::string name		=			VEQ(Nh);
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num states: " + STR(stateNum), LOG_TYPES::TRACE, 2);
-
-	if (Nh < UI_LIMITS_MAXPRINT)
-		_H->getEigVal(dir, HAM_SAVE_EXT::dat, false);
+	
+	// save .h5
 	_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// clear energies
@@ -637,6 +621,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	v_1d<uint> _bonds		=			{};
 	for (int i = 1; i <= maxBondNum; i++)
 		_bonds.push_back(i);
+	// go entropies!
 	auto beforeEntro		=			clk::now();
 	_H->generateFullMap();
 #pragma omp parallel for num_threads(this->threadNum)
@@ -660,19 +645,12 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 
 	// save entropies file
 	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy", arma::hdf5_opts::append));
-	if (Ns < UI_LIMITS_MAXPRINT)
-		ENTROPIES.save(filename + ".dat", arma::arma_ascii);
 
 	if (useShiftAndInvert)
 		return;
 
-	// set the average energy index
-	//const u64 avEnIdx		=			_H->getEnAvIdx();
 	if (_states)
 		_H->getEigVec(dir, stateNum, HAM_SAVE_EXT::h5, true);
-	// save states near the mean energy index
-	//if (Ns == 16)
-		//_H->getEigVec(dir, UI_LIMITS_MIDDLE_SPEC_STATENUM < stateNum ? UI_LIMITS_MIDDLE_SPEC_STATENUM : stateNum, HAM_SAVE_EXT::h5, true);
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -682,10 +660,10 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 */
 inline void UI::symmetriesDeg(clk::time_point start)
 {
-	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
+	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	u64 Nh					=			this->hamComplex->getHilbertSize();
 	// --- create the directories ---
-	std::string dir			=			this->mainDir + kPS + this->hamComplex->getType() + kPS + this->latP.lat->get_info() + kPS;
+	std::string dir			=			makeDirs(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info());
 	fs::create_directories(dir);
 
 	// --- use those files --- 
@@ -711,7 +689,6 @@ inline void UI::symmetriesDeg(clk::time_point start)
 	auto ran				=			this->hamComplex->ran_;
 	bool useShiftAndInvert [[maybe_unused]] = false;
 
-	//stouts("\t->", start);
 	LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
 	if (Nh < UI_LIMITS_MAXFULLED) {
 		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
@@ -858,7 +835,7 @@ inline void UI::symmetriesDeg(clk::time_point start)
 */
 inline void UI::symmetriesCreateDeg(clk::time_point start)
 {
-	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
+	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	u64 Nh					=			this->hamComplex->getHilbertSize();
 	// --- create the directories ---
 	std::string dir			=			makeDirs(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info(), "combinations");
@@ -1347,8 +1324,7 @@ inline void UI::nqsSingle(clk::time_point start, std::shared_ptr<NQS<_T,cpx>> _N
 template<typename _T>
 inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
-	LOGINFO("---------------------------------------------------------------------------------\n", LOG_TYPES::TRACE, 1);
-	
+	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	// --- create the directories ---
 	std::string dir			=			makeDirs(this->mainDir, _H->getType(), this->latP.lat->get_info());
 	//this->mainDir + kPS + _H->getType() + kPS + this->latP.lat->get_info() + kPS;
@@ -1499,3 +1475,5 @@ inline void UI::quadraticStatesMix(clk::time_point start, std::shared_ptr<Quadra
 	LOGINFO("Finished entropies! " + VEQ(stateNum) + ", " + VEQ(realizations),	LOG_TYPES::TRACE,	2);
 	LOGINFO(STR(t_ms(beforeEntro)) + " ms",										LOG_TYPES::TIME,	2);
 };
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
