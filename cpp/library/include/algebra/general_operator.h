@@ -203,16 +203,16 @@ namespace Operators{
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
 		[[maybe_unused]] operator Operator<cpx, _Ts...>()							{ return *this; };
 
-		template <typename T_ = _T,
-			typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr> 
-		[[maybe_unused]] operator Operator<cpx, _Ts...>()
-		{
-			auto _fun = [&](u64 s, _Ts... args) {
-				const auto [s1, v1] = this->fun_(s, args...);
-				return std::make_pair(s1, cpx(v1));
-			};
-			return Operator<cpx, _Ts...>(this->lat_, cpx(this->eigVal_), _fun);
-		};
+		//template <typename T_ = _T,
+		//	typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr> 
+		//[[maybe_unused]] operator Operator<cpx, _Ts...>()
+		//{
+		//	auto _fun = [&](u64 s, _Ts... args) {
+		//		const auto [s1, v1] = this->fun_(s, args...);
+		//		return std::make_pair(s1, cpx(v1));
+		//	};
+		//	return Operator<cpx, _Ts...>(this->lat_, cpx(this->eigVal_), _fun);
+		//};
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		/*

@@ -2,7 +2,10 @@
 #ifndef OPALG_H
 #define OPALG_H
 
-#include <complex>
+#ifndef LINALG_H
+#include "../../source/src/Include/linalg/diagonalizers.h"
+#endif 
+
 #include <functional>
 using u64 = unsigned long long;
 using cpx = std::complex<double>;

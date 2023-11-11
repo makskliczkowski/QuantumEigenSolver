@@ -297,28 +297,10 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename _T>
-inline void Hamiltonian<_T>::diagH(bool woEigVec) {
-	auto memory				=	this->getHamiltonianSize();
-	auto method				=	(memory > 180) ? "std" : "dc";
-	std::string memoryStr	=	"DIM(H)= " + STRP(memory * 1e-6, 5) + "mb";
-	LOGINFO(memoryStr, LOG_TYPES::TRACE, 3);
-	BEGIN_CATCH_HANDLER
-		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<_T>(this->H_));
-		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<_T>(this->H_), method);
-	END_CATCH_HANDLER("Memory exceeded. " + memoryStr, ;);
-	this->calcAvEn();
-}
-
-template <>
-inline void Hamiltonian<cpx>::diagH(bool woEigVec) {
-	auto memory				= this->getHamiltonianSize();
-	auto method				= (memory > 180) ? "std" : "dc";
-	std::string memoryStr	= "DIM(H)= " + STRP(memory * 1e-6, 5) + "gb";
-	LOGINFO(memoryStr, LOG_TYPES::TRACE, 3);
-	BEGIN_CATCH_HANDLER
-		if (woEigVec)			arma::eig_sym(this->eigVal_, arma::Mat<cpx>(this->H_));
-		else					arma::eig_sym(this->eigVal_, this->eigVec_, arma::Mat<cpx>(this->H_), method);
-	END_CATCH_HANDLER("Memory exceeded. " + memoryStr, ;);
+inline void Hamiltonian<_T>::diagH(bool woEigVec) 
+{
+	if (woEigVec)	Diagonalizer<_T>::diagS(this->eigVal_, this->H_);
+	else			Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_);
 	this->calcAvEn();
 }
 
