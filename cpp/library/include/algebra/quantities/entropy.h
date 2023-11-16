@@ -277,23 +277,29 @@ namespace Entropy {
 			template <typename _T>
 			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _Ns, uint _sizeA, uint _Nint) {
 				// set subsystems size
-				int bitNum = (int)std::log2(_Nint);
+				auto bitNum		= (uint)std::log2(_Nint);
 				const u64 dimA	= ULLPOW(bitNum * _sizeA);
 				const u64 dimB	= ULLPOW((_Ns - bitNum * _sizeA));
 				const u64 Nh	= dimA * dimB;
 
 				arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
+
+				//u64 _startingM	= 0;
 				// loop over configurational basis
-				for (u64 n = 0; n < Nh; n++) {
+				for (u64 n = 0; n < Nh; n++) 
+				{
 					u64 counter = 0;
+					// find index of state with same B-side (by dividing the last bits are discarded)
+					u64 idx		= n / dimB;
 					// pick out state with same B side (last L-A_size bits)
-					for (u64 m = n % dimB; m < Nh; m += dimB) {
-						// find index of state with same B-side (by dividing the last bits are discarded)
-						u64 idx = n / dimB;
+					for (u64 m = n % dimB; m < Nh; m += dimB) 
+					//for (u64 m = _startingM; m < Nh; m += dimB)
+					{
 						rho(idx, counter) += algebra::conjugate(_s(n)) * _s(m);
 						// increase counter to move along reduced basis
 						counter++;
 					}
+					//if(++_startingM >= dimB) _startingM = 0;
 				}
 				return rho;
 			};
@@ -311,7 +317,7 @@ namespace Entropy {
 			inline arma::Mat<_T> redDensMatStandard(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
 				// set subsystems size
 				uint Ns			= _hilb.getLatticeSize();
-				uint Nint		= _hilb.getNum();
+				uint Nint		= _hilb.getLocalHilbertSize() * _hilb.getNum();
 				uint bitNum		= (uint)std::log2(Nint);
 				const u64 dimA	= ULLPOW(bitNum * _sizeA);
 				const u64 dimB	= ULLPOW((Ns - bitNum * _sizeA));
@@ -321,16 +327,19 @@ namespace Entropy {
 				auto map		= _hilb.getFullMap();
 				const u64 N		= map.size();
 				// otherwise find in mapping
-				auto find_index = [&](u64 _idx) { return binarySearch(map, 0, Nh - 1, _idx); };
+				auto find_index = [&](u64 _idx) 
+					{ 
+						return binarySearch(map, 0, Nh - 1, _idx); 
+					};
 
 				arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
 				for (u64 n = 0; n < N; n++) {
 					// loop over configurational basis
 					u64 ctr = 0;
 					u64 true_n = map[n];
+					// pick out state with same B side (last L-A_size bits)
+					u64 idx = true_n / dimB;
 					for (u64 m = true_n % dimB; m < Nh; m += dimB) {
-						// pick out state with same B side (last L-A_size bits)
-						u64 idx = true_n / dimB;
 						u64 j	= find_index(m);
 						if (j >= 0)
 							rho(idx, ctr) += algebra::conjugate(_s(n)) * _s(j);

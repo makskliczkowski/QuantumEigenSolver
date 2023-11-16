@@ -604,7 +604,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		_H->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
 	}
 	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
-	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
+	LOGINFO(start, "Diagonalization.", 2);
 
 	std::string name		=			VEQ(Nh);
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
@@ -629,6 +629,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 	v_1d<uint> _bonds		=			{};
 	for (int i = 1; i <= maxBondNum; i++)
 		_bonds.push_back(i);
+	_bonds					=			{ maxBondNum };
 	// go entropies!
 	auto beforeEntro		=			clk::now();
 	_H->generateFullMap();
@@ -642,7 +643,7 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		for (auto i : _bonds) {
 			// iterate through the state
 			auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace);
-			//auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace, Entropy::Entanglement::Bipartite::STANDARD_CAST);
+			//auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace, Entropy::Entanglement::Bipartite::STANDARD);
 			// save the entropy
 			ENTROPIES(i - 1, idx) = entro;
 		}
