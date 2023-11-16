@@ -835,137 +835,137 @@ inline void UI::symmetriesDeg(clk::time_point start)
 */
 inline void UI::symmetriesCreateDeg(clk::time_point start)
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
-	u64 Nh					=			this->hamComplex->getHilbertSize();
-	// --- create the directories ---
-	std::string dir			=			makeDirs(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info(), "combinations");
-	fs::create_directories(dir);
-
-	// --- use those files --- 
-	std::string modelInfo	=			this->hamComplex->getInfo();
-
-	// --- save entropies txt check ---
-	std::string filename	=			dir + modelInfo;
-	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
-	
-	// check Hilbert size or whether we should diagonalize and proceed further
-	if (Nh == 0)
-	{
-		LOGINFO("Skipping creation of the Hamiltonian due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2);
-		return;
-	}
-
-	// set the Hamiltonian
-	this->hamComplex->hamiltonian();
-
-	// set the parameters
-	uint Ns					=			this->hamComplex->getNs();
-	u64 stateNum			=			Nh / 10;
-	auto ran				=			this->hamComplex->ran_;
-	bool useShiftAndInvert [[maybe_unused]] = false;
-
-	LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
-	if (Nh < UI_LIMITS_MAXFULLED) {
-		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
-		this->hamComplex->diagH(false);
-	}
-	else
-	{
-		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
-		useShiftAndInvert	=			true;
-		stateNum = UI_LIMITS_SI_STATENUM;
-		this->hamComplex->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
-	}
-	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
-	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
-
-	std::string name		=			VEQ(Nh);
-	LOGINFO("Spectrum size: "			+ STR(Nh)		, LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states: "		+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
-	this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
-
-	// clear energies
-	this->hamComplex->clearH();
-
-	// iterate through bond cut
-	const uint maxBondNum	=			Ns / 2;
-
-	// get the symmetry rotation matrix
-	auto _symRot			=			this->hamComplex->getSymRot();
-	bool usesSym			=			this->hamComplex->hilbertSpace.checkSym();
-	auto beforeEntro		=			clk::now();
-	this->hamComplex->generateFullMap();
-
-	// information about state combination
-	const int _realizations	=			this->nqsP.nBlocks_;
-	const v_1d<int> _gammas	=			{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50 };
-	v_2d<arma::Col<cpx>> _HM=			{};
-
-	// create random coeficients
-	for (int i = 0; i < _gammas.size(); ++i)
-	{
-		if (_gammas[i] >= stateNum)
-			break;
-
-		_HM.push_back({});
-		// go through gammas
-		for (int j = 0; j < _realizations; ++j)
-			if(_gammas[i] > 1)
-				_HM[i].push_back(ran.createRanState(_gammas[i]));
-			else
-				_HM[i].push_back({ 1.0 });
-	}
-
-	// get index of the average energy
-	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
-	u64 _minIdx					= _idx - stateNum / 2;
-	//u64 _maxIdx					= _idx + stateNum / 2;
-	v_1d<int> toChooseFrom(stateNum);
-	std::iota(toChooseFrom.begin(), toChooseFrom.end(), _minIdx);
-	// as many entropies as realizations
-	v_1d<double> entropies(_realizations);
-
-	// go through the gammas
-	for (int _ig = 0; _ig < _gammas.size(); ++_ig)
-	{
-		auto gamma = _gammas[_ig];
-
-		// too many states
-		if (gamma >= stateNum)
-			break;
-
-		ofs << gamma;
-		LOGINFO("Taking gamma: " + STR(gamma), LOG_TYPES::TRACE, 3);
-
-		// go through the realizations
-#pragma omp parallel for num_threads(this->threadNum)
-		for (int _r = 0; _r < _realizations; _r++)
-		{
-			// choose random indices
-			//auto indices				=	(gamma > 1) ? ran.choice(toChooseFrom, gamma) : v_1d<int>({ ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1) });
-			auto idx					=	ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1 - gamma);
-			//arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(indices[0]);
-			arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(idx);
-			// append states
-			for (int id = 1; id < gamma; id++)
-				_state					+=	_HM[_ig][_r][id] * this->hamComplex->getEigVec(idx + id);
-			// rotate!
-			if (usesSym)
-				_state					=	_symRot * _state;
-			// normalize state
-			//_state						=	_state / sqrt(arma::cdot(_state, _state));
-			auto entro					=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
-
-			entropies[_r] = entro;
-			if (_r > 10 && _r % (_realizations / 10) == 0)
-				LOGINFO("Finished: " + STR(_r * 100.0 / _realizations) + "%. Entropy was: " + VEQ(entro / (log(2) * maxBondNum)), LOG_TYPES::TRACE, 4);
-
-		}
-		for (int _r = 0; _r < _realizations; _r++)
-			ofs << "," << STRP(entropies[_r], 10);
-		ofs << "\n";
-	}
-	ofs.close();
+//	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+//	u64 Nh					=			this->hamComplex->getHilbertSize();
+//	// --- create the directories ---
+//	std::string dir			=			makeDirs(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info(), "combinations");
+//	fs::create_directories(dir);
+//
+//	// --- use those files --- 
+//	std::string modelInfo	=			this->hamComplex->getInfo();
+//
+//	// --- save entropies txt check ---
+//	std::string filename	=			dir + modelInfo;
+//	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
+//	
+//	// check Hilbert size or whether we should diagonalize and proceed further
+//	if (Nh == 0)
+//	{
+//		LOGINFO("Skipping creation of the Hamiltonian due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2);
+//		return;
+//	}
+//
+//	// set the Hamiltonian
+//	this->hamComplex->hamiltonian();
+//
+//	// set the parameters
+//	uint Ns					=			this->hamComplex->getNs();
+//	u64 stateNum			=			Nh / 10;
+//	auto ran				=			this->hamComplex->ran_;
+//	bool useShiftAndInvert [[maybe_unused]] = false;
+//
+//	LOGINFO("Finished buiding Hamiltonian" + modelInfo, LOG_TYPES::TRACE, 1);
+//	if (Nh < UI_LIMITS_MAXFULLED) {
+//		LOGINFO("Using standard diagonalization", LOG_TYPES::TRACE, 2);
+//		this->hamComplex->diagH(false);
+//	}
+//	else
+//	{
+//		LOGINFO("Using S&I", LOG_TYPES::TRACE, 2);
+//		useShiftAndInvert	=			true;
+//		stateNum = UI_LIMITS_SI_STATENUM;
+//		this->hamComplex->diagH(false, (int)stateNum, 0, 1000, 1e-5, "sa");
+//	}
+//	LOGINFO("Finished the diagonalization", LOG_TYPES::TRACE, 2);
+//	LOGINFO(STR(t_ms(start)) + " ms", LOG_TYPES::TIME, 2);
+//
+//	std::string name		=			VEQ(Nh);
+//	LOGINFO("Spectrum size: "			+ STR(Nh)		, LOG_TYPES::TRACE, 3);
+//	LOGINFO("Taking num states: "		+ STR(stateNum)	, LOG_TYPES::TRACE, 2);
+//	this->hamComplex->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+//
+//	// clear energies
+//	this->hamComplex->clearH();
+//
+//	// iterate through bond cut
+//	const uint maxBondNum	=			Ns / 2;
+//
+//	// get the symmetry rotation matrix
+//	auto _symRot			=			this->hamComplex->getSymRot();
+//	bool usesSym			=			this->hamComplex->hilbertSpace.checkSym();
+//	auto beforeEntro		=			clk::now();
+//	this->hamComplex->generateFullMap();
+//
+//	// information about state combination
+//	const int _realizations	=			this->nqsP.nBlocks_;
+//	const v_1d<int> _gammas	=			{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 50 };
+//	v_2d<arma::Col<cpx>> _HM=			{};
+//
+//	// create random coeficients
+//	for (int i = 0; i < _gammas.size(); ++i)
+//	{
+//		if (_gammas[i] >= stateNum)
+//			break;
+//
+//		_HM.push_back({});
+//		// go through gammas
+//		for (int j = 0; j < _realizations; ++j)
+//			if(_gammas[i] > 1)
+//				_HM[i].push_back(ran.createRanState(_gammas[i]));
+//			else
+//				_HM[i].push_back({ 1.0 });
+//	}
+//
+//	// get index of the average energy
+//	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
+//	u64 _minIdx					= _idx - stateNum / 2;
+//	//u64 _maxIdx					= _idx + stateNum / 2;
+//	v_1d<int> toChooseFrom(stateNum);
+//	std::iota(toChooseFrom.begin(), toChooseFrom.end(), _minIdx);
+//	// as many entropies as realizations
+//	v_1d<double> entropies(_realizations);
+//
+//	// go through the gammas
+//	for (int _ig = 0; _ig < _gammas.size(); ++_ig)
+//	{
+//		auto gamma = _gammas[_ig];
+//
+//		// too many states
+//		if (gamma >= stateNum)
+//			break;
+//
+//		ofs << gamma;
+//		LOGINFO("Taking gamma: " + STR(gamma), LOG_TYPES::TRACE, 3);
+//
+//		// go through the realizations
+//#pragma omp parallel for num_threads(this->threadNum)
+//		for (int _r = 0; _r < _realizations; _r++)
+//		{
+//			// choose random indices
+//			//auto indices				=	(gamma > 1) ? ran.choice(toChooseFrom, gamma) : v_1d<int>({ ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1) });
+//			auto idx					=	ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1 - gamma);
+//			//arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(indices[0]);
+//			arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(idx);
+//			// append states
+//			for (int id = 1; id < gamma; id++)
+//				_state					+=	_HM[_ig][_r][id] * this->hamComplex->getEigVec(idx + id);
+//			// rotate!
+//			if (usesSym)
+//				_state					=	_symRot * _state;
+//			// normalize state
+//			//_state						=	_state / sqrt(arma::cdot(_state, _state));
+//			auto entro					=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+//
+//			entropies[_r] = entro;
+//			if (_r > 10 && _r % (_realizations / 10) == 0)
+//				LOGINFO("Finished: " + STR(_r * 100.0 / _realizations) + "%. Entropy was: " + VEQ(entro / (log(2) * maxBondNum)), LOG_TYPES::TRACE, 4);
+//
+//		}
+//		for (int _r = 0; _r < _realizations; _r++)
+//			ofs << "," << STRP(entropies[_r], 10);
+//		ofs << "\n";
+//	}
+//	ofs.close();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

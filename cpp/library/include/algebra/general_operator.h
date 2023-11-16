@@ -199,9 +199,9 @@ namespace Operators{
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		template <typename T_ = _T,
-			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
-		[[maybe_unused]] operator Operator<cpx, _Ts...>()							{ return *this; };
+		//template <typename T_ = _T,
+		//	typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
+		//[[maybe_unused]] operator Operator<cpx, _Ts...>()							{ return *this; };
 
 		//template <typename T_ = _T,
 		//	typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr> 
