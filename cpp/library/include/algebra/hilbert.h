@@ -264,8 +264,8 @@ namespace Hilbert {
 				containsT_ = (this->lat->get_BC() == (uint)BoundaryConditions::PBC);
 
 				// create the translation operator
-				if(containsT_)
-					this->symGroupSec_.push_back(genIn[i]);
+				//if(containsT_)
+				this->symGroupSec_.push_back(genIn[i]);
 				T = Operators::symChoice<_T>(genIn[i], this->lat);
 
 				// erease the translation as we will include it later on
@@ -324,6 +324,8 @@ namespace Hilbert {
 			this->symGroupSec_.push_back(g);
 
 		// --------------------------------------------------------------------------------
+		LOGINFO(2);
+		LOGINFO(LOG_TYPES::INFO, "", 40, '%', 0);
 		LOGINFOG("Using local: ", LOG_TYPES::INFO, 0);
 		for (auto& g : genIn) 
 		{
@@ -338,6 +340,8 @@ namespace Hilbert {
 		{
 			LOGINFOG(SSTR(GlobalSyms::getSTR_GlobalSymGenerators(g.getName())) + ":" + VEQ(g.getVal()), LOG_TYPES::INFO, 1);
 		}
+		LOGINFO(LOG_TYPES::INFO, "", 40, '%', 0);
+		LOGINFO(2);
 
 		// add neutral element
 		// this->symGroup_.push_back(Operators::Operator<_T>(this->lat));
@@ -480,8 +484,8 @@ namespace Hilbert {
 			if (state < SEC) {
 				SEC = state;
 				val = retVal;
-				if (state < baseIdx)
-					break;
+				//if (state < baseIdx)
+					//break;
 			}
 		}
 		return std::make_pair(SEC, val);
@@ -668,7 +672,7 @@ namespace Hilbert {
 				continue;
 
 			// check the representative
-			const auto [SEC, _] = this->findRep(j, true);
+			const auto [SEC, _] = this->findRep(j);
 			
 			// if this state is the smallest already, it for sure is the representative, otherwise we have already used it
 			if (SEC == j) 
