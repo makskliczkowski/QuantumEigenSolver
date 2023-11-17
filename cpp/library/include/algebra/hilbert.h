@@ -128,7 +128,8 @@ namespace Hilbert {
 				symGroupSec_(_H.symGroupSec_),
 				normalization_(_H.normalization_), 
 				mapping_(_H.mapping_), 
-				fullMap_(_H.fullMap_)
+				fullMap_(_H.fullMap_),
+				reprMap_(_H.reprMap_)
 		{
 				WriteLock lhs_lk(this->Mutex, std::defer_lock);
 				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
@@ -138,25 +139,25 @@ namespace Hilbert {
 		/*
 		* @brief Move constructor
 		*/
-		//HilbertSpace(HilbertSpace<_T>&& _H)
-		//	:	Ns(std::move(_H.Ns)), 
-		//		Nhl(std::move(_H.Nhl)),
-		//		Nint(std::move(_H.Nint)),
-		//		Nh(std::move(_H.Nh)),
-		//		NhFull(std::move(_H.NhFull)),
-		//		lat(std::move(_H.lat)),
-		//		symGroupGlobal_(std::move(_H.symGroupGlobal_)),
-		//		symGroup_(std::move(_H.symGroup_)),
-		//		symGroupSec_(std::move(_H.symGroupSec_)),
-		//		normalization_(std::move(_H.normalization_)),
-		//		mapping_(std::move(_H.mapping_)),
-		//		fullMap_(std::move(_H.fullMap_))
-
-		//{
-		//	WriteLock lhs_lk(this->Mutex, std::defer_lock);
-		//	ReadLock  rhs_lk(_H.Mutex, std::defer_lock);
-		//	std::lock(lhs_lk, rhs_lk);
-		//};
+		HilbertSpace(HilbertSpace<_T>&& _H)
+			:	Ns(std::move(_H.Ns)), 
+				Nhl(std::move(_H.Nhl)),
+				Nint(std::move(_H.Nint)),
+				Nh(std::move(_H.Nh)),
+				NhFull(std::move(_H.NhFull)),
+				lat(std::move(_H.lat)),
+				symGroupGlobal_(std::move(_H.symGroupGlobal_)),
+				symGroup_(std::move(_H.symGroup_)),
+				symGroupSec_(std::move(_H.symGroupSec_)),
+				normalization_(std::move(_H.normalization_)),
+				mapping_(std::move(_H.mapping_)),
+				fullMap_(std::move(_H.fullMap_)),
+				reprMap_(std::move(_H.reprMap_))
+		{
+			WriteLock lhs_lk(this->Mutex, std::defer_lock);
+			ReadLock  rhs_lk(_H.Mutex, std::defer_lock);
+			std::lock(lhs_lk, rhs_lk);
+		};
 	
 		// -------------------------- ASSIGN OPERATOR -------------------------
 		HilbertSpace<_T>& operator=(const HilbertSpace<_T>& _H)
@@ -189,7 +190,6 @@ namespace Hilbert {
 		void generateFullMap();															// generates full map if a global symmetry is present
 
 		std::pair<u64, _T> findRep(u64 baseIdx)			const;							// returns the representative index and symmetry return eigval
-		std::pair<u64, _T> findRepStop(u64 baseIdx)			const;						// returns the representative index and symmetry return eigval (breaks if smaller already)
 		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;							// returns the representative and symmetry eigval taking the second symmetry sector beta
 
 		// ------------------------ FULL HILBERT SPACE ------------------------
@@ -463,34 +463,6 @@ namespace Hilbert {
 		return std::make_pair(SEC, val);
 	}
 
-	template<typename _T>
-	inline std::pair<u64, _T> Hilbert::HilbertSpace<_T>::findRepStop(u64 baseIdx) const
-	{
-		// if the map exists, return the value already saved
-		if (!this->reprMap_.empty())
-			return this->reprMap_[baseIdx];
-
-		// start with a biggest value possible
-		u64 SEC = INT64_MAX;
-		// setup starting symmetry eigenvalue - nothing needs to be done
-		_T val = 1.0;
-		// go through all symmetry generators to find the smallest baseIdx - representative
-		for (const auto& G : this->symGroup_)
-		{
-			// act!
-			auto [state, retVal] = G(baseIdx);
-
-			// check if state is smaller
-			if (state < SEC) {
-				SEC = state;
-				val = retVal;
-				//if (state < baseIdx)
-					//break;
-			}
-		}
-		return std::make_pair(SEC, val);
-	}
-
 	// ##########################################################################################################################################
 
 	/*
@@ -571,7 +543,7 @@ namespace Hilbert {
 	inline arma::SpMat<_T> HilbertSpace<_T>::getSymRot(const v_1d<u64>& fMap) const
 	{
 		// check the maximal dimension of the Hilbert space (if we have global symmetries)
-		const u64 maxDim	= fMap.empty() ? ULLPOW(this->Ns) : fMap.size();
+		const u64 maxDim	= fMap.empty() ? this->NhFull : fMap.size();
 
 		// find index helping function
 		auto find_index		= [&](u64 idx) { return (!fMap.empty()) ? binarySearch(fMap, 0, maxDim - 1, idx) : idx; };

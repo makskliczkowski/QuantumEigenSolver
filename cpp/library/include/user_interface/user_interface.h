@@ -643,7 +643,6 @@ inline void UI::symmetries(clk::time_point start, std::shared_ptr<Hamiltonian<_T
 		for (auto i : _bonds) {
 			// iterate through the state
 			auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace);
-			//auto entro		=			Entropy::Entanglement::Bipartite::vonNeuman<_T>(state, i, _H->hilbertSpace, Entropy::Entanglement::Bipartite::STANDARD);
 			// save the entropy
 			ENTROPIES(i - 1, idx) = entro;
 		}

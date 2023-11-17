@@ -307,6 +307,33 @@ namespace Entropy {
 			// ###############################################################
 
 			/*
+			* @brief Calculates the bipartite reduced density matrix of the system via the state mixing
+			* @param _s state to construct the density matrix from
+			* @param _sizeA subsystem size
+			* @param _Ns number of lattice sites
+			* @param _Nint number of local fermionic modes
+			* @returns the bipartite reduced density matrix
+			*/
+			template <typename _T>
+			inline arma::Mat<_T> redDensMatFromBase(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
+				// set subsystems size
+				uint Ns			= _hilb.getLatticeSize();
+				uint Nint		= _hilb.getLocalHilbertSize() * _hilb.getNum();
+				uint bitNum		= (uint)std::log2(Nint);
+				u64 dimA		= ULLPOW(bitNum * _sizeA);
+				for(u64 i = 0; i < _hilb.getHilbertSize(); ++i)
+					if (_hilb.getMapping(i) >= dimA)
+					{
+						dimA	= i;
+						break;
+					}
+				const u64 dimB = _hilb.getHilbertSize() - dimA;
+			};
+
+			// ###############################################################
+
+
+			/*
 			* @brief Calculates the bipartite reduced density matrix of the system via the state mixing. Knowing the mapping with global symmetry.
 			* @param _s state to construct the density matrix from
 			* @param _sizeA subsystem size

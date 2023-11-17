@@ -38,7 +38,7 @@ namespace Operators {
 
 	BEGIN_ENUM(SymGenerators)
 	{
-		DECL_ENUM_ELEMENT(E),
+			DECL_ENUM_ELEMENT(E),
 			DECL_ENUM_ELEMENT(T),
 			DECL_ENUM_ELEMENT(Tr),
 			DECL_ENUM_ELEMENT(R),
@@ -71,9 +71,9 @@ namespace Operators{
 		repType fun_										=			E;		// function allowing to use symmetry
 		SymGenerators name_									=			SymGenerators::E;
 	
-	// ----------------------------------------------------------------------------------------------------
-	
 	public:
+		// ----------------------------------------------------------------------------------------------------
+
 		virtual ~Operator()									=			default;
 		Operator() 
 		{ 
@@ -94,9 +94,6 @@ namespace Operators{
 		{
 			init();
 		};
-		//Operator(std::shared_ptr<Lattice>& _lat, _T _eigVal, repType&& _fun)
-		//	: lat_(_lat), eigVal_(_eigVal),
-		//	fun_(std::move(_fun))					{ init(); };
 		Operator(const Operator<_T, _Ts...>& o)
 			: lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_)
 		{
@@ -128,7 +125,7 @@ namespace Operators{
 			return *this;
 		}
 
-		// ---------- override operators -----------
+		// -------------- O P E R A T O R ( ) -------------
 		
 		virtual auto operator()(u64 s, _Ts... a)		const -> typename _OP<_T>::R{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
 		virtual auto operator()(u64 s, _Ts... a)		-> typename _OP<_T>::R		{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
@@ -137,19 +134,19 @@ namespace Operators{
 
 		// ----------------------------------------------------------------------------------------------------
 
-		// ---------- STATIC ----------
+		// -------------------- STATIC --------------------
 		static auto E(u64 s, _Ts...)					-> typename _OP<_T>::R		{ return std::make_pair(s, _T(1.0)); };
 
-		// ---------- virtual functions to override ----------
+		// ----------------- V I R T U A L ----------------
 		virtual void init() {};
-
-		// ---------- SETTERS -----------
+		
+		// -------------------- SETTERS -------------------
 		auto setFun(const repType& _fun)				-> void						{ this->fun_ = _fun; };
 		auto setFun(repType&& _fun)						-> void						{ this->fun_ = std::move(_fun); };
 		auto setName(SymGenerators _name)				-> void						{ this->name_ = _name; };
 		auto setVal(_T _val)							-> void						{ this->eigVal_ = _val; };
 
-		// ---------- GETTERS -----------
+		// -------------------- GETTERS --------------------
 		auto getVal()									const -> _T					{ return this->eigVal_; };
 		auto getFun()									const -> repType			{ return this->fun_; };
 		auto getName()									const -> SymGenerators		{ return this->name_; };
@@ -215,6 +212,7 @@ namespace Operators{
 		//};
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 		/*
 		* @brief operator to the N'th power
 		*/
@@ -230,18 +228,17 @@ namespace Operators{
 			auto _f = [_n, this](u64 _s, _Ts... _args) {
 				_T val = 1.0;
 				do {
-					auto [newS, newV] = this->operator()(_s, _args...);
-					_s = newS;
-					val *= newV;
+					auto [newS, newV]	= this->operator()(_s, _args...);
+					_s					= newS;
+					val					*= newV;
 					--_n;
-				} while (_n);
+					} while (_n);
 				return std::make_tuple(_s, val);
 			};
 			return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
 		}
 			
-
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
 		* @brief representative eigenvalue calculator
@@ -254,15 +251,16 @@ namespace Operators{
 		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)			{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
 	
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		arma::SpMat<_T> generateMat(u64 _dim, _Ts... _arg) const;
-		template<typename _T1>
-		arma::SpMat<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts... _arg) const;
-		template<typename _T1, typename _T2>
-		arma::SpMat<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts... _arg);
+		
+		template<template <class _TM = _T> class _MatType, HasMatrixType _Concept = _MatType<_T>>
+		_MatType<_T> generateMat(u64 _dim, _Ts... _arg) const;
+		template<template <class _TM = _T> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_T>>
+		_MatType<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts... _arg) const;
+		template<template <class _TM = _T> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_T>>
+		_MatType<_T> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts... _arg);
 
 
 		// calculates the matrix element of operator given a single state
-
 		template <typename _T1, typename _T2>
 		[[deprecated]]
 		static _T avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
@@ -292,14 +290,18 @@ inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, con
 // ################################################ M A T R I X   G E N E R A T I O N ##############################################################
 
 /*
-* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space (offdiagonal but still ok :))
+* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
+* For the total Hilbert space known to be without symmetries - not looking for representatives
 * @brief _dim A dimension of the Hilbert space
 */
 template<typename _T, typename ..._Ts> 
-inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
+template<template <class> class _MatType, HasMatrixType _Concept>
+inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
 {
-	arma::SpMat<_T> op(_dim, _dim);
-	for (u64 _base = 0; _base < _dim; _base++) {
+	_MatType<_T> op(_dim, _dim);
+#pragma omp paralell for
+	for (u64 _base = 0; _base < _dim; _base++) 
+	{
 		auto [_idx, _val]		=	this->operator()(_base, _arg...);
 		op(_idx, _base)			+=	_val;
 	}
@@ -307,15 +309,18 @@ inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _T
 }
 
 /*
-* @brief Creates an operator matrix whenever the operator is not transforming the state to a different symmetry sector (offdiagonal but still ok :))
+* @brief Creates an operator matrix whenever the operator is not transforming the state to a different symmetry sector.
+* Uses the Hilbert space that stores the state transformations from the representative base.
 * @param _Hil the Hilbert space in which we operate
+* @param _arg arguments for the operator
 */
 template<typename _T, typename ..._Ts>
-template<typename _T1>
-inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts ..._arg) const
+template<template <class> class _MatType, typename _T1, HasMatrixType _Concept>
+inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts ..._arg) const
 {
 	u64 Nh							=	_Hil.getHilbertSize();
-	arma::SpMat<_T> op(Nh, Nh);
+	_MatType<_T> op(Nh, Nh);
+#pragma omp parallel for
 	for (u64 _idx = 0; _idx < Nh; _idx++)
 	{
 		auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
@@ -324,9 +329,10 @@ inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilber
 		[[unlikely]] if (EQP(std::abs(_val), 0.0, 1e-14))
 			continue;
 
+		// looking for the representative
 		auto [_newIdx, _eigval]		=	_Hil.findRep(_newState, _Hil.getNorm(_idx));
 		if(_newIdx < Nh)
-			op(_newIdx, _idx)			+=	_val * _eigval;
+			op(_newIdx, _idx)		+=	_val * _eigval;
 	}
 	return op;
 }
@@ -338,13 +344,15 @@ inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilber
 * @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
 */
 template<typename _T, typename ..._Ts>
-template<typename _T1, typename _T2>
-inline arma::SpMat<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts ..._arg)
+template<template <class> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept>
+inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts ..._arg)
 {
 	u64 NhA										=	_Hil1.getHilbertSize();
 	u64 NhB										=	_Hil2.getHilbertSize();
 	arma::SpMat<_T> op(NhA, NhB);
-	for (u64 _idxB = 0; _idxB < NhB; _idxB++) {
+#pragma omp parallel for
+	for (u64 _idxB = 0; _idxB < NhB; _idxB++) 
+	{
 		// act with an operator on beta sector (right)
 		auto [_newStateB, _valB]				=	this->operator()(_Hil2.getMapping(_idxB), _arg...);
 
