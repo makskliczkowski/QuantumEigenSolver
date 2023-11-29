@@ -63,8 +63,11 @@ namespace Operators {
 	//};
 
 	/*
-	* @brief Imitates the behavior f \dot g \equiv f(g(n,...),...) 
-	* Leaves more types to handle thereafter
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
+	* Fixes both the inputs to be complex  - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
 	*/
 	template <typename... _T1, typename... _T2>
 	inline auto operator*(_INPC<_T1...> f, _INPC<_T2...> g)
@@ -77,6 +80,13 @@ namespace Operators {
 		};
 	};
 
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
+	* Fixes both inputs to be real - thus returning real
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
 	template <typename... _T1, typename... _T2>
 	inline auto operator*(_INPR<_T1...> f, _INPR<_T2...> g)
 	{
@@ -88,6 +98,13 @@ namespace Operators {
 		};
 	};
 
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...)
+	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
+	* Fixes first input to be real and the second input to be complex  - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
 	template <typename... _T1, typename... _T2>
 	inline auto operator*(_INPR<_T1...> f, _INPC<_T2...> g)
 	{
@@ -99,6 +116,13 @@ namespace Operators {
 		};
 	};
 
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
+	* Fixes first input to be complex and the second input to be real - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
 	template <typename... _T1, typename... _T2>
 	inline auto operator*(_INPC<_T1...> f, _INPR<_T2...> g)
 	{

@@ -80,11 +80,11 @@ public:
 		this->eigVal_.reset();
 		this->eigVec_.reset();
 	}
-	Hamiltonian() : ran_(randomGen()) {};
+	Hamiltonian() : ran_(randomGen(time(0))) {};
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
 		: hilbertSpace(hilbert)
 	{
-		this->ran_	= randomGen();
+		this->ran_	= randomGen(time(0));
 		this->lat_	= this->hilbertSpace.getLattice();
 		this->Ns	= this->lat_->get_Ns();
 		this->Nh	= this->hilbertSpace.getHilbertSize();
@@ -92,7 +92,7 @@ public:
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
 		: hilbertSpace(std::move(hilbert))
 	{
-		this->ran_	=	randomGen();
+		this->ran_	=	randomGen(time(0));
 		this->lat_	=	this->hilbertSpace.getLattice();
 		this->Ns	=	this->lat_->get_Ns();
 		this->Nh	=	this->hilbertSpace.getHilbertSize();
@@ -144,29 +144,29 @@ public:
 	// -------------------------------------------- GETTERS ---------------------------------------------------
 	
 	auto getDegeneracies()								const -> v_2d<u64>;
-	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx; };								
-	auto getHilbertSize()								const -> u64						{ return this->Nh; };			
-	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace; };							
-	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_; };								
-	auto getHamiltonianSize()							const -> double						{ return this->H_.size() * sizeof(this->H_(0, 0)); };								
+	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx;													};								
+	auto getHilbertSize()								const -> u64						{ return this->Nh;														};			
+	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace;											};							
+	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_;														};								
+	auto getHamiltonianSize()							const -> double						{ return this->H_.size() * sizeof(this->H_(0, 0));						};								
 	auto getHamiltonianSizeH()							const -> double						{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
-	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot(); };
-	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_; };							
-	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx); };			
-	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx); };				
+	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot();								};
+	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_;													};							
+	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx);										};			
+	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx);										};				
 	auto getEigVec(std::string _dir, u64 _mid, 
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
-	auto getEigVal()									const -> arma::vec					{ return this->eigVal_; };						
+	auto getEigVal()									const -> arma::vec					{ return this->eigVal_;													};						
 	auto getEigVal(std::string _dir,
 				HAM_SAVE_EXT _typ, bool _app = false)	const -> void;
-	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx); };	
-	auto getInfo(const v_1d<std::string>& skip = {}, 
-		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info_; };
-	auto getType()										const -> std::string				{ return SSTR(getSTR_MY_MODELS(this->type_)); };
-	auto getTypeI()										const -> uint						{ return this->type_; };
-	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_; };
-	auto getNs()										const -> uint						{ return this->lat_->get_Ns(); };
-	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC(); };
+	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx);											};	
+	auto getInfo(const strVec& skip = {},
+		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info_;													};
+	auto getType()										const -> std::string				{ return SSTR(getSTR_MY_MODELS(this->type_));							};
+	auto getTypeI()										const -> uint						{ return this->type_;													};
+	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_;													};
+	auto getNs()										const -> uint						{ return this->lat_->get_Ns();											};
+	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC();											};
 	// ------------------------------------------- SETTERS ----------------------------------------------------
 	
 	virtual void hamiltonian()							=									0;								
@@ -194,9 +194,9 @@ public:
 	void generateFullMap()								{ this->hilbertSpace.generateFullMap(); };
 
 	// --------------------------------------------- CLEAR -----------------------------------------------------
-	void clearEigVec()									{ this->eigVec_.reset(); };			// resets the eigenvectors memory to 0
-	void clearEigVal()									{ this->eigVal_.reset(); };			// resets the energy memory to 0
-	void clearH()										{ this->H_.reset(); };				// resets the hamiltonian memory to 0
+	void clearEigVec()									{ this->eigVec_.reset();				}; // resets the eigenvectors memory to 0
+	void clearEigVal()									{ this->eigVal_.reset();				}; // resets the energy memory to 0
+	void clearH()										{ this->H_.reset();						}; // resets the hamiltonian memory to 0
 
 	// --------------------------------------------- OTHER -----------------------------------------------------
 
@@ -211,21 +211,24 @@ public:
 
 // ##########################################################################################################################################
 
+/*
+* @brief Calculates the index closest to the average energy in the Hamiltonian
+*/
 template<typename _T>
 inline void Hamiltonian<_T>::calcAvEn()
 {
 	// calculates the middle spectrum element
-	double Eav = arma::mean(this->eigVal_);
+	double Eav	= arma::mean(this->eigVal_);
+	u64 Nh		= this->getHilbertSize();
 
-	// calculates the middle spectrum element
-	u64 Nh = this->getHilbertSize();
+	// calculates the energy difference to find the closest element (the smallest)
 	v_1d<double> tmp(Nh, 0.0);
 	for (int i = 0; i < Nh; i++)
 		tmp[i] = std::abs(this->getEigVal(i) - Eav);
 
 	// get the iterator
-	v_1d<double>::iterator _it = std::min_element(std::begin(tmp), std::end(tmp));
-	this->avEnIdx = _it - std::begin(tmp);
+	v_1d<double>::iterator _it	= std::min_element(std::begin(tmp), std::end(tmp));
+	this->avEnIdx				= _it - std::begin(tmp);
 }
 
 // ##########################################################################################################################################
@@ -233,6 +236,7 @@ inline void Hamiltonian<_T>::calcAvEn()
 // ############################################################ P R I N T I N G #############################################################
 // ##########################################################################################################################################
 // ##########################################################################################################################################
+
 /*
 * @brief prints the base state in the BRAKET notation
 * @param _s base state to be printed in the integer form
@@ -267,6 +271,10 @@ inline void Hamiltonian<_T>::prettyPrint(std::ostream& output, const arma::Col<_
 }
 
 // ##########################################################################################################################################
+// ##########################################################################################################################################
+// ######################################################### H A M I L T O N I A N ##########################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
 
 /*
 * @brief Sets the non-diagonal elements of the Hamimltonian matrix with symmetry sectors: therefore the matrix elements are summed over the SEC
@@ -283,10 +291,6 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 		{
 			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
 			// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-			//arma::Col<int> tmp(4, arma::fill::zeros);
-			//intToBase(this->hilbertSpace.getMapping(idx), tmp);
-			//stout << "\t->REPR: " << this->hilbertSpace.getMapping(idx) << "PLACE: " << idx << EL;
-			//stout << "\t->" << tmp.t() << EL;
 			this->H_(idx, k) += val * symEig;
 		}
 		else
@@ -390,6 +394,7 @@ inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 // ############################################################# G E T T E R S ##############################################################
 // ##########################################################################################################################################
 // ##########################################################################################################################################
+
 /*
 * @brief Prints the eigenvalues into some file "energies" in some directory
 * @param _dir directory to be saved onto
@@ -401,6 +406,7 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool
 {
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	std::ofstream file;
+	BEGIN_CATCH_HANDLER
 	switch (_typ)
 	{
 	case HAM_SAVE_EXT::dat:
@@ -422,6 +428,7 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool
 		LOGINFO("Wrong extension, not saving a file. Available are [.dat, .h5]", LOG_TYPES::WARNING, 1);
 		break;
 	}
+	END_CATCH_HANDLER("Exception in saving the Eigenvalues: ", getEigVal(_dir, HAM_SAVE_EXT::dat, _app););
 }
 
 // ##########################################################################################################################################
@@ -436,8 +443,12 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool
 template<typename _T>
 inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
-	const arma::Mat<_T> states = (_mid == this->Nh) ? this->eigVec_ : this->eigVec_.submat(0, this->avEnIdx - _mid / 2, this->Nh - 1, this->avEnIdx + _mid / 2);
-	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
+	const auto inLeft			= (this->avEnIdx - u64(_mid / 2)) >= 0 ? (this->avEnIdx - u64(_mid / 2)) : 0;
+	const auto inRight			= (this->avEnIdx + u64(_mid / 2)) < this->Nh ? (this->avEnIdx + u64(_mid / 2)) : (this->Nh - 1);
+
+	BEGIN_CATCH_HANDLER
+	const arma::Mat<_T> states	= (_mid == this->Nh) ? this->eigVec_ : this->eigVec_.submat(0, inLeft, this->Nh - 1, inRight);
+	std::string extension		= "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	switch (_typ)
 	{
 	case HAM_SAVE_EXT::dat:
@@ -453,6 +464,8 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 		states.save(_dir + "states" + this->getInfo() + ".dat", arma::raw_ascii);
 		break;
 	}
+	END_CATCH_HANDLER("Exception in saving the Eigenvectors: ", getEigVec(_dir, _mid, HAM_SAVE_EXT::dat, _app););
+
 }
 
 // ##########################################################################################################################################

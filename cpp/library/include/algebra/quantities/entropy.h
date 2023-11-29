@@ -10,47 +10,17 @@
 #include "../hilbert.h"
 #endif // !HILBERT_H
 
-// dynamic bitset
-#include "../../DYNAMIC/dynamic_bitset.hpp"
-
 #ifndef ENTROPY_H
 #define ENTROPY_H
 
-// ################################## S I N G L E   P A R T I C L E ##################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ############################################################ SINGLE PARTICLE #############################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+
 namespace SingleParticle 
 {
-	// #######################################################
-
-	/*
-	* @brief Transform vector of indices to full state in Fock real space basis.
-	* @param _Ns number of lattice sites
-	* @param _state single particle orbital indices
-	* @returns an Armadillo vector in the Fock basis
-	*/
-	inline arma::Col<double> transformIdxToState(uint _Ns, const arma::uvec& _state)
-	{
-		arma::Col<double> _out(_Ns, arma::fill::zeros);
-		for (auto& i : _state)
-			_out(i) = 1;
-		return _out;
-	}
-	
-	/*
-	* @brief Transform vector of indices to full state in Fock real space basis.
-	* @param _Ns number of lattice sites
-	* @param _state single particle orbital indices
-	* @returns an Armadillo vector in the Fock basis
-	*/
-	inline sul::dynamic_bitset<> transformIdxToBitset(uint _Ns, const arma::uvec& _state)
-	{
-		sul::dynamic_bitset<> _out(_Ns);
-		for (auto& i : _state)
-			_out[i] = true;
-		return _out;
-	}
-
-	// #######################################################
-
 	/*
 	* @brief Create single particle correlation matrix for a given Fock state in orbital basis
 	* @param _Ns number of lattice sites
@@ -71,7 +41,7 @@ namespace SingleParticle
 	{
 		if (!_rawRho)
 		{
-			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto prefactors				= 2 * VEC::transformIdxToState(_Ns, _state) - 1;
 			arma::Mat<_T1> W_A_CT_P		= _W_A_CT;
 			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
 				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
@@ -96,7 +66,7 @@ namespace SingleParticle
 	{
 		if (!_rawRho)
 		{
-			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto prefactors				= 2 * VEC::transformIdxToState(_Ns, _state) - 1;
 			arma::Mat<cpx> W_A_CT_P;
 			W_A_CT_P.set_real(_W_A_CT);
 
@@ -123,7 +93,7 @@ namespace SingleParticle
 	{
 		if (!_rawRho)
 		{
-			auto prefactors				= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto prefactors				= 2 * VEC::transformIdxToState(_Ns, _state) - 1;
 			arma::Mat<_T1> W_A_CT_P		= _W_A_CT;
 			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
 				W_A_CT_P.row(_row)		= W_A_CT_P.row(_row) * prefactors;
@@ -146,7 +116,7 @@ namespace SingleParticle
 	{
 		if (!_rawRho)
 		{
-			auto prefactors					= 2 * transformIdxToState(_Ns, _state) - 1;
+			auto prefactors					= 2 * VEC::transformIdxToState(_Ns, _state) - 1;
 			arma::Mat<cpx> W_A_CT_P			= _W_A_CT;
 			for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
 				W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
@@ -207,12 +177,12 @@ namespace SingleParticle
 		for (int mi = 0; mi < _gamma; ++mi)
 		{
 			const auto& _m		=	_states[mi];
-			const auto& _mb		=	transformIdxToBitset(_Ns, _m);
+			const auto& _mb		=	VEC::transformIdxToBitset(_Ns, _m);
 			// go through states |n> (higher than m)
 			for (int ni = mi + 1; ni < _gamma; ++ni)
 			{
 				const auto& _n	=	_states[ni];
-				const auto& _nb	=	transformIdxToBitset(_Ns, _n);
+				const auto& _nb	=	VEC::transformIdxToBitset(_Ns, _n);
 
 				// xor to check the difference
 				auto x			=	_mb ^ _nb;
@@ -251,14 +221,23 @@ namespace SingleParticle
 
 };
 
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ############################################################# E N T R O P Y ##############################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
 
-namespace Entropy {
-	namespace Entanglement {
-		namespace Bipartite {
+namespace Entropy 
+{
+	namespace Entanglement 
+	{
+		namespace Bipartite 
+		{
 
 			// ###############################################################
 
-			enum RHO_METHODS {
+			enum class RHO_METHODS 
+			{
 				STANDARD,
 				STANDARD_CAST,
 				SCHMIDT
@@ -305,33 +284,6 @@ namespace Entropy {
 			};
 
 			// ###############################################################
-
-			/*
-			* @brief Calculates the bipartite reduced density matrix of the system via the state mixing
-			* @param _s state to construct the density matrix from
-			* @param _sizeA subsystem size
-			* @param _Ns number of lattice sites
-			* @param _Nint number of local fermionic modes
-			* @returns the bipartite reduced density matrix
-			*/
-			template <typename _T>
-			inline arma::Mat<_T> redDensMatFromBase(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
-				// set subsystems size
-				uint Ns			= _hilb.getLatticeSize();
-				uint Nint		= _hilb.getLocalHilbertSize() * _hilb.getNum();
-				uint bitNum		= (uint)std::log2(Nint);
-				u64 dimA		= ULLPOW(bitNum * _sizeA);
-				for(u64 i = 0; i < _hilb.getHilbertSize(); ++i)
-					if (_hilb.getMapping(i) >= dimA)
-					{
-						dimA	= i;
-						break;
-					}
-				const u64 dimB = _hilb.getHilbertSize() - dimA;
-			};
-
-			// ###############################################################
-
 
 			/*
 			* @brief Calculates the bipartite reduced density matrix of the system via the state mixing. Knowing the mapping with global symmetry.
@@ -476,11 +428,10 @@ namespace Entropy {
 					// diagonalize
 					arma::eig_sym(eigV, eigS, _J);
 					auto S = 0.0;
-					for (auto eV : eigV)
+					for (auto& eV : eigV)
 					{
 						S += (eV > -1.0) ? ((1.0 + eV) * std::log((1.0 + eV) / 2.0)) : 0.0;
 						S += (eV < 1.0)  ? ((1.0 - eV) * std::log((1.0 - eV) / 2.0)) : 0.0;
-
 					}
 					return -0.5 * algebra::real(S);
 				}

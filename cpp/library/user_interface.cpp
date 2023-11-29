@@ -43,69 +43,69 @@ void UI::parseModel(int argc, cmdArg& argv)
 	std::string choosen_option = "";
 
 	// -------------------- SIMULATION PARAMETERS --------------------
-	SETOPTIONV(		nqsP, nMcSteps	,"m" );
-	SETOPTIONV(		nqsP, batch		,"b" );
-	SETOPTIONV(		nqsP, nBlocks	,"nb");
-	SETOPTIONV(		nqsP, blockSize	,"bs");
-	SETOPTIONV(		nqsP, nHidden	,"nh");
-	SETOPTIONV(		nqsP, nFlips	,"nf");
-	SETOPTION(		nqsP, lr			 );
-	this->nqsP.nTherm_	= uint(0.1 * nqsP.nBlocks_);
-	
+	SETOPTIONV(nqsP, nMcSteps, "m");
+	SETOPTIONV(nqsP, batch, "b");
+	SETOPTIONV(nqsP, nBlocks, "nb");
+	SETOPTIONV(nqsP, blockSize, "bs");
+	SETOPTIONV(nqsP, nHidden, "nh");
+	SETOPTIONV(nqsP, nFlips, "nf");
+	SETOPTION(nqsP, lr);
+	this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
+
 	// ------------- LATTICE -------------
-	SETOPTIONV(		latP, typ, "l"		);
-	SETOPTIONV(		latP, dim, "d"		);
-	SETOPTION(		latP, Lx			);
-	SETOPTION(		latP, Ly			);
-	SETOPTION(		latP, Lz			);
-	SETOPTION(		latP, bc			);
+	SETOPTIONV(latP, typ, "l");
+	SETOPTIONV(latP, dim, "d");
+	SETOPTION(latP, Lx);
+	SETOPTION(latP, Ly);
+	SETOPTION(latP, Lz);
+	SETOPTION(latP, bc);
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 
 	// -------------- MODEL --------------
 
 	// model type
-	SETOPTIONV(		modP, modTyp, "mod"	);
+	SETOPTIONV(modP, modTyp, "mod");
 	// --- ising ---
-	SETOPTION_STEP(	modP, J1			);
-	SETOPTION_STEP(	modP, hx			);
-	SETOPTION_STEP(	modP, hz			);
+	SETOPTION_STEP(modP, J1);
+	SETOPTION_STEP(modP, hx);
+	SETOPTION_STEP(modP, hz);
 	// --- heisenberg ---
-	SETOPTION_STEP(	modP, dlt1			);
+	SETOPTION_STEP(modP, dlt1);
 	// --- xyz ---
-	SETOPTION_STEP(	modP, J2			);
-	SETOPTION_STEP(	modP, dlt2			);
-	SETOPTION_STEP(	modP, eta1			);
-	SETOPTION_STEP(	modP, eta2			);
+	SETOPTION_STEP(modP, J2);
+	SETOPTION_STEP(modP, dlt2);
+	SETOPTION_STEP(modP, eta1);
+	SETOPTION_STEP(modP, eta2);
 	// --- kitaev ---
-	SETOPTION_STEP( modP, kx			);
-	SETOPTION_STEP( modP, ky			);
-	SETOPTION_STEP( modP, kz			);
+	SETOPTION_STEP(modP, kx);
+	SETOPTION_STEP(modP, ky);
+	SETOPTION_STEP(modP, kz);
 
 	// ----------- QUARDRATIC ------------
-	SETOPTIONV(		modP, modTypQ,"modQ");
+	SETOPTIONV(modP, modTypQ, "modQ");
 	SETOPTION_STEP(modP, Beta);
 	SETOPTION_STEP(modP, Phi);
 
 	// ----------- SYMMETRIES ------------
-	SETOPTION(		symP, k				);
-	SETOPTION(		symP, px			);
-	SETOPTION(		symP, py			);
-	SETOPTION(		symP, pz			);
-	SETOPTION(		symP, x				);
-	SETOPTION(		symP, U1			);
-	SETOPTION(		symP, S				);
+	SETOPTION(symP, k);
+	SETOPTION(symP, px);
+	SETOPTION(symP, py);
+	SETOPTION(symP, pz);
+	SETOPTION(symP, x);
+	SETOPTION(symP, U1);
+	SETOPTION(symP, S);
 
 	// ---------- OTHERS
-	this->setOption(this->quiet		, argv, "q"	);
-	this->setOption(this->threadNum	, argv, "th"	);
+	this->setOption(this->quiet, argv, "q");
+	this->setOption(this->threadNum, argv, "th");
 
 	// later function choice
-	this->setOption(this->chosenFun	, argv, "fun"	);
+	this->setOption(this->chosenFun, argv, "fun");
 
 	//---------- DIRECTORY
 
-	bool setDir		[[maybe_unused]]	=	this->setOption(this->mainDir, argv, "dir");
-	this->mainDir						=	fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
+	bool setDir [[maybe_unused]] = this->setOption(this->mainDir, argv, "dir");
+	this->mainDir = fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
 
 	// create the directories
 	createDir(this->mainDir);
@@ -119,35 +119,20 @@ void UI::parseModel(int argc, cmdArg& argv)
 void UI::funChoice()
 {
 	LOGINFO_CH_LVL(0);
+	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 	switch (this->chosenFun)
 	{
 	case -1:
 		// default case of showing the help
 		this->exitWithHelp();
 		break;
-		//case 0:
-		//	// test
-		//	this->make_symmetries_test();
-		//	break;
-		//case 11:
-		//	// calculate the simulation with classical degrees of freedom
-		//	this->make_mc_classical();
-		//	break;
-		//case 12:
-		//	// check the minimum of energy when classical spins are varied with angle and with interaction
-		//	this->make_mc_angles_sweep();
-		//	break;
-		//case 13:
-		//	// check the properties of Kitaev model when the interations are 
-		//	this->make_mc_kitaev_sweep();
-		//	break;
-	// ------------------------------- NEURAL QST -------------------------------
+		// ------------------------------- NEURAL QST -------------------------------
 	case 11:
 		// this option utilizes the Hamiltonian with NQS ansatz calculation
 		LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
 		this->makeSimNQS();
 		break;
-	// ------------------------------- SYMMETRIES -------------------------------
+		// ------------------------------- SYMMETRIES -------------------------------
 	case 20:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
@@ -183,18 +168,22 @@ void UI::funChoice()
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - CREATE DEGENERACIES NEAR ZERO", LOG_TYPES::CHOICE, 1);
 		this->makeSimSymmetriesCreateDeg();
 		break;
-	// ------------------------------- QUADRATIC -------------------------------
+		// ------------------------------- QUADRATIC -------------------------------
 	case 30:
 		// this option utilizes the quadratic Hamiltonian calculation
-		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);
+		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);;
 		this->makeSimQuadratic();
+		break;
+	case 31:
+		// this option makes the quadratic Hamiltonian, takes the state from it and recreates a many body state
+		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - TRANSFORM TO MANY BODY", LOG_TYPES::CHOICE, 1);;
+		this->makeSimQuadraticToManyBody();
 		break;
 	default:
 		// default case of showing the help
 		this->exitWithHelp();
 		break;
 	}
-	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -204,25 +193,25 @@ void UI::funChoice()
 */
 bool UI::defineModels(bool _createLat) {
 	BEGIN_CATCH_HANDLER
-	// create lattice
-	if (_createLat && !this->latP.lat)
-	{
-		switch (this->latP.typ_)
+		// create lattice
+		if (_createLat && !this->latP.lat)
 		{
-		case LatticeTypes::SQ:
-			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
-			break;
-		case LatticeTypes::HEX:
-			this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
-			break;
-		default:
-			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
-			break;
-		};
-	}
+			switch (this->latP.typ_)
+			{
+			case LatticeTypes::SQ:
+				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			case LatticeTypes::HEX:
+				this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			default:
+				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+					this->latP.dim_, this->latP.bc_);
+				break;
+			};
+		}
 	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
 
 	// check if is complex
@@ -305,7 +294,7 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 
 		// ------ GLOBAL ------
 		// check U1
-		if (this->symP.U1_ != -INT_MAX) 
+		if (this->symP.U1_ != -INT_MAX)
 			_glbSyms.push_back(GlobalSyms::getU1Sym(this->latP.lat, this->symP.U1_));
 	};
 	return std::make_pair(_glbSyms, _locSyms);
@@ -325,7 +314,7 @@ void UI::makeSimSymmetries(bool _diag, bool _states)
 	if (this->hamDouble)
 		this->hamDouble.reset();
 	// define the models
-	if (!this->defineModels(true)) 
+	if (!this->defineModels(true))
 		return;
 	if (this->isComplex_)
 		this->symmetries(clk::now(), this->hamComplex, _diag, _states);
@@ -347,7 +336,7 @@ void UI::makeSimSymmetriesDeg()
 		this->hamDouble.reset();
 	// define the models
 	this->useComplex_ = true;
-	if (!this->defineModels(true)) 
+	if (!this->defineModels(true))
 		return;
 	this->symmetriesDeg(clk::now());
 }
@@ -380,21 +369,21 @@ void UI::makeSimSymmetriesSweep()
 {
 	LOGINFO_CH_LVL(3);
 	this->defineModels(true);
-	uint Ns				= this->latP.lat->get_Ns();
-	auto BC				= this->latP.lat->get_BC();
-	u64 Nh				[[maybe_unused]] = 1;
+	uint Ns = this->latP.lat->get_Ns();
+	auto BC = this->latP.lat->get_BC();
+	u64 Nh [[maybe_unused]] = 1;
 
 	// parameters
-	v_1d<int> kS		= {};
-	v_1d<int> Rs		= {};
-	v_1d<int> Szs		= {};
-	v_1d<int> Sys		= {};
-	v_1d<int> U1s		= {};
-	v_1d<int> Sxs		= {};
+	v_1d<int> kS = {};
+	v_1d<int> Rs = {};
+	v_1d<int> Szs = {};
+	v_1d<int> Sys = {};
+	v_1d<int> U1s = {};
+	v_1d<int> Sxs = {};
 
-	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity	= false;//(this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
-	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useU1 = (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	bool useSzParity = false;//(this->modP.modTyp_ == MY_MODELS::XYZ_M);// && (Ns % 2 == 0);
+	bool useSyParity = false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
 	if (useSyParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
@@ -443,21 +432,21 @@ void UI::makeSimSymmetriesSweepHilbert()
 {
 	LOGINFO_CH_LVL(3);
 	this->defineModels(true);
-	uint Ns				= this->latP.lat->get_Ns();
-	auto BC				= this->latP.lat->get_BC();
-	u64 Nh				[[maybe_unused]] = 0;
+	uint Ns = this->latP.lat->get_Ns();
+	auto BC = this->latP.lat->get_BC();
+	u64 Nh [[maybe_unused]] = 0;
 
 	// parameters
-	v_1d<int> kS		= {};
-	v_1d<int> Rs		= {};
-	v_1d<int> Szs		= {};
-	v_1d<int> Sys		= {};
-	v_1d<int> U1s		= {};
-	v_1d<int> Sxs		= {};
+	v_1d<int> kS = {};
+	v_1d<int> Rs = {};
+	v_1d<int> Szs = {};
+	v_1d<int> Sys = {};
+	v_1d<int> U1s = {};
+	v_1d<int> Sxs = {};
 
-	bool useU1			= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity	= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && (this->modP.eta1_ != 0 && this->modP.eta2_ != 0);
-	bool useSyParity	= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useU1 = (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	bool useSzParity = (this->modP.modTyp_ == MY_MODELS::XYZ_M) && (this->modP.eta1_ != 0 && this->modP.eta2_ != 0);
+	bool useSyParity = false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
 	if (useSyParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
@@ -470,7 +459,7 @@ void UI::makeSimSymmetriesSweepHilbert()
 	{
 		this->symP.k_ = k;
 		// check Reflection
-		if (k==-INT_MAX || k == 0 || (k == int(Ns / 2) && (Ns % 2) == 0))
+		if (k == -INT_MAX || k == 0 || (k == int(Ns / 2) && (Ns % 2) == 0))
 			Rs = { -1, 1 };
 		else
 			Rs = { -INT_MAX };
@@ -478,7 +467,7 @@ void UI::makeSimSymmetriesSweepHilbert()
 			this->symP.x_ = r;
 			for (auto pz : Szs) {
 				this->symP.pz_ = pz;
-				for (auto u1 : U1s) 
+				for (auto u1 : U1s)
 				{
 					this->symP.U1_ = u1;
 					// check Parity X
@@ -553,4 +542,22 @@ void UI::makeSimQuadratic()
 		this->quadraticStatesMix<cpx>(clk::now(), this->qhamComplex);
 	else
 		this->quadraticStatesMix<double>(clk::now(), this->qhamDouble);
+}
+
+/*
+* @brief Transform quadratic to many body
+*/
+void UI::makeSimQuadraticToManyBody()
+{
+	// reset Hamiltonians - memory release
+	if (this->qhamComplex)
+		this->qhamComplex.reset();
+	if (this->qhamDouble)
+		this->qhamDouble.reset();
+	// define the models
+	this->useComplex_	= true;
+	this->isComplex_	= true;
+	if (!this->defineModelsQ(true))
+		return;
+	this->quadraticStatesToManyBody<cpx>(clk::now(), this->qhamComplex);
 }
