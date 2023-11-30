@@ -81,22 +81,22 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(modTypQ, MY_MODELS_Q, MY_MODELS_Q::SYK2_M);
 
 		// ############### ISING ###############
-		UI_PARAM_STEP(double, J1, 1.0);	// spin exchange
-		UI_PARAM_STEP(double, hz, 1.0);	// perpendicular field
-		UI_PARAM_STEP(double, hx, 1.0);	// transverse field
+		UI_PARAM_STEP(double, J1, 1.0);								// spin exchange
+		UI_PARAM_STEP(double, hz, 1.0);								// perpendicular field
+		UI_PARAM_STEP(double, hx, 1.0);								// transverse field
 		// ############### XYZ #################		
-		UI_PARAM_STEP(double, J2, 2.0);	// next nearest neighbors exchange
+		UI_PARAM_STEP(double, J2, 2.0);								// next nearest neighbors exchange
 		UI_PARAM_STEP(double, eta1, 0.5);
 		UI_PARAM_STEP(double, eta2, 0.5);
 		UI_PARAM_STEP(double, dlt1, 0.3);
 		UI_PARAM_STEP(double, dlt2, 0.3);
 		// ############### KITAEV ##############
-		UI_PARAM_STEP(double, kx, 1.0);	// spin exchange
-		UI_PARAM_STEP(double, ky, 1.0);	// spin exchange
-		UI_PARAM_STEP(double, kz, 1.0);	// spin exchange
+		UI_PARAM_STEP(double, kx, 1.0);								// spin exchange
+		UI_PARAM_STEP(double, ky, 1.0);								// spin exchange
+		UI_PARAM_STEP(double, kz, 1.0);								// spin exchange
 		// ############ AUBRY_ANDRE ############
 		UI_PARAM_STEP(double, Beta, (1 + std::sqrt(5)) / 2);	// phase mult
-		UI_PARAM_STEP(double, Phi, 1.0);	// phase add
+		UI_PARAM_STEP(double, Phi, 1.0);							// phase add
 
 
 		void setDefault() {
@@ -123,7 +123,7 @@ namespace UI_PARAMS {
 		/*
 		* @brief Check whether the model itself is complex...
 		*/
-		bool checkComplex()
+		bool checkComplex() const
 		{
 			if (this->modTypQ_ == MY_MODELS_Q::FREE_FERMIONS_M)
 				return true;
@@ -422,11 +422,11 @@ public:
 
 	// -----------------------------------------------  	   SIMULATION  		    -------------------------------------------	 
 
-	// ############################      N Q S        #############################
+	// ######################### N Q S ##########################
 
 	void makeSimNQS();
 
-	// #######################        SYMMETRIES            #######################
+	// ####################### SYMMETRIES #######################
 
 	void makeSimSymmetries(bool _diag = true, bool _states = false);
 
@@ -436,7 +436,7 @@ public:
 	void makeSimSymmetriesSweep();
 	void makeSimSymmetriesSweepHilbert();
 
-	// #######################         QUADRATIC            #######################
+	// ####################### QUADRATIC ########################
 
 	void makeSimQuadratic();
 	void makeSimQuadraticToManyBody();
@@ -1492,14 +1492,14 @@ template<typename _T>
 inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
 	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	this->_timer.reset();
+
 	// --- create the directories ---
 	std::string dir = makeDirs(this->mainDir, _H->getType(), this->latP.lat->get_info());
 	fs::create_directories(dir);
 
 	// ------ use those files -------
 	std::string modelInfo	= _H->getInfo();
-
-	// set the parameters
 	uint Ns					= _H->getNs();
 	uint Nh					= _H->getHilbertSize();
 	// how many states to take for calculating the entropies
@@ -1511,8 +1511,8 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 	auto _type				= _H->getTypeI();
 
 	// --- save energies txt check ---
-	std::string filename	= filenameQuadraticRandom(dir + modelInfo + "_Gamma=" + STR(stateNum),
-														_type, _H->ran_);
+	std::string filename	= filenameQuadraticRandom(dir + modelInfo + "_Gamma=" + STR(stateNum), _type, _H->ran_);
+
 	// check how many states maximally can one combine
 	if (combinations < stateNum)
 	{
@@ -1533,7 +1533,6 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 	_H->getSPEnMat();
 
 	// go through the information
-	std::string name = VEQ(Nh);
 	LOGINFO("Spectrum size:						  " + STR(Nh), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num states (combinations):	  " + STR(stateNum), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num realizations (averages):  " + STR(realizations), LOG_TYPES::TRACE, 3);
@@ -1548,13 +1547,13 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 	arma::vec ENTROPIES_MB(realizations, arma::fill::zeros);
 
 	// set which bonds we want to cut in bipartite
-	auto beforeEntro		= clk::now();
+	_timer.checkpoint("entropy");
 	std::vector<double> energies;
 	std::vector<arma::uvec> orbs;
 
 	// get the states to use later
 	_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
-	LOGINFO(beforeEntro, "Combinations time:", 3);
+	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
 	// make matrices cut to a specific number of bonds
 	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);;
@@ -1562,14 +1561,15 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 	arma::Mat<_T> WsC		= Ws.t();
 
 	// indices of orbitals
-	std::vector<uint> idxs(orbs.size());
-	std::iota(idxs.begin(), idxs.end(), 0);
+	auto idxs				= VEC::vecAtoB(orbs.size());
+	// indices of orbitals
 
 	// Hilbert space
 	auto _hilbert			= Hilbert::HilbertSpace<_T>(this->latP.lat);
+
 	// calculate!
-	pBar pbar(5, realizations);
-#pragma omp parallel for num_threads(this->threadNum)
+	pBar pbar(5, realizations, _timer.point(0));
+//#pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < realizations; idx++)
 	{
 		// create vector of orbitals (combine two many-body states from our total number of combinations)
@@ -1596,7 +1596,7 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 			std::complex<double> _c = coeff(i);
 			_state			+= _c * _H->getManyBodyState(VEC::colToVec(orbitals[i]), _hilbert);
 		}
-		//_state				= _state / arma::abs(_state);
+		_state				= _state / arma::cdot(_state, _state);
 		E = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _bonds, _hilbert);
 		ENTROPIES_MB(idx)	= E;
 
@@ -1609,6 +1609,8 @@ inline void UI::quadraticStatesToManyBody(clk::time_point start, std::shared_ptr
 
 	// save entropies
 	LOGINFO("Finished entropies! " + VEQ(stateNum) + ", " + VEQ(realizations), LOG_TYPES::TRACE, 2);
-	LOGINFO(beforeEntro, "Entropies time:", 3);
+	LOGINFO(_timer.point("entropy"), "Entropies time:", 3);
 	return;
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

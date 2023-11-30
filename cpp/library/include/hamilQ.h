@@ -305,7 +305,7 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const std::vector<_T1>&
 			continue;
 		// go through the orbitals
 		for (auto j = 0; j < _particleNumber; j++)
-			_slater(iterator, j) = this->eigVec_(i, _singlePartOrbs[j]);
+			_slater(iterator, j) = this->eigVec_(_singlePartOrbs[j], i);
 		iterator++;
 	}
 	return _slater;
