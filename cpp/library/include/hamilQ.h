@@ -330,7 +330,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const v_1d<_T1>&
 	auto _singlePartOrb = _singlePartOrbs.size();
 
 	if (!this->particleConverving_)
-		throw std::exception("This Hamiltonian does not have the eigenstates in Slater determinant form!");
+		throw std::runtime_error("This Hamiltonian does not have the eigenstates in Slater determinant form!");
 
 	// save the state 
 	arma::Col<_T> _stateOut(_hilbert.getHilbertSize(), arma::fill::zeros);
