@@ -120,6 +120,7 @@ void UI::funChoice()
 {
 	LOGINFO_CH_LVL(0);
 	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
+	this->_timer.reset();
 	switch (this->chosenFun)
 	{
 	case -1:
@@ -136,7 +137,7 @@ void UI::funChoice()
 	case 20:
 		// this option utilizes the Hamiltonian with symmetries calculation
 		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
-		this->symmetriesTest(clk::now());
+		this->symmetriesTest();
 		break;
 	case 21:
 		// this option utilizes the Hamiltonian with symmetries calculation
@@ -282,15 +283,15 @@ bool UI::defineModelsQ(bool _createLat)
 */
 std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> UI::createSymmetries()
 {
-	v_1d<GlobalSyms::GlobalSym> _glbSyms = {};
+	v_1d<GlobalSyms::GlobalSym> _glbSyms					= {};
 	v_1d<std::pair<Operators::SymGenerators, int>> _locSyms = {};
 	if (this->symP.S_ == true)
 	{
 		// create Hilbert space
-		this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
+		this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
 
 		// ------ LOCAL ------
-		_locSyms = this->symP.getLocGenerator();
+		_locSyms			= this->symP.getLocGenerator();
 
 		// ------ GLOBAL ------
 		// check U1
@@ -317,9 +318,9 @@ void UI::makeSimSymmetries(bool _diag, bool _states)
 	if (!this->defineModels(true))
 		return;
 	if (this->isComplex_)
-		this->symmetries(clk::now(), this->hamComplex, _diag, _states);
+		this->symmetries(this->hamComplex, _diag, _states);
 	else
-		this->symmetries(clk::now(), this->hamDouble, _diag, _states);
+		this->symmetries(this->hamDouble, _diag, _states);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -338,7 +339,7 @@ void UI::makeSimSymmetriesDeg()
 	this->useComplex_ = true;
 	if (!this->defineModels(true))
 		return;
-	this->symmetriesDeg(clk::now());
+	this->symmetriesDeg();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -357,7 +358,7 @@ void UI::makeSimSymmetriesCreateDeg()
 	this->useComplex_ = true;
 	if (!this->defineModels(true))
 		return;
-	this->symmetriesCreateDeg(clk::now());
+	this->symmetriesCreateDeg();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -432,21 +433,21 @@ void UI::makeSimSymmetriesSweepHilbert()
 {
 	LOGINFO_CH_LVL(3);
 	this->defineModels(true);
-	uint Ns = this->latP.lat->get_Ns();
-	auto BC = this->latP.lat->get_BC();
+	uint Ns					= this->latP.lat->get_Ns();
+	auto BC					= this->latP.lat->get_BC();
 	u64 Nh [[maybe_unused]] = 0;
 
 	// parameters
-	v_1d<int> kS = {};
-	v_1d<int> Rs = {};
-	v_1d<int> Szs = {};
-	v_1d<int> Sys = {};
-	v_1d<int> U1s = {};
-	v_1d<int> Sxs = {};
+	v_1d<int> kS			= {};
+	v_1d<int> Rs			= {};
+	v_1d<int> Szs			= {};
+	v_1d<int> Sys			= {};
+	v_1d<int> U1s			= {};
+	v_1d<int> Sxs			= {};
 
-	bool useU1 = (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
-	bool useSzParity = (this->modP.modTyp_ == MY_MODELS::XYZ_M) && (this->modP.eta1_ != 0 && this->modP.eta2_ != 0);
-	bool useSyParity = false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
+	bool useU1				= (this->modP.modTyp_ == MY_MODELS::XYZ_M) && this->modP.eta1_ == 0 && this->modP.eta2_ == 0;
+	bool useSzParity		= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (this->modP.eta1_ != 0 && this->modP.eta2_ != 0);
+	bool useSyParity		= false; //(this->modP.modTyp_ == MY_MODELS::XYZ_M) && (Ns % 2 == 0);
 
 	if (useSzParity)	Szs = { -1, 1 }; else Szs = { -INT_MAX };
 	if (useSyParity)	Sys = { -1, 1 }; else Sys = { -INT_MAX };
@@ -488,9 +489,9 @@ void UI::makeSimSymmetriesSweepHilbert()
 						bool empty [[maybe_unused]] = this->defineModels(true);
 						// save the Hilbert space sizes
 						if (this->isComplex_)
-							this->symmetries(clk::now(), this->hamComplex, false);
+							this->symmetries(this->hamComplex, false);
 						else
-							this->symmetries(clk::now(), this->hamDouble, false);
+							this->symmetries(this->hamDouble, false);
 						// add Hilbert space size
 						if (this->hamComplex)
 							Nh += this->hamComplex->getHilbertSize();
@@ -502,7 +503,7 @@ void UI::makeSimSymmetriesSweepHilbert()
 			}
 		}
 	}
-	LOGINFO("------------------ " + VEQ(Nh) + " ------------------", LOG_TYPES::TRACE, 0);
+	LOGINFO("------------------ " + VEQ(Nh) + "/" + VEQ(useU1 ? std::pow(2.0, Ns) : 1) + " ------------------", LOG_TYPES::TRACE, 0);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -515,11 +516,11 @@ void UI::makeSimNQS()
 	this->defineModels();
 	if (this->isComplex_) {
 		this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
-		this->nqsSingle(clk::now(), this->nqsCpx);
+		this->nqsSingle(this->nqsCpx);
 	}
 	else {
 		this->defineNQS<double>(this->hamDouble, this->nqsDouble);
-		this->nqsSingle(clk::now(), this->nqsDouble);
+		this->nqsSingle(this->nqsDouble);
 	}
 }
 
@@ -539,9 +540,9 @@ void UI::makeSimQuadratic()
 	if (!this->defineModelsQ(true))
 		return;
 	if (this->isComplex_)
-		this->quadraticStatesMix<cpx>(clk::now(), this->qhamComplex);
+		this->quadraticStatesMix<cpx>(this->qhamComplex);
 	else
-		this->quadraticStatesMix<double>(clk::now(), this->qhamDouble);
+		this->quadraticStatesMix<double>(this->qhamDouble);
 }
 
 /*
@@ -559,5 +560,5 @@ void UI::makeSimQuadraticToManyBody()
 	this->isComplex_	= true;
 	if (!this->defineModelsQ(true))
 		return;
-	this->quadraticStatesToManyBody<cpx>(clk::now(), this->qhamComplex);
+	this->quadraticStatesToManyBody<cpx>(this->qhamComplex);
 }

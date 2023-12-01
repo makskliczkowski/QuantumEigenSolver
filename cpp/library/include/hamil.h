@@ -45,7 +45,7 @@ const std::string DEF_INFO_SEP		= std::string("_");										// defalut separato
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
 #define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 3);	\
 									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 3))
-										// gets the information about the disorder
+																							// gets the information about the disorder
 
 template <typename _T>
 class Hamiltonian {
@@ -71,20 +71,17 @@ public:
 	randomGen ran_;																			// consistent quick random number generator
 	std::string info_;																		// information about the model
 
-	//vec tmp_vec;																			// tmp vector for base states if the system is too big
-	//vec tmp_vec2;
-	//uint state_val_num;																	// basic number of state_values
 	virtual ~Hamiltonian() {
 		LOGINFO("Base Hamiltonian destructor called.", LOG_TYPES::INFO, 3);
 		this->H_.reset();
 		this->eigVal_.reset();
 		this->eigVec_.reset();
 	}
-	Hamiltonian() : ran_(randomGen(time(0))) {};
+	Hamiltonian() : ran_(randomGen()) {};
 	Hamiltonian(const Hilbert::HilbertSpace<_T>& hilbert)	
 		: hilbertSpace(hilbert)
 	{
-		this->ran_	= randomGen(time(0));
+		this->ran_	= randomGen();
 		this->lat_	= this->hilbertSpace.getLattice();
 		this->Ns	= this->lat_->get_Ns();
 		this->Nh	= this->hilbertSpace.getHilbertSize();
@@ -92,7 +89,7 @@ public:
 	Hamiltonian(Hilbert::HilbertSpace<_T>&& hilbert)		
 		: hilbertSpace(std::move(hilbert))
 	{
-		this->ran_	=	randomGen(time(0));
+		this->ran_	=	randomGen();
 		this->lat_	=	this->hilbertSpace.getLattice();
 		this->Ns	=	this->lat_->get_Ns();
 		this->Nh	=	this->hilbertSpace.getHilbertSize();
@@ -170,6 +167,7 @@ public:
 	// ------------------------------------------- SETTERS ----------------------------------------------------
 	
 	virtual void hamiltonian()							=									0;								
+	auto buildHamiltonian()								-> void;
 
 	void setHElem(u64 k, _T val, u64 newIdx);												// sets the Hamiltonian elements in a virtual way
 	void diagH(bool woEigVec = false);														// diagonalize the Hamiltonian
@@ -208,6 +206,21 @@ public:
 	//void set_angles(const vec& sin_phis, const vec& sin_thetas, const vec& cos_phis, const vec& cos_thetas) {};
 	//void set_angles(int position, double sin_phis, double sin_thetas, double cos_phis, double cos_thetas) {};
 };
+
+// ##########################################################################################################################################
+
+/*
+* @builds Hamiltonian and gets specific info!
+*/
+template<typename _T>
+inline void Hamiltonian<_T>::buildHamiltonian()
+{
+	auto _t = NOW;
+	LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+	this->hamiltonian();
+	LOGINFO("Finished buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+	LOGINFO(_t, "Hamiltonian: " + this->getInfo(), 3);
+}
 
 // ##########################################################################################################################################
 

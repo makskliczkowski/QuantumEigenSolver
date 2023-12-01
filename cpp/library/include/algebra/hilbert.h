@@ -21,8 +21,14 @@
 
 // ##########################################################################################################################################
 
-namespace Hilbert {
+namespace Hilbert 
+{
 	constexpr double SYM_NORM_THRESHOLD = 1e-6;
+
+#ifndef HILBERT_EMPTY_CHECK
+#define HILBERT_EMPTY_CHECK(NH, TODO)	if (Nh == 0) { \
+											LOGINFO("Skipping creation due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2); TODO ;}																													
+#endif
 
 	template <typename _T>
 	class HilbertSpace {
@@ -100,6 +106,7 @@ namespace Hilbert {
 			this->mapping_			=				v_1d<u64>();
 			this->reprMap_			=				v_1d<std::pair<u64, _T>>();
 
+			auto _t					=				NOW;
 			// initialize
 			this->generateSymGroup(_gen);
 			this->generateMapping();
@@ -107,10 +114,11 @@ namespace Hilbert {
 				this->mappingKernelRepr();
 
 			if (this->Nh == this->NhFull)
-				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 3);
+				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
 
 			if (this->Nh <= 0)
-				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 3);
+				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
+			LOGINFO(_t, "Hilbert Space Creator: " + this->getSymInfo(), 3);
 		};
 
 		/*
