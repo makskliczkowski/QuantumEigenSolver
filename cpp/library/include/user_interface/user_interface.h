@@ -1439,7 +1439,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	u64 realizations		= this->nqsP.nBlocks_;
 	// number of combinations to take from single particle states
 	u64 combinations		= this->nqsP.blockSize_;
-	bool useZero			= this->nqsP.nFlips_;
+	bool useZero			= this->modP.modTyp_ == 0;
 	auto _type				= _H->getTypeI();
 
 	// --- save energies txt check ---
