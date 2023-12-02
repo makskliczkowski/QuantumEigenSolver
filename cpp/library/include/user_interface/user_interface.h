@@ -746,8 +746,8 @@ inline void UI::symmetriesDeg()
 	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
 	// get index of the average energy
 	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
-	u64 _minIdx					= _idx - stateNum / 2;
-	u64 _maxIdx					= _idx + stateNum / 2;
+	u64 _minIdx					= 0; //_idx - stateNum / 2;
+	u64 _maxIdx					= Nh - 1;//_idx + stateNum / 2;
 	// as many entropies as realizations
 	v_1d<double> entropies(_realizations);
 
@@ -809,7 +809,7 @@ inline void UI::symmetriesDeg()
 			// update progress
 			PROGRESS_UPD(idx, pbar, VEQ(_gamma) + " Entropy was : S=" + VEQ(entropies[_r] / (log(2.0) * maxBondNum)));
 		}
-		ofs << entropies;
+		ofs << _gamma << " " << entropies;
 	}
 	LOGINFO(_timer.point(1), "Degenerate - Entropies", 2);
 	ofs.close();
@@ -877,8 +877,8 @@ inline void UI::symmetriesCreateDeg()
 	
 	// get index of the average energy
 	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
-	u64 _minIdx					= _idx - stateNum / 2;
-	u64 _maxIdx					= _idx + stateNum / 2;
+	u64 _minIdx					= 0; //_idx - stateNum / 2;
+	u64 _maxIdx					= Nh - 1; //_idx + stateNum / 2;
 
 	auto toChooseFrom			= VEC::vecAtoB(stateNum, _minIdx);
 
@@ -919,7 +919,7 @@ inline void UI::symmetriesCreateDeg()
 	
 			PROGRESS_UPD(idx, pbar, VEQ(gamma) + " Entropy was : S=" + VEQ(entropies[_r] / (log(2.0) * maxBondNum)));
 		}
-		ofs << entropies;
+		ofs << " " << entropies;
 	}
 	LOGINFO(_timer.point(1), "Mixing - Entropies", 2);
 	ofs.close();
