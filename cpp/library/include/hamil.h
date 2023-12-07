@@ -134,7 +134,9 @@ public:
 	void init() {
 		// hamiltonian memory reservation
 		BEGIN_CATCH_HANDLER
+		{
 			this->H_ = arma::SpMat<_T>(this->Nh, this->Nh);
+		}
 		END_CATCH_HANDLER("Memory exceeded", ;);
 	};
 
@@ -300,6 +302,7 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 {
 	u64 kMap = this->hilbertSpace.getMapping(k);
 	BEGIN_CATCH_HANDLER
+	{
 		if (kMap != newIdx)
 		{
 			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
@@ -308,6 +311,7 @@ inline void Hamiltonian<_T>::setHElem(u64 k, _T val, u64 newIdx)
 		}
 		else
 			this->H_(k, k) += val;
+	}
 	END_CATCH_HANDLER("Exception in setting the Hamiltonian elements: " + VEQ(k) + "," + VEQ(kMap) + "," + VEQ(newIdx), exit(-1););
 }
 
@@ -338,6 +342,7 @@ inline void Hamiltonian<_T>::diagH(bool woEigVec)
 template <typename _T>
 inline void Hamiltonian<_T>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
 	BEGIN_CATCH_HANDLER
+	{
 		arma::eigs_opts opts;
 		opts.tol				= tol;
 		opts.maxiter			= maxiter;
@@ -355,7 +360,8 @@ inline void Hamiltonian<_T>::diagH(bool woEigVec, uint k, uint subdim, uint maxi
 			if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
 			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), form.c_str());
 		}
-		END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
+	}
+	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
 }
 
 template <>
@@ -396,8 +402,10 @@ template<typename _type>
 inline void Hamiltonian<_type>::diagHs(bool woEigVec)
 {
 	BEGIN_CATCH_HANDLER
+	{
 		if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, this->getHilbertSize());
 		else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
+	}
 	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
 	this->calcAvEn();
 }
@@ -420,26 +428,28 @@ inline auto Hamiltonian<_T>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	std::ofstream file;
 	BEGIN_CATCH_HANDLER
-	switch (_typ)
 	{
-	case HAM_SAVE_EXT::dat:
-		if(_app)
-			openFile(file, _dir + "energy" + this->getInfo() + extension, std::ios::app);
-		else
-			openFile(file, _dir + "energy" + this->getInfo() + extension);
-		for (auto i = 0; i < this->eigVal_.size(); i++)
-			file << this->eigVal_(i) << EL;
-		file.close();
-		break;
-	case HAM_SAVE_EXT::h5:
-		if(_app)
-			this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy", arma::hdf5_opts::append));
-		else
-			this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy"));
-		break;
-	default:
-		LOGINFO("Wrong extension, not saving a file. Available are [.dat, .h5]", LOG_TYPES::WARNING, 1);
-		break;
+		switch (_typ)
+		{
+		case HAM_SAVE_EXT::dat:
+			if(_app)
+				openFile(file, _dir + "energy" + this->getInfo() + extension, std::ios::app);
+			else
+				openFile(file, _dir + "energy" + this->getInfo() + extension);
+			for (auto i = 0; i < this->eigVal_.size(); i++)
+				file << this->eigVal_(i) << EL;
+			file.close();
+			break;
+		case HAM_SAVE_EXT::h5:
+			if(_app)
+				this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy", arma::hdf5_opts::append));
+			else
+				this->eigVal_.save(arma::hdf5_name(_dir + this->getInfo() + extension, "energy"));
+			break;
+		default:
+			LOGINFO("Wrong extension, not saving a file. Available are [.dat, .h5]", LOG_TYPES::WARNING, 1);
+			break;
+		}
 	}
 	END_CATCH_HANDLER("Exception in saving the Eigenvalues: ", getEigVal(_dir, HAM_SAVE_EXT::dat, _app););
 }
@@ -460,22 +470,24 @@ inline auto Hamiltonian<_T>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT 
 	const auto inRight			= (this->avEnIdx + u64(_mid / 2)) < this->Nh ? (this->avEnIdx + u64(_mid / 2)) : (this->Nh - 1);
 
 	BEGIN_CATCH_HANDLER
-	const arma::Mat<_T> states	= (_mid == this->Nh) ? this->eigVec_ : this->eigVec_.submat(0, inLeft, this->Nh - 1, inRight);
-	std::string extension		= "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
-	switch (_typ)
 	{
-	case HAM_SAVE_EXT::dat:
-		states.save(_dir + "states" + this->getInfo() + extension, arma::raw_ascii);
-		break;
-	case HAM_SAVE_EXT::h5:
-		if (_app)
-			states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states", arma::hdf5_opts::append));
-		else
-			states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states"));
-		break;
-	default:
-		states.save(_dir + "states" + this->getInfo() + ".dat", arma::raw_ascii);
-		break;
+		const arma::Mat<_T> states	= (_mid == this->Nh) ? this->eigVec_ : this->eigVec_.submat(0, inLeft, this->Nh - 1, inRight);
+		std::string extension		= "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
+		switch (_typ)
+		{
+		case HAM_SAVE_EXT::dat:
+			states.save(_dir + "states" + this->getInfo() + extension, arma::raw_ascii);
+			break;
+		case HAM_SAVE_EXT::h5:
+			if (_app)
+				states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states", arma::hdf5_opts::append));
+			else
+				states.save(arma::hdf5_name(_dir + this->getInfo() + extension, "states"));
+			break;
+		default:
+			states.save(_dir + "states" + this->getInfo() + ".dat", arma::raw_ascii);
+			break;
+		}
 	}
 	END_CATCH_HANDLER("Exception in saving the Eigenvectors: ", getEigVec(_dir, _mid, HAM_SAVE_EXT::dat, _app););
 

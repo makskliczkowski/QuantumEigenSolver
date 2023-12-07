@@ -34,81 +34,81 @@ void UI::setDefault()
 void UI::parseModel(int argc, cmdArg& argv)
 {
 	// --------- HELP
-	if (std::string option = this->getCmdOption(argv, "-hlp"); option != "")
+	if (std::string option = this->getCmdOption(argv, "-h"); option != "")
 		this->exitWithHelp();
 
 	// set default at first
 	this->setDefault();
 
 	std::string choosen_option = "";
-
-	// -------------------- SIMULATION PARAMETERS --------------------
-	SETOPTIONV(nqsP, nMcSteps, "m");
-	SETOPTIONV(nqsP, batch, "b");
-	SETOPTIONV(nqsP, nBlocks, "nb");
-	SETOPTIONV(nqsP, blockSize, "bs");
-	SETOPTIONV(nqsP, nHidden, "nh");
-	SETOPTIONV(nqsP, nFlips, "nf");
-	SETOPTION(nqsP, lr);
-	this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
-
-	// ------------- LATTICE -------------
-	SETOPTIONV(latP, typ, "l");
-	SETOPTIONV(latP, dim, "d");
-	SETOPTION(latP, Lx);
-	SETOPTION(latP, Ly);
-	SETOPTION(latP, Lz);
-	SETOPTION(latP, bc);
+	// ---------- SIMULATION PARAMETERS ----------
+	{
+		SETOPTIONV(nqsP,	nMcSteps,	"m"	);
+		SETOPTIONV(nqsP,	batch,		"b"	);
+		SETOPTIONV(nqsP,	nBlocks,	"nb");
+		SETOPTIONV(nqsP,	blockSize,	"bs");
+		SETOPTIONV(nqsP,	nHidden,	"nh");
+		SETOPTIONV(nqsP,	nFlips,		"nf");
+		SETOPTION(nqsP,		lr				);
+		this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
+	}
+	// ----------------- LATTICE -----------------
+	{
+		SETOPTIONV(latP,	typ,	"l"	);
+		SETOPTIONV(latP,	dim,	"d"	);
+		SETOPTION(latP,		Lx			);
+		SETOPTION(latP,		Ly			);
+		SETOPTION(latP,		Lz			);
+		SETOPTION(latP,		bc			);
+	}
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
-
-	// -------------- MODEL --------------
-
-	// model type
-	SETOPTIONV(modP, modTyp, "mod");
-	// --- ising ---
-	SETOPTION_STEP(modP, J1);
-	SETOPTION_STEP(modP, hx);
-	SETOPTION_STEP(modP, hz);
-	// --- heisenberg ---
-	SETOPTION_STEP(modP, dlt1);
-	// --- xyz ---
-	SETOPTION_STEP(modP, J2);
-	SETOPTION_STEP(modP, dlt2);
-	SETOPTION_STEP(modP, eta1);
-	SETOPTION_STEP(modP, eta2);
-	// --- kitaev ---
-	SETOPTION_STEP(modP, kx);
-	SETOPTION_STEP(modP, ky);
-	SETOPTION_STEP(modP, kz);
-
-	// ----------- QUARDRATIC ------------
-	SETOPTIONV(modP, modTypQ, "modQ");
-	SETOPTION_STEP(modP, Beta);
-	SETOPTION_STEP(modP, Phi);
-
-	// ----------- SYMMETRIES ------------
-	SETOPTION(symP, k);
-	SETOPTION(symP, px);
-	SETOPTION(symP, py);
-	SETOPTION(symP, pz);
-	SETOPTION(symP, x);
-	SETOPTION(symP, U1);
-	SETOPTION(symP, S);
-
-	// ---------- OTHERS
-	this->setOption(this->quiet, argv, "q");
-	this->setOption(this->threadNum, argv, "th");
-
-	// later function choice
-	this->setOption(this->chosenFun, argv, "fun");
-
-	//---------- DIRECTORY
-
+	// ------------------ MODEL ------------------
+	{
+		// model type
+		SETOPTIONV(modP, modTyp, "mod");
+		// ------ ising ------
+		SETOPTION_STEP(modP, J1);
+		SETOPTION_STEP(modP, hx);
+		SETOPTION_STEP(modP, hz);
+		// ---- heisenberg ---
+		SETOPTION_STEP(modP, dlt1);
+		// ------- xyz -------
+		SETOPTION_STEP(modP, J2);
+		SETOPTION_STEP(modP, dlt2);
+		SETOPTION_STEP(modP, eta1);
+		SETOPTION_STEP(modP, eta2);
+		// ------ kitaev -----
+		SETOPTION_STEP(modP, kx);
+		SETOPTION_STEP(modP, ky);
+		SETOPTION_STEP(modP, kz);
+	}
+	// --------------- QUARDRATIC ----------------
+	{
+		SETOPTIONV(modP, modTypQ, "modQ");
+		// -- aubry-andres ---
+		SETOPTION_STEP(modP, Beta);
+		SETOPTION_STEP(modP, Phi);
+	}
+	// --------------- SYMMETRIES ----------------
+	{
+		SETOPTION(symP, k);
+		SETOPTION(symP, px);
+		SETOPTION(symP, py);
+		SETOPTION(symP, pz);
+		SETOPTION(symP, x);
+		SETOPTION(symP, U1);
+		SETOPTION(symP, S);
+	}
+	// ----------------- OTHERS ------------------
+	{
+		this->setOption(this->quiet, argv, "q");
+		this->setOption(this->threadNum, argv, "th");
+		// later function choice
+		this->setOption(this->chosenFun, argv, "fun");
+	}
+	// ---------------- DIRECTORY ----------------
 	bool setDir [[maybe_unused]] = this->setOption(this->mainDir, argv, "dir");
-	this->mainDir = fs::current_path().string() + kPS + "DATA" + kPS + this->mainDir + kPS;
-
-	// create the directories
-	createDir(this->mainDir);
+	this->mainDir = makeDirsC(fs::current_path().string(), "DATA", this->mainDir);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -194,6 +194,7 @@ void UI::funChoice()
 */
 bool UI::defineModels(bool _createLat) {
 	BEGIN_CATCH_HANDLER
+	{
 		// create lattice
 		if (_createLat && !this->latP.lat)
 		{
@@ -213,6 +214,7 @@ bool UI::defineModels(bool _createLat) {
 				break;
 			};
 		}
+	}
 	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
 
 	// check if is complex
@@ -241,6 +243,7 @@ bool UI::defineModelsQ(bool _createLat)
 	LOGINFO("Making quadratic model!", LOG_TYPES::INFO, 1);
 
 	BEGIN_CATCH_HANDLER
+	{
 		if (_createLat && !this->latP.lat)
 		{
 			switch (this->latP.typ_)
@@ -259,6 +262,7 @@ bool UI::defineModelsQ(bool _createLat)
 				break;
 			};
 		}
+	}
 	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
 
 	// check if is complex

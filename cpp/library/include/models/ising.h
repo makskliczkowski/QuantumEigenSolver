@@ -81,9 +81,9 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);		// creates random disorder vector
-	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
-	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
+	this->dh			=			this->ran_.template createRanVec<double>(this->Ns, this->h0);		// creates random disorder vector
+	this->dJ			=			this->ran_.template createRanVec<double>(this->Ns, this->J0);		// creates random exchange vector
+	this->dg			=			this->ran_.template createRanVec<double>(this->Ns, this->g0);		// creates random transverse field vector
 	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info
@@ -98,9 +98,9 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.createRanVec(this->Ns, this->h0);		// creates random disorder vector
-	this->dJ			=			this->ran_.createRanVec(this->Ns, this->J0);		// creates random exchange vector
-	this->dg			=			this->ran_.createRanVec(this->Ns, this->g0);		// creates random transverse field vector
+	this->dh			=			this->ran_.template createRanVec<double>(this->Ns, this->h0);		// creates random disorder vector
+	this->dJ			=			this->ran_.template createRanVec<double>(this->Ns, this->J0);		// creates random exchange vector
+	this->dg			=			this->ran_.template createRanVec<double>(this->Ns, this->g0);		// creates random transverse field vector
 	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info

@@ -19,7 +19,7 @@ public:
 	{
 		this->type_			=		MY_MODELS_Q::FREE_FERMIONS_M;
 		this->info_			=		this->info();
-		this->dt_			=		this->ran_.createRanVec(this->Ns, this->t_0);
+		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
 		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
 	};
 	

@@ -330,7 +330,7 @@ protected:
 			UI_PARAM_MAP(u1s		, this->symP._U1		, FHANDLE_PARAM_DEFAULT),
 			UI_PARAM_MAP(SYM		, this->symP._S			, FHANDLE_PARAM_BETWEEN(0., 1.)),		// even use symmetries?
 			// ---------------- other ----------------
-			UI_OTHER_MAP(fun		, -1.					, FHANDLE_PARAM_HIGHERV(-1.0)),			// choice of the function to be calculated
+			UI_OTHER_MAP(fun		, -1.					, FHANDLE_PARAM_HIGHERV(-2.0)),			// choice of the function to be calculated
 			UI_OTHER_MAP(th			, 1.0					, FHANDLE_PARAM_HIGHER0),				// number of threads
 			UI_OTHER_MAP(q			, 0.0					, FHANDLE_PARAM_DEFAULT),				// quiet?
 			UI_OTHER_MAP(dir		, "DEFALUT"				, FHANDLE_PARAM_DEFAULT),
@@ -386,26 +386,22 @@ public:
 	};
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% P A R S E R  F O R   H E L P %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	void exitWithHelp() override {
+	void exitWithHelp() override final 
+	{
+		UserInterface::exitWithHelp();
 		printf(
-			"Usage: name [options] outputDir \n"
+			"Usage of the VQMC library:\n"
 			"options:\n"
-			" The input can be both introduced with [options] described below or with giving the input directory \n"
-			" (which also is the flag in the options) \n"
-			" options:\n"
-			"-f input file for all of the options : (default none) \n"
-			"-m monte carlo steps : bigger than 0 (default 300) \n"
-			"-d dimension : set dimension (default 2) \n"
+			"-m monte carlo steps	: bigger than 0 (default 300) \n"
+			"-d dimension			: set dimension (default 2) \n"
 			"	1 -- 1D \n"
 			"	2 -- 2D \n"
-			"	3 -- 3D -> NOT IMPLEMENTED YET \n"
-			"-l lattice type : (default square) -> CHANGE NOT IMPLEMENTED YET \n"
+			"	3 -- 3D \n"
+			"-l lattice type		: (default square) -> CHANGE NOT IMPLEMENTED YET \n"
 			"   square \n"
 			// SIMULATIONS STEPS
 			"\n"
-			"-q : 0 or 1 -> quiet mode (no outputs) (default false)\n"
-			"\n"
-			"-fun : function to be used in the calculations. There are predefined functions in the model that allow that:\n"
+			"-fun					: function to be used in the calculations. There are predefined functions in the model that allow that:\n"
 			"   The options divide each other on different categories according to the first number _ \n"
 			"   -1 -- default option -> shows help \n"
 			"    0 -- this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)\n"
@@ -418,7 +414,6 @@ public:
 			"\n"
 			"-h - help\n"
 		);
-		std::exit(1);
 	}
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% R E A L   P A R S E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -686,15 +681,18 @@ inline void UI::symmetriesDeg()
 	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	_timer.reset();
 	u64 Nh					= this->hamComplex->getHilbertSize();
+	const auto _realizations= this->nqsP.nBlocks_;
+
 	// create the directories
-	std::string dir			= makeDirsC(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info());
+	std::string dir			= makeDirsC(this->mainDir, 
+										this->hamComplex->getType(), 
+										this->latP.lat->get_info(), "CombinationsManifold_" + STR(_realizations));
 
 	// use those files  
 	std::string modelInfo	= this->hamComplex->getInfo();
 
 	// save entropies txt check 
 	std::string filename	= dir + modelInfo;
-	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
 
 	// check Hilbert size or whether we should diagonalize and proceed further
 	HILBERT_EMPTY_CHECK(Nh, return);
@@ -704,11 +702,12 @@ inline void UI::symmetriesDeg()
 
 	// set the parameters
 	uint Ns					= this->hamComplex->getNs();
+	// 50% 
 	u64 stateNum			= Nh / 2;
 	auto ran				= this->hamComplex->ran_;
 
 	IFELSE_EXCEPTION(Nh < UI_LIMITS_MAXFULLED, this->hamComplex->diagH(false), "Size of the Hilbert space to big to diagonalize");
-	LOGINFO(_timer.point(0), "Degeneracies - diagonalization", 2);
+	LOGINFO(_timer.start(), "Degeneracies - diagonalization", 2);
 
 	std::string name		= VEQ(Nh);
 	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
@@ -719,7 +718,12 @@ inline void UI::symmetriesDeg()
 	this->hamComplex->clearH();
 
 	// degeneracies
-	v_2d<u64> degeneracyMap = this->hamComplex->getDegeneracies();
+	v_2d<u64> degeneracyMap;
+	BEGIN_CATCH_HANDLER
+	{
+		degeneracyMap		= this->hamComplex->getDegeneracies();
+	} 
+	END_CATCH_HANDLER("Cannot setup the degeneracies...", return;)
 
 	// iterate through bond cut
 	const uint maxBondNum	= Ns / 2;
@@ -731,7 +735,6 @@ inline void UI::symmetriesDeg()
 	this->hamComplex->generateFullMap();
 
 	// append gammas - to be sure that we use the correct ones from the degenerate states
-	const int _realizations = this->nqsP.nBlocks_;
 	v_1d<int> _gammas		= { };
 	for (auto i = 0; i < degeneracyMap.size(); ++i)
 		if (degeneracyMap[i].size() != 0)
@@ -745,49 +748,66 @@ inline void UI::symmetriesDeg()
 
 	// ------------------------------- go through all degeneracies (start with degeneracy 2) -------------------------------
 	// get index of the average energy
-	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
-	u64 _minIdx					= 0; //_idx - stateNum / 2;
-	u64 _maxIdx					= Nh - 1;//_idx + stateNum / 2;
-	// as many entropies as realizations
-	v_1d<double> entropies(_realizations);
+	auto _idx	[[maybe_unused]]	= this->hamComplex->getEnAvIdx();
+	u64 _minIdx [[maybe_unused]]	= _idx - stateNum / 2;
+	u64 _maxIdx [[maybe_unused]]	= _idx + stateNum / 2;
+
+	MAT<double> _entropies(_realizations, 2);
 
 	// go through the degeneracies again
 	for (int _ig = 0; _ig < _gammas.size(); ++_ig)
 	{
 		auto _gamma				= _gammas[_ig];
+		// get the number of states in the degenerate manifold
 		int _degSize			= degeneracyMap[_gamma].size();
 		if (_degSize == 0)
 			continue;
-		LOGINFO("Doing: " + VEQ(_gamma) + ". Size=" + VEQ(_degSize), LOG_TYPES::TRACE, 1);
+		LOGINFO("Doing: " + VEQ(_gamma) + VEQV(". Manifold size", _degSize), LOG_TYPES::TRACE, 1);
 
 		// check the start and end idx from middle spectrum
 		auto _idxStart			= _degSize;
 		auto _idxEnd			= 0;
+		// setup the start index
 		for (auto i = 0; i < _degSize; i += _gamma)
+		{
 			if (degeneracyMap[_gamma][i] >= _minIdx)
 			{
+				// first state in the range found
 				_idxStart = i;
 				break;
 			}
+		}
+		// setup the end index
 		for (auto i = _degSize - _gamma; i >= 0; i -= _gamma)
+		{
 			if (degeneracyMap[_gamma][i] <= _maxIdx)
 			{
+				// first index from the back found
 				_idxEnd = i;
 				break;
 			}
+		}
+		
+		// if the indices are correct
 		if (_idxStart >= _idxEnd)
 		{
-			LOGINFO("for: " + VEQ(_gamma) + ". Cannot find states in the middle of the spectrum", LOG_TYPES::TRACE, 1);
+			LOGINFO("For: " + VEQ(_gamma) + ". Cannot find states in the middle of the spectrum", LOG_TYPES::TRACE, 2);
 			continue;
 		}
-		LOGINFO("Choosing from: [" + VEQ(_idxStart) + "," + VEQ(_idxEnd) + "]", LOG_TYPES::TRACE, 1);
+		LOGINFO("Choosing from: [" + VEQ(_idxStart) + "(true:" + STR(degeneracyMap[_gamma][_idxStart]) + ")," +
+									 VEQ(_idxEnd)   + "(true:" + STR(degeneracyMap[_gamma][_idxEnd])   + ")]", 
+									 LOG_TYPES::TRACE, 2);
+
+		// get the range to choose from as there is _gamma which decides on the manifold
+		auto _rangeLength	=	(_idxEnd - _idxStart) / _gamma;
 
 		pBar pbar(5, _realizations);
-#pragma omp parallel for num_threads(this->threadNum)
+//#pragma omp parallel for num_threads(this->threadNum)
 		for (int _r = 0; _r < _realizations; _r++)
 		{
 			// choose indices from degenerate states in the manifold
-			auto idx		=	ran.randomInt<int>(_idxStart, _idxEnd + 1);
+			auto idx		=	_idxStart + _gamma * ran.template randomInt<int>(0, _rangeLength);
+			// set the true state on that index
 			auto idxState	=	degeneracyMap[_gamma][idx];
 
 			CCOL _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(idxState);
@@ -798,21 +818,24 @@ inline void UI::symmetriesDeg()
 				_state		+=	_HM[_ig][_r][id] * this->hamComplex->getEigVec(idxState);
 			}
 
-			// rotate!
-			if (usesSym)
-				_state		=	_symRot * _state;
-
 			// normalize state
 			_state			=	_state / std::sqrt(arma::cdot(_state, _state));
-			entropies[_r]	=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+
+			// rotate!
+			if (usesSym)
+				_state			=	_symRot * _state;
+
+			// save the values
+			_entropies(_r, 0)	=	this->hamComplex->getEigVal(idxState);
+			_entropies(_r, 1)	=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
 
 			// update progress
-			PROGRESS_UPD(idx, pbar, VEQ(_gamma) + " Entropy was : S=" + VEQ(entropies[_r] / (log(2.0) * maxBondNum)));
+			PROGRESS_UPD(_r, pbar, VEQ(_gamma) + " Entropy was : S=" + VEQ(_entropies(_r, 1) / (log(2.0) * maxBondNum)));
 		}
-		ofs << _gamma << " " << entropies;
+		if (!_entropies.save(arma::hdf5_name(filename + ".h5", STR(_gamma), arma::hdf5_opts::append)))
+			_entropies.save(arma::hdf5_name(dir + "entropies" + ".h5", STR(_gamma), arma::hdf5_opts::append));
 	}
 	LOGINFO(_timer.point(1), "Degenerate - Entropies", 2);
-	ofs.close();
 }
 
 /*
@@ -824,15 +847,19 @@ inline void UI::symmetriesCreateDeg()
 	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	_timer.reset();
 	u64 Nh					=			this->hamComplex->getHilbertSize();
+	const auto _realizations=			this->nqsP.nBlocks_;
+
 	// create the directories
-	std::string dir			=			makeDirsC(this->mainDir, this->hamComplex->getType(), this->latP.lat->get_info(), "combinations");
+	std::string dir			=			makeDirsC(this->mainDir, 
+													this->hamComplex->getType(), 
+													this->latP.lat->get_info(), 
+													"CreateCombinationsNearZero_" + STR(_realizations));
 	
 	// use those files 
 	std::string modelInfo	=			this->hamComplex->getInfo();
 	
 	// save entropies txt check
 	std::string filename	=			dir + modelInfo;
-	std::ofstream ofs(dir + modelInfo + ".dat", std::ios_base::out);
 	
 	// check Hilbert size or whether we should diagonalize and proceed further
 	HILBERT_EMPTY_CHECK(Nh, return);
@@ -842,11 +869,12 @@ inline void UI::symmetriesCreateDeg()
 	
 	// set the parameters
 	uint Ns					=			this->hamComplex->getNs();
-	u64 stateNum			=			Nh / 10;
+	// 20% of the Hilbert space
+	u64 stateNum			=			Nh / 5;
 	auto ran				=			this->hamComplex->ran_;
 	
 	IFELSE_EXCEPTION(Nh < UI_LIMITS_MAXFULLED, this->hamComplex->diagH(false), "Size of the Hilbert space to big to diagonalize");
-	LOGINFO(_timer.point(0), "Interacting Mix - diagonalization");
+	LOGINFO(_timer.start(), "Interacting Mix - diagonalization");
 	
 	std::string name		=			VEQ(Nh);
 	LOGINFO("Spectrum size: "			+ STR(Nh)		, LOG_TYPES::TRACE, 3);
@@ -866,7 +894,6 @@ inline void UI::symmetriesCreateDeg()
 	this->hamComplex->generateFullMap();
 	
 	// information about state combination
-	const int _realizations	=			this->nqsP.nBlocks_;
 	const v_1d<int> _gammas	=			{ 1, 2, 3, 4, 5, 10, (int)Ns, int(2*Ns) };
 	v_2d<CCOL> _HM			=			{};
 	
@@ -876,15 +903,15 @@ inline void UI::symmetriesCreateDeg()
 			_HM.push_back(ran.createRanState(_gammas[i], _realizations));
 	
 	// get index of the average energy
-	auto _idx [[maybe_unused]]	= this->hamComplex->getEnAvIdx();
-	u64 _minIdx					= 0; //_idx - stateNum / 2;
-	u64 _maxIdx					= Nh - 1; //_idx + stateNum / 2;
+	auto _idx	[[maybe_unused]]	=	this->hamComplex->getEnAvIdx();
+	u64 _minIdx [[maybe_unused]]	=	_idx - stateNum / 2;
+	u64 _maxIdx [[maybe_unused]]	=	_idx + stateNum / 2;
 
-	auto toChooseFrom			= VEC::vecAtoB(stateNum, _minIdx);
+	auto toChooseFrom		=			VEC::vecAtoB(stateNum, _minIdx);
 
 	// as many entropies as realizations
-	v_1d<double> entropies(_realizations);
-	
+	MAT<double> _entropies(_realizations, 2);
+
 	// go through the gammas
 	for (int _ig = 0; _ig < _gammas.size(); ++_ig)
 	{
@@ -894,20 +921,18 @@ inline void UI::symmetriesCreateDeg()
 		if (gamma >= stateNum)
 			break;
 	
-		ofs << gamma;
 		LOGINFO("Taking gamma: " + STR(gamma), LOG_TYPES::TRACE, 3);
-	
 		pBar pbar(5, _realizations);
-#pragma omp parallel for num_threads(this->threadNum)
+//#pragma omp parallel for num_threads(this->threadNum)
 		for (int _r = 0; _r < _realizations; _r++)
 		{
 			// choose random indices
-			auto idx					=	ran.randomInt<int>(_minIdx, _minIdx + stateNum - 1 - gamma);
-			arma::Col<cpx> _state		=	_HM[_ig][_r][0] * this->hamComplex->getEigVec(idx);
+			auto idx					=	ran.template randomInt<u64>(_minIdx, _maxIdx - 1 - gamma);
+			arma::Col<cpx> _state		=	_HM[_ig][_r](0) * this->hamComplex->getEigVec(idx);
 
 			// append states
 			for (int id = 1; id < gamma; id++)
-				_state					+=	_HM[_ig][_r][id] * this->hamComplex->getEigVec(idx + id);
+				_state					+=	_HM[_ig][_r](id) * this->hamComplex->getEigVec(idx + id);
 
 			// rotate!
 			if (usesSym)
@@ -915,14 +940,15 @@ inline void UI::symmetriesCreateDeg()
 
 			// normalize state
 			_state						=	_state / std::sqrt(arma::cdot(_state, _state));
-			entropies[_r]				=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
+			_entropies(_r, 0)			=	this->hamComplex->getEigVal(idx);
+			_entropies(_r, 1)			=	Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, maxBondNum, this->hamComplex->hilbertSpace);
 	
-			PROGRESS_UPD(idx, pbar, VEQ(gamma) + " Entropy was : S=" + VEQ(entropies[_r] / (log(2.0) * maxBondNum)));
+			PROGRESS_UPD(_r, pbar, VEQ(gamma) + " Entropy was : S=" + VEQ(_entropies(_r, 1) / (log(2.0) * maxBondNum)));
 		}
-		ofs << " " << entropies;
+		if(!_entropies.save(arma::hdf5_name(filename + ".h5", STR(gamma), arma::hdf5_opts::append)))
+			_entropies.save(arma::hdf5_name(dir + "entropies" + ".h5", STR(gamma), arma::hdf5_opts::append));
 	}
 	LOGINFO(_timer.point(1), "Mixing - Entropies", 2);
-	ofs.close();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1426,24 +1452,28 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	this->_timer.reset();
 
+	uint Ns					= _H->getNs();
+	uint Nh					= _H->getHilbertSize();
 	// --- create the directories ---
-	std::string dir = makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info());
+	bool useZero			= (this->modP.modTyp_ == 0) && (Ns % 8 == 0);
+	std::string str0		= "QuadraticToManyBody";
+	if(useZero)	str0		+= "Zero";
+	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), str0);
 
 	// ------ use those files -------
 	std::string modelInfo	= _H->getInfo();
-	uint Ns					= _H->getNs();
-	uint Nh					= _H->getHilbertSize();
 	// how many states to take for calculating the entropies
 	u64 stateNum			= this->nqsP.nMcSteps_;
 	// how many states to take for the average
 	u64 realizations		= this->nqsP.nBlocks_;
 	// number of combinations to take from single particle states
 	u64 combinations		= this->nqsP.blockSize_;
-	bool useZero			= this->modP.modTyp_ == 0;
 	auto _type				= _H->getTypeI();
 
 	// --- save energies txt check ---
-	std::string filename	= filenameQuadraticRandom(dir + modelInfo + "_Gamma=" + STR(stateNum), _type, _H->ran_);
+	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV("_R", realizations) + VEQV("_C", combinations) +
+							  VEQV("_Gamma", stateNum), _type, _H->ran_);
+
 	IF_EXCEPTION(combinations < stateNum, "Bad number of combinations. Must be bigger than the number of states");
 
 	// check the model (if necessery to build hamilonian, do it)
@@ -1478,7 +1508,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	v_1d<arma::uvec> orbs;
 
 	// get the states to use later
-	if (Ns % 8 == 0 && useZero)
+	if (useZero)
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
 	else
 		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
@@ -1497,7 +1527,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 
 	// calculate!
 	pBar pbar(5, realizations, _timer.point(0));
-#pragma omp parallel for num_threads(this->threadNum)
+//#pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < realizations; idx++)
 	{
 		// create vector of orbitals (combine two many-body states from our total number of combinations)

@@ -23,9 +23,9 @@ namespace Operators
 	{
 		// cyclic shift function with boundary preservation
 		_GLB<_T> cyclicShift;
-		uint Lx		= lat->get_Lx();
-		uint Ly		= lat->get_Ly();
-		uint Lz		= lat->get_Lz();
+		uint Lx [[maybe_unused]] = lat->get_Lx();
+		uint Ly [[maybe_unused]] = lat->get_Ly();
+		uint Lz	[[maybe_unused]] = lat->get_Lz();
 		uint Ns		= lat->get_Ns();
 		switch (lat->get_Dim())
 		{

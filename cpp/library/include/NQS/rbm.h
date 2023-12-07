@@ -583,7 +583,7 @@ template<typename _Ht, typename _T>
 inline void RBM_S<_Ht, _T>::saveWeights(std::string _dir)
 {
 	std::string dir			=	_dir + kPS + "RBM" + kPS;
-	std::string filename	=	dir + "weights_" + prettyTime(clk::now()) + ".h5";
+	std::string filename	=	dir + "weights_" + prettyTime() + ".h5";
 	createDir(dir);
 	this->W_.save(	arma::hdf5_name(filename, "W"									));
 	this->bH_.save(	arma::hdf5_name(filename, "hidden"	,	arma::hdf5_opts::append	));

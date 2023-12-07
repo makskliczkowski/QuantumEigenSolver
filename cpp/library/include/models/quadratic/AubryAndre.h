@@ -34,10 +34,10 @@ public:
 	{
 		this->type_		= MY_MODELS_Q::AUBRY_ANDRE_M;
 		this->info_		= this->info();
-		this->dJ		= this->ran_.createRanVec(this->Ns, this->J0);
-		this->dB		= this->ran_.createRanVec(this->Ns, this->B0);
-		this->dP		= this->ran_.createRanVec(this->Ns, this->P0);
-		this->dLd		= this->ran_.createRanVec(this->Ns, this->Ld0);
+		this->dJ		= this->ran_.template createRanVec<double>(this->Ns, this->J0);
+		this->dB		= this->ran_.template createRanVec<double>(this->Ns, this->B0);
+		this->dP		= this->ran_.template createRanVec<double>(this->Ns, this->P0);
+		this->dLd		= this->ran_.template createRanVec<double>(this->Ns, this->Ld0);
 		LOGINFO("I am Aubry-Andre model: ", LOG_TYPES::CHOICE, 2);
 	};
 
