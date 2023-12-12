@@ -1,15 +1,17 @@
-#ifndef OPERATORS_H
-#define OPERATORS_H
-
+#pragma once
 /***********************************
 * Contains the most common operators.
 * Is used for more general opeartors.
 * Also defines various acting on a 
 * Hilbert space.
+* DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
+* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***********************************/
+#ifndef OPERATORS_H
+#define OPERATORS_H
 
 #ifndef ENTROPY_H
-#include "quantities/entropy.h"
+#	include "quantities/entropy.h"
 #endif // !ENTROPY_H
 
 namespace Operators 
@@ -29,6 +31,18 @@ namespace Operators
 	Operators::Operator<double> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site);
 
 	// ##########################################################################################################################################
+
+	std::pair<u64, double> c_dag_up(u64 base_vec, uint L, const v_1d<uint> _sites);
+	Operators::Operator<double> makeCDagUp(std::shared_ptr<Lattice> _lat, uint _site);
+
+	std::pair<u64, double> c_up(u64 base_vec, uint L, const v_1d<uint> _sites);
+	Operators::Operator<double> makeCUp(std::shared_ptr<Lattice> _lat, uint _site);
+
+	std::pair<u64, double> c_dag_dn(u64 base_vec, uint L, const v_1d<uint> _sites);
+	Operators::Operator<double> makeCDagDn(std::shared_ptr<Lattice> _lat, uint _site);
+
+	std::pair<u64, double> c_dn(u64 base_vec, uint L, const v_1d<uint> _sites);
+	Operators::Operator<double> makeCDn(std::shared_ptr<Lattice> _lat, uint _site);
 };
 
 //class avOperators {

@@ -14,7 +14,7 @@
 #define ISING_H
 
 template <typename _T>
-class IsingModel : public Hamiltonian<_T> {
+class IsingModel : public Hamiltonian<_T, 2> {
 protected:
 	// ------------------------------------------- MODEL BASED PARAMETERS -------------------------------------------
 	DISORDER_EQUIV(double, J);

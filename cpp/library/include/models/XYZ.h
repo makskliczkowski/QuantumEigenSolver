@@ -13,7 +13,7 @@
 #define XYZ_H
 
 template <typename _T>
-class XYZ : public Hamiltonian<_T> {
+class XYZ : public Hamiltonian<_T, 2> {
 public:
 	using NQSFun										= typename Hamiltonian<_T>::NQSFun;
 protected:

@@ -30,31 +30,37 @@ namespace Hilbert
 											LOGINFO("Skipping creation due to signal or empty Hilbert space.", LOG_TYPES::FINISH, 2); TODO ;}																													
 #endif
 
-	template <typename _T>
-	class HilbertSpace {
+	template <typename _T, uint _spinModes>
+	class HilbertSpace 
+	{
 	private:
 		void mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T>& normThreaded, int t);
 		void mappingKernelRepr();
 
 	protected:
+		const uint Nhl										= _spinModes;		// number of local possibilities 
+		
+		// mutexes
 		using MutexType										= std::shared_timed_mutex;
 		using ReadLock										= std::shared_lock<MutexType>;
 		using WriteLock										= std::unique_lock<MutexType>;
+		mutable MutexType Mutex;
 		
+		// using templates
 		using GSymV											= v_1d<GlobalSyms::GlobalSym>;
 		using SymOpV										= v_1d<Operators::Operator<_T>>;
 		using SymGV											= v_1d<std::pair<Operators::SymGenerators, int>>;
 		using RPair											= std::pair<u64, _T>;
 		using RPairV										= v_1d<std::pair<u64, _T>>;
 
-		mutable MutexType Mutex;
+		// sizes
+		clk::time_point t_;
 		uint threadNum										= 1;				// get number of threads
 		uint Ns												= 1;				// number of lattice sites
-		uint Nhl											= 2;				// number of local possibilities
 		uint Nint											= 1;				// number of fermionic modes such that total V=L^D*N_int
 		u64 Nh												= 1;				// number of states in the Hilbert space	
 		u64 NhFull											= 1;				// full Hilbert space
-		std::shared_ptr<Lattice> lat;
+		std::shared_ptr<Lattice> lat;											// class containing the general lattice
 
 		// --------------------------- SYMMERTIES ----------------------------
 		GSymV symGroupGlobal_;													// stores the global symmetry group representatives
@@ -77,7 +83,7 @@ namespace Hilbert
 			this->normalization_.clear();
 		}
 		
-		HilbertSpace() = default;
+		HilbertSpace()										= default;
 
 		/*
 		* @brief Create the Hilbert space class allowing for creation of specific symmetry 
@@ -91,10 +97,10 @@ namespace Hilbert
 		HilbertSpace(std::shared_ptr<Lattice> _lat,
 			SymGV _gen											= {},
 			GSymV _glob											= {},
-			uint _Nhl											= 2, 
 			uint _Nint											= 1,
-			bool _genereateReprezentativesMap					= false)
-			: Nhl(_Nhl), Nint(_Nint), lat(_lat)
+			bool _genereateRepresentativesMap					= false,
+			clk::time_point _t									= NOW)
+			: t_(_t), Nint(_Nint), lat(_lat)
 		{
 			this->Ns				=				this->lat->get_Ns();
 			this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
@@ -106,31 +112,36 @@ namespace Hilbert
 			this->mapping_			=				v_1d<u64>();
 			this->reprMap_			=				v_1d<std::pair<u64, _T>>();
 
-			auto _t					=				NOW;
 			// initialize
 			this->generateSymGroup(_gen);
+			LOGINFO(_t, "Symmetry group generator: " + this->getSymInfo(), 4);
 			this->generateMapping();
-			if (_genereateReprezentativesMap)
+			LOGINFO(_t, "Mapping generator: " + this->getSymInfo(), 4);
+			if (_genereateRepresentativesMap)
+			{
 				this->mappingKernelRepr();
+				LOGINFO(_t, "Representatives generator: " + this->getSymInfo(), 4);
+			}
+			LOGINFO(_t, "Hilbert Space Creator: " + this->getSymInfo(), 3);
 
 			if (this->Nh == this->NhFull)
 				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
-
-			if (this->Nh <= 0)
+			else if (this->Nh <= 0)
 				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
-			LOGINFO(_t, "Hilbert Space Creator: " + this->getSymInfo(), 3);
 		};
 
 		/*
 		* @brief Assign constructor
 		*/
-		HilbertSpace(const HilbertSpace<_T>& _H)
-			:	Ns(_H.Ns), 
-				Nhl(_H.Nhl), 
+		HilbertSpace(const HilbertSpace<_T, _spinModes>& _H)
+			:	Nhl(_H.Nhl),
+				Ns(_H.Ns), 
 				Nint(_H.Nint), 
 				Nh(_H.Nh), 
 				NhFull(_H.NhFull), 
 				lat(_H.lat),
+				t_(_H.t_),
+				threadNum(_H.threadNum),
 				symGroupGlobal_(_H.symGroupGlobal_), 
 				symGroup_(_H.symGroup_), 
 				symGroupSec_(_H.symGroupSec_),
@@ -147,9 +158,11 @@ namespace Hilbert
 		/*
 		* @brief Move constructor
 		*/
-		HilbertSpace(HilbertSpace<_T>&& _H)
-			:	Ns(std::move(_H.Ns)), 
-				Nhl(std::move(_H.Nhl)),
+		HilbertSpace(HilbertSpace<_T, _spinModes>&& _H)
+			:	Nhl(std::move(_H.Nhl)),
+				t_(std::move(_H.t_)),
+				threadNum(std::move(_H.threadNum)),
+				Ns(std::move(_H.Ns)), 
 				Nint(std::move(_H.Nint)),
 				Nh(std::move(_H.Nh)),
 				NhFull(std::move(_H.NhFull)),
@@ -168,7 +181,7 @@ namespace Hilbert
 		};
 	
 		// -------------------------- ASSIGN OPERATOR -------------------------
-		HilbertSpace<_T>& operator=(const HilbertSpace<_T>& _H)
+		HilbertSpace<_T>& operator=(const HilbertSpace<_T, _spinModes>& _H)
 		{
 			if (this != &_H) 
 			{
@@ -178,16 +191,17 @@ namespace Hilbert
 
 				this->Ns				= _H.Ns;
 				this->Nh				= _H.Nh;
-				this->Nhl				= _H.Nhl;
+				this->lat				= _H.lat;
 				this->Nint				= _H.Nint;
 				this->NhFull			= _H.NhFull;
-				this->symGroupGlobal_	= _H.symGroupGlobal_;
+				this->threadNum			= _H.threadNum;
 				this->symGroupSec_		= _H.symGroupSec_;
+				this->symGroupGlobal_	= _H.symGroupGlobal_;
 				this->normalization_	= _H.normalization_;
 				this->symGroup_			= _H.symGroup_;
-				this->mapping_			= _H.mapping_;
 				this->fullMap_			= _H.fullMap_;
-				this->lat				= _H.lat;
+				this->mapping_			= _H.mapping_;
+				this->t_				= _H.t_;
 			}
 			return *this;
 		};
@@ -231,7 +245,7 @@ namespace Hilbert
 		bool			checkSym()						const					{ return !(this->Nh == this->NhFull);										};
 		bool			checkLSym()						const					{ return this->symGroup_.size() != 0;										};
 		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0;									};
-		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false; };
+		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
 		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
 
@@ -241,8 +255,8 @@ namespace Hilbert
 	* @brief Based on the input symmetry generators, allows to create a local point symmetry group mix.
 	* @param g enum types generators with corresponding sector value
 	*/
-	template<typename _T>
-	inline void HilbertSpace<_T>::generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g)
+	template<typename _T, uint _spinModes>
+	inline void HilbertSpace<_T, _spinModes>::generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g)
 	{
 		// no symmetries! - there are no global and local symmetries to be used, therefore return
 		if (g.empty() && !this->checkGSym())
@@ -401,8 +415,8 @@ namespace Hilbert
 	* @brief Creates the information string about the Hilbert space and symmetries
 	* @returns string containing the information about all the symmetries
 	*/
-	template<typename _T>
-	inline std::string Hilbert::HilbertSpace<_T>::getSymInfo() const
+	template<typename _T, uint _spinModes>
+	inline std::string Hilbert::HilbertSpace<_T, _spinModes>::getSymInfo() const
 	{
 		std::string tmp = ",";
 		if(this->checkLSym())
@@ -445,8 +459,8 @@ namespace Hilbert
 	* @param @base_idx current base vector index to act on it with symmetry generators
 	* @returns pair containing the representative index and symmetry eigenvalue connected with returning to it
 	*/
-	template<typename _T>
-	inline std::pair<u64, _T> Hilbert::HilbertSpace<_T>::findRep(u64 baseIdx) const
+	template<typename _T, uint _spinModes>
+	inline std::pair<u64, _T> Hilbert::HilbertSpace<_T, _spinModes>::findRep(u64 baseIdx) const
 	{
 		// if the map exists, return the value already saved
 		if (!this->reprMap_.empty())
@@ -482,8 +496,8 @@ namespace Hilbert
 	* @warning (the same is used for creating the Hamiltonian with beta = alfa)
 	* @returns representative binary number and eigenvalue from symmetries to return to that state from baseIdx
 	*/
-	template<typename _T>
-	inline std::pair<u64, _T> Hilbert::HilbertSpace<_T>::findRep(u64 baseIdx, _T nB) const
+	template<typename _T, uint _spinModes>
+	inline std::pair<u64, _T> Hilbert::HilbertSpace<_T, _spinModes>::findRep(u64 baseIdx, _T nB) const
 	{
 		// check if mapping exists, if not - return the same state and 1.0
 		if (this->mapping_.empty())
@@ -527,8 +541,8 @@ namespace Hilbert
 	* @returns The value of the normalization.
 	* @link Based on Prof. Laeuchli lecture
 	*/
-	template<typename _T>
-	inline _T Hilbert::HilbertSpace<_T>::getSymNorm(u64 baseIdx) const
+	template<typename _T, uint _spinModes>
+	inline _T Hilbert::HilbertSpace<_T, _spinModes>::getSymNorm(u64 baseIdx) const
 	{
 		_T norm = 0.0;
 		for (auto& G : this->symGroup_) {
@@ -547,8 +561,8 @@ namespace Hilbert
 	* @param fMap full mapping between current Hilber space and the full Hilbert space (usefull when having global symmetries), otherwise empty
 	* @returns the rotation matrix that transforms to the full Hilbert space (without the local symmetries included)
 	*/
-	template<typename _T>
-	inline arma::SpMat<_T> HilbertSpace<_T>::getSymRot(const v_1d<u64>& fMap) const
+	template<typename _T, uint _spinModes>
+	inline arma::SpMat<_T> HilbertSpace<_T, _spinModes>::getSymRot(const v_1d<u64>& fMap) const
 	{
 		// check the maximal dimension of the Hilbert space (if we have global symmetries)
 		const u64 maxDim	= fMap.empty() ? this->NhFull : fMap.size();
@@ -584,8 +598,8 @@ namespace Hilbert
 	/*
 	* @brief Creates a symmetry rotation matrix that reproduces the full Hiblert state. Generates the full map if necessary (global symmetries check).
 	*/
-	template<typename _T>
-	inline arma::SpMat<_T> HilbertSpace<_T>::getSymRot() const
+	template<typename _T, uint _spinModes>
+	inline arma::SpMat<_T> HilbertSpace<_T, _spinModes>::getSymRot() const
 	{
 		// check the maximal dimension of the Hilbert space (if we have global symmetries)
 		v_1d<u64> fMap		= (this->symGroupGlobal_.empty()) ? v_1d<u64>() : this->getFullMap();
@@ -635,8 +649,8 @@ namespace Hilbert
 	* @brief For a given range of states in a full Hilbert space, get a transformation to equivalence class representatives (ECR).
 	* This means that we make it by acting on each basis state with all symmetry generators.
 	*/
-	template<typename _T>
-	inline void HilbertSpace<_T>::mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T>& normThreaded, int t)
+	template<typename _T, uint _spinModes>
+	inline void HilbertSpace<_T, _spinModes>::mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T>& normThreaded, int t)
 	{
 		// go through each state
 		for (u64 j = start; j < stop; j++) 
@@ -671,8 +685,8 @@ namespace Hilbert
 	/*
 	* @brief For all states in full Hilbert space, get a transformation to equivalence class representatives (ECR) and save it for later.
 	*/
-	template<typename _T>
-	inline void HilbertSpace<_T>::mappingKernelRepr()
+	template<typename _T, uint _spinModes>
+	inline void HilbertSpace<_T, _spinModes>::mappingKernelRepr()
 	{
 		LOGINFO("Creating the map of representatives", LOG_TYPES::INFO, 1);
 		// go through each state
@@ -717,8 +731,8 @@ namespace Hilbert
 	* @brief Splits the mapping genertation onto threads, where each finds basis states in the reduced Hilbert space within a given range.
 	* The mapping is retrieved by concatenating the resulting maps from each thread.
 	*/
-	template<typename _T>
-	inline void HilbertSpace<_T>::generateMapping()
+	template<typename _T, uint _spinModes>
+	inline void HilbertSpace<_T, _spinModes>::generateMapping()
 	{
 		// if no symmetries we don't need mapping
 		if (this->symGroupGlobal_.empty() && this->symGroup_.empty())
@@ -784,8 +798,8 @@ namespace Hilbert
 	* Hiblert space.
 	* @returns Full map to the basis without the global symmetries. 
 	*/
-	template<typename _T>
-	inline v_1d<u64> HilbertSpace<_T>::getFullMap() const 
+	template<typename _T, uint _spinModes>
+	inline v_1d<u64> HilbertSpace<_T, _spinModes>::getFullMap() const
 	{
 		// if the fullMap alread
 		if (!this->fullMap_.empty()) return this->fullMap_;
@@ -811,8 +825,8 @@ namespace Hilbert
 	/*
 	* @brief Generates full mapping to the full Hilbert space using global symmetries.
 	*/
-	template<typename _T>
-	inline void Hilbert::HilbertSpace<_T>::generateFullMap()
+	template<typename _T, uint _spinModes>
+	inline void Hilbert::HilbertSpace<_T, _spinModes>::generateFullMap()
 	{
 		this->fullMap_ = {};
 		if (!this->symGroupGlobal_.empty())
@@ -839,8 +853,8 @@ namespace Hilbert
 	* @param _s state to be transformed
 	* @returns if global symmetry is present, we transform the state; otherwise we return the same state. 
 	*/
-	template<typename _T>
-	inline arma::Col<_T> Hilbert::HilbertSpace<_T>::castToFull(const arma::Col<_T>& _s)
+	template<typename _T, uint _spinModes>
+	inline arma::Col<_T> Hilbert::HilbertSpace<_T, _spinModes>::castToFull(const arma::Col<_T>& _s)
 	{
 		if (!this->checkGSym())
 			return _s;

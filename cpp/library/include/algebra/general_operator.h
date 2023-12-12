@@ -20,14 +20,14 @@
 #include "operator_algebra.h"
 #endif
 
-// ############################################### FORWARD DECLARATIONS
+// ################################################################ FORWARD DECLARATIONS ########################################################################
 
 namespace Hilbert {
-	template <typename _T>
+	template <typename _T, uint _spinModes = 2>
 	class HilbertSpace;
 };
 
-// ####################################### D E F I N I T I O N S   O F   I M P L E M E N T A T I O N ###############################################################
+// ################################################ D E F I N I T I O N S   O F   I M P L E M E N T A T I O N ###################################################
 
 namespace Operators {
 
@@ -53,9 +53,23 @@ namespace Operators {
 
 	}
 	END_ENUM(SymGenerators);
+
+	/*
+	* @brief Implemented fermionic operators
+	*/
+	enum FermionicOperators { C_UP_DAG, C_UP, C_DOWN_DAG, C_DOWN };
+
+	BEGIN_ENUM(FermionicOperators)
+	{
+		DECL_ENUM_ELEMENT(C_UP_DAG),
+		DECL_ENUM_ELEMENT(C_UP),
+		DECL_ENUM_ELEMENT(C_DOWN_DAG),
+		DECL_ENUM_ELEMENT(C_DOWN),
+	}
+	END_ENUM(FermionicOperators);
 };
 
-// ################################################################### G E N E R A L ###############################################################################
+// ################################################################### G E N E R A L ############################################################################
 
 namespace Operators{
 
@@ -273,6 +287,7 @@ namespace Operators{
 
 // ##########################################################################################################################################
 
+//!TODO
 template<typename _T, typename ..._Ts>
 template<typename _T1, typename _T2>
 inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
@@ -280,6 +295,7 @@ inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, con
 	return _T();
 }
 
+//!TODO
 template<typename _T, typename ..._Ts>
 template<typename _T1>
 inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)

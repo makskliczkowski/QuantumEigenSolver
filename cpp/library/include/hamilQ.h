@@ -1,5 +1,4 @@
 #pragma once
-
 /***************************************
 * Defines the quadratic lattice Hamiltonian
 * class. Allows for later inhertiance
@@ -50,16 +49,17 @@ inline std::string filenameQuadraticRandom(std::string _f,				// #
 {																		// #
 	if (isQuadraticRandom(_type))										// #
 		return _f + "_R=" + STR(ran.randomInt(0, 1000));				// #
-	return _f;
+	return _f;															// #
 }																		// #
 // #########################################################################
 
 /*
-* @brief Allows one to construct a non-interacting Hamiltonian
+* @brief Allows one to construct a non-interacting Hamiltonian - can be transformed to spinless fermions 
 */
 template <typename _T>
-class QuadraticHamiltonian : public Hamiltonian<_T>
+class QuadraticHamiltonian : public Hamiltonian<_T, 2>
 {
+	// ------------------------------------------- CLASS TYPES ----------------------------------------------
 public:
 	using		NQSFun				= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
 	using		manyBodyTuple		= std::tuple<v_1d<double>, v_1d<arma::uvec>>;
@@ -69,27 +69,29 @@ protected:
 	uint		size_				= 1;
 	// check the particle conservation
 	bool		particleConverving_ = true;
+	// constant to be added to the energy
 	_T			constant_		= 0.0;
 
-public:
 	// ------------------ M A N Y   B O D Y ------------------
+public:
 	void getManyBodyEnergies(uint N, v_1d<double>& manyBodySpectrum, v_1d<arma::uvec>& manyBodyOrbitals, int _num = -1);
 	void getManyBodyEnergiesZero(uint N, v_1d<double>& manyBodySpectrum, v_1d<arma::uvec>& manyBodyOrbitals, int _num = -1);
 
-	// energy
+	// ------------------ energy
 	template<typename _T2, typename = typename std::enable_if<std::is_arithmetic<_T2>::value, _T2>::type>
 	double getManyBodyEnergy(const v_1d<_T2>& _state);
 	double getManyBodyEnergy(u64 _state);
 
-	// state
+	// ------------------ slater
 	template<typename _T1, typename = typename std::enable_if<std::is_arithmetic<_T1>::value, _T1>::type>
 	arma::Mat<_T> getSlater(const v_1d<_T1>& _singlePartOrbs, u64 _realSpaceOccupation);
 
+	// ------------------ state from orbitals
 	template<typename _T1, typename _T2, typename = typename std::enable_if<std::is_arithmetic<_T1>::value, _T1>::type>
 	arma::Col<_T> getManyBodyState(const v_1d<_T1>& _singlePartOrbs, const Hilbert::HilbertSpace<_T2>& _hibert);
 
 	// --------------- C O N S T R U C T O R S ---------------
-	~QuadraticHamiltonian()			= default;
+	virtual ~QuadraticHamiltonian()	= default;
 	QuadraticHamiltonian()			= default;
 	QuadraticHamiltonian(std::shared_ptr<Lattice> _lat, _T _constant, bool _partCons = true)
 		: particleConverving_(_partCons), constant_(_constant)
@@ -103,18 +105,18 @@ public:
 		this->init();
 	}
 
-	// ########### GETTERS ###########
+	// -------------------- G E T T E R S --------------------
 	virtual auto getTransMat()		-> arma::Mat<_T>		{ return this->eigVec_;							};	// returns the unitary base transformation {<x|q>}
 	virtual auto getSPEnMat()		-> arma::Col<double>	{ return this->eigVal_;							};	// returns the single particle energies
 	auto getTypeI()					const -> uint			{ return (uint)this->type_;						};	// get type integer
 	auto getType()					const -> std::string	{ return getSTR_MY_MODELS_Q((uint)this->type_); };	// get type string
 
-	// ########### OVERRIDE ##########
+	// ------------------- O V E R R I D E -------------------
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)		override {										};
 	cpx locEnergy(u64 _id, uint s, NQSFun f1)				override { return 0.0;							};
 	cpx locEnergy(const DCOL& v,
-		uint site, NQSFun f1,
-		DCOL& tmp)											override { return 0.0;							};
+					uint site, NQSFun f1,
+					DCOL& tmp)								override { return 0.0;							};
 
 };
 
