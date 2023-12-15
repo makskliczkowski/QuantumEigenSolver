@@ -32,16 +32,16 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	std::pair<u64, double> c_dag_up(u64 base_vec, uint L, const v_1d<uint> _sites);
+	std::pair<u64, double> c_dag_up(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCDagUp(std::shared_ptr<Lattice> _lat, uint _site);
 
-	std::pair<u64, double> c_up(u64 base_vec, uint L, const v_1d<uint> _sites);
+	std::pair<u64, double> c_up(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCUp(std::shared_ptr<Lattice> _lat, uint _site);
 
-	std::pair<u64, double> c_dag_dn(u64 base_vec, uint L, const v_1d<uint> _sites);
+	std::pair<u64, double> c_dag_dn(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCDagDn(std::shared_ptr<Lattice> _lat, uint _site);
 
-	std::pair<u64, double> c_dn(u64 base_vec, uint L, const v_1d<uint> _sites);
+	std::pair<u64, double> c_dn(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCDn(std::shared_ptr<Lattice> _lat, uint _site);
 };
 

@@ -8,27 +8,10 @@
 
 // ############################## D E F I N I T I O N S   F O R   R B M ##############################
 
-#ifdef NQS_RBM_USESR
-	// calculation of the inverse 
-	#ifdef NQS_RBM_PINV
-		constexpr auto tolPinv = 1e-5;
-		#ifdef NQS_RBM_SREG
-			#undef NQS_RBM_SREG
-		#endif
-	#else
-		#ifndef NQS_RBM_SREG
-			#define NQS_RBM_SREG
-		#endif
-		constexpr double regB = 0.95;
-		constexpr double regLambda0 = 100;
-		constexpr double regLambdaMin = 1e-4;
-	#endif
-#endif
-
 /*
 * @brief Restricted Boltzmann Machines ansatz for quantum state
 */
-template <typename _Ht, typename _T>
+template <typename _Ht, typename _T = _Ht>
 class RBM_S : public NQS<_Ht, _T>
 {
 public:
@@ -38,7 +21,7 @@ public:
 protected:
 	uint nHid_						=						1;
 	// general parameters
-#ifdef NQS_RBM_SREG
+#ifdef NQS_SREG
 	double regBCurrent				=						0;			// parameter for regularisation, changes with Monte Carlo steps
 	double regBMult					=						regB;		// starting parameter for regularisation
 #endif
@@ -56,28 +39,27 @@ protected:
 	auto hiperbolicF(const NQSS& _v)		const -> NQSB	{ return arma::cosh(this->bH_ + this->W_ * _v); };
 	auto hiperbolicF()						const -> NQSB	{ return arma::cosh(this->theta_); };
 	
-
 	// -------------------------------------------------------------------
 protected:
-	// ------------------------- A L O C A T O R S -----------------------
+	// ----------------------- A L O C A T O R S -------------------------
 	void setInfo()											override final;
 	void allocate()											override final;
 
-	// ------------------------- S E T T E R S --------------------------
+	// ------------------------- S E T T E R S ---------------------------
 	void setState(NQSS _st)									override final;
 	void setState(NQSS _st, bool _set)						override final;
 	void setState(u64 _st)									override final;
 	void setState(u64 _st, bool _set)						override final;
 
 
-	// ------------------------- W E I G H T S --------------------------
+	// ------------------------- W E I G H T S ---------------------------
 	void setTheta();
 	void setTheta(const NQSS& v);
 	void updTheta();
 	void updTheta(const NQSS& v);
 
 	// ------------------------- T R A I N ------------------------------
-#ifdef NQS_RBM_SREG 
+#ifdef NQS_SREG 
 	void rescaleS() {
 		this->S_.diag() += (regLambda0 < regLambdaMin) ? regLambdaMin : (regLambda0 * this->regBCurrent);
 	};
@@ -88,7 +70,7 @@ protected:
 	void updateWeights()									override final;
 	void saveWeights(std::string _dir)						override final;
 	// --- S R ---
-#ifdef NQS_RBM_USESR
+#ifdef NQS_USESR
 	void derivativeSR(int step);
 #endif
 	// ------------------------- P R O B A B I L I T Y --------------------------
@@ -124,7 +106,7 @@ public:
 	void init()							override final;
 	void update()						override final		
 	{
-#ifdef NQS_RBM_ANGLES_UPD
+#ifdef NQS_ANGLES_UPD
 		this->updTheta(); 
 #endif
 	};
@@ -148,7 +130,7 @@ public:
 		uint nFlip = 1, uint progPrc = 25) override
 	{
 		const int _stps = nBlck - nThrm;
-#ifdef NQS_RBM_SREG
+#ifdef NQS_SREG
 		this->regBCurrent = this->regBMult;
 #endif
 		this->Derivatives_.resize(_stps, this->fullSize_);
@@ -559,6 +541,7 @@ inline void RBM_S<_Ht, _T>::updTheta(const NQSS& v)
 
 // ##############################################################################################################################################
 
+#ifdef NQS_USESR
 /*
 * @brief updates the weights using stochastic gradient descent or stochastic reconfiguration [SR]
 */
@@ -576,6 +559,7 @@ inline void RBM_S<_Ht, _T>::derivativeSR(int step)
 #endif 
 	this->F_ = this->lr_ * arma::solve(this->S_, this->F_);
 }
+#endif
 
 // ##############################################################################################################################################
 

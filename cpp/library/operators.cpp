@@ -85,41 +85,46 @@ Operators::Operator<double> Operators::makeSigmaZ(std::shared_ptr<Lattice> lat, 
 * @param base_vec vector to be acted on
 * @param L lattice size
 */
-std::pair<u64, double> Operators::c_dag_up(u64 base_vec, uint L, const v_1d<uint> _sites)
+std::pair<u64, double> Operators::c_dag_up(u64 base_vec, uint L, v_1d<uint> _sites)
 {
 	// divide by the 2^L to get the integer corresponding to the UP spin only
-	auto tmp	= base_vec / BinaryPowers[L];
+	u64 tmp		= base_vec / BinaryPowers[L];
 	double val	= 1.0;
 	double sign = 1.0;
+	uint comp	= 0;
 
-	// go through sites - those give different operators at those positions
+	// go through sites - those give different operators at those positions, check for 0
 	for (auto const& site : _sites)
-	{
-		if (checkBit(tmp, L - 1 - site))
-		{
-			val = 0;
+		if (val *= (double)!checkBit(tmp, L - 1 - site); !(bool)val)
 			break;
-		}
-		double _signIn = 1.0;
-		// check the Fermionic sign after moving the operators
-		for (auto i = L - 1; i > site; i--)
-			if (checkBit(tmp, L - 1 - i))
-				_signIn *= (-1.0);
-		// flip the vector at last
-		sign	= sign * _signIn;
-		tmp		= flip(tmp, L - 1 - site);
+
+	// get the sign corresponding to sorting _sites
+	if (val != 0 && _sites.size() > 1)
+	{
+		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		if (comp % 2) sign *= -1;
 	}
+	else if(val == 0)
+		return std::make_pair(tmp, sign * val);
 
-	// calculate the sign of _sites
-	//if (val != 0 and _sites.size() > 1)
-	//{
-	//	uint _comparisons = 0;
-	//	v_1d<uint> sites_ = _sites;
-	//	VEC::bubbleSort(sites_.begin(), sites_.end(), std::greater<uint>(), &_comparisons);
-	//	if (_comparisons % 2)
-	//		sign *= -1;
-	//}
+	uint _currentSite	= 0;
+	double _signSite	= 1.0;
 
+	// check the Fermionic sign after moving the operators
+	// go through all lattice sites, 
+	// if the site at current site is one of those, append with sign
+	for (auto i = L - 1; i > _sites[_sites.size() - 1]; i--)
+	{
+		if (checkBit(tmp, L - 1 - i))
+			_signSite *= (-1.0);
+		if (i == _sites[_currentSite])
+		{
+			sign	*= _signSite;
+			tmp		=	flip(tmp, L - 1 - i);
+			_currentSite++;
+
+		}
+	}
 	return std::make_pair(tmp, sign * val);
 }
 
@@ -141,41 +146,46 @@ Operators::Operator<double> Operators::makeCDagUp(std::shared_ptr<Lattice> _lat,
 * @param base_vec vector to be acted on
 * @param L lattice size
 */
-std::pair<u64, double> Operators::c_up(u64 base_vec, uint L, const v_1d<uint> _sites)
+std::pair<u64, double> Operators::c_up(u64 base_vec, uint L, v_1d<uint> _sites)
 {
 	// divide by the 2^L to get the integer corresponding to the UP spin only
-	auto tmp	= base_vec / BinaryPowers[L];
+	u64 tmp		= base_vec / BinaryPowers[L];
 	double val	= 1.0;
 	double sign = 1.0;
+	uint comp	= 0;
 
-	// go through sites - those give different operators at those positions
+	// go through sites - those give different operators at those positions, check for 0
 	for (auto const& site : _sites)
-	{
-		if (!checkBit(tmp, L - 1 - site))
-		{
-			val = 0;
+		if (val *= (double)checkBit(tmp, L - 1 - site); (bool)!val)
 			break;
-		}
-		double _signIn = 1.0;
-		// check the Fermionic sign after moving the operators
-		for (auto i = L - 1; i > site; i--)
-			if (checkBit(tmp, L - 1 - i))
-				_signIn *= (-1.0);
-		// flip the vector at last
-		sign	= sign * _signIn;
-		tmp		= flip(tmp, L - 1 - site);
+
+	// get the sign corresponding to sorting _sites
+	if (val != 0 && _sites.size() > 1)
+	{
+		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		if (comp % 2) sign *= -1;
 	}
+	else if(val == 0)
+		return std::make_pair(tmp, sign * val);
 
-	//// calculate the sign of _sites
-	//if (val != 0 and _sites.size() > 1)
-	//{
-	//	uint _comparisons = 0;
-	//	v_1d<uint> sites_ = _sites;
-	//	VEC::bubbleSort(sites_.begin(), sites_.end(), std::greater<uint>(), &_comparisons);
-	//	if (_comparisons % 2)
-	//		sign *= -1;
-	//}
+	uint _currentSite	= 0;
+	double _signSite	= 1.0;
 
+	// check the Fermionic sign after moving the operators
+	// go through all lattice sites, 
+	// if the site at current site is one of those, append with sign
+	for (auto i = L - 1; i > _sites[_sites.size() - 1]; i--)
+	{
+		if (checkBit(tmp, L - 1 - i))
+			_signSite *= (-1.0);
+		if (i == _sites[_currentSite])
+		{
+			sign	*= _signSite;
+			tmp		=	flip(tmp, L - 1 - i);
+			_currentSite++;
+
+		}
+	}
 	return std::make_pair(tmp, sign * val);
 }
 
@@ -196,29 +206,45 @@ Operators::Operator<double> Operators::makeCUp(std::shared_ptr<Lattice> _lat, ui
 * @param base_vec vector to be acted on
 * @param L lattice size
 */
-std::pair<u64, double> Operators::c_dag_dn(u64 base_vec, uint L, const v_1d<uint> _sites)
+std::pair<u64, double> Operators::c_dag_dn(u64 base_vec, uint L, v_1d<uint> _sites)
 {
-	// modulo by the 2^L to get the integer corresponding to the DOWN spin only
-	auto tmp	= base_vec % BinaryPowers[L];
+	// modulo by the 2^L to get the integer corresponding to the DN spin only
+	u64 tmp		= base_vec / BinaryPowers[L];
 	double val	= 1.0;
-	double sign = 1.0;
+	double sign = L % 2 == 0 ? (1.0) : (-1.0);
+	uint comp	= 0;
 
-	// go through sites - those give different operators at those positions
+	// go through sites - those give different operators at those positions, check for 0
 	for (auto const& site : _sites)
-	{
-		if (checkBit(tmp, L - 1 - site))
-		{
-			val = 0;
+		if (val *= (double)!checkBit(tmp, L - 1 - site); (bool)!val)
 			break;
+
+	// get the sign corresponding to sorting _sites
+	if (val != 0 && _sites.size() > 1)
+	{
+		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		if (comp % 2) sign *= -1;
+	}
+	else if(val == 0)
+		return std::make_pair(tmp, sign * val);
+
+	uint _currentSite	= 0;
+	double _signSite	= 1.0;
+
+	// check the Fermionic sign after moving the operators
+	// go through all lattice sites, 
+	// if the site at current site is one of those, append with sign
+	for (auto i = L - 1; i > _sites[_sites.size() - 1]; i--)
+	{
+		if (checkBit(tmp, L - 1 - i))
+			_signSite *= (-1.0);
+		if (i == _sites[_currentSite])
+		{
+			sign	*= _signSite;
+			tmp		=	flip(tmp, L - 1 - i);
+			_currentSite++;
+
 		}
-		double _signIn = 1.0;
-		// check the Fermionic sign after moving the operators
-		for (auto i = L - 1; i > site; i--)
-			if (checkBit(tmp, L - 1 - i))
-				_signIn *= (-1.0);
-		// flip the vector at last
-		sign	= sign * _signIn;
-		tmp		= flip(tmp, L - 1 - site);
 	}
 	return std::make_pair(tmp, sign * val);
 }
@@ -240,29 +266,45 @@ Operators::Operator<double> Operators::makeCDagDn(std::shared_ptr<Lattice> _lat,
 * @param base_vec vector to be acted on
 * @param L lattice size
 */
-std::pair<u64, double> Operators::c_dn(u64 base_vec, uint L, const v_1d<uint> _sites)
+std::pair<u64, double> Operators::c_dn(u64 base_vec, uint L, v_1d<uint> _sites)
 {
-	// modulo by the 2^L to get the integer corresponding to the DOWN spin only
-	auto tmp	= base_vec % BinaryPowers[L];
+	// modulo by the 2^L to get the integer corresponding to the DN spin only
+	u64 tmp		= base_vec / BinaryPowers[L];
 	double val	= 1.0;
-	double sign = 1.0;
+	double sign = L % 2 == 0 ? (1.0) : (-1.0);
+	uint comp	= 0;
 
-	// go through sites - those give different operators at those positions
+	// go through sites - those give different operators at those positions, check for 0
 	for (auto const& site : _sites)
-	{
-		if (!checkBit(tmp, L - 1 - site))
-		{
-			val = 0;
+		if (val *= (double)checkBit(tmp, L - 1 - site); (bool)!val)
 			break;
+
+	// get the sign corresponding to sorting _sites
+	if (val != 0 && _sites.size() > 1)
+	{
+		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		if (comp % 2) sign *= -1;
+	}
+	else if(val == 0)
+		return std::make_pair(tmp, sign * val);
+
+	uint _currentSite	= 0;
+	double _signSite	= 1.0;
+
+	// check the Fermionic sign after moving the operators
+	// go through all lattice sites, 
+	// if the site at current site is one of those, append with sign
+	for (auto i = L - 1; i > _sites[_sites.size() - 1]; i--)
+	{
+		if (checkBit(tmp, L - 1 - i))
+			_signSite *= (-1.0);
+		if (i == _sites[_currentSite])
+		{
+			sign	*= _signSite;
+			tmp		=	flip(tmp, L - 1 - i);
+			_currentSite++;
+
 		}
-		double _signIn = 1.0;
-		// check the Fermionic sign after moving the operators
-		for (auto i = L - 1; i > site; i--)
-			if (checkBit(tmp, L - 1 - i))
-				_signIn *= (-1.0);
-		// flip the vector at last
-		sign	= sign * _signIn;
-		tmp		= flip(tmp, L - 1 - site);
 	}
 	return std::make_pair(tmp, sign * val);
 }

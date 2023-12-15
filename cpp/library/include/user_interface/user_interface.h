@@ -1,22 +1,44 @@
 #pragma once
+/***************************************
+* Defines the user interface class based
+* on a general UI class. All methods for 
+* this software stored.
+* DEC 2023. UNDER CONSTANT DEVELOPMENT
+* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
+***************************************/
 #include "../../source/src/UserInterface/ui.h"
 
-#ifdef DEBUG
-//#define DEBUG_BINARY
+#ifdef _DEBUG
+//	#define DEBUG_BINARY
 #else
-//#define OMP_NUM_THREADS 16;
-#include <thread>
-#include <mutex>
+//	#define OMP_NUM_THREADS 16;
+#	include <thread>
+#	include <mutex>
 #endif
 
-// ######################### RBM ############################
+// ######################### NQS ############################
+// save the weights?									 // #
+#define NQS_SAVE_WEIGHTS								 // #
+#ifdef NQS_SAVE_WEIGHTS									 // #
+#	define NQS_SAVE_DIR "WEIGHTS" + kPS					 // #
+#endif													 // #
+														 // #
+// use CPU?												 // #
+#define NQS_USE_CPU										 // #
+//#define NQS_USE_GPU									 // #
+														 // #
+#ifdef NQS_USE_CPU										 // #
+//#	define NQS_USE_OMP									 // #
+#elif defined NSQ_USE_GPU								 // #
+														 // #
+#endif													 // #
 // definitions											 // #
-#define NQS_RBM_ANGLES_UPD								 // #
-#define NQS_RBM_USESR									 // #
-#define NQS_RBM_PINV									 // #
+#define NQS_ANGLES_UPD									 // #
+#define NQS_USESR										 // #
+#define NQS_PINV										 // #
 //#define NQS_RBM_SREG									 // #
 #ifndef RBM_H											 // #
-#include "../NQS/rbm.h"									 // #
+#	include "../NQS/rbm.h"								 // #
 #endif													 // #
 // ##########################################################
 

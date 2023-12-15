@@ -73,6 +73,7 @@ namespace Hilbert
 		v_1d<u64> fullMap_									= {};				// stores the map of the representatives to a Hilbert space without the global syms
 		RPairV reprMap_										= {};				// stores the map from the Hilbert space to the corresponding representative index and value of return (optional)
 
+
 	public:
 		// -------------------------- CONSTRUCTORS ---------------------------
 		~HilbertSpace()
@@ -99,7 +100,8 @@ namespace Hilbert
 			GSymV _glob											= {},
 			uint _Nint											= 1,
 			bool _genereateRepresentativesMap					= false,
-			clk::time_point _t									= NOW)
+			clk::time_point _t									= NOW,
+			bool _generateMapping								= true)
 			: t_(_t), Nint(_Nint), lat(_lat)
 		{
 			this->Ns				=				this->lat->get_Ns();
@@ -112,17 +114,8 @@ namespace Hilbert
 			this->mapping_			=				v_1d<u64>();
 			this->reprMap_			=				v_1d<std::pair<u64, _T>>();
 
-			// initialize
-			this->generateSymGroup(_gen);
-			LOGINFO(_t, "Symmetry group generator: " + this->getSymInfo(), 4);
-			this->generateMapping();
-			LOGINFO(_t, "Mapping generator: " + this->getSymInfo(), 4);
-			if (_genereateRepresentativesMap)
-			{
-				this->mappingKernelRepr();
-				LOGINFO(_t, "Representatives generator: " + this->getSymInfo(), 4);
-			}
-			LOGINFO(_t, "Hilbert Space Creator: " + this->getSymInfo(), 3);
+			if(_generateMapping)
+				this->initMapping(_genereateRepresentativesMap, _t);
 
 			if (this->Nh == this->NhFull)
 				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
@@ -206,6 +199,12 @@ namespace Hilbert
 			return *this;
 		};
 
+		// ------------------------- MAP INITIALIZERS -------------------------
+
+		void initMapping(SymGV _gen							= {},
+						 bool _genereateRepresentativesMap	= false,
+						 clk::time_point _t					= NOW);
+
 		// ------------------------- INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
 		void generateMapping();															// generates mapping from reduced hilbert space to original
@@ -249,6 +248,26 @@ namespace Hilbert
 		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
 
+	// ##########################################################################################################################################
+	
+	/*
+	* @brief Initializes the mapping for the Hilbert space
+	*/
+	template<typename _T, uint _spinModes>
+	void HilbertSpace<_T, _spinModes>::initMapping(SymGV _gen, bool _genereateRepresentativesMap, clk::time_point _t)
+	{
+		// initialize
+		this->generateSymGroup(_gen);
+		LOGINFO(_t, "Symmetry group generator: " + this->getSymInfo(), 4);
+		this->generateMapping();
+		LOGINFO(_t, "Mapping generator: " + this->getSymInfo(), 4);
+		if (_genereateRepresentativesMap)
+		{
+			this->mappingKernelRepr();
+			LOGINFO(_t, "Representatives generator: " + this->getSymInfo(), 4);
+		}
+		LOGINFO(_t, "Hilbert Space Creator: " + this->getSymInfo(), 3);
+	}
 	// ##########################################################################################################################################
 
 	/*
