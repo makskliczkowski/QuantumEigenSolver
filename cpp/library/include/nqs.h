@@ -206,12 +206,14 @@ public:
 							 u64 _start, 
 							 bool _therm = false);
 	
-	virtual arma::Col<_T> train(uint nSam, 
-								uint nThrm, 
-								uint nBlck, 
-								uint bSize, 
-								uint nFlip		= 1, 
-								uint progPrc	= 25);
+	virtual arma::Col<_T> train(uint mcSteps,					// number of Monte Carlo Steps
+								uint nThrm,						// number of mcSteps to thermalize
+								uint nBlck,						// number of such blocks for one average step
+								uint bSize,						// for killing correlations
+								uint nFlip			= 1,		// number of flips to set
+								bool quiet			= false,	// shall talk?
+								clk::time_point _t	= NOW,		// time!
+								uint progPrc		= 25);
 
 	virtual arma::Col<_T> collect(	uint nSam, 
 									uint nThrm, 
@@ -341,6 +343,10 @@ inline void NQS<_Ht, _spinModes, _discreteValue, _T, _stateType>::chooseRandomFl
 }
 
 // ##########################################################################################################################################
+// ##########################################################################################################################################
+// ############################################################ S A M P L I N G #############################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
 
 /*
 * @brief Block updates the current state according to Metropolis-Hastings algorithm. The block size is chosen so that
@@ -392,7 +398,7 @@ inline void NQS<_Ht, _spinModes, _discreteValue, _T, _stateType>::blockSample(ui
 #endif
 }
 
-// ##############################################################################################################################################
+// ##########################################################################################################################################
 
 /*
 * @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP
@@ -475,35 +481,39 @@ inline void NQS<_Ht, _spinModes, _discreteValue, _T, _stateType>::locEnKernel(ui
 }
 #endif
 
-// ##############################################################################################################################################
+// ##########################################################################################################################################
 
 template<typename _Ht, uint _spinModes, double _discreteValue, typename _T, class _stateType>
-inline arma::Col<_T> NQS<_Ht, _spinModes, _discreteValue, _T, _stateType>::train(uint nSam, uint nThrm, uint nBlck, uint bSize, uint nFlip, uint progPrc)
+inline arma::Col<_T> NQS<_Ht, _spinModes, _discreteValue, _T, _stateType>::train(uint mcSteps,
+																				 uint nThrm,
+																				 uint nBlck,
+																				 uint bSize,
+																				 uint nFlip,
+																				 bool quiet,
+																				 clk::time_point _t,
+																				 uint progPrc)
 {
-	std::string outstr = "";
-
-	// start the timer!
-	auto _start = std::chrono::high_resolution_clock::now();
-
+	std::string outstr	= "";
+	
 	// set the info about training
-	strSeparatedP(outstr, '\t', 2,
-		VEQV("mc", nSam),
-		VEQV("mcTherm", nThrm),
-		VEQV("nb", nBlck),
-		VEQV("bs", bSize),
-		VEQV("bs", nFlip)
+	strSeparatedP(outstr, '\n\t', 2,
+								VEQV("Monte Carlo Steps", mcSteps),
+								VEQV("Thermalization Steps", nThrm),
+								VEQV("Block Number", nBlck),
+								VEQV("Size of the single block", bSize),
+								VEQV("Number of flips taken at each step", nFlip)
 	);
 	LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
 
 	// make the pbar!
-	this->pBar_ = pBar(progPrc, nSam);
+	this->pBar_			= pBar(progPrc, mcSteps);
 
-	// check if the batch is not bigger than the blocks number
-	const int _stps = nBlck - nThrm;
+	// check if the number of thermal samples is not bigger than the MC steps
+	const int _stps		= nBlck - nThrm;
 	if (_stps < 0)
 	{
 		LOGINFOG("Number of steps is too small - thermalisaton too high!", LOG_TYPES::ERROR, 0);
-		return {};
+		throw std::runtime_error("Number of steps is too small - thermalisaton too high!");
 	};
 
 	// save all average weights for covariance matrix
