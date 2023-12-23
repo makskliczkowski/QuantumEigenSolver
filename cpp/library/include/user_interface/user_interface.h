@@ -1527,7 +1527,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 
 	// calculate!
 	pBar pbar(5, realizations, _timer.point(0));
-//#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < realizations; idx++)
 	{
 		// create vector of orbitals (combine two many-body states from our total number of combinations)
