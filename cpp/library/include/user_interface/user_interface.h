@@ -196,7 +196,7 @@ namespace UI_PARAMS {
 		* @brief Checks if the symmetries make the Hamiltonian complex
 		* @param Ns lattice size
 		*/
-		bool checkComplex(int Ns) {
+		bool checkComplex(int Ns) const {
 			if (this->k_ == 0 || (this->k_ == Ns / 2 && Ns % 2 == 0) || this->py_ != -INT_MAX)
 				return false;
 			return true;
@@ -1471,8 +1471,8 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	auto _type				= _H->getTypeI();
 
 	// --- save energies txt check ---
-	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV("_R", realizations) + VEQV("_C", combinations) +
-							  VEQV("_Gamma", stateNum), _type, _H->ran_);
+	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV(_R, realizations) + VEQV(_C, combinations) +
+							  VEQV(_Gamma, stateNum), _type, _H->ran_);
 
 	IF_EXCEPTION(combinations < stateNum, "Bad number of combinations. Must be bigger than the number of states");
 
@@ -1515,7 +1515,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
 	// make matrices cut to a specific number of bonds
-	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);;
+	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);
 	// conjugate transpose it - to be used later
 	arma::Mat<_T> WsC		= Ws.t();
 
@@ -1542,15 +1542,13 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 		// -------------------------------- CORRELATION --------------------------------
 
 		// iterate through the state
-		auto J				= SingleParticle::corrMatrix<_T>(Ns, Ws, WsC, orbitals, coeff, _H->ran_);
-		ENTROPIES_SP(idx)	= Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
+		arma::Mat<cpx> J	= SingleParticle::corrMatrix<cpx>(Ns, Ws, WsC, orbitals, coeff, _H->ran_);
+		ENTROPIES_SP(idx)	= Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman<cpx>(J);
 
 		// --------------------------------- MANY BODY ---------------------------------
 		arma::Col<_T> _state(_hilbert.getHilbertSize(), arma::fill::zeros);
 		for (int i = 0; i < orbitals.size(); ++i)
 			_state			+= coeff(i) * _H->getManyBodyState(VEC::colToVec(orbitals[i]), _hilbert);
-
-		_state				= _state / std::sqrt(arma::cdot(_state, _state));
 		ENTROPIES_MB(idx)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _bonds, _hilbert);
 
 		// update progress
