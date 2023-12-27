@@ -193,7 +193,7 @@ namespace SingleParticle
 
 				v_1d<uint> qs;
 				// add position orbitals that are occupied
-				x.iterate_bits_on([&](uint _pos) { qs.push_back(_pos); });
+				x.iterate_bits_on([&](uint _pos) { qs.push_back(_Ns - _pos - 1); });
 
 				// go through occupied orbitals
 				std::tuple<uint, uint> qs_nor = {qs[0], qs[1]};
