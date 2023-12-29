@@ -32,11 +32,11 @@ namespace SingleParticle
 	*/
 	template<typename _T1>
 	inline arma::Mat<_T1> corrMatrixSingle(
-								uint							_Ns,
-								const arma::Mat<double>&		_W_A, 
-								const arma::Mat<double>&		_W_A_CT,
+								uint								_Ns,
+								const arma::Mat<double>&	_W_A, 
+								const arma::Mat<double>&	_W_A_CT,
 								const arma::uvec&				_state, 
-								bool							_rawRho = false	
+								bool								_rawRho = false	
 		)
 	{
 		if (!_rawRho)
@@ -57,11 +57,11 @@ namespace SingleParticle
 
 	template<>
 	inline arma::Mat<cpx> corrMatrixSingle(	
-								uint							_Ns,
-								const arma::Mat<double>&		_W_A,
-								const arma::Mat<double>&		_W_A_CT,
+								uint								_Ns,
+								const arma::Mat<double>&	_W_A,
+								const arma::Mat<double>&	_W_A_CT,
 								const arma::uvec&				_state, 
-								bool							_rawRho	
+								bool								_rawRho	
 		)
 	{
 		if (!_rawRho)
@@ -76,8 +76,8 @@ namespace SingleParticle
 		}
 		// raw rho matrix (without delta_ij)
 		arma::Mat<cpx> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
-		arma::Mat<double> _left		= _W_A_CT.cols(_state);
-		arma::Mat<double> _right	= _W_A.rows(_state);
+		arma::Mat<double> _left			= _W_A_CT.cols(_state);
+		arma::Mat<double> _right		= _W_A.rows(_state);
 		_J.set_real(2.0 * _left * _right);
 		return _J;
 	};
@@ -85,9 +85,9 @@ namespace SingleParticle
 	template<typename _T1>
 	inline arma::Mat<_T1> corrMatrixSingle(
 								uint							_Ns,
-								const arma::Mat<cpx>&			_W_A, 
-								const arma::Mat<cpx>&			_W_A_CT,
-								const arma::uvec&				_state, 
+								const arma::Mat<cpx>&	_W_A, 
+								const arma::Mat<cpx>&	_W_A_CT,
+								const arma::uvec&			_state, 
 								bool							_rawRho = false	
 		)
 	{

@@ -17,74 +17,76 @@
 #endif
 
 // ######################### NQS ############################
-// save the weights?									 // #
-#define NQS_SAVE_WEIGHTS								 // #
-#ifdef NQS_SAVE_WEIGHTS									 // #
-#	define NQS_SAVE_DIR "WEIGHTS" + kPS					 // #
-#endif													 // #
-														 // #
-// use CPU?												 // #
-#define NQS_USE_CPU										 // #
-//#define NQS_USE_GPU									 // #
-														 // #
-#ifdef NQS_USE_CPU										 // #
-//#	define NQS_USE_OMP									 // #
-#elif defined NSQ_USE_GPU								 // #
-														 // #
-#endif													 // #
-// definitions											 // #
-#define NQS_ANGLES_UPD									 // #
-#define NQS_USESR										 // #
-#define NQS_PINV										 // #
-//#define NQS_RBM_SREG									 // #
-#ifndef RBM_H											 // #
-#	include "../NQS/rbm.h"								 // #
-#endif													 // #
+// save the weights?													// #
+#define NQS_SAVE_WEIGHTS											// #
+#ifdef NQS_SAVE_WEIGHTS												// #
+#	define NQS_SAVE_DIR "WEIGHTS" + kPS							// #
+#endif																	// #
+																			// #
+// use CPU?																// #
+#define NQS_USE_CPU													// #
+//#define NQS_USE_GPU												// #
+																			// #
+#ifdef NQS_USE_CPU													// #
+//#	define NQS_USE_OMP											// #
+#elif defined NSQ_USE_GPU											// #
+// something															// #
+#endif																	// #
+// definitions															// #
+#define NQS_ANGLES_UPD												// #
+#define NQS_USESR														// #
+#ifdef NQS_USESR														// #
+// how to handle the inverse of the matrix					// #
+#	define NQS_PINV 1e-5												// #
+// regularization for the covariance matrix					// #
+#	define NQS_SREG													// #
+#endif																	// #
+#ifndef RBM_H															// #
+#	include "../NQS/rbm.h"											// #
+#endif																	// #
 // ##########################################################
 
 
 // ######################### MODELS #########################
-#ifndef ISING_H											 // #
-#include "../models/ising.h"							 // #
-#endif // !ISING_H										 // #
-// MODELS												 // #
-#ifndef XYZ_H											 // #
-#include "../models/XYZ.h"								 // #
-#endif // !XYZ_H										 // #
+#ifndef ISING_H														// #
+#include "../models/ising.h"										// #
+#endif // !ISING_H													// #
+// MODELS																// #
+#ifndef XYZ_H															// #
+#include "../models/XYZ.h"											// #
+#endif // !XYZ_H														// #
 // ##########################################################
 
 // ######################## MODELS Q ########################
-#ifndef SYK2_M_H										 // #
-#include "../models/quadratic/SYK2.h"					 // #
-#endif // !SYK2											 // #
-#ifndef FF_M_H											 // #
-#include "../models/quadratic/FreeFermions.h"			 // #
-#endif // !SYK2											 // #
-#ifndef AUBRY_ANDRE_M_H									 // #
-#include "../models/quadratic/AubryAndre.h"				 // #
-#endif // !SYK2											 // #
+#ifndef SYK2_M_H														// #
+#include "../models/quadratic/SYK2.h"							// #
+#endif // !SYK2														// #
+#ifndef FF_M_H															// #
+#include "../models/quadratic/FreeFermions.h"				// #
+#endif // !SYK2														// #
+#ifndef AUBRY_ANDRE_M_H												// #
+#include "../models/quadratic/AubryAndre.h"					// #
+#endif // !SYK2														// #
 // ##########################################################
 
 // ###################### LATTICES ##########################
-#ifndef SQUARE_H										 // #
-#include "../../source/src/Lattices/square.h"			 // #
-#endif													 // #
-#ifndef HEXAGONAL_H										 // #
-#include "../../source/src/Lattices/hexagonal.h"		 // #
-#endif													 // #
+#ifndef SQUARE_H														// #
+#include "../../source/src/Lattices/square.h"				// #
+#endif																	// #
+#ifndef HEXAGONAL_H													// #
+#include "../../source/src/Lattices/hexagonal.h"			// #
+#endif																	// #
 // ##########################################################
-
-#define UI_HAAR_DIR std::string("G:\\My Drive\\Python\\Colab\\ProjectsData\\2023_Integrable_XYZ_XXZ\\DATA\\Haar_random\\")
 
 // maximal ed size to compare
 // ###################### LIMITS ############################
 #define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
-constexpr int UI_LIMITS_NQS_ED									= ULLPOW(16);
+constexpr int UI_LIMITS_NQS_ED									= ULLPOW(18);
+constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
-
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
+constexpr u64 UI_LIMITS_MAXPRINT									= ULLPOW(3);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
@@ -297,8 +299,8 @@ protected:
 	std::shared_ptr<QuadraticHamiltonian<cpx>>		qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
-	std::shared_ptr<NQS<cpx, cpx>>					nqsCpx;
-	std::shared_ptr<NQS<double, cpx>>				nqsDouble;
+	std::shared_ptr<NQS<cpx, 2>>				nqsCpx;
+	std::shared_ptr<NQS<double, 2>>				nqsDouble;
 
 	// ##############################
 	void setDefaultMap()					final override {
@@ -306,56 +308,59 @@ protected:
 			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
 			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0),			// mcsteps	
 			UI_OTHER_MAP(b			, this->nqsP.batch_		, FHANDLE_PARAM_HIGHER0),			// batch
-			UI_OTHER_MAP(nb			, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0),			// number of blocks
-			UI_OTHER_MAP(bs			, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0),			// block size
-			UI_OTHER_MAP(nh			, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0),			// hidden params
-			UI_OTHER_MAP(nf			, this->nqsP.nFlips_	, FHANDLE_PARAM_HIGHER0),			// hidden params
+			UI_OTHER_MAP(nb		, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0),			// number of blocks
+			UI_OTHER_MAP(bs		, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0),			// block size
+			UI_OTHER_MAP(nh		, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0),			// hidden params
+			UI_OTHER_MAP(nf		, this->nqsP.nFlips_		, FHANDLE_PARAM_HIGHER0),			// hidden params
 
-			{			"f"			, std::make_tuple(""	, FHANDLE_PARAM_DEFAULT)		},	// file to read from directory
+			// --------------- directory parameters ---------------
+			{			"f"			, std::make_tuple(""		, FHANDLE_PARAM_DEFAULT)},			// file to read from directory
+			
 			// ---------------- lattice parameters ----------------
-			UI_OTHER_MAP(d			, this->latP._dim		, FHANDLE_PARAM_BETWEEN(1., 3.)),
-			UI_OTHER_MAP(bc			, this->latP._bc		, FHANDLE_PARAM_BETWEEN(0., 3.)),
-			UI_OTHER_MAP(l			, this->latP._typ		, FHANDLE_PARAM_BETWEEN(0., 1.)),
-			UI_OTHER_MAP(lx			, this->latP._Lx		, FHANDLE_PARAM_HIGHER0),
-			UI_OTHER_MAP(ly			, this->latP._Ly		, FHANDLE_PARAM_HIGHER0),
-			UI_OTHER_MAP(lz			, this->latP._Lz		, FHANDLE_PARAM_HIGHER0),
-			// ---------------- model parameters ----------------
-			UI_OTHER_MAP(mod		, this->modP._modTyp	, FHANDLE_PARAM_BETWEEN(0., 2.)),
+			UI_OTHER_MAP(d			, this->latP._dim			, FHANDLE_PARAM_BETWEEN(1., 3.)),
+			UI_OTHER_MAP(bc		, this->latP._bc			, FHANDLE_PARAM_BETWEEN(0., 3.)),
+			UI_OTHER_MAP(l			, this->latP._typ			, FHANDLE_PARAM_BETWEEN(0., 1.)),
+			UI_OTHER_MAP(lx		, this->latP._Lx			, FHANDLE_PARAM_HIGHER0),
+			UI_OTHER_MAP(ly		, this->latP._Ly			, FHANDLE_PARAM_HIGHER0),
+			UI_OTHER_MAP(lz		, this->latP._Lz			, FHANDLE_PARAM_HIGHER0),
+			
+			// ----------------- model parameters -----------------			
+			UI_OTHER_MAP(mod		, this->modP._modTyp		, FHANDLE_PARAM_BETWEEN(0., 2.)),
 			// -------- ising
-			UI_PARAM_MAP(J1			, this->modP._J1		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(hx			, this->modP._hx		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(hz			, this->modP._hz		, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(J1		, this->modP._J1			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(hx		, this->modP._hx			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(hz		, this->modP._hz			, FHANDLE_PARAM_DEFAULT),
 			// -------- heisenberg		
 			UI_PARAM_MAP(dlt1		, this->modP._dlt1		, FHANDLE_PARAM_DEFAULT),
 			// -------- xyz
-			UI_PARAM_MAP(J2			, this->modP._J2		, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(J2		, this->modP._J2			, FHANDLE_PARAM_DEFAULT),
 			UI_PARAM_MAP(eta1		, this->modP._eta1		, FHANDLE_PARAM_DEFAULT),
 			UI_PARAM_MAP(eta2		, this->modP._eta2		, FHANDLE_PARAM_DEFAULT),
 			UI_PARAM_MAP(dlt2		, this->modP._dlt2		, FHANDLE_PARAM_DEFAULT),
 			// -------- kitaev --------
-			UI_PARAM_MAP(kx			, 0.0					, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(ky			, 0.0					, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(kz			, 0.0					, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(kx		, 0.0							, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(ky		, 0.0							, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(kz		, 0.0							, FHANDLE_PARAM_DEFAULT),
 			// ----------- model quadratic parameters ------------
 			UI_OTHER_MAP(mod		, this->modP._modTypQ	, FHANDLE_PARAM_BETWEEN(0., 3.)),
 			// -------- aubry-andre
 			UI_PARAM_MAP(Beta		, this->modP._Beta		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(Phi		, this->modP._Phi		, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(Phi		, this->modP._Phi			, FHANDLE_PARAM_DEFAULT),
 
-
-			// ---------------- symmetries ----------------
-			UI_PARAM_MAP(ks			, this->symP._k			, FHANDLE_PARAM_HIGHER0),
-			UI_PARAM_MAP(pxs		, this->symP._px		, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(pys		, this->symP._py		, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(pzs		, this->symP._pz		, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(xs			, this->symP._x			, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(u1s		, this->symP._U1		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(SYM		, this->symP._S			, FHANDLE_PARAM_BETWEEN(0., 1.)),		// even use symmetries?
+			// -------------------- symmetries -------------------
+			UI_PARAM_MAP(ks		, this->symP._k			, FHANDLE_PARAM_HIGHER0),
+			UI_PARAM_MAP(pxs		, this->symP._px			, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(pys		, this->symP._py			, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(pzs		, this->symP._pz			, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(xs		, this->symP._x			, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(u1s		, this->symP._U1			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(SYM		, this->symP._S			, FHANDLE_PARAM_BETWEEN(0., 1.)),	// even use symmetries?
+			
 			// ---------------- other ----------------
-			UI_OTHER_MAP(fun		, -1.					, FHANDLE_PARAM_HIGHERV(-2.0)),			// choice of the function to be calculated
-			UI_OTHER_MAP(th			, 1.0					, FHANDLE_PARAM_HIGHER0),				// number of threads
-			UI_OTHER_MAP(q			, 0.0					, FHANDLE_PARAM_DEFAULT),				// quiet?
-			UI_OTHER_MAP(dir		, "DEFALUT"				, FHANDLE_PARAM_DEFAULT),
+			UI_OTHER_MAP(fun		, -1.							, FHANDLE_PARAM_HIGHERV(-2.0)),		// choice of the function to be calculated
+			UI_OTHER_MAP(th		, 1.0							, FHANDLE_PARAM_HIGHER0),				// number of threads
+			UI_OTHER_MAP(q			, 0.0							, FHANDLE_PARAM_DEFAULT),				// quiet?
+			UI_OTHER_MAP(dir		, "DEFALUT"					, FHANDLE_PARAM_DEFAULT),
 		};
 	};
 
@@ -375,8 +380,8 @@ private:
 
 	// ####################### N Q S #######################
 
-	template<typename _T>
-	void nqsSingle(std::shared_ptr<NQS<_T, cpx>> _NQS);
+	template<typename _T, uint _spinModes>
+	void nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS);
 
 	// ##################### QUADRATIC #####################
 	template<typename _T>
@@ -395,8 +400,8 @@ private:
 	template<typename _T>
 	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H);
 
-	template<typename _T>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS);
+	template<typename _T, uint _spinModes = 2>
+	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, _spinModes>>& _NQS);
 
 public:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% C O N S T R U C T O R S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -554,19 +559,21 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
-* @brief Based on a given type, it creates a NQS
+* @brief Based on a given type, it creates a NQS. Uses the model provided by the user to get the Hamiltonian.
+* @param _H Specific Hamiltonian
+* @param _NQS Neural Network Quantum State frameweork
 */
-template<typename _T>
-inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, cpx>>& _NQS)
+template<typename _T, uint _spinModes>
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, _spinModes>>& _NQS)
 {
 	switch (this->nqsP.type_)
 	{
 	case NQSTYPES::RBM:
-		_NQS = std::make_shared<RBM_S<_T, cpx>>(_H,
-			this->nqsP.nHidden_,
-			this->nqsP.batch_,
-			this->threadNum,
-			this->nqsP.lr_);
+		_NQS = std::make_shared<RBM_S<_T, _spinModes>>(	_H,
+																		this->nqsP.nHidden_,
+																		this->nqsP.batch_,
+																		this->nqsP.lr_,
+																		this->threadNum);
 		break;
 	default:
 		LOGINFO("I don't know any other NQS types :<", LOG_TYPES::INFO, 1);
@@ -1285,47 +1292,52 @@ inline void UI::symmetriesTest()
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 
-template<typename _T>
-inline void UI::nqsSingle(std::shared_ptr<NQS<_T, cpx>> _NQS)
+template<typename _T, uint _spinModes>
+inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 {
+	_timer.reset();
+	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
 	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
-	LOGINFO_CH_LVL(2);
-	std::string dir = this->mainDir;
-	dir += this->latP.lat->get_info() + kPS;
+	// get info
+	std::string nqsInfo		= _NQS->getInfo();
+	std::string modelInfo	= _NQS->getHamiltonianInfo();
+	std::string dir			=	makeDirsC(this->mainDir, this->latP.lat->get_info(), modelInfo, nqsInfo);
 
-	std::string nqsInfo = _NQS->getInfo();
-	std::string modelInfo = _NQS->H_->getInfo();
-	dir += modelInfo + kPS;
-	createDir(dir);
-
-	// calculate ED to compare with Lanczos
-	u64 Nh = _NQS->getHilbertSize();
-	if (Nh <= UI_LIMITS_NQS_ED) {
-		_NQS->H_->hamiltonian();
-		if (UI_LIMITS_NQS_LANCZOS_STATENUM < Nh)
-			_NQS->H_->diagH(false, UI_LIMITS_NQS_LANCZOS_STATENUM, 0, 1000, 0.0, "sa");
+	// calculate ED to compare with Lanczos or Full
+	u64 Nh						= _NQS->getHilbertSize();
+	if (Nh <= UI_LIMITS_NQS_ED)
+	{
+		auto _H = _NQS->getHamiltonian();
+		_H->hamiltonian();
+		if (Nh < UI_LIMITS_NQS_FULLED)
+			_H->diagH(false);
 		else
-			_NQS->H_->diagH(false);
-		LOGINFOG("Found the ED groundstate to be EED_0 = " + STRP(_NQS->H_->getEigVal(0), 7),
-			LOG_TYPES::TRACE, 2);
+		{
+			LOGINFO("LANCZOS NOT YET USED", LOG_TYPES::ERROR, 2);
+			throw std::runtime_error("!TODO");
+			//_NQS->H_->diagH(false, UI_LIMITS_NQS_LANCZOS_STATENUM, 0, 1000, 0.0, "sa");
+		}
+		LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 	}
 
 	// start the simulation
-	arma::Col<cpx> _ENS = _NQS->train(	this->nqsP.nMcSteps_,
-										this->nqsP.nTherm_,
-										this->nqsP.nBlocks_,
-										this->nqsP.blockSize_,
-										this->nqsP.nFlips_);
-	arma::Mat<double> _ENSM(_ENS.size(), 2, arma::fill::zeros);
-	_ENSM.col(0) = arma::real(_ENS);
-	_ENSM.col(1) = arma::imag(_ENS);
+	arma::Col<cpx> _EN		= _NQS->train(	this->nqsP.nMcSteps_,
+														this->nqsP.nTherm_,
+														this->nqsP.nBlocks_,
+														this->nqsP.blockSize_,
+														dir,												
+														this->nqsP.nFlips_,
+														this->quiet,
+														_timer.start(),
+														15);
+	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
+	_ENSM.col(0)	= arma::real(_EN);
+	_ENSM.col(1)	= arma::imag(_EN);
 
-	double ENQS_0 = arma::mean(_ENSM.col(0).tail(10));
+	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(int(this->nqsP.nMcSteps_ / 20)));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
-	_ENSM.save(dir + "en_" + nqsInfo + ".dat", arma::raw_ascii);
-
-
+	_ENSM.save(dir + "history.dat", arma::raw_ascii);
 }
 
 // ##########################################################################################################################################

@@ -58,8 +58,8 @@ class Hamiltonian
 {
 public:
 	// definitions
-	using NQSFun										= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
-	const uint Nhl										= _spinModes;
+	using NQSFun											= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
+	const uint Nhl											= _spinModes;
 
 	// Hilbert space
 	Hilbert::HilbertSpace<_T, _spinModes> hilbertSpace;
@@ -69,12 +69,12 @@ protected:
 	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS TYPES ----------------------------------------------
 	MY_MODELS type_										= MY_MODELS::NONE;
-	uint Ns												= 1;
-	u64 Nh												= 1;
+	uint Ns													= 1;
+	u64 Nh													= 1;
 
 	// ------------------------------------------- CLASS FIELDS ---------------------------------------------
-	double avEn											= 0.0;
-	u64 avEnIdx											= -1;														
+	double avEn												= 0.0;
+	u64 avEnIdx												= -1;														
 	
 	// matrices
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
@@ -107,47 +107,47 @@ public:
 	// ------------------------------------------- PRINTERS ---------------------------------------------------
 	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);
 	static void prettyPrint(	std::ostream& output,	const COL<_T>& state, uint Ns, double _tol = 5e-2);	
-	void print(u64 _id)									const								{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n");					};
-	void print()										const								{ this->H_.print("H=\n");												};
-
+	void print(u64 _id)									const										{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n");								};
+	void print()											const										{ this->H_.print("H=\n");																	};
+																																												
 	// --------------------------------------------- INFO -----------------------------------------------------
 	std::string info(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_")	const;
 	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2)	const = 0;
 
 	// --------------------------------------------- INITS ----------------------------------------------------
-	auto init()											-> void;
+	auto init()												-> void;
 
 	// -------------------------------------------- GETTERS ---------------------------------------------------
 	auto getDegeneracies()								const -> v_2d<u64>;
-	auto getEnAvIdx()									const -> u64						{ return this->avEnIdx;													};								
+	auto getEnAvIdx()										const -> u64								{ return this->avEnIdx;																	};								
 	// hilbert
-	auto getHilbertSize()								const -> u64						{ return this->Nh;														};			
-	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace;											};							
+	auto getHilbertSize()								const -> u64								{ return this->Nh;																		};			
+	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>	{ return this->hilbertSpace;															};							
 	// hamiltonian
-	auto getHamiltonian()								const -> arma::SpMat<_T>			{ return this->H_;														};								
-	auto getHamiltonianSize()							const -> double						{ return this->H_.size() * sizeof(this->H_(0, 0));						};								
-	auto getHamiltonianSizeH()							const -> double						{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
-	auto getSymRot()									const -> arma::SpMat<_T>			{ return this->hilbertSpace.getSymRot();								};
+	auto getHamiltonian()								const -> arma::SpMat<_T>				{ return this->H_;																		};								
+	auto getHamiltonianSize()							const -> double							{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
+	auto getHamiltonianSizeH()							const -> double							{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
+	auto getSymRot()										const -> arma::SpMat<_T>				{ return this->hilbertSpace.getSymRot();											};
 	// eigenvectors
-	auto getEigVec()									const -> arma::Mat<_T>				{ return this->eigVec_;													};							
-	auto getEigVec(u64 idx)								const -> arma::Col<_T>				{ return this->eigVec_.col(idx);										};			
-	auto getEigVec(u64 idx, u64 elem)					const -> _T							{ return this->eigVal_(elem, idx);										};				
+	auto getEigVec()										const -> arma::Mat<_T>					{ return this->eigVec_;																	};							
+	auto getEigVec(u64 idx)								const -> arma::Col<_T>					{ return this->eigVec_.col(idx);														};			
+	auto getEigVec(u64 idx, u64 elem)				const -> _T									{ return this->eigVal_(elem, idx);													};				
 	auto getEigVec(std::string _dir, u64 _mid, 
-		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
+		HAM_SAVE_EXT _typ, bool _app = false)		const -> void;
 	// eigenvalues
-	auto getEigVal()									const -> arma::vec					{ return this->eigVal_;													};						
+	auto getEigVal()										const -> arma::vec						{ return this->eigVal_;																	};						
 	auto getEigVal(std::string _dir,
-		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
-	auto getEigVal(u64 idx)								const -> double						{ return this->eigVal_(idx);											};	
+		HAM_SAVE_EXT _typ, bool _app = false)		const -> void;
+	auto getEigVal(u64 idx)								const -> double							{ return this->eigVal_(idx);															};	
 	auto getInfo(const strVec& skip = {},
-		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info_;													};
+		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string				{ return this->info_;																	};
 	// types
-	auto getType()										const -> std::string				{ return SSTR(getSTR_MY_MODELS(this->type_));							};
-	auto getTypeI()										const -> uint						{ return this->type_;													};
+	auto getType()											const -> std::string						{ return SSTR(getSTR_MY_MODELS(this->type_));									};
+	auto getTypeI()										const -> uint								{ return this->type_;																	};
 	// lattice
-	auto getLat()										const -> std::shared_ptr<Lattice>	{ return this->lat_;													};
-	auto getNs()										const -> uint						{ return this->lat_->get_Ns();											};
-	auto getBC()										const -> BoundaryConditions			{ return this->lat_->get_BC();											};
+	auto getLat()											const -> std::shared_ptr<Lattice>	{ return this->lat_;																		};
+	auto getNs()											const -> uint								{ return this->lat_->get_Ns();														};
+	auto getBC()											const -> BoundaryConditions			{ return this->lat_->get_BC();														};
 	
 	// ------------------------------------------- SETTERS -----------------------------------------------------
 	
@@ -155,27 +155,27 @@ public:
 	virtual void hamiltonian()							= 0;								
 	auto buildHamiltonian()								-> void;
 
-	auto setHElem(u64 k, _T val, u64 newIdx)			-> void;							// sets the Hamiltonian elements in a virtual way
-	auto calcAvEn()										-> void;							// calculate the average energy
-	auto diagH(bool woEigVec = false)					-> void;							// diagonalize the Hamiltonian
-	auto diagHs(bool woEigVec = false)					-> void;							// diagonalize the Hamiltonian sparse
+	auto setHElem(u64 k, _T val, u64 newIdx)		-> void;								// sets the Hamiltonian elements in a virtual way
+	auto calcAvEn()										-> void;								// calculate the average energy
+	auto diagH(bool woEigVec = false)				-> void;								// diagonalize the Hamiltonian
+	auto diagHs(bool woEigVec = false)				-> void;								// diagonalize the Hamiltonian sparse
 	auto diagH(bool woEigVec, 
 				uint k, 
 				uint subdim = 0, 
 				uint maxiter = 1000,
 				double tol = 0, 
-				std::string form = "sm")				-> void;							// diagonalize the Hamiltonian using Lanczos' method
+				std::string form = "sm")				-> void;								// diagonalize the Hamiltonian using Lanczos' method
 
 public:
 	// ------------------------------------------ LOCAL ENERGY -------------------------------------------------
 	virtual void locEnergy(	u64 _elemId, 
-							u64 _elem, 
-							uint _site)					= 0; 
-	virtual cpx locEnergy(u64 _id, uint s, NQSFun f1)	= 0;								// returns the local energy for VQMC purposes
+									u64 _elem, 
+									uint _site)						= 0; 
+	virtual cpx locEnergy(u64 _id, uint s, NQSFun f1)	= 0;							// returns the local energy for VQMC purposes
 	virtual cpx locEnergy(const arma::Col<double>& v, 
-						  uint site,
-						  NQSFun f1,
-						  arma::Col<double>& tmp)		= 0;								// returns the local energy for VQMC purposes
+								 uint site,
+								 NQSFun f1,
+								 arma::Col<double>& tmp)		= 0;							// returns the local energy for VQMC purposes
 	
 	// ----------------------------------------- FOR OTHER TYPES -----------------------------------------------
 	virtual void updateInfo()							= 0;
@@ -183,9 +183,9 @@ public:
 	void generateFullMap()								{ this->hilbertSpace.generateFullMap(); }; // generates the full Hilbert space map
 
 	// --------------------------------------------- CLEAR -----------------------------------------------------
-	void clearEigVec()									{ this->eigVec_.reset();				}; // resets the eigenvectors memory to 0
-	void clearEigVal()									{ this->eigVal_.reset();				}; // resets the energy memory to 0
-	void clearH()										{ this->H_.reset();						}; // resets the hamiltonian memory to 0
+	void clearEigVec()									{ this->eigVec_.reset();					}; // resets the eigenvectors memory to 0
+	void clearEigVal()									{ this->eigVal_.reset();					}; // resets the energy memory to 0
+	void clearH()											{ this->H_.reset();							}; // resets the hamiltonian memory to 0
 
 	// --------------------------------------------- OTHER -----------------------------------------------------
 };
@@ -364,7 +364,7 @@ template <typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
 {
 	if (woEigVec)	Diagonalizer<_T>::diagS(this->eigVal_, this->H_);
-	else			Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_);
+	else				Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_);
 	this->calcAvEn();
 }
 
@@ -387,12 +387,12 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 				LOG_TYPES::INFO, 3);
 		if (form == "sg")
 		{
-			if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), 0.0, opts);
+			if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), 0.0, opts);
 			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), 0.0, opts);
 		}
 		else
 		{
-			if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
+			if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
 			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), form.c_str());
 		}
 	}
@@ -439,7 +439,7 @@ inline void Hamiltonian<_T, _spinModes>::diagHs(bool woEigVec)
 	BEGIN_CATCH_HANDLER
 	{
 		if (woEigVec)			arma::eigs_sym(this->eigVal_, this->H_, this->getHilbertSize());
-		else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
+		else						arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
 	}
 	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
 	this->calcAvEn();

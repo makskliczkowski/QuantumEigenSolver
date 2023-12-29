@@ -99,23 +99,23 @@ namespace Hilbert
 			SymGV _gen											= {},
 			GSymV _glob											= {},
 			uint _Nint											= 1,
-			bool _genereateRepresentativesMap					= false,
-			clk::time_point _t									= NOW,
-			bool _generateMapping								= true)
+			bool _genereateRepresentativesMap			= false,
+			clk::time_point _t								= NOW,
+			bool _generateMapping							= true)
 			: t_(_t), Nint(_Nint), lat(_lat)
 		{
-			this->Ns				=				this->lat->get_Ns();
+			this->Ns					=				this->lat->get_Ns();
 			this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
 
 			// set symmetry elements
-			this->symGroupGlobal_	=				_glob;
+			this->symGroupGlobal_=				_glob;
 			this->normalization_	=				v_1d<_T>();
-			this->symGroup_			=				v_1d<Operators::Operator<_T>>();
+			this->symGroup_		=				v_1d<Operators::Operator<_T>>();
 			this->mapping_			=				v_1d<u64>();
 			this->reprMap_			=				v_1d<std::pair<u64, _T>>();
 
 			if(_generateMapping)
-				this->initMapping(_genereateRepresentativesMap, _t);
+				this->initMapping(_gen, _genereateRepresentativesMap, _t);
 
 			if (this->Nh == this->NhFull)
 				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
@@ -207,45 +207,45 @@ namespace Hilbert
 
 		// ------------------------- INNER GENERATORS -------------------------
 		void generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g);	// generates symmetry groups taking the comutation into account
-		void generateMapping();															// generates mapping from reduced hilbert space to original
-		void generateFullMap();															// generates full map if a global symmetry is present
+		void generateMapping();																// generates mapping from reduced hilbert space to original
+		void generateFullMap();																// generates full map if a global symmetry is present
 
-		std::pair<u64, _T> findRep(u64 baseIdx)			const;							// returns the representative index and symmetry return eigval
-		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;							// returns the representative and symmetry eigval taking the second symmetry sector beta
+		std::pair<u64, _T> findRep(u64 baseIdx)			const;					// returns the representative index and symmetry return eigval
+		std::pair<u64, _T> findRep(u64 baseIdx, _T nB)	const;					// returns the representative and symmetry eigval taking the second symmetry sector beta
 
 		// ------------------------ FULL HILBERT SPACE ------------------------
 
 		arma::Col<_T> castToFull(const arma::Col<_T>& _s);
 
 		// ----------------------------- GETTERS ------------------------------
-		BoundaryConditions getBC()						const					{ return this->lat->get_BC();												};
-		std::shared_ptr<Lattice> getLattice()			const					{ return this->lat;															};
-		auto getLatticeSize()							const -> uint			{ return this->Ns;															};
-		auto getLocalHilbertSize()						const -> uint			{ return this->Nhl;															};
-		auto getFullHilbertSize()						const -> u64			{ return this->NhFull;														};
-		auto getHilbertSize()							const -> u64			{ return this->Nh;															};
-		auto getNum()									const -> uint			{ return this->Nint;														};
-		auto getNorm()									const -> v_1d<_T>		{ return this->normalization_;												};
-		auto getNorm(u64 k)								const -> _T				{ return this->normalization_.size() != 0 ? this->normalization_[k] : 1.0;	};
-		auto getMapping()								const -> v_1d<u64>		{ return this->mapping_;													};
-		auto getMapping(u64 k)							const -> u64			{ return this->mapping_.empty() ? k : this->mapping_[k];					};
-		auto getRepr()									const -> RPairV			{ return this->reprMap_;													};
-		auto getRepr(u64 k)								const -> RPair			{ if(!this->reprMap_.empty()) return this->reprMap_[k];						};
-		auto getSymGroup()								const -> SymOpV			{ return this->symGroup_;													};
-		auto getSymGroupGlob()							const -> GSymV			{ return this->symGroupGlobal_;												};
+		BoundaryConditions getBC()								const						{ return this->lat->get_BC();																};
+		std::shared_ptr<Lattice> getLattice()				const						{ return this->lat;																			};
+		auto getLatticeSize()									const -> uint			{ return this->Ns;																			};
+		auto getLocalHilbertSize()								const -> uint			{ return this->Nhl;																			};
+		auto getFullHilbertSize()								const -> u64			{ return this->NhFull;																		};
+		auto getHilbertSize()									const -> u64			{ return this->Nh;																			};
+		auto getNum()												const -> uint			{ return this->Nint;																			};
+		auto getNorm()												const -> v_1d<_T>		{ return this->normalization_;															};
+		auto getNorm(u64 k)										const -> _T				{ return this->normalization_.size() != 0 ? this->normalization_[k] : 1.0;	};
+		auto getMapping()											const -> v_1d<u64>	{ return this->mapping_;																	};
+		auto getMapping(u64 k)									const -> u64			{ return this->mapping_.empty() ? k : this->mapping_[k];							};
+		auto getRepr()												const -> RPairV		{ return this->reprMap_;																	};
+		auto getRepr(u64 k)										const -> RPair			{ if(!this->reprMap_.empty()) return this->reprMap_[k];							};
+		auto getSymGroup()										const -> SymOpV		{ return this->symGroup_;																	};
+		auto getSymGroupGlob()									const -> GSymV			{ return this->symGroupGlobal_;															};
 
-		v_1d<u64>		getFullMap()					const;					// returns the full map (taking global symmetries into account)
-		arma::SpMat<_T> getSymRot()						const;					// returns the symmetry rotation matrix
+		v_1d<u64> getFullMap()									const;					// returns the full map (taking global symmetries into account)
+		arma::SpMat<_T> getSymRot()							const;					// returns the symmetry rotation matrix
 		arma::SpMat<_T> getSymRot(const v_1d<u64>& fMap)const;					// returns the symmetry rotation matrix
-		_T				getSymNorm(u64 baseIdx)			const;					// returns the symmetry normalization (how many states map into that one)
-		std::string		getSymInfo()					const;
+		_T	getSymNorm(u64 baseIdx)								const;					// returns the symmetry normalization (how many states map into that one)
+		std::string	getSymInfo()								const;
 
 		// ----------------------------- CHECKERS -----------------------------
-		bool			checkSym()						const					{ return !(this->Nh == this->NhFull);										};
-		bool			checkLSym()						const					{ return this->symGroup_.size() != 0;										};
-		bool			checkGSym()						const					{ return this->symGroupGlobal_.size() != 0;									};
-		bool			checkU1()						const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
-		int				checkU1Val()					const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
+		bool checkSym()											const						{ return !(this->Nh == this->NhFull);													};
+		bool checkLSym()											const						{ return this->symGroup_.size() != 0;													};
+		bool checkGSym()											const						{ return this->symGroupGlobal_.size() != 0;											};
+		bool checkU1()												const						{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
+		int  checkU1Val()											const						{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
 
 	// ##########################################################################################################################################

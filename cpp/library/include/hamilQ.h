@@ -15,42 +15,42 @@
 #define HAMIL_QUADRATIC_H
 
 // ########################### EXISTING MODELS #############################
-enum class MY_MODELS_Q													// #
-{																		// #
-	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE			// #
-};																		// #
-BEGIN_ENUMC(MY_MODELS_Q)												// #
-{																		// #
-		DECL_ENUM_ELEMENT(FREE_FERMIONS_M),								// #
-		DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),								// #
-		DECL_ENUM_ELEMENT(SYK2_M),										// #
-		DECL_ENUM_ELEMENT(ANDERSON_M),									// #
-		DECL_ENUM_ELEMENT(NONE)											// #
-}																		// #
-END_ENUMC(MY_MODELS_Q)													// #	
+enum class MY_MODELS_Q																	// #
+{																								// #
+	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE					// #
+};																								// #
+BEGIN_ENUMC(MY_MODELS_Q)																// #
+{																								// #
+		DECL_ENUM_ELEMENT(FREE_FERMIONS_M),											// #
+		DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),											// #
+		DECL_ENUM_ELEMENT(SYK2_M),														// #
+		DECL_ENUM_ELEMENT(ANDERSON_M),												// #
+		DECL_ENUM_ELEMENT(NONE)															// #
+}																								// #
+END_ENUMC(MY_MODELS_Q)																	// #	
 ////////////////////////////////////////////////////////////////////////////
-template <>																// #
-inline std::string str_p(const MY_MODELS_Q v, 							// #
-	const int n, 														// #
-	bool scientific)													// #
-{																		// #
-	return str_p(static_cast<std::underlying_type_t<MY_MODELS_Q>>(v),	// # 
-		n, scientific);													// #
-}																		// #
+template <>																					// #
+inline std::string str_p(const MY_MODELS_Q v, 									// #
+	const int n, 																			// #
+	bool scientific)																		// #
+{																								// #
+	return str_p(static_cast<std::underlying_type_t<MY_MODELS_Q>>(v),		// # 
+		n, scientific);																	// #
+}																								// #
 ////////////////////////////////////////////////////////////////////////////
-inline bool isQuadraticRandom(uint _type)								// #
-{																		// #
-	return	_type == (uint)MY_MODELS_Q::ANDERSON_M ||					// #
-		_type == (uint)MY_MODELS_Q::SYK2_M;								// #
-}																		// #
-inline std::string filenameQuadraticRandom(std::string _f,				// #
-	uint _type,															// #
-	randomGen& ran)														// #
-{																		// #
-	if (isQuadraticRandom(_type))										// #
-		return _f + "_R=" + STR(ran.randomInt(0, 1000));				// #
-	return _f;															// #
-}																		// #
+inline bool isQuadraticRandom(uint _type)											// #
+{																								// #
+	return	_type == (uint)MY_MODELS_Q::ANDERSON_M ||							// #
+		_type == (uint)MY_MODELS_Q::SYK2_M;											// #
+}																								// #
+inline std::string filenameQuadraticRandom(std::string _f,					// #
+	uint _type,																				// #
+	randomGen& ran)																		// #
+{																								// #
+	if (isQuadraticRandom(_type))														// #
+		return _f + "_R=" + STR(ran.randomInt(0, 1000));						// #
+	return _f;																				// #
+}																								// #
 // #########################################################################
 
 /*
