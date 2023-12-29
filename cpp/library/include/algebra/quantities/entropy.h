@@ -193,7 +193,7 @@ namespace SingleParticle
 
 				v_1d<uint> qs;
 				// add position orbitals that are occupied
-				x.iterate_bits_on([&](uint _pos) { qs.push_back(_pos); });
+				x.iterate_bits_on([&](uint _pos) { qs.push_back(_Ns - _pos - 1); });
 
 				// go through occupied orbitals
 				std::tuple<uint, uint> qs_nor = {qs[0], qs[1]};
@@ -208,8 +208,8 @@ namespace SingleParticle
 					if (!(_n[q2] || _m[q2]))
 						continue;
 
-					auto COEFF	=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
-					auto Mult	=	(_W_A_CT.col(q1) * _W_A.row(q2));
+					auto COEFF			=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
+					arma::Mat<_T1> Mult	=	(_W_A_CT.col(q1) * _W_A.row(q2));
 					J			+=	COEFF * Mult;
 				}
 			}
@@ -420,18 +420,19 @@ namespace Entropy
 			namespace SingleParticle
 			{
 				template<typename _T>
-				inline double vonNeuman(const arma::Mat<_T> _J)
+				inline double vonNeuman(const arma::Mat<_T>& _J)
 				{
-					//auto Ns			=		_J.n_rows;
-					arma::Mat<_T> eigS;
-					arma::Col<double> eigV;
+					// auto Ns			=		_J.n_rows;
+					// arma::Mat<_T> eigS;
+					arma::Col<_T> eigV;
 					// diagonalize
-					arma::eig_sym(eigV, eigS, _J);
+					arma::eig_gen(eigV, _J);
 					auto S = 0.0;
 					for (auto& eV : eigV)
 					{
-						S += (eV > -1.0) ? ((1.0 + eV) * std::log((1.0 + eV) / 2.0)) : 0.0;
-						S += (eV < 1.0)  ? ((1.0 - eV) * std::log((1.0 - eV) / 2.0)) : 0.0;
+						auto eVin = std::real(eV);
+						S += (eVin > -1.0) ? ((1.0 + eVin) * std::log((1.0 + eVin) / 2.0)) : 0.0;
+						S += (eVin < 1.0)  ? ((1.0 - eVin) * std::log((1.0 - eVin) / 2.0)) : 0.0;
 					}
 					return -0.5 * algebra::real(S);
 				}

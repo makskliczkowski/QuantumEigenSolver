@@ -218,7 +218,7 @@ namespace UI_PARAMS {
 		* @brief Checks if the symmetries make the Hamiltonian complex
 		* @param Ns lattice size
 		*/
-		bool checkComplex(int Ns) {
+		bool checkComplex(int Ns) const {
 			if (this->k_ == 0 || (this->k_ == Ns / 2 && Ns % 2 == 0) || this->py_ != -INT_MAX)
 				return false;
 			return true;
@@ -1339,14 +1339,16 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
 	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
 	_timer.reset();
-	// create the directories
-	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info());
-
+	uint Ns					= _H->getNs();
+	// --- create the directories ---
+	bool useZero			= (this->modP.modTyp_ == 0) && (Ns % 8 == 0);
+	std::string str0		= "QuadraticToManyBody";
+	if (useZero) str0 += "Zero";
+	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), str0);
 	// use those files
 	std::string modelInfo	= _H->getInfo();
 
 	// set the parameters
-	uint Ns					= _H->getNs();
 	uint Nh					= _H->getHilbertSize();
 	// how many states to take for calculating the entropies
 	u64 stateNum			= this->nqsP.nMcSteps_;
@@ -1357,7 +1359,8 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	auto _type				= _H->getTypeI();
 
 	// save energies txt check
-	std::string filename	= filenameQuadraticRandom(dir + modelInfo + "_Gamma=" + STR(stateNum), _type, _H->ran_);
+	std::string filename = filenameQuadraticRandom(dir + modelInfo + VEQV(_R, realizations) + VEQV(_C, combinations) +
+												   VEQV(_Gamma, stateNum), _type, _H->ran_);
 	IF_EXCEPTION(combinations < stateNum, "Bad number of combinations. Must be bigger than the number of states");
 
 	// check the model (if necessery to build hamilonian, do it)
@@ -1381,10 +1384,8 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// iterate through bond cut
-	v_1d<uint> _bonds = { uint(Ns / 4), uint(Ns / 2) };
-	arma::mat ENTROPIES(_bonds.size(), realizations, arma::fill::zeros);
-
-	auto beforeEntro = clk::now();
+	v_1d<uint> _bonds = { uint(Ns / 2) };
+	arma::vec ENTROPIES(realizations, arma::fill::zeros);
 
 	v_1d<double> energies;
 	v_1d<arma::uvec> orbs;
@@ -1393,7 +1394,6 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
 	else
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
-	LOGINFO("Combinations time: " + STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 
 	// make matrices cut to a specific number of bonds
 	v_1d<arma::Mat<_T>> Ws;
@@ -1430,37 +1430,17 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 			auto J = SingleParticle::corrMatrix<_T>(Ns, Ws[_bondI], WsC[_bondI], orbitals, coeff, _H->ran_);
 			auto E = Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
 			// save the entropy
-			ENTROPIES(_bondI, idx) = E;
+			ENTROPIES(idx) = E;
 			_bondI++;
 		}
 		// update progress
 		PROGRESS_UPD(idx, pbar, "PROGRESS");
 	}
 	// save entropies file
-	ENTROPIES.save(arma::hdf5_name(filename + ".h5", "entropy"));
-
-	// save means
-	try {
-		arma::Col<double> means(2, arma::fill::zeros);
-		std::ofstream ofs(dir + modelInfo + "_meanE.dat", std::ios_base::app);
-		for (int i = 0; i < _bonds.size(); i++)
-		{
-			auto meanE = arma::mean(ENTROPIES.row(i));
-			LOGINFO("Bond: " + STR(_bonds[i]) + "->Entropy: " + STRP(meanE, 12), LOG_TYPES::TRACE, 3);
-			LOGINFO(STRP(meanE / (_bonds[i] * std::log(2.0)), 12), LOG_TYPES::TRACE, 4);
-			ofs << stateNum << "," << meanE / (_bonds[i] * std::log(2.0)) << ",";
-		}
-		ofs << EL;
-		ofs.close();
-	}
-	catch (std::exception& e)
-	{
-		LOGINFO("Couldn't save the averages... No worries...", LOG_TYPES::WARNING, 1);
-	}
+	ENTROPIES.save(arma::hdf5_name(filename + "_SP.h5", "entropy"));
 
 	// save entropies
 	LOGINFO("Finished entropies! " + VEQ(stateNum) + ", " + VEQ(realizations), LOG_TYPES::TRACE, 2);
-	LOGINFO(STR(t_ms(beforeEntro)) + " ms", LOG_TYPES::TIME, 2);
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1493,8 +1473,8 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	auto _type				= _H->getTypeI();
 
 	// --- save energies txt check ---
-	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV("_R", realizations) + VEQV("_C", combinations) +
-							  VEQV("_Gamma", stateNum), _type, _H->ran_);
+	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV(_R, realizations) + VEQV(_C, combinations) +
+							  VEQV(_Gamma, stateNum), _type, _H->ran_);
 
 	IF_EXCEPTION(combinations < stateNum, "Bad number of combinations. Must be bigger than the number of states");
 
@@ -1537,7 +1517,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
 	// make matrices cut to a specific number of bonds
-	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);;
+	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);
 	// conjugate transpose it - to be used later
 	arma::Mat<_T> WsC		= Ws.t();
 
@@ -1549,7 +1529,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 
 	// calculate!
 	pBar pbar(5, realizations, _timer.point(0));
-//#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < realizations; idx++)
 	{
 		// create vector of orbitals (combine two many-body states from our total number of combinations)
@@ -1564,15 +1544,13 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 		// -------------------------------- CORRELATION --------------------------------
 
 		// iterate through the state
-		auto J				= SingleParticle::corrMatrix<_T>(Ns, Ws, WsC, orbitals, coeff, _H->ran_);
-		ENTROPIES_SP(idx)	= Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman(J);
+		arma::Mat<cpx> J	= SingleParticle::corrMatrix<cpx>(Ns, Ws, WsC, orbitals, coeff, _H->ran_);
+		ENTROPIES_SP(idx)	= Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman<cpx>(J);
 
 		// --------------------------------- MANY BODY ---------------------------------
 		arma::Col<_T> _state(_hilbert.getHilbertSize(), arma::fill::zeros);
 		for (int i = 0; i < orbitals.size(); ++i)
 			_state			+= coeff(i) * _H->getManyBodyState(VEC::colToVec(orbitals[i]), _hilbert);
-
-		_state				= _state / std::sqrt(arma::cdot(_state, _state));
 		ENTROPIES_MB(idx)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _bonds, _hilbert);
 
 		// update progress
