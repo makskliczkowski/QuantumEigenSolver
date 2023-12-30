@@ -45,12 +45,14 @@ void UI::parseModel(int argc, cmdArg& argv)
 	{
 		SETOPTIONV(nqsP,	nMcSteps,	"m"	);
 		SETOPTIONV(nqsP,	batch,		"b"	);
-		SETOPTIONV(nqsP,	nBlocks,	"nb");
-		SETOPTIONV(nqsP,	blockSize,	"bs");
-		SETOPTIONV(nqsP,	nHidden,	"nh");
-		SETOPTIONV(nqsP,	nFlips,		"nf");
-		SETOPTION(nqsP,		lr				);
-		this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
+		SETOPTIONV(nqsP,	nBlocks,		"nb"	);
+		SETOPTIONV(nqsP,	blockSize,	"bs"	);
+		SETOPTIONV(nqsP,	nHidden,		"nh"	);
+		SETOPTIONV(nqsP,	nFlips,		"nf"	);
+		SETOPTIONV(nqsP,	nTherm,		"nt"	);
+		SETOPTION(nqsP,	lr						);
+		SETOPTIONV(nqsP,	loadNQS,		"lNQS");
+		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
 	// ----------------- LATTICE -----------------
 	{

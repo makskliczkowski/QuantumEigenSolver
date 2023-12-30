@@ -39,7 +39,7 @@
 // how to handle the inverse of the matrix					// #
 #	define NQS_PINV 1e-5												// #
 // regularization for the covariance matrix					// #
-#	define NQS_SREG													// #
+//#	define NQS_SREG													// #
 #endif																	// #
 #ifndef RBM_H															// #
 #	include "../NQS/rbm.h"											// #
@@ -229,8 +229,8 @@ namespace UI_PARAMS {
 
 	// !TODO 
 	// Neural network quantum states params
-	struct NqsP {
-		//unique_ptr<rbmState<_type, _hamtype>> phi;
+	struct NqsP 
+	{
 		v_1d<u64> layersDim;
 		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM);
 		UI_PARAM_CREATE_DEFAULT(nHidden, uint, 1);
@@ -243,8 +243,12 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(nMcSteps, uint, 1000);
 		UI_PARAM_CREATE_DEFAULT(batch, u64, 1024);
 		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
+		// weight load directory
+		inline static const std::string _loadNQS	= ""; 
+		std::string loadNQS_								= "";
 
-		void setDefault() {
+		void setDefault() 
+		{
 			UI_PARAM_SET_DEFAULT(nHidden);
 			UI_PARAM_SET_DEFAULT(nVisible);
 			UI_PARAM_SET_DEFAULT(nLayers);
@@ -255,6 +259,7 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT(nMcSteps);
 			UI_PARAM_SET_DEFAULT(batch);
 			UI_PARAM_SET_DEFAULT(lr);
+			UI_PARAM_SET_DEFAULT(loadNQS);
 		}
 	};
 };
@@ -288,22 +293,23 @@ protected:
 	bool isComplex_ = false;
 	bool useComplex_ = false;
 
-	// ^^^^^^^^^ FOR DOUBLE ^^^^^^^^^
-	Hilbert::HilbertSpace<double>					hilDouble;
-	std::shared_ptr<Hamiltonian<double>>			hamDouble;
+	// ^^^^^^^^^ FOR DOUBLE ^^^^^^^^^					
+	Hilbert::HilbertSpace<double>							hilDouble;
+	std::shared_ptr<Hamiltonian<double>>				hamDouble;
 	std::shared_ptr<QuadraticHamiltonian<double>>	qhamDouble;
 
 	// ^^^^^^^^ FOR COMPLEX ^^^^^^^^^
-	Hilbert::HilbertSpace<cpx>						hilComplex;
-	std::shared_ptr<Hamiltonian<cpx>>				hamComplex;
+	Hilbert::HilbertSpace<cpx>								hilComplex;
+	std::shared_ptr<Hamiltonian<cpx>>					hamComplex;
 	std::shared_ptr<QuadraticHamiltonian<cpx>>		qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
-	std::shared_ptr<NQS<cpx, 2>>				nqsCpx;
-	std::shared_ptr<NQS<double, 2>>				nqsDouble;
+	std::shared_ptr<NQS<cpx, 2>>							nqsCpx;
+	std::shared_ptr<NQS<double, 2>>						nqsDouble;
 
 	// ##############################
-	void setDefaultMap()					final override {
+	void setDefaultMap()					final override 
+	{
 		this->defaultParams = {
 			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
 			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0),			// mcsteps	
@@ -312,6 +318,7 @@ protected:
 			UI_OTHER_MAP(bs		, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0),			// block size
 			UI_OTHER_MAP(nh		, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0),			// hidden params
 			UI_OTHER_MAP(nf		, this->nqsP.nFlips_		, FHANDLE_PARAM_HIGHER0),			// hidden params
+			UI_OTHER_MAP(dirNQS	, this->nqsP.loadNQS_	, FHANDLE_PARAM_DEFAULT),			// directory to load the weights from
 
 			// --------------- directory parameters ---------------
 			{			"f"			, std::make_tuple(""		, FHANDLE_PARAM_DEFAULT)},			// file to read from directory
@@ -390,7 +397,7 @@ private:
 	template<typename _T>
 	void quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
 
-	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineModels(bool _createLat = true);
 	bool defineModelsQ(bool _createLat = true);
 
@@ -1320,6 +1327,8 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		}
 		LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 	}
+	if (!this->nqsP.loadNQS_.empty())
+		_NQS->setWeights(this->nqsP.loadNQS_, "weights.h5");
 
 	// start the simulation
 	arma::Col<cpx> _EN		= _NQS->train(	this->nqsP.nMcSteps_,

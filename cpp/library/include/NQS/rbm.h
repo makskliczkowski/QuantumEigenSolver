@@ -58,7 +58,10 @@ protected:
 	auto pRatio(std::initializer_list<int> fP,
 		std::initializer_list<double> fV)	-> _T				override final;
 	// ------------------------ W E I G H T S ------------------------
+public:
 	bool setWeights(std::string _path, std::string _file)	override final;
+	bool saveWeights(std::string _path, std::string _file)override final;
+protected:
 	void updateWeights()												override final;
 	// set the angles for the RBM to be updated
 	void setTheta()													{ this->setTheta(this->curVec_); };
@@ -379,7 +382,8 @@ inline bool RBM_S<_Ht, _spinModes, _T, _stateType>::setWeights(std::string _path
 	BEGIN_CATCH_HANDLER
 	{
 		// set the forces vector for the weights
-		NQS<_Ht, _spinModes, _T, _stateType>::setWeights(_path, _file);
+		if(!NQS<_Ht, _spinModes, _T, _stateType>::setWeights(_path, _file))
+			return false;
 		this->bV_	= this->F_.subvec(0, this->nVis_ - 1);
 		this->bH_	= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
 		this->W_		= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->fullSize_ - 1), this->W_.n_rows, this->W_.n_cols);
@@ -388,7 +392,30 @@ inline bool RBM_S<_Ht, _spinModes, _T, _stateType>::setWeights(std::string _path
 	return true;
 }
 
-// ##############################################################################################################################################
+/*
+* @brief After reading the weights from the path specified by the user, it sets the inner vectors from them.
+* @param _path folder for the weights to be saved onto
+* @param _file name of the file to save the weights onto
+* @returns whether the load has been successful
+*/
+template<typename _Ht, uint _spinModes, typename _T, class _stateType>
+inline bool RBM_S<_Ht, _spinModes, _T, _stateType>::saveWeights(std::string _path, std::string _file)
+{
+	BEGIN_CATCH_HANDLER
+	{
+		this->F_.subvec(0, this->nVis_ - 1) = this->bV_;
+		this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1) = this->bH_;
+		this->F_.subvec(this->nVis_ + this->nHid_, this->fullSize_ - 1) = this->W_.as_col();
+		
+		// set the forces vector for the weights
+		if(!NQS<_Ht, _spinModes, _T, _stateType>::saveWeights(_path, _file))
+			return false;
+	}
+	END_CATCH_HANDLER("Couldn't save the weights for the RBM NQS...", return false);
+	return true;
+}
+
+// ##########################################################################################################################################
 
 /*
 * @brief Updates the weights in the system according to a given gradient

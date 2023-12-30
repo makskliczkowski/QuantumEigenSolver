@@ -33,8 +33,15 @@ BEGIN_ENUM(NQSTYPES)				// #
 }										// #
 END_ENUM(NQSTYPES)				// #
 // ###############################
+#ifdef _DEBUG
+#undef _DEBUG
+#endif
+
+static volatile bool _cond = true;
 
 #include <thread>
+#include <future>
+#include <functional>
 
 // ##########################################################################################################################################
 // ##########################################################################################################################################
@@ -182,9 +189,12 @@ protected:
 	virtual void update(const NQSS& v, uint nFlips = 1)				{};
 #endif
 	virtual void updateWeights()							=					0;
+public:
 	virtual bool saveWeights(std::string _path, std::string _file);
 	virtual bool setWeights(std::string _path, std::string _file);
 
+	/* ------------------------------------------------------------ */
+ protected:
 	// --------------------- T R A I N   E T C -----------------------
 	virtual void grad(const NQSS& _v, uint _plc)		=					0;
 	virtual void gradFinal(const NQSB& _energies);
@@ -206,6 +216,7 @@ protected:
 						std::initializer_list<double> fV)	-> _T			{ return this->pRatio(fP, fV); };
 	_T locEnKernel();
 #ifndef NQS_USE_OMP
+protected:
 	virtual void locEnKernel(uint _start, uint _end, uint _threadNum);
 #endif
 
@@ -263,7 +274,7 @@ public:
 											uint nThrm, 
 											uint nBlck, 
 											uint bSize, 
-											uint nFlip = 1)	{};
+											uint nFlip = 1)	{ return arma::Col<_T>(1, arma::fill::zeros); };
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)			const ->_T =			0;
@@ -292,8 +303,10 @@ public:
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline bool NQS<_Ht, _spinModes, _T, _stateType>::saveWeights(std::string _path, std::string _file)
 {
-	LOGINFO(LOG_TYPES::INFO, "Saving the checkpoint configuration to", 2);
+	LOGINFO(LOG_TYPES::INFO, "Saving the checkpoint configuration.", 2);
+#ifdef _DEBUG
 	LOGINFO(LOG_TYPES::INFO, _path + _file, 3);
+#endif
 	createDir(_path);
 	bool _isSaved	= false;
 #ifdef HAS_CXX20
@@ -334,8 +347,11 @@ inline bool NQS<_Ht, _spinModes, _T, _stateType>::saveWeights(std::string _path,
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline bool NQS<_Ht, _spinModes, _T, _stateType>::setWeights(std::string _path, std::string _file)
 {
-	LOGINFO(LOG_TYPES::INFO, "Loading the checkpoint weights from", 2);
+	LOGINFO(LOG_TYPES::INFO, "Loading the checkpoint weights:", 2);
+#ifdef _DEBUG
 	LOGINFO(LOG_TYPES::INFO, _path + _file, 3);
+#endif
+
 #ifdef HAS_CXX20
 	if (_file.ends_with(".h5"))
 #else
@@ -430,7 +446,13 @@ inline NQS<_Ht, _spinModes, _T, _stateType>::~NQS()
 #if not defined NQS_USE_OMP && not defined _DEBUG
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		flagThreadKill_[_thread] = 1;
+		std::unique_lock<std::mutex> lock(mutex);
+		flagThreadKill_[_thread]	= 1;
+		flagThreadRun_[_thread]		= 1;	
+		cv.notify_all();
+	}
+	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+	{
 		threads_[_thread].join();
 	}
 #endif
@@ -470,22 +492,22 @@ inline NQS<_Ht, _spinModes, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 #	else
 		this->threads_.reserve(this->threadNum_);
 		this->flagThreadKill_	=			v_1d<bool>(this->threadNum_, false);
-		this->flagThreadRun_	=			v_1d<bool>(this->threadNum_, false);
+		this->flagThreadRun_		=			v_1d<bool>(this->threadNum_, false);
+		this->kernelValues_		=			v_1d<_T>(this->threadNum_, 0.0);
 		
 		// calculate how many sites goes to one thread
-		uint _siteStep			=			std::ceil(this->Ns / 1.0 / this->threadNum_);
+		uint _siteStep				=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
 
 		// start the threads that calculate the energy with the local energy kernel function
 		// this function waits for the specific energy calculation to be ready on each thread
 		// this is handled through "flagThreadRun_" member
-		for (auto i = 0; i < this->threadNum_; i++)
+		for (uint i = 0; i < this->threadNum_; i++)
 		{
-			this->threads_.emplace_back(std::thread(&NQS<_Ht, _spinModes, 
-													_discreteValue, _T, _stateType>::locEnKernel, 
-													this, 
-													i * _siteStep,
-													std::min((i+1) * _siteStep, this->nSites_),
-													i));
+			std::function<void()> lambda = [this, i, _siteStep]() 
+				{ 
+					this->locEnKernel(i * _siteStep, std::min((i + 1) * _siteStep, this->nSites_), i); 
+				};
+			this->threads_.emplace_back(std::thread(lambda));
 		}
 #	endif
 #endif
@@ -576,7 +598,7 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::blockSample(uint _bSize, u64 _
 // ########################################################## L O C   E N E R G Y ###########################################################
 // ##########################################################################################################################################
 // ##########################################################################################################################################
-
+#pragma optimize("", off)
 /*
 * @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP is used
 * when the omp pragma NQS_USE_OMP is set or multithreading is not used, otherwise threadpool is used
@@ -609,18 +631,30 @@ inline _T NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel()
 	// run all threads
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
+		std::unique_lock<std::mutex> lock(mutex);
 		this->flagThreadRun_[_thread] = true;
-		cv.notify_one();
+		cv.notify_all();
 	}
 	// wait for all threads
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		while (this->flagThreadRun_[_thread]);
+		while (true)
+		{
+			_cond = this->flagThreadRun_[_thread];
+			if (!_cond)
+				break;
+			//std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			//LOGINFO("Still waiting for " + VEQ(_thread), LOG_TYPES::TRACE, 3);
+		}
+			//LOGINFO("Finished: " + VEQ(_thread), LOG_TYPES::TRACE, 2);
+
 		energy += kernelValues_[_thread];
 	}
+	//LOGINFO("Finished: " + VEQ(energy), LOG_TYPES::TRACE, 2);
 	return energy;
 #endif
 }
+#pragma optimize("", on)
 
 #ifndef NQS_USE_OMP
 /*
@@ -640,9 +674,12 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel(uint _start, uint 
 			// aquire mutex lock as required by condition variable
 			std::unique_lock<std::mutex> lock(mutex);									
 			// thread will suspend here and release the lock if the expression does not return true
-			cv.wait(lock, [this, _threadNum] {return flagThreadRun_[_threadNum]; });	
+			cv.wait(lock, [this, _threadNum] { return flagThreadRun_[_threadNum]; });	
+			lock.unlock();
 		}
-		
+		if (flagThreadKill_[_threadNum])
+			break;
+
 		this->kernelValues_[_threadNum] = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
@@ -653,7 +690,9 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel(uint _start, uint 
 																	 std::placeholders::_1,
 																	 std::placeholders::_2));
 		}
+		// lock again
 		flagThreadRun_[_threadNum] = false;
+		cv.notify_one();
 	}
 }
 #endif
@@ -793,45 +832,38 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::covMatrixReg()
 */
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
-																											uint nThrm,
-																											uint nBlck,
-																											uint bSize,
-																											std::string dir,
-																											uint nFlip,
-																											bool quiet,
-																											clk::time_point _t,
-																											uint progPrc)
+																					  uint nThrm,
+																					  uint nBlck,
+																					  uint bSize,
+																					  std::string dir,
+																					  uint nFlip,
+																					  bool quiet,
+																					  clk::time_point _t,
+																					  uint progPrc)
 {
 	std::string outstr	= "";
 	// set the info about training
-	strSeparatedP(outstr, '\n\t', 2,
-								VEQV("Monte Carlo Steps", mcSteps),
-								VEQV("Thermalization Steps", nThrm),
-								VEQV("Block Number", nBlck),
-								VEQV("Size of the single block", bSize),
-								VEQV("Number of flips taken at each step", nFlip));
+	strSeparatedP(outstr, '\t', 2,
+								VEQV(Monte Carlo Steps, mcSteps),
+								VEQV(Thermalization Steps, nThrm),
+								VEQV(Block Number, nBlck),
+								VEQV(Size of the single block, bSize),
+								VEQV(Number of flips taken at each step, nFlip));
 	LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
 
 	// make the pbar!
 	this->pBar_			= pBar(progPrc, mcSteps);
 
-	// check if the number of thermal samples is not bigger than the MC steps
-	const int _stps	= nBlck - nThrm;
-	if (_stps < 0)
-	{
-		LOGINFOG("Number of steps is too small - thermalisaton too high!", LOG_TYPES::ERROR, 0);
-		throw std::runtime_error("Number of steps is too small - thermalisaton too high!");
-	};
 	// set the derivatives matrix
 #ifdef NQS_SREG
 	this->covMatrixRegCurrent = this->covMatrixRegStart;
 #endif
-	this->derivatives_.resize(_stps, this->fullSize_);
+	this->derivatives_.resize(nBlck, this->fullSize_);
 
 	// save all average weights for covariance matrix
 	arma::Col<_T> meanEn(mcSteps, arma::fill::zeros);
 	// history of energies
-	arma::Col<_T> En(_stps, arma::fill::zeros);
+	arma::Col<_T> En(nBlck, arma::fill::zeros);
 	// set the random state at the begining
 	this->setRandomState();
 	this->nFlip_		= nFlip;
@@ -839,13 +871,13 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 	this->flipVals_.resize(nFlip_);
 
 	// go through the Monte Carlo steps
-	for (uint i = 0; i < mcSteps; ++i)
+	for (uint i = 1; i <= mcSteps; ++i)
 	{
 		// thermalize!
 		this->blockSample(nThrm, this->curState_, true);
 
 		// iterate blocks
-		for (uint _taken = 0; _taken < _stps; ++_taken) {
+		for (uint _taken = 0; _taken < nBlck; ++_taken) {
 
 			// sample them!
 			this->blockSample(bSize, this->curState_, false);
@@ -861,7 +893,7 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 		// finally, update the weights
 		this->updateWeights();
 		// save the mean energy
-		meanEn(i) = arma::mean(En);
+		meanEn(i - 1) = arma::mean(En);
 
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
