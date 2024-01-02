@@ -37,9 +37,9 @@
 #define NQS_USESR														// #
 #ifdef NQS_USESR														// #
 // how to handle the inverse of the matrix					// #
-#	define NQS_PINV 1e-5												// #
+//#	define NQS_PINV 1e-6												// #
 // regularization for the covariance matrix					// #
-//#	define NQS_SREG													// #
+#	define NQS_SREG													// #
 #endif																	// #
 #ifndef RBM_H															// #
 #	include "../NQS/rbm.h"											// #

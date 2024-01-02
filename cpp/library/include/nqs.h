@@ -43,6 +43,20 @@ static volatile bool _cond = true;
 #include <future>
 #include <functional>
 
+// structure with condition variables
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+template <typename _T>
+struct CondVarKernel
+{
+	std::mutex mutex;
+	std::condition_variable cv;
+	std::atomic<bool>	end_	= false;
+	bool flagThreadKill_		= false;
+	bool flagThreadRun_		= false;
+	_T kernelValue_			= 0.0;
+};
+#endif 
+
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 // ########################################################## N Q S   S O L V E R ###########################################################
@@ -93,17 +107,13 @@ protected:
 	/* ----------------------------------------------------------- */
 
 	// ---------------------- T H R E A D I N G ---------------------
-
+							
 	uint threadNum_					=		1;									// number of threads that works on this
 	// create thread pool
-#if true || defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
 	v_1d<std::thread> threads_;
-	// mutex and condition variable for the speedup
+	v_1d<CondVarKernel<_T>> kernels_;
 	std::mutex mutex;
-	std::condition_variable cv;
-	v_1d<bool> flagThreadKill_;
-	v_1d<bool> flagThreadRun_;
-	v_1d<_T> kernelValues_;
 #endif
 
 	/* ----------------------------------------------------------- */
@@ -204,8 +214,9 @@ public:
 #endif
 	 // regularization
 #ifdef NQS_SREG 
-	double covMatrixRegCurrent = 1e-4;										// parameter for regularisation, changes with Monte Carlo steps
-	double covMatrixRegStart	= 1e-4;										// starting parameter for regularisation
+	double covMatrixRegMult		= 0.98;										// multiplier for the regularization
+	double covMatrixRegStart	= 1e-2;										// starting parameter for regularisation (epsilon1)
+	double covMatrixRegStart2	= 1e-3;										// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg();
 #endif
 	
@@ -446,15 +457,15 @@ inline NQS<_Ht, _spinModes, _T, _stateType>::~NQS()
 #if not defined NQS_USE_OMP && not defined _DEBUG
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		std::unique_lock<std::mutex> lock(mutex);
-		flagThreadKill_[_thread]	= 1;
-		flagThreadRun_[_thread]		= 1;	
-		cv.notify_all();
+		std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
+		this->kernels_[_thread].flagThreadKill_	= true;
+		this->kernels_[_thread].end_					= true;
+		this->kernels_[_thread].flagThreadRun_		= 1;
+		this->kernels_[_thread].cv.notify_all();
 	}
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
-	{
-		threads_[_thread].join();
-	}
+		if (threads_[_thread].joinable())
+			threads_[_thread].join();
 #endif
 }
 
@@ -491,12 +502,10 @@ inline NQS<_Ht, _spinModes, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 		omp_set_num_threads(this->threadNum_);   
 #	else
 		this->threads_.reserve(this->threadNum_);
-		this->flagThreadKill_	=			v_1d<bool>(this->threadNum_, false);
-		this->flagThreadRun_		=			v_1d<bool>(this->threadNum_, false);
-		this->kernelValues_		=			v_1d<_T>(this->threadNum_, 0.0);
+		this->kernels_			=			v_1d<CondVarKernel<_T>>(this->threadNum_);
 		
 		// calculate how many sites goes to one thread
-		uint _siteStep				=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
+		uint _siteStep			=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
 
 		// start the threads that calculate the energy with the local energy kernel function
 		// this function waits for the specific energy calculation to be ready on each thread
@@ -598,7 +607,7 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::blockSample(uint _bSize, u64 _
 // ########################################################## L O C   E N E R G Y ###########################################################
 // ##########################################################################################################################################
 // ##########################################################################################################################################
-#pragma optimize("", off)
+
 /*
 * @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP is used
 * when the omp pragma NQS_USE_OMP is set or multithreading is not used, otherwise threadpool is used
@@ -631,30 +640,22 @@ inline _T NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel()
 	// run all threads
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		std::unique_lock<std::mutex> lock(mutex);
-		this->flagThreadRun_[_thread] = true;
-		cv.notify_all();
+		std::lock_guard<std::mutex> lock(this->kernels_[_thread].mutex);
+		this->kernels_[_thread].flagThreadRun_ = true;
+		this->kernels_[_thread].end_				= false;
+		this->kernels_[_thread].cv.notify_one();
 	}
+
 	// wait for all threads
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		while (true)
-		{
-			_cond = this->flagThreadRun_[_thread];
-			if (!_cond)
-				break;
-			//std::this_thread::sleep_for(std::chrono::milliseconds(50));
-			//LOGINFO("Still waiting for " + VEQ(_thread), LOG_TYPES::TRACE, 3);
-		}
-			//LOGINFO("Finished: " + VEQ(_thread), LOG_TYPES::TRACE, 2);
-
-		energy += kernelValues_[_thread];
+		while (!this->kernels_[_thread].end_);
+		energy += this->kernels_[_thread].kernelValue_;
 	}
 	//LOGINFO("Finished: " + VEQ(energy), LOG_TYPES::TRACE, 2);
 	return energy;
 #endif
 }
-#pragma optimize("", on)
 
 #ifndef NQS_USE_OMP
 /*
@@ -667,23 +668,28 @@ template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)
 {
 	// does not go in if the simulation is finished
-	while (!flagThreadKill_[_threadNum])
+	while (!this->kernels_[_threadNum].flagThreadKill_)
 	{
 		// wait for the lock to end
 		{
 			// aquire mutex lock as required by condition variable
-			std::unique_lock<std::mutex> lock(mutex);									
+			std::unique_lock<std::mutex> lock(this->kernels_[_threadNum].mutex);	
 			// thread will suspend here and release the lock if the expression does not return true
-			cv.wait(lock, [this, _threadNum] { return flagThreadRun_[_threadNum]; });	
-			lock.unlock();
+			this->kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->kernels_[_threadNum].flagThreadRun_; });	
 		}
-		if (flagThreadKill_[_threadNum])
-			break;
 
-		this->kernelValues_[_threadNum] = 0.0;
+		// kill me!
+		if (this->kernels_[_threadNum].flagThreadKill_)
+		{
+			std::unique_lock<std::mutex> lock(this->kernels_[_threadNum].mutex);
+			this->kernels_[_threadNum].end_ = true;
+			break;
+		}
+
+		this->kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
-			this->kernelValues_[_threadNum] +=   this->H_->locEnergy(this->curState_,
+			this->kernels_[_threadNum].kernelValue_ += this->H_->locEnergy(this->curState_,
 																	 site, 
 																	 std::bind(&NQS<_Ht, _spinModes, _T, _stateType>::pKernel,
 																	 this,
@@ -691,8 +697,11 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel(uint _start, uint 
 																	 std::placeholders::_2));
 		}
 		// lock again
-		flagThreadRun_[_threadNum] = false;
-		cv.notify_one();
+		{
+			this->kernels_[_threadNum].flagThreadRun_ = false;
+			this->kernels_[_threadNum].end_				= true;
+			//this->kernels_[_threadNum].cv.notify_one();
+		}
 	}
 }
 #endif
@@ -787,11 +796,7 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::gradFinal(const NQSB& _energie
 	
 	// update model
 	this->gradSR(0);
-	
-	// use the regularization
-	#ifdef NQS_SREG
-	this->covMatrixRegCurrent *= this->covMatrixRegStart;
-	#endif // S_REGULAR
+
 #else
 	// standard updater with the gradient only!
 	this->F_ *= this->lr_;
@@ -809,7 +814,9 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::gradFinal(const NQSB& _energie
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void NQS<_Ht, _spinModes, _T, _stateType>::covMatrixReg()
 {
-	this->S_.diag() += this->covMatrixRegCurrent;
+	COL<_T> eps			=	this->S_.diag() * this->covMatrixRegStart;
+	eps					=	eps + (this->covMatrixRegStart2 / this->covMatrixRegStart) * arma::max(eps) ;
+	this->S_.diag()	+= eps;
 }
 #endif
 
@@ -853,11 +860,6 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 
 	// make the pbar!
 	this->pBar_			= pBar(progPrc, mcSteps);
-
-	// set the derivatives matrix
-#ifdef NQS_SREG
-	this->covMatrixRegCurrent = this->covMatrixRegStart;
-#endif
 	this->derivatives_.resize(nBlck, this->fullSize_);
 
 	// save all average weights for covariance matrix
@@ -899,6 +901,13 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
 #ifdef NQS_SAVE_WEIGHTS
 		if (i % this->pBar_.percentageSteps == 0) this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
+#endif
+#ifdef NQS_SREG
+		// use the regularization
+		this->covMatrixRegStart		= this->covMatrixRegStart * covMatrixRegMult;
+		this->covMatrixRegStart2	= this->covMatrixRegStart2 * covMatrixRegMult;
+		//LOGINFO(VEQP(this->covMatrixRegStart, 16), LOG_TYPES::TRACE, 1);
+		//LOGINFO(VEQP(this->covMatrixRegStart2, 16), LOG_TYPES::TRACE, 1);
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);
