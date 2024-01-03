@@ -314,7 +314,9 @@ cpx XYZ<_T>::locEnergy(u64 _cur, uint _site, XYZ<_T>::NQSFun _fun)
 
 /*
 * Calculate the local energy end return the corresponding vectors with the value
-* @param _id base state index
+* @param _cur base state index
+* @param _site lattice site
+* @param _fun function for Neural Network Quantum State whenever the state changes (after potential flip) - nondiagonal
 */
 template <typename _T>
 cpx XYZ<_T>::locEnergy(const DCOL& v, uint _site, XYZ<_T>::NQSFun _fun, DCOL& tmp)

@@ -37,9 +37,9 @@
 #define NQS_USESR														// #
 #ifdef NQS_USESR														// #
 // how to handle the inverse of the matrix					// #
-//#	define NQS_PINV 1e-6												// #
+#	define NQS_PINV -1												// #
 // regularization for the covariance matrix					// #
-#	define NQS_SREG													// #
+//#	define NQS_SREG													// #
 #endif																	// #
 #ifndef RBM_H															// #
 #	include "../NQS/rbm.h"											// #
@@ -51,10 +51,12 @@
 #ifndef ISING_H														// #
 #include "../models/ising.h"										// #
 #endif // !ISING_H													// #
-// MODELS																// #
 #ifndef XYZ_H															// #
 #include "../models/XYZ.h"											// #
 #endif // !XYZ_H														// #
+#ifndef HEISENBERG_KITAEV_H										// #
+#include "../models/heisenberg-kitaev.h"						// #
+#endif																	// #
 // ##########################################################
 
 // ######################## MODELS Q ########################
@@ -108,7 +110,7 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
 		UI_PARAM_CREATE_DEFAULT(modTypQ, MY_MODELS_Q, MY_MODELS_Q::SYK2_M);
 
-		// ############### ISING ###############
+		// ############## ISING ################
 		UI_PARAM_STEP(double, J1, 1.0);								// spin exchange
 		UI_PARAM_STEP(double, hz, 1.0);								// perpendicular field
 		UI_PARAM_STEP(double, hx, 1.0);								// transverse field
@@ -118,11 +120,15 @@ namespace UI_PARAMS {
 		UI_PARAM_STEP(double, eta2, 0.5);
 		UI_PARAM_STEP(double, dlt1, 0.3);
 		UI_PARAM_STEP(double, dlt2, 0.3);
-		// ############### KITAEV ##############
-		UI_PARAM_STEP(double, kx, 1.0);								// spin exchange
-		UI_PARAM_STEP(double, ky, 1.0);								// spin exchange
-		UI_PARAM_STEP(double, kz, 1.0);								// spin exchange
-		// ############ AUBRY_ANDRE ############
+		// ############# KITAEV ################
+		v_1d<double> Kx_;
+		v_1d<double> Ky_;
+		v_1d<double> Kz_;
+		v_1d<double> heiJ_;
+		v_1d<double> heiDlt_;
+		v_1d<double> heiHx_;
+		v_1d<double> heiHz_;
+		// ########### AUBRY_ANDRE #############
 		UI_PARAM_STEP(double, Beta, (1 + std::sqrt(5)) / 2);	// phase mult
 		UI_PARAM_STEP(double, Phi, 1.0);							// phase add
 
@@ -140,9 +146,13 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT_STEP(dlt1);
 			UI_PARAM_SET_DEFAULT_STEP(dlt2);
 			// kitaev
-			UI_PARAM_SET_DEFAULT_STEP(kx);
-			UI_PARAM_SET_DEFAULT_STEP(ky);
-			UI_PARAM_SET_DEFAULT_STEP(kz);
+			this->Kx_		= v_1d<double>(1, 1.0);
+			this->Ky_		= v_1d<double>(1, 1.0);
+			this->Kz_		= v_1d<double>(1, 1.0);
+			this->heiJ_		= v_1d<double>(1, 1.0);
+			this->heiDlt_	= v_1d<double>(1, 1.0);
+			this->heiHz_	= v_1d<double>(1, 1.0);
+			this->heiHx_	= v_1d<double>(1, 1.0);
 			// aubry-andre
 			UI_PARAM_SET_DEFAULT_STEP(Beta);
 			UI_PARAM_SET_DEFAULT_STEP(Phi);
@@ -241,7 +251,6 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(nTherm, uint, 50);
 		UI_PARAM_CREATE_DEFAULT(nBlocks, uint, 500);
 		UI_PARAM_CREATE_DEFAULT(nMcSteps, uint, 1000);
-		UI_PARAM_CREATE_DEFAULT(batch, u64, 1024);
 		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
 		// weight load directory
 		inline static const std::string _loadNQS	= ""; 
@@ -257,7 +266,6 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT(nTherm);
 			UI_PARAM_SET_DEFAULT(nBlocks);
 			UI_PARAM_SET_DEFAULT(nMcSteps);
-			UI_PARAM_SET_DEFAULT(batch);
 			UI_PARAM_SET_DEFAULT(lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
 		}
@@ -313,7 +321,6 @@ protected:
 		this->defaultParams = {
 			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
 			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0),			// mcsteps	
-			UI_OTHER_MAP(b			, this->nqsP.batch_		, FHANDLE_PARAM_HIGHER0),			// batch
 			UI_OTHER_MAP(nb		, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0),			// number of blocks
 			UI_OTHER_MAP(bs		, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0),			// block size
 			UI_OTHER_MAP(nh		, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0),			// hidden params
@@ -494,10 +501,10 @@ public:
 template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
-	bool _isGood = true;
+	bool _isGood					= true;
 	// get the symmetries
-	auto [_glbSyms, _locSyms] = this->createSymmetries();
-	_Hil = Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
+	auto [_glbSyms, _locSyms]	= this->createSymmetries();
+	_Hil								= Hilbert::HilbertSpace<_T>(this->latP.lat, _locSyms, _glbSyms);
 	if (_Hil.getHilbertSize() == 0)
 	{
 		LOGINFO("No states in the Hilbert space. Not creating model.", LOG_TYPES::INFO, 3);
@@ -520,6 +527,11 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
+		break;
+	case MY_MODELS::HEI_KIT_M:
+		_H = std::make_shared<HeisenbergKitaev<_T>>(std::move(_Hil), 
+			this->modP.Kx_, this->modP.Ky_, this->modP.Kz_,
+			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
@@ -578,7 +590,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 	case NQSTYPES::RBM:
 		_NQS = std::make_shared<RBM_S<_T, _spinModes>>(	_H,
 																		this->nqsP.nHidden_,
-																		this->nqsP.batch_,
+																		this->nqsP.blockSize_,
 																		this->nqsP.lr_,
 																		this->threadNum);
 		break;
@@ -1317,15 +1329,16 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 	{
 		auto _H = _NQS->getHamiltonian();
 		_H->hamiltonian();
-		if (Nh < UI_LIMITS_NQS_FULLED)
+		if (Nh <= UI_LIMITS_NQS_FULLED)
+		{
 			_H->diagH(false);
+			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
+		}
 		else
 		{
 			LOGINFO("LANCZOS NOT YET USED", LOG_TYPES::ERROR, 2);
-			throw std::runtime_error("!TODO");
 			//_NQS->H_->diagH(false, UI_LIMITS_NQS_LANCZOS_STATENUM, 0, 1000, 0.0, "sa");
 		}
-		LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 	}
 	if (!this->nqsP.loadNQS_.empty())
 		_NQS->setWeights(this->nqsP.loadNQS_, "weights.h5");
@@ -1344,7 +1357,9 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 	_ENSM.col(0)	= arma::real(_EN);
 	_ENSM.col(1)	= arma::imag(_EN);
 
-	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(int(this->nqsP.nMcSteps_ / 20)));
+	auto perc		= int(this->nqsP.nMcSteps_ / 20);
+	perc				= perc == 0 ? 1 : perc;
+	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(perc));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
 	_ENSM.save(dir + "history.dat", arma::raw_ascii);
 }

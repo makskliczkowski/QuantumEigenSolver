@@ -44,9 +44,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 	// ---------- SIMULATION PARAMETERS ----------
 	{
 		SETOPTIONV(nqsP,	nMcSteps,	"m"	);
-		SETOPTIONV(nqsP,	batch,		"b"	);
-		SETOPTIONV(nqsP,	nBlocks,		"nb"	);
 		SETOPTIONV(nqsP,	blockSize,	"bs"	);
+		SETOPTIONV(nqsP,	nBlocks,		"nb"	);
 		SETOPTIONV(nqsP,	nHidden,		"nh"	);
 		SETOPTIONV(nqsP,	nFlips,		"nf"	);
 		SETOPTIONV(nqsP,	nTherm,		"nt"	);
@@ -64,6 +63,9 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(latP,		bc			);
 	}
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
+	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
+		Ns *= 2;
+
 	// ------------------ MODEL ------------------
 	{
 		// model type
@@ -73,16 +75,34 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION_STEP(modP, hx);
 		SETOPTION_STEP(modP, hz);
 		// ---- heisenberg ---
-		SETOPTION_STEP(modP, dlt1);
+		{
+			this->modP.heiDlt_.resize(Ns);
+			this->modP.heiJ_.resize(Ns);
+			this->modP.heiHx_.resize(Ns);
+			this->modP.heiHz_.resize(Ns);
+			SETOPTION(modP, heiJ);
+			SETOPTION(modP, heiDlt);
+			SETOPTION(modP, heiHz);
+			SETOPTION(modP, heiHx);
+			SETOPTION_STEP(modP, dlt1);
+		}
 		// ------- xyz -------
 		SETOPTION_STEP(modP, J2);
 		SETOPTION_STEP(modP, dlt2);
 		SETOPTION_STEP(modP, eta1);
 		SETOPTION_STEP(modP, eta2);
 		// ------ kitaev -----
-		SETOPTION_STEP(modP, kx);
-		SETOPTION_STEP(modP, ky);
-		SETOPTION_STEP(modP, kz);
+		{
+			// resize
+			this->modP.Kx_.resize(Ns);
+			this->modP.Ky_.resize(Ns);
+			this->modP.Kz_.resize(Ns);
+			// set options
+			SETOPTION(modP, Kx);
+			SETOPTION(modP, Ky);
+			SETOPTION(modP, Kz);
+		}
+
 	}
 	// --------------- QUARDRATIC ----------------
 	{

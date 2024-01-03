@@ -15,33 +15,35 @@
 #define HAMIL_H
 
 // ############################ EXISTING MODELS ############################
-enum MY_MODELS {														// #
-	ISING_M, XYZ_M, NONE 												// #
-};																		// #
-BEGIN_ENUM(MY_MODELS)													// #
-{																		// #
-	DECL_ENUM_ELEMENT(ISING_M),											// #
-	DECL_ENUM_ELEMENT(XYZ_M),											// #
-	DECL_ENUM_ELEMENT(NONE)												// #
-}																		// #
-END_ENUM(MY_MODELS)														// #	
+enum MY_MODELS 																			// #
+{																								// #	
+	ISING_M, XYZ_M, HEI_KIT_M, NONE 													// #
+};																								// #
+BEGIN_ENUM(MY_MODELS)																	// #
+{																								// #
+	DECL_ENUM_ELEMENT(ISING_M),														// #
+	DECL_ENUM_ELEMENT(XYZ_M),															// #
+	DECL_ENUM_ELEMENT(HEI_KIT_M),														// #
+	DECL_ENUM_ELEMENT(NONE)																// #
+}																								// #
+END_ENUM(MY_MODELS)																		// #	
 // #########################################################################
 
 // ########################### SAVING EXTENSIONS ###########################
-enum HAM_SAVE_EXT {														// #
-	dat, h5																// #
-};																		// #
-BEGIN_ENUM(HAM_SAVE_EXT)												// #
-{																		// #
-	DECL_ENUM_ELEMENT(dat), DECL_ENUM_ELEMENT(h5)						// #
-}																		// #
-END_ENUM(HAM_SAVE_EXT)													// #	
+enum HAM_SAVE_EXT {																		// #
+	dat, h5																					// #
+};																								// #
+BEGIN_ENUM(HAM_SAVE_EXT)																// #
+{																								// #
+	DECL_ENUM_ELEMENT(dat), DECL_ENUM_ELEMENT(h5)								// #
+}																								// #
+END_ENUM(HAM_SAVE_EXT)																	// #	
 // #########################################################################
 
-const std::string DEF_INFO_SEP		= std::string("_");										// defalut separator in info about the model
+const std::string DEF_INFO_SEP		= std::string("_");											// defalut separator in info about the model
 #define DISORDER_EQUIV(type, param) type param		= 1;	\
-									type param##0	= 0;	\
-									arma::Col<type> d##param
+												type param##0	= 0;	\
+												arma::Col<type> d##param
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))						// gets the value moved by the disorder strength
 #define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 3);	\
 									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 3))
@@ -92,16 +94,16 @@ public:
 	{
 		this->ran_	=	randomGen();
 		this->lat_	=	this->hilbertSpace.getLattice();
-		this->Ns	=	this->lat_->get_Ns();
-		this->Nh	=	this->hilbertSpace.getHilbertSize();
+		this->Ns		=	this->lat_->get_Ns();
+		this->Nh		=	this->hilbertSpace.getHilbertSize();
 	};
 	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
 		: hilbertSpace(std::move(hilbert))
 	{
 		this->ran_	=	randomGen();
 		this->lat_	=	this->hilbertSpace.getLattice();
-		this->Ns	=	this->lat_->get_Ns();
-		this->Nh	=	this->hilbertSpace.getHilbertSize();
+		this->Ns		=	this->lat_->get_Ns();
+		this->Nh		=	this->hilbertSpace.getHilbertSize();
 	};																			
 
 	// ------------------------------------------- PRINTERS ---------------------------------------------------
@@ -152,7 +154,7 @@ public:
 	// ------------------------------------------- SETTERS -----------------------------------------------------
 	
 	// ----------------------------------------- HAMILTONIAN ---------------------------------------------------
-	virtual void hamiltonian()							= 0;								
+	virtual void hamiltonian();
 	auto buildHamiltonian()								-> void;
 
 	auto setHElem(u64 k, _T val, u64 newIdx)		-> void;								// sets the Hamiltonian elements in a virtual way
@@ -175,7 +177,7 @@ public:
 	virtual cpx locEnergy(const arma::Col<double>& v, 
 								 uint site,
 								 NQSFun f1,
-								 arma::Col<double>& tmp)		= 0;							// returns the local energy for VQMC purposes
+								 arma::Col<double>& tmp)		{ return 0; };				// returns the local energy for VQMC purposes
 	
 	// ----------------------------------------- FOR OTHER TYPES -----------------------------------------------
 	virtual void updateInfo()							= 0;
@@ -226,6 +228,27 @@ Hamiltonian<_T, _spinModes>::~Hamiltonian()
 	this->H_.reset();
 	this->eigVal_.reset();
 	this->eigVec_.reset();
+}
+
+/*
+* Generates the total Hamiltonian of the system. The diagonal part is straightforward,
+* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
+*/
+template<typename _T, uint _spinModes>
+void Hamiltonian<_T, _spinModes>::hamiltonian()
+{
+	if (this->Nh == 0)
+	{
+		LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
+		return;
+	}
+	this->init();
+	for (u64 k = 0; k < this->Nh; k++)
+	{
+		u64 kMap = this->hilbertSpace.getMapping(k);
+		for (uint site_ = 0; site_ <= this->Ns - 1; site_++)
+			this->locEnergy(k, kMap, site_);
+	}
 }
 
 // ##########################################################################################################################################

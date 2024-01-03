@@ -273,6 +273,13 @@ inline _T RBM_S<_Ht, _spinModes, _T, _stateType>::pRatio(const NQSS& _v1, const 
 
 // %%%%%%%%%%%%% U S I N G   I N I T I A L I Z E R %%%%%%%%%%%%%
 
+/*
+* @brief Calculates the probability ratio whenever we use multiple flips ariving from the external vectors.
+* Uses the flips stored within the NQS class (fP, fV)
+* @param fP flip places to be used
+* @param fV flip values to be used
+* @returns probability ratio for a given ansatz based on the current state
+*/
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline _T RBM_S<_Ht, _spinModes, _T, _stateType>::pRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
@@ -470,9 +477,8 @@ inline void RBM_S<_Ht, _spinModes, _T, _stateType>::grad(const NQSS& _v, uint _p
 //#pragma omp parallel for num_threads(this->threadNum_)
 //	for (int i = 0; i < this->nHid_; i++)
 //		this->Derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
-#ifdef NQS_USE_OMP
-#	pragma omp parallel for num_threads(this->threadNum_)
-#endif
+
+//#pragma omp parallel for num_threads(this->threadNum_)
 	for (int i = 0; i < this->nHid_; i++)
 		for (auto j = 0; j < this->nVis_; j++)
 			this->derivatives_(_plc, (this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->derivatives_(_plc, i + this->nVis_) * _v(j);

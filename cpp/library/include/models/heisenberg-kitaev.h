@@ -1,258 +1,305 @@
-//#pragma once
-//
-//#include "heisenberg.h"
-//
-//
-//// --------------------------------------------------------------------------- HEISENBERG INTERACTING WITH KITAEV SPINS ---------------------------------------------------------------------------
-//#ifndef HEISENBERG_KITAEV
-//#define HEISENBERG_KITAEV
-//template<typename _type>
-//class Heisenberg_kitaev : public Heisenberg<_type> {
-//private:
-//	double Kx = 1.0;									// kitaev model exchange 
-//	double Ky = 1.0;									// kitaev model exchange 
-//	double Kz = 1.0;									// kitaev model exchange 
-//	vec dKx;											// kitaev model exchange vector
-//	vec dKy;											// kitaev model exchange vector
-//	vec dKz;											// kitaev model exchange vector
-//	double K0;											// disorder with Kitaev exchange
-//	vec tmp_vec;
-//	vec tmp_vec2;
-//public:
-//	~Heisenberg_kitaev() = default;
-//	Heisenberg_kitaev(double J, double J0, double g, double g0, double h, double w, double delta, std::tuple<double, double, double> K, double K0, std::shared_ptr<Lattice> lat)
-//		: Heisenberg<_type>(J, J0, g, g0, h, w, delta, lat)
-//	{
-//		this->Kx = std::get<0>(K);
-//		this->Ky = std::get<1>(K);
-//		this->Kz = std::get<2>(K);
-//		this->K0 = K0;
-//
-//		// creates random disorder vector
-//		this->dKx = create_random_vec(this->Ns, this->ran, this->K0);
-//		this->dKy = create_random_vec(this->Ns, this->ran, this->K0);
-//		this->dKz = create_random_vec(this->Ns, this->ran, this->K0);
-//
-//		// state values number in local energy without the number of nearest neighbors
-//		this->state_val_num = 2;
-//		// change info
-//		this->info = this->inf();
-//	};
-//	// ----------------------------------- SETTERS ---------------------------------
-//
-//	// ----------------------------------- GETTERS ---------------------------------
-//	cpx locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
-//	cpx locEnergy(const vec& _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) override;
-//	void hamiltonian() override;
-//
-//	string inf(const v_1d<string>& skip = {}, string sep = "_", int prec = 2) const override
-//	{
-//		string name = sep + \
-//			"hei_ktv,Ns=" + STR(this->Ns) + \
-//			",J=" + STRP(this->J, prec) + \
-//			",J0=" + STRP(this->J0, prec) + \
-//			",d=" + STRP(this->delta, prec) + \
-//			",g=" + STRP(this->g, prec) + \
-//			",g0=" + STRP(this->g0, prec) + \
-//			",h=" + STRP(this->h, prec) + \
-//			",w=" + STRP(this->w, prec) + \
-//			",K=(" + STRP(this->Kx, prec) + "," + STRP(this->Ky, prec) + "," + STRP(this->Ky, prec) + ")" \
-//			",K0=" + STRP(this->K0, prec);
-//		return this->SpinHamiltonian<_type>::inf(name, skip, sep);
-//	};
-//	void update_info() override { this->info = this->inf(); };
-//};
-//
-//// ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
-//
-///*
-//* @brief Calculate the local energy end return the corresponding vectors with the value
-//* @param _id base state index
-//*/
-//template <typename _type>
-//inline cpx Heisenberg_kitaev<_type>::locEnergy(u64 _id, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
-//
-//	// sumup the value of non-changed state
-//	double localVal = 0;
-//	cpx changedVal = 0.0;
-//
-//	//const uint nn_number = this->lattice->get_nn_forward_num(site);
-//	auto nns = this->lattice->get_nn_forward_number(site);
-//
-//	// true - spin up, false - spin down
-//	const double si = checkBit(_id, this->Ns - site - 1) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
-//
-//	// perpendicular field (SZ) - HEISENBERG
-//	localVal += (this->h + this->dh(site)) * si;
-//
-//	// transverse field (SX) - HEISENBERG
-//	changedVal += f1(site, si) * operators::_SPIN_RBM * (this->g + this->dg(site));
-//
-//
-//	// check the Siz Si+1z
-//	for (auto n_num: nns) {
-//		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-//			// check Sz 
-//			const double sj = checkBit(_id, this->Ns - 1 - nei) ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
-//			// --------------------- HEISENBERG 
-//
-//			// diagonal elements setting  interaction field
-//			const double interaction = this->J + this->dJ(nei);
-//			const double sisj = si * sj;
-//			localVal += interaction * this->delta * sisj;
-//
-//			const u64 flip_idx_nn = flip(flip(_id, this->Ns - 1 - nei), this->Ns - 1 - site);
-//			double flip_val = 0.0;
-//
-//			// S+S- + S-S+
-//			if (sisj < 0)
-//				flip_val += 0.5 * interaction;
-//
-//			// --------------------- KITAEV
-//			if (n_num == 0)
-//				localVal += (this->Kz + this->dKz(site)) * sisj;
-//			else if (n_num == 1)
-//				flip_val -= (this->Ky + this->dKy(site)) * sisj;
-//			else if (n_num == 2)
-//				flip_val += operators::_SPIN_RBM * operators::_SPIN_RBM * (this->Kx + this->dKx(site));
-//
-//			INT_TO_BASE_BIT(flip_idx_nn, tmp);
-//			changedVal += flip_val * f2(tmp * operators::_SPIN_RBM);
-//		}
-//	}
-//	return changedVal + localVal;
-//}
-//
-///*
-//* @brief Calculate the local energy end return the corresponding vectors with the value
-//* @param _id base state index
-//*/
-//template <typename _type>
-//inline cpx Heisenberg_kitaev<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
-//	// sumup the value of non-changed state
-//	double localVal = 0;
-//	cpx changedVal = 0.0;
-//
-//	//const uint nn_number = this->lattice->get_nn_forward_num(site);
-//	auto nns = this->lattice->get_nn_forward_number(site);
-//
-//	// true - spin up, false - spin down
-//	const double si = checkBitV(v, site) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
-//
-//	// perpendicular field (SZ) - HEISENBERG
-//	localVal += (this->h + this->dh(site)) * si;
-//
-//	// transverse field (SX) - HEISENBERG
-//	changedVal += f1(site, si) * operators::_SPIN_RBM * (this->g + this->dg(site));
-//
-//	tmp = v;
-//	flipV(tmp, site);
-//
-//	// check the Siz Si+1z
-//	for (auto n_num : nns) {
-//		if (int nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-//			// check Sz 
-//			const double sj = checkBitV(v, nei) > 0 ? operators::_SPIN_RBM : -operators::_SPIN_RBM;
-//
-//			// --------------------- HEISENBERG 
-//
-//			// diagonal elements setting  interaction field
-//			const auto interaction = this->J + this->dJ(site);
-//			const auto sisj = si * sj;
-//			localVal += interaction * this->delta * sisj;
-//
-//			flipV(tmp, nei);
-//			double flip_val = 0.0;
-//
-//			// S+S- + S-S+
-//			if (sisj < 0)
-//				flip_val += 0.5 * interaction;
-//
-//			// --------------------- KITAEV
-//			if (n_num == 0)
-//				localVal += (this->Kz + this->dKz(site)) * sisj;
-//			else if (n_num == 1)
-//				flip_val -= (this->Ky + this->dKy(site)) * sisj;
-//			else if (n_num == 2)
-//				flip_val += operators::_SPIN_RBM * operators::_SPIN_RBM * (this->Kx + this->dKx(site));
-//
-//			flipV(tmp, nei);
-//			changedVal += flip_val * f2(tmp);
-//		}
-//	}
-//	return changedVal + localVal;
-//}
-//
-//
-//// ----------------------------------------------------------------------------- BUILDING HAMILTONIAN -----------------------------------------------------------------------------
-//
-///*
-//* @brief Generates the total Hamiltonian of the system. The diagonal part is straightforward,
-//* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
-//*/
-//template <typename _type>
-//void Heisenberg_kitaev<_type>::hamiltonian() {
-//
-//	this->init_ham_mat();
-//	auto Ns = this->lattice->get_Ns();
-//
-//	for (u64 k = 0; k < this->N; k++) {
-//		// loop over all sites
-//		u64 idx = 0;
-//		cpx val = 0.0;
-//		for (int i = 0; i < this->Ns; i++) {
-//			// check all the neighbors
-//			auto nns = this->lattice->get_nn_forward_number(i);
-//
-//			// perpendicular field (SZ) - HEISENBERG
-//			std::tie(idx, val) = Operators<cpx>::sigma_z(k, Ns, { i });
-//			this->H(idx, k) += (this->h + this->dh(i)) * real(val);
-//
-//			// flip with S^x_i with the transverse field
-//			std::tie(idx, val) = Operators<cpx>::sigma_x(k, Ns, { i });
-//			this->setHamiltonianElem(k, (this->g + this->dg(i)) * real(val), idx);
-//
-//			// check the Siz Si+1z
-//			for (auto n_num : nns) {
-//				if (int nei = this->lattice->get_nn(i, n_num); nei >= 0) {
-//					// --------------------- HEISENBERG ---------------------
-//
-//					// diagonal elements setting  interaction field
-//					double interaction = (this->J + this->dJ(i));
-//					auto [idx_z, val_z] = Operators<cpx>::sigma_z(k, Ns, { i });
-//					auto [idx_z2, val_z2] = Operators<cpx>::sigma_z(idx_z, Ns, { nei });
-//
-//					// setting the neighbors elements
-//					this->H(idx_z2, k) += interaction * this->delta * real(val_z * val_z2);
-//
-//					// setting the neighbors elements
-//					auto [idx_x, val_x] = Operators<cpx>::sigma_x(k, Ns, { i });
-//					auto [idx_x2, val_x2] = Operators<cpx>::sigma_x(idx_x, Ns, { nei });
-//
-//					// S+S- + S-S+ hopping
-//					if (real(val_z * val_z2) < 0)
-//						this->setHamiltonianElem(k, 0.5 * interaction, idx_x2);
-//
-//					// --------------------- KITAEV ---------------------
-//					
-//					// z_bond
-//					if (n_num == 0)
-//						this->setHamiltonianElem(k, (this->Kz + this->dKz(i)) * real(val_z * val_z2), idx_z2);
-//					// y_bond
-//					else if (n_num == 1) {
-//						auto [idx_y, val_y] = Operators<cpx>::sigma_y(k, Ns, { i });
-//						auto [idx_y2, val_y2] = Operators<cpx>::sigma_y(idx_y, Ns, { nei });
-//						this->setHamiltonianElem(k, (this->Ky + this->dKy(i)) * real(val_y * val_y2), idx_y2);
-//					}
-//					// x_bond
-//					else if (n_num == 2)
-//						this->setHamiltonianElem(k, (this->Kx + this->dKx(i)) * real(val_x * val_x2), idx_x2);
-//				}
-//			}
-//		}
-//	}
-//}
-//
-//
-//
-//#endif
+#pragma once
+/***********************************
+* Is an instance of the Heisenberg-Kitaev
+* model. Derives from a general Hamiltonian.
+************************************/
+
+#ifndef HAMIL_H
+#	include "../hamil.h"
+#endif // !HAMIL_H
+
+#ifndef HEISENBERG_KITAEV_H
+#define HEISENBERG_KITAEV_H
+
+/*
+* @brief HeisenbergKitaev Hamiltonian.
+*/
+template <typename _T>
+class HeisenbergKitaev : public Hamiltonian<_T, 2>
+{
+public:
+	using NQSFun								= typename Hamiltonian<_T>::NQSFun;
+protected:
+	// ######################################### Parameters ########################################
+	v_1d<double> Kx;
+	v_1d<double> Ky;
+	v_1d<double> Kz;
+	v_1d<double> J;
+	v_1d<double> delta;
+	v_1d<double> hz;
+	v_1d<double> hx;
+
+public:
+	// ######################################## Constructors ########################################
+	~HeisenbergKitaev()						{ LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 3); };
+	HeisenbergKitaev()						= default;
+	HeisenbergKitaev( const Hilbert::HilbertSpace<_T>& hilbert,
+							const v_1d<double>& _Kx,
+							const v_1d<double>& _Ky,
+							const v_1d<double>& _Kz,
+							const v_1d<double>& _J,
+							const v_1d<double>& _delta,
+							const v_1d<double>& _hz = {},
+							const v_1d<double>& _hx = {});
+	HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilbert,
+							const v_1d<double>& _Kx,
+							const v_1d<double>& _Ky,
+							const v_1d<double>& _Kz,
+							const v_1d<double>& _J,
+							const v_1d<double>& _delta,
+							const v_1d<double>& _hz = {},
+							const v_1d<double>& _hx = {});
+
+	// ########################################### Methods ###########################################
+	void locEnergy(u64 _elemId,
+						u64 _elem,
+						uint _site)				override final;
+	cpx locEnergy(u64 _id,
+						uint site,
+						NQSFun f1)				override final;
+
+	// ############################################ Info #############################################
+
+	std::string info(	const strVec& skip	= {},
+							std::string sep		= "_",
+							int prec = 2)		const override final;
+	void updateInfo()							override final { this->info_ = this->info({}, ",", 3); };
+};
+
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ######################################################## C O N S T R U C T O R S #########################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+
+/*
+* @brief Set the info about the Heisenberg-Kitaev model.
+* @param skip which parameters to skip
+* @param sep separator
+* @param prec precision of showing the parameters
+*/
+template<typename _T>
+inline std::string HeisenbergKitaev<_T>::info(const strVec& skip, std::string sep, int prec) const
+{
+	bool _different_J		= !std::equal(this->J.begin() + 1, this->J.end(), this->J.begin());
+	bool _different_Kx	= !std::equal(this->Kx.begin() + 1, this->Kx.end(), this->Kx.begin());
+	bool _different_Ky	= !std::equal(this->Ky.begin() + 1, this->Ky.end(), this->Ky.begin());
+	bool _different_Kz	= !std::equal(this->Kz.begin() + 1, this->Kz.end(), this->Kz.begin());
+	bool _different_dlt	= !std::equal(this->delta.begin() + 1, this->delta.end(), this->delta.begin());
+	bool _different_hz	= !std::equal(this->hz.begin() + 1, this->hz.end(), this->hz.begin());
+	bool _different_hx	= !std::equal(this->hx.begin() + 1, this->hx.end(), this->hx.begin());
+	auto BC					= this->hilbertSpace.getBC();
+
+	std::string name		= sep + "heikit,Ns=" + STR(this->Ns);
+	name += "," + (_different_J  ? "J=r"		: VEQVP(J,		J[0],		3));
+	name += "," + (_different_Kx ? "Kx=r"		: VEQVP(Kx,		Kx[0],	3));
+	name += "," + (_different_Ky ? "Ky=r"		: VEQVP(Ky,		Ky[0],	3));
+	name += "," + (_different_Kz ? "Kz=r"		: VEQVP(Kz,		Kz[0],	3));
+	name += "," + (_different_dlt? "dlt=r"		: VEQVP(delta, delta[0],3));
+	name += "," + (_different_hz ? "hz=r"		: VEQVP(hz,		hz[0],	3));
+	name += "," + (_different_hx ? "hx=r"		: VEQVP(hx,		hx[0],	3));
+	name += this->hilbertSpace.getSymInfo();
+	name += "," + VEQ(BC);
+	return this->Hamiltonian<_T>::info(name, skip, sep);
+}
+
+// ##########################################################################################################################################
+
+template<typename _T>
+inline HeisenbergKitaev<_T>::HeisenbergKitaev(const Hilbert::HilbertSpace<_T>& hilbert, 
+															 const v_1d<double>& _Kx,
+															 const v_1d<double>& _Ky,
+															 const v_1d<double>& _Kz,
+															 const v_1d<double>& _J,
+															 const v_1d<double>& _delta,
+															 const v_1d<double>& _hz,
+															 const v_1d<double>& _hx)
+
+
+	: Hamiltonian<_T>(hilbert), Kx(_Kx), Ky(_Ky), Kz(_Kz), J(_J), delta(_delta)
+{
+	// handle perpendicular field
+	if (_hz.size() == 0)
+		this->hz = v_1d<double>(J.size(), 0.0);
+	else
+		this->hz = _hz;
+	// handle transverse field
+	if (_hx.size() == 0)
+		this->hx = v_1d<double>(J.size(), 0.0);
+	else
+		this->hx = _hx;
+
+	this->ran_	= randomGen();
+	this->Ns		= this->hilbertSpace.getLatticeSize();
+	this->type_ = MY_MODELS::HEI_KIT_M;
+
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
+}
+
+template<typename _T>
+inline HeisenbergKitaev<_T>::HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilbert, 
+															 const v_1d<double>& _Kx,
+															 const v_1d<double>& _Ky,
+															 const v_1d<double>& _Kz,
+															 const v_1d<double>& _J,
+															 const v_1d<double>& _delta,
+															 const v_1d<double>& _hz,
+															 const v_1d<double>& _hx)
+	: Hamiltonian<_T>(std::move(hilbert)), Kx(_Kx), Ky(_Ky), Kz(_Kz), J(_J), delta(_delta)
+{
+	// handle perpendicular field
+	if (_hz.size() == 0)
+		this->hz = v_1d<double>(J.size(), 0.0);
+	else
+		this->hz = _hz;
+	// handle transverse field
+	if (_hx.size() == 0)
+		this->hx = v_1d<double>(J.size(), 0.0);
+	else
+		this->hx = _hx;
+
+	this->ran_	= randomGen();
+	this->Ns		= this->hilbertSpace.getLatticeSize();
+	this->type_ = MY_MODELS::HEI_KIT_M;
+
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
+}
+
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ######################################################## L O C A L   E N E R G Y #########################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+
+/*
+* Calculate the local energy end return the corresponding vectors with the value
+* @param _cur base state index
+* @param _site lattice site
+* @param _fun function for Neural Network Quantum State whenever the state changes (after potential flip) - nondiagonal
+*/
+template <typename _T>
+cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::NQSFun _fun)
+{
+	// value that does not change
+	double localVal	= 0.0;
+	cpx changedVal		= 0.0;
+
+	// get number of forward nn
+	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
+
+	// -------------- perpendicular field --------------
+	const double si	=	checkBit(_cur, this->Ns - _site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	localVal				+= hz[_site] * si;
+
+	// ---------------- transverse field ---------------
+	if (!EQP(this->hx[_site], 0.0, 1e-9))
+		changedVal += _fun({ (int)_site }, { si }) * Operators::_SPIN_RBM * hx[_site];
+
+	// ------------------- CHECK NN --------------------
+	for (uint nn = 0; nn < NUM_OF_NN; nn++)
+	{
+		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0)
+		{
+			// --------------------- HEISENBERG ---------------------
+			// SZiSZj
+			const double sj	=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal				+= J[_site] * delta[_site] * si * sj;
+
+			// SYiSYj
+			auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto changedIn		=	siY * sjY * J[_site];
+
+			// SXiSXj
+			changedIn			+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
+
+			// ----------------------- KITAEV -----------------------
+			// z_bond
+			if (N_NUMBER == 0)
+				localVal			+= this->Kz[_site] * si * sj;
+			// y_bond
+			else if (N_NUMBER == 1)
+				changedIn		+= siY * sjY * Ky[_site];
+			// x_bond
+			else if (N_NUMBER == 2)
+				changedIn		+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * Kx[_site];
+
+			// apply change
+			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn;
+		}
+	}
+	// return all
+	return changedVal + localVal;
+}
+
+// ##########################################################################################################################################
+
+/*
+* @brief body of setting up of the Hamiltonian
+*/
+template<typename _T>
+inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
+{
+	// get number of forward nn
+	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
+	u64 newIdx			= 0;
+	_T newVal			= 0;
+
+	// -------------- perpendicular field --------------
+	if (!EQP(this->hz[_site], 0.0, 1e-9))
+	{
+		std::tie(newIdx, newVal) = Operators::sigma_z(_elem, this->Ns, { _site });
+		this->setHElem(_elemId, hz[_site] * newVal, newIdx);
+	}
+
+	// -------------- transverse field --------------
+	if (!EQP(this->hx[_site], 0.0, 1e-9)) 
+	{
+		std::tie(newIdx, newVal) = Operators::sigma_x(_elem, this->Ns, { _site });
+		this->setHElem(_elemId, hx[_site] * newVal, newIdx);
+	}
+
+	// ------------------- CHECK NN --------------------
+	for (uint nn = 0; nn < NUM_OF_NN; nn++)
+	{
+		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
+		{
+			// --------------------- HEISENBERG ---------------------
+			// SZiSZj (diagonal elements)
+			auto [idx_z, val_z]		= Operators::sigma_z(_elem, this->Ns, { _site });
+			auto [idx_z2, val_z2]	= Operators::sigma_z(idx_z, this->Ns, { (uint)nei });
+			this->setHElem(_elemId,	J[_site] * delta[_site] * (val_z * val_z2), idx_z2);
+
+			// SYiSYj
+			auto [idx_y, val_y]		= Operators::sigma_y(_elem, this->Ns, { _site });
+			auto [idx_y2, val_y2]	= Operators::sigma_y(idx_y, this->Ns, { (uint)nei });
+			this->setHElem(_elemId, J[_site] * std::real(val_y * val_y2), idx_y2);
+
+			// SXiSXj
+			auto [idx_x, val_x]		= Operators::sigma_x(_elem, this->Ns, { _site });
+			auto [idx_x2, val_x2]	= Operators::sigma_x(idx_x, this->Ns, { (uint)nei });
+			this->setHElem(_elemId,	J[_site] * val_x * val_x2,	idx_x2);
+
+			// ----------------------- KITAEV -----------------------
+			// z_bond
+			if (N_NUMBER == 0)
+				this->setHElem(_elemId, this->Kz[_site] * std::real(val_z * val_z2), idx_z2);
+			// y_bond
+			else if (N_NUMBER == 1) 
+				this->setHElem(_elemId, this->Ky[_site] * std::real(val_y * val_y2), idx_y2);
+			// x_bond
+			else if (N_NUMBER == 2)
+				this->setHElem(_elemId, this->Kx[_site] * std::real(val_x * val_x2), idx_x2);
+		}
+	}
+}
+
+// ##########################################################################################################################################
+
+#endif

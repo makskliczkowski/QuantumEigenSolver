@@ -214,7 +214,7 @@ public:
 #endif
 	 // regularization
 #ifdef NQS_SREG 
-	double covMatrixRegMult		= 0.98;										// multiplier for the regularization
+	double covMatrixRegMult		= 0.95;										// multiplier for the regularization
 	double covMatrixRegStart	= 1e-2;										// starting parameter for regularisation (epsilon1)
 	double covMatrixRegStart2	= 1e-3;										// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg();
@@ -770,11 +770,15 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::gradSR(uint step)
 #	endif
 #	ifdef NQS_PINV
 	// calculate the pseudoinverse
-	this->F_ = this->lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
+	if (NQS_PINV > 0)
+		this->F_ = this->lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
+	else
+		this->F_ = this->lr_ * (arma::pinv(this->S_) * this->F_);
 	return;
 #	else 
 	// solve normally
-	this->F_ = this->lr_ * arma::solve(this->S_, this->F_);
+	//this->F_ = this->lr_ * (arma::inv(this->S_) * this->F_);
+	this->F_ = this->lr_ * arma::solve(this->S_, this->F_, solve_opts::likely_sympd);
 #	endif 
 }
 #endif
@@ -814,9 +818,15 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::gradFinal(const NQSB& _energie
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void NQS<_Ht, _spinModes, _T, _stateType>::covMatrixReg()
 {
-	COL<_T> eps			=	this->S_.diag() * this->covMatrixRegStart;
-	eps					=	eps + (this->covMatrixRegStart2 / this->covMatrixRegStart) * arma::max(eps) ;
-	this->S_.diag()	+= eps;
+	if (this->covMatrixRegStart != 0)
+	{
+		this->S_.diag() += (this->covMatrixRegStart * this->S_.diag());
+	}
+	if (this->covMatrixRegStart2 != 0)
+	{
+		auto maximal_re	=	arma::max(arma::real(this->S_.diag()));
+		this->S_.diag()	+= this->covMatrixRegStart2 * maximal_re;
+	}
 }
 #endif
 
@@ -875,8 +885,9 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 	// go through the Monte Carlo steps
 	for (uint i = 1; i <= mcSteps; ++i)
 	{
+		this->setRandomState();
 		// thermalize!
-		this->blockSample(nThrm, this->curState_, true);
+		this->blockSample(nThrm, this->curState_, false);
 
 		// iterate blocks
 		for (uint _taken = 0; _taken < nBlck; ++_taken) {
@@ -903,11 +914,8 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 		if (i % this->pBar_.percentageSteps == 0) this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
 #endif
 #ifdef NQS_SREG
-		// use the regularization
-		this->covMatrixRegStart		= this->covMatrixRegStart * covMatrixRegMult;
-		this->covMatrixRegStart2	= this->covMatrixRegStart2 * covMatrixRegMult;
-		//LOGINFO(VEQP(this->covMatrixRegStart, 16), LOG_TYPES::TRACE, 1);
-		//LOGINFO(VEQP(this->covMatrixRegStart2, 16), LOG_TYPES::TRACE, 1);
+		this->covMatrixRegStart		= std::max(covMatrixRegStart * covMatrixRegMult, 1e-5 / this->lr_);
+		this->covMatrixRegStart2	= std::max(covMatrixRegStart2 * covMatrixRegMult, 1e-6 / this->lr_);
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);
