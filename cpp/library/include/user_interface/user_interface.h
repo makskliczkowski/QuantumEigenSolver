@@ -1411,6 +1411,8 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	}
 	// obtain the single particle energies
 	arma::Mat<_T> W = _H->getTransMat();
+	_H->getSPEnMat();
+
 	LOGINFO("Finished creating matrices" + modelInfo, LOG_TYPES::TRACE, 1);
 
 	std::string name = VEQ(Nh);
@@ -1429,10 +1431,11 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	v_1d<double> energies;
 	v_1d<arma::uvec> orbs;
 	// get the states to use later
-	if (_H->getTypeI() != (uint)MY_MODELS_Q::FREE_FERMIONS_M || Ns % 8 != 0)
-		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
-	else
+	if (useZero)
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
+	else
+		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
+	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
 	// make matrices cut to a specific number of bonds
 	v_1d<arma::Mat<_T>> Ws;
