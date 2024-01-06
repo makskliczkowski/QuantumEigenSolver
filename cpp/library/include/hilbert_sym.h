@@ -191,7 +191,7 @@ namespace Operators
 	// ###################################################################
 
 	/*
-	* @brief Parity with \sigma^x
+	* @brief Parity with \\sigma^x
 	*/
 	template <typename _T>
 	inline Operator<_T> makeFlipX(std::shared_ptr<Lattice> lat, int sec) 
@@ -203,7 +203,7 @@ namespace Operators
 	// ###################################################################
 
 	/*
-	* @brief Parity with \sigma^y
+	* @brief Parity with \\sigma^y
 	*/
 	template <typename _T>
 	inline Operator<_T> makeFlipY(std::shared_ptr<Lattice> lat, int sec) 
@@ -215,7 +215,7 @@ namespace Operators
 	// ###################################################################
 
 	/*
-	* @brief Parity with \sigma^z
+	* @brief Parity with \\sigma^z
 	*/
 	template <typename _T>
 	inline Operator<_T> makeFlipZ(std::shared_ptr<Lattice> lat, int sec) {

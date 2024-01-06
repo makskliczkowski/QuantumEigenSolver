@@ -36,10 +36,14 @@ public:
 	using NQSW						=						arma::Mat<_T>;
 protected:
 	// architecture parameters
+	bool conservesParticles_	=						true;
 	uint nPP_						=						1;
+	uint nParticles_				=						1;
+
 	/* ------------------------------------------------------------ */
 	// ------------------------ W E I G H T S ------------------------
-	NQSW Pfaffian_;
+	NQSW Pfaffian_;										// for stroing the Pfaffian at each step
+	NQSB Fmat_;												// for storing the additional waves from the PP
 
 	/* ------------------------------------------------------------ */
 protected:
@@ -70,19 +74,93 @@ protected:
 	void update(const NQSS& v, uint nFlips)					override final;
 #endif
 
-	// ------------------------- T R A I N ------------------------------	
+	// ---------------------------- T R A I N ----------------------------	
 	void grad(const NQSS& _v, uint _plc)						override final;
 
-	// -------------------------------------------------------------------
+	// ---------------------------- S P I N S ----------------------------
+	/*
+	* @brief Allows one to find the new Pfaffian matrix to calculate the overlap <x|\\phi_ref> in the PP wave function.
+	* This is done as (N/2)! Pf[X] for the standard
+	* |\\phi _ref> = (\\sum _{i,j} \\sum _{\\sigma, \\sigma'} F_{ij}^{\\sigma,\\sigma'} c_{i\\sigma}^\\dag c_{j\\sigma}^\\dag
+	* One seeks for the position of spins and obtains X_ij = F_{ri,rj}^{\\sigma_i, \\sigma_j} - F_{rj,ri}^{\\sigma_j, \\sigma_i}.
+	* For now we calculate this as a double loop
+	* This is for the spins and in this loop it just checks the spin ad hoc, as half filling is imposed.
+	[!TODO optimize].
+	*
+	* @param state defined as a column vector of ones and zeros:
+	*	for fermions one has vector of #Nsite spin ups and then #Nsite spin downs
+	*	for spins one has only vector of #Nsite spins that can be transformed to Abrikosov fermions
+	*/
+	template <class _StateType, uint __spinModes = _spinModes>
+	typename std::enable_if<(__spinModes == _spinModes)					and 
+									(__spinModes == 2)								and 
+									((std::is_same<_StateType, NQSB>::value)	or
+									 (std::is_same<_StateType, u64>::value)), void>::type ansatzPP(const _StateType& _n)
+	{
+		// go through ri
+		for (uint i = 0; i < this->nSites_; ++i)
+		{
+			// check the spin at a given position
+			bool spinI = checkBit(_n, i);
+			for (uint j = 0; j < this->nSites_; ++j)
+			{
+				// check the spin at a given position
+				bool spinJ		=	checkBit(_n, j);
+				{
+					// F_{ri,rj}^{\\sigma_i, \\sigma_j}
+					uint positionLeft		=	(spinI ? 0 : 2 * this->nSites_ * this->nSites_) + 
+													(spinJ ? 0 : this->nSites_ * this->nSites_)		+ 
+													i * this->nSites_ + j;
+					// F_{rj,ri}^{\\sigma_j, \\sigma_i}
+					uint positionRight	=	(spinI ? 2 * this->nSites_ * this->nSites_ : 0) + 
+													(spinJ ? this->nSites_ * this->nSites_ : 0)		+ 
+													j * this->nSites_ + i;
+					// get the Pffafian please
+					this->Pfaffian_(i, j) = this->Fmat_(positionLeft) - this->Fmat_(positionRight);
+				}
+			}
+		}
+	}
+
+	// ------------------------- F E R M I O N S -------------------------
+
+	/*
+	* @brief Allows one to find the new Pfaffian matrix to calculate the overlap <x|\\phi_ref> in the PP wave function.
+	* This is done as (N/2)! Pf[X] for the standard
+	* |\\phi _ref> = (\\sum _{i,j} \\sum _{\\sigma, \\sigma'} F_{ij}^{\\sigma,\\sigma'} c_{i\\sigma}^\\dag c_{j\\sigma}^\\dag
+	* One seeks for the position of spins and obtains X_ij = F_{ri,rj}^{\\sigma_i, \\sigma_j} - F_{rj,ri}^{\\sigma_j, \\sigma_i}.
+	* For now we calculate this as a double loop
+	* This is for the Fermions and in this loop it just checks the spin ad hoc, as half filling is imposed.
+	[!TODO optimize].
+	*
+	* @param state defined as a column vector of ones and zeros:
+	*	for fermions one has vector of #Nsite spin ups and then #Nsite spin downs
+	*	for spins one has only vector of #Nsite spins that can be transformed to Abrikosov fermions
+	*/
+	template <class _StateType, uint __spinModes = _spinModes>
+	typename std::enable_if<(__spinModes == _spinModes)					and 
+									(__spinModes == 4)								and 
+									((std::is_same<_StateType, NQSB>::value)	or
+									 (std::is_same<_StateType, u64>::value)), void>::type ansatzPP(const _StateType& _n)
+	{
+		// !TODO
+		LOGINFO("Function " + __FUNCTION__ + " not implemented yet!", LOG_TYPES::ERROR, 0);
+		throw (std::runtime_error(__FUNCTION__));
+	}
+
 public:
 	~RBM_PP_S()
 	{
 		LOGINFO(this->info_ + " - destructor called.", LOG_TYPES::INFO, 4);
 	};
 	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1)
-		: NQS<_Ht, _spinModes, _T, _stateType>(_H, _lr, _threadNum), nHid_(_nHid)
+		: RBM_S<_Ht, _spinModes, _T, _stateType>(_H, _nHid, _lr, _threadNum)
 	{
-		//this->fullSize_ = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
+		// !TODO make this changable
+		this->nParticles_ = this->nSites_;
+		this->nPP_			= 4 * this->nSites_ * this->nSites_;
+
+		this->fullSize_	= this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_ + this->nPP_;
 		this->allocate();
 		this->setInfo();
 		this->init();
@@ -96,7 +174,7 @@ public:
 	auto getNPP()						const -> uint			{ return this->nPP_; };
 	
 	// --------------------- F I N A L E -----------------------
-	auto ansatz(const NQSS& _in)	const->_T				override final;
+	auto ansatz(const NQSS& _in)	const -> _T				override final;
 };
 
 // ##########################################################################################################################################
@@ -111,8 +189,8 @@ public:
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 _T RBM_PP_S<_Ht, _spinModes, _T, _stateType>::ansatz(const NQSS& _in) const
 {
-	//!TODO
-	return (std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in))) / std::sqrt(this->nVis_); //* std::pow(2.0, this->n_hidden)
+	//this->ansatzPP();
+	return RBM_S<_Ht, _spinModes, _T, _stateType>::ansatz(_in) * algebra::pfaffian<_T>(this->Pfaffian_, this->nParticles_); //* std::pow(2.0, this->n_hidden)
 };
 
 // ##########################################################################################################################################
@@ -128,12 +206,16 @@ template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void RBM_PP_S<_Ht, _spinModes, _T, _stateType>::allocate()
 {
 	// allocate weights
-	//!TODO
+	// Pfaffian matrix for each step
+	this->Pfaffian_	= NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
+	// allocate the weights themselves !TODO - make this symmetric? 
+	// square matrix with spin changes F_{ij}^{\\sigma, \\sigma '}
+	this->Fmat_			= NQSB(this->nSites_ * this->nSites_ * 4);
 	// allocate the rest
 	RBM_S<_Ht, _spinModes, _T, _stateType>::allocate();
 }
 
-// ##############################################################################################################################################
+// #######################################################################################################################################
 
 /*
 * @brief Initializes the weights and biases for the RBM-PP NQS model
@@ -141,7 +223,24 @@ inline void RBM_PP_S<_Ht, _spinModes, _T, _stateType>::allocate()
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void RBM_PP_S<_Ht, _spinModes, _T, _stateType>::init()
 {
-
+	// matrix for the PP wave function
+	this->Fmat_	= NQSB(this->nSites_ * this->nSites_ * 4);
+	auto _lat	= this->H_->getLat();
+	for (uint i = 0; i < this->nSites_; i++)
+	{
+		for (uint j = 0; j < this->nSites_; j++)
+		{
+			auto distance = _lat->getSiteDistance(i, j);
+			for (uint _spin = 0; _spin < 4; ++_spin)
+			{
+				auto p = this->nSites_ * i + j + _spin * this->nSites_ * this->nSites_;
+				// make the weights proportional to the distance
+				this->Fmat_(p) = 0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
+				if (distance != 0)
+					this->Fmat_ /= distance * distance;
+			}
+		}
+	}
 	// !TODO
 	RBM_S<_Ht, _spinModes, _T, _stateType>::init();
 }

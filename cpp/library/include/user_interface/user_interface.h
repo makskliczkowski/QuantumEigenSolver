@@ -593,7 +593,12 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 	case NQSTYPES::RBM:
 		_NQS = std::make_shared<RBM_S<_T, _spinModes>>(	_H,
 																		this->nqsP.nHidden_,
-																		this->nqsP.blockSize_,
+																		this->nqsP.lr_,
+																		this->threadNum);
+		break;
+	case NQSTYPES::RBMPP:
+		_NQS = std::make_shared<RBM_PP_S<_T, _spinModes>>(_H,
+																		this->nqsP.nHidden_,
 																		this->nqsP.lr_,
 																		this->threadNum);
 		break;
@@ -1339,8 +1344,8 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		}
 		else
 		{
-			LOGINFO("LANCZOS NOT YET USED", LOG_TYPES::ERROR, 2);
-			//_NQS->H_->diagH(false, UI_LIMITS_NQS_LANCZOS_STATENUM, 0, 1000, 0.0, "sa");
+			_H->diagH(false, 50, 0, 1000, 0, "lanczos");
+			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
 	}
 	if (!this->nqsP.loadNQS_.empty())

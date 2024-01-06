@@ -48,6 +48,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(nqsP,	nBlocks,		"nb"	);
 		SETOPTIONV(nqsP,	nHidden,		"nh"	);
 		SETOPTIONV(nqsP,	nFlips,		"nf"	);
+		SETOPTIONV(nqsP,	type,			"nqst");
 		SETOPTIONV(nqsP,	nTherm,		"nt"	);
 		SETOPTION(nqsP,	lr						);
 		SETOPTIONV(nqsP,	loadNQS,		"lNQS");

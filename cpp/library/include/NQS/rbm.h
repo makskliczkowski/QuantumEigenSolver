@@ -41,38 +41,38 @@ protected:
 	/* ------------------------------------------------------------ */
 protected:
 	// ----------------------- S T A R T E R S -----------------------
-	void setInfo()														override final;
-	void allocate()													override final;
+	void setInfo()														override;
+	void allocate()													override;
 
 	// ------------------------ S E T T E R S ------------------------
-	void setState(const NQSS& _st, bool _set)					override final;
-	void setState(u64 _st, bool _set)							override final;
+	void setState(const NQSS& _st, bool _set)					override;
+	void setState(u64 _st, bool _set)							override;
 
 	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
 
-	auto pRatio(uint fP, float fV)			-> _T				override final;
-	auto pRatio(uint nFlips)					-> _T				override final;
+	auto pRatio(uint fP, float fV)			-> _T				override;
+	auto pRatio(uint nFlips)					-> _T				override;
 	auto pRatio(const NQSS& _v1,
-					const NQSS& _v2)				-> _T				override final;
+					const NQSS& _v2)				-> _T				override;
 	auto pRatio(std::initializer_list<int> fP,
-		std::initializer_list<double> fV)	-> _T				override final;
+		std::initializer_list<double> fV)	-> _T				override;
 	// ------------------------ W E I G H T S ------------------------
 public:
-	bool setWeights(std::string _path, std::string _file)	override final;
-	bool saveWeights(std::string _path, std::string _file)override final;
+	bool setWeights(std::string _path, std::string _file)	override;
+	bool saveWeights(std::string _path, std::string _file)override;
 protected:
-	void updateWeights()												override final;
+	void updateWeights()												override;
 	// set the angles for the RBM to be updated
 	void setTheta()													{ this->setTheta(this->curVec_); };
 	void setTheta(const NQSS& v);
 #ifdef NQS_ANGLES_UPD
-	void update(uint nFlips)										override final;
-	void update(const NQSS& v, uint nFlips)					override final;
+	void update(uint nFlips)										override;
+	void update(const NQSS& v, uint nFlips)					override;
 #endif
 
 	// ------------------------- T R A I N ------------------------------	
-	void grad(const NQSS& _v, uint _plc)						override final;
+	void grad(const NQSS& _v, uint _plc)						override;
 
 	// -------------------------------------------------------------------
 public:
@@ -80,7 +80,7 @@ public:
 	{
 		LOGINFO(this->info_ + " - destructor called.", LOG_TYPES::INFO, 4);
 	};
-	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, uint _batch, double _lr, uint _threadNum = 1)
+	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1)
 		: NQS<_Ht, _spinModes, _T, _stateType>(_H, _lr, _threadNum), nHid_(_nHid)
 	{
 		this->fullSize_ = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
@@ -91,13 +91,13 @@ public:
 	}
 
 	// --------------------- S E T T E R S ---------------------
-	void init()							override final;
+	void init()														override;
 	
 	// --------------------- G E T T E R S ---------------------
 	auto getNhid()						const -> uint			{ return this->nHid_; };
 	
 	// --------------------- F I N A L E -----------------------
-	auto ansatz(const NQSS& _in)	const->_T				override final;
+	auto ansatz(const NQSS& _in)	const->_T				override;
 };
 
 // ##########################################################################################################################################

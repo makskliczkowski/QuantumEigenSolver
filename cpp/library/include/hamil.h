@@ -81,6 +81,7 @@ protected:
 	// matrices
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
 	arma::SpMat<_T> H_;									// the Hamiltonian
+	arma::Mat<_T> K_;										// the Krylov Vectors
 	arma::vec eigVal_;									// eigenvalues vector
 public:
 	randomGen ran_;										// consistent quick random number generator
@@ -395,63 +396,46 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
+* Modes:
+*		From ARMA:
+			- la,
+			- sa, 
+			- sg,
+			- lm
+*		Mine:
+*			- lanczos
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) {
+inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
+{
 	BEGIN_CATCH_HANDLER
 	{
 		arma::eigs_opts opts;
-		opts.tol				= tol;
+		opts.tol					= tol;
 		opts.maxiter			= maxiter;
 		opts.subdim				= (subdim == 0) ? (2 * int(k) + 1) : subdim;
 		
-		LOGINFO("Diagonalizing Hamiltonian. Using: " + SSTR((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I"), 
-				LOG_TYPES::INFO, 3);
 		if (form == "sg")
 		{
-			if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), 0.0, opts);
-			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), 0.0, opts);
+			LOGINFO("Diagonalizing Hamiltonian. Using: S&I", LOG_TYPES::INFO, 3);
+			//if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), 0.0, opts);
+			//else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), 0.0, opts);
+		}
+		else if (form == "lanczos")
+		{
+			LOGINFO("Diagonalizing Hamiltonian. Using: Lanczos", LOG_TYPES::INFO, 3);
+			LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_, k, &this->ran_);
+			//this->calcAvEn();
 		}
 		else
 		{
-			if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
-			else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), form.c_str());
+			LOGINFO("Diagonalizing Hamiltonian. Using: Lanczos from Armadillo", LOG_TYPES::INFO, 3);
+			//if (woEigVec)		arma::eigs_sym(this->eigVal_, this->H_, arma::uword(k), form.c_str());
+			//else					arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, arma::uword(k), form.c_str());
 		}
 	}
 	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
-}
-
-template <>
-inline void Hamiltonian<cpx>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form)
-{
-	//try {
-	//	eigs_opts opts;
-	//	opts.tol = tol;
-	//	opts.maxiter = maxiter;
-	//	opts.subdim = (subdim == 0) ? (2 * int(k) + 1) : subdim;
-
-	//	stout << "\t\t\t->Using " << ((form == "la" || form == "sa" || form == "lm") ? "Lanczos" : "S&I") << EL;
-
-	//	//if (form == "sg")
-	//	//{
-	//	//	stout << "\t\t\t->Using sigma." << EL;
-	//	//	if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), 0.0, opts);
-	//	//	else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), 0.0, opts);
-	//	//}
-	//	//else
-	//	//{
-	//	stout << "\t\t\t->Using standard." << EL;
-	//	if (withoutEigenVec) arma::eigs_sym(this->eigenvalues, this->H, uword(k), form.c_str());
-	//	else				 arma::eigs_sym(this->eigenvalues, this->eigenvectors, this->H, uword(k), form.c_str());
-	//	//}
-	//}
-	//catch (const std::bad_alloc& e) {
-	//	stout << "Memory exceeded" << e.what() << EL;
-	//	stout << "dim(H) = " << H.size() * sizeof(H(0, 0)) << "bytes" << EL;
-	//	assert(false);
-	//}
-	//E_av_idx = int(k / 2.0);
 }
 
 // ##########################################################################################################################################

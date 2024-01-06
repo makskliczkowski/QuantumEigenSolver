@@ -24,12 +24,14 @@
 // ######### NQS TYPES ###########
 enum NQSTYPES						// #
 {										// #
-	RBM								// #
+	RBM,								// #
+	RBMPP								// #
 };										// #
 										// #
 BEGIN_ENUM(NQSTYPES)				// #
 {										// #
-	DECL_ENUM_ELEMENT(RBM)		// #
+	DECL_ENUM_ELEMENT(RBM),		// #
+	DECL_ENUM_ELEMENT(RBMPP)	// #
 }										// #
 END_ENUM(NQSTYPES)				// #
 // ###############################
@@ -166,7 +168,7 @@ protected:
 	// $A(s', s) = min [1, \frac{P(s')}{P(s)}\frac{r(s'->s)}{r(s->s')}],$ 
 	// where r(s'->s) is chosen such that the ratio is 1.0. 
 	// For example one can choose 
-	// $ r(s'->s) = \frac{|<s'|H|s>|(1-\delta _{s,s'})}{\sum _{s!=s'} |<s'|H|s>| }.$
+	// $ r(s'->s) = \frac{|<s'|H|s>|(1-\delta _{s,s'})}{\\sum _{s!=s'} |<s'|H|s>| }.$
 	// Then, the acceptance ratio decides on accepting the new parameter. 
 	// The probability:
 	// $ P(s) = \frac{||<\psi|s>||^2}{<\psi|\psi>}.$ 
