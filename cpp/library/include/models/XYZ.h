@@ -339,7 +339,7 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	_T newVal			= 0;
 
 	// -------------- perpendicular field --------------
-	std::tie(newIdx, newVal) = Operators::sigma_z(_elem, this->Ns, { _site });
+	std::tie(newIdx, newVal) = Operators::sigma_z<_T>(_elem, this->Ns, { _site });
 	this->setHElem(_elemId, PARAM_W_DISORDER(hz, _site) * newVal, newIdx);
 
 	if (this->parityBreak_ && (_site == 0 || _site == this->Ns - 1))
@@ -356,8 +356,8 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) {
 			// SZiSZj
-			auto [idx_z, val_z]		= Operators::sigma_z(_elem, this->Ns,	{ _site });
-			auto [idx_z2, val_z2]	= Operators::sigma_z(idx_z, this->Ns,	{ (uint)nei });
+			auto [idx_z, val_z]		= Operators::sigma_z<_T>(_elem, this->Ns,	{ _site });
+			auto [idx_z2, val_z2]	= Operators::sigma_z<_T>(idx_z, this->Ns,	{ (uint)nei });
 			this->setHElem(_elemId, 
 							PARAM_W_DISORDER(dA, _site) * PARAM_W_DISORDER(Ja, _site) * (val_z * val_z2),
 							idx_z2);
@@ -381,8 +381,8 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 		uint N_NUMBER = this->lat_->get_nnn_ForwardNum(_site, nnn);
 		if (int nei = this->lat_->get_nnn(_site, N_NUMBER); nei >= 0) {
 			// SZiSZj
-			auto [idx_z, val_z]		= Operators::sigma_z(_elem, this->Ns,	{ _site });
-			auto [idx_z2, val_z2]	= Operators::sigma_z(idx_z, this->Ns,	{ (uint)nei });
+			auto [idx_z, val_z]		= Operators::sigma_z<_T>(_elem, this->Ns,	{ _site });
+			auto [idx_z2, val_z2]	= Operators::sigma_z<_T>(idx_z, this->Ns,	{ (uint)nei });
 			this->setHElem(_elemId,
 							PARAM_W_DISORDER(dB, _site) * PARAM_W_DISORDER(Jb, _site) * (val_z * val_z2),
 							idx_z2);

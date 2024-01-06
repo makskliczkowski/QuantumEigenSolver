@@ -27,8 +27,25 @@ namespace Operators
 	std::pair<u64, cpx> sigma_y(u64 base_vec, int L, const v_1d<uint>& sites);
 	Operators::Operator<cpx> makeSigmaY(std::shared_ptr<Lattice> lat, uint site);
 
-	std::pair<u64, double> sigma_z(u64 base_vec, int L, const v_1d<uint>& sites);
-	Operators::Operator<double> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site);
+	/*
+	* @brief multiplication of sigma_zi | state >
+	* @param L lattice dimensionality (base vector length)
+	* @param sites the sites to meassure correlation at
+	*/
+	template <typename _T>
+	std::pair<u64, _T> sigma_z(u64 base_vec, int L, const v_1d<uint>& sites)
+	{
+		_T val = 1.0;
+		for (auto const& site : sites)
+			val *= checkBit(base_vec, L - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
+		return std::make_pair(base_vec, val);
+	}
+	template <typename _T>
+	Operators::Operator<_T> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site)
+	{
+		typename _OP<_T>::GLB fun_ = [&](u64 state) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { site }); };
+		return Operator<_T>(lat, 1.0, fun_, SymGenerators::SZ);
+	}
 
 	// ##########################################################################################################################################
 

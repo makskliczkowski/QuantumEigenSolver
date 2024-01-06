@@ -50,26 +50,6 @@ Operators::Operator<cpx> Operators::makeSigmaY(std::shared_ptr<Lattice> lat, uin
 }
 
 // ##############################################################################################################################
-
-/*
-* @brief multiplication of sigma_zi | state >
-* @param L lattice dimensionality (base vector length)
-* @param sites the sites to meassure correlation at
-*/
-std::pair<u64, double> Operators::sigma_z(u64 base_vec, int L, const v_1d<uint>& sites) {
-	double val = 1.0;
-	for (auto const& site : sites)
-		val *= checkBit(base_vec, L - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
-	return std::make_pair(base_vec, val);
-};
-
-Operators::Operator<double> Operators::makeSigmaZ(std::shared_ptr<Lattice> lat, uint site)
-{
-	_OP<double>::GLB fun_ = [&](u64 state) { return Operators::sigma_z(state, lat->get_Ns(), { site }); };
-	return Operator<double>(lat, 1.0, fun_, SymGenerators::SZ);
-}
-
-// ##############################################################################################################################
 // ##############################################################################################################################
 // ###################################################### F E R M I O N S #######################################################
 // ##############################################################################################################################

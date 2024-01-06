@@ -287,7 +287,10 @@ public:
 											uint nThrm, 
 											uint nBlck, 
 											uint bSize, 
-											uint nFlip = 1)	{ return arma::Col<_T>(1, arma::fill::zeros); };
+											uint nFlip				= 1,
+											bool quiet				= false,
+											clk::time_point _t	= NOW,			// time!
+											v_1d<std::shared_ptr<Operators::OperatorNQS<cpx>>> _opLocal = {});
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)			const ->_T =			0;
@@ -455,7 +458,7 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::allocate()
 template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline NQS<_Ht, _spinModes, _T, _stateType>::~NQS()
 {
-	LOGINFO(LOG_TYPES::TRACE, "Destroying the general NQS class", 2);
+	LOGINFO("Destroying the general NQS class", LOG_TYPES::TRACE, 3);
 #if not defined NQS_USE_OMP && not defined _DEBUG
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
@@ -923,5 +926,83 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::train(uint mcSteps,
 	LOGINFO(_t, "NQS_EQ", 1);
 	return meanEn;
 }
+
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ########################################################## C O L L E C T I O N ###########################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+
+template<typename _Ht, uint _spinModes, typename _T, class _stateType>
+inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::collect(	uint nSam, 
+																							uint nThrm, 
+																							uint nBlck,
+																							uint bSize,
+																							uint nFlip,
+																							bool quiet,
+																							clk::time_point _t,
+																							v_1d<std::shared_ptr<Operators::OperatorNQS<cpx>>> _opLocal)
+{																							
+	std::string outstr= "";
+	// set the info about training
+	strSeparatedP(outstr, '\t', 2,
+								VEQV(Thermalization Steps, nThrm),
+								VEQV(Block Number, nBlck),
+								VEQV(Size of the single block, bSize),
+								VEQV(Number of flips taken at each step, nFlip));
+	LOGINFOG("Collect: " + outstr, LOG_TYPES::TRACE, 1);
+
+	// make the pbar!
+	this->pBar_			= pBar(20, nSam);
+	arma::Col<_T> meanEn(nSam, arma::fill::zeros);
+	// history of energies
+	arma::Col<_T> En(nBlck, arma::fill::zeros);
+
+	// set the random state at the begining
+	this->nFlip_		= nFlip;
+	this->flipPlaces_.resize(nFlip_);
+	this->flipVals_.resize(nFlip_);
+	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
+	
+	// go through the number of samples to be collected
+	for (uint i = 1; i <= nSam; ++i)
+	{
+		this->setRandomState();
+		// thermalize!
+		this->blockSample(nThrm, this->curState_, false);
+
+		// iterate blocks
+		for (uint _taken = 0; _taken < nBlck; ++_taken) 
+		{
+			// sample them!
+			this->blockSample(bSize, this->curState_, false);
+
+			// energy
+			En(_taken) = this->locEnKernel();
+
+			// local operators
+			{
+				for (auto& op : _opLocal)
+				{
+					auto val [[maybe_unused]] = op->operator()(this->curState_, opFun);
+				}
+			}
+		}
+		// normalize operators to be saved 
+		{
+			for (auto& op : _opLocal)
+				op->normalize(nBlck);
+		}
+
+		// save the mean energy
+		meanEn(i - 1) = arma::mean(En);
+
+		// update the progress bar
+		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
+	}
+	LOGINFO(_t, "NQS_EQ", 1);
+	return meanEn;
+}
+
 
 #endif

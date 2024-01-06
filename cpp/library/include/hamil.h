@@ -324,7 +324,7 @@ inline void Hamiltonian<_T, _spinModes>::printBaseState(std::ostream& output, u6
 	INT_TO_BASE(_s, _tmpVec);
 	if (!EQP(std::abs(val), 0.0, _tol)) 
 	{
-		auto pm				=			(val >= 0) ? "+" : "";
+		auto pm				=			(algebra::real(val) >= 0) ? "+" : "";
 		output				<< pm << val << "*|" << _tmpVec << +">";
 	}
 }

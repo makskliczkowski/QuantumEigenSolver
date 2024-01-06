@@ -71,18 +71,20 @@ namespace Operators {
 
 // ################################################################### G E N E R A L ############################################################################
 
-namespace Operators{
+namespace Operators
+{
 
 	/*
 	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
 	* Can take several arguments
 	*/
 	template<typename _T, typename ..._Ts>
-	class Operator {
+	class Operator 
+	{
 		typedef typename _OP<_T>::template INP<_Ts...> repType;					// type returned for representing, what it does with state and value it returns
-		std::shared_ptr<Lattice> lat_;											// lattice type to be used later on
-		_T eigVal_											=			1.0;	// eigenvalue for symmetry generator (if there is inner value)
-		repType fun_										=			E;		// function allowing to use symmetry
+		std::shared_ptr<Lattice> lat_;													// lattice type to be used later on
+		_T eigVal_												=			1.0;				// eigenvalue for symmetry generator (if there is inner value)
+		repType fun_											=			E;					// function allowing to use symmetry
 		SymGenerators name_									=			SymGenerators::E;
 	
 	public:
@@ -141,29 +143,30 @@ namespace Operators{
 
 		// -------------- O P E R A T O R ( ) -------------
 		
-		virtual auto operator()(u64 s, _Ts... a)		const -> typename _OP<_T>::R{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
-		virtual auto operator()(u64 s, _Ts... a)		-> typename _OP<_T>::R		{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		const -> typename _OP<_T>::R	{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
+		virtual auto operator()(u64 s, _Ts... a)		-> typename _OP<_T>::R			{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
 		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)	const	{ return std::bind(this->fun_, s, std::placeholders::_1); };
 		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)			{ return std::bind(this->fun_, s, std::placeholders::_1); };
 
 		// ----------------------------------------------------------------------------------------------------
 
 		// -------------------- STATIC --------------------
-		static auto E(u64 s, _Ts...)					-> typename _OP<_T>::R		{ return std::make_pair(s, _T(1.0)); };
+		static auto E(u64 s, _Ts...)						-> typename _OP<_T>::R			{ return std::make_pair(s, _T(1.0)); };
 
 		// ----------------- V I R T U A L ----------------
 		virtual void init() {};
 		
 		// -------------------- SETTERS -------------------
-		auto setFun(const repType& _fun)				-> void						{ this->fun_ = _fun; };
-		auto setFun(repType&& _fun)						-> void						{ this->fun_ = std::move(_fun); };
-		auto setName(SymGenerators _name)				-> void						{ this->name_ = _name; };
-		auto setVal(_T _val)							-> void						{ this->eigVal_ = _val; };
+		auto setFun(const repType& _fun)					-> void								{ this->fun_ = _fun; };
+		auto setFun(repType&& _fun)						-> void								{ this->fun_ = std::move(_fun); };
+		auto setName(SymGenerators _name)				-> void								{ this->name_ = _name; };
+		auto setVal(_T _val)									-> void								{ this->eigVal_ = _val; };
 
 		// -------------------- GETTERS --------------------
-		auto getVal()									const -> _T					{ return this->eigVal_; };
-		auto getFun()									const -> repType			{ return this->fun_; };
-		auto getName()									const -> SymGenerators		{ return this->name_; };
+		auto getVal()											const -> _T							{ return this->eigVal_; };
+		auto getFun()											const -> repType					{ return this->fun_; };
+		auto getName()											const -> SymGenerators			{ return this->name_; };
+		auto getNs()											const -> uint						{ return this->lat_->get_Ns(); };
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -257,12 +260,12 @@ namespace Operators{
 		/*
 		* @brief representative eigenvalue calculator
 		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op)								{ return _op.eigVal_;};
+		friend _T chi(const Operator<_T, _Ts...>& _op)										{ return _op.eigVal_;};
 
 		/*
 		* @brief calculate operator acting on state num eigenvalue
 		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)			{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
+		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)				{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
 	
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		
@@ -282,6 +285,64 @@ namespace Operators{
 		[[deprecated]]
 		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
 
+	};
+
+	// ##########################################################################################################################################
+	// ##########################################################################################################################################
+	// ######################################################## N Q S   O P E R A T O R #########################################################
+	// ##########################################################################################################################################
+	// ##########################################################################################################################################
+
+	template <typename _T, typename ..._Ts>
+	class OperatorNQS
+	{
+		// type returned for representing, what it does with state and value it returns
+		typedef typename _OP<_T>::template INP<_Ts...> repType; 
+		using NQSS			= arma::Col<double>;
+		using NQSFun		= std::function<cpx(const NQSS& _v)>;
+	public:
+		std::string name_ = "";
+		// ##### current value #####
+		_T currentValue_ 	= 0.0;
+		v_1d<_T> samples_;
+		NQSS state_;
+
+		// operators to apply step by step that add up in the average <S|O|\psi_M>
+		// O may in general be 
+		v_1d<Operators::Operator<_T, _Ts...>> op_;
+		
+		// ### construct operators ###
+		OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name = "")
+			: name_(_name), currentValue_(0.0), op_({ _op }) { this->state_.resize(_op.getNs()); };
+
+		OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name = "")
+			: name_(_name), currentValue_(0.0), op_(_opV) { this->state_.resize(_opV[0].getNs()); };
+		
+		// ####### application #######
+		auto operator()(u64 s, NQSFun _fun, _Ts... a) -> _T
+		{ 
+			_T _valTotal = 0.0;
+			for (auto& _op : op_)
+			{
+				// take value and new vector 
+				auto [s2, _val] = _op(s, a...);
+				// transform to state
+				INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
+				// calculate the probability ratio
+				_valTotal += _val * _fun(this->state_);
+			}
+			this->currentValue_ += _valTotal;
+			return _valTotal;
+		};
+
+		// ######### setters #########
+		auto reset()					-> void { currentValue_ = 0.0; };
+		auto resetSamples(			-> void { this->reset(); this->samples_ = {}; }
+		auto normalize(uint N)		-> void { currentValue_ /= double(N); samples_.push_back(currentValue_); this->reset(); };
+
+		// ######### getters #########
+		auto value()					const -> _T { return currentValue_; };
+		auto getOperator(uint i)	const -> Operators::Operator<_T, _Ts...> { return this->op_[i]; };
 	};
 };
 

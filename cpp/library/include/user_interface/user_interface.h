@@ -1340,6 +1340,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		if (Nh <= UI_LIMITS_NQS_FULLED)
 		{
 			_H->diagH(false);
+			_H->prettyPrint(stout, _H->getEigVec(0), latP.lat->get_Ns(), 1e-2);
 			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
 		else
@@ -1351,16 +1352,34 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 	if (!this->nqsP.loadNQS_.empty())
 		_NQS->setWeights(this->nqsP.loadNQS_, "weights.h5");
 
+	// set the operators to save
+	v_1d<std::shared_ptr<Operators::OperatorNQS<cpx>>> _ops;
+	for (auto i = 0; i < this->latP.lat->get_Ns(); ++i) 
+	{
+		std::shared_ptr< Operators::OperatorNQS<cpx>> _op = std::make_shared<Operators::OperatorNQS<cpx>>(Operators::makeSigmaZ<cpx>(latP.lat, i), "sz_" + STR(i));
+		_ops.push_back(_op);
+	}
+
 	// start the simulation
-	arma::Col<cpx> _EN		= _NQS->train(	this->nqsP.nMcSteps_,
-														this->nqsP.nTherm_,
-														this->nqsP.nBlocks_,
-														this->nqsP.blockSize_,
-														dir,												
-														this->nqsP.nFlips_,
-														this->quiet,
-														_timer.start(),
-														15);
+	arma::Col<cpx> _EN(this->nqsP.nMcSteps_ * 2, arma::fill::zeros);
+	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(this->nqsP.nMcSteps_,
+																			this->nqsP.nTherm_,
+																			this->nqsP.nBlocks_,
+																			this->nqsP.blockSize_,
+																			dir,												
+																			this->nqsP.nFlips_,
+																			this->quiet,
+																			_timer.start(),
+																			15);
+	_EN.subvec(this->nqsP.nMcSteps_, 2 * this->nqsP.nMcSteps_ - 1) = _NQS->collect(	this->nqsP.nMcSteps_,
+																												this->nqsP.nTherm_,
+																												this->nqsP.nBlocks_,
+																												this->nqsP.blockSize_,
+																												this->nqsP.nFlips_,
+																												this->quiet,
+																												_timer.start(),
+																												_ops);
+
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
 	_ENSM.col(0)	= arma::real(_EN);
 	_ENSM.col(1)	= arma::imag(_EN);
