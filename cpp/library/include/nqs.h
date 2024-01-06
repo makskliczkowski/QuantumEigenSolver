@@ -215,7 +215,7 @@ public:
 	 // regularization
 #ifdef NQS_SREG 
 	double covMatrixRegMult		= 0.95;										// multiplier for the regularization
-	double covMatrixRegStart	= 1e-2;										// starting parameter for regularisation (epsilon1)
+	double covMatrixRegStart	= 1e-1;										// starting parameter for regularisation (epsilon1)
 	double covMatrixRegStart2	= 1e-3;										// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg();
 #endif
@@ -778,7 +778,7 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::gradSR(uint step)
 #	else 
 	// solve normally
 	//this->F_ = this->lr_ * (arma::inv(this->S_) * this->F_);
-	this->F_ = this->lr_ * arma::solve(this->S_, this->F_, solve_opts::likely_sympd);
+	this->F_ = this->lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
 #	endif 
 }
 #endif
