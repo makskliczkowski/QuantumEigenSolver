@@ -1353,12 +1353,13 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		_NQS->setWeights(this->nqsP.loadNQS_, "weights.h5");
 
 	// set the operators to save
-	v_1d<std::shared_ptr<Operators::OperatorNQS<cpx>>> _ops;
-	for (auto i = 0; i < this->latP.lat->get_Ns(); ++i) 
-	{
-		std::shared_ptr< Operators::OperatorNQS<cpx>> _op = std::make_shared<Operators::OperatorNQS<cpx>>(Operators::makeSigmaZ<cpx>(latP.lat, i), "sz_" + STR(i));
-		_ops.push_back(_op);
-	}
+	//v_1d<std::shared_ptr<Operators::OperatorNQS<cpx>>> _ops;
+	//for (auto i = 0; i < this->latP.lat->get_Ns(); ++i) 
+	//{
+	//	std::shared_ptr< Operators::OperatorNQS<cpx>> _op = std::make_shared<Operators::OperatorNQS<cpx>>(Operators::makeSigmaZ<cpx>(latP.lat, i), "sz_" + STR(i));
+	//	_ops.push_back(_op);
+	//}
+	NQSAv::MeasurementNQS<cpx> _meas(this->latP.lat, {});
 
 	// start the simulation
 	arma::Col<cpx> _EN(this->nqsP.nMcSteps_ * 2, arma::fill::zeros);
@@ -1378,7 +1379,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 																												this->nqsP.nFlips_,
 																												this->quiet,
 																												_timer.start(),
-																												_ops);
+																												_meas);
 
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
 	_ENSM.col(0)	= arma::real(_EN);

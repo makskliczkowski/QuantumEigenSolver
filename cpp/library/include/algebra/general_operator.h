@@ -76,7 +76,7 @@ namespace Operators
 
 	/*
 	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
-	* Can take several arguments
+	* Can take several template arguments
 	*/
 	template<typename _T, typename ..._Ts>
 	class Operator 
@@ -286,64 +286,6 @@ namespace Operators
 		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
 
 	};
-
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ######################################################## N Q S   O P E R A T O R #########################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-
-	template <typename _T, typename ..._Ts>
-	class OperatorNQS
-	{
-		// type returned for representing, what it does with state and value it returns
-		typedef typename _OP<_T>::template INP<_Ts...> repType; 
-		using NQSS			= arma::Col<double>;
-		using NQSFun		= std::function<cpx(const NQSS& _v)>;
-	public:
-		std::string name_ = "";
-		// ##### current value #####
-		_T currentValue_ 	= 0.0;
-		v_1d<_T> samples_;
-		NQSS state_;
-
-		// operators to apply step by step that add up in the average <S|O|\psi_M>
-		// O may in general be 
-		v_1d<Operators::Operator<_T, _Ts...>> op_;
-		
-		// ### construct operators ###
-		OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name = "")
-			: name_(_name), currentValue_(0.0), op_({ _op }) { this->state_.resize(_op.getNs()); };
-
-		OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name = "")
-			: name_(_name), currentValue_(0.0), op_(_opV) { this->state_.resize(_opV[0].getNs()); };
-		
-		// ####### application #######
-		auto operator()(u64 s, NQSFun _fun, _Ts... a) -> _T
-		{ 
-			_T _valTotal = 0.0;
-			for (auto& _op : op_)
-			{
-				// take value and new vector 
-				auto [s2, _val] = _op(s, a...);
-				// transform to state
-				INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
-				// calculate the probability ratio
-				_valTotal += _val * _fun(this->state_);
-			}
-			this->currentValue_ += _valTotal;
-			return _valTotal;
-		};
-
-		// ######### setters #########
-		auto reset()					-> void { currentValue_ = 0.0; };
-		auto resetSamples(			-> void { this->reset(); this->samples_ = {}; }
-		auto normalize(uint N)		-> void { currentValue_ /= double(N); samples_.push_back(currentValue_); this->reset(); };
-
-		// ######### getters #########
-		auto value()					const -> _T { return currentValue_; };
-		auto getOperator(uint i)	const -> Operators::Operator<_T, _Ts...> { return this->op_[i]; };
-	};
 };
 
 // ##########################################################################################################################################
@@ -376,7 +318,7 @@ template<template <class> class _MatType, HasMatrixType _Concept>
 inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
 {
 	_MatType<_T> op(_dim, _dim);
-#pragma omp paralell for
+#pragma omp parallel for
 	for (u64 _base = 0; _base < _dim; _base++) 
 	{
 		auto [_idx, _val]		=	this->operator()(_base, _arg...);
