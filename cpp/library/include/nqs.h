@@ -215,7 +215,7 @@ namespace Operators
 	template <typename ..._Tss>
 	inline uint Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tss ...a)
 	{
-		const uint dummy[] = { (updCurrent(_val, a), 0)... };
+		const int dummy[] = { (updCurrent(_val, a), 0)... };
 		if (sizeof...(a) == 0)
 			this->updCurrentI(_val, 0, 0);
 		else if (sizeof...(a) == 1)
