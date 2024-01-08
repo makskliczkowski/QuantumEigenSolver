@@ -13,7 +13,7 @@
 */
 template <typename _Ht, 
 			uint _spinModes		= 2,
-			typename _T				= std::complex<double>,
+			typename _T				= _Ht,
 			class _stateType		= double>
 class RBM_S : public NQS<_Ht, _spinModes, _T, _stateType>
 {
@@ -147,14 +147,14 @@ inline void RBM_S<_Ht, _spinModes, _T, _stateType>::init()
 {
 	// initialize biases visible
 	for (uint i = 0; i < this->nVis_; i++)
-		this->bV_(i) = 0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
+		this->bV_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
 	// initialize biases hidden
 	for (uint i = 0; i < this->nHid_; i++)
-		this->bH_(i) = 0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
+		this->bH_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
 	// weights matrix
 	for (uint i = 0; i < this->W_.n_rows; i++)
 		for (uint j = 0; j < this->W_.n_cols; j++)
-			this->W_(i, j) = 0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
+			this->W_(i, j) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
 	// initialize with a random state
 	this->setRandomState();
 }

@@ -26,7 +26,7 @@
 */
 template <typename _Ht, 
 			uint _spinModes		= 2,
-			typename _T				= std::complex<double>,
+			typename _T				= _Ht,
 			class _stateType		= double>
 class RBM_PP_S : public RBM_S<_Ht, _spinModes, _T, _stateType>
 {
@@ -224,8 +224,9 @@ template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline void RBM_PP_S<_Ht, _spinModes, _T, _stateType>::init()
 {
 	// matrix for the PP wave function
-	this->Fmat_	= NQSB(this->nSites_ * this->nSites_ * 4);
+	this->Fmat_	= 0.05 * NQSB(this->nSites_ * this->nSites_ * 4, arma::fill::randn);
 	auto _lat	= this->H_->getLat();
+	
 	for (uint i = 0; i < this->nSites_; i++)
 	{
 		for (uint j = 0; j < this->nSites_; j++)
@@ -235,9 +236,8 @@ inline void RBM_PP_S<_Ht, _spinModes, _T, _stateType>::init()
 			{
 				auto p = this->nSites_ * i + j + _spin * this->nSites_ * this->nSites_;
 				// make the weights proportional to the distance
-				this->Fmat_(p) = 0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
 				if (distance != 0)
-					this->Fmat_ /= distance * distance;
+					this->Fmat_(p) /= distance * distance;
 			}
 		}
 	}

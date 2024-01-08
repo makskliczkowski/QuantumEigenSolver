@@ -37,7 +37,7 @@ namespace Hilbert
 		void mappingKernel(u64 start, u64 stop, v_1d<u64>& mapThreaded, v_1d<_T>& normThreaded, int t);
 		void mappingKernelRepr();
 
-	protected:
+	public:
 		const uint Nhl										= _spinModes;		// number of local possibilities 
 		
 		// mutexes
@@ -128,13 +128,13 @@ namespace Hilbert
 		*/
 		HilbertSpace(const HilbertSpace<_T, _spinModes>& _H)
 			:	Nhl(_H.Nhl),
+				t_(_H.t_),
+				threadNum(_H.threadNum),
 				Ns(_H.Ns), 
 				Nint(_H.Nint), 
 				Nh(_H.Nh), 
 				NhFull(_H.NhFull), 
 				lat(_H.lat),
-				t_(_H.t_),
-				threadNum(_H.threadNum),
 				symGroupGlobal_(_H.symGroupGlobal_), 
 				symGroup_(_H.symGroup_), 
 				symGroupSec_(_H.symGroupSec_),
@@ -146,6 +146,36 @@ namespace Hilbert
 				WriteLock lhs_lk(this->Mutex, std::defer_lock);
 				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
 				std::lock(lhs_lk, rhs_lk);
+		};
+
+		/*
+		* @brief Assign constructor with different type
+		*/
+		template <typename _T2 = _T>
+		HilbertSpace(const HilbertSpace<_T2, _spinModes>& _H, bool otherType)
+			:	Nhl(_H.Nhl),
+				t_(_H.t_),
+				threadNum(_H.threadNum),
+				Ns(_H.Ns), 
+				Nint(_H.Nint), 
+				Nh(_H.Nh), 
+				NhFull(_H.NhFull), 
+				lat(_H.lat),
+				symGroupGlobal_(_H.symGroupGlobal_)
+		{
+			// set symmetry elements
+			this->normalization_ = v_1d<_T>();
+			this->symGroup_ = v_1d<Operators::Operator<_T>>();
+			this->mapping_ = v_1d<u64>();
+			this->reprMap_ = v_1d<std::pair<u64, _T>>();
+
+			if (true)
+				this->initMapping(this->symGroupSec_, false, t_);
+
+			if (this->Nh == this->NhFull)
+				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
+			else if (this->Nh <= 0)
+				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
 		};
 
 		/*
@@ -174,7 +204,7 @@ namespace Hilbert
 		};
 	
 		// -------------------------- ASSIGN OPERATOR -------------------------
-		HilbertSpace<_T>& operator=(const HilbertSpace<_T, _spinModes>& _H)
+		HilbertSpace<_T, _spinModes>& operator=(const HilbertSpace<_T, _spinModes>& _H)
 		{
 			if (this != &_H) 
 			{
@@ -182,19 +212,19 @@ namespace Hilbert
 				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
 				std::lock(lhs_lk, rhs_lk);
 
-				this->Ns				= _H.Ns;
-				this->Nh				= _H.Nh;
-				this->lat				= _H.lat;
-				this->Nint				= _H.Nint;
-				this->NhFull			= _H.NhFull;
+				this->Ns						= _H.Ns;
+				this->Nh						= _H.Nh;
+				this->lat					= _H.lat;
+				this->Nint					= _H.Nint;
+				this->NhFull				= _H.NhFull;
 				this->threadNum			= _H.threadNum;
 				this->symGroupSec_		= _H.symGroupSec_;
 				this->symGroupGlobal_	= _H.symGroupGlobal_;
-				this->normalization_	= _H.normalization_;
+				this->normalization_		= _H.normalization_;
 				this->symGroup_			= _H.symGroup_;
-				this->fullMap_			= _H.fullMap_;
-				this->mapping_			= _H.mapping_;
-				this->t_				= _H.t_;
+				this->fullMap_				= _H.fullMap_;
+				this->mapping_				= _H.mapping_;
+				this->t_						= _H.t_;
 			}
 			return *this;
 		};

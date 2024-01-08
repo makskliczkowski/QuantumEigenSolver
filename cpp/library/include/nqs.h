@@ -94,6 +94,17 @@ namespace Operators
 		arma::Mat<cpx> currentValue_;
 		// save samples here
 		v_1d<arma::Mat<cpx>> samples_;
+
+		// ####### MANY BODY #######
+		arma::Mat<_T> manyBodyMatrix_;
+		arma::Mat<_T> manyBodyVal_;
+
+		// ######## INDICES ########
+		// for finding out the index in the variadic variable
+		v_1d<uint> indices_;
+		uint currentIdx_					= 0;
+
+		// ######## HELPER #########
 		// store the column state
 		NQSS state_;
 
@@ -110,21 +121,28 @@ namespace Operators
 		// ###### APPLICATION ######
 		auto operator()(u64 s, _Ts... a)							const -> v_1d<typename _OP<_T>::R>;
 		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)	-> cpx;
-		auto operator[](uint i)										const -> arma::Mat<cpx> { return this->samples_[i];		};
+		auto operator[](uint i)										const -> arma::Mat<cpx> { return this->samples_[i];	};
 		// updates current value
-		auto updCurrentI(cpx _val, uint i = 0, uint j = 0)	-> void { this->currentValue_(i, j) += _val;					};
-		// template variadic
-		auto updCurrent(cpx _val, uint i)						-> uint { return i;													};
+		template <class _Tt = uint>
+		auto updCurrent(cpx _val, _Tt i)							-> void;
+		template <class _Tt, typename ..._Tss>
+		auto updCurrent(cpx _val, _Tt i, _Tss...a)			-> void;
 		template <typename ..._Tss>
-		auto updCurrent(cpx _val, _Tss...a)						-> uint;
-
+		auto updCurrent(cpx _val, _Tss...a)						-> void { this->updCurrent(_val, a...);					};
+	
+	public:
 		// ######## SETTERS ########
 		auto resetSamples()			-> void { this->samples_ = {};																};
 		auto resetValue()				-> void { currentValue_ = arma::Mat<cpx>(sizeX_, sizeY_, arma::fill::zeros);	};
 		auto reset()					-> void { this->resetValue(); this->resetSamples();									};
-		auto normalize(uint N)		-> void { samples_.push_back(currentValue_ / double(N)); this->resetValue();	};
+		auto normalize(uint N)		-> void; 
+		template <typename _T2>
+		auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>&, _Ts... a)		-> void;
+		auto applyManyBody(const arma::Col<_T>& _C, uint i = 0, uint j = 0)	-> arma::Col<_T>;
 
 		// ######## GETTERS ########
+		auto mbmat()					const -> arma::Mat<_T>							{ return this->manyBodyMatrix_;		};
+		auto mbval()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
 		auto name()						const -> std::string								{ return this->name_;					};
 		auto var()						const -> arma::Mat<cpx>							{ return VEC::var(samples_);			};
 		auto mean()						const -> arma::Mat<cpx>							{ return VEC::mean(samples_);			};
@@ -152,21 +170,25 @@ namespace Operators
 	{
 		if (sizeof...(_Ts) == 0)
 		{
-			this->sizeX_ = 1;
-			this->sizeY_ = 1;
+			this->sizeX_				= 1;
+			this->sizeY_				= 1;
+			this->indices_				= {};
 		}
 		else if (sizeof...(_Ts) == 1)
 		{
-			this->sizeX_ = this->Ns_;
-			this->sizeY_ = 1;
+			this->sizeX_				= this->Ns_;
+			this->sizeY_				= 1;
+			this->indices_				= { 0 };
 		}
 		else if (sizeof...(_Ts) == 2)
 		{
-			this->sizeX_ = this->Ns_;
-			this->sizeY_ = this->Ns_;
+			this->sizeX_				= this->Ns_;
+			this->sizeY_				= this->Ns_;
+			this->indices_				= { 0, 0 };
 		}
 		else
 			throw std::runtime_error("Not implemented for more than two arguments!");
+		this->manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
 	};
 
 	template <typename _T, typename ..._Ts>
@@ -212,19 +234,60 @@ namespace Operators
 	// ##########################################################################################################################################
 	
 	template<typename _T, typename ..._Ts>
-	template <typename ..._Tss>
-	inline uint Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tss ...a)
+	template<class _Tt>
+	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i)
 	{
-		const uint dummy[] = { (updCurrent(_val, a), 0)... };
-		if (sizeof...(a) == 0)
-			this->updCurrentI(_val, 0, 0);
-		else if (sizeof...(a) == 1)
-			this->updCurrentI(_val, dummy[0], 0);
-		else if (sizeof...(a) == 2)
-			this->updCurrentI(_val, dummy[0], dummy[1]);
+		this->indices_[this->currentIdx_] = i;
+		this->currentIdx_++;
+		if (indices_.size() == 0)
+			this->currentValue_(0, 0) += _val;
+		else if (indices_.size() == 1)
+			this->currentValue_(this->indices_[0], 0) += _val;
+		else if (indices_.size() == 2)
+			this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
 		else
 			throw std::runtime_error("Not implemented such exotic operators");
-		return 0;
+	}
+
+	template<typename _T, typename ..._Ts>
+	template <class _Tt, typename ..._Tss>
+	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i, _Tss ...a)
+	{
+		indices_[currentIdx_] = i;
+		currentIdx_++;
+		updCurrent(_val, a...);
+	}
+
+	/*
+	* @brief Sets the many body matrix to apply it later for the many body states
+	* @param _H Hilbert space
+	*/
+	template<typename _T, typename ..._Ts>
+	template <typename _T2>
+	inline void Operators::OperatorNQS<_T, _Ts...>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _H, _Ts ...a)
+	{
+		this->manyBodyMatrix_ = arma::Mat<_T>(_H.getHilbertSize(), _H.getHilbertSize(), arma::fill::zeros);
+		for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+		{
+			auto _Min = _op.template generateMat<typename arma::Mat, _T2>(_H, a...);
+			this->manyBodyMatrix_ += _Min;
+		}
+		this->manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
+	}
+
+	/*
+	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
+	* to a specific place (i, j) in the matrix
+	* @param _C many body state
+	* @param i first matrix save element
+	* @param j second matrix save element
+	*/
+	template<typename _T, typename ..._Ts>
+	inline arma::Col<_T> Operators::OperatorNQS<_T, _Ts...>::applyManyBody(const arma::Col<_T>& _C, uint i, uint j) 
+	{
+		arma::Col<_T> _Cout = this->manyBodyMatrix_ * _C;
+		manyBodyVal_(i, j) = arma::cdot(_C, _Cout);
+		return _Cout;
 	}
 
 	/*
@@ -238,7 +301,8 @@ namespace Operators
 	inline cpx Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
 	{
 		// starting value
-		cpx _valTotal = 0.0;
+		this->currentIdx_ = 0;
+		cpx _valTotal		= 0.0;
 		// go through operators
 		for (auto& _op : op_)
 		{
@@ -270,6 +334,16 @@ namespace Operators
 		return _out;
 	}
 
+	/*
+	* @brief Normalize the values after given block sample
+	* @param N size of the block
+	*/
+	template<typename _T, typename ..._Ts>
+	inline auto Operators::OperatorNQS<_T, _Ts...>::normalize(uint N) -> void
+	{
+		samples_.push_back(currentValue_ / double(N)); 
+		this->resetValue();
+	}
 };
 
 // average operators in the NQS
@@ -313,10 +387,12 @@ namespace NQSAv
 		using NQSS			= arma::Col<double>;
 		// for initializing the pRatio function with a single column vector
 		using NQSFunCol	= std::function<cpx(const NQSS& _v)>;
-		using OPG			= v_1d<std::unique_ptr<Operators::OperatorNQS<_T>>>;
-		using OPL			= v_1d<std::unique_ptr<Operators::OperatorNQS<_T, uint>>>;
-		using OPC			= v_1d<std::unique_ptr<Operators::OperatorNQS<_T, uint, uint>>>;
+		using OPG			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>>;
+		using OPL			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>>;
+		using OPC			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>>;
 	protected:
+		std::string dir_	= "";
+		uint threads_		= 1;
 		uint Ns_				= 0;
 		// operator vector
 		//v_1d<NQSAv::MeasurementNQSOperators> measOp_;
@@ -330,12 +406,16 @@ namespace NQSAv
 		OPC opC_;
 	public:
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators);
-		MeasurementNQS(std::shared_ptr<Lattice> _lat, const OPG& _opG,
-																	 const OPL& _opL,
-																	 const OPC& _opC);
+		MeasurementNQS(std::shared_ptr<Lattice> _lat, const std::string& _dir,
+																	 OPG&& _opG,
+																	 OPL&& _opL,
+																	 OPC&& _opC,
+																	 uint _threadNum = 1);
 
 		void measure(u64 s, NQSFunCol _fun);
+		void measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>&);
 		void normalize(uint _nBlck);
+		void save(const strVec& _ext = { ".h5" });
 	};
 
 	// ##########################################################################################################################################
@@ -368,10 +448,20 @@ namespace NQSAv
 	}
 
 	template <typename _T>
-	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat, const OPG& _opG, const OPL& _opL, const OPC& _opC)
-		: Ns_(_lat->get_Ns()), lat_(_lat), opG_(_opG), opL_(_opL), opC_(_opC)
+	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat,  const std::string& _dir,
+																												OPG&& _opG,
+																												OPL&& _opL, 
+																												OPC&& _opC,
+																												uint _threadNum)
+		: dir_(_dir), threads_(_threadNum), Ns_(_lat->get_Ns()), lat_(_lat)
 	{
-		CONSTRUCTOR_CALL;
+		// create directory
+		makeDir(_dir);
+
+		this->opG_ = std::move(_opG);
+		this->opL_ = std::move(_opL);
+		this->opC_ = std::move(_opC);
+		//CONSTRUCTOR_CALL;
 	}
 
 	// ##########################################################################################################################################
@@ -397,7 +487,7 @@ namespace NQSAv
 			for (auto& _op : this->opL_)
 			{
 				// go through the local operators
-#pragma omp parallel for
+#pragma omp parallel for num_threads(this->threads_)
 				for (auto i = 0; i < this->Ns_; ++i)
 				{
 					auto val [[maybe_unused]] = _op->operator()(s, _fun, i);
@@ -411,12 +501,60 @@ namespace NQSAv
 			// measure correlation
 			for (auto& _op : this->opC_)
 			{
-#pragma omp parallel for
+#pragma omp parallel for num_threads(this->threads_)
 				for (auto i = 0; i < this->Ns_; ++i)
 				{
 					for (auto j = 0; j < this->Ns_; ++j)
 					{
 						auto val [[maybe_unused]] = _op->operator()(s, _fun, i, j);
+					}
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	}
+
+	template<typename _T>
+	inline void NQSAv::MeasurementNQS<_T>::measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>& _H)
+	{
+		BEGIN_CATCH_HANDLER
+		{
+			// measure global
+			for (auto& _op : this->opG_)
+			{
+				_op->setManyBodyMat(_H);
+				_op->applyManyBody(_state, 0, 0);
+			}
+				
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure local
+			for (auto& _op : this->opL_)
+			{
+				// go through the local operators
+				for (auto i = 0; i < this->Ns_; ++i)
+				{
+					_op->setManyBodyMat(_H, i);
+					_op->applyManyBody(_state, i, 0);
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure correlation
+			for (auto& _op : this->opC_)
+			{
+				for (auto i = 0; i < this->Ns_; ++i)
+				{
+					for (auto j = 0; j < this->Ns_; ++j)
+					{
+						_op->setManyBodyMat(_H, i, j);
+						_op->applyManyBody(_state, i, j);
 					}
 				}
 			}
@@ -451,8 +589,79 @@ namespace NQSAv
 		}
 		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
 	}
-};
 
+	template<typename _T>
+	inline void NQSAv::MeasurementNQS<_T>::save(const strVec& _ext)
+	{
+		BEGIN_CATCH_HANDLER
+		{
+			// save global
+			for (auto& _op : this->opG_)
+			{
+				// nqs
+				{
+					arma::Mat<cpx> M = _op->mean();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->name() + ext, M, "values");
+				}
+				// many body
+				{
+					arma::Mat<_T> M = _op->mbval();
+					if(M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure local
+			for (auto& _op : this->opL_)
+			{
+				{
+					arma::Mat<cpx> M = _op->mean();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->name() + ext, M, "values");
+				}
+				// many body
+				{
+					arma::Mat<_T> M = _op->mbval();
+					if (M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure correlation
+			for (auto& _op : this->opC_)
+			{
+				{
+					arma::Mat<cpx> M = _op->mean();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->name() + ext, M, "values");
+				}
+				// many body
+				{
+					arma::Mat<_T> M = _op->mbval();
+					if (M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	}
+
+};
 
 // ##########################################################################################################################################
 // ##########################################################################################################################################
@@ -466,7 +675,7 @@ namespace NQSAv
 */
 template <typename _Ht,
 		  uint _spinModes				= 2, 
-		  typename _T					= std::complex<double>, 
+		  typename _T					= _Ht, 
 		  class _stateType			= double>
 class NQS 
 {
@@ -657,7 +866,8 @@ public:
 	// Hamiltonian
 	auto getHamiltonianInfo()						const -> std::string { return this->H_->getInfo();			};
 	auto getHamiltonianEigVal(u64 _idx)			const -> double		{ return this->H_->getEigVal(_idx); };
-	auto getHamiltonian()							const -> std::shared_ptr<Hamiltonian<_Ht>> { return this->H_; };
+	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;							};
+	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
 
 #ifdef NQS_USE_CPU
 	auto getThreadID()								const -> uint;
@@ -715,29 +925,9 @@ template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline bool NQS<_Ht, _spinModes, _T, _stateType>::saveWeights(std::string _path, std::string _file)
 {
 	LOGINFO(LOG_TYPES::INFO, "Saving the checkpoint configuration.", 2);
-#ifdef _DEBUG
-	LOGINFO(LOG_TYPES::INFO, _path + _file, 3);
-#endif
-	createDir(_path);
-	bool _isSaved	= false;
-#ifdef HAS_CXX20
-	if (_file.ends_with(".h5"))
-#else
-	if (endsWith(_file, ".h5"))
-#endif
-		_isSaved	=	this->F_.save(arma::hdf5_name(_path + _file, "weights"));
-#ifdef HAS_CXX20
-	else if (_file.ends_with(".bin"))
-#else
-	else if (endsWith(_file, ".bin"))
-#endif
-		_isSaved	=	this->F_.save(_path + _file);
-#ifdef HAS_CXX20
-	else if (_file.ends_with(".txt") || _file.ends_with(".dat"))
-#else
-	else if (endsWith(_file, ".txt") || endsWith(_file, ".dat"))
-#endif
-		_isSaved	=	this->F_.save(_path + _file, arma::arma_ascii);
+
+	// save the weights to a given path
+	auto _isSaved = saveAlgebraic<_T>(_path, _file, this->F_, "weights");
 
 	// if not saved properly
 	if (!_isSaved && (_file != "weights.h5"))
@@ -759,39 +949,7 @@ template<typename _Ht, uint _spinModes, typename _T, class _stateType>
 inline bool NQS<_Ht, _spinModes, _T, _stateType>::setWeights(std::string _path, std::string _file)
 {
 	LOGINFO(LOG_TYPES::INFO, "Loading the checkpoint weights:", 2);
-#ifdef _DEBUG
-	LOGINFO(LOG_TYPES::INFO, _path + _file, 3);
-#endif
-
-#ifdef HAS_CXX20
-	if (_file.ends_with(".h5"))
-#else
-	if (endsWith(_file, ".h5"))
-#endif
-	{
-		this->F_.load(arma::hdf5_name(_path + _file, "weights"));
-		return true;
-	}
-#ifdef HAS_CXX20
-	else if (_file.ends_with(".bin"))
-#else
-	else if (endsWith(_file, ".bin"))
-#endif
-	{
-		this->F_.load(_path + _file);
-		return true;
-	}
-#ifdef HAS_CXX20
-	else if (_file.ends_with(".txt") || _file.ends_with(".dat"))
-#else
-	else if (endsWith(_file, ".txt") || endsWith(_file, ".dat"))
-#endif
-	{
-		this->F_.load(_path + _file, arma::arma_ascii);
-		return true;
-	}
-	//throw std::runtime_error("Couldn't read the file: " + _path + _file);
-	return false;
+	return loadAlgebraic<_T>(_path, _file, this->F_, "weights");
 }
 
 // ##########################################################################################################################################
@@ -1089,12 +1247,12 @@ inline void NQS<_Ht, _spinModes, _T, _stateType>::locEnKernel(uint _start, uint 
 		this->kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
-			this->kernels_[_threadNum].kernelValue_ += this->H_->locEnergy(this->curState_,
+			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(this->curState_,
 																	 site, 
 																	 std::bind(&NQS<_Ht, _spinModes, _T, _stateType>::pKernel,
 																	 this,
 																	 std::placeholders::_1,
-																	 std::placeholders::_2));
+																	 std::placeholders::_2)));
 		}
 		// lock again
 		{
@@ -1388,7 +1546,7 @@ inline arma::Col<_T> NQS<_Ht, _spinModes, _T, _stateType>::collect(	uint nSam,
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
 	}
-	LOGINFO(_t, "NQS_EQ", 1);
+	LOGINFO(_t, "NQS_COLLECTION", 1);
 	return meanEn;
 }
 

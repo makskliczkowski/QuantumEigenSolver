@@ -46,6 +46,26 @@ namespace Operators
 		typename _OP<_T>::GLB fun_ = [&](u64 state) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { site }); };
 		return Operator<_T>(lat, 1.0, fun_, SymGenerators::SZ);
 	}
+	
+	/*
+	* @brief Creates local sigma z
+	*/
+	template <typename _T>
+	Operators::Operator<_T, uint> sigmaZ_L(std::shared_ptr<Lattice> lat)
+	{
+		typename _OP<_T>::LOC fun_ = [&](u64 state, uint i) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i }); };
+		return Operator<_T, uint>(lat, 1.0, fun_, SymGenerators::SZ);
+	}
+
+	/*
+	* @brief Creates correlation sigma z
+	*/
+	template <typename _T>
+	Operators::Operator<_T, uint, uint> sigmaZ_C(std::shared_ptr<Lattice> lat)
+	{
+		typename _OP<_T>::COR fun_ = [&](u64 state, uint i, uint j) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i, j }); };
+		return Operator<_T, uint, uint>(lat, 1.0, fun_, SymGenerators::SZ);
+	}
 
 	// ##########################################################################################################################################
 

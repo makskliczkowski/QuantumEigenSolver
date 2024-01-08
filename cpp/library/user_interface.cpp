@@ -540,8 +540,9 @@ void UI::makeSimSymmetriesSweepHilbert()
 */
 void UI::makeSimNQS()
 {
+	this->useComplex_ = true;
 	this->defineModels();
-	if (this->isComplex_) 
+	if (this->isComplex_ || this->useComplex_) 
 	{
 		this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
 		this->nqsSingle(this->nqsCpx);
