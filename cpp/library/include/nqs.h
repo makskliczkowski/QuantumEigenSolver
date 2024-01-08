@@ -266,7 +266,7 @@ namespace Operators
 		// go through operators
 		for (auto& _op : op_)
 			// take value and new vector (written as an integer) 
-			_out.push_back(_op(s, a));
+			_out.push_back(_op(s, a...));
 		return _out;
 	}
 
