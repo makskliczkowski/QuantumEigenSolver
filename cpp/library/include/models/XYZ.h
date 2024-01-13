@@ -248,15 +248,15 @@ cpx XYZ<_T>::locEnergy(u64 _cur, uint _site, XYZ<_T>::NQSFun _fun)
 {
 	// value that does not change
 	double localVal	= 0.0;
-	cpx changedVal		= 0.0;
+	cpx changedVal	= 0.0;
 
 	// get number of forward nn
-	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
-	uint NUM_OF_NNN	= (uint)this->lat_->get_nnn_ForwardNum(_site);
+	uint NUM_OF_NN	=	(uint)this->lat_->get_nn_ForwardNum(_site);
+	uint NUM_OF_NNN	=	(uint)this->lat_->get_nnn_ForwardNum(_site);
 
 	// -------------- perpendicular field --------------
 	const double si	=	checkBit(_cur, this->Ns - _site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-	localVal				+= PARAM_W_DISORDER(hz, _site) * si;
+	localVal		+=	PARAM_W_DISORDER(hz, _site) * si;
 
 	// ---------------- transverse field ---------------
 	if (!EQP(this->hx, 0.0, 1e-9)) 
@@ -269,44 +269,49 @@ cpx XYZ<_T>::locEnergy(u64 _cur, uint _site, XYZ<_T>::NQSFun _fun)
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
 		{
 			// SZiSZj
-			const double sj	=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			localVal				+= PARAM_W_DISORDER(dA, _site) * PARAM_W_DISORDER(Ja, _site) * si * sj;
+			const double sj		=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+=	PARAM_W_DISORDER(dA, _site) * PARAM_W_DISORDER(Ja, _site) * si * sj;
 
 			// SYiSYj
-			auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto changedIn		=  siY * sjY * PARAM_W_DISORDER(Ja, _site) * (1.0 + PARAM_W_DISORDER(eA, _site));
+			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto changedIn		=	siY * sjY * PARAM_W_DISORDER(Ja, _site) * (1.0 + PARAM_W_DISORDER(eA, _site));
 
 			// SXiSXj
-			changedIn			+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Ja, _site) * (1.0 - PARAM_W_DISORDER(eA, _site));
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Ja, _site) * (1.0 - PARAM_W_DISORDER(eA, _site));
 			
 			// apply change
-			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn; 
+			changedVal			+=	_fun({ (int)_site, nei }, { si, sj }) * changedIn; 
 		}
 	}
 
 	// ------------------- CHECK NNN --------------------
-	for (uint nnn = 0; nnn < NUM_OF_NNN; nnn++) 
+	if (!EQP(this->Jb, 0.0, 1e-9))
 	{
-		uint N_NUMBER = this->lat_->get_nnn_ForwardNum(_site, nnn);
-		if (int nei = this->lat_->get_nnn(_site, N_NUMBER); nei >= 0) 
+		for (uint nnn = 0; nnn < NUM_OF_NNN; nnn++) 
 		{
-			// SZiSZj
-			const double sj	=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			localVal				+= PARAM_W_DISORDER(dB, _site) * PARAM_W_DISORDER(Jb, _site) * si * sj;
+			uint N_NUMBER = this->lat_->get_nnn_ForwardNum(_site, nnn);
+			if (int nei = this->lat_->get_nnn(_site, N_NUMBER); nei >= 0) 
+			{
+				// SZiSZj
+				const double sj	=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+				localVal				+= PARAM_W_DISORDER(dB, _site) * PARAM_W_DISORDER(Jb, _site) * si * sj;
 
-			// SYiSYj
-			auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto changedIn		=  siY * sjY * PARAM_W_DISORDER(Jb, _site) * (1.0 + PARAM_W_DISORDER(eB, _site));
+				// SYiSYj
+				auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+				auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+				auto changedIn		=  siY * sjY * PARAM_W_DISORDER(Jb, _site) * (1.0 + PARAM_W_DISORDER(eB, _site));
 
-			// SXiSXj
-			changedIn			+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Jb, _site) * (1.0 - PARAM_W_DISORDER(eB, _site));
+				// SXiSXj
+				changedIn			+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Jb, _site) * (1.0 - PARAM_W_DISORDER(eB, _site));
 			
-			// apply change
-			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn; 
+				// apply change
+				changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn; 
+			}
 		}
 	}
+	
+	// return
 	return changedVal + localVal;
 }
 

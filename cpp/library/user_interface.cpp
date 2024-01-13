@@ -43,15 +43,19 @@ void UI::parseModel(int argc, cmdArg& argv)
 	std::string choosen_option = "";
 	// ---------- SIMULATION PARAMETERS ----------
 	{
-		SETOPTIONV(nqsP,	nMcSteps,	"m"	);
+		SETOPTIONV(nqsP,	nMcSteps,	"m"		);
 		SETOPTIONV(nqsP,	blockSize,	"bs"	);
-		SETOPTIONV(nqsP,	nBlocks,		"nb"	);
-		SETOPTIONV(nqsP,	nHidden,		"nh"	);
+		SETOPTIONV(nqsP,	nBlocks,	"nb"	);
+		SETOPTIONV(nqsP,	nHidden,	"nh"	);
 		SETOPTIONV(nqsP,	nFlips,		"nf"	);
-		SETOPTIONV(nqsP,	type,			"nqst");
+		SETOPTIONV(nqsP,	type,		"nqst"	);
 		SETOPTIONV(nqsP,	nTherm,		"nt"	);
-		SETOPTION(nqsP,	lr						);
-		SETOPTIONV(nqsP,	loadNQS,		"lNQS");
+		SETOPTION(nqsP,		lr					);
+		SETOPTIONV(nqsP,	loadNQS,	"lNQS"	);
+		// samples
+		SETOPTIONV(nqsP,	nMcSamples,	"mcS"	);
+		SETOPTIONV(nqsP,	blockSizeS,	"bsS"	);
+		SETOPTIONV(nqsP,	nSBlocks,	"nbS"	);
 		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
 	// ----------------- LATTICE -----------------

@@ -102,8 +102,9 @@ public:
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum, int _nPart)
-	: NQS_S<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nPart), nHid_(_nHid)
+	: NQS_S<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nPart)
 {
+	this->nHid_ = _nHid;
 	this->fullSize_ = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
 	this->allocate();
 	this->setInfo();
@@ -308,26 +309,26 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
-	//this->bV_ -= this->F_.subvec(0, this->nVis_ - 1);
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif		
-	for (int i = 0; i < this->nVis_; i++)
-			this->bV_(i) -= this->F_(i);
+	this->bV_ -= this->F_.subvec(0, this->nVis_ - 1);
+// #ifndef _DEBUG
+// #pragma omp parallel for num_threads(this->threadsNumLeft_)
+// #endif		
+	//for (int i = 0; i < this->nVis_; i++)
+			//this->bV_(i) -= this->F_(i);
 
-	//this->bH_ -= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif
+	this->bH_ -= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
+// #ifndef _DEBUG
+// #pragma omp parallel for num_threads(this->threadsNumLeft_)
+// #endif	
 		for (int i = 0; i < this->nHid_; i++)
 			this->bH_(i) -= this->F_(i + this->nVis_);
-	//this->W_ -= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->fullSize_ - 1), this->W_.n_rows, this->W_.n_cols);
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif
-		for (int i = 0; i < this->nHid_; i++)
-			for (auto j = 0; j < this->nVis_; j++)
-				this->W_(i, j) -= this->F_((this->nVis_ + this->nHid_) + i + j * this->nHid_);
+	this->W_ -= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->fullSize_ - 1), this->W_.n_rows, this->W_.n_cols);
+// #ifndef _DEBUG
+// #pragma omp parallel for num_threads(this->threadsNumLeft_)
+// #endif	
+		//for (int i = 0; i < this->nHid_; i++)
+		//	for (auto j = 0; j < this->nVis_; j++)
+		//		this->W_(i, j) -= this->F_((this->nVis_ + this->nHid_) + i + j * this->nHid_);
 
 }
 
@@ -352,22 +353,22 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 
 	// calculate the flattened part
 	//this->derivatives_.submat(_plc, 0, _plc, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadsNumLeft_)
+//#endif
 	for (uint i = 0; i < this->nVis_; ++i)
 		this->derivatives_(_plc, i) = _v(i);
 
-	//this->derivatives_.submat(_plc, this->nVis_, _plc, this->nVis_ + this->nHid_ - 1) = arma::tanh(this->theta_).as_row();
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif
-	for (uint i = 0; i < this->nHid_; ++i)
-		this->derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
+	this->derivatives_.submat(_plc, this->nVis_, _plc, this->nVis_ + this->nHid_ - 1) = arma::tanh(this->theta_).as_row();
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadsNumLeft_)
+//#endif
+	//for (uint i = 0; i < this->nHid_; ++i)
+		//this->derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
 
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadsNumLeft_)
-#endif
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadsNumLeft_)
+//#endif
 	for (int i = 0; i < this->nHid_; ++i)
 		for (auto j = 0; j < this->nVis_; j++)
 			this->derivatives_(_plc, (this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->derivatives_(_plc, i + this->nVis_) * _v(j);
@@ -389,7 +390,8 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 {
-	for (uint i = 0; i < nFlips; ++i){
+	for (uint i = 0; i < nFlips; ++i)
+	{
 #ifdef SPIN
 		this->theta_	-=	(2.0 * this->flipVals_[i]) * this->W_.col(this->flipPlaces_[i]);
 #else
@@ -435,6 +437,8 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFl
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GENERAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //////////////////////////////////////////////////////////////////////////////////////////
+#	ifndef RBM_GEN_H
+#		define RBM_GEN_H
 template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
 class RBM_S : public RBM<_spinModes, _Ht, _T, _stateType>
 {
@@ -455,6 +459,7 @@ public:
 	virtual auto pRatio(std::initializer_list<int> fP,		
 				std::initializer_list<double> fV)	-> _T	override { NQS_LOG_ERROR_SPIN_MODES; };
 };
+#	endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -538,7 +543,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 {
 	// you know what to do after one flip
 	if (nFlips == 1)
-		return NQS<2, _Ht, _T, _stateType>::pRatio();
+		return NQS_S<2, _Ht, _T, _stateType>::pRatio();
 	// set the starting point
 	_T val				=	0;
 	// save the temporary angles
@@ -550,11 +555,11 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 		auto flipVal	=	this->flipVals_[i];
 		// set the first value of b_visible
 #ifdef SPIN
-		_T currVal		=	(-2.0 * flipVal);
+		_T currVal		=	-2.0 * flipVal;
 #else
-		_T currVal		=	(1.0 - 2.0 * flipVal);
+		_T currVal		=	1.0 - 2.0 * flipVal;
 #endif
-		thetaTMP			+= currVal * this->W_.col(flipPlace);
+		thetaTMP		+=	currVal * this->W_.col(flipPlace);
 		val				+=	currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
@@ -617,31 +622,29 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	if (nFlips == 0) 
 		return 1.0;
 
-	// go through flips
-	auto flipPlace	= fP.begin();
-	auto flipVal	= fV.begin();
-
 	// single flip only
 	if (nFlips == 1) 
-		return this->pRatio(*flipPlace, *flipVal);
+		return this->pRatio(*fP.begin(), *fV.begin());
 
 	// set the starting point
 	_T val			= 0;
+	auto currVal	= 0.0;
 	// make temporary angles vector
-	NQSB thetaTMP	= this->theta_;
+	auto thetaTMP	= this->theta_;
 	// iterate through the flips
-	for (uint i = 0; i < nFlips; i++)
+	for (uint i = 0; i < nFlips; ++i)
 	{
-		flipPlace	= fP.begin() + i;
-		flipVal		= fV.begin() + i;
+		auto flipPlace	= *(fP.begin() + i);
+		auto flipVal	= *(fV.begin() + i);
 		// set the first value of b_visible
 #ifdef SPIN
-		auto currVal= -2.0 * (*flipVal);
+		currVal		= -2.0 * flipVal;
 #else
-		auto currVal= 1.0 - 2.0 * (*flipVal);
+		currVal		= 1.0 - 2.0 * flipVal;
 #endif
-		thetaTMP	+= currVal * this->W_.col(*flipPlace);
-		val			+= currVal * this->bV_(*flipPlace);
+		// !TODO speed this up by not creating thetaTMP
+		thetaTMP	+= currVal * this->W_.col(flipPlace);
+		val			+= currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD

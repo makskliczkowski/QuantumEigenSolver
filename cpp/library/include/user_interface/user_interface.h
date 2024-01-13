@@ -254,6 +254,10 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(nTherm, uint, 50);
 		UI_PARAM_CREATE_DEFAULT(nBlocks, uint, 500);
 		UI_PARAM_CREATE_DEFAULT(nMcSteps, uint, 1000);
+		// for collecting
+		UI_PARAM_CREATE_DEFAULT(nMcSamples, uint, 100);
+		UI_PARAM_CREATE_DEFAULT(nSBlocks, uint, 100);
+		UI_PARAM_CREATE_DEFAULT(blockSizeS, uint, 8);
 		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
 		// weight load directory
 		inline static const std::string _loadNQS	= ""; 
@@ -271,6 +275,10 @@ namespace UI_PARAMS {
 			UI_PARAM_SET_DEFAULT(nMcSteps);
 			UI_PARAM_SET_DEFAULT(lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
+			// collection
+			UI_PARAM_SET_DEFAULT(nMcSamples);
+			UI_PARAM_SET_DEFAULT(nSBlocks);
+			UI_PARAM_SET_DEFAULT(blockSizeS);
 		}
 	};
 };
@@ -322,62 +330,66 @@ protected:
 	void setDefaultMap()					final override 
 	{
 		this->defaultParams = {
-			UI_OTHER_MAP(nqs		, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
-			UI_OTHER_MAP(m			, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0),			// mcsteps	
+			UI_OTHER_MAP(nqs	, this->nqsP.type_		, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
+			UI_OTHER_MAP(m		, this->nqsP.nMcSteps_	, FHANDLE_PARAM_HIGHER0),			// mcsteps	
 			UI_OTHER_MAP(nb		, this->nqsP.nBlocks_	, FHANDLE_PARAM_HIGHER0),			// number of blocks
 			UI_OTHER_MAP(bs		, this->nqsP.blockSize_	, FHANDLE_PARAM_HIGHER0),			// block size
 			UI_OTHER_MAP(nh		, this->nqsP.nHidden_	, FHANDLE_PARAM_HIGHER0),			// hidden params
-			UI_OTHER_MAP(nf		, this->nqsP.nFlips_		, FHANDLE_PARAM_HIGHER0),			// hidden params
+			UI_OTHER_MAP(nf		, this->nqsP.nFlips_	, FHANDLE_PARAM_HIGHER0),			// flip number
+			// for collecting in nqs
+			UI_OTHER_MAP(bsS	, this->nqsP.blockSizeS_, FHANDLE_PARAM_HIGHER0),			// block size samples
+			UI_OTHER_MAP(mcS	, this->nqsP.nMcSamples_, FHANDLE_PARAM_HIGHER0),			// mcsteps samples
+			UI_OTHER_MAP(nbS	, this->nqsP.nSBlocks_	, FHANDLE_PARAM_HIGHER0),			// number of blocks - samples
 			UI_OTHER_MAP(dirNQS	, this->nqsP.loadNQS_	, FHANDLE_PARAM_DEFAULT),			// directory to load the weights from
 
 			// --------------- directory parameters ---------------
-			{			"f"			, std::make_tuple(""		, FHANDLE_PARAM_DEFAULT)},			// file to read from directory
+			{"f"				, std::make_tuple(""	, FHANDLE_PARAM_DEFAULT)},			// file to read from directory
 			
 			// ---------------- lattice parameters ----------------
-			UI_OTHER_MAP(d			, this->latP._dim			, FHANDLE_PARAM_BETWEEN(1., 3.)),
-			UI_OTHER_MAP(bc		, this->latP._bc			, FHANDLE_PARAM_BETWEEN(0., 3.)),
-			UI_OTHER_MAP(l			, this->latP._typ			, FHANDLE_PARAM_BETWEEN(0., 1.)),
-			UI_OTHER_MAP(lx		, this->latP._Lx			, FHANDLE_PARAM_HIGHER0),
-			UI_OTHER_MAP(ly		, this->latP._Ly			, FHANDLE_PARAM_HIGHER0),
-			UI_OTHER_MAP(lz		, this->latP._Lz			, FHANDLE_PARAM_HIGHER0),
+			UI_OTHER_MAP(d		, this->latP._dim		, FHANDLE_PARAM_BETWEEN(1., 3.)),
+			UI_OTHER_MAP(bc		, this->latP._bc		, FHANDLE_PARAM_BETWEEN(0., 3.)),
+			UI_OTHER_MAP(l		, this->latP._typ		, FHANDLE_PARAM_BETWEEN(0., 1.)),
+			UI_OTHER_MAP(lx		, this->latP._Lx		, FHANDLE_PARAM_HIGHER0),
+			UI_OTHER_MAP(ly		, this->latP._Ly		, FHANDLE_PARAM_HIGHER0),
+			UI_OTHER_MAP(lz		, this->latP._Lz		, FHANDLE_PARAM_HIGHER0),
 			
 			// ----------------- model parameters -----------------			
-			UI_OTHER_MAP(mod		, this->modP._modTyp		, FHANDLE_PARAM_BETWEEN(0., 2.)),
+			UI_OTHER_MAP(mod		, this->modP._modTyp, FHANDLE_PARAM_BETWEEN(0., 2.)),
 			// -------- ising
-			UI_PARAM_MAP(J1		, this->modP._J1			, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(hx		, this->modP._hx			, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(hz		, this->modP._hz			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(J1			, this->modP._J1	, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(hx			, this->modP._hx	, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(hz			, this->modP._hz	, FHANDLE_PARAM_DEFAULT),
 			// -------- heisenberg		
-			UI_PARAM_MAP(dlt1		, this->modP._dlt1		, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(dlt1		, this->modP._dlt1	, FHANDLE_PARAM_DEFAULT),
 			// -------- xyz
-			UI_PARAM_MAP(J2		, this->modP._J2			, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(eta1		, this->modP._eta1		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(eta2		, this->modP._eta2		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(dlt2		, this->modP._dlt2		, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(J2			, this->modP._J2	, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(eta1		, this->modP._eta1	, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(eta2		, this->modP._eta2	, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(dlt2		, this->modP._dlt2	, FHANDLE_PARAM_DEFAULT),
 			// -------- kitaev --------
-			UI_PARAM_MAP(kx		, 0.0							, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(ky		, 0.0							, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(kz		, 0.0							, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(kx			, 0.0				, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(ky			, 0.0				, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(kz			, 0.0				, FHANDLE_PARAM_DEFAULT),
 			// ----------- model quadratic parameters ------------
 			UI_OTHER_MAP(mod		, this->modP._modTypQ	, FHANDLE_PARAM_BETWEEN(0., 3.)),
 			// -------- aubry-andre
 			UI_PARAM_MAP(Beta		, this->modP._Beta		, FHANDLE_PARAM_DEFAULT),
-			UI_PARAM_MAP(Phi		, this->modP._Phi			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(Phi		, this->modP._Phi		, FHANDLE_PARAM_DEFAULT),
 
 			// -------------------- symmetries -------------------
-			UI_PARAM_MAP(ks		, this->symP._k			, FHANDLE_PARAM_HIGHER0),
-			UI_PARAM_MAP(pxs		, this->symP._px			, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(pys		, this->symP._py			, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(pzs		, this->symP._pz			, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(xs		, this->symP._x			, FHANDLE_PARAM_BETWEEN()),
-			UI_PARAM_MAP(u1s		, this->symP._U1			, FHANDLE_PARAM_DEFAULT),
+			UI_PARAM_MAP(ks			, this->symP._k			, FHANDLE_PARAM_HIGHER0),
+			UI_PARAM_MAP(pxs		, this->symP._px		, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(pys		, this->symP._py		, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(pzs		, this->symP._pz		, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(xs			, this->symP._x			, FHANDLE_PARAM_BETWEEN()),
+			UI_PARAM_MAP(u1s		, this->symP._U1		, FHANDLE_PARAM_DEFAULT),
 			UI_PARAM_MAP(SYM		, this->symP._S			, FHANDLE_PARAM_BETWEEN(0., 1.)),	// even use symmetries?
 			
 			// ---------------- other ----------------
-			UI_OTHER_MAP(fun		, -1.							, FHANDLE_PARAM_HIGHERV(-2.0)),		// choice of the function to be calculated
-			UI_OTHER_MAP(th		, 1.0							, FHANDLE_PARAM_HIGHER0),				// number of threads
-			UI_OTHER_MAP(q			, 0.0							, FHANDLE_PARAM_DEFAULT),				// quiet?
-			UI_OTHER_MAP(dir		, "DEFALUT"					, FHANDLE_PARAM_DEFAULT),
+			UI_OTHER_MAP(fun		, -1.					, FHANDLE_PARAM_HIGHERV(-2.0)),		// choice of the function to be calculated
+			UI_OTHER_MAP(th			, 1.0					, FHANDLE_PARAM_HIGHER0),			// number of threads
+			UI_OTHER_MAP(q			, 0.0					, FHANDLE_PARAM_DEFAULT),			// quiet?
+			UI_OTHER_MAP(dir		, "DEFALUT"				, FHANDLE_PARAM_DEFAULT),
 		};
 	};
 
@@ -1342,7 +1354,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 		{
 			_H->diagH(false);
 			_mbs = _H->getEigVec(0);
-			if(latP.lat->get_Ns() < 10)
+			if(latP.lat->get_Ns() < 6)
 				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-2);
 			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
@@ -1372,7 +1384,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 																			_opsC, this->threadNum);
 
 	// start the simulation
-	arma::Col<_T> _EN(this->nqsP.nMcSteps_ * 2, arma::fill::zeros);
+	arma::Col<_T> _EN(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
 	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(this->nqsP.nMcSteps_,
 																			this->nqsP.nTherm_,
 																			this->nqsP.nBlocks_,
@@ -1381,21 +1393,22 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 																			this->nqsP.nFlips_,
 																			this->quiet,
 																			_timer.start(),
-																			15);
-	_EN.subvec(this->nqsP.nMcSteps_, 2 * this->nqsP.nMcSteps_ - 1) = _NQS->collect(	this->nqsP.nMcSteps_,
-																												this->nqsP.nTherm_,
-																												this->nqsP.nBlocks_,
-																												this->nqsP.blockSize_,
-																												this->nqsP.nFlips_,
-																												this->quiet,
-																												_timer.start(),
-																												_meas);
+																			3);
+	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(this->nqsP.nMcSamples_,
+																	0,
+																	this->nqsP.nSBlocks_,
+																	this->nqsP.blockSizeS_,
+																	this->nqsP.nFlips_,
+																	this->quiet,
+																	_timer.start(),
+																	_meas);
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
 	_ENSM.col(0)	= arma::real(_EN);
 	_ENSM.col(1)	= arma::imag(_EN);
 
-	auto perc		= int(this->nqsP.nMcSteps_ / 20);
-	perc				= perc == 0 ? 1 : perc;
+	// save energy
+	auto perc		= int(this->nqsP.nMcSamples_ / 20);
+	perc			= perc == 0 ? 1 : perc;
 	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(perc));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
 	_ENSM.save(dir + "history.dat", arma::raw_ascii);

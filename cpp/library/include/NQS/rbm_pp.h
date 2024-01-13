@@ -75,14 +75,19 @@ protected:
 #ifdef NQS_ANGLES_UPD
 	void update(uint nFlips)									override final;
 	void update(const NQSS& v, uint nFlips)						override final;
+	void unupdate(uint nFlips)									override final;
 #endif
 
 	// ---------------------------- T R A I N ----------------------------	
 	void grad(const NQSS& _v, uint _plc)						override final;
 
 	// --------------------------- A N S A T Z ---------------------------
-	// sets the Pffafian matrix inside the Pfaffian_
-
+	virtual void updPffafianC(uint fP, float fV)				= 0;
+	virtual void updPffafianC(std::initializer_list<int> fP,
+							  std::initializer_list<double> fV)	= 0;
+	virtual void updPffafian(uint fP, float fV)					= 0;
+	virtual void updPffafian(std::initializer_list<int> fP,
+							  std::initializer_list<double> fV)	= 0;
 public:
 	~RBM_PP() override											{ DESTRUCTOR_CALL; };
 	RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1);
@@ -136,6 +141,7 @@ RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>
 	this->allocate();
 	this->setInfo();
 	this->init();
+	// sets the thetas and Pfaffian as well
 	this->setRandomState(true);
 }
 
@@ -179,7 +185,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 	RBM_S<_spinModes, _Ht, _T, _stateType>::allocate();
 }
 
-///////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 /*
 * @brief Initializes the weights and biases for the RBM-PP NQS model
@@ -210,7 +216,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 	RBM<_spinModes, _Ht, _T, _stateType>::init();
 }
 
-///////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 /*
 * @brief Sets the info about the RBM-PP model NQS.
@@ -245,7 +251,9 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setInfo()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 {
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) / this->pfaffianVal_;
+	// update pfaffian candidate matrix and its corresponding value
+	this->updPffafianC(fP, fV);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * this->pfaffianValCandidate_ / this->pfaffianVal_;
 }
 
 // %%%%%%%%%%%%%%%% M U L T I P L E   F L I P S %%%%%%%%%%%%%%%%
@@ -257,10 +265,13 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 * @returns probability ratio for a given ansatz based on the current state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+[[deprecated("Use pRatio(uint fP, float fV) instead")]]
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 {
-	//!TODO
-	return _T(0);
+	// update pfaffian candidate matrix and its corresponding value
+	for (auto i = 0; i < nFlips; ++i)
+		this->updPffafianC(this->flipPlaces_[i], this->flipVals_[i]);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * this->pfaffianValCandidate_ / this->pfaffianVal_;
 }
 
 // %%%%%%%%%%%%%%%%% U S I N G   V E C T O R S %%%%%%%%%%%%%%%%%
@@ -271,8 +282,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const NQSS& _v2)
 {
-	//!TODO
-	return _T(0);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPffV(_v2) / this->getPffV(_v1);
 }
 
 // %%%%%%%%%%%%% U S I N G   I N I T I A L I Z E R %%%%%%%%%%%%%
@@ -287,8 +297,8 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
-	//!TODO
-	return _T(0);
+	this->updPffafianC(fP, fV);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * this->pfaffianValCandidate_ / this->pfaffianVal_;
 }
 
 // ##########################################################################################################################################
@@ -297,23 +307,55 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 
+/*
+* @brief Sets the state and the corresponding PP state as well.
+* Updates the pfaffian matrix.
+* @param _st column state to be set
+* @param _set set the matrices?
+*/
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st, bool _set)
 {
 	RBM_S<_spinModes, _Ht, _T, _stateType>::setState(_st, _set);
 #ifdef NQS_ANGLES_UPD
-	if (_set) this->setPffVal();
+	if (_set)
+	{
+		// set pfaffian matrix and its corresponding value
+		this->setPffMat();
+		// set pfaffian value for newly set matrix
+		this->setPffVal();
+		// set candidate to be the same for the angles update
+		this->PfaffianCandidate_ = this->Pfaffian_;
+		// set its value to be the same as well
+		this->pfaffianValCandidate_ = this->pfaffianVal_;
+	}
 #endif
 }
 
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
+/*
+* @brief Sets the state and the corresponding PP state as well.
+* Updates the pfaffian matrix.
+* @param _st integer state to be set
+* @param _set set the matrices?
+*/
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(u64 _st, bool _set)
 {
 	RBM_S<_spinModes, _Ht, _T, _stateType>::setState(_st, _set);
 #ifdef NQS_ANGLES_UPD
-	if (_set) this->setPffVal();
+	if (_set)
+	{
+		// set pfaffian matrix and its corresponding value
+		this->setPffMat();
+		// set pfaffian value for newly set matrix
+		this->setPffVal();
+		// set candidate to be the same for the angles update
+		this->PfaffianCandidate_ = this->Pfaffian_;
+		// set its value to be the same as well
+		this->pfaffianValCandidate_ = this->pfaffianVal_;
+	}
 #endif
 }
 
@@ -346,7 +388,7 @@ inline bool RBM_PP<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _pat
 	return true;
 }
 
-///////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 /*
 * @brief After reading the weights from the path specified by the user, it sets the inner vectors from them.
@@ -379,7 +421,6 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
 	// update RBM weights
 	RBM_S<_spinModes, _Ht, _T, _stateType>::updateWeights();
-	// update the rest
 	// !TODO
 }
 
@@ -399,6 +440,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 {
 	// calculate the RBM derivative
 	RBM_S<_spinModes, _Ht, _T, _stateType>::grad(_v, _plc);
+	// !TODO
 }
 
 // ##########################################################################################################################################
@@ -407,8 +449,9 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 #	ifdef NQS_ANGLES_UPD
+
 /*
 * @brief Update angles with the flipped spin (spins)
 * @param nFlips number of flips to be used
@@ -420,19 +463,29 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 	// update the angles in the RBM
 	RBM_S<_spinModes, _Ht, _T, _stateType>::update(nFlips);
 	// update the Pffafian matrix
-	// this->ansatzPP();
-	//for (uint i = 0; i < this->flipPlaces_.size(); i++)
-	//{
-	//	for (uint j = 0; i < this->nParticles_; ++i)
-	//	{
-	//		// update X_{i,j} -> F_{ij}^{s'_i, s_j} - F{ji}^{s_j, s'_i}
-	//		auto pos_i = (v(i) > 0 ? 0 : this->nSites_) + i;
-
-	//	}
-	//}
+	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
+	// replace updating the pfaffian back
+	this->Pfaffian_ = this->PfaffianCandidate_;
+	this->pfaffianVal_ = this->pfaffianValCandidate_;
 }
 
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+/*
+* @brief If a new pfaffian state has not been accepted, unupdate the values
+* @param nFlips number of flips to be used
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::unupdate(uint nFlips)
+{
+	// unupdate the Pffafian matrix
+	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
+	// replace updating the pfaffian back
+	this->PfaffianCandidate_ = this->Pfaffian_;
+	this->pfaffianValCandidate_ = this->pfaffianVal_;
+}
+
+////////////////////////////////////////////////////////////////////////
 
 /*
 * @brief Update angles with the flipped spin (spins)
@@ -446,21 +499,27 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint 
 	// update the angles in the RBM
 	RBM_S<_spinModes, _Ht, _T, _stateType>::update(v, nFlips);
 	// update the Pffafian matrix
-	//this->ansatzPP(v);
+	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
+	// replace updating the pfaffian back
+	this->Pfaffian_ = this->PfaffianCandidate_;
+	this->pfaffianVal_ = this->pfaffianValCandidate_;
 }
 #	endif
-////////////////////////////////////////////////////////////////////////////
 
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
+////////////////////////////////////////////////////////////////////////
+
+// #######################################################################################
+// #######################################################################################
+// #######################################################################################
+// #######################################################################################
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GENERAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //////////////////////////////////////////////////////////////////////////////////////////
+#	ifndef RBM_PP_GEN_H
+#		define RBM_PP_GEN_H
 template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
 class RBM_PP_S : public RBM_PP<_spinModes, _Ht, _T, _stateType>
 {
@@ -474,7 +533,16 @@ class RBM_PP_S : public RBM_PP<_spinModes, _Ht, _T, _stateType>
 	// --------------------- G E T T E R S ---------------------
 	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
 	virtual auto getPffMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+protected:
+	// --------------------------- A N S A T Z ---------------------------
+	void updPffafianC(uint fP, float fV)					override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updPffafianC(std::initializer_list<int> fP,
+					 std::initializer_list<double> fV)		override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updPffafian(uint fP, float fV)						override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updPffafian(std::initializer_list<int> fP,
+					 std::initializer_list<double> fV)		override { NQS_LOG_ERROR_SPIN_MODES; };
 };
+#	endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -492,15 +560,23 @@ template <typename _Ht, typename _T, class _stateType>
 class RBM_PP_S<2, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	/* ------------------------------------------------------------ */
+	/* ------------------------------------------------------- */
 public:
 	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nParticles = -1)
 		: RBM_PP<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles) {};
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPffMat(const NQSS& _n)	const -> NQSW override;
-	virtual auto getPffMat(u64 _n)			const -> NQSW override;
+	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override;
+	virtual auto getPffMat(u64 _n)			const -> NQSW	override;
+protected:
+	// --------------------------- A N S A T Z -----------------
+	void updPffafianC(uint fP, float fV)					override;
+	void updPffafianC(std::initializer_list<int> fP,
+					 std::initializer_list<double> fV)		override;
+	void updPffafian(uint fP, float fV)						override;
+	void updPffafian(std::initializer_list<int> fP,
+					 std::initializer_list<double> fV)		override;
 };
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -582,6 +658,162 @@ RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffM
 	}
 	return _out;
 }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!! P F F A F I A N   C A N D I D A T E !!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/*
+* @brief Updates the pfaffian candidate according to a single flip
+* @param fP place of the flip in the current vector
+* @param fV value before the flip at fP
+*/
+template <typename _Ht, typename _T, class _stateType>
+void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(uint fP, float fV)
+{
+	// if the fP is known, only the column and row containing it shall be updated
+	// we will use current state as well to see where the other places are
+	// remember, fV is the other way around
+	uint ns2 = this->nSites_ * this->nSites_;
+	uint kFL = (fV < 0) ? fP : fP + 2 * ns2;
+	uint kFR = (fV < 0) ? fP : fP + ns2;
+	// run over the columns as the row is set
+	for (uint i = 0; i < this->nParticles_; ++i)
+	{
+		// the same is not allowed
+		if (i == fP)
+			continue;
+		// check the bit on the i'th place
+		bool spini = checkBit(this->curVec_, i);
+		// set the left place in the weights (column)
+		uint iFL = spini ? i : i + ns2;
+		uint iFR = spini ? i + 2 * ns2 : i;
+		// update 
+		this->PfaffianCandidate_(fP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
+		this->PfaffianCandidate_(i, fP) = -this->PfaffianCandidate_(fP, i);
+	}
+	// set the value
+	this->setPffValC();
+}
+
+////////////////////////////////////////////////////////////////
+
+/*
+* @brief Updates the pfaffian according to a single flip
+* @param fP place of the flip in the current vector
+* @param fV value before the flip at fP
+*/
+template <typename _Ht, typename _T, class _stateType>
+void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafian(uint fP, float fV)
+{
+	// if the fP is known, only the column and row containing it shall be updated
+	// we will use current state as well to see where the other places are
+	// remember, fV is the other way around
+	uint ns2 = this->nSites_ * this->nSites_;
+	uint kFL = (fV < 0) ? fP : fP + 2 * ns2;
+	uint kFR = (fV < 0) ? fP : fP + ns2;
+	// run over the columns as the row is set
+	for (uint i = 0; i < this->nParticles_; ++i)
+	{
+		// the same is not allowed
+		if (i == fP)
+			continue;
+		// check the bit on the i'th place
+		bool spini = checkBit(this->curVec_, i);
+		// set the left place in the weights (column)
+		uint iFL = spini ? i : i + ns2;
+		uint iFR = spini ? i + 2 * ns2 : i;
+		// update 
+		this->Pfaffian_(fP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
+		this->Pfaffian_(i, fP) = -this->Pfaffian_(fP, i);
+	}
+}
+
+////////////////////////////////////////////////////////////////
+
+template <typename _Ht, typename _T, class _stateType>
+void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(std::initializer_list<int> fP, std::initializer_list<double> fV)
+{
+	// if the fP is known, only the column and row containing it shall be updated
+	// we will use current state as well to see where the other places are
+	// remember, fV is the other way around
+	uint ns2 = this->nSites_ * this->nSites_;
+	// save the minimum of both sizes as new flip size if someone makes wrong movement
+#ifdef _DEBUG
+	size_t nFlips = std::min(fP.size(), fV.size());
+#else
+	size_t nFlips = fP.size();
+#endif
+	// go through the flips
+	for (uint k = 0; k < nFlips; ++k)
+	{
+		bool spink = *(fV.begin() + k) > 0;
+		bool kP = *(fP.begin() + k);
+		uint kFL = (spink < 0) ? kP : kP + 2 * ns2;
+		uint kFR = (spink < 0) ? kP : kP + ns2;
+		// run over the columns as the row is set
+		for (uint i = 0; i < this->nParticles_; ++i)
+		{
+			// the same is not allowed
+			if (i == kP)
+				continue;
+			// check the bit on the i'th place
+			bool spini = checkBit(this->curVec_, i);
+			// set the left place in the weights (column)
+			uint iFL = spini ? i : i + ns2;
+			uint iFR = spini ? i + 2 * ns2 : i;
+			// update 
+			this->PfaffianCandidate_(kP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
+			this->PfaffianCandidate_(i, kP) = -this->PfaffianCandidate_(kP, i);
+		}
+	}
+	// set the value
+	this->setPffValC();
+}
+
+////////////////////////////////////////////////////////////////
+
+template <typename _Ht, typename _T, class _stateType>
+void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafian(std::initializer_list<int> fP, std::initializer_list<double> fV)
+{
+	// if the fP is known, only the column and row containing it shall be updated
+	// we will use current state as well to see where the other places are
+	// remember, fV is the other way around
+	uint ns2 = this->nSites_ * this->nSites_;
+	// save the minimum of both sizes as new flip size if someone makes wrong movement
+#ifdef _DEBUG
+	size_t nFlips = std::min(fP.size(), fV.size());
+#else
+	size_t nFlips = fP.size();
+#endif
+	// go through the flips
+	for (uint k = 0; k < nFlips; ++k)
+	{
+		bool spink = *(fV.begin() + k) > 0;
+		bool kP = *(fP.begin() + k);
+		uint kFL = (spink < 0) ? kP : kP + 2 * ns2;
+		uint kFR = (spink < 0) ? kP : kP + ns2;
+		// run over the columns as the row is set
+		for (uint i = 0; i < this->nParticles_; ++i)
+		{
+			// the same is not allowed
+			if (i == kP)
+				continue;
+			// check the bit on the i'th place
+			bool spini = checkBit(this->curVec_, i);
+			// set the left place in the weights (column)
+			uint iFL = spini ? i : i + ns2;
+			uint iFR = spini ? i + 2 * ns2 : i;
+			// update 
+			this->Pfaffian_(kP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
+			this->Pfaffian_(i, kP) = -this->Pfaffian_(kP, i);
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #	endif

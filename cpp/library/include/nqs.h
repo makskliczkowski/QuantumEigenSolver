@@ -865,6 +865,7 @@ protected:
 #ifdef NQS_ANGLES_UPD
 	virtual void update(uint nFlips = 1)								{};
 	virtual void update(const NQSS& v, uint nFlips = 1)					{};
+	virtual void unupdate(uint nFlips = 1)								{};
 #endif
 	virtual void updateWeights()						=				0;
 public:
@@ -883,8 +884,8 @@ public:
 	 // regularization
 #ifdef NQS_SREG 
 	double covMatrixRegMult		= 0.95;									// multiplier for the regularization
-	double covMatrixRegStart	= 1e-3;									// starting parameter for regularisation (epsilon1)
-	double covMatrixRegStart2	= 1e-3;									// starting parameter for regularisation (epsilon2)
+	double covMatrixRegStart	= 1e-4;									// starting parameter for regularisation (epsilon1)
+	double covMatrixRegStart2	= 1e-4;									// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg();
 #endif
 	
@@ -1031,7 +1032,7 @@ uint NQS<_spinModes, _Ht, _T, _stateType>::getThreadID() const
 #	ifdef NQS_USE_OMP
 		return omp_get_thread_num() % this->threadNum_;
 #	else
-		return std::hash<std::thread::id>{}(std::this_thread::get_id());
+		return std::hash<std::thread::id>{}(std::this_thread::get_id()) % this->threadNum_;
 #	endif
 #else
 	return 0;
@@ -1109,7 +1110,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _
 	this->tmpVec_ = this->curVec_;
 
 	// go through each block step
-	for (uint bStep = 0; bStep < _bSize; bStep++)
+	for (uint bStep = 0; bStep < _bSize; ++bStep)
 	{
 		// set the random flip sites
 		this->chooseRandomFlips();
@@ -1129,11 +1130,14 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _
 			// update current state and vector when the flip has been accepted
 			this->applyFlipsC();
 			// update angles if needed
-			this->update();
+			this->update(this->nFlip_);
 		}
 		// set the vector back to normal
 		else
+		{
+			this->unupdate();
 			this->unapplyFlipsT();
+		}
 	}
 	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_);
 #ifndef NQS_ANGLES_UPD
@@ -1353,9 +1357,10 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies)
 {
 	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}>
-	this->F_ = arma::cov(arma::conj(this->derivatives_), _energies, 1);
+	auto conjd	= arma::conj(this->derivatives_);
+	this->F_	= arma::cov(conjd, _energies, 1);
 #ifdef NQS_USESR
-	this->S_ = arma::cov(arma::conj(this->derivatives_), this->derivatives_, 1);
+	this->S_	= arma::cov(conjd, this->derivatives_, 1);
 	
 	// update model
 	this->gradSR(0);
@@ -1473,7 +1478,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 		if (i % this->pBar_.percentageSteps == 0) this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
 #endif
 #ifdef NQS_SREG
-		this->covMatrixRegStart		= 0;//std::max(covMatrixRegStart * covMatrixRegMult, 1e-3);
+		this->covMatrixRegStart		= std::max(covMatrixRegStart * covMatrixRegMult, 1e-5);
 		this->covMatrixRegStart2	= 0;// std::max(covMatrixRegStart2 * covMatrixRegMult, 1e-6 / this->lr_);
 #endif
 	}
@@ -1519,7 +1524,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= nSam; ++i)
 	{
-		this->setRandomState();
+		//this->setRandomState();
 		// thermalize!
 		this->blockSample(nThrm, this->curState_, false);
 
@@ -1686,12 +1691,15 @@ inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 	// go through the vector elements
 	for (auto i = 0; i < this->flipPlaces_.size(); ++i)
 	{
+		auto fP					= this->ran_.template randomInt<uint>(0, this->nVis_);
 		// choose the flip place of the vector
-		this->flipPlaces_[i]	= this->ran_.template randomInt<uint>(0, this->nVis_);
+		this->flipPlaces_[i]	= fP;
 		// save the element of a vector before the flip
-		this->flipVals_[i]		= this->tmpVec_(this->flipPlaces_[i]);
+		this->flipVals_[i]		= this->tmpVec_(fP);
 	}
 }
+
+//////////////////////////////////////////////////
 
 /*
 * @brief Set the number of random flips.
