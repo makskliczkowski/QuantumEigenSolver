@@ -318,11 +318,13 @@ template<template <class> class _MatType, HasMatrixType _Concept>
 inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
 {
 	_MatType<_T> op(_dim, _dim);
+#ifndef _DEBUG
 #pragma omp parallel for
+#endif
 	for (u64 _base = 0; _base < _dim; _base++) 
 	{
 		auto [_idx, _val]		=	this->operator()(_base, _arg...);
-		op(_idx, _base)			+=	_val;
+		op(_idx, _base)		+=	_val;
 	}
 	return op;
 }
@@ -338,8 +340,14 @@ template<template <class> class _MatType, typename _T1, HasMatrixType _Concept>
 inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts ..._arg) const
 {
 	u64 Nh							=	_Hil.getHilbertSize();
+	// return full Hilbert size
+	//	if (Nh == _Hil.getFullHilbertSize())
+	//	return this->generateMat(Nh, _arg...);
+
 	_MatType<_T> op(Nh, Nh);
+#ifndef _DEBUG
 #pragma omp parallel for
+#endif
 	for (u64 _idx = 0; _idx < Nh; _idx++)
 	{
 		auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
@@ -351,7 +359,7 @@ inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::
 		// looking for the representative
 		auto [_newIdx, _eigval]		=	_Hil.findRep(_newState, _Hil.getNorm(_idx));
 		if(_newIdx < Nh)
-			op(_newIdx, _idx)		+=	_val * _eigval;
+			op(_newIdx, _idx)			+=	_val * _eigval;
 	}
 	return op;
 }

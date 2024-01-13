@@ -81,7 +81,7 @@ public:
 template<typename _T>
 inline std::string HeisenbergKitaev<_T>::info(const strVec& skip, std::string sep, int prec) const
 {
-	bool _different_J		= !std::equal(this->J.begin() + 1, this->J.end(), this->J.begin());
+	bool _different_J	= !std::equal(this->J.begin() + 1, this->J.end(), this->J.begin());
 	bool _different_Kx	= !std::equal(this->Kx.begin() + 1, this->Kx.end(), this->Kx.begin());
 	bool _different_Ky	= !std::equal(this->Ky.begin() + 1, this->Ky.end(), this->Ky.begin());
 	bool _different_Kz	= !std::equal(this->Kz.begin() + 1, this->Kz.end(), this->Kz.begin());
@@ -91,7 +91,7 @@ inline std::string HeisenbergKitaev<_T>::info(const strVec& skip, std::string se
 	auto BC					= this->hilbertSpace.getBC();
 
 	std::string name		= sep + "heikit,Ns=" + STR(this->Ns);
-	name += "," + (_different_J  ? "J=r"		: VEQVP(J,		J[0],		3));
+	name += "," + (_different_J  ? "J=r"		: VEQVP(J,		J[0],	3));
 	name += "," + (_different_Kx ? "Kx=r"		: VEQVP(Kx,		Kx[0],	3));
 	name += "," + (_different_Ky ? "Ky=r"		: VEQVP(Ky,		Ky[0],	3));
 	name += "," + (_different_Kz ? "Kz=r"		: VEQVP(Kz,		Kz[0],	3));
@@ -130,7 +130,7 @@ inline HeisenbergKitaev<_T>::HeisenbergKitaev(const Hilbert::HilbertSpace<_T>& h
 		this->hx = _hx;
 
 	this->ran_	= randomGen();
-	this->Ns		= this->hilbertSpace.getLatticeSize();
+	this->Ns	= this->hilbertSpace.getLatticeSize();
 	this->type_ = MY_MODELS::HEI_KIT_M;
 
 	//change info
@@ -207,21 +207,21 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
-			const double sj	=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			localVal				+= J[_site] * delta[_site] * si * sj;
+			const double sj		=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+= J[_site] * delta[_site] * si * sj;
 
 			// SYiSYj
-			auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
 			auto changedIn		=	siY * sjY * J[_site];
 
 			// SXiSXj
-			changedIn			+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
 
 			// ----------------------- KITAEV -----------------------
 			// z_bond
 			if (N_NUMBER == 0)
-				localVal			+= this->Kz[_site] * si * sj;
+				localVal		+= this->Kz[_site] * si * sj;
 			// y_bond
 			else if (N_NUMBER == 1)
 				changedIn		+= siY * sjY * Ky[_site];

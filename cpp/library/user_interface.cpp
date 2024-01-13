@@ -242,7 +242,7 @@ bool UI::defineModels(bool _createLat) {
 
 	// check if is complex
 	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
-	LOGINFO("Making : " + std::string((this->isComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 3);
+	LOGINFO("Making : " + std::string((this->isComplex_ || this->useComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 3);
 
 	// check if is complex and define the Hamiltonian
 	bool _ok;

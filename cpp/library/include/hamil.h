@@ -15,29 +15,29 @@
 #define HAMIL_H
 
 // ############################ EXISTING MODELS ############################
-enum MY_MODELS 																			// #
-{																								// #	
-	ISING_M, XYZ_M, HEI_KIT_M, NONE 													// #
-};																								// #
-BEGIN_ENUM(MY_MODELS)																	// #
-{																								// #
-	DECL_ENUM_ELEMENT(ISING_M),														// #
-	DECL_ENUM_ELEMENT(XYZ_M),															// #
-	DECL_ENUM_ELEMENT(HEI_KIT_M),														// #
-	DECL_ENUM_ELEMENT(NONE)																// #
-}																								// #
-END_ENUM(MY_MODELS)																		// #	
+enum MY_MODELS 															// #
+{																		// #	
+	ISING_M, XYZ_M, HEI_KIT_M, NONE 									// #
+};																		// #
+BEGIN_ENUM(MY_MODELS)													// #
+{																		// #
+	DECL_ENUM_ELEMENT(ISING_M),											// #
+	DECL_ENUM_ELEMENT(XYZ_M),											// #
+	DECL_ENUM_ELEMENT(HEI_KIT_M),										// #
+	DECL_ENUM_ELEMENT(NONE)												// #
+}																		// #
+END_ENUM(MY_MODELS)									 					// #	
 // #########################################################################
 
 // ########################### SAVING EXTENSIONS ###########################
-enum HAM_SAVE_EXT {																		// #
-	dat, h5																					// #
-};																								// #
-BEGIN_ENUM(HAM_SAVE_EXT)																// #
-{																								// #
-	DECL_ENUM_ELEMENT(dat), DECL_ENUM_ELEMENT(h5)								// #
-}																								// #
-END_ENUM(HAM_SAVE_EXT)																	// #	
+enum HAM_SAVE_EXT {														// #
+	dat, h5																// #
+};																		// #
+BEGIN_ENUM(HAM_SAVE_EXT)												// #
+{																		// #
+	DECL_ENUM_ELEMENT(dat), DECL_ENUM_ELEMENT(h5)						// #
+}																		// #
+END_ENUM(HAM_SAVE_EXT)													// #	
 // #########################################################################
 
 const std::string DEF_INFO_SEP		= std::string("_");											// defalut separator in info about the model

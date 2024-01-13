@@ -396,7 +396,7 @@ namespace Hilbert
 
 		// --------------------------------------------------------------------------------
 		LOGINFO(2);
-		LOGINFO(LOG_TYPES::INFO, "", 40, '%', 0);
+		LOGINFO("", LOG_TYPES::INFO, 40, '%', 0);
 		LOGINFOG("Using local: ", LOG_TYPES::INFO, 0);
 		for (auto& g : genIn) 
 		{
@@ -411,7 +411,7 @@ namespace Hilbert
 		{
 			LOGINFOG(SSTR(GlobalSyms::getSTR_GlobalSymGenerators(g.getName())) + ":" + VEQ(g.getVal()), LOG_TYPES::INFO, 1);
 		}
-		LOGINFO(LOG_TYPES::INFO, "", 40, '%', 0);
+		LOGINFO("", LOG_TYPES::INFO, 40, '%', 0);
 		LOGINFO(2);
 
 		// add neutral element

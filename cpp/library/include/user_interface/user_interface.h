@@ -17,70 +17,70 @@
 #endif
 
 // ######################### NQS ############################
-// save the weights?													// #
-#define NQS_SAVE_WEIGHTS											// #
-#ifdef NQS_SAVE_WEIGHTS												// #
-#	define NQS_SAVE_DIR "WEIGHTS" + kPS							// #
-#endif																	// #
-																			// #
-// use CPU?																// #
-#define NQS_USE_CPU													// #
-//#define NQS_USE_GPU												// #
-																			// #
-#ifdef NQS_USE_CPU													// #
-//#	define NQS_USE_OMP											// #
-#elif defined NSQ_USE_GPU											// #
-// something															// #
-#endif																	// #
-// definitions															// #
-#define NQS_ANGLES_UPD												// #
-#define NQS_USESR														// #
-#ifdef NQS_USESR														// #
-// how to handle the inverse of the matrix					// #
-//#	define NQS_PINV -1												// #
-// regularization for the covariance matrix					// #
-//#	define NQS_SREG													// #
-#endif																	// #
-#ifndef RBMPP_H														// #
-#	include "../NQS/rbm_pp.h"										// #
-#endif																	// #
-#ifndef RBM_H															// #
-#	include "../NQS/rbm.h"											// #
-#endif																	// #
+// save the weights?									// #
+#define NQS_SAVE_WEIGHTS								// #
+#ifdef NQS_SAVE_WEIGHTS									// #
+#	define NQS_SAVE_DIR "WEIGHTS" + kPS					// #
+#endif													// #
+														// #
+// use CPU?												// #
+#define NQS_USE_CPU										// #
+//#define NQS_USE_GPU									// #
+														// #
+#ifdef NQS_USE_CPU										// #
+//#	define NQS_USE_OMP									// #
+#elif defined NSQ_USE_GPU								// #
+// something											// #
+#endif													// #
+// definitions											// #
+#define NQS_ANGLES_UPD									// #
+#define NQS_USESR										// #
+#ifdef NQS_USESR										// #
+// how to handle the inverse of the matrix				// #
+//#	define NQS_PINV 1e-3								// #
+// regularization for the covariance matrix				// #
+//#	define NQS_SREG										// #
+#endif													// #
+#ifndef RBMPP_H											// #
+#	include "../NQS/rbm_pp.h"							// #
+#endif													// #
+#ifndef RBM_H											// #
+#	include "../NQS/rbm.h"								// #
+#endif													// #
 // ##########################################################
 
 
 // ######################### MODELS #########################
-#ifndef ISING_H														// #
-#include "../models/ising.h"										// #
-#endif // !ISING_H													// #
-#ifndef XYZ_H															// #
-#include "../models/XYZ.h"											// #
-#endif // !XYZ_H														// #
-#ifndef HEISENBERG_KITAEV_H										// #
-#include "../models/heisenberg-kitaev.h"						// #
-#endif																	// #
+#ifndef ISING_H											// #
+#include "../models/ising.h"							// #
+#endif // !ISING_H										// #
+#ifndef XYZ_H											// #
+#include "../models/XYZ.h"								// #
+#endif // !XYZ_H										// #
+#ifndef HEISENBERG_KITAEV_H								// #
+#include "../models/heisenberg-kitaev.h"				// #
+#endif													// #
 // ##########################################################
 
 // ######################## MODELS Q ########################
-#ifndef SYK2_M_H														// #
-#include "../models/quadratic/SYK2.h"							// #
-#endif // !SYK2														// #
-#ifndef FF_M_H															// #
-#include "../models/quadratic/FreeFermions.h"				// #
-#endif // !SYK2														// #
-#ifndef AUBRY_ANDRE_M_H												// #
-#include "../models/quadratic/AubryAndre.h"					// #
-#endif // !SYK2														// #
+#ifndef SYK2_M_H										// #
+#include "../models/quadratic/SYK2.h"					// #
+#endif // !SYK2											// #
+#ifndef FF_M_H											// #
+#include "../models/quadratic/FreeFermions.h"			// #
+#endif // !SYK2											// #
+#ifndef AUBRY_ANDRE_M_H									// #
+#include "../models/quadratic/AubryAndre.h"				// #
+#endif // !SYK2											// #
 // ##########################################################
 
 // ###################### LATTICES ##########################
-#ifndef SQUARE_H														// #
-#include "../../source/src/Lattices/square.h"				// #
-#endif																	// #
-#ifndef HEXAGONAL_H													// #
-#include "../../source/src/Lattices/hexagonal.h"			// #
-#endif																	// #
+#ifndef SQUARE_H										 // #
+#include "../../source/src/Lattices/square.h"			 // #
+#endif													 // #
+#ifndef HEXAGONAL_H										 // #
+#include "../../source/src/Lattices/hexagonal.h"		 // #
+#endif													 // #
 // ##########################################################
 
 // maximal ed size to compare
@@ -91,7 +91,7 @@ constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
-constexpr u64 UI_LIMITS_MAXPRINT									= ULLPOW(3);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // ##########################################################
@@ -245,7 +245,7 @@ namespace UI_PARAMS {
 	struct NqsP 
 	{
 		v_1d<u64> layersDim;
-		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM);
+		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM_T);
 		UI_PARAM_CREATE_DEFAULT(nHidden, uint, 1);
 		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
 		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
@@ -305,18 +305,18 @@ protected:
 	bool useComplex_ = false;
 
 	// ^^^^^^^^^ FOR DOUBLE ^^^^^^^^^					
-	Hilbert::HilbertSpace<double>							hilDouble;
+	Hilbert::HilbertSpace<double>						hilDouble;
 	std::shared_ptr<Hamiltonian<double>>				hamDouble;
-	std::shared_ptr<QuadraticHamiltonian<double>>	qhamDouble;
+	std::shared_ptr<QuadraticHamiltonian<double>>		qhamDouble;
 
 	// ^^^^^^^^ FOR COMPLEX ^^^^^^^^^
-	Hilbert::HilbertSpace<cpx>								hilComplex;
+	Hilbert::HilbertSpace<cpx>							hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>					hamComplex;
-	std::shared_ptr<QuadraticHamiltonian<cpx>>		qhamComplex;
+	std::shared_ptr<QuadraticHamiltonian<cpx>>			qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
-	std::shared_ptr<NQS<cpx, 2>>							nqsCpx;
-	std::shared_ptr<NQS<double, 2>>						nqsDouble;
+	std::shared_ptr<NQS<2, cpx>>						nqsCpx;
+	std::shared_ptr<NQS<2, double>>						nqsDouble;
 
 	// ##############################
 	void setDefaultMap()					final override 
@@ -398,7 +398,7 @@ private:
 	// ####################### N Q S #######################
 
 	template<typename _T, uint _spinModes>
-	void nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS);
+	void nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS);
 
 	// ##################### QUADRATIC #####################
 	template<typename _T>
@@ -418,12 +418,12 @@ private:
 	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H);
 
 	template<typename _T, uint _spinModes = 2>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, _spinModes>>& _NQS);
+	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS);
 
 public:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% C O N S T R U C T O R S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	~UI() = default;
-	UI() = default;
+	~UI()		= default;
+	UI()		= default;
 	UI(int argc, char** argv) {
 		this->setDefaultMap();
 		this->init(argc, argv);
@@ -586,21 +586,21 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
 * @param _NQS Neural Network Quantum State frameweork
 */
 template<typename _T, uint _spinModes>
-inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_T, _spinModes>>& _NQS)
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS)
 {
 	switch (this->nqsP.type_)
 	{
-	case NQSTYPES::RBM:
-		_NQS = std::make_shared<RBM_S<_T, _spinModes>>(	_H,
-																		this->nqsP.nHidden_,
-																		this->nqsP.lr_,
-																		this->threadNum);
+	case NQSTYPES::RBM_T:
+		_NQS = std::make_shared<RBM_S<_spinModes, _T>>(	_H,
+														this->nqsP.nHidden_,
+														this->nqsP.lr_,
+														this->threadNum);
 		break;
-	case NQSTYPES::RBMPP:
-		_NQS = std::make_shared<RBM_PP_S<_T, _spinModes>>(_H,
-																		this->nqsP.nHidden_,
-																		this->nqsP.lr_,
-																		this->threadNum);
+	case NQSTYPES::RBMPP_T:
+		_NQS = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H,
+														this->nqsP.nHidden_,
+														this->nqsP.lr_,
+														this->threadNum);
 		break;
 	default:
 		LOGINFO("I don't know any other NQS types :<", LOG_TYPES::INFO, 1);
@@ -623,7 +623,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 template<typename _T>
 inline void UI::symmetries(std::shared_ptr<Hamiltonian<_T>> _H, bool _diag, bool _states)
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	u64 Nh					=	_H->getHilbertSize();
 	// create the directories
@@ -734,7 +734,7 @@ inline void UI::symmetries(std::shared_ptr<Hamiltonian<_T>> _H, bool _diag, bool
 */
 inline void UI::symmetriesDeg()
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	u64 Nh					= this->hamComplex->getHilbertSize();
 	const auto _realizations= this->nqsP.nBlocks_;
@@ -900,7 +900,7 @@ inline void UI::symmetriesDeg()
 */
 inline void UI::symmetriesCreateDeg()
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	u64 Nh					=			this->hamComplex->getHilbertSize();
 	const auto _realizations=			this->nqsP.nBlocks_;
@@ -1320,10 +1320,10 @@ inline void UI::symmetriesTest()
 // ##########################################################################################################################################
 
 template<typename _T, uint _spinModes>
-inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
+inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 {
 	_timer.reset();
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
 	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
 	// get info
@@ -1341,9 +1341,9 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		if (Nh <= UI_LIMITS_NQS_FULLED)
 		{
 			_H->diagH(false);
-			arma::Col<_T> _state = _H->getEigVec(0); 
-			_mbs = _state;
-			_H->prettyPrint(stout, _state, latP.lat->get_Ns(), 1e-2);
+			_mbs = _H->getEigVec(0);
+			if(latP.lat->get_Ns() < 10)
+				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-2);
 			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
 		else
@@ -1367,9 +1367,9 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 		_opsC.push_back(_SzC);
 	}
 	// create measurement operator
-	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir, std::move(_opsG), 
-																			std::move(_opsL), 
-																			std::move(_opsC), this->threadNum);
+	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  _opsG, 
+																			_opsL, 
+																			_opsC, this->threadNum);
 
 	// start the simulation
 	arma::Col<_T> _EN(this->nqsP.nMcSteps_ * 2, arma::fill::zeros);
@@ -1390,11 +1390,6 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 																												this->quiet,
 																												_timer.start(),
 																												_meas);
-	// many body
-	if (_mbs.size() != 0)
-		_meas.measure(_mbs, _NQS->getHilbertSpace());
-	// save the measured quantities
-	_meas.save();
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
 	_ENSM.col(0)	= arma::real(_EN);
 	_ENSM.col(1)	= arma::imag(_EN);
@@ -1404,6 +1399,12 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(perc));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
 	_ENSM.save(dir + "history.dat", arma::raw_ascii);
+
+	// many body
+	if (_mbs.size() != 0)
+		_meas.measure(_mbs, _NQS->getHilbertSpace());
+	// save the measured quantities
+	_meas.save();
 }
 
 // ##########################################################################################################################################
@@ -1415,7 +1416,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_T, _spinModes>> _NQS)
 template<typename _T>
 inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	uint Ns					= _H->getNs();
 	// --- create the directories ---
@@ -1532,7 +1533,7 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 template<typename _T>
 inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
-	LOGINFO(LOG_TYPES::TRACE, "", 40, '#', 1);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	this->_timer.reset();
 
 	uint Ns					= _H->getNs();
