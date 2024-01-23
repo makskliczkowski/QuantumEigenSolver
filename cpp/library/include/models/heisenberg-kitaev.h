@@ -58,6 +58,10 @@ public:
 						uint site,
 						NQSFun f1)				override final;
 
+	cpx locEnergy(const arma::Col<double>& _id,
+						uint site,
+						NQSFun f1)				override final;
+
 	// ############################################ Info #############################################
 
 	std::string info(	const strVec& skip	= {},
@@ -192,8 +196,8 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
 
 	// -------------- perpendicular field --------------
-	const double si	=	checkBit(_cur, this->Ns - _site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-	localVal				+= hz[_site] * si;
+	const double si		=	checkBit(_cur, this->Ns - _site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	localVal			+= hz[_site] * si;
 
 	// ---------------- transverse field ---------------
 	if (!EQP(this->hx[_site], 0.0, 1e-9))
@@ -208,6 +212,64 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
 			const double sj		=	checkBit(_cur, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+= J[_site] * delta[_site] * si * sj;
+
+			// SYiSYj
+			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto changedIn		=	siY * sjY * J[_site];
+
+			// SXiSXj
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
+
+			// ----------------------- KITAEV -----------------------
+			// z_bond
+			if (N_NUMBER == 0)
+				localVal		+= this->Kz[_site] * si * sj;
+			// y_bond
+			else if (N_NUMBER == 1)
+				changedIn		+= siY * sjY * Ky[_site];
+			// x_bond
+			else if (N_NUMBER == 2)
+				changedIn		+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * Kx[_site];
+
+			// apply change
+			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn;
+		}
+	}
+	// return all
+	return changedVal + localVal;
+}
+
+// ##########################################################################################################################################
+
+template<typename _T>
+inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _site, NQSFun _fun)
+{
+	// value that does not change
+	double localVal		= 0.0;
+	cpx changedVal		= 0.0;
+
+	// get number of forward nn
+	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
+
+	// -------------- perpendicular field --------------
+	const double si		=	checkBit(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	localVal			+= hz[_site] * si;
+
+	// ---------------- transverse field ---------------
+	if (!EQP(this->hx[_site], 0.0, 1e-9))
+		changedVal += _fun({ (int)_site }, { si }) * Operators::_SPIN_RBM * hx[_site];
+
+	// ------------------- CHECK NN --------------------
+	for (uint nn = 0; nn < NUM_OF_NN; nn++)
+	{
+		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0)
+		{
+			// --------------------- HEISENBERG ---------------------
+			// SZiSZj
+			const double sj		=	checkBit(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 			localVal			+= J[_site] * delta[_site] * si * sj;
 
 			// SYiSYj
@@ -300,6 +362,6 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	}
 }
 
-// ##########################################################################################################################################
+
 
 #endif

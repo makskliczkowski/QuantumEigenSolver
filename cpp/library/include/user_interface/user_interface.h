@@ -34,6 +34,8 @@
 #endif													// #
 // definitions											// #
 #define NQS_ANGLES_UPD									// #
+// use vector only?										// #
+#define NQS_USE_VEC_ONLY								// #
 #define NQS_USESR										// #
 #ifdef NQS_USESR										// #
 // how to handle the inverse of the matrix				// #
@@ -1393,7 +1395,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 																			this->nqsP.nFlips_,
 																			this->quiet,
 																			_timer.start(),
-																			3);
+																			10);
 	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(this->nqsP.nMcSamples_,
 																	0,
 																	this->nqsP.nSBlocks_,

@@ -9,17 +9,9 @@
 #ifndef NQS_H
 #	define NQS_H
 
-// #################################
-#ifndef HAMIL_H					// #
-#	include "hamil.h"			// #
-#endif // !HAMIL_H				// #
-// #################################
-
-// #################################
-#ifndef ML_H					// #
-#	include "ml.h"				// #
-#endif // !ML_H					// #
-// #################################
+//////////////////////////////////////////////////////////////////////////////////////////
+#include "NQS/nqs_operator.h"
+//////////////////////////////////////////////////////////////////////////////////////////
 
 // ######### NQS TYPES #############
 enum NQSTYPES					// #
@@ -39,7 +31,6 @@ END_ENUM(NQSTYPES)				// #
 #	undef _DEBUG
 #endif
 
-#include <thread>
 #include <future>
 #include <functional>
 #include <any>
@@ -65,651 +56,6 @@ struct CondVarKernel
 	_T kernelValue_			= 0.0;
 };
 
-#	endif 
-//////////////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// Operators for the NQS
-#	ifndef NQS_OPERATOR_H
-#		define NQS_OPERATOR_H
-namespace Operators
-{
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ######################################################## N Q S   O P E R A T O R #########################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-
-	/*
-	* @brief Class for storing the operators that act on the quantum state taking into account the probability 
-	* ratio for the averages
-	*/
-	template <typename _T, typename ..._Ts>
-	class OperatorNQS
-	{
-	protected:
-		using NQSS			= arma::Col<double>;
-		// for initializing the pRatio function with a single column vector
-		using NQSFunCol		= std::function<cpx(const NQSS& _v)>;
-		// for initializing the pRatio function with initializer listr
-		using NQSFun		= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
-		// decide about the size of values
-		void decideSize();
-	public:
-		// ##### OPERATOR NAME #####
-		std::string name_					= "";
-		uint sizeX_							= 1;
-		uint sizeY_							= 1;
-		uint Ns_							= 1;
-		// ##### CURRENT VALUE #####
-		arma::Mat<cpx> currentValue_;
-		// save samples here
-		v_1d<arma::Mat<cpx>> samples_;
-
-		// ####### MANY BODY #######
-		arma::Mat<_T> manyBodyMatrix_;
-		arma::Mat<_T> manyBodyVal_;
-
-		// ######## INDICES ########
-		// for finding out the index in the variadic variable
-		v_1d<uint> indices_;
-		uint currentIdx_					= 0;
-
-		// ######## HELPER #########
-		// store the column state
-		NQSS state_;
-
-		// operators to apply step by step that add up in the average <S|O|\psi_M>
-		// O may in general create a combination of the base states, leave it as a vector then
-		v_1d<Operators::Operator<_T, _Ts...>> op_;
-		
-		// ####### CONSTRUCT #######
-		~OperatorNQS();
-		OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name = "");
-		OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name = "");
-		OperatorNQS(const Operators::OperatorNQS<_T, _Ts...>& _other);
-		OperatorNQS(Operators::OperatorNQS<_T, _Ts...>&& _other);
-
-		// ###### APPLICATION ######
-		auto operator()(u64 s, _Ts... a)						const -> v_1d<typename _OP<_T>::R>;
-		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		-> cpx;
-		auto operator[](uint i)									const -> arma::Mat<cpx> { return this->samples_[i];	};
-		// updates current value
-		template <class _Tt = uint>
-		auto updCurrent(cpx _val, _Tt i)						-> void;
-		template <class _Tt, typename ..._Tss>
-		auto updCurrent(cpx _val, _Tt i, _Tss...a)				-> void;
-		template <typename ..._Tss>
-		auto updCurrent(cpx _val, _Tss...a)						-> void { this->updCurrent(_val, a...);					};
-		
-	public:
-		// ######## SETTERS ########
-		auto resetSamples()				-> void { this->samples_ = {};													};
-		auto resetMB()					-> void { manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);		};
-		auto resetValue()				-> void { currentValue_ = arma::Mat<cpx>(sizeX_, sizeY_, arma::fill::zeros);	};
-		auto reset()					-> void { this->resetValue(); this->resetSamples(); 							};
-		auto normalize(uint N)			-> void; 
-		template <typename _T2>
-		auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>&, _Ts... a)	-> void;
-		auto applyManyBody(const arma::Col<_T>& _C, uint i = 0, uint j = 0)	-> arma::Col<_T>;
-
-		// ######## GETTERS ########
-		auto mbmat()					const -> arma::Mat<_T>							{ return this->manyBodyMatrix_;			};
-		auto mbval()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
-		auto name()						const -> std::string							{ return this->name_;					};
-		auto var()						const -> arma::Mat<cpx>							{ return VEC::var(samples_);			};
-		auto mean()						const -> arma::Mat<cpx>							{ return VEC::mean(samples_);		};
-		auto value()					const -> arma::Mat<cpx>							{ return currentValue_;					};
-		auto value(uint i)				const -> arma::Mat<cpx>							{ return samples_[i];					};
-		auto samples()					const -> v_1d<arma::Mat<cpx>>					{ return this->samples_;				};
-		auto getOperator(uint i)		const -> Operators::Operator<_T, _Ts...>		{ return this->op_[i];					};
-	};
-
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ###################################################### C L A S S   C O N S T U C T #######################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	
-	/*
-	* @brief Resize the current value so one can store only the necessary values in the matrix (sizeX, sizeY)
-	* Global has sizeX = sizeY = 1,
-	* Local has sizeX = Ns, sizeY = 1,
-	* Correlation has sizeX = Ns, sizeY = Ns.
-	* @param ...args placeholder for the arguments
-	*/
-	template<typename _T, typename ..._Ts>
-	inline void Operators::OperatorNQS<_T, _Ts...>::decideSize()
-	{
-		constexpr size_t numArgs		= sizeof...(_Ts);
-		if (numArgs > 2) 
-			throw std::runtime_error("Not implemented for more than two arguments!");
-
-		if (numArgs == 0)
-		{
-			this->sizeX_				= 1;
-			this->sizeY_				= 1;
-			this->indices_				= {};
-		}
-		else if (numArgs == 1)
-		{
-			this->sizeX_				= this->Ns_;
-			this->sizeY_				= 1;
-			this->indices_				= { 0 };
-		}
-		else if (numArgs == 2)
-		{
-			this->sizeX_				= this->Ns_;
-			this->sizeY_				= this->Ns_;
-			this->indices_				= { 0, 0 };
-		}
-		else
-			throw std::runtime_error("Not implemented for more than two arguments!");
-		this->manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
-	};
-
-	template <typename _T, typename ..._Ts>
-	OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name)
-		: name_(_name), Ns_(_op.getNs()), samples_({}), op_({ _op })
-	{
-		this->decideSize();
-		this->state_.resize(Ns_);
-		this->reset();
-	};
-
-	template <typename _T, typename ..._Ts>
-	OperatorNQS<_T, _Ts...>::OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name)
-		: name_(_name), Ns_(_opV[0].getNs()), samples_({}), op_(_opV)
-	{
-		this->decideSize();
-		this->state_.resize(Ns_);
-		this->reset();
-	};
-
-	template<typename _T, typename ..._Ts>
-	inline Operators::OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::OperatorNQS<_T, _Ts...>& _other)
-		: name_(_other.name_), Ns_(_other.Ns_), currentValue_(_other.currentValue_), samples_(_other.samples_), op_(_other.op_)
-	{
-		this->decideSize();
-		this->state_.resize(Ns_);
-		this->reset();
-	}
-
-	template<typename _T, typename ..._Ts>
-	inline Operators::OperatorNQS<_T, _Ts...>::OperatorNQS(Operators::OperatorNQS<_T, _Ts...>&& _other)
-		: name_(std::move(_other.name_)), Ns_(std::move(_other.Ns_)), currentValue_(std::move(_other.currentValue_)), samples_(std::move(_other.samples_)), op_(std::move(_other.op_))
-	{
-		this->decideSize();
-		this->state_ = std::move(_other.state_);
-		this->reset();
-	}
-
-	template<typename _T, typename ..._Ts>
-	inline Operators::OperatorNQS<_T, _Ts...>::~OperatorNQS()
-	{
-		for (auto& x : this->samples_) x.reset();
-		this->samples_.clear();
-		op_.clear();
-	}
-
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ##################################################### C L A S S   O P E R A T O R S ######################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	
-	template<typename _T, typename ..._Ts>
-	template<class _Tt>
-	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i)
-	{
-		this->indices_[this->currentIdx_] = i;
-		this->currentIdx_++;
-		if (indices_.size() == 0)
-			this->currentValue_(0, 0) += _val;
-		else if (indices_.size() == 1)
-			this->currentValue_(this->indices_[0], 0) += _val;
-		else if (indices_.size() == 2)
-			this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
-		else
-			throw std::runtime_error("Not implemented such exotic operators");
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	template<typename _T, typename ..._Ts>
-	template <class _Tt, typename ..._Tss>
-	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i, _Tss ...a)
-	{
-		indices_[currentIdx_] = i;
-		currentIdx_++;
-		updCurrent(_val, a...);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Sets the many body matrix to apply it later for the many body states
-	* @param _H Hilbert space
-	*/
-	template<typename _T, typename ..._Ts>
-	template <typename _T2>
-	inline void Operators::OperatorNQS<_T, _Ts...>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _H, _Ts ...a)
-	{
-		this->manyBodyMatrix_ = arma::Mat<_T>(_H.getHilbertSize(), _H.getHilbertSize(), arma::fill::zeros);
-		for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
-		{
-			if (_H.getHilbertSize() == _H.getFullHilbertSize())
-			{
-				auto _Min = _op.template generateMat<typename arma::Mat>(_H.getFullHilbertSize(), a...);
-				this->manyBodyMatrix_ += _Min;
-			}
-			else
-			{
-				auto _Min = _op.template generateMat<typename arma::Mat, _T2>(_H, a...);
-				this->manyBodyMatrix_ += _Min;
-			}
-		}
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* to a specific place (i, j) in the matrix
-	* @param _C many body state
-	* @param i first matrix save element
-	* @param j second matrix save element
-	*/
-	template<typename _T, typename ..._Ts>
-	inline arma::Col<_T> Operators::OperatorNQS<_T, _Ts...>::applyManyBody(const arma::Col<_T>& _C, uint i, uint j) 
-	{
-		arma::Col<_T> _Cout = this->manyBodyMatrix_ * _C;
-		manyBodyVal_(i, j) = arma::cdot(_C, _Cout);
-		return _Cout;
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Apply the operators without a value change with pRatio.
-	* @param s base state to apply the operators to
-	* @param _fun pRatio function from the NQS
-	* @param ...a additional parameters to the operators
-	* @returns vector of changed base states with their corresponding values
-	*/
-	template<typename _T, typename ..._Ts>
-	inline cpx Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
-	{
-		// starting value
-		this->currentIdx_ = 0;
-		cpx _valTotal		= 0.0;
-		// go through operators
-		for (auto& _op : op_)
-		{
-			// take value and new vector (written as an integer) 
-			auto [s2, _val] = _op(s, a...);
-			// transform to state
-			INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
-			// calculate the probability ratio
-			_valTotal += _val * _fun(this->state_);
-		}
-		this->updCurrent(_valTotal, a...);
-		return toType<_T>(_valTotal.real(), _valTotal.imag());
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Apply the operators without a value change with pRatio.
-	* @param s base state to apply the operators to
-	* @param ...a additional parameters to the operators
-	* @returns vector of changed base states with their corresponding values
-	*/
-	template<typename _T, typename ..._Ts>
-	inline v_1d<typename _OP<_T>::R> Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, _Ts ...a) const
-	{
-		v_1d<typename _OP<_T>::R> _out;
-		// go through operators
-		for (auto& _op : op_)
-			// take value and new vector (written as an integer) 
-			_out.push_back(_op(s, a));
-		return _out;
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Normalize the values after given block sample
-	* @param N size of the block
-	*/
-	template<typename _T, typename ..._Ts>
-	inline auto Operators::OperatorNQS<_T, _Ts...>::normalize(uint N) -> void
-	{
-		samples_.push_back(currentValue_ / double(N)); 
-		this->resetValue();
-	}
-};
-#	endif
-//////////////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// average operators in the NQS
-#	ifndef NQS_AV_H
-#		define NQS_AV_H
-namespace NQSAv
-{
-//	// CREATE A MAPPING TO DECIDE WHICH OPERATORS TO USE
-//#define MEASUREMENT_OPERATORS_CREATE(WHICH) WHICH, WHICH##TOT, WHICH##COR,
-//#define MEASUREMENT_OPERATORS_DECLARE(WHICH) DECL_ENUM_ELEMENT(WHICH), DECL_ENUM_ELEMENT(WHICH##TOT), DECL_ENUM_ELEMENT(WHICH##COR),
-//	/*
-//	* @brief Operators that are available for the measurement
-//	* !TODO Generalize me!
-//	*/
-//	enum class MeasurementNQSOperators
-//	{
-//		MEASUREMENT_OPERATORS_CREATE(SZ)
-//		MEASUREMENT_OPERATORS_CREATE(SX)
-//	};
-//
-//	BEGIN_ENUMC(MeasurementNQSOperators)
-//	{
-//		MEASUREMENT_OPERATORS_DECLARE(SZ)
-//		MEASUREMENT_OPERATORS_DECLARE(SX)
-//	}
-//	END_ENUMC(MeasurementNQSOperators);
-//
-//#define MEASUREMENT_OPERATORS_MAP(WHICH, ENUM_NAME)	{getSTR_##ENUM_NAME(WHICH), ENUM_NAME::##WHICH},				\
-//																		{getSTR_##ENUM_NAME(WHICH##TOT), ENUM_NAME::##WHICH##TOT},	\
-//																		{getSTR_##ENUM_NAME(WHICH##COR), ENUM_NAME::##WHICH##COR},
-//	// create a map
-//	std::map<std::string, MeasurementNQSOperators> MeasurementNQSOperatorsMap = {
-//		MEASUREMENT_OPERATORS_MAP(SZ, MeasurementNQSOperators)
-//		MEASUREMENT_OPERATORS_MAP(SX, MeasurementNQSOperators)
-//	};
-
-	/*
-	* @brief Class that stores the measurements from the NQS and is able to save them.
-	*/
-	template <typename _T>
-	class MeasurementNQS
-	{
-		using NQSS			= arma::Col<double>;
-		// for initializing the pRatio function with a single column vector
-		using NQSFunCol		= std::function<cpx(const NQSS& _v)>;
-		using OPG			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>>;
-		using OPL			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>>;
-		using OPC			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>>;
-	protected:
-		std::string dir_	= "";
-		uint threads_		= 1;
-		uint Ns_			= 0;
-		// operator vector
-		//v_1d<NQSAv::MeasurementNQSOperators> measOp_;
-		// lattice pointer
-		std::shared_ptr<Lattice> lat_;
-		// global operators
-		OPG opG_;
-		// local operators
-		OPL opL_;
-		// correlation operators
-		OPC opC_;
-	public:
-		~MeasurementNQS() 
-		{ 
-			LOGINFO("Destroying the measurement", LOG_TYPES::TRACE, 3);
-			for (auto& x : opG_) x.reset(); 
-			for (auto& x : opL_) x.reset();
-			for (auto& x : opC_) x.reset();
-		}
-		MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators);
-		MeasurementNQS(std::shared_ptr<Lattice> _lat, const std::string& _dir,
-																	 const OPG& _opG,
-																	 const OPL& _opL,
-																	 const OPC& _opC,
-																	 uint _threadNum = 1);
-
-		void measure(u64 s, NQSFunCol _fun);
-		void measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>&);
-		void normalize(uint _nBlck);
-		void save(const strVec& _ext = { ".h5" });
-	};
-
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ###################################################### C L A S S   C O N S T U C T #######################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	
-	template <typename _T>
-	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators)
-		: Ns_(_lat->get_Ns()), lat_(_lat)
-	{}
-
-	////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////////
-	template <typename _T>
-	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat,  const std::string& _dir,
-													const OPG& _opG,
-													const OPL& _opL, 
-													const OPC& _opC,
-													uint _threadNum)
-		: dir_(_dir), threads_(_threadNum), Ns_(_lat->get_Ns()), lat_(_lat)
-	{
-		// create directory
-		makeDir(_dir);
-
-		this->opG_ = _opG;
-		this->opL_ = _opL;
-		this->opC_ = _opC;
-		//CONSTRUCTOR_CALL;
-	}
-
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	// ####################################################### C L A S S   M E A S U R E ########################################################
-	// ##########################################################################################################################################
-	// ##########################################################################################################################################
-	
-	template <typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::measure(u64 s, NQSFunCol _fun)
-	{
-		BEGIN_CATCH_HANDLER
-		{
-			// measure global
-			for (auto& _op : this->opG_)
-				auto val [[maybe_unused]] = _op->operator()(s, _fun);
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure local
-			for (auto& _op : this->opL_)
-			{
-				// go through the local operators
-				for (auto i = 0; i < this->Ns_; ++i)
-				{
-					auto val [[maybe_unused]] = _op->operator()(s, _fun, i);
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure correlation
-			for (auto& _op : this->opC_)
-			{
-				for (auto i = 0; i < this->Ns_; ++i)
-				{
-					for (auto j = 0; j < this->Ns_; ++j)
-					{
-						auto val [[maybe_unused]] = _op->operator()(s, _fun, i, j);
-					}
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	template<typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>& _H)
-	{
-		BEGIN_CATCH_HANDLER
-		{
-			// measure global
-			for (auto& _op : this->opG_)
-			{
-				_op->resetMB();
-				_op->setManyBodyMat(_H);
-				_op->applyManyBody(_state, 0, 0);
-			}
-				
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure local
-			for (auto& _op : this->opL_)
-			{
-				_op->resetMB();
-				// go through the local operators
-				for (auto i = 0; i < this->Ns_; ++i)
-				{
-					_op->setManyBodyMat(_H, i);
-					_op->applyManyBody(_state, i, 0);
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure correlation
-			for (auto& _op : this->opC_)
-			{
-				_op->resetMB();
-				for (auto i = 0; i < this->Ns_; ++i)
-				{
-					for (auto j = 0; j < this->Ns_; ++j)
-					{
-						_op->setManyBodyMat(_H, i, j);
-						_op->applyManyBody(_state, i, j);
-					}
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	template <typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::normalize(uint _nBlck)
-	{
-		BEGIN_CATCH_HANDLER
-		{
-			// measure global
-			for (auto& _op : this->opG_)
-				_op->normalize(_nBlck);
-		}
-		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure local
-			for (auto& _op : this->opL_)
-				_op->normalize(_nBlck);
-		}
-		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure correlation
-			for (auto& _op : this->opC_)
-				_op->normalize(_nBlck);
-		}
-		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	template<typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::save(const strVec& _ext)
-	{
-		BEGIN_CATCH_HANDLER
-		{
-			// save global
-			for (auto& _op : this->opG_)
-			{
-				// nqs
-				{
-					arma::Mat<cpx> M = _op->mean();
-					// save!
-					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->name() + ext, M, "values");
-				}
-				// many body
-				{
-					arma::Mat<_T> M = _op->mbval();
-					if(M.size() != 0)
-						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure local
-			for (auto& _op : this->opL_)
-			{
-				{
-					arma::Mat<cpx> M = _op->mean();
-					// save!
-					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->name() + ext, M, "values");
-				}
-				// many body
-				{
-					arma::Mat<_T> M = _op->mbval();
-					if (M.size() != 0)
-						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-		BEGIN_CATCH_HANDLER
-		{
-			// measure correlation
-			for (auto& _op : this->opC_)
-			{
-				{
-					arma::Mat<cpx> M = _op->mean();
-					// save!
-					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->name() + ext, M, "values");
-				}
-				// many body
-				{
-					arma::Mat<_T> M = _op->mbval();
-					if (M.size() != 0)
-						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-				}
-			}
-		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-};
 #	endif 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -785,8 +131,10 @@ protected:
 	v_1d<_stateType> flipVals_;											// stores values before the flip to be used for the gradients
 	
 	// current state
-	u64 curState_						=		0;						// currently processed state
 	NQSS curVec_;														// currently processed state vector for convenience
+#ifndef NQS_USE_VEC_ONLY
+	u64 curState_						=		0;						// currently processed state
+#endif
 	
 	// temporary placeholders
 	v_1d<NQSS> tmpVecs_;
@@ -926,15 +274,16 @@ public:
 	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;						};
 	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
 
-#ifdef NQS_USE_CPU
-	auto getThreadID()							const -> uint;
-#endif
-
 	// ----------------------- S A M P L I N G -----------------------
+#ifndef NQS_USE_VEC_ONLY
 	virtual void blockSample(	uint _bSize,
 								u64 _start, 
 								bool _therm = false);
-	
+#else
+	virtual void blockSample(	uint _bSize,
+								const NQSS& _start,
+								bool _therm = false);
+#endif
 	virtual arma::Col<_T> train(uint mcSteps,							// number of Monte Carlo Steps
 								uint nThrm,								// number of mcSteps to thermalize
 								uint nBlck,								// number of such blocks for one average step
@@ -1013,35 +362,6 @@ inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, 
 
 // ##########################################################################################################################################
 // ##########################################################################################################################################
-// ########################################################### T H R E A D I N G ############################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-
-/*
-* @brief Returns the thread ID of the currently working thread
-* @returns the thread ID integer modulated by this thread number
-*/
-#ifdef NQS_USE_CPU
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-uint NQS<_spinModes, _Ht, _T, _stateType>::getThreadID() const
-{
-#ifndef _DEBUG
-	if (this->threadNum_ == 1)
-		return 0;
-	else
-#	ifdef NQS_USE_OMP
-		return omp_get_thread_num() % this->threadNum_;
-#	else
-		return std::hash<std::thread::id>{}(std::this_thread::get_id()) % this->threadNum_;
-#	endif
-#else
-	return 0;
-#endif
-};
-#endif
-
-// ##########################################################################################################################################
-// ##########################################################################################################################################
 // ########################################################### C O N S T R U C T ############################################################
 // ##########################################################################################################################################
 // ##########################################################################################################################################
@@ -1100,11 +420,20 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 * @param _nFlip number of flips in a single step
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+#ifndef NQS_USE_VEC_ONLY
 inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _start, bool _therm)
+#else
+inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const NQSS& _start, bool _therm)
+#endif
 {
 	// check whether we should set a state again or thermalize the whole process
+#ifndef NQS_USE_VEC_ONLY
 	if (_start != this->curState_ || _therm)
 		this->setState(_start, _therm);
+#else
+	if (_therm)
+		this->setState(_start, _therm);
+#endif
 
 	// set the temporary state - the vectors are usefull so set them accordingly
 	this->tmpVec_ = this->curVec_;
@@ -1139,9 +468,16 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _
 			this->unapplyFlipsT();
 		}
 	}
+	// set the current integer state
+#ifndef NQS_USE_VEC_ONLY
 	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_);
+#endif
 #ifndef NQS_ANGLES_UPD
+#	ifndef NQS_USE_VEC_ONLY
 	this->setState(this->curState_, true);
+#	else
+	this->setState(this->curVec_, true);
+#	endif
 #endif
 }
 
@@ -1168,12 +504,21 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 #	endif
 	for (int site = 0; site < this->nSites_; site++) 
 	{
-		auto energy	=	this->H_->locEnergy(	this->curState_, 
-														site, 
-														std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
-														this,
-														std::placeholders::_1,
-														std::placeholders::_2));
+#	ifndef NQS_USE_VEC_ONLY
+		auto energy	=	this->H_->locEnergy(this->curState_, 
+											site, 
+											std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
+											this,
+											std::placeholders::_1,
+											std::placeholders::_2));
+#	else
+		auto energy	=	this->H_->locEnergy(this->curVec_, 
+											site, 
+											std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
+											this,
+											std::placeholders::_1,
+											std::placeholders::_2));
+#	endif
 		energyR		+=	algebra::real(energy);
 		energyI		+=	algebra::imag(energy);
 	}
@@ -1228,26 +573,34 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 			std::unique_lock<std::mutex> lock(this->kernels_[_threadNum].mutex);	
 			// thread will suspend here and release the lock if the expression does not return true
 			this->kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->kernels_[_threadNum].flagThreadRun_; });	
-		}
 
-		// kill me!
-		if (this->kernels_[_threadNum].flagThreadKill_)
-		{
-			std::unique_lock<std::mutex> lock(this->kernels_[_threadNum].mutex);
-			this->kernels_[_threadNum].end_ = true;
-			break;
+			// if kill then kill
+			if (this->kernels_[_threadNum].flagThreadKill_)
+			{
+				this->kernels_[_threadNum].end_ = true;
+				break;
+			}
 		}
 
 		// Process the work
 		this->kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
+#ifndef NQS_USE_VEC_ONLY
 			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(this->curState_,
-																	 site, 
-																	 std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
-																	 this,
-																	 std::placeholders::_1,
-																	 std::placeholders::_2)));
+																							 site, 
+																							 std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
+																							 this,
+																							 std::placeholders::_1,
+																							 std::placeholders::_2)));
+#else
+			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(this->curVec_,
+																							site, 
+																							std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
+																							this,
+																							std::placeholders::_1,
+																							std::placeholders::_2)));
+#endif
 		}
 		// lock again
 		{
@@ -1289,9 +642,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st)
 	this->curVec_	= _st / _val * this->discVal_;
 #else
 	this->curVec_	= _st;
-	//this->tmpVec_	= _st;
 #endif
+#ifndef NQS_USE_VEC_ONLY
 	this->curState_ = BASE_TO_INT<u64>(_st, this->discVal_);
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -1303,9 +657,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 {
+#ifndef NQS_USE_VEC_ONLY
 	this->curState_ = _st;
+#endif
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
-	//this->tmpVec_ = _st;
 }
 
 // ##########################################################################################################################################
@@ -1450,15 +805,22 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 	for (uint i = 1; i <= mcSteps; ++i)
 	{
 		this->setRandomState();
-		// thermalize!
+		// thermalize
+#ifndef NQS_USE_VEC_ONLY
 		this->blockSample(nThrm, this->curState_, false);
+#else
+		this->blockSample(nThrm, this->curVec_, false);
+#endif
 
 		// iterate blocks
 		for (uint _taken = 0; _taken < nBlck; ++_taken) {
 
 			// sample them!
+#ifndef NQS_USE_VEC_ONLY
 			this->blockSample(bSize, this->curState_, false);
-
+#else
+			this->blockSample(bSize, this->curVec_, false);
+#endif
 			// calculate the gradient!
 			this->grad(this->curVec_, _taken);
 
@@ -1526,19 +888,25 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 	{
 		//this->setRandomState();
 		// thermalize!
+#ifndef NQS_USE_VEC_ONLY
 		this->blockSample(nThrm, this->curState_, false);
-
+#else
+		this->blockSample(nThrm, this->curVec_, false);
+#endif
 		// iterate blocks
 		for (uint _taken = 0; _taken < nBlck; ++_taken) 
 		{
 			// sample them!
+#ifndef NQS_USE_VEC_ONLY
 			this->blockSample(bSize, this->curState_, false);
-
+#else
+			this->blockSample(bSize, this->curVec_, false);
+#endif 
 			// energy
 			En(_taken) = this->locEnKernel();
 
 			// local operators
-			_meas.measure(this->curState_, opFun);
+			_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun);
 		}
 
 		// normalize operators to be saved 

@@ -77,8 +77,7 @@ public:
 						NQSFun f1)								override final;
 	cpx locEnergy(	const DCOL& v,
 						uint site, 
-						NQSFun f1,
-						DCOL& tmp)								override final;
+						NQSFun f1)								override final;
 
 	// ############################################ Info #############################################
 
@@ -319,14 +318,80 @@ cpx XYZ<_T>::locEnergy(u64 _cur, uint _site, XYZ<_T>::NQSFun _fun)
 
 /*
 * Calculate the local energy end return the corresponding vectors with the value
-* @param _cur base state index
+* @param _v base state
 * @param _site lattice site
 * @param _fun function for Neural Network Quantum State whenever the state changes (after potential flip) - nondiagonal
 */
 template <typename _T>
-cpx XYZ<_T>::locEnergy(const DCOL& v, uint _site, XYZ<_T>::NQSFun _fun, DCOL& tmp)
+cpx XYZ<_T>::locEnergy(const DCOL& _cur, uint _site, XYZ<_T>::NQSFun _fun)
 {
-	return 0.0;
+	// value that does not change
+	double localVal	= 0.0;
+	cpx changedVal	= 0.0;
+
+	// get number of forward nn
+	uint NUM_OF_NN	=	(uint)this->lat_->get_nn_ForwardNum(_site);
+	uint NUM_OF_NNN	=	(uint)this->lat_->get_nnn_ForwardNum(_site);
+
+	// -------------- perpendicular field --------------
+	const double si	=	checkBit(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	localVal		+=	PARAM_W_DISORDER(hz, _site) * si;
+
+	// ---------------- transverse field ---------------
+	if (!EQP(this->hx, 0.0, 1e-9)) 
+		changedVal		+= _fun({ (int)_site }, { si }) * Operators::_SPIN_RBM * PARAM_W_DISORDER(hx, _site);
+
+	// ------------------- CHECK NN --------------------
+	for (uint nn = 0; nn < NUM_OF_NN; nn++) 
+	{
+		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
+		{
+			// SZiSZj
+			const double sj		=	checkBit(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+=	PARAM_W_DISORDER(dA, _site) * PARAM_W_DISORDER(Ja, _site) * si * sj;
+
+			// SYiSYj
+			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+			auto changedIn		=	siY * sjY * PARAM_W_DISORDER(Ja, _site) * (1.0 + PARAM_W_DISORDER(eA, _site));
+
+			// SXiSXj
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Ja, _site) * (1.0 - PARAM_W_DISORDER(eA, _site));
+			
+			// apply change
+			changedVal			+=	_fun({ (int)_site, nei }, { si, sj }) * changedIn; 
+		}
+	}
+
+	// ------------------- CHECK NNN --------------------
+	if (!EQP(this->Jb, 0.0, 1e-9))
+	{
+		for (uint nnn = 0; nnn < NUM_OF_NNN; nnn++) 
+		{
+			uint N_NUMBER = this->lat_->get_nnn_ForwardNum(_site, nnn);
+			if (int nei = this->lat_->get_nnn(_site, N_NUMBER); nei >= 0) 
+			{
+				// SZiSZj
+				const double sj			=	checkBit(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+				localVal				+=	PARAM_W_DISORDER(dB, _site) * PARAM_W_DISORDER(Jb, _site) * si * sj;
+
+				// SYiSYj
+				auto siY				=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+				auto sjY				=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
+				auto changedIn			=	siY * sjY * PARAM_W_DISORDER(Jb, _site) * (1.0 + PARAM_W_DISORDER(eB, _site));
+
+				// SXiSXj
+				changedIn				+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * PARAM_W_DISORDER(Jb, _site) * (1.0 - PARAM_W_DISORDER(eB, _site));
+			
+				// apply change
+				changedVal				+=	_fun({ (int)_site, nei }, { si, sj }) * changedIn; 
+			}
+		}
+	}
+	
+	// return
+	return changedVal + localVal;
 }
 
 // ##########################################################################################################################################

@@ -115,8 +115,7 @@ public:
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)		override {										};
 	cpx locEnergy(u64 _id, uint s, NQSFun f1)				override { return 0.0;							};
 	cpx locEnergy(const DCOL& v,
-					uint site, NQSFun f1,
-					DCOL& tmp)								override { return 0.0;							};
+					uint site, NQSFun f1)					override { return 0.0;							};
 
 };
 

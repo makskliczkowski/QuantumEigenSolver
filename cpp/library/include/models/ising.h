@@ -43,8 +43,7 @@ public:
 	cpx locEnergy(u64 _id, uint site, NQSFun f1)		override final;
 	cpx locEnergy(const arma::Col<double>& v,
 				  uint site,
-				  NQSFun f1,
-				  arma::Col<double>& tmp)				override final { return 0; };
+				  NQSFun f1)							override final { return 0; };
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -179,7 +178,7 @@ inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, NQSFun f1)
 	uint NUM_OF_NN		=	(uint)this->lat_->get_nn_ForwardNum(site);
 
 	// check spin at a given site
-	double _Si			=	checkBit<u64>(_id, this->Ns - site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	double _Si			=	checkBit(_id, this->Ns - site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 
 	// add to a local value
 	_locVal				+=	PARAM_W_DISORDER(h, site) * _Si;
@@ -188,7 +187,7 @@ inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, NQSFun f1)
 	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
 		auto N_NUMBER = this->lat_->get_nn_ForwardNum(site, nn);
 		if (auto nei = this->lat_->get_nn(site, N_NUMBER); nei >= 0) {
-			double _Sj	=	checkBit<u64>(_id, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			double _Sj	=	checkBit(_id, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 			_locVal		+=	PARAM_W_DISORDER(J, site) * _Si * _Sj;
 		}
 	}

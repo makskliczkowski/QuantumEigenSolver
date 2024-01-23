@@ -63,7 +63,7 @@ protected:
 	auto pRatio(const NQSS& _v1,
 					const NQSS& _v2)		-> _T				override final;
 	auto pRatio(std::initializer_list<int> fP,
-		std::initializer_list<double> fV)	-> _T				override final;
+				std::initializer_list<double> fV) -> _T			override final;
 
 	// ------------------------ W E I G H T S ------------------------
 public:
@@ -112,8 +112,10 @@ public:
 	void setPffValC(const NQSW& _M)								{ this->pfaffianValCandidate_ = this->getPff(_M); };
 	// --------------------- G E T T E R S ---------------------
 	virtual auto getPffMat(const NQSS& _n)	const -> NQSW		= 0;
+#ifndef NQS_USE_VEC_ONLY
 	virtual auto getPffMat(u64 _n)			const -> NQSW		= 0;
-	virtual auto getPffMat()			const -> NQSW			{ return this->getPffMat(this->curState_); }
+#endif
+	virtual auto getPffMat()			const -> NQSW			{ return this->getPffMat(this->curVec_); }
 	auto getNPP()						const -> uint			{ return this->nPP_; };
 	auto getPff()						const -> _T				{ return algebra::pfaffian<_T>(this->Pfaffian_, this->nParticles_); }
 	auto getPff(const NQSW& _M)			const -> _T				{ return algebra::pfaffian<_T>(_M, _M.n_rows); }
@@ -532,7 +534,9 @@ class RBM_PP_S : public RBM_PP<_spinModes, _Ht, _T, _stateType>
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
 	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+#ifndef NQS_USE_VEC_ONLY
 	virtual auto getPffMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+#endif
 protected:
 	// --------------------------- A N S A T Z ---------------------------
 	void updPffafianC(uint fP, float fV)					override { NQS_LOG_ERROR_SPIN_MODES; };
@@ -568,7 +572,9 @@ public:
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
 	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override;
+#ifndef NQS_USE_VEC_ONLY
 	virtual auto getPffMat(u64 _n)			const -> NQSW	override;
+#endif
 protected:
 	// --------------------------- A N S A T Z -----------------
 	void updPffafianC(uint fP, float fV)					override;
@@ -629,6 +635,7 @@ RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffM
 
 ////////////////////////////////////////////////////////////////
 
+#ifndef NQS_USE_VEC_ONLY
 template <typename _Ht, typename _T, class _stateType>
 RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(u64 _n) const
 {
@@ -658,6 +665,7 @@ RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffM
 	}
 	return _out;
 }
+#endif
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

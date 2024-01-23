@@ -26,6 +26,7 @@ protected:
 	// architecture parameters
 	uint nHid_						=						1;
 
+
 	/* ------------------------------------------------------------ */
 	// ------------------------ W E I G H T S ------------------------
 	NQSW W_;												// weight matrix
@@ -38,6 +39,11 @@ protected:
 	// calculate the hiperbolic cosine of the function to obtain the ansatz
 	auto coshF(const NQSS& _v)		const -> NQSB			{ return arma::cosh(this->bH_ + this->W_ * _v);		};
 	auto coshF()					const -> NQSB			{ return arma::cosh(this->theta_);					};
+	// ---------------------- T H R E A D I N G ---------------------
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+	// create the map for thetas for a given thread
+	std::map<std::thread::id, NQSB> thetaTmp_;
+#endif
 	
 	/* ------------------------------------------------------------ */
 protected:
@@ -57,7 +63,7 @@ protected:
 					const NQSS& _v2)				-> _T	override = 0;
 	virtual auto pRatio(const NQSS& _v1)			-> _T	override = 0;
 	virtual auto pRatio(std::initializer_list<int> fP,
-				std::initializer_list<double> fV)	-> _T	override = 0;
+						std::initializer_list<double> fV) -> _T	override = 0;
 
 	// ------------------------ W E I G H T S ------------------------
 public:
@@ -145,6 +151,12 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->theta_.resize(this->nHid_);
 	this->thetaCOSH_.resize(this->nHid_);
 	this->W_.resize(this->nHid_, this->nVis_);
+	// create thread map
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+	// allocate the vector for using it in the RBM
+	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+		this->thetaTmp_[this->threads_[_thread].get_id()] = NQSB(this->nHid_);
+#endif
 	// allocate the rest
 	NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();
 }
@@ -617,6 +629,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 #else
 	size_t nFlips = fP.size();
 #endif
+	auto thId = std::this_thread::get_id();
 
 	// no flips!
 	if (nFlips == 0) 
@@ -630,7 +643,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	_T val			= 0;
 	auto currVal	= 0.0;
 	// make temporary angles vector
-	auto thetaTMP	= this->theta_;
+	this->thetaTmp_[thId] = this->theta_;
 	// iterate through the flips
 	for (uint i = 0; i < nFlips; ++i)
 	{
@@ -643,12 +656,12 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 		currVal		= 1.0 - 2.0 * flipVal;
 #endif
 		// !TODO speed this up by not creating thetaTMP
-		thetaTMP	+= currVal * this->W_.col(flipPlace);
-		val			+= currVal * this->bV_(flipPlace);
+		this->thetaTmp_[thId]	+= currVal * this->W_.col(flipPlace);
+		val						+= currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
-	val = std::exp(val) * arma::prod(arma::cosh(thetaTMP) / this->thetaCOSH_);
+	val = std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 #else
 	val = val * arma::prod(this->coshF(this->tmpVec) / this->coshF(this->curVec));
 #endif
