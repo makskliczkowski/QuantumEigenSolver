@@ -139,7 +139,7 @@ public:
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	// eigenvalues
 	auto getEigVal()									const -> arma::vec							{ return this->eigVal_;															};						
-	auto getEigVal(std::string _dir,
+	virtual auto getEigVal(std::string _dir,
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	auto getEigVal(u64 idx)								const -> double								{ return this->eigVal_(idx);													};	
 	auto getInfo(const strVec& skip = {},

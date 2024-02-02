@@ -196,7 +196,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 {
 	// matrix for the PP wave function
-	this->Fmat_	= 0.05 * NQSB(this->nSites_ * this->nSites_ * 4, arma::fill::randn);
+	this->Fmat_	= 0.05 * NQSB(this->nPP_, arma::fill::randn);
 	auto _lat	= this->H_->getLat();
 	
 	for (uint i = 0; i < this->nSites_; i++)

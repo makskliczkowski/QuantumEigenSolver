@@ -1485,11 +1485,16 @@ inline void UI::quadraticStatesMix(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 
 	v_1d<double> energies;
 	v_1d<arma::uvec> orbs;
+
+	// single particle orbital indices (all posibilities)
+	v_1d<uint> _SPOrbitals(Ns);
+	_SPOrbitals = VEC::vecAtoB<uint>(_SPOrbitals.size());
+
 	// get the states to use later
 	if (useZero)
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
 	else
-		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
+		_H->getManyBodyEnergies(Ns / 2, _SPOrbitals, energies, orbs, combinations);
 	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
 	// make matrices cut to a specific number of bonds
@@ -1554,7 +1559,7 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	uint Ns					= _H->getNs();
 	uint Nh					= _H->getHilbertSize();
 	// --- create the directories ---
-	bool useZero			= (this->modP.modTyp_ == 0) && (Ns % 8 == 0);
+	bool useZero			= this->modP.modTyp_ == (uint)MY_MODELS_Q::FREE_FERMIONS_M;
 	std::string str0		= "QuadraticToManyBody";
 	if(useZero)	str0		+= "Zero";
 	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), str0);
@@ -1563,9 +1568,9 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	std::string modelInfo	= _H->getInfo();
 	// how many states to take for calculating the entropies
 	u64 stateNum			= this->nqsP.nMcSteps_;
-	// how many states to take for the average
+	// how many states to take for the average (realizations of the combinations N * \Gamma states)
 	u64 realizations		= this->nqsP.nBlocks_;
-	// number of combinations to take from single particle states
+	// number of combinations to take from single particle states (is \Gamma)
 	u64 combinations		= this->nqsP.blockSize_;
 	auto _type				= _H->getTypeI();
 
@@ -1582,18 +1587,13 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 		_H->diagH(false);
 		LOGINFO(_timer.start(), __FUNCTION__, 3);
 	}
-
-	// obtain the single particle energies
-	arma::Mat<_T> W			= _H->getTransMat();
-	_H->getSPEnMat();
-
 	// go through the information
 	LOGINFO("Spectrum size:						  " + STR(Nh), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num states (combinations):	  " + STR(stateNum), LOG_TYPES::TRACE, 3);
 	LOGINFO("Taking num realizations (averages):  " + STR(realizations), LOG_TYPES::TRACE, 3);
 
 	// save single particle energies
-	if (!fs::exists(dir + modelInfo + ".h5"))
+	if (!fs::exists(filename + ".h5"))
 		_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
 	// iterate through bond cut
@@ -1603,39 +1603,44 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 
 	// set which bonds we want to cut in bipartite
 	_timer.checkpoint("entropy");
+	// many body orbitals (constructed of vectors of indices of single particle states)
 	v_1d<double> energies;
 	v_1d<arma::uvec> orbs;
+
+	// single particle orbital indices (all posibilities)
+	v_1d<uint> _SPOrbitals(Ns);
+	_SPOrbitals				= VEC::vecAtoB<uint>(_SPOrbitals.size());
 
 	// get the states to use later
 	if (useZero)
 		_H->getManyBodyEnergiesZero(Ns / 2, energies, orbs, combinations);
 	else
-		_H->getManyBodyEnergies(Ns / 2, energies, orbs, combinations);
+		_H->getManyBodyEnergies(Ns / 2, _SPOrbitals, energies, orbs, combinations);
 	LOGINFO(_timer.point("entropy"), "Combinations time:", 3);
 
+	// obtain the single particle energies
+	arma::Mat<_T> W			= _H->getTransMat();
 	// make matrices cut to a specific number of bonds
 	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);
 	// conjugate transpose it - to be used later
 	arma::Mat<_T> WsC		= Ws.t();
-
-	// indices of orbitals
-	auto idxs				= VEC::vecAtoB(orbs.size());
 
 	// Hilbert space
 	auto _hilbert			= Hilbert::HilbertSpace<_T>(this->latP.lat);
 
 	// calculate!
 	pBar pbar(5, realizations, _timer.point(0));
-#pragma omp parallel for num_threads(this->threadNum)
+//#pragma omp parallel for num_threads(this->threadNum)
 	for (u64 idx = 0; idx < realizations; idx++)
 	{
 		// create vector of orbitals (combine two many-body states from our total number of combinations)
-		auto orbitalIndices = _H->ran_.choice(idxs, stateNum);
+		auto orbitalIndices = _H->ran_.choice(_SPOrbitals, stateNum);
+
 		v_1d<arma::uvec> orbitals;
 		for (auto& idxO : orbitalIndices)
 			orbitals.push_back(orbs[idxO]);
 
-		// generate coefficients (create random state consisting of stateNum = gamma states)
+		// generate coefficients (create random state consisting of stateNum = \Gamma states)
 		auto coeff			= _H->ran_.createRanState(stateNum);
 
 		// -------------------------------- CORRELATION --------------------------------
@@ -1645,13 +1650,15 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 		ENTROPIES_SP(idx)	= Entropy::Entanglement::Bipartite::SingleParticle::vonNeuman<cpx>(J);
 
 		// --------------------------------- MANY BODY ---------------------------------
+		arma::Mat<_T> _slater(Ns / 2, Ns / 2, arma::fill::zeros);
 		arma::Col<_T> _state(_hilbert.getHilbertSize(), arma::fill::zeros);
 		for (int i = 0; i < orbitals.size(); ++i)
-			_state			+= coeff(i) * _H->getManyBodyState(VEC::colToVec(orbitals[i]), _hilbert);
-		ENTROPIES_MB(idx)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _bonds, _hilbert);
+			_state			+= coeff(i) * _H->getManyBodyState(orbitals[i], _hilbert, _slater);
+		auto entro			= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _bonds, _hilbert);
+		ENTROPIES_MB(idx)	= entro;
 
-		// update progress
-		PROGRESS_UPD(idx, pbar, "PROGRESS");
+		// update progress (checkpoint for saving the entropies)
+		PROGRESS_UPD_DO(idx, pbar, "PROGRESS", ENTROPIES_MB.save(arma::hdf5_name(filename + "_MB.h5", "entropy")); ENTROPIES_SP.save(arma::hdf5_name(filename + "_SP.h5", "entropy")));
 	}
 	// save entropies file
 	ENTROPIES_MB.save(arma::hdf5_name(filename + "_MB.h5", "entropy"));
@@ -1660,7 +1667,6 @@ inline void UI::quadraticStatesToManyBody(std::shared_ptr<QuadraticHamiltonian<_
 	// save entropies
 	LOGINFO("Finished entropies! " + VEQ(stateNum) + ", " + VEQ(realizations), LOG_TYPES::TRACE, 2);
 	LOGINFO(_timer.point("entropy"), "Entropies time:", 3);
-	return;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
