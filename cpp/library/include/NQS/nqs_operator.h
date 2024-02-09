@@ -109,8 +109,8 @@ namespace Operators
 		auto mbmat()					const -> arma::Mat<_T>							{ return this->manyBodyMatrix_;			};
 		auto mbval()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
 		auto name()						const -> std::string							{ return this->name_;					};
-		auto var()						const -> arma::Mat<cpx>							{ return VEC::var(samples_);			};
-		auto mean()						const -> arma::Mat<cpx>							{ return VEC::mean(samples_);		};
+		auto var()						const -> arma::Mat<cpx>							{ return Vectors::var(samples_);		};
+		auto mean()						const -> arma::Mat<cpx>							{ return Vectors::mean(samples_);		};
 		auto value()					const -> arma::Mat<cpx>							{ return currentValue_;					};
 		auto value(uint i)				const -> arma::Mat<cpx>							{ return samples_[i];					};
 		auto samples()					const -> v_1d<arma::Mat<cpx>>					{ return this->samples_;				};

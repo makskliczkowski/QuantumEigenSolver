@@ -48,7 +48,7 @@ inline std::string filenameQuadraticRandom(std::string _f,				// #
 	randomGen& ran)														// #
 {																		// #
 	if (isQuadraticRandom(_type))										// #
-		return _f + "_R=" + STR(ran.randomInt(0, 1000));				// #
+		return _f + "_R=" + STR(ran.randomInt<int>(0, 1000));			// #
 	return _f;															// #
 }																		// #
 // #########################################################################
@@ -70,17 +70,18 @@ protected:
 	// check the particle conservation
 	bool		particleConverving_ = true;
 	// constant to be added to the energy
-	_T			constant_		= 0.0;
+	_T			constant_			= 0.0;
 
 	// ------------------ M A N Y   B O D Y ------------------
 public:
-	void getManyBodyEnergies(uint N, v_1d<uint> _orbitals, v_1d<double>& manyBodySpectrum, v_1d<arma::uvec>& manyBodyOrbitals, int _num = -1);
-	virtual void getManyBodyEnergiesZero(uint N, v_1d<double>& manyBodySpectrum, v_1d<arma::uvec>& manyBodyOrbitals, int _num = -1) { throw std::runtime_error("This model does not have the function implemented."); };
+	void getManyBodyOrbitals(uint N, v_1d<uint> _orbitals, v_1d<v_1d<uint>>& manyBodyOrbitals);
+	void getManyBodyOrbitals(uint N, v_1d<uint> _orbitals, v_1d<v_1d<uint>>& manyBodyOrbitals, uint _num, uint _threadNum = 1);
+	void getManyBodyEnergies(v_1d<double>& manyBodySpectrum, const v_1d<v_1d<uint>>& manyBodyOrbitals, uint _threadNum = 1);
 
 	// ------------------ energy
+	template<typename _T2, typename _A, typename = typename std::enable_if<std::is_arithmetic<_T2>::value, _T2>::type>
+	double getManyBodyEnergy(const std::vector<_T2, _A>& _state);
 	double getManyBodyEnergy(const v_1d<std::seed_seq::result_type>& _state);
-	template<typename _T2, typename = typename std::enable_if<std::is_arithmetic<_T2>::value, _T2>::type>
-	double getManyBodyEnergy(const v_1d<_T2>& _state);
 	double getManyBodyEnergy(u64 _state);
 
 	// ----------------- Particle Conserving -----------------
@@ -147,29 +148,27 @@ public:
 * @returns many body energy
 */
 template<typename _T>
-template<typename _T2, typename>
-inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const v_1d<_T2>& _state)
+template<typename _T2, typename _A, typename>
+inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const std::vector<_T2, _A>& _state)
 {
+	double _energy = 0.0;
 	// if Hamiltonian conserves the number of particles the excitations are easy
 	if (this->particleConverving_)
 	{
-		double _energy = 0.0;
 		for (auto& i : _state)
 			_energy += this->eigVal_(i);
-		return _energy;
 	}
 	// otherwise one has to create pairs of Fermions (the Bogolubov quasiparticles)
 	else
 	{
-		double _energy = 0.0;
 		// the spectrum is symmetric (2V states)
 		for (auto& i : _state)
 		{
 			auto _idx = this->Ns - 1;
 			_energy += this->eigVal_(_idx + i) + this->eigVal_(_idx - i);
 		}
-		return _energy;
 	}
+	return _energy;
 }
 
 // -----------------------------------------------------------------------------------------------------------------------------------
@@ -182,29 +181,27 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const v_1d<_T2>& _stat
 template<typename _T>
 inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const v_1d<std::seed_seq::result_type>& _state)
 {
+	double _energy = 0.0;
 	// if Hamiltonian conserves the number of particles the excitations are easy
 	if (this->particleConverving_)
 	{
-		double _energy = 0.0;
 		for (int j = 0; j < _state.size(); j++)
 		{
 			auto _idx	= _state[j];
 			_energy		+= this->eigVal_(_idx);
 		}
-		return _energy;
 	}
 	// otherwise one has to create pairs of Fermions (the Bogolubov quasiparticles)
 	else
 	{
-		double _energy = 0.0;
 		// the spectrum is symmetric (2V states)
 		for (int j = 0; j < _state.size(); j++)
 		{
 			auto _idx	= this->Ns - 1;
 			_energy		+= this->eigVal_(_idx + _state[j]) + this->eigVal_(_idx - _state[j]);
 		}
-		return _energy;
 	}
+	return _energy;
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------
@@ -235,45 +232,69 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(u64 _state)
 /*
 * @brief Create combination of quasiparticle orbitals to obtain the many body product states...
 * @param N number of particles out of the single particle sectors
-* @param manyBodySpectrum save the many body energies here!
+* @param _orbitals set of many single particle states selection
 * @param manyBodyOrbitals save the many body orbitals there - choose N ones out of a vector of length V.
-* @param _num number of combinations
 */
 template<typename _T>
-inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(uint N, v_1d<uint> _orbitals, v_1d<double>& manyBodySpectrum, v_1d<arma::uvec>& manyBodyOrbitals, int _num)
+inline void QuadraticHamiltonian<_T>::getManyBodyOrbitals(uint N, v_1d<uint> _orbitals, v_1d<v_1d<uint>>& manyBodyOrbitals)
 {
-	// resize, those will save the eigenspectrum of many body states
-	manyBodySpectrum.clear();
-	manyBodySpectrum.resize(_num);
+	// only correct orbitals are to be given
+	if (this->Ns != _orbitals.size())
+		throw std::runtime_error(std::string("Wrong number of orbitals given!"));
+
+	// clear me!
+	manyBodyOrbitals.clear();
+	manyBodyOrbitals = Vectors::combinations(_orbitals, N);
+}
+
+// ##################################################################################################################################
+
+/*
+* @brief Create combination of quasiparticle orbitals to obtain the many body product states... Does so by random selection.
+* @param N number of particles out of the single particle sectors
+* @param _orbitals set of many single particle states selection
+* @param manyBodyOrbitals save the many body orbitals there - choose N ones out of a vector of length V.
+* @param _num number of many body states
+* @param _threadNum number of threads
+*/
+template<typename _T>
+inline void QuadraticHamiltonian<_T>::getManyBodyOrbitals(uint N, v_1d<uint> _orbitals, v_1d<v_1d<uint>>& manyBodyOrbitals, uint _num, uint _threadNum)
+{
+	// only correct orbitals are to be given
+	if (this->Ns != _orbitals.size())
+		throw std::runtime_error(std::string("Wrong number of orbitals given!"));
+
+	// clear me!
 	manyBodyOrbitals.clear();
 	manyBodyOrbitals.resize(_num);
 
-	// only correct orbitals are to be given
-	if(this->Ns != _orbitals.size())
-		throw std::runtime_error(std::string("Wrong number of orbitals given!"));
-
-	// get through combinations!
-#pragma omp parallel for
+	// go through random iterations
+#pragma omp parallel for num_threads(_threadNum)
 	for (int i = 0; i < _num; ++i)
-	{
-		// create combination (choose N elements and set them to 1)
-		auto _combination = this->ran_.choice(_orbitals, N);
-
-		// transform to uvec
-		arma::uvec _combinationV(_combination.size());
-		for (int j = 0; j < _combination.size(); j++)
-			_combinationV(j) = _combination[j];
-
-		// append
-		manyBodyOrbitals[i] = _combinationV;
-
-		// get energy
-		double _manyBodyEn	= this->getManyBodyEnergy(_combination);
-		manyBodySpectrum[i] = _manyBodyEn;
-	}
+		manyBodyOrbitals[i] = this->ran_.choice(_orbitals, N);
 }
 
-// ################################################################################################################################################
+// ##################################################################################################################################
+
+/*
+* @brief Create combination of quasiparticle orbitals to obtain the many body product states...
+* @param manyBodySpectrum save the many body energies here!
+* @param manyBodyOrbitals set of many single particle states selection 
+* @param _threadNum number of threads
+*/
+template<typename _T>
+inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(v_1d<double>& manyBodySpectrum, const v_1d<v_1d<uint>>& manyBodyOrbitals, uint _threadNum)
+{
+	// resize, those will save the eigenspectrum of many body states
+	manyBodySpectrum.clear();
+
+	// get through combinations!
+#pragma omp parallel for num_threads(_threadNum)
+	for (const auto& orb: manyBodyOrbitals)
+		manyBodySpectrum.push_back(this->getManyBodyEnergy(orb));
+}
+
+// ##################################################################################################################################
 
 /*
 * @brief Sets the slater determinant in order to create a single coefficient of a state.
@@ -285,32 +306,38 @@ template<typename _T1, typename>
 inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const v_1d<_T1>& _singlePartOrbs, u64 _realSpaceOccupations)
 {
 	// get the number of particles to set the Slater matrix
-	int _particleNumber = _singlePartOrbs.size();
+	const int _particleNumber = _singlePartOrbs.size();
 
 	// create Slater matrix
 	arma::Mat<_T> _slater(_particleNumber, _particleNumber, arma::fill::zeros);
 
 	// go through the basis states with a given particle number (rows - real space vectors)
 	int iterator = 0;
-	for (auto i = 0; i < this->Ns; ++i)
+	for (int i = 0; i < this->Ns; ++i)
 	{
 		if (!checkBit(_realSpaceOccupations, i))
 			continue;
+
+		// check if we can do this via Armadillo
+		const auto eigVecRow	= this->eigVec_.col(i).subvec(_singlePartOrbs.data(), particleNumber);
+		_slater.row(iterator++) = arma::conv_to<arma::Row<_T>>::from(eigVecRow);
+
 		// go through the orbitals
-		for (auto j = 0; j < _particleNumber; j++)
-			_slater(iterator, j) = this->eigVec_(_singlePartOrbs[j], i);
-		iterator++;
+		//for (auto j = 0; j < _particleNumber; j++)
+			//_slater(iterator, j) = this->eigVec_(_singlePartOrbs[j], i);
+		//iterator++;
 	}
 	return _slater;
 }
 
 // -----------------------------------------------------------------------------------------------------------------------------------
+
 template<typename _T>
 template<typename _T1, typename>
 inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const arma::Col<_T1>& _singlePartOrbs, u64 _realSpaceOccupations)
 {
 	// get the number of particles to set the Slater matrix
-	int _particleNumber = _singlePartOrbs.size();
+	const int _particleNumber = _singlePartOrbs.size();
 
 	// create Slater matrix
 	arma::Mat<_T> _slater(_particleNumber, _particleNumber, arma::fill::zeros);
@@ -321,10 +348,14 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const arma::Col<_T1>& _
 	{
 		if (!checkBit(_realSpaceOccupations, i))
 			continue;
-		// go through the orbitals
-		for (auto j = 0; j < _particleNumber; j++)
-			_slater(iterator, j) = this->eigVec_(_singlePartOrbs(j), i);
-		iterator++;
+
+		// Extract the required elements from eigVec_ using matrix slicing
+		_slater.row(iterator++) = this->eigVec_.submat(_singlePartOrbs, arma::span(i, i));
+
+		//// go through the orbitals
+		//for (auto j = 0; j < _particleNumber; j++)
+		//	_slater(iterator, j) = this->eigVec_(_singlePartOrbs(j), i);
+		//iterator++;
 	}
 	return _slater;
 }
@@ -339,7 +370,7 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const _T1& _singlePartO
 	int _particleNumber = _singlePartOrbs.size();
 
 	// create Slater matrix
-	if(_slater.is_empty())
+	if(_slater.n_rows != _particleNumber && _slater.n_rows != _slater.n_cols)
 		_slater = arma::Mat<_T>(_particleNumber, _particleNumber, arma::fill::zeros);
 
 	// go through the basis states with a given particle number (rows - real space vectors)
@@ -348,9 +379,10 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const _T1& _singlePartO
 	{
 		if (!checkBit(_realSpaceOccupations, i))
 			continue;
+
 		// go through the orbitals
 		for (auto j = 0; j < _particleNumber; j++)
-			_slater(iterator, j) = this->eigVec_(_singlePartOrbs(j), i);
+			_slater(iterator, j) = this->eigVec_(_singlePartOrbs[j], i);
 		iterator++;
 	}
 	return _slater;
@@ -386,8 +418,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const v_1d<_T1>&
 		if (std::popcount(_state) != _singlePartOrb)
 			continue;
 		// set the element of the vector to slater determinant
-		auto _eigSlater		= arma::eig_gen(this->getSlater(_singlePartOrbs, _state));
-		auto _prodSlatter	= arma::prod(_eigSlater);
+		auto _prodSlatter	= arma::prod(arma::eig_gen(this->getSlater(_singlePartOrbs, _state)));
 		_stateOut(i)		= toType<_T>(std::real(_prodSlatter), std::imag(_prodSlatter));
 	}
 	return _stateOut;
@@ -423,8 +454,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const arma::Col<
 		if (std::popcount(_state) != _singlePartOrb)
 			continue;
 		// set the element of the vector to slater determinant
-		auto _eigSlater		= arma::eig_gen(this->getSlater(_singlePartOrbs, _state));
-		auto _prodSlatter	= arma::prod(_eigSlater);
+		auto _prodSlatter	= arma::prod(arma::eig_gen(this->getSlater(_singlePartOrbs, _state)));
 		_stateOut(i)		= toType<_T>(std::real(_prodSlatter), std::imag(_prodSlatter));
 	}
 	return _stateOut;
@@ -460,8 +490,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const _T1& _sing
 		if (std::popcount(_state) != _singlePartOrb)
 			continue;
 		// set the element of the vector to slater determinant
-		auto _eigSlater		= arma::eig_gen(this->getSlater(_singlePartOrbs, _state, _slater));
-		auto _prodSlatter	= arma::prod(_eigSlater);
+		auto _prodSlatter	= arma::prod(arma::eig_gen(this->getSlater(_singlePartOrbs, _state, _slater)));
 		_stateOut(i)		= toType<_T>(std::real(_prodSlatter), std::imag(_prodSlatter));
 	}
 	return _stateOut;

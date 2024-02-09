@@ -17,6 +17,7 @@
 #endif
 
 #include <mutex>
+#include <cstdint>
 #include <shared_mutex>
 
 // ##########################################################################################################################################
@@ -928,5 +929,173 @@ namespace Hilbert
 
 };
 
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+// ############################################################ SINGLE PARTICLE #############################################################
+// ##########################################################################################################################################
+// ##########################################################################################################################################
+
+/*
+* @brief Usefull functions for single particle Hamiltonians. 
+*/
+namespace SingleParticle
+{
+	namespace CorrelationMatrix
+	{
+		/*
+		* @brief Create single particle correlation matrix for a given Fock state in orbital basis
+		* @param _Ns number of lattice sites
+		* @param _W_A transformation matrix to quasiparticle operators reduced to subsystem fraction A
+		* @param _W_A_CT transformation matrix to quasiparticle operators reduced to subsystem fraction A - hermitian conjguate
+		* @param _state a vector of occupations in quasiparticle operators
+		* @param _rawRho shall return a raw rho 2*(c+c) correlation, or total correlation matrix ([c+,c])
+		* @returns single particle correlation matrix for a single product state in quasiparticle basis
+		*/
+		template<typename _T1>
+		inline arma::Mat<_T1> corrMatrix(uint						_Ns,
+										 const arma::Mat<_T1>&		_W_A, 
+										 const arma::Mat<_T1>&		_W_A_CT,
+										 const arma::uvec&			_state,
+										 bool						_rawRho = false)
+		{			
+			if (!_rawRho)
+			{
+				auto prefactors					= 2 * States::transformIdxToState(_Ns, _state) - 1;
+				arma::Mat<_T1> W_A_CT_P			= _W_A_CT;
+				for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+					W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
+				return W_A_CT_P * _W_A;
+			}
+			// raw rho matrix (without delta_ij)
+			auto state_							=	arma::conv_to<arma::uvec>::from(_state);
+			return corrMatrix(_Ns, _W_A, _W_A_CT, state_, _rawRho);
+
+			arma::Mat<_T1> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
+			arma::Mat<_T1> _left		=	_W_A_CT.cols(state_);
+			arma::Mat<_T1> _right		=	_W_A.rows(state_);
+			_J							=	(2.0 * _left * _right);
+			return _J;
+		};
+
+		// ------------------------------------------------------
+
+		template<typename _V = uint, typename _AV = std::allocator<_V>, typename _T1 = double>
+		inline arma::Mat<_T1> corrMatrix(uint							_Ns,
+										 const arma::Mat<_T1>&			_W_A, 
+										 const arma::Mat<_T1>&			_W_A_CT,
+										 const std::vector<_V, _AV>&	_state,
+										 bool							_rawRho = false)
+		{
+			if (!_rawRho)
+			{
+				auto prefactors					= 2 * States::transformIdxToState(_Ns, _state) - 1;
+				arma::Mat<_T1> W_A_CT_P			= _W_A_CT;
+				for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
+					W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
+				return W_A_CT_P * _W_A;
+			}
+			// raw rho matrix (without delta_ij)
+			arma::uvec state_					= arma::conv_to<arma::uvec>::from(_state);
+			return corrMatrix<_T1>(_Ns, _W_A, _W_A_CT, state_, _rawRho);
+		};
+
+		// #######################################################
+		// #######################################################
+		// #######################################################
+
+		/*
+		* @brief Create correlation matrix for multiple states
+		*/
+		template<typename _S, typename _SA = std::allocator<_S>, typename _T1 = double, typename _T2 = _T1>
+		inline arma::Mat<typename std::common_type<_T1, _T2>::type> corrMatrix(	uint								_Ns,
+																				const arma::Mat<_T1>&				_W_A, 
+																				const arma::Mat<_T1>&				_W_A_CT,
+																				const std::vector<_S, _SA>&			_states,
+																				arma::Col<_T2>&						_coeff,
+																				randomGen&							_gen,
+																				bool								_rawRho = false)
+		{
+			using res_typ	= typename std::common_type<_T1, _T2>::type;
+			// get the number of states in the mixture ($\gamma$)
+			uint _gamma		=		_states.size();
+
+			if (_gamma == 0)
+				throw std::runtime_error(std::string("Cannot create a correlation matrix out of no states, damnit..."));
+			
+			// define J
+			uint La			=		_W_A.n_cols;
+			arma::Mat<res_typ> J(La, La, arma::fill::zeros);
+
+			// if there is a single state only - go for it!
+			if (_gamma == 1)
+			{
+				if(!_rawRho)
+					J += corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
+					//return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
+				else
+					J += algebra::cast<_T2>(corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true));
+				return J;
+			}
+
+			// check the size of coefficients, otherwise create new if they are bad...
+			if(_coeff.n_elem != _gamma)
+				_coeff		=		_gen.createRanState<cpx>(_gamma);
+			// save the conjugate coefficients to be quicker
+			auto _coeffC	=		arma::conj(_coeff);
+
+			// correlation matrix
+			J				=		_rawRho ? arma::Mat<res_typ>(La, La, arma::fill::zeros) : -arma::Mat<res_typ>(La, La, arma::fill::eye);
+
+			// ### E Q U A L    P A R T ###
+			for (int mi = 0; mi < _gamma; ++mi)
+				J			+=		_coeff[mi] * _coeffC[mi] * corrMatrix(_Ns, _W_A, _W_A_CT, _states[mi], true);
+
+			// ### U E Q U L ###
+			// go through states <m|
+			for (int mi = 0; mi < _gamma; ++mi)
+			{
+				const auto& _m		=	_states[mi];
+				const auto& _mb		=	States::transformIdxToBitset(_Ns, _m);
+				// go through states |n> (higher than m)
+				for (int ni = mi + 1; ni < _gamma; ++ni)
+				{
+					const auto& _n	=	_states[ni];
+					const auto& _nb	=	States::transformIdxToBitset(_Ns, _n);
+
+					// xor to check the difference
+					auto x			=	_mb ^ _nb;
+					auto _counter	=	x.count();
+
+					if (_counter != 2)
+						continue;
+
+					v_1d<uint> qs;
+					// add position orbitals that are occupied
+					x.iterate_bits_on([&](uint _pos) { qs.push_back(_Ns - _pos - 1); });
+
+					// go through occupied orbitals
+					std::tuple<uint, uint> qs_nor = {qs[0], qs[1]};
+					std::tuple<uint, uint> qs_rev = {qs[1], qs[0]};
+					v_1d<std::tuple<uint, uint>> qs_get = { qs_nor, qs_rev };
+					for (auto& [q1, q2] : qs_get)
+					{
+						// q1 has to be occupied in n or occupied in m (if occupied in n then for sure not occupied in m)
+						if (!(_n[q1] || _m[q1]))
+							continue;
+
+						if (!(_n[q2] || _m[q2]))
+							continue;
+
+						auto COEFF			=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
+						arma::Mat<_T1> Mult	=	(_W_A_CT.col(q1) * _W_A.row(q2));
+						J			+=	COEFF * Mult;
+					}
+				}
+			}
+			return J;
+		};
+
+	}
+};
 
 #endif // !SYMMETRIES_H

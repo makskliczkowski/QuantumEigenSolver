@@ -3,6 +3,38 @@ int LASTLVL = 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+void UI::exitWithHelp()
+{
+	UserInterface::exitWithHelp();
+	printf(
+		"Usage of the VQMC library:\n"
+		"options:\n"
+		"-m monte carlo steps	: bigger than 0 (default 300) \n"
+		"-d dimension			: set dimension (default 2) \n"
+		"	1 -- 1D \n"
+		"	2 -- 2D \n"
+		"	3 -- 3D \n"
+		"-l lattice type		: (default square) -> CHANGE NOT IMPLEMENTED YET \n"
+		"   square \n"
+		// SIMULATIONS STEPS
+		"\n"
+		"-fun					: function to be used in the calculations. There are predefined functions in the model that allow that:\n"
+		"   The options divide each other on different categories according to the first number _ \n"
+		"   -1 -- default option -> shows help \n"
+		"    0 -- this option tests the calculations of various types of Hamiltonians and compares the results\n (w and wo symmetries included)\n"
+		"    1 -- this option utilizes the classical degrees of freedom with RBM\n"
+		"		11 -- check the difference between AF and FM classical spins configuration\n"
+		"		12 -- check the minimum of energy when classical spins are varied with angle and with interaction\n"
+		"    2 -- this option utilizes the Hamiltonian with symmetries calculation\n"
+		"		21 -- input the symmetries and the model information and a given block will be calculated\n"
+		"		22 -- input the symmetries and the model information and a given block will be calculated with a sweep in Jb (to be changed)\n"
+		"\n"
+		"-h - help\n"
+	);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 /*
 * @brief  Setting parameters to default.
 */
@@ -75,6 +107,15 @@ void UI::parseModel(int argc, cmdArg& argv)
 	{
 		// model type
 		SETOPTIONV(modP, modTyp, "mod");
+
+		// ---- quadratic ----
+		SETOPTIONV(modP, q_manybody,		"q_mb");
+		SETOPTIONV(modP, q_manifold,		"q_man");
+		SETOPTIONV(modP, q_gamma,			"q_gamma");
+		SETOPTIONV(modP, q_realizationNum,	"q_R");
+		SETOPTIONV(modP, q_randomCombNum,	"q_CN");
+
+
 		// ------ ising ------
 		SETOPTION_STEP(modP, J1);
 		SETOPTION_STEP(modP, hx);
@@ -148,6 +189,8 @@ void UI::funChoice()
 	LOGINFO_CH_LVL(0);
 	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 	this->_timer.reset();
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
+
 	switch (this->chosenFun)
 	{
 	case -1:
@@ -200,12 +243,7 @@ void UI::funChoice()
 	case 30:
 		// this option utilizes the quadratic Hamiltonian calculation
 		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);;
-		this->makeSimQuadratic();
-		break;
-	case 31:
-		// this option makes the quadratic Hamiltonian, takes the state from it and recreates a many body state
-		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - TRANSFORM TO MANY BODY", LOG_TYPES::CHOICE, 1);;
-		this->makeSimQuadraticToManyBody();
+		this->makeSymQuadraticManifold();
 		break;
 	default:
 		// default case of showing the help
@@ -217,46 +255,50 @@ void UI::funChoice()
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
+* @brief Defines the lattice in the system
+*/
+bool UI::defineLattice()
+{
+	BEGIN_CATCH_HANDLER
+	{
+		switch (this->latP.typ_)
+		{
+		case LatticeTypes::SQ:
+			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		case LatticeTypes::HEX:
+			this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		default:
+			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
+				this->latP.dim_, this->latP.bc_);
+			break;
+		};
+	}
+	END_CATCH_HANDLER("Exception in setting the lattices: ", return false;);
+	return true;
+}
+
+// ----------------------------------------------------------------------------------------------
+
+/*
 * @brief defines the models based on the input parameters - interacting
 */
 bool UI::defineModels(bool _createLat) {
-	BEGIN_CATCH_HANDLER
-	{
-		// create lattice
-		if (_createLat && !this->latP.lat)
-		{
-			switch (this->latP.typ_)
-			{
-			case LatticeTypes::SQ:
-				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			case LatticeTypes::HEX:
-				this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			default:
-				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			};
-		}
-	}
-	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
 
-	// check if is complex
-	this->isComplex_ = this->symP.checkComplex(this->latP.lat->get_Ns());
-	LOGINFO("Making : " + std::string((this->isComplex_ || this->useComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 3);
+	if (_createLat && !this->latP.lat)
+		this->defineLattice();
 
-	// check if is complex and define the Hamiltonian
-	bool _ok;
-	if (this->isComplex_ || this->useComplex_)
-		_ok = this->defineModel(this->hilComplex, this->hamComplex);
+	this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
+	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
+	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
+	
+	if (_takeComplex)
+		return this->defineModel(this->hilComplex, this->hamComplex);
 	else
-		_ok = this->defineModel(this->hilDouble, this->hamDouble);
-
-	return _ok;
-
+		return this->defineModel(this->hilDouble, this->hamDouble);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -269,42 +311,19 @@ bool UI::defineModelsQ(bool _createLat)
 	// create lattice
 	LOGINFO("Making quadratic model!", LOG_TYPES::INFO, 1);
 
-	BEGIN_CATCH_HANDLER
-	{
-		if (_createLat && !this->latP.lat)
-		{
-			switch (this->latP.typ_)
-			{
-			case LatticeTypes::SQ:
-				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			case LatticeTypes::HEX:
-				this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			default:
-				this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-					this->latP.dim_, this->latP.bc_);
-				break;
-			};
-		}
-	}
-	END_CATCH_HANDLER("Exception in setting the lattices: ", ;);
+	if (_createLat && !this->latP.lat)
+		this->defineLattice();
 
 	// check if is complex
-	this->isComplex_ = this->modP.checkComplex();
-	LOGINFO("Making : " + std::string((this->isComplex_) ? " complex" : " real"), LOG_TYPES::INFO, 2);
-
+	this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
+	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
+	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
+	
 	// check if is complex and define the Hamiltonian
-	bool _ok;
-	if (this->isComplex_ || this->useComplex_)
-		_ok = this->defineModelQ<cpx>(this->qhamComplex);
+	if (_takeComplex)
+		return this->defineModelQ<cpx>(this->qhamComplex);
 	else
-		_ok = this->defineModelQ<double>(this->qhamDouble);
-
-	return _ok;
-
+		return this->defineModelQ<double>(this->qhamDouble);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -340,18 +359,16 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 */
 void UI::makeSimSymmetries(bool _diag, bool _states)
 {
-	// reset Hamiltonians - memory release
-	if (this->hamComplex)
-		this->hamComplex.reset();
-	if (this->hamDouble)
-		this->hamDouble.reset();
 	// define the models
-	if (!this->defineModels(true))
-		return;
-	if (this->isComplex_)
-		this->symmetries(this->hamComplex, _diag, _states);
-	else
-		this->symmetries(this->hamDouble, _diag, _states);
+	this->resetEd();
+	// define the models
+	if (this->defineModels(true))
+	{
+		if (this->isComplex_)
+			this->symmetries(this->hamComplex, _diag, _states);
+		else
+			this->symmetries(this->hamDouble, _diag, _states);
+	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -361,16 +378,13 @@ void UI::makeSimSymmetries(bool _diag, bool _states)
 */
 void UI::makeSimSymmetriesDeg()
 {
-	// reset Hamiltonians - memory release
-	if (this->hamComplex)
-		this->hamComplex.reset();
-	if (this->hamDouble)
-		this->hamDouble.reset();
 	// define the models
+	this->resetEd();
+	// force complex Hamiltonian
 	this->useComplex_ = true;
-	if (!this->defineModels(true))
-		return;
-	this->symmetriesDeg();
+	// simulate
+	if (this->defineModels(true))
+		this->symmetriesDeg();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -380,16 +394,13 @@ void UI::makeSimSymmetriesDeg()
 */
 void UI::makeSimSymmetriesCreateDeg()
 {
-	// reset Hamiltonians - memory release
-	if (this->hamComplex)
-		this->hamComplex.reset();
-	if (this->hamDouble)
-		this->hamDouble.reset();
 	// define the models
+	this->resetEd();
+	// force complex Hamiltonian
 	this->useComplex_ = true;
-	if (!this->defineModels(true))
-		return;
-	this->symmetriesCreateDeg();
+	// simulate
+	if (this->defineModels(true))
+		this->symmetriesCreateDeg();
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -545,54 +556,21 @@ void UI::makeSimSymmetriesSweepHilbert()
 void UI::makeSimNQS()
 {
 	this->useComplex_ = true;
-	this->defineModels();
-	if (this->isComplex_ || this->useComplex_) 
-	{
-		this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
-		this->nqsSingle(this->nqsCpx);
-	}
-	else
-	{
-		this->defineNQS<double>(this->hamDouble, this->nqsDouble);
-		this->nqsSingle(this->nqsDouble);
-	}
+	this->defineModels(true);
+	this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
+	this->nqsSingle(this->nqsCpx);
+
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
-* @brief make simulation with quadratic states mixing
-*/
-void UI::makeSimQuadratic()
+void UI::makeSymQuadraticManifold()
 {
 	// reset Hamiltonians - memory release
-	if (this->qhamComplex)
-		this->qhamComplex.reset();
-	if (this->qhamDouble)
-		this->qhamDouble.reset();
-	// define the models
-	if (!this->defineModelsQ(true))
-		return;
-	if (this->isComplex_)
-		this->quadraticStatesMix<cpx>(this->qhamComplex);
-	else
-		this->quadraticStatesMix<double>(this->qhamDouble);
+	this->resetQuadratic();
+	this->useComplex_ = true;
+	if (this->defineModelsQ(true))
+		this->quadraticStatesManifold<cpx>(this->qhamComplex);
 }
 
-/*
-* @brief Transform quadratic to many body
-*/
-void UI::makeSimQuadraticToManyBody()
-{
-	// reset Hamiltonians - memory release
-	if (this->qhamComplex)
-		this->qhamComplex.reset();
-	if (this->qhamDouble)
-		this->qhamDouble.reset();
-	// define the models
-	this->useComplex_	= true;
-	this->isComplex_	= true;
-	if (!this->defineModelsQ(true))
-		return;
-	this->quadraticStatesToManyBody<cpx>(this->qhamComplex);
-}
+// ------------------------------------------------

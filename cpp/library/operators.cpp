@@ -81,7 +81,7 @@ std::pair<u64, double> Operators::c_dag_up(u64 base_vec, uint L, v_1d<uint> _sit
 	// get the sign corresponding to sorting _sites
 	if (val != 0 && _sites.size() > 1)
 	{
-		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		Vectors::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
 		if (comp % 2) sign *= -1;
 	}
 	else if(val == 0)
@@ -142,7 +142,7 @@ std::pair<u64, double> Operators::c_up(u64 base_vec, uint L, v_1d<uint> _sites)
 	// get the sign corresponding to sorting _sites
 	if (val != 0 && _sites.size() > 1)
 	{
-		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		Vectors::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
 		if (comp % 2) sign *= -1;
 	}
 	else if(val == 0)
@@ -202,7 +202,7 @@ std::pair<u64, double> Operators::c_dag_dn(u64 base_vec, uint L, v_1d<uint> _sit
 	// get the sign corresponding to sorting _sites
 	if (val != 0 && _sites.size() > 1)
 	{
-		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		Vectors::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
 		if (comp % 2) sign *= -1;
 	}
 	else if(val == 0)
@@ -262,7 +262,7 @@ std::pair<u64, double> Operators::c_dn(u64 base_vec, uint L, v_1d<uint> _sites)
 	// get the sign corresponding to sorting _sites
 	if (val != 0 && _sites.size() > 1)
 	{
-		VEC::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
+		Vectors::bubbleSort(_sites.begin(), _sites.end(), std::greater<uint>(), &comp);
 		if (comp % 2) sign *= -1;
 	}
 	else if(val == 0)
