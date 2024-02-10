@@ -90,7 +90,7 @@ namespace Operators
 		else if (dim == 3) 
 			k = Kz;
 		// exponent used as generator
-		_T val	= MATH::expI<double, _T>(k);
+		_T val	= Math::expI<double, _T>(k);
 		// return operator		
 		return Operator<_T>(lat, val, translation<_T>(lat), SymGenerators::T);
 	}

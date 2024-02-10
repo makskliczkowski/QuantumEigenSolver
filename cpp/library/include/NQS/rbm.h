@@ -643,7 +643,11 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	_T val			= 0;
 	auto currVal	= 0.0;
 	// make temporary angles vector
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
 	this->thetaTmp_[thId] = this->theta_;
+#else
+	auto thetaTmp_ = this->theta_;
+#endif
 	// iterate through the flips
 	for (uint i = 0; i < nFlips; ++i)
 	{
@@ -656,12 +660,20 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 		currVal		= 1.0 - 2.0 * flipVal;
 #endif
 		// !TODO speed this up by not creating thetaTMP
+#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
 		this->thetaTmp_[thId]	+= currVal * this->W_.col(flipPlace);
+#else
+		thetaTmp_				+= currVal * this->W_.col(flipPlace);
+#endif
 		val						+= currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
+#	if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
 	val = std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
+#	else
+	val = std::exp(val) * arma::prod(arma::cosh(thetaTmp_) / this->thetaCOSH_);
+#	endif
 #else
 	val = val * arma::prod(this->coshF(this->tmpVec) / this->coshF(this->curVec));
 #endif

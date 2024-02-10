@@ -88,8 +88,10 @@ namespace Entropy
 					for (const auto& eV : eigV)
 					{
 						const double eVin = std::real(eV);
-						S += (eVin > -1.0) ? ((1.0 + eVin) * std::log1p((eVin)) - LOG_HALF) : 0.0;
-						S += (eVin < 1.0)  ? ((1.0 - eVin) * std::log1p((-eVin)) - LOG_HALF) : 0.0;
+						if(eVin > -1.0)
+							S += (1.0 + eVin) * (std::log1p(eVin) - LOG_TWO);
+						if(eVin < 1.0)
+							S += (1.0 - eVin) * (std::log1p(-eVin) - LOG_TWO);
 					}
 					return -0.5 * S;
 				}

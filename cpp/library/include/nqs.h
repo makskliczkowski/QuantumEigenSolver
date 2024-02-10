@@ -27,9 +27,9 @@ BEGIN_ENUM(NQSTYPES)			// #
 }								// #
 END_ENUM(NQSTYPES)				// #
 // #################################
-#ifdef _DEBUG
-#	undef _DEBUG
-#endif
+//#ifdef _DEBUG
+//#	undef _DEBUG
+//#endif
 
 #include <future>
 #include <functional>
@@ -243,7 +243,7 @@ public:
 	auto pKernel(std::initializer_list<int>  fP,
 				 std::initializer_list<double> fV)		-> _T			{ return this->pRatio(fP, fV); };
 	_T locEnKernel();
-#ifndef NQS_USE_OMP
+#if not defined NQS_USE_OMP && not defined _DEBUG
 protected:
 	virtual void locEnKernel(uint _start, uint _end, uint _threadNum);
 #endif
@@ -553,8 +553,8 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 }
 
 ///////////////////////////////////////////////////////////////////////
-#ifndef NQS_USE_OMP
 
+#if not defined NQS_USE_OMP && not defined _DEBUG
 /*
 * @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program
 * @param _start starting site for a given thread
@@ -613,6 +613,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 	}
 }
 #endif
+
 ///////////////////////////////////////////////////////////////////////
 
 // ##########################################################################################################################################

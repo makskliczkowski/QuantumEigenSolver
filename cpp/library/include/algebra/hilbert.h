@@ -967,14 +967,12 @@ namespace SingleParticle
 				return W_A_CT_P * _W_A;
 			}
 			// raw rho matrix (without delta_ij)
-			auto state_							=	arma::conv_to<arma::uvec>::from(_state);
-			return corrMatrix(_Ns, _W_A, _W_A_CT, state_, _rawRho);
-
-			arma::Mat<_T1> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
-			arma::Mat<_T1> _left		=	_W_A_CT.cols(state_);
-			arma::Mat<_T1> _right		=	_W_A.rows(state_);
-			_J							=	(2.0 * _left * _right);
-			return _J;
+			//arma::Mat<_T1> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
+			//arma::Mat<_T1> _left		=	_W_A_CT.cols(state_);
+			//arma::Mat<_T1> _right		=	_W_A.rows(state_);
+			//_J							=	(2.0 * _W_A_CT.cols(state_) * _W_A.rows(state_));
+			//return _J;
+			return arma::Mat<_T1>(2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state));
 		};
 
 		// ------------------------------------------------------
@@ -995,8 +993,7 @@ namespace SingleParticle
 				return W_A_CT_P * _W_A;
 			}
 			// raw rho matrix (without delta_ij)
-			arma::uvec state_					= arma::conv_to<arma::uvec>::from(_state);
-			return corrMatrix<_T1>(_Ns, _W_A, _W_A_CT, state_, _rawRho);
+			return corrMatrix<_T1>(_Ns, _W_A, _W_A_CT, arma::conv_to<arma::uvec>::from(_state), _rawRho);
 		};
 
 		// #######################################################
@@ -1022,20 +1019,20 @@ namespace SingleParticle
 			if (_gamma == 0)
 				throw std::runtime_error(std::string("Cannot create a correlation matrix out of no states, damnit..."));
 			
-			// define J
-			uint La			=		_W_A.n_cols;
-			arma::Mat<res_typ> J(La, La, arma::fill::zeros);
 
 			// if there is a single state only - go for it!
 			if (_gamma == 1)
 			{
 				if(!_rawRho)
-					J += corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
+					return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
 					//return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
 				else
-					J += algebra::cast<_T2>(corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true));
-				return J;
+					return algebra::cast<_T2>(corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true));
 			}
+
+			// define J
+			uint La			=		_W_A.n_cols;
+			arma::Mat<res_typ> J(La, La, arma::fill::zeros);
 
 			// check the size of coefficients, otherwise create new if they are bad...
 			if(_coeff.n_elem != _gamma)
@@ -1080,13 +1077,13 @@ namespace SingleParticle
 					for (auto& [q1, q2] : qs_get)
 					{
 						// q1 has to be occupied in n or occupied in m (if occupied in n then for sure not occupied in m)
-						if (!(_n[q1] || _m[q1]))
+						if (!(_nb[q1] || _mb[q1]))
 							continue;
 
-						if (!(_n[q2] || _m[q2]))
+						if (!(_nb[q2] || _mb[q2]))
 							continue;
 
-						auto COEFF			=	_n[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
+						auto COEFF			=	_nb[q2] ? (2.0 * _coeffC[mi] * _coeff[ni]) : (2.0 * _coeff[mi] * _coeffC[ni]);
 						arma::Mat<_T1> Mult	=	(_W_A_CT.col(q1) * _W_A.row(q2));
 						J			+=	COEFF * Mult;
 					}

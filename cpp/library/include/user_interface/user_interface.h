@@ -1554,6 +1554,7 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 		{
 			if (_save)
 			{
+				LOGINFO("Checkpoint", LOG_TYPES::TRACE, 4);
 				ENTROPIES_SP.save(arma::hdf5_name(filename + "_SP.h5", "entropy"));
 				ENERGIES.save(arma::hdf5_name(filename + "_EN.h5", "energy"));
 				if(this->modP.q_manybody_)
@@ -1572,38 +1573,51 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 		auto _zippedEnergies = Containers::zip(energies, orbs);
 
 		// get map with frequencies of specific energies
-		auto _frequencies = Vectors::freq(energies, _gamma - 1);
+		auto _frequencies = Vectors::freq<10>(energies, _gamma - 1);
+		if (_frequencies.size() == 0)
+			throw std::runtime_error("Bad number of frequencies. Must be bigger than $\\Gamma$.");
 
 		// remove the _zippedEnergies based on existing in this map to get the manifolds
 		std::erase_if(_zippedEnergies, [&](const auto& elem)
 			{
 				auto const& [_en, _vec] = elem;
-				return !_frequencies.contains(_en);
+				return !_frequencies.contains(Math::trunc<double, 10>(_en));
 			});
 
 		// sort the zipped energies please
 		Containers::sort<0>(_zippedEnergies, [](const auto& a, const auto& b) { return a < b; });
 
 		// go through the realizations
-#pragma omp parallel for num_threads(this->threadNum)
+#ifndef _DEBUG
+#	pragma omp parallel for num_threads(this->threadNum)
+#endif
 		for (u64 idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
 			auto coeff			= this->ran_.createRanState<_T>(_gamma);
 
 			// get the random state
-			auto idxState		= this->ran_.randomInt(0, _zippedEnergies.size() - _gamma);
+			long long idxState	= this->ran_.randomInt(0, _zippedEnergies.size() - _gamma);
 
 			// while we cannot take _gamma states out of it, lower the index
-			while (std::get<0>(_zippedEnergies[idxState]) != std::get<0>(_zippedEnergies[idxState + _gamma]))
-				idxState--;
+			long long _iter		= 1;
+			const auto E_idx	= Math::trunc<double, 10>(std::get<0>(_zippedEnergies[idxState]));
+
+			while (((idxState - _iter) > 0) && _iter <= _gamma + 1)
+			{
+				const auto E_in	= Math::trunc<double, 10>(std::get<0>(_zippedEnergies[idxState - _iter]));
+				if (E_in != E_idx)
+					break;
+				_iter++;
+			}
+			idxState -= (_iter - 1);
 
 			// take the chosen orbitals
 			std::vector<std::vector<uint>> orbitals;
 			for (uint i = idxState; i < idxState + _gamma; ++i)
 			{
 				orbitals.push_back(std::get<1>(_zippedEnergies[i]));
-				ENERGIES(idx, i - idxState) = energies[i];
+				ENERGIES(idx, i - idxState) = std::get<0>(_zippedEnergies[i]);
 			}
 
 			// SP
@@ -1618,7 +1632,9 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 	else
 	{
 		// go through the realizations
-#pragma omp parallel for num_threads(this->threadNum)
+#ifndef _DEBUG
+#	pragma omp parallel for num_threads(this->threadNum)
+#endif
 		for (u64 idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)

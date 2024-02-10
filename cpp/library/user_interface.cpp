@@ -190,66 +190,70 @@ void UI::funChoice()
 	LOGINFO("USING #THREADS=" + STR(this->threadNum), LOG_TYPES::CHOICE, 1);
 	this->_timer.reset();
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
-
-	switch (this->chosenFun)
+	
+	BEGIN_CATCH_HANDLER
 	{
-	case -1:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
-		// ------------------------------- NEURAL QST -------------------------------
-	case 11:
-		// this option utilizes the Hamiltonian with NQS ansatz calculation
-		LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
-		this->makeSimNQS();
-		break;
-		// ------------------------------- SYMMETRIES -------------------------------
-	case 20:
-		// this option utilizes the Hamiltonian with symmetries calculation
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
-		this->symmetriesTest();
-		break;
-	case 21:
-		// this option utilizes the Hamiltonian with symmetries calculation
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetries();
-		break;
-	case 22:
-		// this option utilizes the Hamiltonian with symmetries calculation - sweep!
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SWEEP ALL", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetriesSweep();
-		break;
-	case 23:
-		// this option creates a map between Hamiltonian type and the Hilbert space size with symmetries
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE ALL HILBERT", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetriesSweepHilbert();
-		break;
-	case 24:
-		// this option utilizes the Hamiltonian with symmetries calculation
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE STATES", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetries(true, true);
-		break;
-	case 25:
-		// this option utilizes the Hamiltonian with symmetries calculation
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE DEGENERACIES", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetriesDeg();
-		break;
-	case 26:
-		// this option takes the Hamiltonian in a given symmetry sector and calculates entropy of combination of states
-		LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - CREATE DEGENERACIES NEAR ZERO", LOG_TYPES::CHOICE, 1);
-		this->makeSimSymmetriesCreateDeg();
-		break;
-		// ------------------------------- QUADRATIC -------------------------------
-	case 30:
-		// this option utilizes the quadratic Hamiltonian calculation
-		LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);;
-		this->makeSymQuadraticManifold();
-		break;
-	default:
-		// default case of showing the help
-		this->exitWithHelp();
-		break;
+		switch (this->chosenFun)
+		{
+		case -1:
+			// default case of showing the help
+			this->exitWithHelp();
+			break;
+			// ------------------------------- NEURAL QST -------------------------------
+		case 11:
+			// this option utilizes the Hamiltonian with NQS ansatz calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
+			this->makeSimNQS();
+			break;
+			// ------------------------------- SYMMETRIES -------------------------------
+		case 20:
+			// this option utilizes the Hamiltonian with symmetries calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - ALL SECTORS", LOG_TYPES::CHOICE, 1);
+			this->symmetriesTest();
+			break;
+		case 21:
+			// this option utilizes the Hamiltonian with symmetries calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetries();
+			break;
+		case 22:
+			// this option utilizes the Hamiltonian with symmetries calculation - sweep!
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SWEEP ALL", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetriesSweep();
+			break;
+		case 23:
+			// this option creates a map between Hamiltonian type and the Hilbert space size with symmetries
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE ALL HILBERT", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetriesSweepHilbert();
+			break;
+		case 24:
+			// this option utilizes the Hamiltonian with symmetries calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE STATES", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetries(true, true);
+			break;
+		case 25:
+			// this option utilizes the Hamiltonian with symmetries calculation
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - SAVE DEGENERACIES", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetriesDeg();
+			break;
+		case 26:
+			// this option takes the Hamiltonian in a given symmetry sector and calculates entropy of combination of states
+			LOGINFO("SIMULATION: HAMILTONIAN WITH SYMMETRIES - CREATE DEGENERACIES NEAR ZERO", LOG_TYPES::CHOICE, 1);
+			this->makeSimSymmetriesCreateDeg();
+			break;
+			// ------------------------------- QUADRATIC -------------------------------
+		case 30:
+			// this option utilizes the quadratic Hamiltonian calculation
+			LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);;
+			this->makeSymQuadraticManifold();
+			break;
+		default:
+			// default case of showing the help
+			this->exitWithHelp();
+			break;
+		}
 	}
+	END_CATCH_HANDLER("The function chooser returned with: ", return);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -289,7 +289,9 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(v_1d<double>& manyBody
 	manyBodySpectrum.clear();
 
 	// get through combinations!
-#pragma omp parallel for num_threads(_threadNum)
+#ifndef _DEBUG
+#	pragma omp parallel for num_threads(_threadNum)
+#endif
 	for (const auto& orb: manyBodyOrbitals)
 		manyBodySpectrum.push_back(this->getManyBodyEnergy(orb));
 }
