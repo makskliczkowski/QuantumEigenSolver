@@ -85,7 +85,7 @@ namespace DensityMatrix
 		const u64 dimA	= ULLPOW(bitNum * _sizeA);
 		const u64 dimB	= ULLPOW((Ns - bitNum * _sizeA));
 		const u64 Nh	= dimA * dimB;
-		if (!_hilb.checkGSym())		return		Entropy::Entanglement::Bipartite::redDensMatStandard<_T>(_s, Ns, _sizeA, Nint);
+		if (!_hilb.checkGSym())	return redDensMatStandard<_T>(_s, Ns, _sizeA, Nint);
 
 		auto map		= _hilb.getFullMap();
 		const u64 N		= map.size();

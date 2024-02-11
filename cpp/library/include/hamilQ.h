@@ -321,7 +321,7 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const v_1d<_T1>& _singl
 			continue;
 
 		// check if we can do this via Armadillo
-		const auto eigVecRow	= this->eigVec_.col(i).subvec(_singlePartOrbs.data(), particleNumber);
+		const auto eigVecRow	= this->eigVec_.col(i).subvec(_singlePartOrbs.data(), _particleNumber);
 		_slater.row(iterator++) = arma::conv_to<arma::Row<_T>>::from(eigVecRow);
 
 		// go through the orbitals
