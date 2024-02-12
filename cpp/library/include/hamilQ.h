@@ -287,13 +287,14 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(v_1d<double>& manyBody
 {
 	// resize, those will save the eigenspectrum of many body states
 	manyBodySpectrum.clear();
+	manyBodySpectrum.resize(manyBodyOrbitals.size());
 
 	// get through combinations!
 #ifndef _DEBUG
 #	pragma omp parallel for num_threads(_threadNum)
 #endif
-	for (const auto& orb: manyBodyOrbitals)
-		manyBodySpectrum.push_back(this->getManyBodyEnergy(orb));
+	for (auto i = 0; i < manyBodyOrbitals.size(); ++i)
+		manyBodySpectrum[i] = (this->getManyBodyEnergy(manyBodyOrbitals[i]));
 }
 
 // ##################################################################################################################################

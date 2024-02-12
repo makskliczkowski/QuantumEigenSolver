@@ -627,9 +627,9 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 #ifdef _DEBUG
 	size_t nFlips = std::min(fP.size(), fV.size());
 #else
-	size_t nFlips = fP.size();
+	size_t nFlips	= fP.size();
+	auto thId		= std::this_thread::get_id();
 #endif
-	auto thId = std::this_thread::get_id();
 
 	// no flips!
 	if (nFlips == 0) 

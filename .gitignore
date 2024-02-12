@@ -174,3 +174,7 @@ dmypy.json
 /cpp/VQMC_S/x64/Release/VQMC_S.vcxproj.FileListAbsolute.txt
 *.sln
 *.user
+
+# executables
+*.o
+*.exe

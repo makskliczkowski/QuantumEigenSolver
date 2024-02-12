@@ -367,12 +367,12 @@ protected:
 	std::shared_ptr<NQS<2, double>>						nqsDouble;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	void setDefaultMap()					final override;
+	void setDefaultMap()								final override;
 
 private:
 	// reset model
-	void resetEd() { if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset(); }
-	void resetQuadratic() { if (this->qhamComplex) this->qhamComplex.reset(); if (this->qhamDouble) this->qhamDouble.reset(); };
+	void resetEd()										{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset();		};
+	void resetQuadratic()								{ if (this->qhamComplex) this->qhamComplex.reset(); if (this->qhamDouble) this->qhamDouble.reset(); };
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1447,9 +1447,13 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 }
 
 // ##########################################################################################################################################
+
+// ##########################################################################################################################################
 // ##########################################################################################################################################
 // ########################################################### Q U A D R A T I C ############################################################
 // ##########################################################################################################################################
+// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 template<typename _T>
@@ -1554,11 +1558,16 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 		{
 			if (_save)
 			{
-				LOGINFO("Checkpoint", LOG_TYPES::TRACE, 4);
-				ENTROPIES_SP.save(arma::hdf5_name(filename + "_SP.h5", "entropy"));
-				ENERGIES.save(arma::hdf5_name(filename + "_EN.h5", "energy"));
-				if(this->modP.q_manybody_)
-					ENTROPIES_MB.save(arma::hdf5_name(filename + "_MB.h5", "entropy")); 
+#ifndef _DEBUG
+#	pragma omp critical
+#endif
+				{
+					LOGINFO("Checkpoint", LOG_TYPES::TRACE, 4);
+					ENTROPIES_SP.save(arma::hdf5_name(filename + "_SP.h5", "entropy"));
+					ENERGIES.save(arma::hdf5_name(filename + "_EN.h5", "energy"));
+					if (this->modP.q_manybody_)
+						ENTROPIES_MB.save(arma::hdf5_name(filename + "_MB.h5", "entropy"));
+				}
 			}
 		};
 	// ------------------------------------ MAIN -----------------------------------
