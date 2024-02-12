@@ -249,34 +249,34 @@ namespace Hilbert
 		arma::Col<_T> castToFull(const arma::Col<_T>& _s);
 
 		// ----------------------------- GETTERS ------------------------------
-		BoundaryConditions getBC()								const						{ return this->lat->get_BC();																};
-		std::shared_ptr<Lattice> getLattice()				const						{ return this->lat;																			};
+		BoundaryConditions getBC()								const					{ return this->lat->get_BC();																};
+		std::shared_ptr<Lattice> getLattice()					const					{ return this->lat;																			};
 		auto getLatticeSize()									const -> uint			{ return this->Ns;																			};
 		auto getLocalHilbertSize()								const -> uint			{ return this->Nhl;																			};
 		auto getFullHilbertSize()								const -> u64			{ return this->NhFull;																		};
 		auto getHilbertSize()									const -> u64			{ return this->Nh;																			};
-		auto getNum()												const -> uint			{ return this->Nint;																			};
-		auto getNorm()												const -> v_1d<_T>		{ return this->normalization_;															};
-		auto getNorm(u64 k)										const -> _T				{ return this->normalization_.size() != 0 ? this->normalization_[k] : 1.0;	};
-		auto getMapping()											const -> v_1d<u64>	{ return this->mapping_;																	};
-		auto getMapping(u64 k)									const -> u64			{ return this->mapping_.empty() ? k : this->mapping_[k];							};
-		auto getRepr()												const -> RPairV		{ return this->reprMap_;																	};
-		auto getRepr(u64 k)										const -> RPair			{ if(!this->reprMap_.empty()) return this->reprMap_[k];							};
-		auto getSymGroup()										const -> SymOpV		{ return this->symGroup_;																	};
-		auto getSymGroupGlob()									const -> GSymV			{ return this->symGroupGlobal_;															};
+		auto getNum()											const -> uint			{ return this->Nint;																		};
+		auto getNorm()											const -> v_1d<_T>		{ return this->normalization_;																};
+		auto getNorm(u64 k)										const -> _T				{ return this->normalization_.size() != 0 ? this->normalization_[k] : 1.0;					};
+		auto getMapping()										const -> v_1d<u64>		{ return this->mapping_;																	};
+		auto getMapping(u64 k)									const -> u64			{ return this->mapping_.empty() ? k : this->mapping_[k];									};
+		auto getRepr()											const -> RPairV			{ return this->reprMap_;																	};
+		auto getRepr(u64 k)										const -> RPair			{ if(!this->reprMap_.empty()) return this->reprMap_[k];										};
+		auto getSymGroup()										const -> SymOpV			{ return this->symGroup_;																	};
+		auto getSymGroupGlob()									const -> GSymV			{ return this->symGroupGlobal_;																};
 
 		v_1d<u64> getFullMap()									const;					// returns the full map (taking global symmetries into account)
-		arma::SpMat<_T> getSymRot()							const;					// returns the symmetry rotation matrix
-		arma::SpMat<_T> getSymRot(const v_1d<u64>& fMap)const;					// returns the symmetry rotation matrix
+		arma::SpMat<_T> getSymRot()								const;					// returns the symmetry rotation matrix
+		arma::SpMat<_T> getSymRot(const v_1d<u64>& fMap)		const;					// returns the symmetry rotation matrix
 		_T	getSymNorm(u64 baseIdx)								const;					// returns the symmetry normalization (how many states map into that one)
 		std::string	getSymInfo()								const;
 
 		// ----------------------------- CHECKERS -----------------------------
-		bool checkSym()											const						{ return !(this->Nh == this->NhFull);													};
-		bool checkLSym()											const						{ return this->symGroup_.size() != 0;													};
-		bool checkGSym()											const						{ return this->symGroupGlobal_.size() != 0;											};
-		bool checkU1()												const						{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
-		int  checkU1Val()											const						{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
+		bool checkSym()											const					{ return !(this->Nh == this->NhFull);														};
+		bool checkLSym()										const					{ return this->symGroup_.size() != 0;														};
+		bool checkGSym()										const					{ return this->symGroupGlobal_.size() != 0;													};
+		bool checkU1()											const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
+		int  checkU1Val()										const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
 
 	// ##########################################################################################################################################
@@ -289,9 +289,11 @@ namespace Hilbert
 	{
 		// initialize
 		this->generateSymGroup(_gen);
-		LOGINFO(_t, "Symmetry group generator: " + this->getSymInfo(), 4);
+		if(_gen.size() != 0)
+			LOGINFO(_t, "Symmetry group generator: " + this->getSymInfo(), 4);
 		this->generateMapping();
-		LOGINFO(_t, "Mapping generator: " + this->getSymInfo(), 4);
+		if(_gen.size() != 0)
+			LOGINFO(_t, "Mapping generator: " + this->getSymInfo(), 4);
 		if (_genereateRepresentativesMap)
 		{
 			this->mappingKernelRepr();
