@@ -721,7 +721,7 @@ typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>
 
 #ifndef NQS_USE_VEC_ONLY
 template <typename _Ht, typename _T, class _stateType>
-RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(u64 _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(u64 _n) const
 {
 	NQSW _out(this->nParticles_, this->nParticles_, arma::fill::zeros);
 	// go through ri
