@@ -683,7 +683,7 @@ protected:
 * @returns the Pfaffian matrix
 */
 template <typename _Ht, typename _T, class _stateType>
-RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(const NQSS& _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(const NQSS& _n) const
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN})
 	NQSW _out(this->nParticles_, this->nParticles_, arma::fill::zeros);
