@@ -27,9 +27,6 @@ BEGIN_ENUM(NQSTYPES)			// #
 }								// #
 END_ENUM(NQSTYPES)				// #
 // #################################
-//#ifdef _DEBUG
-//#	undef _DEBUG
-//#endif
 
 #include <future>
 #include <functional>
@@ -40,7 +37,7 @@ END_ENUM(NQSTYPES)				// #
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Kernel for multithreading
-#	if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 
 /*
 * @brief structure with condition variables for the NQS to perfom multithread operations
@@ -65,6 +62,7 @@ struct CondVarKernel
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -115,7 +113,7 @@ protected:
 							
 	uint threadNum_						=		1;						// number of threads that works on this
 	// create thread pool
-#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	uint threadsNumLeft_				=		0;
 	v_1d<std::thread> threads_;
 	v_1d<CondVarKernel<_T>> kernels_;
@@ -242,9 +240,11 @@ public:
 	// ------------------------ E N E R G Y --------------------------
 	auto pKernel(std::initializer_list<int>  fP,
 				 std::initializer_list<double> fV)		-> _T			{ return this->pRatio(fP, fV); };
-	_T locEnKernel();
-#if not defined NQS_USE_OMP && not defined _DEBUG
+
+	/* ------------------------------------------------------------ */
 protected:
+	_T locEnKernel();
+#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
 	virtual void locEnKernel(uint _start, uint _end, uint _threadNum);
 #endif
 
@@ -295,13 +295,13 @@ public:
 								uint progPrc		= 25);
 
 	virtual arma::Col<_T> collect(uint nSam, 
-										uint nThrm, 
-										uint nBlck, 
-										uint bSize, 
-										uint nFlip			= 1,
-										bool quiet			= false,
-										clk::time_point _t	= NOW,		// time!
-										NQSAv::MeasurementNQS<_T>& _mes = {});
+								  uint nThrm, 
+								  uint nBlck, 
+								  uint bSize, 
+								  uint nFlip		= 1,
+								  bool quiet		= false,
+								  clk::time_point _t	= NOW,			// time!
+								  NQSAv::MeasurementNQS<_T>& _mes = {});
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
@@ -316,9 +316,11 @@ public:
 };
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################# W E I G H T S ##############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -361,9 +363,11 @@ inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, 
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ########################################################### C O N S T R U C T ############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -391,7 +395,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 {
 	DESTRUCTOR_CALL;
-#if not defined NQS_USE_OMP && not defined _DEBUG
+#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
 		std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
@@ -407,9 +411,11 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################ S A M P L I N G #############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -482,9 +488,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ########################################################## L O C   E N E R G Y ###########################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -495,7 +503,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 {
-#if defined _DEBUG || defined NQS_USE_OMP
+#if defined NQS_USE_OMP
 	double energyR	= 0.0;
 	double energyI	= 0.0;
 
@@ -554,7 +562,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 
 ///////////////////////////////////////////////////////////////////////
 
-#if not defined NQS_USE_OMP && not defined _DEBUG
+#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
 /*
 * @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program
 * @param _start starting site for a given thread
@@ -617,9 +625,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 ///////////////////////////////////////////////////////////////////////
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################# S E T T E R S ##############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -629,21 +639,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st)
 {
-#ifdef _DEBUG
-	// check the previous value to be sure
-	auto _val		= this->discVal_;
-	for (auto& _valin : _st)
-	{
-		if (_valin != 0)
-		{
-			_val	= _valin;
-			break;
-		}
-	}
-	this->curVec_	= _st / _val * this->discVal_;
-#else
 	this->curVec_	= _st;
-#endif
 #ifndef NQS_USE_VEC_ONLY
 	this->curState_ = BASE_TO_INT<u64>(_st, this->discVal_);
 #endif
@@ -665,9 +661,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################ G R A D I E N T #############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 ///////////////////////////////////////////////////////////////////////
@@ -828,6 +826,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 			// energy
 			En(_taken) = this->locEnKernel();
 		}
+		LOGINFO(VEQ(arma::mean(En)), LOG_TYPES::CHOICE, 1);
 		// calculate the final update vector
 		this->gradFinal(En);
 		// finally, update the weights
@@ -952,14 +951,14 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 
 	// set threads
 	{
-#ifdef _DEBUG
+#ifndef NQS_USE_MULTITHREADING
 		this->threadNum_		=			1;
 #else
 		this->threadNum_		=			std::min(_threadNum, this->nSites_);
 		this->threadsNumLeft_	=			std::max(_threadNum - this->threadNum_, (uint)1);
 #endif
 	// Use threads for all consecutive parallel regions
-#if defined NQS_USE_CPU && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING
 #	ifdef NQS_USE_OMP
 		omp_set_num_threads(this->threadNum_);   
 #	else
@@ -1037,7 +1036,8 @@ class NQS_S<2, _Ht, _T, _stateType> : public NQS<2, _Ht, _T, _stateType>
 	NQS_PUBLIC_TYPES(_T, _stateType);
 
 	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
-		: NQS<2, _Ht, _T, _stateType>(_H, _lr, _threadNum, _H->getNs()) {};
+		: NQS<2, _Ht, _T, _stateType>(_H, _lr, _threadNum, _H->getNs()) 
+	{	};
 
 protected:
 	// -------------------------- F L I P S --------------------------

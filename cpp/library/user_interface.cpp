@@ -114,6 +114,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(modP, q_gamma,			"q_gamma");
 		SETOPTIONV(modP, q_realizationNum,	"q_R");
 		SETOPTIONV(modP, q_randomCombNum,	"q_CN");
+		SETOPTIONV(modP, q_shuffle,			"q_S");
 
 
 		// ------ ising ------
@@ -203,7 +204,7 @@ void UI::funChoice()
 			this->exitWithHelp();
 			break;
 			// ------------------------------- NEURAL QST -------------------------------
-		case 11:
+		case 10:
 			// this option utilizes the Hamiltonian with NQS ansatz calculation
 			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
 			this->makeSimNQS();

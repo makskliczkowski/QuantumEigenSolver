@@ -28,6 +28,7 @@
 //#define NQS_USE_GPU									// #
 														// #
 #ifdef NQS_USE_CPU										 // #
+#	define NQS_USE_MULTITHREADING						 // #
 //#	define NQS_USE_OMP									 // #
 #elif defined NSQ_USE_GPU								 // #
 // something											 // #
@@ -100,6 +101,9 @@ constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
 constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
+// --- QUADRATIC
+constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 24;
+
 // ##########################################################
 
 #define UI_CHECK_SYM(val, gen)									if(this->val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::gen, this->val##_));
@@ -158,6 +162,7 @@ namespace UI_PARAMS {
 		UI_PARAM_CREATE_DEFAULT(q_manybody, bool, true);			// use the many body calculation?
 		UI_PARAM_CREATE_DEFAULT(q_randomCombNum, uint, 100);		// number of random combinations for the average (to choose from)
 		UI_PARAM_CREATE_DEFAULT(q_realizationNum, uint, 100);		// number of realizations for the average
+		UI_PARAM_CREATE_DEFAULT(q_shuffle, bool, true);				// shuffle the states?
 
 		// ########### AUBRY_ANDRE #############
 
@@ -1465,7 +1470,7 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 
 	// --- create the directories ---
 	bool _manifold			= (_type == (uint)MY_MODELS_Q::FREE_FERMIONS_M) && this->modP.q_manifold_;
-	std::string str0		= "QuadraticEntropies" + std::string((_manifold) ? "Manifold" : "");
+	std::string str0		= "QuadraticEntropies" + std::string(this->modP.q_shuffle_ ? "S" : "") + std::string((_manifold) ? "Manifold" : "");
 	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), str0);
 
 	// ------ use those files -------
@@ -1518,10 +1523,13 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 	_timer.checkpoint("combinations");
 	
 	// calculate many body orbitals to be used
-	if (Ns <= 22)
+	if (Ns <= UI_LIMITS_QUADRATIC_COMBINATIONS)
 		_H->getManyBodyOrbitals(Ns / 2, _SPOrbitals, orbs);
 	else
 		_H->getManyBodyOrbitals(Ns / 2, _SPOrbitals, orbs, _combinations, this->threadNum);
+	if(this->modP.q_shuffle_)
+		std::shuffle(orbs.begin(), orbs.end(), this->ran_.eng());
+	// obtain the energies
 	_H->getManyBodyEnergies(energies, orbs, this->threadNum);
 
 		// obtain the single particle energies
@@ -1648,7 +1656,6 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
 			auto coeff		= this->ran_.createRanState<_T>(_gamma);
-
 			// get the random state
 			auto idxState	= this->ran_.randomInt<uint>(0, energies.size() - _gamma);
 

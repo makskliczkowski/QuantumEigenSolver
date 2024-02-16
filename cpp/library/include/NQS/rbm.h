@@ -7,11 +7,13 @@
 #endif // !NQS_H
 
 //////////////////////////////////////////////////////////////////////////////////////////
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -40,7 +42,7 @@ protected:
 	auto coshF(const NQSS& _v)		const -> NQSB			{ return arma::cosh(this->bH_ + this->W_ * _v);		};
 	auto coshF()					const -> NQSB			{ return arma::cosh(this->theta_);					};
 	// ---------------------- T H R E A D I N G ---------------------
-#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
 	// create the map for thetas for a given thread
 	std::map<std::thread::id, NQSB> thetaTmp_;
 #endif
@@ -101,9 +103,11 @@ public:
 };
  
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ########################################################### C O N S T R U C T ############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -114,14 +118,14 @@ RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H,
 	this->fullSize_ = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
 	this->allocate();
 	this->setInfo();
-	this->init();
-	this->setRandomState(true);
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################## A N S A T Z ###############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -134,9 +138,11 @@ _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 };
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ######################################################## I N I T I A L I Z E R S #########################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -152,7 +158,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->thetaCOSH_.resize(this->nHid_);
 	this->W_.resize(this->nHid_, this->nVis_);
 	// create thread map
-#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	// allocate the vector for using it in the RBM
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 		this->thetaTmp_[this->threads_[_thread].get_id()] = NQSB(this->nHid_);
@@ -210,9 +216,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setInfo()
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################# S E T T E R S ##############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -334,7 +342,8 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 // #endif	
 		for (int i = 0; i < this->nHid_; i++)
 			this->bH_(i) -= this->F_(i + this->nVis_);
-	this->W_ -= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->fullSize_ - 1), this->W_.n_rows, this->W_.n_cols);
+
+	this->W_ -= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->nVis_ + this->nHid_ + (this->nVis_ * this->nHid_) - 1), this->W_.n_rows, this->W_.n_cols);
 // #ifndef _DEBUG
 // #pragma omp parallel for num_threads(this->threadsNumLeft_)
 // #endif	
@@ -345,9 +354,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################ G R A D I E N T #############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -364,12 +375,12 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 #endif
 
 	// calculate the flattened part
-	//this->derivatives_.submat(_plc, 0, _plc, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
+	this->derivatives_.submat(_plc, 0, _plc, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
 //#ifndef _DEBUG
 //#pragma omp parallel for num_threads(this->threadsNumLeft_)
 //#endif
-	for (uint i = 0; i < this->nVis_; ++i)
-		this->derivatives_(_plc, i) = _v(i);
+	//for (uint i = 0; i < this->nVis_; ++i)
+	//	this->derivatives_(_plc, i) = _v(i);
 
 	this->derivatives_.submat(_plc, this->nVis_, _plc, this->nVis_ + this->nHid_ - 1) = arma::tanh(this->theta_).as_row();
 //#ifndef _DEBUG
@@ -378,18 +389,20 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 	//for (uint i = 0; i < this->nHid_; ++i)
 		//this->derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
 
-//#ifndef _DEBUG
-//#pragma omp parallel for num_threads(this->threadsNumLeft_)
-//#endif
+#ifndef _DEBUG
+#	pragma omp parallel for num_threads(this->threadsNumLeft_)
+#endif
 	for (int i = 0; i < this->nHid_; ++i)
 		for (auto j = 0; j < this->nVis_; j++)
 			this->derivatives_(_plc, (this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->derivatives_(_plc, i + this->nVis_) * _v(j);
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################ U P D A T E R S #############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 ///////////////////////////////////////////////////////////////////////
@@ -445,9 +458,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFl
 // ##########################################################################################################################################
 
 //////////////////////////////////////////////////////////////////////////////////////////
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GENERAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_GEN_H
 #		define RBM_GEN_H
@@ -474,10 +489,10 @@ public:
 #	endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////////////////////////
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SPINS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_2_H
 #		define RBM_2_H
@@ -491,7 +506,11 @@ class RBM_S<2, _Ht, _T, _stateType> : public RBM<2, _Ht, _T, _stateType>
 	NQS_PUBLIC_TYPES(_T, _stateType);
 
 	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nParticles = -1)
-		: RBM<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles) { };
+		: RBM<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles) 
+	{ 
+		this->init();
+		this->setRandomState(true);
+	};
 
 	/* ----------------------------------------------------------- */
 	protected:
@@ -505,9 +524,7 @@ class RBM_S<2, _Ht, _T, _stateType> : public RBM<2, _Ht, _T, _stateType>
 				std::initializer_list<double> fV)	-> _T	override;
 };
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!! P R O B A B I L I T Y !!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 // %%%%%%%%%%%%%%%%%%% S I N G L E   F L I P %%%%%%%%%%%%%%%%%%%
 
@@ -624,7 +641,7 @@ template<typename _Ht, typename _T, class _stateType>
 inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
 	// save the minimum of both sizes as new flip size if someone makes wrong movement
-#ifdef _DEBUG
+#ifndef NQS_USE_MULTITHREADING
 	size_t nFlips = std::min(fP.size(), fV.size());
 #else
 	size_t nFlips	= fP.size();
@@ -643,7 +660,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	_T val			= 0;
 	auto currVal	= 0.0;
 	// make temporary angles vector
-#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	this->thetaTmp_[thId] = this->theta_;
 #else
 	auto thetaTmp_ = this->theta_;
@@ -660,7 +677,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 		currVal		= 1.0 - 2.0 * flipVal;
 #endif
 		// !TODO speed this up by not creating thetaTMP
-#if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 		this->thetaTmp_[thId]	+= currVal * this->W_.col(flipPlace);
 #else
 		thetaTmp_				+= currVal * this->W_.col(flipPlace);
@@ -669,7 +686,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
-#	if defined NQS_USE_CPU && not defined NQS_USE_OMP && not defined _DEBUG
+#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	val = std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 #	else
 	val = std::exp(val) * arma::prod(arma::cosh(thetaTmp_) / this->thetaCOSH_);
@@ -686,9 +703,11 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 //////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FERMIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_4_H
 #		define RBM_4_H
