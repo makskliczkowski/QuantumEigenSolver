@@ -27,7 +27,7 @@ public:
 protected:
 	// architecture parameters
 	uint nHid_						=						1;
-
+	u64 rbmSize_					=						1;
 
 	/* ------------------------------------------------------------ */
 	// ------------------------ W E I G H T S ------------------------
@@ -115,7 +115,8 @@ RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H,
 	: NQS_S<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nPart)
 {
 	this->nHid_ = _nHid;
-	this->fullSize_ = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
+	this->rbmSize_  = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
+	this->fullSize_ = this->rbmSize_;
 	this->allocate();
 	this->setInfo();
 }
@@ -267,9 +268,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(const NQSS& v)
 }
 
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 // ############################################################# W E I G H T S ##############################################################
 // ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -310,7 +313,7 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 	{
 		this->F_.subvec(0, this->nVis_ - 1) = this->bV_;
 		this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1) = this->bH_;
-		this->F_.subvec(this->nVis_ + this->nHid_, this->nVis_ + this->nHid_ + this->W_.n_rows * this->W_.n_cols - 1) = this->W_.as_col();
+		this->F_.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1) = this->W_.as_col();
 		
 		// set the forces vector for the weights
 		if(!NQS_S<_spinModes, _Ht, _T, _stateType>::saveWeights(_path, _file))
@@ -329,28 +332,10 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
-	this->bV_ -= this->F_.subvec(0, this->nVis_ - 1);
-// #ifndef _DEBUG
-// #pragma omp parallel for num_threads(this->threadsNumLeft_)
-// #endif		
-	//for (int i = 0; i < this->nVis_; i++)
-			//this->bV_(i) -= this->F_(i);
-
-	this->bH_ -= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
-// #ifndef _DEBUG
-// #pragma omp parallel for num_threads(this->threadsNumLeft_)
-// #endif	
-		for (int i = 0; i < this->nHid_; i++)
-			this->bH_(i) -= this->F_(i + this->nVis_);
-
-	this->W_ -= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->nVis_ + this->nHid_ + (this->nVis_ * this->nHid_) - 1), this->W_.n_rows, this->W_.n_cols);
-// #ifndef _DEBUG
-// #pragma omp parallel for num_threads(this->threadsNumLeft_)
-// #endif	
-		//for (int i = 0; i < this->nHid_; i++)
-		//	for (auto j = 0; j < this->nVis_; j++)
-		//		this->W_(i, j) -= this->F_((this->nVis_ + this->nHid_) + i + j * this->nHid_);
-
+	this->bV_	-= this->F_.subvec(0, this->nVis_ - 1);
+	this->bH_	-= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
+	this->W_	-= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1),
+								this->W_.n_rows, this->W_.n_cols);
 }
 
 // ##########################################################################################################################################
@@ -369,32 +354,24 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
 {
+	auto _currDerivative = this->derivatives_.row(_plc);
 	// update the angles if it is necessary
 #ifndef NQS_ANGLES_UPD
 	this->setTheta(_v);
 #endif
 
 	// calculate the flattened part
-	this->derivatives_.submat(_plc, 0, _plc, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
-//#ifndef _DEBUG
-//#pragma omp parallel for num_threads(this->threadsNumLeft_)
-//#endif
-	//for (uint i = 0; i < this->nVis_; ++i)
-	//	this->derivatives_(_plc, i) = _v(i);
+	_currDerivative.subvec(0, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
 
-	this->derivatives_.submat(_plc, this->nVis_, _plc, this->nVis_ + this->nHid_ - 1) = arma::tanh(this->theta_).as_row();
-//#ifndef _DEBUG
-//#pragma omp parallel for num_threads(this->threadsNumLeft_)
-//#endif
-	//for (uint i = 0; i < this->nHid_; ++i)
-		//this->derivatives_(_plc, i + this->nVis_) = std::tanh(this->theta_(i));
+	auto _hiddDerivative	= _currDerivative.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
+	_hiddDerivative			= arma::tanh(this->theta_).as_row();
 
+	auto _weightsDerivative	= _currDerivative.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1);
 #ifndef _DEBUG
 #	pragma omp parallel for num_threads(this->threadsNumLeft_)
 #endif
-	for (int i = 0; i < this->nHid_; ++i)
-		for (auto j = 0; j < this->nVis_; j++)
-			this->derivatives_(_plc, (this->nVis_ + this->nHid_) + i + j * this->nHid_) = this->derivatives_(_plc, i + this->nVis_) * _v(j);
+	for (int j = 0; j < this->nVis_; ++j)
+		_weightsDerivative.subvec(j * this->nHid_, (j + 1) * this->nHid_ - 1) = _v(j) * _hiddDerivative;
 }
 
 // ##########################################################################################################################################
@@ -619,7 +596,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const NQSS& _v2
 template<typename _Ht, typename _T, class _stateType>
 inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(const NQSS& _v1)
 {
-	_T val	= arma::dot(this->bV_, arma::Col<double>(_v1 - this->curVec_));
+	_T val	= arma::dot(this->bV_, _v1 - this->curVec_);
 #ifdef NQS_ANGLES_UPD
 	val		+= arma::sum(arma::log(this->coshF(_v1) / this->thetaCOSH_));
 #else

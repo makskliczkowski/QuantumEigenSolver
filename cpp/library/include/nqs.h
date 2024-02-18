@@ -826,7 +826,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 			// energy
 			En(_taken) = this->locEnKernel();
 		}
-		LOGINFO(VEQ(arma::mean(En)), LOG_TYPES::CHOICE, 1);
+		//LOGINFO(VEQ(arma::mean(En)), LOG_TYPES::CHOICE, 1);
 		// calculate the final update vector
 		this->gradFinal(En);
 		// finally, update the weights

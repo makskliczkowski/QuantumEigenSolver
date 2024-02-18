@@ -17,15 +17,13 @@
 #endif
 
 // ######################### NQS ############################
-// save the weights?									 // #
 #define NQS_SAVE_WEIGHTS								 // #
 #ifdef NQS_SAVE_WEIGHTS									 // #
 #	define NQS_SAVE_DIR "WEIGHTS" + kPS					 // #
 #endif													 // #
 														 // #
-// use CPU?												// #
-#define NQS_USE_CPU										 // #
 //#define NQS_USE_GPU									// #
+#define NQS_USE_CPU										 // #
 														// #
 #ifdef NQS_USE_CPU										 // #
 #	define NQS_USE_MULTITHREADING						 // #
