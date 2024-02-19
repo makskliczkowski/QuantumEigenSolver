@@ -143,6 +143,7 @@ protected:
 
 	// derivatives storage
 	NQSW derivatives_;													// store the variational derivatives F_k
+	NQSW derivativesC_;													// derivatives conjugated
 #ifdef NQS_USESR
 	NQSW S_;															// positive semi-definite covariance matrix
 #endif
@@ -230,8 +231,8 @@ public:
 	 // regularization
 #ifdef NQS_SREG 
 	double covMatrixRegMult		= 0.95;									// multiplier for the regularization
-	double covMatrixRegStart	= 1e-4;									// starting parameter for regularisation (epsilon1)
-	double covMatrixRegStart2	= 1e-4;									// starting parameter for regularisation (epsilon2)
+	double covMatrixRegStart	= 0.02;									// starting parameter for regularisation (epsilon1)
+	double covMatrixRegStart2	= 0.0;									// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg();
 #endif
 	
@@ -399,8 +400,8 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
 		std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
-		this->kernels_[_thread].flagThreadKill_	= true;
-		this->kernels_[_thread].end_					= true;
+		this->kernels_[_thread].flagThreadKill_		= true;
+		this->kernels_[_thread].end_				= true;
 		this->kernels_[_thread].flagThreadRun_		= 1;
 		this->kernels_[_thread].cv.notify_all();
 	}
@@ -698,6 +699,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 #	endif 
 }
 #endif
+
 ///////////////////////////////////////////////////////////////////////
 
 /*
@@ -711,10 +713,10 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies)
 {
 	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}>
-	auto conjd	= arma::conj(this->derivatives_);
-	this->F_	= arma::cov(conjd, _energies, 1);
+	this->derivativesC_ = arma::conj(this->derivatives_);
+	this->F_			= arma::cov(this->derivativesC_, _energies, 1);
 #ifdef NQS_USESR
-	this->S_	= arma::cov(conjd, this->derivatives_, 1);
+	this->S_			= arma::cov(this->derivativesC_, this->derivatives_, 1);
 	
 	// update model
 	this->gradSR(0);
@@ -739,7 +741,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg()
 {
 	if (this->covMatrixRegStart != 0)
 	{
-		this->S_.diag() += (this->covMatrixRegStart * this->S_.diag());
+		this->S_.diag() *= (1.0 + this->covMatrixRegStart);
 	}
 	if (this->covMatrixRegStart2 != 0)
 	{
@@ -791,6 +793,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 	// make the pbar!
 	this->pBar_			= pBar(progPrc, mcSteps);
 	this->derivatives_.resize(nBlck, this->fullSize_);
+	this->derivativesC_.resize(nBlck, this->fullSize_);
 
 	// save all average weights for covariance matrix
 	arma::Col<_T> meanEn(mcSteps, arma::fill::zeros);
@@ -826,22 +829,18 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 			// energy
 			En(_taken) = this->locEnKernel();
 		}
-		//LOGINFO(VEQ(arma::mean(En)), LOG_TYPES::CHOICE, 1);
 		// calculate the final update vector
 		this->gradFinal(En);
 		// finally, update the weights
 		this->updateWeights();
 		// save the mean energy
 		meanEn(i - 1) = arma::mean(En);
+		LOGINFO(VEQ(meanEn(i - 1)), LOG_TYPES::TRACE, 1);
 
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
 #ifdef NQS_SAVE_WEIGHTS
 		if (i % this->pBar_.percentageSteps == 0) this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
-#endif
-#ifdef NQS_SREG
-		this->covMatrixRegStart		= std::max(covMatrixRegStart * covMatrixRegMult, 1e-5);
-		this->covMatrixRegStart2	= 0;// std::max(covMatrixRegStart2 * covMatrixRegMult, 1e-6 / this->lr_);
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);

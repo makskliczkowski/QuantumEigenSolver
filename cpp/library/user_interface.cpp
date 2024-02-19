@@ -177,13 +177,13 @@ void UI::parseModel(int argc, cmdArg& argv)
 	}
 	// ---------------- DIRECTORY ----------------
 	bool setDir [[maybe_unused]] = this->setOption(this->mainDir, argv, "dir");
-	if(this->mainDir.starts_with("."))
-		this->mainDir = makeDirsC(fs::current_path().string(), "DATA", this->mainDir);
+	if (this->mainDir.starts_with("./"))
+		this->mainDir = makeDirsC(fs::current_path().string(), "DATA", this->mainDir.substr(2));
 	else
 		this->mainDir = makeDirsC(this->mainDir);
 }
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief chooses the method to be used later based on input -fun argument

@@ -45,6 +45,8 @@ protected:
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
 	// create the map for thetas for a given thread
 	std::map<std::thread::id, NQSB> thetaTmp_;
+#else
+	NQSB thetaTmp_;
 #endif
 	
 	/* ------------------------------------------------------------ */
@@ -163,6 +165,8 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	// allocate the vector for using it in the RBM
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 		this->thetaTmp_[this->threads_[_thread].get_id()] = NQSB(this->nHid_);
+#else
+	this->thetaTmp_ = NQSB(this->nHid_);
 #endif
 	// allocate the rest
 	NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();
@@ -354,7 +358,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
 {
-	auto _currDerivative = this->derivatives_.row(_plc);
+	auto _currDerivative	= this->derivatives_.row(_plc);
 	// update the angles if it is necessary
 #ifndef NQS_ANGLES_UPD
 	this->setTheta(_v);
@@ -549,11 +553,16 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 {
 	// you know what to do after one flip
 	if (nFlips == 1)
-		return NQS_S<2, _Ht, _T, _stateType>::pRatio();
+		return RBM_S<2, _Ht, _T, _stateType>::pRatio(this->flipPlaces_[0], this->flipVals_[0]);
 	// set the starting point
 	_T val				=	0;
 	// save the temporary angles
-	NQSB thetaTMP		=	this->theta_;
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+	auto thId				= std::this_thread::get_id();
+	this->thetaTmp_[thId]	= this->theta_;
+#else
+	this->thetaTMP		=	this->theta_;
+#endif // 
 	// iterate through the flips
 	for (uint i = 0; i < nFlips; ++i)
 	{
@@ -565,12 +574,20 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 #else
 		_T currVal		=	1.0 - 2.0 * flipVal;
 #endif
-		thetaTMP		+=	currVal * this->W_.col(flipPlace);
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+		this->thetaTmp_[thId] += currVal * this->W_.col(flipPlace);
+#else
+		this->thetaTmp_ += currVal * this->W_.col(flipPlace);
+#endif
 		val				+=	currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
-	val				=	std::exp(val) * arma::prod(arma::cosh(thetaTMP) / this->thetaCOSH_);
+#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
+#	else
+	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
+#	endif
 #else
 	val				= val * this->bV_(fP) + arma::sum(arma::log(this->coshF(this->tmpVec_) / this->coshF(this->curVec_)));
 	val				= std::exp(val);
@@ -631,7 +648,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 
 	// single flip only
 	if (nFlips == 1) 
-		return this->pRatio(*fP.begin(), *fV.begin());
+		return RBM_S<2, _Ht, _T, _stateType>::pRatio(*fP.begin(), *fV.begin());
 
 	// set the starting point
 	_T val			= 0;

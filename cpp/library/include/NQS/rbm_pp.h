@@ -39,20 +39,33 @@ class RBM_PP : public RBM_S<_spinModes, _Ht, _T, _stateType>
 protected:
 	// architecture parameters
 	uint nPP_					= 1;
+	uint nSites2_				= 1;
+	uint nParticles2_			= 1;
 	u64 rbmPPSize_				= 1;
 
 	/* ------------------------------------------------------------ */
 	// ------------------------ W E I G H T S ------------------------
-	// go through the quarters (spin sectors)
-	v_2d<bool> spinSectors_;
+	NQSB Fpp_;													// for storing the additional variational parameters from the PP
+	v_2d<bool> spinSectors_;									// go through the quarters (spin sectors)
+
 	_T pfaffian_				= 0.0;							// store the last pfaffian value
 	_T pfaffianNew_				= 0.0;							// store the last pfaffian value for the candidate
 	NQSW X_;													// for stroing the matrix for Pfaffian calculation at each step
 	NQSW Xinv_;													// for stroing the matrix inverse for Pfaffian calculation at each step
 	NQSW Xnew_;													// for stroing the matrix for Pfaffian calculation at each step - new candidate
 	
-	NQSB Fpp_;													// for storing the additional variational parameters from the PP
-	u64 getFIndex(bool _spini, bool _spinj, uint ri, uint rj)	const;
+// for calculating the Pfaffian probabilities from the Hamiltonian
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
+	// create the map for thetas for a given thread
+	std::map<std::thread::id, NQSW> XTmp_;
+#else
+	NQSW XTmp_;
+#endif
+
+
+	/* ------------------------------------------------------------ */
+	
+	u64 getFPPIndex(bool _spini, bool _spinj, uint ri, uint rj)	const;
 
 	/* ------------------------------------------------------------ */
 protected:
@@ -91,55 +104,59 @@ protected:
 	void grad(const NQSS& _v, uint _plc)						override final;
 
 	// --------------------------- A N S A T Z ---------------------------
-	virtual void updPffafianC(uint fP, float fV)				= 0;
-	virtual void updPffafianC(std::initializer_list<int> fP,
-							  std::initializer_list<double> fV)	= 0;
-	virtual void updPffafian(uint fP, float fV)					= 0;
-	virtual void updPffafian(std::initializer_list<int> fP,
-							  std::initializer_list<double> fV)	= 0;
-public:
-	~RBM_PP() override											{ DESTRUCTOR_CALL;									};
+	virtual void updFPP_C(uint fP, float fV)					= 0;
+	virtual void updFPP_C(std::initializer_list<int> fP,
+						std::initializer_list<double> fV)		= 0;
+	virtual void updFPP(uint fP, float fV)						= 0;
+	virtual void updFPP(std::initializer_list<int> fP,
+						std::initializer_list<double> fV)		= 0;
+	virtual void updFPP_F(std::initializer_list<int> fP, 
+						std::initializer_list<double> fV,
+						arma::Mat<_T>& _Xtmp)					= 0;
+public: 				  
+	~RBM_PP() override											{ DESTRUCTOR_CALL;												};
 	RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1);
 
 	// --------------------- S E T T E R S ---------------------
 	void init()													override final;
-	// for the previous pfaffian matrix
-	void setPffMat()											{ this->X_ = this->getPffMat();						};
-	void setPffMat(const NQSS& _n)								{ this->X_ = this->getPffMat(_n);					};
-	void setPffMat(u64 _n)										{ this->X_ = this->getPffMat(_n);					};
-	// for the new pfaffian matrix
-	void setPffMatC()											{ this->Xnew_ = this->getPffMat();					};
-	void setPffMatC(const NQSS& _n)								{ this->Xnew_ = this->getPffMat(_n);				};
-	void setPffMatC(u64 _n)										{ this->Xnew_ = this->getPffMat(_n);				};
+	// for the PP matrix
+	void setFPP()												{ this->X_ = this->getPPMat();									};
+	void setFPP(const NQSS& _n)									{ this->X_ = this->getPPMat(_n);								};
+	void setFPP(u64 _n)											{ this->X_ = this->getPPMat(_n);								};
+	// for the new PP matrix
+	void setFPP_C()												{ this->Xnew_ = this->getPPMat();								};
+	void setFPP_C(const NQSS& _n)								{ this->Xnew_ = this->getPPMat(_n);								};
+	void setFPP_C(u64 _n)										{ this->Xnew_ = this->getPPMat(_n);								};
 	// for the pfaffian value
-	void setPffVal()											{ this->pfaffian_ = this->getPff();					};
-	void setPffVal(const NQSS& _n)								{ this->setPffMat(_n); this->setPffVal();			};
-	void setPffVal(const NQSW& _M)								{ this->pfaffian_ = this->getPff(_M);				};
+	void setPfaffian()											{ this->pfaffian_ = this->getPfaffian();						};
+	void setPfaffian(const NQSS& _n)							{ this->setFPP(_n); this->setPfaffian();						};
+	void setPfaffian(const NQSW& _M)							{ this->pfaffian_ = this->getPfaffian(_M);						};
 	// for the candidate pfaffian value 
-	void setPffValC()											{ this->pfaffianNew_ = this->getPffC();				};
-	void setPffValC(const NQSS& _n)								{ this->setPffMatC(_n); this->setPffValC();			};
-	void setPffValC(const NQSW& _M)								{ this->pfaffianNew_ = this->getPff(_M);			};
+	void setPfaffian_C()										{ this->pfaffianNew_ = this->getPfaffian_C();					};
+	void setPfaffian_C(const NQSS& _n)							{ this->setFPP_C(_n); this->setPfaffian_C();					};
+	void setPfaffian_C(const NQSW& _M)							{ this->pfaffianNew_ = this->getPfaffian(_M);					};
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPffMat(const NQSS& _n)	const -> NQSW		= 0;
+	virtual auto getPPMat(const NQSS& _n)	const -> NQSW		= 0;
 #ifndef NQS_USE_VEC_ONLY
-	virtual auto getPffMat(u64 _n)			const -> NQSW		= 0;
+	virtual auto getPPMat(u64 _n)			const -> NQSW		= 0;
 #endif
 	// based on the current vector, obtain a matrix for Pffafian calcuation
-	virtual auto getPffMat()				const -> NQSW		{ return this->getPffMat(this->curVec_);								};
-	// get the Pffafian value for a given vector
-	auto getPffV(const NQSS& _in)			const -> _T			{ return this->getPff(this->getPffMat(_in));							};
-	// get size of the PP function matrix
-	auto getNPP()							const -> uint		{ return this->nPP_;													};
+	virtual auto getPPMat()					const -> NQSW		{ return this->getPPMat(this->curVec_);							};
 	// based on the current matrix, obtain the Pffafian
-	auto getPff()							const -> _T			{ return algebra::pfaffian<_T>(this->X_, this->nParticles_);			};
-	// based on given matrix, obtain the Pffafian
-	auto getPff(const NQSW& _M)				const -> _T			{ return algebra::pfaffian<_T>(_M, _M.n_rows);							};
+	auto getPfaffian()						const -> _T			{ return algebra::pfaffian<_T>(this->X_, this->nParticles_);	};
 	// based on the current candidate matrix, obtain the Pffafian
-	auto getPffC()							const -> _T			{ return algebra::pfaffian<_T>(this->Xnew_, this->nParticles_);			};
+	auto getPfaffian_C()					const -> _T			{ return algebra::pfaffian<_T>(this->Xnew_, this->nParticles_);	};
+	// get the Pffafian value for a given vector
+	auto getPfaffian(const NQSS& _in)		const -> _T			{ return this->getPfaffian(this->getPPMat(_in));				};
+	// based on given matrix, obtain the Pffafian
+	static auto getPfaffian(const NQSW& _M)	-> _T				{ return algebra::pfaffian<_T>(_M, _M.n_rows);					};
+	// --------------------------------------------------------
 	// get the current Pffafian value
-	auto getPffV()							const -> _T			{ return this->pfaffian_;												};
+	auto getCurrentPfaffian()				const -> _T			{ return this->pfaffian_;										};
 	// get the current Pffafian candidate value
-	auto getPffVC()							const -> _T			{ return this->pfaffianNew_;											};
+	auto getCurrentPfaffian_C()				const -> _T			{ return this->pfaffianNew_;									};
+	// get size of the PP function matrix
+	auto getNPP()							const -> uint		{ return this->nPP_;											};
 	// --------------------- F I N A L E -----------------------
 	auto ansatz(const NQSS& _in)			const -> _T			override final;
 };
@@ -163,9 +180,11 @@ RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>
 	spinSectors_.push_back({ 0, 0 });
 
 	// !TODO make this changable
-	this->nPP_		= this->spinSectors_.size() * this->nSites_ * this->nSites_; // for both spin channels
-	this->rbmPPSize_= this->rbmSize_ + this->nPP_;
-	this->fullSize_ = this->rbmPPSize_;
+	this->nSites2_		= this->nSites_ * this->nSites_;
+	this->nParticles2_	= this->nParticles_ * this->nParticles_;
+	this->nPP_			= this->spinSectors_.size() * this->nSites2_; // for both spin channels
+	this->rbmPPSize_	= this->rbmSize_ + this->nPP_;
+	this->fullSize_		= this->rbmPPSize_;
 	this->allocate();
 	this->setInfo();
 }
@@ -183,10 +202,10 @@ RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>
 * @param _in the state for which the ansatz shall be calculated
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 {
 	// set the Jacobian before!
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz(_in) * this->getPffV(_in); //* std::pow(2.0, this->n_hidden)
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz(_in) * this->getPfaffian(_in); //* std::pow(2.0, this->n_hidden)
 };
 
 // ##########################################################################################################################################
@@ -207,21 +226,21 @@ _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 * @returns index of the coefficient in the flattened F matrix
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline u64 RBM_PP<_spinModes, _Ht, _T, _stateType>::getFIndex(bool _spini, bool _spinj, uint ri, uint rj) const
+inline u64 RBM_PP<_spinModes, _Ht, _T, _stateType>::getFPPIndex(bool _spini, bool _spinj, uint ri, uint rj) const
 {
 	if (_spini)
 	{
 		if (_spinj)
-			return ri * this->nParticles_ + rj;
+			return ri * this->nSites_ + rj;
 		else
-			return this->nParticles_ * this->nParticles_ + ri * this->nParticles_ + rj;
+			return this->nSites2_ + ri * this->nSites_ + rj;
 	}
 	else
 	{
 		if (_spinj)
-			return 2 * this->nParticles_ * this->nParticles_ + ri * this->nParticles_ + rj;
+			return 2 * this->nSites2_ + ri * this->nSites_ + rj;
 		else
-			return 3 * this->nParticles_ * this->nParticles_ + ri * this->nParticles_ + rj;
+			return 3 * this->nSites2_ + ri * this->nSites_ + rj;
 	}
 }
 
@@ -239,6 +258,12 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->X_		= NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
 	this->Xinv_		= NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
 
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+	// allocate the vector for using it in the RBM
+	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+		this->XTmp_[this->threads_[_thread].get_id()] = NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
+#endif
+
 	// allocate the weights themselves !TODO - make this symmetric? 
 	// square matrix with spin changes F_{ij}^{\\sigma, \\sigma '}
 	this->Fpp_		= NQSB(this->nPP_);
@@ -255,7 +280,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 {
 	// matrix for the PP wave function
-	this->Fpp_	= 1e-2 * NQSB(this->nPP_, arma::fill::randn);
+	this->Fpp_	= NQSB(this->nPP_, arma::fill::zeros);
 	auto _lat	= this->H_->getLat();
 	
 	// go through the lattice
@@ -268,8 +293,9 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 			for (const auto& spinSec: this->spinSectors_)
 			{
 				// make the weights proportional to the distance
+				this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) = 0.1 * algebra::cast<_T>(this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
 				if (distance != 0)
-					this->Fpp_(this->getFIndex(spinSec[0], spinSec[1], i, j)) /= distance * distance;
+					this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) /= distance * distance;
 			}
 		}
 	}
@@ -287,13 +313,13 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setInfo()
 {
 	this->info_ = "";
-	strSeparatedS(this->info_, ',', "RBMPP", 
-		VEQV(mod, this->H_->getType()), 
-		VEQV(nv, this->nVis_), 
-		VEQV(nh, this->nHid_), 
-		VEQV(npp, this->nPP_),
-		VEQV(nS, this->spinModes_),
-		VEQVS(lr, this->lr_));
+	strSeparatedS(	this->info_, ',', "RBMPP", 
+					VEQV(mod, this->H_->getType()), 
+					VEQV(nv, this->nVis_), 
+					VEQV(nh, this->nHid_), 
+					VEQV(npp, this->nPP_),
+					VEQV(nS, this->spinModes_),
+					VEQVS(lr, this->lr_));
 }
 
 // ##########################################################################################################################################
@@ -316,8 +342,9 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 {
 	// update pfaffian candidate matrix and its corresponding value
-	this->updPffafianC(fP, fV);
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * this->pfaffianNew_ / this->pfaffian_;
+	this->updFPP_C(fP, fV);
+	this->setPfaffian_C();
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * (this->pfaffianNew_ / this->pfaffian_);
 }
 
 // %%%%%%%%%%%%%%%% M U L T I P L E   F L I P S %%%%%%%%%%%%%%%%
@@ -334,8 +361,9 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 {
 	// update pfaffian candidate matrix and its corresponding value
 	for (auto i = 0; i < nFlips; ++i)
-		this->updPffafianC(this->flipPlaces_[i], this->flipVals_[i]);
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * this->pfaffianNew_ / this->pfaffian_;
+		this->updFPP_C(this->flipPlaces_[i], this->flipVals_[i]);
+	this->setPfaffian_C();
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * (this->pfaffianNew_ / this->pfaffian_);
 }
 
 // %%%%%%%%%%%%%%%%% U S I N G   V E C T O R S %%%%%%%%%%%%%%%%%
@@ -346,7 +374,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const NQSS& _v2)
 {
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPffV(_v2) / this->getPffV(_v1);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPfaffian(_v2) / this->getPfaffian(_v1);
 }
 
 // %%%%%%%%%%%%% U S I N G   I N I T I A L I Z E R %%%%%%%%%%%%%
@@ -361,8 +389,19 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
-	this->updPffafianC(fP, fV);
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * this->pfaffianNew_ / this->pfaffian_;
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+	auto thId			= std::this_thread::get_id();
+	this->XTmp_[thId]	= this->X_;
+	// update
+	this->updFPP_F(fP, fV, this->XTmp_[thId]);
+	auto _pfaffian		= this->getPfaffian(this->XTmp_[thId]);
+#else
+	this->XTmp_			= this->X_;
+	// update
+	this->updFPP_F(fP, fV, this->XTmp_);
+	auto _pfaffian		= this->getPfaffian(this->XTmp_);
+#endif
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * _pfaffian / this->pfaffian_;
 }
 
 // ##########################################################################################################################################
@@ -386,14 +425,14 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st, b
 #ifdef NQS_ANGLES_UPD
 	if (_set)
 	{
-		// set pfaffian matrix and its corresponding value
-		this->setPffMat();
-		// set pfaffian value for newly set matrix
-		this->setPffVal();
+		// set PP matrix
+		this->setFPP();
+		// set Pfaffian value for newly set matrix
+		this->setPfaffian();
 		// set candidate to be the same for the angles update
-		this->Xnew_ = this->X_;
+		this->Xnew_			= this->X_;
 		// set its value to be the same as well
-		this->pfaffianNew_ = this->pfaffian_;
+		this->pfaffianNew_	= this->pfaffian_;
 	}
 #endif
 }
@@ -413,10 +452,10 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(u64 _st, bool _set
 #ifdef NQS_ANGLES_UPD
 	if (_set)
 	{
-		// set pfaffian matrix and its corresponding value
-		this->setPffMat();
-		// set pfaffian value for newly set matrix
-		this->setPffVal();
+		// set PP matrix and its corresponding Pfaffian value
+		this->setFPP();
+		// set Pfaffian value for newly set matrix
+		this->setPfaffian();
 		// set candidate to be the same for the angles update
 		this->Xnew_			= this->X_;
 		// set its value to be the same as well
@@ -516,13 +555,18 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 	RBM_S<_spinModes, _Ht, _T, _stateType>::grad(_v, _plc);
 	// calculate the derivative of the Pffafian 
 	// as 1/Pf(X) * \partial Pf(X) / \partial x = 1/2 Tr(X^{-1} \partial X / \partial x)
-	arma::Mat<_T> Xinv	= arma::inv(this->X_);
-	Xinv				= ((Xinv.t() - Xinv) * 0.5) * this->pfaffian_;
+	this->Xinv_				= arma::inv(this->X_);
+	// NOT MULTIPLYING BY PFAFFIAN WORKS < BUT WHY?! >
+	this->Xinv_ = (this->Xinv_.st() - this->Xinv_);// *(0.5 * this->pfaffian_);
+	auto _currDerivative	= this->derivatives_.row(_plc).subvec(this->rbmSize_, this->rbmPPSize_ - 1);
 
 	// find the correct indices on the values that can be updated
-	this->derivatives_.submat(_plc, this->rbmSize_, _plc, this->rbmPPSize_ - 1).zeros();
+	_currDerivative.zeros();
 
-	int _spinIter = 0;
+	int _spinIter		= 0;
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum_)
+#endif
 	for (const auto& s: this->spinSectors_)
 	{
 		for (uint i = 0; i < this->nParticles_; ++i)
@@ -533,19 +577,18 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 
 			for (uint j = 0; j < this->nParticles_; ++j)
 			{
+				// skip the diagonal part
+				if (j == i)
+					continue;
 
 				// if right spin differs from the current right spin, just continue
 				if (checkBit(this->curVec_, j) != s[1])
 					continue;
 
-				// skip the diagonal part
-				if (j == i)
-					continue;
-
-				this->derivatives_(_plc, this->getFIndex(s[0], s[1], i, j)) = Xinv(i, j);
+				_currDerivative(this->getFPPIndex(s[0], s[1], i, j)) = this->Xinv_(i, j);
 			}
 		}
-		_spinIter += this->nParticles_ * this->nParticles_;
+		_spinIter += this->nParticles2_;
 	}
 }
 
@@ -570,6 +613,13 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 {
 	// update the angles in the RBM
 	RBM_S<_spinModes, _Ht, _T, _stateType>::update(nFlips);
+	//for (uint i = 0; i < nFlips; i++)
+	//{
+	//	// update the Pffafian matrix for the candidate
+	//	const auto fP = this->flipPlaces_[i];
+	//	const auto fV = this->flipVals_[i];
+	//	this->updFPP(fP, fV);
+	//}
 	// update the Pffafian matrix
 	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
 	// replace updating the pfaffian back
@@ -586,6 +636,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::unupdate(uint nFlips)
 {
+	RBM_S<_spinModes, _Ht, _T, _stateType>::unupdate(nFlips);
 	// unupdate the Pffafian matrix
 	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
 	// replace updating the pfaffian back
@@ -606,9 +657,12 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint 
 {
 	// update the angles in the RBM
 	RBM_S<_spinModes, _Ht, _T, _stateType>::update(v, nFlips);
-	// update the Pffafian matrix
-	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
-	// replace updating the pfaffian back
+	//for (uint i = 0; i < nFlips; i++)
+	//{
+	//	// update the Pffafian matrix for the candidate
+	//	const auto fP = this->flipPlaces_[i];
+	//	this->updFPP(fP, v(fP));
+	//}
 	this->X_		= this->Xnew_;
 	this->pfaffian_ = this->pfaffianNew_;
 }
@@ -641,18 +695,21 @@ class RBM_PP_S : public RBM_PP<_spinModes, _Ht, _T, _stateType>
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+	virtual auto getPPMat(const NQSS& _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
 #ifndef NQS_USE_VEC_ONLY
-	virtual auto getPffMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+	virtual auto getPPMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
 #endif
 protected:
 	// --------------------------- A N S A T Z ---------------------------
-	void updPffafianC(uint fP, float fV)					override { NQS_LOG_ERROR_SPIN_MODES; };
-	void updPffafianC(std::initializer_list<int> fP,
-					 std::initializer_list<double> fV)		override { NQS_LOG_ERROR_SPIN_MODES; };
-	void updPffafian(uint fP, float fV)						override { NQS_LOG_ERROR_SPIN_MODES; };
-	void updPffafian(std::initializer_list<int> fP,
-					 std::initializer_list<double> fV)		override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP_C(uint fP, float fV)						override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP_C(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)			override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP(uint fP, float fV)							override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)			override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP_F(std::initializer_list<int> fP,
+				std::initializer_list<double> fV,
+				arma::Mat<_T>& _Xtmp)						override { NQS_LOG_ERROR_SPIN_MODES; };
 };
 #	endif
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -686,18 +743,21 @@ public:
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPffMat(const NQSS& _n)	const -> NQSW	override;
+	virtual auto getPPMat(const NQSS& _n)	const -> NQSW	override;
 #ifndef NQS_USE_VEC_ONLY
-	virtual auto getPffMat(u64 _n)			const -> NQSW	override;
+	virtual auto getPPMat(u64 _n)			const -> NQSW	override;
 #endif
 protected:
 	// --------------------------- A N S A T Z -----------------
-	void updPffafianC(uint fP, float fV)					override;
-	void updPffafianC(std::initializer_list<int> fP,
+	void updFPP_C(uint fP, float fV)						override;
+	void updFPP_C(std::initializer_list<int> fP,
 					 std::initializer_list<double> fV)		override;
-	void updPffafian(uint fP, float fV)						override;
-	void updPffafian(std::initializer_list<int> fP,
-					 std::initializer_list<double> fV)		override;
+	void updFPP(uint fP, float fV)							override;
+	void updFPP(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)			override;
+	void updFPP_F(std::initializer_list<int> fP,
+				std::initializer_list<double> fV,
+				arma::Mat<_T>& _Xtmp)						override;
 };
 
 // !!!!!!!!!!!!!!!! P F F A F I A N   S T A T E !!!!!!!!!!!!!!!!
@@ -717,7 +777,7 @@ protected:
 * @returns the Pfaffian matrix
 */
 template <typename _Ht, typename _T, class _stateType>
-typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(const NQSS& _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(const NQSS& _n) const
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN})
 	NQSW _out(this->nParticles_, this->nParticles_, arma::fill::zeros);
@@ -732,12 +792,12 @@ typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>
 		for (uint j = i + 1; j < this->nSites_; ++j)
 		{
 			// check the spin at a given position
-			bool spin_rj =	checkBit(_n, j);
+			bool spin_rj = checkBit(_n, j);
 			{
 				// F_{ri,rj}^{\\sigma_i, \\sigma_j} - find the index corresponding to those particles in F
 				// F_{rj,ri}^{\\sigma_j, \\sigma_i} - find the index corresponding to those particles in F
 				// get the Pffafian please X_ij = F_{ri,rj}^{\\sigma_i, \\sigma_j} - F_{rj,ri}^{\\sigma_j, \\sigma_i}
-				_out(i, j) = this->Fpp_(this->getFIndex(spin_ri, spin_rj, i, j)) - this->Fpp_(this->getFIndex(spin_rj, spin_ri, j, i));
+				_out(i, j) = this->Fpp_(this->getFPPIndex(spin_ri, spin_rj, i, j)) - this->Fpp_(this->getFPPIndex(spin_rj, spin_ri, j, i));
 				_out(j, i) = -_out(i, j);
 			}
 		}
@@ -749,7 +809,7 @@ typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>
 
 #ifndef NQS_USE_VEC_ONLY
 template <typename _Ht, typename _T, class _stateType>
-typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPffMat(u64 _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(u64 _n) const
 {
 	NQSW _out(this->nParticles_, this->nParticles_, arma::fill::zeros);
 	// go through ri
@@ -789,7 +849,7 @@ typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>
 * @param fV value before the flip at fP
 */
 template <typename _Ht, typename _T, class _stateType>
-void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(uint fP, float fV)
+void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP_C(uint fP, float fV)
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN} = {I, II} , {III, IV})
 	// if the fP is known, only the column and row containing it shall be updated
@@ -797,6 +857,7 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(uint fP, float fV)
 	// remember, fV is the other way around (so it's before the flip)
 	// new k, when particle on fP has been set for F_{ki}^{\sigma_k', \sigma _i}
 	// run over the columns
+	auto fVV = fV < 0;
 	for (uint i = 0; i < this->nParticles_; ++i)
 	{
 		// the same is not allowed (no double occupations)
@@ -807,16 +868,14 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(uint fP, float fV)
 		bool spin_next	= checkBit(this->curVec_, i);
 
 		// F_{ri,rj}^{\\sigma_i, \\sigma_j} - find the index corresponding to those particles in F
-		auto posLeft	= this->getFIndex(fV < 0, spin_next, fP, i);
+		auto posLeft	= this->getFPPIndex(fVV, spin_next, fP, i);
 		// F_{rj,ri}^{\\sigma_j, \\sigma_i} - find the index corresponding to those particles in F
-		auto posRight	= this->getFIndex(spin_next, fV < 0, i, fP);
+		auto posRight	= this->getFPPIndex(spin_next, fVV, i, fP);
 
 		// update 
 		this->Xnew_(fP, i) = this->Fpp_(posLeft) - this->Fpp_(posRight);
 		this->Xnew_(i, fP) = -this->Xnew_(fP, i);
 	}
-	// set the value
-	this->setPffValC();
 }
 
 ////////////////////////////////////////////////////////////////
@@ -827,7 +886,7 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(uint fP, float fV)
 * @param fV value before the flip at fP
 */
 template <typename _Ht, typename _T, class _stateType>
-void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafian(uint fP, float fV)
+void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP(uint fP, float fV)
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN} = {I, II} , {III, IV})
 	// if the fP is known, only the column and row containing it shall be updated
@@ -845,98 +904,75 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafian(uint fP, float fV)
 		bool spin_next	= checkBit(this->curVec_, i);
 
 		// F_{ri,rj}^{\\sigma_i, \\sigma_j} - find the index corresponding to those particles in F
-		auto posLeft	= this->getFIndex(fV < 0, spin_next, fP, i);
+		auto posLeft	= this->getFPPIndex(fV < 0, spin_next, fP, i);
 		// F_{rj,ri}^{\\sigma_j, \\sigma_i} - find the index corresponding to those particles in F
-		auto posRight	= this->getFIndex(spin_next, fV < 0, i, fP);
+		auto posRight	= this->getFPPIndex(spin_next, fV < 0, i, fP);
 
 		// update 
 		this->X_(fP, i) = this->Fpp_(posLeft) - this->Fpp_(posRight);
-		this->X_(i, fP) = -this->Xnew_(fP, i);
+		this->X_(i, fP) = -this->X_(fP, i);
 	}
-	// set the value
-	this->setPffVal();
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+template <typename _Ht, typename _T, class _stateType>
+void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP_F(std::initializer_list<int> fP, std::initializer_list<double> fV, arma::Mat<_T>& _XTmp)
+{
+	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN} = {I, II} , {III, IV})
+	// if the fP is known, only the column and row containing it shall be updated
+	// we will use current state as well to see where the other places are
+	// remember, fV is the other way around (so it's before the flip)
+	// new k, when particle on fP has been set for F_{ki}^{\sigma_k', \sigma _i}
+	// run over the columns
+
+	// !TODO Optimize!
+	arma::Col<double> _state = this->curVec_;
+	for (auto fPi = 0; fPi < fP.size(); ++fPi)
+		_state(*(fP.begin() + fPi)) *= -1;
+
+	for (auto fPi = 0; fPi < fP.size(); ++fPi)
+	{
+		auto fPP = *(fP.begin() + fPi);
+		auto fVV = *(fV.begin() + fPi);
+		bool fVS = fVV < 0;
+		for (auto i = 0; i < this->nParticles_; ++i)
+		{
+			// the same is not allowed (no double occupations)
+			if (i == fPP)
+				continue;
+
+			// check the bit on the i'th place to know in which place you'll end up
+			bool spin_next	= checkBit(_state, i);
+
+			// F_{ri,rj}^{\\sigma_i, \\sigma_j} - find the index corresponding to those particles in F
+			auto posLeft	= this->getFPPIndex(fVS, spin_next, fPP, i);
+			// F_{rj,ri}^{\\sigma_j, \\sigma_i} - find the index corresponding to those particles in F
+			auto posRight	= this->getFPPIndex(spin_next, fVS, i, fPP);
+
+			// update 
+			_XTmp(fPP, i)	= this->Fpp_(posLeft) - this->Fpp_(posRight);
+			_XTmp(i, fPP)	= -_XTmp(fPP, i);
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////
 
 template <typename _Ht, typename _T, class _stateType>
-void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafianC(std::initializer_list<int> fP, std::initializer_list<double> fV)
+void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP_C(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
-	// if the fP is known, only the column and row containing it shall be updated
-	// we will use current state as well to see where the other places are
-//	// remember, fV is the other way around
-//	uint ns2 = this->nSites_ * this->nSites_;
-//	// save the minimum of both sizes as new flip size if someone makes wrong movement
-//#ifdef _DEBUG
-//	size_t nFlips = std::min(fP.size(), fV.size());
-//#else
-//	size_t nFlips = fP.size();
-//#endif
-//	// go through the flips
-//	for (uint k = 0; k < nFlips; ++k)
-//	{
-//		bool spink = *(fV.begin() + k) > 0;
-//		bool kP = *(fP.begin() + k);
-//		uint kFL = (spink < 0) ? kP : kP + 2 * ns2;
-//		uint kFR = (spink < 0) ? kP : kP + ns2;
-//		// run over the columns as the row is set
-//		for (uint i = 0; i < this->nParticles_; ++i)
-//		{
-//			// the same is not allowed
-//			if (i == kP)
-//				continue;
-//			// check the bit on the i'th place
-//			bool spini = checkBit(this->curVec_, i);
-//			// set the left place in the weights (column)
-//			uint iFL = spini ? i : i + ns2;
-//			uint iFR = spini ? i + 2 * ns2 : i;
-//			// update 
-//			this->Xnew_(kP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
-//			this->Xnew_(i, kP) = -this->Xnew_(kP, i);
-//		}
-//	}
-//	// set the value
-//	this->setPffValC();
+	this->updFPP_F(fP, fV, this->Xnew_);
 }
 
 ////////////////////////////////////////////////////////////////
 
 template <typename _Ht, typename _T, class _stateType>
-void RBM_PP_S<2, _Ht, _T, _stateType>::updPffafian(std::initializer_list<int> fP, std::initializer_list<double> fV)
+void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
-	// if the fP is known, only the column and row containing it shall be updated
-	// we will use current state as well to see where the other places are
-	// remember, fV is the other way around
-//	uint ns2 = this->nSites_ * this->nSites_;
-//	// save the minimum of both sizes as new flip size if someone makes wrong movement
-//#ifdef _DEBUG
-//	size_t nFlips = std::min(fP.size(), fV.size());
-//#else
-//	size_t nFlips = fP.size();
-//#endif
-//	// go through the flips
-//	for (uint k = 0; k < nFlips; ++k)
-//	{
-//		bool spink = *(fV.begin() + k) > 0;
-//		bool kP = *(fP.begin() + k);
-//		uint kFL = (spink < 0) ? kP : kP + 2 * ns2;
-//		uint kFR = (spink < 0) ? kP : kP + ns2;
-//		// run over the columns as the row is set
-//		for (uint i = 0; i < this->nParticles_; ++i)
-//		{
-//			// the same is not allowed
-//			if (i == kP)
-//				continue;
-//			// check the bit on the i'th place
-//			bool spini = checkBit(this->curVec_, i);
-//			// set the left place in the weights (column)
-//			uint iFL = spini ? i : i + ns2;
-//			uint iFR = spini ? i + 2 * ns2 : i;
-//			// update 
-//			this->X_(kP, i) = this->Fmat_(kFL + iFL) - this->Fmat_(kFR + iFR);
-//			this->X_(i, kP) = -this->X_(kP, i);
-//		}
-//	}
+	this->updFPP_F(fP, fV, this->X_);
 }
 
 ////////////////////////////////////////////////////////////////
