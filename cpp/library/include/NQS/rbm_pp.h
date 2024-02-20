@@ -929,15 +929,19 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP_F(std::initializer_list<int> fP, s
 	// run over the columns
 
 	// !TODO Optimize!
-	arma::Col<double> _state = this->curVec_;
+	v_1d<bool> _state(this->curVec_.size());
+
+	for (auto i = 0; i < this->nParticles_; ++i)
+		_state[i] = checkBit(this->curVec_, i);
+
 	for (auto fPi = 0; fPi < fP.size(); ++fPi)
-		_state(*(fP.begin() + fPi)) *= -1;
+		_state[*(fP.begin() + fPi)] = (*(fV.begin() + fPi) < 0);
 
 	for (auto fPi = 0; fPi < fP.size(); ++fPi)
 	{
 		auto fPP = *(fP.begin() + fPi);
-		auto fVV = *(fV.begin() + fPi);
-		bool fVS = fVV < 0;
+		auto fVV = _state[fPP];
+
 		for (auto i = 0; i < this->nParticles_; ++i)
 		{
 			// the same is not allowed (no double occupations)
@@ -945,12 +949,12 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP_F(std::initializer_list<int> fP, s
 				continue;
 
 			// check the bit on the i'th place to know in which place you'll end up
-			bool spin_next	= checkBit(_state, i);
+			bool spin_next	= _state[i];
 
 			// F_{ri,rj}^{\\sigma_i, \\sigma_j} - find the index corresponding to those particles in F
-			auto posLeft	= this->getFPPIndex(fVS, spin_next, fPP, i);
+			auto posLeft	= this->getFPPIndex(fVV, spin_next, fPP, i);
 			// F_{rj,ri}^{\\sigma_j, \\sigma_i} - find the index corresponding to those particles in F
-			auto posRight	= this->getFPPIndex(spin_next, fVS, i, fPP);
+			auto posRight	= this->getFPPIndex(spin_next, fVV, i, fPP);
 
 			// update 
 			_XTmp(fPP, i)	= this->Fpp_(posLeft) - this->Fpp_(posRight);
