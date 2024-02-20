@@ -543,18 +543,13 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 		this->kernels_[_thread].cv.notify_one();
 	}
 
-	// Wait for all threads using condition variable
-	//{
-	//	// Assuming 0th kernel for the condition variable
-	//	std::unique_lock<std::mutex> lock(this->kernels_[0].mutex); 
-	//	this->kernels_[0].cv.wait(lock, [this]() {
-	//					return std::all_of(this->kernels_.begin(), this->kernels_.end(), 
-	//					[](const auto& kernel) { return kernel.end_.load(); }); });
-	//}
 	// wait for all threads
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
-		while (!this->kernels_[_thread].end_);
+		{
+			std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
+			this->kernels_[_thread].cv.wait(lock, [this, _thread] { return !this->kernels_[_thread].flagThreadRun_; });
+		}
 		energy += this->kernels_[_thread].kernelValue_;
 	}
 	return energy;
@@ -613,12 +608,12 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		}
 		// lock again
 		{
-			// std::lock_guard<std::mutex> lock(this->kernels_[_threadNum].mutex);
+			std::lock_guard<std::mutex> lock(this->kernels_[_threadNum].mutex);
 			this->kernels_[_threadNum].flagThreadRun_	= false;
 			this->kernels_[_threadNum].end_				= true;
 			// Notify waiting threads if needed
-			//this->kernels_[_threadNum].cv.notify_one();
 		}
+		this->kernels_[_threadNum].cv.notify_one();
 	}
 }
 #endif

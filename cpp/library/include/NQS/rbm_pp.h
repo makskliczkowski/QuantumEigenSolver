@@ -564,9 +564,9 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 	_currDerivative.zeros();
 
 	int _spinIter		= 0;
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum_)
-#endif
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadNum_)
+//#endif
 	for (const auto& s: this->spinSectors_)
 	{
 		for (uint i = 0; i < this->nParticles_; ++i)
