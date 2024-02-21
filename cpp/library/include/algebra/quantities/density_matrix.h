@@ -41,9 +41,14 @@ namespace DensityMatrix
 	{
 		// set subsystems size
 		auto bitNum		= (uint)std::log2(_Nint);
-		const u64 dimA	= ULLPOW(bitNum * _sizeA);
-		const u64 dimB	= ULLPOW((_Ns - bitNum * _sizeA));
+		auto powA		= bitNum * _sizeA;
+		auto powB		= bitNum * (_Ns - _sizeA);
+		const u64 dimA	= ULLPOW(powA);
+		const u64 dimB	= ULLPOW(powB);
 		const u64 Nh	= dimA * dimB;
+		// get the masks for the bit manipulation
+		// const u64 maskA = (dimA - 1) << powB;
+		const u64 maskB = dimB - 1;
 
 		arma::Mat<_T> rho(dimA, dimA, arma::fill::zeros);
 
@@ -51,18 +56,22 @@ namespace DensityMatrix
 		// loop over configurational basis
 		for (u64 n = 0; n < Nh; n++) 
 		{
-			u64 counter = 0;
-			// find index of state with same B-side (by dividing the last bits are discarded)
-			u64 idx		= n / dimB;
-			// pick out state with same B side (last L-A_size bits)
-			for (u64 m = n % dimB; m < Nh; m += dimB) 
-			//for (u64 m = _startingM; m < Nh; m += dimB)
-			{
-				rho(idx, counter) += algebra::conjugate(_s(n)) * _s(m);
-				// increase counter to move along reduced basis
-				counter++;
-			}
-			//if(++_startingM >= dimB) _startingM = 0;
+			// u64 counter = 0;
+			// find index of state in A, with same B-sides (by dividing the last bits are discarded). 
+			// The same is done by shifting the bits to the right.
+			// u64 idx	= n / dimB; bit shift should be faster
+			u64 idx		= n >> powB;
+			_T _sn_c    = algebra::conjugate(_s(n));
+			// pick out state with same B side (last L-A_size bits) (should be faster than modulo)
+			//for (u64 m = (n & maskA); m < Nh; m += dimB)
+			////for (u64 m = n % dimB; m < Nh; m += dimB) 
+			////for (u64 m = _startingM; m < Nh; m += dimB)
+			//{
+			//	rho(idx, counter) += _sn_c * _s(m);
+			//	// increase counter to move along reduced basis
+			//	counter++;
+			//}
+			rho.row(idx) += _sn_c * _s.elem(arma::regspace<arma::uvec>(n & maskB, dimB, Nh - 1));
 		}
 		return rho;
 	};
@@ -131,7 +140,44 @@ namespace DensityMatrix
 		const u64 dimB	= ULLPOW(bitNum * (Ns - _sizeA));
 		return arma::reshape(_s, dimA, dimB);
 	}
-			
+	
+	// ###############################################################
+
+	/*
+	* @brief Using reshape method to calculate the reduced density matrix - Schmidt decomposition for the state
+	* @param _s state to construct the density matrix from
+	* @param _sizeA subsystem size
+	* @param _size total size of the system
+	* @param _mask mask for the reshaping
+	* @param _locHilbertSize local Hilbert space size
+	*/
+	template<typename _TV, typename _T>
+	typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
+	schmidt(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, size_t _locHilbertSize = 2)
+	{
+		uint bitNum		= (uint)std::log2(_locHilbertSize);
+		const u64 dA	= ULLPOW(bitNum * _sizeA);
+		const u64 dB	= ULLPOW(bitNum * (_size - _sizeA));
+
+		// create second part of the mask
+		const _T _maskB = Binary::flipAll(_maskA, _size);
+
+		// create the reduced density matrix
+		arma::Mat<_TV> _psi(dA, dA, arma::fill::zeros);
+
+		// loop over the state
+		for(u64 _st = 0; _st < _s.size(); ++_st)
+		{
+			// get the index of the state
+			// get the index of the state in the reduced basis
+			u64 _idxA	= Binary::extract(_st, _maskA);
+			u64 _idxB	= Binary::extract(_st, _maskB);
+			_psi(_idxA, _idxB) += _s(_st);
+		}
+		// return the new Schmidt decomposed matrix
+		return _psi;
+	}
+
 	// ###############################################################
 
 	/*
