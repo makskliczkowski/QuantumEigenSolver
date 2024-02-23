@@ -35,6 +35,7 @@ namespace Operators
 	/*
 	* @brief Class for storing the operators that act on the quantum state taking into account the probability 
 	* ratio for the averages
+	* @todo Implement for more than spin operators
 	*/
 	template <typename _T, typename ..._Ts>
 	class OperatorNQS
@@ -53,12 +54,14 @@ namespace Operators
 		uint sizeX_							= 1;
 		uint sizeY_							= 1;
 		uint Ns_							= 1;
+
 		// ##### CURRENT VALUE #####
-		arma::Mat<cpx> currentValue_;
+		arma::Mat<_T> currentValue_;
 		// save samples here
-		v_1d<arma::Mat<cpx>> samples_;
+		v_1d<arma::Mat<_T>> samples_;
 
 		// ####### MANY BODY #######
+		// store the matrix for the many body average basded on a given quantum state
 		arma::Mat<_T> manyBodyMatrix_;
 		arma::Mat<_T> manyBodyVal_;
 
@@ -71,39 +74,53 @@ namespace Operators
 		// store the column state
 		NQSS state_;
 
-		// operators to apply step by step that add up in the average <S|O|\psi_M>
+		// operators to apply step by step that add up in the average \sum _ s' <s|O|s'> * \Psi(s') / \Psi(s)
+		// we apply the operator to the left and look for all the states that can be reached from the base state
+		// the s' are every possible state that can be reached from the base state with the operator action on s
 		// O may in general create a combination of the base states, leave it as a vector then
 		v_1d<Operators::Operator<_T, _Ts...>> op_;
 		
 		// ####### CONSTRUCT #######
 		~OperatorNQS();
+
+		// standard constructor
 		OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name = "");
 		OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name = "");
+
+		// copy and move constructors
 		OperatorNQS(const Operators::OperatorNQS<_T, _Ts...>& _other);
 		OperatorNQS(Operators::OperatorNQS<_T, _Ts...>&& _other);
 
 		// ###### APPLICATION ######
 		auto operator()(u64 s, _Ts... a)						const -> v_1d<typename _OP<_T>::R>;
-		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		-> cpx;
-		auto operator[](uint i)									const -> arma::Mat<cpx> { return this->samples_[i];	};
+		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		-> _T;
+		auto operator[](uint i)									const -> arma::Mat<_T> { return this->samples_[i];		};
+
 		// updates current value
 		template <class _Tt = uint>
-		auto updCurrent(cpx _val, _Tt i)						-> void;
+		typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+		updCurrent(_T _val, _Tt i);
 		template <class _Tt, typename ..._Tss>
-		auto updCurrent(cpx _val, _Tt i, _Tss...a)				-> void;
+		typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+		updCurrent(_T _val, _Tt i, _Tss...a)
+		{
+			indices_[currentIdx_] = i;
+			currentIdx_++;
+			updCurrent(_val, a...);
+		};
 		template <typename ..._Tss>
-		auto updCurrent(cpx _val, _Tss...a)						-> void { this->updCurrent(_val, a...);					};
+		void updCurrent(_T _val, _Tss...a)												{ this->updCurrent(_val, a...);			};
 		
 	public:
 		// ######## SETTERS ########
-		auto resetSamples()				-> void { this->samples_ = {};													};
-		auto resetMB()					-> void { manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);		};
-		auto resetValue()				-> void { currentValue_ = arma::Mat<cpx>(sizeX_, sizeY_, arma::fill::zeros);	};
-		auto reset()					-> void { this->resetValue(); this->resetSamples(); 							};
+		auto resetSamples()				-> void { this->samples_ = {};															};
+		auto resetMB()					-> void { manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);				};
+		auto resetValue()				-> void { currentValue_ = arma::Mat<cpx>(sizeX_, sizeY_, arma::fill::zeros);			};
+		auto reset()					-> void;
 		auto normalize(uint N)			-> void; 
 		template <typename _T2>
-		auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>&, _Ts... a)	-> void;
-		auto applyManyBody(const arma::Col<_T>& _C, uint i = 0, uint j = 0)	-> arma::Col<_T>;
+		auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>&, _Ts... a)				-> void;
+		auto applyManyBody(const arma::Col<_T>& _C, uint i = 0, uint j = 0)				-> arma::Col<_T>;
 
 		// ######## GETTERS ########
 		auto mbmat()					const -> arma::Mat<_T>							{ return this->manyBodyMatrix_;			};
@@ -117,6 +134,19 @@ namespace Operators
 		auto getOperator(uint i)		const -> Operators::Operator<_T, _Ts...>		{ return this->op_[i];					};
 	};
 
+
+	// ##########################################################################################################################################
+	
+	/*
+	* @brief Resets the samples and the current value
+	*/
+	template <typename _T, typename ..._Ts>
+	void OperatorNQS<_T, _Ts...>::reset()
+	{ 
+		this->resetValue(); 
+		this->resetSamples(); 
+	};
+
 	// ##########################################################################################################################################
 	// ##########################################################################################################################################
 	// ###################################################### C L A S S   C O N S T U C T #######################################################
@@ -125,14 +155,17 @@ namespace Operators
 	
 	/*
 	* @brief Resize the current value so one can store only the necessary values in the matrix (sizeX, sizeY)
-	* Global has sizeX = sizeY = 1,
-	* Local has sizeX = Ns, sizeY = 1,
-	* Correlation has sizeX = Ns, sizeY = Ns.
-	* @param ...args placeholder for the arguments
+	* Global		has sizeX = sizeY = 1,
+	* Local			has sizeX = Ns, sizeY = 1,
+	* Correlation	has sizeX = Ns, sizeY = Ns.
+	* @template _T type of the operator
+	* @template _Ts types of the additional parameters
+	* @throws runtime_error if the number of arguments is not 0, 1 or 2
 	*/
 	template<typename _T, typename ..._Ts>
 	inline void Operators::OperatorNQS<_T, _Ts...>::decideSize()
 	{
+		// get the size of template operators to decide on the opeartor type
 		constexpr size_t numArgs		= sizeof...(_Ts);
 		if (numArgs > 2) 
 			throw std::runtime_error("Not implemented for more than two arguments!");
@@ -157,14 +190,19 @@ namespace Operators
 		}
 		else
 			throw std::runtime_error("Not implemented for more than two arguments!");
-		this->manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
+
+		// store the matrix for the many body average basded on a given quantum state
+		this->manyBodyVal_	=  arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
 	};
+
+	// ##########################################################################################################################################
 
 	template <typename _T, typename ..._Ts>
 	OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name)
 		: name_(_name), Ns_(_op.getNs()), samples_({}), op_({ _op })
 	{
 		this->decideSize();
+		// create the state (basis state)
 		this->state_.resize(Ns_);
 		this->reset();
 	};
@@ -174,6 +212,7 @@ namespace Operators
 		: name_(_name), Ns_(_opV[0].getNs()), samples_({}), op_(_opV)
 	{
 		this->decideSize();
+		// create the state (basis state)
 		this->state_.resize(Ns_);
 		this->reset();
 	};
@@ -183,6 +222,7 @@ namespace Operators
 		: name_(_other.name_), Ns_(_other.Ns_), currentValue_(_other.currentValue_), samples_(_other.samples_), op_(_other.op_)
 	{
 		this->decideSize();
+		// create the state (basis state)
 		this->state_.resize(Ns_);
 		this->reset();
 	}
@@ -192,6 +232,7 @@ namespace Operators
 		: name_(std::move(_other.name_)), Ns_(std::move(_other.Ns_)), currentValue_(std::move(_other.currentValue_)), samples_(std::move(_other.samples_)), op_(std::move(_other.op_))
 	{
 		this->decideSize();
+		// create the state (basis state)
 		this->state_ = std::move(_other.state_);
 		this->reset();
 	}
@@ -212,10 +253,13 @@ namespace Operators
 	
 	template<typename _T, typename ..._Ts>
 	template<class _Tt>
-	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i)
+	inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+	Operators::OperatorNQS<_T, _Ts...>::updCurrent(_T _val, _Tt i)
 	{
 		this->indices_[this->currentIdx_] = i;
 		this->currentIdx_++;
+
+		// check the size of the indices
 		if (indices_.size() == 0)
 			this->currentValue_(0, 0) += _val;
 		else if (indices_.size() == 1)
@@ -228,37 +272,33 @@ namespace Operators
 
 	////////////////////////////////////////////////////////////////////////////
 
-	template<typename _T, typename ..._Ts>
-	template <class _Tt, typename ..._Tss>
-	inline void Operators::OperatorNQS<_T, _Ts...>::updCurrent(cpx _val, _Tt i, _Tss ...a)
-	{
-		indices_[currentIdx_] = i;
-		currentIdx_++;
-		updCurrent(_val, a...);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
 	/*
 	* @brief Sets the many body matrix to apply it later for the many body states
 	* @param _H Hilbert space
+	* @param ...a additional parameters to the operators
 	*/
 	template<typename _T, typename ..._Ts>
 	template <typename _T2>
 	inline void Operators::OperatorNQS<_T, _Ts...>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _H, _Ts ...a)
 	{
+		// get the common type
+		using res_typ = typename std::common_type<_T, _T2>::type;
+		// store all the measured values
 		this->manyBodyMatrix_ = arma::Mat<_T>(_H.getHilbertSize(), _H.getHilbertSize(), arma::fill::zeros);
+
+		// go through all operators, check the corresponding Hilbert sizes!
 		for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
 		{
+			// if we don't need to apply the symmetries
 			if (_H.getHilbertSize() == _H.getFullHilbertSize())
 			{
 				auto _Min = _op.template generateMat<typename arma::Mat>(_H.getFullHilbertSize(), a...);
-				this->manyBodyMatrix_ += _Min;
+				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 			else
 			{
-				auto _Min = _op.template generateMat<typename arma::Mat, _T2>(_H, a...);
-				this->manyBodyMatrix_ += _Min;
+				auto _Min = _op.template generateMat<typename arma::Mat, res_typ>(_H, a...);
+				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 		}
 	}
@@ -267,15 +307,15 @@ namespace Operators
 
 	/*
 	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* to a specific place (i, j) in the matrix
+	* to a specific place (i, j) in the matrix. The place corresponds to the locality of the operator.
 	* @param _C many body state
 	* @param i first matrix save element
 	* @param j second matrix save element
 	*/
 	template<typename _T, typename ..._Ts>
-	inline arma::Col<_T> Operators::OperatorNQS<_T, _Ts...>::applyManyBody(const arma::Col<_T>& _C, uint i, uint j) 
+	inline arma::Col<_T> Operators::OperatorNQS<_T, _Ts...>::applyManyBody(const arma::Col<_T>& _C, uint i, uint j)
 	{
-		arma::Col<_T> _Cout = this->manyBodyMatrix_ * _C;
+		auto _Cout = this->manyBodyMatrix_ * _C;
 		manyBodyVal_(i, j) = arma::cdot(_C, _Cout);
 		return _Cout;
 	}
@@ -290,11 +330,11 @@ namespace Operators
 	* @returns vector of changed base states with their corresponding values
 	*/
 	template<typename _T, typename ..._Ts>
-	inline cpx Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
+	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
 	{
 		// starting value
 		this->currentIdx_	= 0;
-		cpx _valTotal		= 0.0;
+		_T _valTotal		= 0.0;
 		// go through operators
 		for (auto& _op : op_)
 		{
@@ -331,11 +371,11 @@ namespace Operators
 	////////////////////////////////////////////////////////////////////////////
 
 	/*
-	* @brief Normalize the values after given block sample
+	* @brief Normalize the values after given block sample. After that, it resets the value
 	* @param N size of the block
 	*/
 	template<typename _T, typename ..._Ts>
-	inline auto Operators::OperatorNQS<_T, _Ts...>::normalize(uint N) -> void
+	inline void Operators::OperatorNQS<_T, _Ts...>::normalize(uint N)
 	{
 		samples_.push_back(currentValue_ / double(N)); 
 		this->resetValue();
