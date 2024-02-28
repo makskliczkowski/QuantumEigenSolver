@@ -25,7 +25,7 @@ public:
 	void hamiltonian() override										
 	{ 
 		this->init();
-		this->H_ = this->ran_.GOE(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
+		this->H_ = this->ran_.template GOE<_T>(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------

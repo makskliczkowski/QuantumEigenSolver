@@ -55,13 +55,16 @@
 
 // ######################### MODELS #########################
 #ifndef ISING_H											 // #
-#include "../models/ising.h"							 // #
+#	include "../models/ising.h"							 // #
 #endif // !ISING_H										 // #
 #ifndef XYZ_H											 // #
-#include "../models/XYZ.h"								 // #
+#	include "../models/XYZ.h"							 // #
 #endif // !XYZ_H										 // #
 #ifndef HEISENBERG_KITAEV_H								 // #
-#include "../models/heisenberg-kitaev.h"				 // #
+#	include "../models/heisenberg-kitaev.h"				 // #
+#endif													 // #
+#ifndef QSM_H											 // #
+#	include "../models/quantum_sun.h"					 // #
 #endif													 // #
 // ##########################################################
 
@@ -107,19 +110,21 @@ constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 24;
 #define UI_CHECK_SYM(val, gen)									if(this->val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::gen, this->val##_));
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################## P A R A M S ###############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
-namespace UI_PARAMS {
+namespace UI_PARAMS 
+{
 
 	// ----------------------------------------------------------------
 
 	/*
 	* @brief Defines parameters used later for the models
 	*/
-	struct ModP {
+	struct ModP 
+	{
 		// ############### TYPE ################
 		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
 		
@@ -131,6 +136,7 @@ namespace UI_PARAMS {
 		UI_PARAM_STEP(double, J1, 1.0);								// spin exchange
 		UI_PARAM_STEP(double, hz, 1.0);								// perpendicular field
 		UI_PARAM_STEP(double, hx, 1.0);								// transverse field
+
 		// ############### XYZ #################		
 		UI_PARAM_STEP(double, J2, 2.0);								// next nearest neighbors exchange
 		UI_PARAM_STEP(double, eta1, 0.5);
@@ -143,10 +149,43 @@ namespace UI_PARAMS {
 		v_1d<double> Kx_;
 		v_1d<double> Ky_;
 		v_1d<double> Kz_;
+		void resizeKitaev(const size_t Ns)
+		{
+			this->Kx_.resize(Ns);
+			this->Ky_.resize(Ns);
+			this->Kz_.resize(Ns);
+		};
+
+		// ########### HEISENBERG ##############
+
 		v_1d<double> heiJ_;
 		v_1d<double> heiDlt_;
 		v_1d<double> heiHx_;
 		v_1d<double> heiHz_;
+		void resizeHeisenberg(const size_t Ns)
+		{
+			this->heiJ_.resize(Ns);
+			this->heiDlt_.resize(Ns);
+			this->heiHx_.resize(Ns);
+			this->heiHz_.resize(Ns);
+		};
+
+		// ############### QSM #################
+
+		UI_PARAM_CREATE_DEFAULTD(qsm_N, size_t, 1);
+		UI_PARAM_CREATE_DEFAULTD(qsm_Ntot, size_t, 1);
+		UI_PARAM_CREATE_DEFAULTD(qsm_gamma, double, 1.0);
+		UI_PARAM_CREATE_DEFAULTD(qsm_g0, double, 1.0);
+		v_1d<double> qsm_alpha_;
+		v_1d<double> qsm_xi_;
+		v_1d<double> qsm_h_;
+
+		void resizeQSM()
+		{
+			this->qsm_alpha_.resize(this->qsm_N_);
+			this->qsm_xi_.resize(this->qsm_N_);
+			this->qsm_h_.resize(this->qsm_N_);
+		};
 
 		// #####################################
 		// ######### Q U A D R A T I C #########
@@ -171,27 +210,53 @@ namespace UI_PARAMS {
 		void setDefault() 
 		{
 			UI_PARAM_SET_DEFAULT(modTyp);
-			// ising
-			UI_PARAM_SET_DEFAULT_STEP(J1);
-			UI_PARAM_SET_DEFAULT_STEP(hz);
-			UI_PARAM_SET_DEFAULT_STEP(hx);
-			// xyz
-			UI_PARAM_SET_DEFAULT_STEP(J2);
-			UI_PARAM_SET_DEFAULT_STEP(eta1);
-			UI_PARAM_SET_DEFAULT_STEP(eta2);
-			UI_PARAM_SET_DEFAULT_STEP(dlt1);
-			UI_PARAM_SET_DEFAULT_STEP(dlt2);
-			// kitaev
-			this->Kx_		= v_1d<double>(1, 1.0);
-			this->Ky_		= v_1d<double>(1, 1.0);
-			this->Kz_		= v_1d<double>(1, 1.0);
-			this->heiJ_		= v_1d<double>(1, 1.0);
-			this->heiDlt_	= v_1d<double>(1, 1.0);
-			this->heiHz_	= v_1d<double>(1, 1.0);
-			this->heiHx_	= v_1d<double>(1, 1.0);
-			// aubry-andre
-			UI_PARAM_SET_DEFAULT_STEP(Beta);
-			UI_PARAM_SET_DEFAULT_STEP(Phi);
+
+			// SPIN
+			{
+				// ising
+				{
+					UI_PARAM_SET_DEFAULT_STEP(J1);
+					UI_PARAM_SET_DEFAULT_STEP(hz);
+					UI_PARAM_SET_DEFAULT_STEP(hx);
+				}
+				// xyz
+				{
+					UI_PARAM_SET_DEFAULT_STEP(J2);
+					UI_PARAM_SET_DEFAULT_STEP(eta1);
+					UI_PARAM_SET_DEFAULT_STEP(eta2);
+					UI_PARAM_SET_DEFAULT_STEP(dlt1);
+					UI_PARAM_SET_DEFAULT_STEP(dlt2);
+				}
+				// kitaev
+				{
+					this->Kx_		= v_1d<double>(1, 1.0);
+					this->Ky_		= v_1d<double>(1, 1.0);
+					this->Kz_		= v_1d<double>(1, 1.0);
+					this->heiJ_		= v_1d<double>(1, 1.0);
+					this->heiDlt_	= v_1d<double>(1, 1.0);
+					this->heiHz_	= v_1d<double>(1, 1.0);
+					this->heiHx_	= v_1d<double>(1, 1.0);
+				}
+				// QSM
+				{
+					UI_PARAM_SET_DEFAULT(qsm_gamma);
+					UI_PARAM_SET_DEFAULT(qsm_g0);
+					UI_PARAM_SET_DEFAULT(qsm_Ntot);
+					UI_PARAM_SET_DEFAULT(qsm_N);
+					this->qsm_alpha_	= v_1d<double>(1, 1.0);
+					this->qsm_xi_		= v_1d<double>(1, 1.0);
+					this->qsm_h_		= v_1d<double>(1, 1.0);
+				}
+			}
+
+			// QUADRATIC
+			{
+				// aubry-andre
+				{
+					UI_PARAM_SET_DEFAULT_STEP(Beta);
+					UI_PARAM_SET_DEFAULT_STEP(Phi);
+				}
+			}
 		}
 
 		// -------------------------------------
@@ -325,9 +390,9 @@ namespace UI_PARAMS {
 };
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################# U I N T E R F ##############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -400,12 +465,18 @@ private:
 	template<typename _T>
 	void quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
 
+	// ##################### SPIN MODELS ###################
+
+	template<typename _T>
+	void checkETH(std::shared_ptr<Hamiltonian<_T>> _H);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineLattice();
 	bool defineModels(bool _createLat = true);
 	bool defineModelsQ(bool _createLat = true);
 
+	template<typename _T>
+	bool defineHilbert(Hilbert::HilbertSpace<_T>& _Hil);
 	template<typename _T>
 	bool defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
 	template<typename _T>
@@ -459,9 +530,9 @@ public:
 };
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################# D E F A U L T ##############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -534,16 +605,13 @@ inline void UI::setDefaultMap()
 };
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################# D E F I N E S ##############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
-/*
-* @brief Defines the interacting model based on the input file...
-*/
 template<typename _T>
-inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
+inline bool UI::defineHilbert(Hilbert::HilbertSpace<_T>& _Hil)
 {
 	bool _isGood				= true;
 	// get the symmetries
@@ -556,6 +624,17 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 	}
 	else
 		LOGINFO(VEQVS(HilbertSize, _Hil.getHilbertSize()), LOG_TYPES::INFO, 3);
+	return _isGood;
+}
+
+/*
+* @brief Defines the interacting model based on the input file...
+*/
+template<typename _T>
+inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
+{
+	if (!defineHilbert<_T>(_Hil))
+		return false;
 
 	// switch the model types
 	switch (this->modP.modTyp_)
@@ -577,6 +656,10 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.Kx_, this->modP.Ky_, this->modP.Kz_,
 			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
+	case MY_MODELS::QSM_M:
+		_H = std::make_shared<QSM<_T>>(std::move(_Hil), this->modP.qsm_N_, this->modP.qsm_gamma_, this->modP.qsm_g0_,
+			this->modP.qsm_alpha_, this->modP.qsm_h_, this->modP.qsm_xi_);
+		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
 			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
@@ -586,7 +669,7 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			false);
 		break;
 	}
-	return _isGood;
+	return true;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -650,9 +733,9 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ########################################################## S Y M M E T R I E S ###########################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -1223,7 +1306,7 @@ inline void UI::symmetriesTest()
 							LOGINFO("DOING: " + infoSym, LOG_TYPES::TRACE, 3);
 							file << "\t->" << infoSym << EL;
 
-							this->hamComplex->hamiltonian();
+							this->hamComplex->buildHamiltonian();
 							LOGINFO("Finished building Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
 							this->hamComplex->diagH(false);
 							LOGINFO("Finished diagonalizing Hamiltonian " + sI, LOG_TYPES::TRACE, 4);
@@ -1355,9 +1438,9 @@ inline void UI::symmetriesTest()
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ######################################################### V A R I A T I O N A L ##########################################################
-// ##########################################################################################################################################
+// 
 // ##########################################################################################################################################
 
 template<typename _T, uint _spinModes>
@@ -1378,7 +1461,7 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 	if (Nh <= UI_LIMITS_NQS_ED)
 	{
 		auto _H = _NQS->getHamiltonian();
-		_H->hamiltonian();
+		_H->buildHamiltonian();
 		if (Nh <= UI_LIMITS_NQS_FULLED)
 		{
 			_H->diagH(false);
@@ -1451,13 +1534,10 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 
 // ##########################################################################################################################################
 
-// ##########################################################################################################################################
-// ##########################################################################################################################################
 // ########################################################### Q U A D R A T I C ############################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
+
 
 template<typename _T>
 inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
@@ -1684,3 +1764,9 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T>
+inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
+{
+
+}

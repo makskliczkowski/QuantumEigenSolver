@@ -48,10 +48,15 @@ namespace Hilbert
 		mutable MutexType Mutex;
 		
 		// using templates
+		// global symmetries
 		using GSymV											= v_1d<GlobalSyms::GlobalSym>;
+		// symmetry operator vector
 		using SymOpV										= v_1d<Operators::Operator<_T>>;
+		// symmetry group with values
 		using SymGV											= v_1d<std::pair<Operators::SymGenerators, int>>;
+		// pair of state and symmetry return
 		using RPair											= std::pair<u64, _T>;
+		// vector of pairs
 		using RPairV										= v_1d<std::pair<u64, _T>>;
 
 		// sizes
@@ -77,132 +82,25 @@ namespace Hilbert
 
 	public:
 		// -------------------------- CONSTRUCTORS ---------------------------
-		~HilbertSpace()
-		{
-			LOGINFO("Hilbert space destructor called.", LOG_TYPES::INFO, 3);
-			this->fullMap_.clear();
-			this->mapping_.clear();
-			this->normalization_.clear();
-		}
-		
-		HilbertSpace()										= default;
-
-		/*
-		* @brief Create the Hilbert space class allowing for creation of specific symmetry 
-		* sectors or a general Hilbert space for the system.
-		* @param _lat general lattice to be used for creation of the system
-		* @param _gen vector of symmetry generators with their eigenvalues
-		* @param _glob global symmetries 
-		* @param _Nhl number of local degrees of freedom on a give lattice site (2 for spins, 4 for 1/2-spin fermions
-		* @param _Nint number of fermionic modes for a given lattice site
-		*/
+		~HilbertSpace();
+		HilbertSpace()									= default;
+		HilbertSpace(size_t _Ns, 
+					 SymGV _gen							= {},
+					 GSymV _glob						= {},
+					 bool _genereateRepresentativesMap	= false,
+					 clk::time_point _t					= NOW,
+					 bool _generateMapping				= true);
 		HilbertSpace(std::shared_ptr<Lattice> _lat,
-			SymGV _gen											= {},
-			GSymV _glob											= {},
-			uint _Nint											= 1,
-			bool _genereateRepresentativesMap			= false,
-			clk::time_point _t								= NOW,
-			bool _generateMapping							= true)
-			: t_(_t), Nint(_Nint), lat(_lat)
-		{
-			this->Ns					=				this->lat->get_Ns();
-			this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
-
-			// set symmetry elements
-			this->symGroupGlobal_=				_glob;
-			this->normalization_	=				v_1d<_T>();
-			this->symGroup_		=				v_1d<Operators::Operator<_T>>();
-			this->mapping_			=				v_1d<u64>();
-			this->reprMap_			=				v_1d<std::pair<u64, _T>>();
-
-			if(_generateMapping)
-				this->initMapping(_gen, _genereateRepresentativesMap, _t);
-
-			if (this->Nh == this->NhFull)
-				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
-			else if (this->Nh <= 0)
-				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
-		};
-
-		/*
-		* @brief Assign constructor
-		*/
-		HilbertSpace(const HilbertSpace<_T, _spinModes>& _H)
-			:	Nhl(_H.Nhl),
-				t_(_H.t_),
-				threadNum(_H.threadNum),
-				Ns(_H.Ns), 
-				Nint(_H.Nint), 
-				Nh(_H.Nh), 
-				NhFull(_H.NhFull), 
-				lat(_H.lat),
-				symGroupGlobal_(_H.symGroupGlobal_), 
-				symGroup_(_H.symGroup_), 
-				symGroupSec_(_H.symGroupSec_),
-				normalization_(_H.normalization_), 
-				mapping_(_H.mapping_), 
-				fullMap_(_H.fullMap_),
-				reprMap_(_H.reprMap_)
-		{
-				WriteLock lhs_lk(this->Mutex, std::defer_lock);
-				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
-				std::lock(lhs_lk, rhs_lk);
-		};
-
-		/*
-		* @brief Assign constructor with different type
-		*/
+					 SymGV _gen							= {},
+					 GSymV _glob						= {},
+					 uint _Nint							= 1,
+					 bool _genereateRepresentativesMap	= false,
+					 clk::time_point _t					= NOW,
+					 bool _generateMapping				= true);
+		HilbertSpace(const HilbertSpace<_T, _spinModes>& _H);
+		HilbertSpace(HilbertSpace<_T, _spinModes>&& _H);
 		template <typename _T2 = _T>
-		HilbertSpace(const HilbertSpace<_T2, _spinModes>& _H, bool otherType)
-			:	Nhl(_H.Nhl),
-				t_(_H.t_),
-				threadNum(_H.threadNum),
-				Ns(_H.Ns), 
-				Nint(_H.Nint), 
-				Nh(_H.Nh), 
-				NhFull(_H.NhFull), 
-				lat(_H.lat),
-				symGroupGlobal_(_H.symGroupGlobal_)
-		{
-			// set symmetry elements
-			this->normalization_ = v_1d<_T>();
-			this->symGroup_ = v_1d<Operators::Operator<_T>>();
-			this->mapping_ = v_1d<u64>();
-			this->reprMap_ = v_1d<std::pair<u64, _T>>();
-
-			if (true)
-				this->initMapping(this->symGroupSec_, false, t_);
-
-			if (this->Nh == this->NhFull)
-				LOGINFO("Produced the full Hilbert space - no symmetries are used", LOG_TYPES::WARNING, 2);
-			else if (this->Nh <= 0)
-				LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
-		};
-
-		/*
-		* @brief Move constructor
-		*/
-		HilbertSpace(HilbertSpace<_T, _spinModes>&& _H)
-			:	Nhl(std::move(_H.Nhl)),
-				t_(std::move(_H.t_)),
-				threadNum(std::move(_H.threadNum)),
-				Ns(std::move(_H.Ns)), 
-				Nint(std::move(_H.Nint)),
-				Nh(std::move(_H.Nh)),
-				NhFull(std::move(_H.NhFull)),
-				lat(std::move(_H.lat)),
-				symGroupGlobal_(std::move(_H.symGroupGlobal_)),
-				symGroup_(std::move(_H.symGroup_)),
-				symGroupSec_(std::move(_H.symGroupSec_)),
-				normalization_(std::move(_H.normalization_)),
-				mapping_(std::move(_H.mapping_)),
-				fullMap_(std::move(_H.fullMap_)),
-				reprMap_(std::move(_H.reprMap_))
-		{
-			WriteLock lhs_lk(this->Mutex, std::defer_lock);
-			ReadLock  rhs_lk(_H.Mutex, std::defer_lock);
-			std::lock(lhs_lk, rhs_lk);
-		};
+		HilbertSpace(const HilbertSpace<_T2, _spinModes>& _H, bool otherType);
 	
 		// -------------------------- ASSIGN OPERATOR -------------------------
 		HilbertSpace<_T, _spinModes>& operator=(const HilbertSpace<_T, _spinModes>& _H)
@@ -231,7 +129,8 @@ namespace Hilbert
 		};
 
 		// ------------------------- MAP INITIALIZERS -------------------------
-
+		void hi();
+		void init();
 		void initMapping(SymGV _gen							= {},
 						 bool _genereateRepresentativesMap	= false,
 						 clk::time_point _t					= NOW);
@@ -275,9 +174,173 @@ namespace Hilbert
 		bool checkSym()											const					{ return !(this->Nh == this->NhFull);														};
 		bool checkLSym()										const					{ return this->symGroup_.size() != 0;														};
 		bool checkGSym()										const					{ return this->symGroupGlobal_.size() != 0;													};
+		
+		bool checkGSym(GlobalSyms::GlobalSymGenerators _g)		const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == _g) return true; return false;			};
+		bool checkGVal(GlobalSyms::GlobalSymGenerators _g)		const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == _g) return g.getVal(); return -INT_MAX;	};
+		
+		// certain global symmetries
 		bool checkU1()											const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return true; return false;				};
 		int  checkU1Val()										const					{ for (const GlobalSyms::GlobalSym& g : this->symGroupGlobal_) if (g.getName() == GlobalSyms::GlobalSymGenerators::U1) return (int)g.getVal(); return -INT_MAX; };
 	};
+
+	// ##########################################################################################################################################
+
+	template<typename _T, uint _spinModes>
+	HilbertSpace<_T, _spinModes>::~HilbertSpace()
+	{
+		DESTRUCTOR_CALL;
+		LOGINFO("Hilbert space destructor called.", LOG_TYPES::INFO, 3);
+		this->fullMap_.clear();
+		this->mapping_.clear();
+		this->normalization_.clear();
+	}
+
+	// ##########################################################################################################################################
+
+	template<typename _T, uint _spinModes>
+	inline Hilbert::HilbertSpace<_T, _spinModes>::HilbertSpace(size_t _Ns, SymGV _gen, GSymV _glob, bool _genereateRepresentativesMap, clk::time_point _t, bool _generateMapping)
+		: t_(_t), Nint(1), Ns(_Ns)
+	{
+		// set symmetry elements
+		this->symGroupGlobal_	=				_glob;
+
+		// initialize vectors
+		this->init();
+
+		if(_generateMapping)
+			this->initMapping(_gen, _genereateRepresentativesMap, _t);
+
+		this->hi();
+	}
+
+	/*
+	* @brief Create the Hilbert space class allowing for creation of specific symmetry 
+	* sectors or a general Hilbert space for the system.
+	* @param _lat general lattice to be used for creation of the system
+	* @param _gen vector of symmetry generators with their eigenvalues
+	* @param _glob global symmetries 
+	* @param _Nhl number of local degrees of freedom on a give lattice site (2 for spins, 4 for 1/2-spin fermions
+	* @param _Nint number of fermionic modes for a given lattice site
+	*/
+	template<typename _T, uint _spinModes>
+	HilbertSpace<_T, _spinModes>::HilbertSpace(std::shared_ptr<Lattice> _lat,
+												SymGV _gen,
+												GSymV _glob,
+												uint _Nint,
+												bool _genereateRepresentativesMap,
+												clk::time_point _t,
+												bool _generateMapping)
+		: t_(_t), Nint(_Nint), lat(_lat)
+	{
+		// set symmetry elements
+		this->symGroupGlobal_	=				_glob;
+
+		// initialize vectors
+		this->init();
+
+		if(_generateMapping)
+			this->initMapping(_gen, _genereateRepresentativesMap, _t);
+
+		this->hi();
+	};
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Assign constructor with different type
+	*/
+	template<typename _T, uint _spinModes>
+	template <typename _T2>
+	HilbertSpace<_T, _spinModes>::HilbertSpace(const HilbertSpace<_T2, _spinModes>& _H, bool otherType)
+		: Nhl(_H.Nhl),
+		t_(_H.t_),
+		threadNum(_H.threadNum),
+		Ns(_H.Ns), 
+		Nint(_H.Nint), 
+		Nh(_H.Nh), 
+		NhFull(_H.NhFull), 
+		lat(_H.lat),
+		symGroupGlobal_(_H.symGroupGlobal_)
+	{
+		this->init();
+
+		if (true)
+			this->initMapping(this->symGroupSec_, false, t_);
+
+		this->hi();
+	};
+
+	/*
+	* @brief Assign constructor
+	*/
+	template<typename _T, uint _spinModes>
+	HilbertSpace<_T, _spinModes>::HilbertSpace(const HilbertSpace<_T, _spinModes>& _H)
+		: Nhl(_H.Nhl), t_(_H.t_), threadNum(_H.threadNum), Ns(_H.Ns), Nint(_H.Nint), 
+		Nh(_H.Nh), NhFull(_H.NhFull), lat(_H.lat), symGroupGlobal_(_H.symGroupGlobal_), 
+		symGroup_(_H.symGroup_), symGroupSec_(_H.symGroupSec_), normalization_(_H.normalization_), 
+		mapping_(_H.mapping_), fullMap_(_H.fullMap_), reprMap_(_H.reprMap_)
+	{
+		WriteLock lhs_lk(this->Mutex, std::defer_lock);
+		ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
+		std::lock(lhs_lk, rhs_lk);
+	};
+
+	/*
+	* @brief Move constructor
+	*/
+	template<typename _T, uint _spinModes>
+	HilbertSpace<_T, _spinModes>::HilbertSpace(HilbertSpace<_T, _spinModes>&& _H)
+		: Nhl(std::move(_H.Nhl)),
+		t_(std::move(_H.t_)),
+		threadNum(std::move(_H.threadNum)),
+		Ns(std::move(_H.Ns)), 
+		Nint(std::move(_H.Nint)),
+		Nh(std::move(_H.Nh)),
+		NhFull(std::move(_H.NhFull)),
+		lat(std::move(_H.lat)),
+		symGroupGlobal_(std::move(_H.symGroupGlobal_)),
+		symGroup_(std::move(_H.symGroup_)),
+		symGroupSec_(std::move(_H.symGroupSec_)),
+		normalization_(std::move(_H.normalization_)),
+		mapping_(std::move(_H.mapping_)),
+		fullMap_(std::move(_H.fullMap_)),
+		reprMap_(std::move(_H.reprMap_))
+	{
+		WriteLock lhs_lk(this->Mutex, std::defer_lock);
+		ReadLock  rhs_lk(_H.Mutex, std::defer_lock);
+		std::lock(lhs_lk, rhs_lk);
+	};
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Introduction to the Hilbert space class allowing for creation of specific symmetry
+	* sectors or a general Hilbert space for the system.
+	*/
+	template<typename _T, uint _spinModes>
+	inline void Hilbert::HilbertSpace<_T, _spinModes>::hi()
+	{
+		if (this->Nh == this->NhFull)
+			LOGINFO("Produced the full Hilbert space - no symmetries are used. Spin modes = " + STR(Nhl), LOG_TYPES::WARNING, 2);
+		else if (this->Nh <= 0)
+			LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
+	}
+
+	/*
+	* @brief Initialize the variables for the Hilbert space.
+	*/
+	template<typename _T, uint _spinModes>
+	inline void Hilbert::HilbertSpace<_T, _spinModes>::init()
+	{
+		// set the number of sites
+		this->Ns				=				this->lat->get_Ns();
+		this->NhFull			=				(u64)std::pow(this->Nhl, this->Ns * this->Nint);
+
+		this->normalization_	=				v_1d<_T>();
+		this->symGroup_			=				v_1d<Operators::Operator<_T>>();
+		this->mapping_			=				v_1d<u64>();
+		this->reprMap_			=				v_1d<std::pair<u64, _T>>();
+	}
 
 	// ##########################################################################################################################################
 	

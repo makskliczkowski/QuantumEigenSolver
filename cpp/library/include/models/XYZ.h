@@ -35,56 +35,56 @@ public:
 	// ######################################## Constructors ########################################
 	~XYZ()														{ LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 3); };
 	XYZ()															= default;
-	XYZ(const Hilbert::HilbertSpace<_T>& hilbert,	double _Ja, double _Jb, 
-																	double _hx, double _hz, 
-																	double _dA, double _dB, 
-																	double _eA, double _eB, 
-																	bool _parityBreak = false);
+	XYZ(const Hilbert::HilbertSpace<_T>& hilbert, double _Ja, double _Jb, 
+												  double _hx, double _hz, 
+												  double _dA, double _dB, 
+												  double _eA, double _eB, 
+												  bool _parityBreak = false);
 
-	XYZ(Hilbert::HilbertSpace<_T>&& hilbert,			double _Ja, double _Jb,
-																	double _hx, double _hz,
-																	double _dA, double _dB,
-																	double _eA, double _eB,
-																	bool _parityBreak = false);
+	XYZ(Hilbert::HilbertSpace<_T>&& hilbert, double _Ja, double _Jb,
+											 double _hx, double _hz,
+											 double _dA, double _dB,
+											 double _eA, double _eB,
+											 bool _parityBreak = false);
 
-	XYZ(const Hilbert::HilbertSpace<_T>& hilbert,	double _Ja, double _Jb,
-																	double _hx, double _hz,
-																	double _dA, double _dB,
-																	double _eA, double _eB,
-																	double _Ja0, double _Jb0,
-																	double _hx0, double _hz0,
-																	double _dA0, double _dB0,
-																	double _eA0, double _eB0,
-																	bool _parityBreak = false);
+	XYZ(const Hilbert::HilbertSpace<_T>& hilbert, double _Ja, double _Jb,
+												  double _hx, double _hz,
+												  double _dA, double _dB,
+												  double _eA, double _eB,
+												  double _Ja0, double _Jb0,
+												  double _hx0, double _hz0,
+												  double _dA0, double _dB0,
+												  double _eA0, double _eB0,
+												  bool _parityBreak = false);
 
-	XYZ(Hilbert::HilbertSpace<_T>&& hilbert,			double _Ja, double _Jb,
-																	double _hx, double _hz,
-																	double _dA, double _dB,
-																	double _eA, double _eB,
-																	double _Ja0, double _Jb0,
-																	double _hx0, double _hz0,
-																	double _dA0, double _dB0,
-																	double _eA0, double _eB0,
-																	bool _parityBreak = false);
+	XYZ(Hilbert::HilbertSpace<_T>&& hilbert, double _Ja, double _Jb,
+											 double _hx, double _hz,
+											 double _dA, double _dB,
+											 double _eA, double _eB,
+											 double _Ja0, double _Jb0,
+											 double _hx0, double _hz0,
+											 double _dA0, double _dB0,
+											 double _eA0, double _eB0,
+											 bool _parityBreak = false);
 
 	// ########################################### Methods ###########################################
-	void hamiltonian()										override final;
-	void locEnergy(u64 _elemId, 
-						u64 _elem, 
-						uint _site)								override final;
-	cpx locEnergy( u64 _id, 
-						uint site,
-						NQSFun f1)								override final;
-	cpx locEnergy(	const DCOL& v,
-						uint site, 
-						NQSFun f1)								override final;
+
+	void locEnergy(u64 _elemId,
+					u64 _elem,
+					uint _site)					override final;
+	cpx locEnergy(u64 _id,
+				uint site,
+				NQSFun f1)						override final;
+	cpx locEnergy(const DCOL& v,
+				uint site,
+				NQSFun f1)						override final;
 
 	// ############################################ Info #############################################
 
 	std::string info(const strVec& skip = {}, 
-							std::string sep	= "_", 
-							int prec				= 2)			const override final;
-	void updateInfo()											override final	{ this->info_ = this->info({}, ",", 3); };
+					std::string sep	= "_", 
+					int prec = 2)				const override final;
+	void updateInfo()							override final		{ this->info_ = this->info({}, ",", 3); };
 };
 
 // ##########################################################################################################################################
@@ -404,7 +404,7 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
 	// get number of forward nn
 	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
-	uint NUM_OF_NNN	= (uint)this->lat_->get_nnn_ForwardNum(_site);
+	uint NUM_OF_NNN		= (uint)this->lat_->get_nnn_ForwardNum(_site);
 	u64 newIdx			= 0;
 	_T newVal			= 0;
 
@@ -469,31 +469,6 @@ inline void XYZ<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 							PARAM_W_DISORDER(Jb, _site) * (1.0 - PARAM_W_DISORDER(eB, _site)) * val_x * val_x2,
 							idx_x2);
 		}
-	}
-}
-
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-// ######################################################### H A M I L T O N I A N ##########################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-
-/*
-* Generates the total Hamiltonian of the system. The diagonal part is straightforward,
-* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
-*/
-template <typename _T>
-void XYZ<_T>::hamiltonian() {
-	if (this->Nh == 0)
-	{
-		LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
-		return;
-	}
-	this->init();
-	for (u64 k = 0; k < this->Nh; k++) {
-		u64 kMap = this->hilbertSpace.getMapping(k);
-		for (uint site_ = 0; site_ <= this->Ns - 1; site_++)
-			this->locEnergy(k, kMap, site_);
 	}
 }
 

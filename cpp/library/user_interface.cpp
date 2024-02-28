@@ -90,6 +90,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(nqsP,	nSBlocks,	"nbS"	);
 		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
+
 	// ----------------- LATTICE -----------------
 	{
 		SETOPTIONV(latP,	typ,	"l"	);
@@ -109,54 +110,73 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(modP, modTyp, "mod");
 
 		// ---- quadratic ----
-		SETOPTIONV(modP, q_manybody,		"q_mb");
-		SETOPTIONV(modP, q_manifold,		"q_man");
-		SETOPTIONV(modP, q_gamma,			"q_gamma");
-		SETOPTIONV(modP, q_realizationNum,	"q_R");
-		SETOPTIONV(modP, q_randomCombNum,	"q_CN");
-		SETOPTIONV(modP, q_shuffle,			"q_S");
-
-
-		// ------ ising ------
-		SETOPTION_STEP(modP, J1);
-		SETOPTION_STEP(modP, hx);
-		SETOPTION_STEP(modP, hz);
-		// ---- heisenberg ---
 		{
-			this->modP.heiDlt_.resize(Ns);
-			this->modP.heiJ_.resize(Ns);
-			this->modP.heiHx_.resize(Ns);
-			this->modP.heiHz_.resize(Ns);
-			SETOPTION(modP, heiJ);
-			SETOPTION(modP, heiDlt);
-			SETOPTION(modP, heiHz);
-			SETOPTION(modP, heiHx);
-			SETOPTION_STEP(modP, dlt1);
+			SETOPTIONV(modP, modTypQ, "modQ");
+			SETOPTIONV(modP, q_manybody,		"q_mb");
+			SETOPTIONV(modP, q_manifold,		"q_man");
+			SETOPTIONV(modP, q_gamma,			"q_gamma");
+			SETOPTIONV(modP, q_realizationNum,	"q_R");
+			SETOPTIONV(modP, q_randomCombNum,	"q_CN");
+			SETOPTIONV(modP, q_shuffle,			"q_S");
+			
+			// -- aubry-andres ---
+			{
+				SETOPTION_STEP(modP, Beta);
+				SETOPTION_STEP(modP, Phi);
+			}
 		}
-		// ------- xyz -------
-		SETOPTION_STEP(modP, J2);
-		SETOPTION_STEP(modP, dlt2);
-		SETOPTION_STEP(modP, eta1);
-		SETOPTION_STEP(modP, eta2);
-		// ------ kitaev -----
+		// ------ spin ------
 		{
-			// resize
-			this->modP.Kx_.resize(Ns);
-			this->modP.Ky_.resize(Ns);
-			this->modP.Kz_.resize(Ns);
-			// set options
-			SETOPTION(modP, Kx);
-			SETOPTION(modP, Ky);
-			SETOPTION(modP, Kz);
-		}
+			// ------ ising ------
+			{
+				SETOPTION_STEP(modP, J1);
+				SETOPTION_STEP(modP, hx);
+				SETOPTION_STEP(modP, hz);
+			}
+			// ---- heisenberg ---
+			{
+				// resize
+				this->modP.resizeHeisenberg(Ns);
 
-	}
-	// --------------- QUARDRATIC ----------------
-	{
-		SETOPTIONV(modP, modTypQ, "modQ");
-		// -- aubry-andres ---
-		SETOPTION_STEP(modP, Beta);
-		SETOPTION_STEP(modP, Phi);
+				SETOPTION(modP, heiJ);
+				SETOPTION(modP, heiDlt);
+				SETOPTION(modP, heiHz);
+				SETOPTION(modP, heiHx);
+				SETOPTION_STEP(modP, dlt1);
+			}
+			// ------- xyz -------
+			{
+				SETOPTION_STEP(modP, J2);
+				SETOPTION_STEP(modP, dlt2);
+				SETOPTION_STEP(modP, eta1);
+				SETOPTION_STEP(modP, eta2);
+			}
+			// ------ kitaev -----
+			{
+				// resize
+				this->modP.resizeKitaev(Ns);
+
+				// set options
+				SETOPTION(modP, Kx);
+				SETOPTION(modP, Ky);
+				SETOPTION(modP, Kz);
+			}
+			// ------ QSM ---------
+			{
+				SETOPTION(modP, qsm_gamma);
+				SETOPTION(modP, qsm_g0);
+				SETOPTION(modP, qsm_Ntot);
+				SETOPTION(modP, qsm_N);
+
+				// resize
+				this->modP.resizeQSM();
+				
+				// set
+				SETOPTION(modP, qsm_alpha);
+				SETOPTION(modP, qsm_xi);
+				SETOPTION(modP, qsm_h);
+			}
+		}
 	}
 	// --------------- SYMMETRIES ----------------
 	{
@@ -169,18 +189,9 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(symP, S);
 	}
 	// ----------------- OTHERS ------------------
-	{
-		this->setOption(this->quiet, argv, "q");
-		this->setOption(this->threadNum, argv, "th");
-		// later function choice
-		this->setOption(this->chosenFun, argv, "fun");
-	}
+	this->parseOthers(argv);
 	// ---------------- DIRECTORY ----------------
-	bool setDir [[maybe_unused]] = this->setOption(this->mainDir, argv, "dir");
-	if (this->mainDir.starts_with("./"))
-		this->mainDir = makeDirsC(fs::current_path().string(), "DATA", this->mainDir.substr(2));
-	else
-		this->mainDir = makeDirsC(this->mainDir);
+	this->parseMainDir(argv);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

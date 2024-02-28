@@ -377,7 +377,7 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	inline void Operators::OperatorNQS<_T, _Ts...>::normalize(uint N)
 	{
-		samples_.push_back(currentValue_ / double(N)); 
+		samples_.push_back(currentValue_ / (long double)(N)); 
 		this->resetValue();
 	}
 };
@@ -446,17 +446,17 @@ namespace NQSAv
 	public:
 		~MeasurementNQS() 
 		{ 
-			LOGINFO("Destroying the measurement", LOG_TYPES::TRACE, 3);
+			LOGINFO("Destroying the measurement of the NQS averages.", LOG_TYPES::TRACE, 3);
 			for (auto& x : opG_) x.reset(); 
 			for (auto& x : opL_) x.reset();
 			for (auto& x : opC_) x.reset();
 		}
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators);
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const std::string& _dir,
-																	 const OPG& _opG,
-																	 const OPL& _opL,
-																	 const OPC& _opC,
-																	 uint _threadNum = 1);
+													  const OPG& _opG,
+													  const OPL& _opL,
+													  const OPC& _opC,
+													  uint _threadNum = 1);
 
 		void measure(u64 s, NQSFunCol _fun);
 		void measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>&);
@@ -491,7 +491,7 @@ namespace NQSAv
 		this->opG_ = _opG;
 		this->opL_ = _opL;
 		this->opC_ = _opC;
-		//CONSTRUCTOR_CALL;
+		CONSTRUCTOR_CALL;
 	}
 
 	// ##########################################################################################################################################
@@ -614,7 +614,7 @@ namespace NQSAv
 			for (auto& _op : this->opL_)
 				_op->normalize(_nBlck);
 		}
-		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
+		END_CATCH_HANDLER("Problem in the normalization of local operators.", ;);
 
 		BEGIN_CATCH_HANDLER
 		{
@@ -622,7 +622,7 @@ namespace NQSAv
 			for (auto& _op : this->opC_)
 				_op->normalize(_nBlck);
 		}
-		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
+		END_CATCH_HANDLER("Problem in the normalization of correlation operators.", ;);
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -673,7 +673,7 @@ namespace NQSAv
 				}
 			}
 		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+		END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
 
 		BEGIN_CATCH_HANDLER
 		{
@@ -695,7 +695,7 @@ namespace NQSAv
 				}
 			}
 		}
-		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+		END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
 	}
 
 	////////////////////////////////////////////////////////////////////////////

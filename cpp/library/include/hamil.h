@@ -17,13 +17,14 @@
 // ############################ EXISTING MODELS ############################
 enum MY_MODELS 															// #
 {																		// #	
-	ISING_M, XYZ_M, HEI_KIT_M, NONE 									// #
+	ISING_M, XYZ_M, HEI_KIT_M, QSM_M, NONE 								// #
 };																		// #
 BEGIN_ENUM(MY_MODELS)													// #
 {																		// #
 	DECL_ENUM_ELEMENT(ISING_M),											// #
 	DECL_ENUM_ELEMENT(XYZ_M),											// #
 	DECL_ENUM_ELEMENT(HEI_KIT_M),										// #
+	DECL_ENUM_ELEMENT(QSM_M),											// #
 	DECL_ENUM_ELEMENT(NONE)												// #
 }																		// #
 END_ENUM(MY_MODELS)									 					// #	
@@ -71,54 +72,49 @@ protected:
 	std::shared_ptr<Lattice> lat_;
 	// ------------------------------------------- CLASS TYPES ----------------------------------------------
 	MY_MODELS type_										= MY_MODELS::NONE;
+	uint Ns_											= 1;
 	uint Ns												= 1;
+	u64 Nh_												= 1;
 	u64 Nh												= 1;
 
 	// ------------------------------------------- CLASS FIELDS ---------------------------------------------
-	double avEn											= 0.0;
 	u64 avEnIdx											= -1;														
+	double avEn											= 0.0;
 	
 	// matrices
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
 	arma::SpMat<_T> H_;									// the Hamiltonian
-	arma::Mat<_T> K_;										// the Krylov Vectors
+	arma::Mat<_T> K_;									// the Krylov Vectors (if needed)
 	arma::vec eigVal_;									// eigenvalues vector
 public:
 	randomGen ran_;										// consistent quick random number generator
 	std::string info_;									// information about the model
 	
 	// -------------------------------------------- CONSTRUCTORS --------------------------------------------
+	
 	virtual ~Hamiltonian();
-	Hamiltonian()	:	ran_(randomGen()) {};
-	Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert)
-		: hilbertSpace(hilbert)
-	{
-		this->ran_	=	randomGen();
-		this->lat_	=	this->hilbertSpace.getLattice();
-		this->Ns	=	this->lat_->get_Ns();
-		this->Nh	=	this->hilbertSpace.getHilbertSize();
-	};
-	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
-		: hilbertSpace(std::move(hilbert))
-	{
-		this->ran_	=	randomGen();
-		this->lat_	=	this->hilbertSpace.getLattice();
-		this->Ns	=	this->lat_->get_Ns();
-		this->Nh	=	this->hilbertSpace.getHilbertSize();
-	};																			
+	Hamiltonian();
+	Hamiltonian(const size_t _Ns);
+	Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert);
+	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert);
 
 	// ------------------------------------------- PRINTERS ---------------------------------------------------
+
 	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);
-	static void prettyPrint(	std::ostream& output,	const COL<_T>& state, uint Ns, double _tol = 5e-2);	
-	void print(u64 _id)									const										{ this->eigVec_.col(_id).print("|"+STR(_id)+">=\n");							};
+
+	template <template <typename> class _V, typename _TV = _T>
+	static void prettyPrint(	std::ostream& output,	const _V<_TV>& state, uint Ns, double _tol = 5e-2);	
+	
+	void print(u64 _id)									const										{ this->eigVec_.col(_id).print("|"+STR(_id)+">\n");								};
 	void print()										const										{ this->H_.print("H=\n");														};
 																																												
 	// --------------------------------------------- INFO -----------------------------------------------------
+	
 	std::string info(std::string name = "", const v_1d<std::string>& skip = {}, std::string sep = "_")	const;
 	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2)	const = 0;
 
 	// --------------------------------------------- INITS ----------------------------------------------------
-	auto init()												-> void;
+	auto init()											-> void;
 
 	// -------------------------------------------- GETTERS ---------------------------------------------------
 	auto getDegeneracies()								const -> v_2d<u64>;
@@ -142,32 +138,37 @@ public:
 	virtual auto getEigVal(std::string _dir,
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	auto getEigVal(u64 idx)								const -> double								{ return this->eigVal_(idx);													};	
+	// info
 	auto getInfo(const strVec& skip = {},
 		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string						{ return this->info_;															};
 	// types
 	auto getType()										const -> std::string						{ return SSTR(getSTR_MY_MODELS(this->type_));									};
 	auto getTypeI()										const -> uint								{ return this->type_;															};
-	// lattice
+	// lattice (if applicable)
 	auto getLat()										const -> std::shared_ptr<Lattice>			{ return this->lat_;															};
 	auto getNs()										const -> uint								{ return this->lat_->get_Ns();													};
 	auto getBC()										const -> BoundaryConditions					{ return this->lat_->get_BC();													};
 	
 	// ------------------------------------------- SETTERS -----------------------------------------------------
 	
-	// ----------------------------------------- HAMILTONIAN ---------------------------------------------------
-	virtual void hamiltonian();
-	auto buildHamiltonian()								-> void;
+	auto setSeed(u64 seed)								-> void										{ this->ran_.newSeed(seed);														};
 
+	// ----------------------------------------- HAMILTONIAN ---------------------------------------------------
+protected:
+	virtual void hamiltonian();
 	auto setHElem(u64 k, _T val, u64 newIdx)			-> void;									// sets the Hamiltonian elements in a virtual way
 	auto calcAvEn()										-> void;									// calculate the average energy
+
+public:
+	auto buildHamiltonian()								-> void;
 	auto diagH(bool woEigVec = false)					-> void;									// diagonalize the Hamiltonian
 	auto diagHs(bool woEigVec = false)					-> void;									// diagonalize the Hamiltonian sparse
 	auto diagH(bool woEigVec, 
-				uint k, 
-				uint subdim = 0, 
-				uint maxiter = 1000,
-				double tol = 0, 
-				std::string form = "sm")				-> void;									// diagonalize the Hamiltonian using Lanczos' method
+			   uint k, 
+			   uint subdim = 0, 
+			   uint maxiter = 1000,
+			   double tol = 0, 
+			   std::string form = "sm")					-> void;									// diagonalize the Hamiltonian using Lanczos' method
 
 public:
 	// ------------------------------------------ LOCAL ENERGY -------------------------------------------------
@@ -181,21 +182,75 @@ public:
 	
 	// ----------------------------------------- FOR OTHER TYPES -----------------------------------------------
 	virtual void updateInfo()							= 0;
+
 public:
-	void generateFullMap()								{ this->hilbertSpace.generateFullMap(); }; // generates the full Hilbert space map
+	void generateFullMap()								{ this->hilbertSpace.generateFullMap();		}; // generates the full Hilbert space map
 
 	// --------------------------------------------- CLEAR -----------------------------------------------------
 	void clearEigVec()									{ this->eigVec_.reset();					}; // resets the eigenvectors memory to 0
 	void clearEigVal()									{ this->eigVal_.reset();					}; // resets the energy memory to 0
 	void clearH()										{ this->H_.reset();							}; // resets the hamiltonian memory to 0
+	void clear()										{ this->clearEigVec(); this->clearEigVal(); this->clearH();	}; 
 
 	// --------------------------------------------- OTHER -----------------------------------------------------
 };
 
+
 // ##########################################################################################################################################
+
+// ############################################################## C O N S T R ###############################################################
+
 // ##########################################################################################################################################
+
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian()
+	: ran_(randomGen())
+{
+	CONSTRUCTOR_CALL;
+}
+
+/*
+* @brief Constructor of the Hamiltonian class for the systems that don't require the lattice
+* @param _Ns number of particles in the system
+*/
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
+	: Hamiltonian<_T, _spinModes>(), Ns_(_Ns), Ns(_Ns)
+{
+	this->hilbertSpace = Hilbert::HilbertSpace<_T, _spinModes>(Ns_);
+	this->Nh	=  ULLPOW(Ns_);
+}
+
+/*
+* @brief Constructor of the Hamiltonian with the Hilbert space
+*/
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert)
+	: Hamiltonian<_T, _spinModes>()
+{
+	this->hilbertSpace = hilbert;
+	this->lat_	=	this->hilbertSpace.getLattice();
+	this->Ns	=	this->lat_->get_Ns();
+	this->Nh	=	this->hilbertSpace.getHilbertSize();
+};
+
+/*
+* @brief Constructor with move semantics for the Hilbert space
+*/
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
+	: hilbertSpace(std::move(hilbert))
+{
+	this->ran_	=	randomGen();
+	this->lat_	=	this->hilbertSpace.getLattice();
+	this->Ns	=	this->lat_->get_Ns();
+	this->Nh	=	this->hilbertSpace.getHilbertSize();
+};			
+
+// ##########################################################################################################################################
+
 // ################################################################ I N F O #################################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -224,11 +279,14 @@ std::string Hamiltonian<_T, _spinModes>::info(std::string name, const v_1d<std::
 template<typename _T, uint _spinModes>
 Hamiltonian<_T, _spinModes>::~Hamiltonian()
 {
+	DESTRUCTOR_CALL;
 	LOGINFO("Base Hamiltonian destructor called.", LOG_TYPES::INFO, 3);
 	this->H_.reset();
 	this->eigVal_.reset();
 	this->eigVec_.reset();
 }
+
+// ##########################################################################################################################################
 
 /*
 * Generates the total Hamiltonian of the system. The diagonal part is straightforward,
@@ -243,10 +301,10 @@ void Hamiltonian<_T, _spinModes>::hamiltonian()
 		return;
 	}
 	this->init();
-	for (u64 k = 0; k < this->Nh; k++)
+	for (u64 k = 0; k < this->Nh; ++k)
 	{
 		u64 kMap = this->hilbertSpace.getMapping(k);
-		for (uint site_ = 0; site_ <= this->Ns - 1; site_++)
+		for (uint site_ = 0; site_ <= this->Ns - 1; ++site_)
 			this->locEnergy(k, kMap, site_);
 	}
 }
@@ -270,7 +328,7 @@ void Hamiltonian<_T, _spinModes>::init()
 // ##########################################################################################################################################
 
 /*
-* @builds Hamiltonian and gets specific info!
+* @builds Hamiltonian and gets specific info! 
 */
 template<typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::buildHamiltonian()
@@ -285,7 +343,7 @@ inline void Hamiltonian<_T, _spinModes>::buildHamiltonian()
 // ##########################################################################################################################################
 
 /*
-* @brief Calculates the index closest to the average energy in the Hamiltonian
+* @brief Calculates the index closest to the average energy in the Hamiltonian. The index is stored in the avEnIdx variable.
 */
 template<typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::calcAvEn()
@@ -305,9 +363,9 @@ inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################ P R I N T I N G #############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -335,18 +393,19 @@ inline void Hamiltonian<_T, _spinModes>::printBaseState(std::ostream& output, u6
 * @param tol tolerance of the coefficients absolute value
 */
 template<typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::prettyPrint(std::ostream& output, const COL<_T>& state, uint Ns, double tol)
+template <template <typename> class _V, typename _TV>
+inline void Hamiltonian<_T, _spinModes>::prettyPrint(std::ostream& output, const _V<_TV>& state, uint Ns, double tol)
 {
 	v_1d<int> tmpVec(Ns);
 	for (u64 k = 0; k < state.size(); k++)
-		printBaseState(output, k, state(k), tmpVec, tol);
+		printBaseState(output, k, state[k], tmpVec, tol);
 	output << EL;
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ######################################################### H A M I L T O N I A N ##########################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -374,9 +433,9 @@ inline void Hamiltonian<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ######################################################### D I A G O N A L I Z E ##########################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -395,15 +454,20 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
 
 /*
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
-* Modes:
+* Modes (form):
 *		From ARMA:
-			- la,
-			- sa, 
-			- sg,
-			- lm
+			- la - largest algebraic
+			- sa - smallest algebraic
+			- sg - smallest magnitude
+			- lm - largest magnitude
 *		Mine:
-*			- lanczos
-* @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
+*			- lanczos - Lanczos method
+* @param woEigVec does not compute eigenvectors to save memory potentially
+* @param k number of eigenvalues to be computed
+* @param subdim dimension of the subspace to be used in the Lanczos method
+* @param maxiter maximum number of iterations in the Lanczos method
+* @param tol tolerance of the Lanczos method
+* @param form form of the diagonalization
 */
 template <typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
@@ -452,9 +516,9 @@ inline void Hamiltonian<_T, _spinModes>::diagHs(bool woEigVec)
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ############################################################# G E T T E R S ##############################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
