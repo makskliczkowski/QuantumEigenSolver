@@ -152,7 +152,7 @@ namespace SystemProperties
 			auto _v = std::abs(algebra::conjugate(_coeff) * _coeff);
 			ipr		+= _v * _v;
 		}
-		return pr;
+		return ipr;
 	}
 
 	// ---------------------------------------------------------------------------
