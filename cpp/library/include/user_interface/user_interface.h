@@ -1862,7 +1862,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// get info
 	std::string modelInfo	=	_H->getInfo();
 	std::string randomStr   =   FileParser::appWRandom("", _H->ran_);
-	std::string dir			=	makeDirsC(this->mainDir, modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string dir			=	makeDirsC(this->mainDir, "QSM_MAT_ELEM", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
 	std::string extension   =   ".h5";
 	// set seed
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
