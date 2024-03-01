@@ -81,12 +81,16 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	class Operator 
 	{
-		typedef typename _OP<_T>::template INP<_Ts...> repType;					// type returned for representing, what it does with state and value it returns
-		std::shared_ptr<Lattice> lat_;													// lattice type to be used later on
-		_T eigVal_												=			1.0;				// eigenvalue for symmetry generator (if there is inner value)
-		repType fun_											=			E;					// function allowing to use symmetry
-		SymGenerators name_									=			SymGenerators::E;
-	
+		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
+		size_t Ns_											=			1;					// number of elements in the vector (for one to know how to act on it)
+		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, the lattice can be empty if not needed
+		_T eigVal_											=			1.0;				// eigenvalue for symmetry generator (if there is an inner value)
+		repType fun_										=			E;					// function allowing to use the symmetry operation
+		
+		// used for checking on which states the operator acts when forgetting and using the matrix only
+		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
+		SymGenerators name_									=			SymGenerators::E;   // name of the operator
+		
 	public:
 		// ----------------------------------------------------------------------------------------------------
 
@@ -95,28 +99,47 @@ namespace Operators
 		{ 
 			init(); 
 		};
+		
+		// with the usage of the elements in the state vector
+		Operator(size_t Ns) 
+			: Ns_(Ns)
+		{ 
+			init(); 
+		};
+		Operator(size_t Ns, _T _eigVal) 
+			: Ns_(Ns), eigVal_(_eigVal)
+		{ 
+			init(); 
+		};
+		Operator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E) 
+			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), name_(_name)
+		{ 
+			init(); 
+		};
+
+		// for the usage with the lattice (mostly for spin models, spinless fermions and hardcore bosons)
 		Operator(std::shared_ptr<Lattice> _lat)
-			: lat_(_lat)
+			: Ns_(_lat->get_Ns()), lat_(_lat)
 		{
 			init();
 		};
 		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal)
-			: lat_(_lat), eigVal_(_eigVal)
+			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal)
 		{
 			init();
 		};
 		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E)
-			: lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name)
+			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name)
 		{
 			init();
 		};
 		Operator(const Operator<_T, _Ts...>& o)
-			: lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_)
+			: Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_)
 		{
 			init();
 		};
 		Operator(Operator<_T, _Ts...>&& o)
-			: lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_))
+			: Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_))
 		{
 			init();
 		};
@@ -125,6 +148,7 @@ namespace Operators
 
 		Operator<_T, _Ts...>& operator=(const Operator<_T, _Ts...>& _other)
 		{
+			this->Ns_		=		_other.Ns_;
 			this->lat_		=		_other.lat_;
 			this->fun_		=		_other.fun_;
 			this->eigVal_	=		_other.eigVal_;
@@ -134,6 +158,7 @@ namespace Operators
 
 		Operator<_T, _Ts...>& operator=(const Operator<_T, _Ts...>&& _other)
 		{
+			this->Ns_		=		std::move(_other.Ns_);
 			this->lat_		=		std::move(_other.lat_);
 			this->fun_		=		std::move(_other.fun_);
 			this->eigVal_	=		std::move(_other.eigVal_);
@@ -151,24 +176,32 @@ namespace Operators
 		// ----------------------------------------------------------------------------------------------------
 
 		// -------------------- STATIC --------------------
-		static auto E(u64 s, _Ts...)						-> typename _OP<_T>::R			{ return std::make_pair(s, _T(1.0)); };
+		static auto E(u64 s, _Ts...)					-> typename _OP<_T>::R			{ return std::make_pair(s, _T(1.0));	};
 
 		// ----------------- V I R T U A L ----------------
 		virtual void init() {};
 		
 		// -------------------- SETTERS -------------------
-		auto setFun(const repType& _fun)					-> void								{ this->fun_ = _fun; };
-		auto setFun(repType&& _fun)						-> void								{ this->fun_ = std::move(_fun); };
-		auto setName(SymGenerators _name)				-> void								{ this->name_ = _name; };
-		auto setVal(_T _val)									-> void								{ this->eigVal_ = _val; };
 
+		auto setActOn(u64 _acton)						-> void							{ this->acton_ = _acton;							};
+		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;								};
+		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);						};
+		auto setName(SymGenerators _name)				-> void							{ this->name_ = _name;								};
+		auto setVal(_T _val)							-> void							{ this->eigVal_ = _val;								};
+		auto setNs(size_t Ns)							-> void							{ this->Ns_ = Ns;									};
+		
 		// -------------------- GETTERS --------------------
-		auto getVal()											const -> _T							{ return this->eigVal_; };
-		auto getFun()											const -> repType					{ return this->fun_; };
-		auto getName()											const -> SymGenerators			{ return this->name_; };
-		auto getNs()											const -> uint						{ return this->lat_->get_Ns(); };
+		auto getActOn()									const -> u64					{ return this->acton_;								};
+		auto getNs()									const -> size_t					{ return this->Ns_;									};
+		auto getVal()									const -> _T						{ return this->eigVal_;								};
+		auto getFun()									const -> repType				{ return this->fun_;								};
+		auto getName()									const -> SymGenerators			{ return this->name_;								};
+		auto getNameS()									const -> std::string			{ return STR(getSTR_SymGenerators(this->name_));	};
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		/*
+		* Joins the operators into one operator. This combines the operators acting on the same Hilbert space.
+		*/
 
 		template <typename T_ = _T, 
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
@@ -211,7 +244,7 @@ namespace Operators
 			return Operators::Operator<cpx, _Ts..., _T2s...>(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ * op.fun_, Operators::SymGenerators::OTHER);
 		}
 
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		//template <typename T_ = _T,
 		//	typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
@@ -228,39 +261,19 @@ namespace Operators
 		//	return Operator<cpx, _Ts...>(this->lat_, cpx(this->eigVal_), _fun);
 		//};
 
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		/*
-		* @brief operator to the N'th power
-		*/
+	
 		template <typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type* = nullptr>
 		[[nodiscard]]
-		Operator<_T, _Ts...> operator^(_T1 _n) 
-		{
-			if (_n == 0)
-				return Operator<_T, _Ts...>(this->lat_, 1.0, Operators::Operator<_T, _Ts...>::E);
-			else if (_n == 1)
-				return *this;
-
-			auto _f = [_n, this](u64 _s, _Ts... _args) {
-				_T val = 1.0;
-				do {
-					auto [newS, newV]	= this->operator()(_s, _args...);
-					_s					= newS;
-					val					*= newV;
-					--_n;
-					} while (_n);
-				return std::make_tuple(_s, val);
-			};
-			return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
-		}
+		Operator<_T, _Ts...> operator^(_T1 _n);
 			
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
 		* @brief representative eigenvalue calculator
 		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op)										{ return _op.eigVal_;};
+		friend _T chi(const Operator<_T, _Ts...>& _op)									{ return _op.eigVal_;};
 
 		/*
 		* @brief calculate operator acting on state num eigenvalue
@@ -269,12 +282,13 @@ namespace Operators
 	
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		
-		template<template <class _TM = _T> class _MatType, HasMatrixType _Concept = _MatType<_T>>
-		_MatType<_T> generateMat(u64 _dim, _Ts... _arg) const;
-		template<template <class _TM = _T> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_T>>
-		_MatType<typename std::common_type<_T, _T1>::type> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts... _arg) const;
-		template<template <class _TM = _T> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_T>>
-		_MatType<typename std::common_type<_T, _T1, _T2>::type> generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts... _arg);
+		template<template <class _TM = _T> class _MatType, HasMatrixType _Concept = _MatType<_T>, typename _InT = u64>
+		typename std::enable_if<std::is_integral<_InT>::value, _MatType<_T>>::type
+		generateMat(_InT _dim, _Ts... _arg) const;
+		template<template <class _TM = _T> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_T>, uint _spinModes = 2>
+		_MatType<typename std::common_type<_T, _T1>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
+		template<template <class _TM = _T> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_T>, uint _spinModes = 2>
+		_MatType<typename std::common_type<_T, _T1, _T2>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
 
 
 		// calculates the matrix element of operator given a single state
@@ -284,9 +298,37 @@ namespace Operators
 		template <typename _T1>
 		[[deprecated]]
 		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
-
 	};
 };
+
+// ##########################################################################################################################################
+
+/*
+* @brief Raising the operator to the power of n (n is an integer) 
+* @param _n the power to which the operator is raised
+* @returns the operator raised to the power of n
+*/
+template<typename _T, typename ..._Ts>
+template<typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type*>
+inline Operators::Operator<_T,_Ts...> Operators::Operator<_T, _Ts...>::operator ^(_T1 _n)
+{
+	if (_n == 0)
+		return Operator<_T, _Ts...>(this->lat_, 1.0, Operators::Operator<_T, _Ts...>::E);
+	else if (_n == 1)
+		return *this;
+
+	auto _f = [_n, this](u64 _s, _Ts... _args) {
+		_T val = 1.0;
+		do {
+			auto [newS, newV]	= this->operator()(_s, _args...);
+			_s					= newS;
+			val					*= newV;
+			--_n;
+			} while (_n);
+		return std::make_tuple(_s, val);
+	};
+	return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
+}
 
 // ##########################################################################################################################################
 
@@ -306,38 +348,44 @@ inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, con
 	return _T();
 }
 
-// ################################################ M A T R I X   G E N E R A T I O N ##############################################################
+// #################################################### M A T R I X   G E N E R A T I O N ####################################################
 
 /*
 * @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
+* The operator is acting on the same Hilbert space as the one it is acting on.
 * For the total Hilbert space known to be without symmetries - not looking for representatives
 * @brief _dim A dimension of the Hilbert space
+* @returns A matrix representing the operator
 */
 template<typename _T, typename ..._Ts> 
-template<template <class> class _MatType, HasMatrixType _Concept>
-inline _MatType<_T> Operators::Operator<_T, _Ts...>::generateMat(u64 _dim, _Ts ..._arg) const
+template<template <class> class _MatType, HasMatrixType _Concept, typename _InT>
+inline typename std::enable_if<std::is_integral<_InT>::value, _MatType<_T>>::type
+Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
 	_MatType<_T> op(_dim, _dim);
 #ifndef _DEBUG
 #pragma omp parallel for
 #endif
-	for (u64 _base = 0; _base < _dim; _base++) 
+	for (u64 _base = 0; _base < _dim; ++_base) 
 	{
-		auto [_idx, _val]		=	this->operator()(_base, _arg...);
+		auto [_idx, _val]	=	this->operator()(_base, _arg...);
 		op(_idx, _base)		+=	_val;
 	}
 	return op;
 }
 
+// ##########################################################################################################################################
+
 /*
-* @brief Creates an operator matrix whenever the operator is not transforming the state to a different symmetry sector.
+* @brief Creates an operator matrix whenever the operator is not transforming the state from a different symmetry sector.
 * Uses the Hilbert space that stores the state transformations from the representative base.
 * @param _Hil the Hilbert space in which we operate
 * @param _arg arguments for the operator
+* @returns A matrix representing the operator
 */
 template<typename _T, typename ..._Ts>
-template<template <class> class _MatType, typename _T1, HasMatrixType _Concept>
-inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil, _Ts ..._arg) const
+template<template <class> class _MatType, typename _T1, HasMatrixType _Concept, uint _spinModes>
+inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts ..._arg) const
 {
 	using res_typ	=	typename std::common_type<_T1, _T>::type;
 	u64 Nh			=	_Hil.getHilbertSize();
@@ -364,6 +412,8 @@ inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T
 	return op;
 }
 
+// ##########################################################################################################################################
+
 /*
 * @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
 * @param _Hil the Hilbert space in which we operate
@@ -371,8 +421,8 @@ inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T
 * @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
 */
 template<typename _T, typename ..._Ts>
-template<template <class> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept>
-inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1>& _Hil1, const Hilbert::HilbertSpace<_T2>& _Hil2, _Ts ..._arg)
+template<template <class> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept, uint _spinModes>
+inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts ..._arg)
 {
 	using res_typ		=	typename std::common_type<_T1, _T, _T2>::type;
 	u64 NhA				=	_Hil1.getHilbertSize();
@@ -396,3 +446,5 @@ inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operat
 			op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
 	}
 }
+
+// ##########################################################################################################################################

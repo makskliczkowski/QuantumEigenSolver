@@ -66,7 +66,43 @@ namespace Entropy
 			};
 
 			// ##########################################################################################################################################
+
+			template <typename _T, typename _TV>
+			[[nodiscard]]
+			inline typename std::enable_if<std::is_arithmetic<_TV>::value, double>::type
+			vonNeuman(const arma::Col<_T>& _s,
+					uint _sizeA,
+					size_t _Ns,
+					const _TV& _maskA,
+					DensityMatrix::RHO_METHODS _ch = DensityMatrix::RHO_METHODS::SCHMIDT,
+					uint _locHilbert = 2)
+			{
+				// get the reduced density matrix
+				auto rho = redDensMat<_T>(_s, _sizeA, _Ns, _maskA, _ch, _locHilbert);
+				// get the values
+				arma::vec vals;
+				if (_ch == RHO_METHODS::SCHMIDT)
+				{
+					vals = arma::svd(rho);
+					vals = arma::square(vals);
+				}
+				else
+					arma::eig_sym(vals, rho);
+
+				// calculate entropy
+				double entropy = 0.0;
+				
+				// go through the values
+				for (const auto& val: vals)
+					if (val > 0.0)
+						entropy += -val * std::log(val);
+				return entropy;
+			};
+
+			// ##########################################################################################################################################
+			
 			// ###################################################### S I N G L E   P A R T I C L E #####################################################
+			
 			// ##########################################################################################################################################
 			
 			namespace SingleParticle

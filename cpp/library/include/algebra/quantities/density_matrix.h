@@ -132,7 +132,8 @@ namespace DensityMatrix
 	* @returns the bipartite reduced density matrix
 	*/
 	template<typename _T>
-	inline arma::Mat<_T> redDensMatSchmidt(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) {
+	inline arma::Mat<_T> redDensMatSchmidt(const arma::Col<_T>& _s, uint _sizeA, const Hilbert::HilbertSpace<_T>& _hilb) 
+	{
 		// set subsystems size
 		uint Ns			= _hilb.getLatticeSize();
 		uint bitNum		= (uint)std::log2(_hilb.getLocalHilbertSize());
@@ -140,7 +141,27 @@ namespace DensityMatrix
 		const u64 dimB	= ULLPOW(bitNum * (Ns - _sizeA));
 		return arma::reshape(_s, dimA, dimB);
 	}
-	
+
+	// ###############################################################
+
+	/*
+	* @brief Using reshape method to calculate the reduced density matrix
+	* @param _s state to construct the density matrix from
+	* @param _sizeA subsystem size
+	* @param _Ns number of lattice sites
+	* @param _locHilbert local Hilbert space size
+	* @returns the bipartite reduced density matrix
+	*/
+	template<typename _TV>
+	inline arma::Mat<_TV> schmidt(const arma::Col<_TV>& _s, uint _sizeA, size_t _Ns, uint _locHilbert = 2) 
+	{
+		// set subsystems size
+		uint bitNum		= (uint)std::log2(_locHilbert);
+		const u64 dimA	= ULLPOW(bitNum * _sizeA);
+		const u64 dimB	= ULLPOW(bitNum * (_Ns - _sizeA));
+		return arma::reshape(_s, dimA, dimB);
+	}
+
 	// ###############################################################
 
 	/*
@@ -152,10 +173,10 @@ namespace DensityMatrix
 	* @param _locHilbertSize local Hilbert space size
 	*/
 	template<typename _TV, typename _T>
-	typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
-	schmidt(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, size_t _locHilbertSize = 2)
+	inline typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
+	schmidt(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, size_t _locHilbert = 2)
 	{
-		uint bitNum		= (uint)std::log2(_locHilbertSize);
+		uint bitNum		= (uint)std::log2(_locHilbert);
 		const u64 dA	= ULLPOW(bitNum * _sizeA);
 		const u64 dB	= ULLPOW(bitNum * (_size - _sizeA));
 
@@ -163,7 +184,7 @@ namespace DensityMatrix
 		const _T _maskB = Binary::flipAll(_maskA, _size);
 
 		// create the reduced density matrix
-		arma::Mat<_TV> _psi(dA, dA, arma::fill::zeros);
+		arma::Mat<_TV> _psi(dA, dB, arma::fill::zeros);
 
 		// loop over the state
 		for(u64 _st = 0; _st < _s.size(); ++_st)
@@ -208,6 +229,53 @@ namespace DensityMatrix
 			break;
 		}
 	}
+
+	// ###############################################################
+
+	template <typename _T>
+	inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, uint _sizeA, size_t _Ns, RHO_METHODS _ch = RHO_METHODS::SCHMIDT, uint _locHilbert = 2)
+	{
+		switch (_ch) 
+		{
+		case RHO_METHODS::STANDARD:
+			return arma::Mat<_T>();
+			break;
+		case RHO_METHODS::STANDARD_CAST:
+			return arma::Mat<_T>();
+			break;
+		case RHO_METHODS::SCHMIDT:
+			return schmidt(_s, _sizeA, _Ns, _locHilbert);
+			break;
+		default:
+			return schmidt(_s, _sizeA, _Ns, _locHilbert);
+			break;
+		}
+	}
+
+	// ###############################################################
+
+	template<typename _TV, typename _T>
+	inline typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
+	redDensMat(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, RHO_METHODS _ch = RHO_METHODS::SCHMIDT, size_t _locHilbert = 2)
+	{
+		switch (_ch) 
+		{
+		case RHO_METHODS::STANDARD:
+			return arma::Mat<_TV>();
+			break;
+		case RHO_METHODS::STANDARD_CAST:
+			return arma::Mat<_TV>();
+			break;
+		case RHO_METHODS::SCHMIDT:
+			return schmidt(_s, _sizeA, _size, _maskA, _locHilbert);
+			break;
+		default:
+			return schmidt(_s, _sizeA, _size, _maskA, _locHilbert);
+			break;
+		}
+	}
+	
+	// ###############################################################
 };
 
 #endif

@@ -80,6 +80,8 @@ protected:
 	// ------------------------------------------- CLASS FIELDS ---------------------------------------------
 	u64 avEnIdx											= -1;														
 	double avEn											= 0.0;
+	double minEn										= 0.0;
+	double maxEn										= 0.0;
 	
 	// matrices
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
@@ -114,11 +116,17 @@ public:
 	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2)	const = 0;
 
 	// --------------------------------------------- INITS ----------------------------------------------------
+	virtual auto randomize(double _a,
+							double _s, 
+							const strVec& _which)		-> void										{};
 	auto init()											-> void;
 
 	// -------------------------------------------- GETTERS ---------------------------------------------------
 	auto getDegeneracies()								const -> v_2d<u64>;
+	auto getEnArndAvIdx(long long _l, long long _r)		const -> std::pair<u64, u64>;
+	auto getEnPairsIdx(u64 _mn, u64 _mx, double _tol)	const -> v_1d<std::tuple<double, u64, u64>>;
 	auto getEnAvIdx()									const -> u64								{ return this->avEnIdx;															};								
+	auto getEnAv()										const -> double								{ return this->avEn;															};
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
 	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>			{ return this->hilbertSpace;													};							
@@ -146,7 +154,7 @@ public:
 	auto getTypeI()										const -> uint								{ return this->type_;															};
 	// lattice (if applicable)
 	auto getLat()										const -> std::shared_ptr<Lattice>			{ return this->lat_;															};
-	auto getNs()										const -> uint								{ return this->lat_->get_Ns();													};
+	auto getNs()										const -> uint								{ return this->Ns_;																};
 	auto getBC()										const -> BoundaryConditions					{ return this->lat_->get_BC();													};
 	
 	// ------------------------------------------- SETTERS -----------------------------------------------------
@@ -230,7 +238,8 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, 
 {
 	this->hilbertSpace = hilbert;
 	this->lat_	=	this->hilbertSpace.getLattice();
-	this->Ns	=	this->lat_->get_Ns();
+	this->Ns	=	this->hilbertSpace.getNs();
+	this->Ns_   =	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
 };
 
@@ -349,17 +358,71 @@ template<typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 {
 	// calculates the middle spectrum element
-	double Eav	= arma::mean(this->eigVal_);
+	this->avEn	= arma::mean(this->eigVal_);
+	this->minEn = this->eigVal_(0);
+	this->maxEn = this->eigVal_(this->Nh - 1);
 	u64 Nh		= this->getHilbertSize();
 
 	// calculates the energy difference to find the closest element (the smallest)
 	v_1d<double> tmp(Nh, 0.0);
 	for (int i = 0; i < Nh; i++)
-		tmp[i] = std::abs(this->getEigVal(i) - Eav);
+		tmp[i] = std::abs(this->getEigVal(i) - this->avEn);
 
 	// get the iterator
 	v_1d<double>::iterator _it	= std::min_element(std::begin(tmp), std::end(tmp));
 	this->avEnIdx				= _it - std::begin(tmp);
+}
+
+// ##########################################################################################################################################
+
+/*
+* @brief Calculates the index closest to the average energy in the Hamiltonian. The index is stored in the avEnIdx variable.
+* @param _l number of elements to the left from the average energy
+* @param _r number of elements to the right from the average energy
+* @returns pair of indices of the energy spectrum around the average energy
+*/
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long _l, long long _r) const
+{
+	u64 _min = std::max(0ll, (long long)this->avEnIdx - _l);
+	u64 _max = std::min(this->Nh, this->avEnIdx + _r);
+	return std::make_pair(_min, _max);
+}
+
+// ##########################################################################################################################################
+
+/*
+* @brief Calculates the indices of the energy pairs in the spectrum that are close to each other within the given tolerance
+* @param _mn minimum index of the energy spectrum
+* @param _mx maximum index of the energy spectrum
+* @param _tol tolerance of the energy difference
+* @returns vector of tuples of the energy difference and the indices of the energy spectrum
+*/
+template<typename _T, uint _spinModes>
+inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPairsIdx(u64 _mn, u64 _mx, double _tol) const
+{
+	v_1d<std::tuple<double, u64, u64>> v;
+
+	// rescale by the spectrum total width
+	_tol *= (this->maxEn - this->minEn);
+	std::function<bool(double, double)> _cmp = [&](double a, double b) 
+		{ 
+			return std::abs(a - b) < _tol; 
+		};
+	// go through the whole spectrum
+	for (u64 i = _mn; i < _mx; ++i)
+	{
+		for (u64 j = i + 1; j < _mx; ++j)
+		{
+			// check the energy difference
+			if (_cmp(this->eigVal_(j), this->eigVal_(i)))
+				v.push_back(std::make_tuple(std::abs(this->eigVal_(j) - this->eigVal_(i)) / (this->maxEn - this->minEn), j, i));
+		}
+	}
+
+	// sort the omegas, cause why not
+	Containers::sort<0>(v, [](const auto& a, const auto& b) { return a < b; });
+	return v;
 }
 
 // ##########################################################################################################################################

@@ -16,13 +16,69 @@
 
 namespace Operators 
 {
+	// ##########################################################################################################################################
+
 	constexpr double _SPIN			=		0.5;
 	constexpr double _SPIN_RBM		=		_SPIN;
 
 	// ##########################################################################################################################################
 
+	/*
+	* @brief Applies the many body matrix to a given state O|\Psi>
+	* @param _C many body state
+	* @param _M many body matrix
+	*/
+	template<typename _Ct, typename _M>
+	inline _Ct apply(const _Ct& _C, const _M& _mat)
+	{
+		return _mat * _C;
+	}
+
+	/*
+	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
+	* @param _C many body state
+	* @param _M many body matrix
+	* @returns the overlap <\Psi|O|\Psi>
+	*/
+	template<typename _Ct, typename _M>
+	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const _M& _mat)
+	{
+		return arma::cdot(_C, _mat * _C);
+	}
+
+	/*
+	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
+	* @param _Cleft many body state
+	* @param _Cright many body state
+	* @param _M many body matrix
+	* @returns the overlap <\Psi|O|\Psi>
+	*/
+	template <typename _Ct, typename _M>
+	inline inner_type_t<_Ct> applyOverlap(const _Ct& _Cleft, const _Ct& _Cright, const _M& _mat)
+	{
+		return arma::cdot(_Cleft, _mat * _Cright);
+	}
+
+
+	// ##########################################################################################################################################
+
+	namespace SpinOperators
+	{
+		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		Operators::Operator<double> sig_x(size_t _Ns, size_t _part);
+		Operators::Operator<double> sig_x(size_t _Ns, const v_1d<uint>& sites);
+		Operators::Operator<double> sig_x(size_t _Ns);
+
+		std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		Operators::Operator<double> sig_z(size_t _Ns, size_t _part);
+		Operators::Operator<double> sig_z(size_t _Ns, const v_1d<uint>& sites);
+		Operators::Operator<double> sig_z(size_t _Ns);
+	}
+
+	// ##########################################################################################################################################
+
 	std::pair<u64, double> sigma_x(u64 base_vec, int L, const v_1d<uint>& sites);
-	Operators::Operator<double> makeSigmaX(std::shared_ptr<Lattice> lat, uint site); 
+	Operators::Operator<double> makeSigmaX(std::shared_ptr<Lattice> lat, uint site);
 
 	std::pair<u64, cpx> sigma_y(u64 base_vec, int L, const v_1d<uint>& sites);
 	Operators::Operator<cpx> makeSigmaY(std::shared_ptr<Lattice> lat, uint site);

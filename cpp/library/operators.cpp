@@ -1,9 +1,203 @@
 #include "./include/algebra/operators.h"
 
+namespace Operators
+{
+
+	// ##############################################################################################################################
+
+	// ######################################################### S P I N S ##########################################################
+
+	// ##############################################################################################################################
+	
+	namespace SpinOperators
+	{
+		// ############################################################################################# 
+
+		/*
+		* @brief multiplication of sigma_xi | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			for (auto const& site : sites)
+				base_vec = flip(base_vec, _Ns - 1 - site);
+			return std::make_pair(base_vec, Operators::_SPIN);
+		}
+
+		/*
+		* @brief multiplication of sigma_xi | state > - local
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param _part the site to meassure correlation at
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_x(size_t _Ns, size_t _part)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, _part](u64 state) { return sig_x(state, _Ns, { (uint)_part }); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			u64 _acts = 0;
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+			_acts |= 1 << (_Ns - 1 - _part);
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		/*
+		* @brief multiplication of sigma_xi | state > - correlation
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_x(size_t _Ns, const v_1d<uint>& sites)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, sites](u64 state) { return sig_x(state, _Ns, sites); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			u64 _acts = 0;
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+			for(auto _part : sites)
+				_acts |= 1 << (_Ns - 1 - _part);
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		/*
+		* @brief multiplication of sigma_xi | state > - correlation - global
+		* @param _Ns lattice dimensionality (base vector length)
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_x(size_t _Ns)
+		{
+			// set the vector of sites
+			v_1d<uint> _sites		= Vectors::vecAtoB<uint>(_Ns);
+			// create the function
+			_OP<double>::GLB fun_	= [_Ns, _sites](u64 state) { return sig_x(state, _Ns, _sites); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+
+			// take all of them!
+			u64 _acts				= (ULLPOW(_Ns)) - 1;
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		// ############################################################################################# 
+
+		/*
+		* @brief multiplication of sigma_zi | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			auto _val = 1.0;
+			for (auto const& site : sites)
+				_val *= Binary::check(base_vec, _Ns - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
+			return std::make_pair(base_vec, _val);
+		}
+
+		/*
+		* @brief multiplication of sigma_zi | state > - local
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param _part the site to meassure correlation at
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_z(size_t _Ns, size_t _part)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, _part](u64 state) { return sig_z(state, _Ns, { (uint)_part }); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			u64 _acts = 0;
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+			_acts |= 1 << (_Ns - 1 - _part);
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		/*
+		* @brief multiplication of sigma_zi | state > - correlation
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_z(size_t _Ns, const v_1d<uint>& sites)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, sites](u64 state) { return sig_z(state, _Ns, sites); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			u64 _acts = 0;
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+			for(auto _part : sites)
+				_acts |= 1 << (_Ns - 1 - _part);
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		/*
+		* @brief multiplication of sigma_zi | state > - correlation - global
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at
+		* @returns the operator acting on the _part site
+		*/
+		Operators::Operator<double> sig_z(size_t _Ns)
+		{
+			// set the vector of sites
+			v_1d<uint> _sites		= Vectors::vecAtoB<uint>(_Ns);
+			// create the function
+			_OP<double>::GLB fun_	= [_Ns, _sites](u64 state) { return sig_z(state, _Ns, _sites); };
+
+			// save on which elements the operator acts (for the sake of the correctness)
+			// |set the bitmask on the state, remember that this is counted from the left|
+			// the first position is leftwise 0, the last is leftwise Ns - 1
+
+			// take all of them!
+			u64 _acts				= (ULLPOW(_Ns)) - 1;
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			_op.setActOn(_acts);
+			return _op;
+		}
+
+		// ############################################################################################# 
+
+	}
+}
+
 // ##############################################################################################################################
-// ##############################################################################################################################
+
 // ######################################################### S P I N S ##########################################################
-// ##############################################################################################################################
+
 // ##############################################################################################################################
 
 /*
@@ -50,9 +244,12 @@ Operators::Operator<cpx> Operators::makeSigmaY(std::shared_ptr<Lattice> lat, uin
 }
 
 // ##############################################################################################################################
+
+
 // ##############################################################################################################################
+
 // ###################################################### F E R M I O N S #######################################################
-// ##############################################################################################################################
+
 // ##############################################################################################################################
 
 /*

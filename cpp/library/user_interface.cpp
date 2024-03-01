@@ -90,7 +90,6 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(nqsP,	nSBlocks,	"nbS"	);
 		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
-
 	// ----------------- LATTICE -----------------
 	{
 		SETOPTIONV(latP,	typ,	"l"	);
@@ -103,15 +102,18 @@ void UI::parseModel(int argc, cmdArg& argv)
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
 		Ns *= 2;
-
 	// ------------------ MODEL ------------------
 	{
 		// model type
 		SETOPTIONV(modP, modTyp, "mod");
+		SETOPTION(modP, modRanN);
+		SETOPTION(modP, modRanSeed);
+		SETOPTION(modP, modMidStates);
+		SETOPTION(modP, modEnDiff);
 
 		// ---- quadratic ----
 		{
-			SETOPTIONV(modP, modTypQ, "modQ");
+			SETOPTIONV(modP, modTypQ,			"modQ");
 			SETOPTIONV(modP, q_manybody,		"q_mb");
 			SETOPTIONV(modP, q_manifold,		"q_man");
 			SETOPTIONV(modP, q_gamma,			"q_gamma");
@@ -163,18 +165,18 @@ void UI::parseModel(int argc, cmdArg& argv)
 			}
 			// ------ QSM ---------
 			{
-				SETOPTION(modP, qsm_gamma);
-				SETOPTION(modP, qsm_g0);
-				SETOPTION(modP, qsm_Ntot);
-				SETOPTION(modP, qsm_N);
+				SETOPTION(modP.qsm, qsm_gamma);
+				SETOPTION(modP.qsm, qsm_g0);
+				SETOPTION(modP.qsm, qsm_Ntot);
+				SETOPTION(modP.qsm, qsm_N);
 
 				// resize
-				this->modP.resizeQSM();
+				this->modP.qsm.resizeQSM();
 				
 				// set
-				SETOPTION(modP, qsm_alpha);
-				SETOPTION(modP, qsm_xi);
-				SETOPTION(modP, qsm_h);
+				SETOPTIONVECTOR(modP.qsm, qsm_alpha);
+				SETOPTIONVECTOR(modP.qsm, qsm_xi);
+				SETOPTIONVECTOR(modP.qsm, qsm_h);
 			}
 		}
 	}
@@ -262,6 +264,12 @@ void UI::funChoice()
 			LOGINFO("SIMULATION: QUADRATIC HAMILTONIAN - STATES MIXING", LOG_TYPES::CHOICE, 1);;
 			this->makeSymQuadraticManifold();
 			break;
+			// ----------------------------------- ETH ---------------------------------
+		case 40:
+			// this option utilizes the Hamiltonian for ETH
+			LOGINFO("SIMULATION: HAMILTONIAN - ETH", LOG_TYPES::CHOICE, 1);
+			this->makeSimETH();
+			break;
 		default:
 			// default case of showing the help
 			this->exitWithHelp();
@@ -305,19 +313,34 @@ bool UI::defineLattice()
 /*
 * @brief defines the models based on the input parameters - interacting
 */
-bool UI::defineModels(bool _createLat) {
-
+bool UI::defineModels(bool _createLat, bool _checkSyms, bool _useHilbert) 
+{
+	// create lattice if not created
 	if (_createLat && !this->latP.lat)
 		this->defineLattice();
 
-	this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
+	if(_checkSyms)
+		this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
+
+	// go complex if needed
 	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
+	
 	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
 	
-	if (_takeComplex)
-		return this->defineModel(this->hilComplex, this->hamComplex);
+	if (_useHilbert)
+	{
+		if (_takeComplex)
+			return this->defineModel(this->hilComplex, this->hamComplex);
+		else
+			return this->defineModel(this->hilDouble, this->hamDouble);
+	}
 	else
-		return this->defineModel(this->hilDouble, this->hamDouble);
+	{
+		if (_takeComplex)
+			return this->defineModel(this->hamComplex);
+		else
+			return this->defineModel(this->hamDouble);
+	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -590,6 +613,19 @@ void UI::makeSymQuadraticManifold()
 	this->useComplex_ = true;
 	if (this->defineModelsQ(true))
 		this->quadraticStatesManifold<cpx>(this->qhamComplex);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+void UI::makeSimETH()
+{
+	// define the models
+	this->resetEd();
+	// force complex Hamiltonian
+	this->useComplex_ = false;
+	// simulate
+	if (this->defineModels(false, false, false))
+		this->checkETH(this->hamDouble);
 }
 
 // ------------------------------------------------

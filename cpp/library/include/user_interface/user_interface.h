@@ -89,6 +89,13 @@
 #endif													 // #
 // ##########################################################
 
+// ##################### STATISTICAL ########################
+#ifndef STATISTICS_H									 // #
+#include "../quantities/statistics.h"					 // #
+#endif													 // #
+#include "../algebra/quantities/measure.h"				 // #
+// ##########################################################
+
 // ###################### LIMITS ############################
 
 #define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
@@ -125,20 +132,29 @@ namespace UI_PARAMS
 	*/
 	struct ModP 
 	{
-		// ############### TYPE ################
-		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
+		// ################################## TYPE ##################################
 		
-		// #####################################
-		// ####### I N T E R A C T I N G #######
-		// #####################################
+		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
+		UI_PARAM_CREATE_DEFAULT(modRanN, uint, 1);			// number of random states
+		UI_PARAM_CREATE_DEFAULT(modRanSeed, u64, 0);		// seed for the random number generator
+		UI_PARAM_CREATE_DEFAULTD(modMidStates, double, 1.0);// states in the middle of the spectrum
+		UI_PARAM_CREATE_DEFAULTD(modEnDiff, double, 1.0);	// tolerance for the energy difference of the states in offdiagonal
+
+		// ##########################################################################
+		
+		// ########################## I N T E R A C T I N G #########################
+		
+		// ##########################################################################
 
 		// ############## ISING ################
-		UI_PARAM_STEP(double, J1, 1.0);								// spin exchange
-		UI_PARAM_STEP(double, hz, 1.0);								// perpendicular field
-		UI_PARAM_STEP(double, hx, 1.0);								// transverse field
+		
+		UI_PARAM_STEP(double, J1, 1.0);			// spin exchange
+		UI_PARAM_STEP(double, hz, 1.0);			// perpendicular field
+		UI_PARAM_STEP(double, hx, 1.0);			// transverse field
 
 		// ############### XYZ #################		
-		UI_PARAM_STEP(double, J2, 2.0);								// next nearest neighbors exchange
+		
+		UI_PARAM_STEP(double, J2, 2.0);			// next nearest neighbors exchange
 		UI_PARAM_STEP(double, eta1, 0.5);
 		UI_PARAM_STEP(double, eta2, 0.5);
 		UI_PARAM_STEP(double, dlt1, 0.3);
@@ -172,20 +188,29 @@ namespace UI_PARAMS
 
 		// ############### QSM #################
 
-		UI_PARAM_CREATE_DEFAULTD(qsm_N, size_t, 1);
-		UI_PARAM_CREATE_DEFAULTD(qsm_Ntot, size_t, 1);
-		UI_PARAM_CREATE_DEFAULTD(qsm_gamma, double, 1.0);
-		UI_PARAM_CREATE_DEFAULTD(qsm_g0, double, 1.0);
-		v_1d<double> qsm_alpha_;
-		v_1d<double> qsm_xi_;
-		v_1d<double> qsm_h_;
-
-		void resizeQSM()
+		struct
 		{
-			this->qsm_alpha_.resize(this->qsm_N_);
-			this->qsm_xi_.resize(this->qsm_N_);
-			this->qsm_h_.resize(this->qsm_N_);
-		};
+			UI_PARAM_CREATE_DEFAULTD(qsm_N, size_t, 1);
+			UI_PARAM_CREATE_DEFAULTD(qsm_Ntot, size_t, 1);
+			UI_PARAM_CREATE_DEFAULTD(qsm_gamma, double, 1.0);
+			UI_PARAM_CREATE_DEFAULTD(qsm_g0, double, 1.0);
+
+			UI_PARAM_CREATE_DEFAULTV(qsm_alpha, double);
+			UI_PARAM_CREATE_DEFAULTV(qsm_xi, double);
+			UI_PARAM_CREATE_DEFAULTV(qsm_h, double);
+			void resizeQSM()
+			{
+				auto _N = this->qsm_Ntot_ - this->qsm_N_;
+				if (_N < 0)
+					return;
+				this->qsm_alpha_r_ = 0;
+				this->qsm_alpha_.resize(this->qsm_Ntot_ - this->qsm_N_);
+				this->qsm_xi_r_ = 0;
+				this->qsm_xi_.resize(this->qsm_Ntot_ - this->qsm_N_);
+				this->qsm_h_r_ = 0;
+				this->qsm_h_.resize(this->qsm_Ntot_ - this->qsm_N_);
+			};
+		} qsm;
 
 		// #####################################
 		// ######### Q U A D R A T I C #########
@@ -239,13 +264,13 @@ namespace UI_PARAMS
 				}
 				// QSM
 				{
-					UI_PARAM_SET_DEFAULT(qsm_gamma);
-					UI_PARAM_SET_DEFAULT(qsm_g0);
-					UI_PARAM_SET_DEFAULT(qsm_Ntot);
-					UI_PARAM_SET_DEFAULT(qsm_N);
-					this->qsm_alpha_	= v_1d<double>(1, 1.0);
-					this->qsm_xi_		= v_1d<double>(1, 1.0);
-					this->qsm_h_		= v_1d<double>(1, 1.0);
+					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_gamma);
+					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_g0);
+					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_Ntot);
+					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_N);
+					this->qsm.qsm_alpha_	= v_1d<double>(1, 1.0);
+					this->qsm.qsm_xi_		= v_1d<double>(1, 1.0);
+					this->qsm.qsm_h_		= v_1d<double>(1, 1.0);
 				}
 			}
 
@@ -398,7 +423,8 @@ namespace UI_PARAMS
 /*
 * @brief User interface class for the QES
 */
-class UI : public UserInterface {
+class UI : public UserInterface 
+{
 
 protected:
 
@@ -472,7 +498,7 @@ private:
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineLattice();
-	bool defineModels(bool _createLat = true);
+	bool defineModels(bool _createLat = true, bool _checkSyms = true, bool _useHilbert = true);
 	bool defineModelsQ(bool _createLat = true);
 
 	template<typename _T>
@@ -480,19 +506,20 @@ private:
 	template<typename _T>
 	bool defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H);
 	template<typename _T>
+	bool defineModel(std::shared_ptr<Hamiltonian<_T>>& _H);
+	template<typename _T>
 	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H);
 	template<typename _T, uint _spinModes = 2>
 	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 public:
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% C O N S T R U C T O R S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	~UI()		= default;
 	UI()		= default;
-	UI(int argc, char** argv)				{ this->setDefaultMap(); this->init(argc, argv); };
+	UI(int argc, char** argv);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% P A R S E R  F O R   H E L P %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
@@ -527,7 +554,19 @@ public:
 
 	void makeSymQuadraticManifold();
 
+	// ############################################### E T H
+
+	void makeSimETH();
+
 };
+
+// ##########################################################################################################################################
+
+inline UI::UI(int argc, char** argv)
+{
+	this->setDefaultMap(); 
+	this->init(argc, argv);
+}
 
 // ##########################################################################################################################################
 
@@ -565,7 +604,7 @@ inline void UI::setDefaultMap()
 		UI_OTHER_MAP(lz		, this->latP._Lz			, FHANDLE_PARAM_HIGHER0),
 		
 		// ----------------- model parameters -----------------			
-		UI_OTHER_MAP(mod		, this->modP._modTyp, FHANDLE_PARAM_BETWEEN(0., 2.)),
+		UI_OTHER_MAP(mod		, this->modP._modTyp, FHANDLE_PARAM_BETWEEN(0., 10.)),
 		// -------- ising
 		UI_PARAM_MAP(J1			, this->modP._J1		, FHANDLE_PARAM_DEFAULT),
 		UI_PARAM_MAP(hx			, this->modP._hx		, FHANDLE_PARAM_DEFAULT),
@@ -657,8 +696,50 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
 	case MY_MODELS::QSM_M:
-		_H = std::make_shared<QSM<_T>>(std::move(_Hil), this->modP.qsm_N_, this->modP.qsm_gamma_, this->modP.qsm_g0_,
-			this->modP.qsm_alpha_, this->modP.qsm_h_, this->modP.qsm_xi_);
+		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		break;
+	default:
+		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+			false);
+		break;
+	}
+	return true;
+}
+
+template<typename _T>
+inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H)
+{
+	Hilbert::HilbertSpace<_T> _Hil(this->modP.qsm.qsm_Ntot_);
+	// switch the model types
+	switch (this->modP.modTyp_)
+	{
+	case MY_MODELS::ISING_M:
+		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
+		break;
+	case MY_MODELS::XYZ_M:
+		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+			false);
+		break;
+	case MY_MODELS::HEI_KIT_M:
+		_H = std::make_shared<HeisenbergKitaev<_T>>(std::move(_Hil), 
+			this->modP.Kx_, this->modP.Ky_, this->modP.Kz_,
+			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
+		break;
+	case MY_MODELS::QSM_M:
+		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
@@ -1538,7 +1619,6 @@ inline void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 
 // ##########################################################################################################################################
 
-
 template<typename _T>
 inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 {
@@ -1768,5 +1848,179 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 template<typename _T>
 inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 {
+	_timer.reset();
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
+	// check the random field
+	auto _rH	= this->modP.qsm.qsm_h_r_;
+	auto _rA	= this->modP.qsm.qsm_h_ra_;
+	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
+	u64 _Nh		= ULLPOW(_Ns);
+	// stats in the middle number (diagonal part)
+	size_t _Dt	= this->modP.modMidStates_ >= 1.0 ? u64(this->modP.modMidStates_) : u64(_Nh * this->modP.modMidStates_);
+	
+	// get info
+	std::string modelInfo	=	_H->getInfo();
+	std::string randomStr   =   FileParser::appWRandom("", _H->ran_);
+	std::string dir			=	makeDirsC(this->mainDir, modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string extension   =   ".h5";
+	// set seed
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
+	// set the placeholder for the values to save
+	arma::Col<double> _gaps(this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _entr(_Dt, this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _en(_Dt, this->modP.modRanN_, arma::fill::zeros);
+
+	// choose the random position inside the dot for the correlation
+	uint _pos	= this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
+
+	// create the operators
+	auto _sx	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
+	auto _sxc	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
+	auto _sz	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
+	auto _szc	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
+
+	// create the matrices
+	v_1d<Operators::Operator<_T>> _ops = { _sx, _sxc, _sz, _szc };
+	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops);
+	_measure.initializeMatrices(_Nh);
+
+	// to save the operators (those elements will be stored for each operator separately)
+	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
+	// the n'th row in the column will be the state index
+	// the columns corresponds to realizations of disorder
+	v_1d<arma::Mat<_T>> _diagElems(_ops.size(), arma::Mat<_T>(_Dt, this->modP.modRanN_, arma::fill::zeros));
+	// go through realizations
+	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
+	{
+		_timer.checkpoint(STR(_r));
+
+		// -----------------------------------------------------------------------------
+		
+		LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
+		_H->randomize(this->modP.qsm.qsm_h_ra_, _rH, {"h"});
+		_H->clearH();
+
+		// -----------------------------------------------------------------------------
+
+		// set the Hamiltonian
+		_H->buildHamiltonian();
+		_H->diagH(false);
+		LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
+
+		// -----------------------------------------------------------------------------
+		
+		{
+			// save the Hamiltonian for small systems
+			if (_r == 0 && _H->getNs() <= 6)
+				arma::Mat<_T>(_H->getHamiltonian()).save(arma::hdf5_name(dir + "H.h5", "H"));
+		}
+		
+		// -----------------------------------------------------------------------------
+				
+		// get the average energy index and the points around it on the diagonal
+		const auto [_minIdxDiag, _maxIdxDiag] = _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
+		const auto _offdiagPairs = _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
+
+		// save the energies
+		{
+			for(u64 i = _minIdxDiag; i < _maxIdxDiag; ++i)
+				_en(i - _minIdxDiag, _r) = _H->getEigVal(i);
+		}
+
+		// -----------------------------------------------------------------------------
+		
+		// save the offdiagonal elements
+		// this will be stored as a matrix with the following structure:
+		// the 0 column will be the energy difference
+		// the 1 column will be the left state index
+		// the 2 column will be the right state index
+		// the 3 column will be the matrix element
+		// in the vector we store different operators
+		v_1d<arma::Mat<_T>> _offDiag(_ops.size(), arma::Mat<_T>(_offdiagPairs.size(), 4, arma::fill::zeros));
+
+		// -----------------------------------------------------------------------------
+		
+		// calculator
+		{
+			// -----------------------------------------------------------------------------
+			
+			// calculate the eigenlevel statistics
+			_gaps(_r) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
+			LOGINFO(StrParser::colorize(VEQ(_gaps(_r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+			LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
+			
+			// -----------------------------------------------------------------------------
+			
+			// other measures
+			{
+#pragma omp parallel for num_threads(this->threadNum)
+				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				{
+					// calculate the entanglement entropy
+					_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), (uint)1, _Ns, (uint)1);
+				}
+			}
+
+			// -----------------------------------------------------------------------------
+			
+			// diagonal
+			{
+				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				{
+					// calculate the diagonal elements
+					_measure.measure(_H->getEigVec(_start));
+					const auto& _measured = _measure.getValG();
+
+					// save the diagonal elements
+					for (uint i = 0; i < _measured.size(); ++i)
+					{
+						_diagElems[i](_start - _minIdxDiag, _r) = _measured[i];
+					}
+				}
+			}
+
+			// -----------------------------------------------------------------------------
+			
+			// offdiagonal
+			{
+				for (uint _start = 0; _start < _offdiagPairs.size(); ++_start)
+				{
+					const auto& [w, high, low] = _offdiagPairs[_start];
+					_measure.measure(_H->getEigVec(high), _H->getEigVec(low));
+					const auto& _measured = _measure.getValG();
+
+					// save the off-diagonal elements
+					for (uint i = 0; i < _measured.size(); ++i)
+					{
+						_offDiag[i](_start, 0) = w;
+						_offDiag[i](_start, 1) = high;
+						_offDiag[i](_start, 2) = low;
+						_offDiag[i](_start, 3) = _measured[i];
+					}
+				}
+				// save the offdiagonal
+				saveAlgebraic(dir, "offdiag_sx_l" + randomStr + "_" + STR(_r) + extension, _offDiag[0]);
+				saveAlgebraic(dir, "offdiag_sx_c" + randomStr + "_" + STR(_r) + extension, _offDiag[1]);
+				saveAlgebraic(dir, "offdiag_sz_l" + randomStr + "_" + STR(_r) + extension, _offDiag[2]);
+				saveAlgebraic(dir, "offdiag_sz_c" + randomStr + "_" + STR(_r) + extension, _offDiag[3]);
+			}
+		}
+		
+		// -----------------------------------------------------------------------------
+	}
+
+	// save the matrices
+	saveAlgebraic(dir, "gap_ratio" + randomStr + extension, _gaps);
+	saveAlgebraic(dir, "entro" + randomStr + extension, _entr);
+	saveAlgebraic(dir, "en" + randomStr + extension, _en);
+
+	// diagonal elements
+	saveAlgebraic(dir, "diag_sx_l" + randomStr + extension, _diagElems[0]);
+	saveAlgebraic(dir, "diag_sx_c" + randomStr + extension, _diagElems[1]);
+	saveAlgebraic(dir, "diag_sz_l" + randomStr + extension, _diagElems[2]);
+	saveAlgebraic(dir, "diag_sz_c" + randomStr + extension, _diagElems[3]);
+
+	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }

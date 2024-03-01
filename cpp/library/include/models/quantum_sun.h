@@ -2,6 +2,7 @@
 /***********************************
 * Is an instance of the QSM model.
 * Derives from a general Hamiltonian.
+* For more information see the QSM model.
 * https://arxiv.org/pdf/2308.07431.pdf
 ************************************/
 
@@ -38,6 +39,12 @@ protected:
 	void initializeParticles();
 
 public:
+	void setRandomXi(double _around, double _strength)			{ this->xi_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
+	void setRandomAlpha(double _around, double _strength)		{ this->a_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
+	void setRandomMagnetic(double _around, double _strength)	{ this->h_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
+	void setRandomHDot()										{ this->Hdot_ = this->ran_.template GOE<_T>(this->dimIn_); this->Hdot_ = this->gamma_ / sqrt(this->dimIn_ + 1) * this->Hdot_; };
+	void randomize(double _a, double _s, const strVec& _which)	override final;
+public:
 	~QSM() override;
 	QSM(const size_t _Nall);
 	QSM(const size_t _Nall,
@@ -73,10 +80,10 @@ public:
 		uint _site)								override final;
 	cpx locEnergy(u64 _id,
 		uint site,
-		NQSFun f1)								override final { return 0; }
+		NQSFun f1)								override final		{ return 0; }
 	cpx locEnergy(const DCOL& v,
 		uint site,
-		NQSFun f1)								override final { return 0; }
+		NQSFun f1)								override final		{ return 0; }
 
 	// ############################################ Info #############################################
 
@@ -93,12 +100,25 @@ public:
 
 // ##########################################################################################################################################
 
+/*
+* @brief Destructor of the QSM model.
+*/
 template<typename _T>
 inline QSM<_T>::~QSM()
 {
 	DESTRUCTOR_CALL;
 }
 
+// ##########################################################################################################################################
+
+/*
+* @brief Checks the sizes of the vectors of the QSM model. It checks if the number of particles in the dot is larger than the number of particles in the system.
+* It also checks if the sizes of the coupling vector 'a', the random box distribution vector 'xi' and the magnetic field vector 'h' are equal to the number of particles outside the dot.
+* @throws std::invalid_argument if the number of particles in the dot is larger than the number of particles in the system.
+* @throws std::invalid_argument if the size of the coupling vector 'a' is not equal to the number of particles outside the dot.
+* @throws std::invalid_argument if the size of the random box distribution vector 'xi' is not equal to the number of particles outside the dot.
+* @throws std::invalid_argument if the size of the magnetic field vector 'h' is not equal to the number of particles outside the dot.
+*/
 template<typename _T>
 inline void QSM<_T>::checkSizes()
 {
@@ -118,19 +138,39 @@ inline void QSM<_T>::checkSizes()
 
 }
 
+// ##########################################################################################################################################
+
+/*
+* @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
+*/
 template<typename _T>
 inline QSM<_T>::QSM(const size_t _Nall)
 	: Hamiltonian<_T, 2>(_Nall)
 {
 	CONSTRUCTOR_CALL;
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
 }
 
+// ##########################################################################################################################################
+
+/*
+* @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
+*/
 template<typename _T>
 inline QSM<_T>::QSM(const size_t _Nall, const size_t _N, 
 	const double _gamma, const double _g0, 
 	const v_1d<double>& _a, const v_1d<double>& _h, const v_1d<double>& _xi)
-	: QSM(_Nall), Nin_(_N), gamma_(_gamma), g0_(_g0), a_(_a), h_(_h), xi_(_xi)
+	: QSM(_Nall)
 {	
+	this->Nin_		= _N;
+	this->gamma_	= _gamma;
+	this->g0_		= _g0;
+	this->a_		= _a;
+	this->h_		= _h;
+	this->xi_		= _xi;
+
 	// we will keep the particles from the dot at the beginning of the vectors
 	// remember that this Hamiltonian is zero-dimensional, so we don't need to worry about the order of the particles
 
@@ -142,6 +182,21 @@ inline QSM<_T>::QSM(const size_t _Nall, const size_t _N,
 
 // ##########################################################################################################################################
 
+/*
+* @brief Constructor of the QSM model. It takes the Hilbert space and the parameters of the QSM model.
+* @param _hil: the Hilbert space of the QSM model.
+* @param _N: the number of particles within the dot.
+* @param _gamma: the Hilbert-Schmidt norm of the coupling operator normalizer.
+* @param _g0: the coupling strength between the dot and outside world.
+* @param _a: the coupling between the dot and outside world.
+* @param _h: the internal dot magnetic field.
+* @param _xi: the random box distribution couplings.
+* @note The Hilbert space is used to initialize the Hamiltonian.
+* @note The number of particles within the dot is used to initialize the particles outside the dot.
+* @note The parameters of the QSM model are used to initialize the Hamiltonian.
+* @note The random Hamiltonian for the dot is initialized automatically.
+* @note The random neighbors and distances for the particles outside the dot are initialized automatically
+*/
 template<typename _T>
 inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>& _hil, const size_t _N, 
 	const double _gamma, const double _g0, 
@@ -155,8 +210,30 @@ inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>& _hil, const size_t _N,
 	this->checkSizes();
 
 	this->initializeParticles();
+
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
 }
 
+// ##########################################################################################################################################
+
+/*
+* @brief Constructor of the QSM model. It takes the Hilbert space and moves it along with
+* the parameters of the QSM model.
+* @param _hil: the Hilbert space of the QSM model.
+* @param _N: the number of particles within the dot.
+* @param _gamma: the Hilbert-Schmidt norm of the coupling operator normalizer.
+* @param _g0: the coupling strength between the dot and outside world.
+* @param _a: the coupling between the dot and outside world.
+* @param _h: the internal dot magnetic field.
+* @param _xi: the random box distribution couplings.
+* @note The Hilbert space is used to initialize the Hamiltonian.
+* @note The number of particles within the dot is used to initialize the particles outside the dot.
+* @note The parameters of the QSM model are used to initialize the Hamiltonian.
+* @note The random Hamiltonian for the dot is initialized automatically.
+* @note The random neighbors and distances for the particles outside the dot are initialized automatically
+*/
 template<typename _T>
 inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>&& _hil, const size_t _N, 
 	const double _gamma, const double _g0,
@@ -170,13 +247,46 @@ inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>&& _hil, const size_t _N,
 	this->checkSizes();
 
 	this->initializeParticles();
+
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
 }
+
 // ##########################################################################################################################################
 
 // ############################################################### I N I T S ################################################################
 
 // ##########################################################################################################################################
 
+/*
+* @brief Randomizes the parameters of the QSM model. The parameters that can be randomized are: 
+* alpha [alpha], magnetic field [h], distance random limits [xi] and the random dot GOE distribution [dot].
+* The latter is done automatically and does not need to be specified.
+* @param _around: the mean value of the random distribution.
+* @param _str: the strength of the random distribution.
+* @param _which: the parameters to randomize.
+*/
+template<typename _T>
+inline void QSM<_T>::randomize(double _around, double _str, const strVec& _which)
+{
+	if(std::find(_which.begin(), _which.end(), "alpha") != _which.end())
+		this->setRandomAlpha(_around, _str);
+	if(std::find(_which.begin(), _which.end(), "h") != _which.end())
+		this->setRandomMagnetic(_around, _str);
+	if(std::find(_which.begin(), _which.end(), "xi") != _which.end())
+		this->setRandomXi(_around, _str);
+	// initialize the random Hamiltonian for the dot
+	// this includes initializing the random neighbors and distances for the particles outside the dot
+	this->initializeParticles();
+}
+
+// ##########################################################################################################################################
+
+/*
+* @brief Initializes the particles outside the dot. It also initializes the random neighbors and distances for the particles outside the dot.
+* @note The random neighbors are used to create the spin-flip interaction between the dot and the outside world.
+*/
 template<typename _T>
 inline void QSM<_T>::initializeParticles()
 {
@@ -212,6 +322,13 @@ inline void QSM<_T>::initializeParticles()
 
 // ##########################################################################################################################################
 
+/*
+* @brief Returns the information about the QSM model.
+* @param skip: the parameters to skip.
+* @param sep: the separator between the parameters.
+* @param prec: the precision of the output.
+* @returns the information about the QSM model.
+*/
 template<typename _T>
 inline std::string QSM<_T>::info(const strVec & skip, std::string sep, int prec) const
 {
@@ -220,12 +337,15 @@ inline std::string QSM<_T>::info(const strVec & skip, std::string sep, int prec)
 	bool _different_xi		= !std::equal(this->xi_.begin() + 1, this->xi_.end(), this->xi_.begin());
 
 	std::string name		= sep + "qsm,Ns=" + STR(this->Ns);
-	name += "," +	VEQV(N, Nin_);
-	name +=	"," +	VEQV(gamm, gamma_);
-	name += "," +	VEQV(g0, g0_);
-	name += "," +	(_different_alpha	? "alpha=r"	:	VEQVP(alpha, a_[0], 3));
-	name += "," +	(_different_h		? "h=r"		:	VEQVP(h, h_[0], 3));
-	name += "," +	(_different_xi		? "xi=r"	:	VEQVP(xi, xi_[0], 3));
+	name += sep +	VEQV(N, Nin_);
+	name +=	sep +	VEQV(gamm, gamma_);
+	name += sep +	VEQV(g0, g0_);
+	if(std::find(skip.begin(), skip.end(), "alpha") == skip.end())
+		name += sep +	(_different_alpha	? "alpha=r"	:	VEQVP(alpha, a_[0], 3));
+	if(std::find(skip.begin(), skip.end(), "h") == skip.end())
+		name += sep +	(_different_h		? "h=r"		:	VEQVP(h, h_[0], 3));
+	if(std::find(skip.begin(), skip.end(), "xi") == skip.end())
+		name += sep +	(_different_xi		? "xi=r"	:	VEQVP(xi, xi_[0], 3));
 
 	name += this->hilbertSpace.getSymInfo();
 	return this->Hamiltonian<_T>::info(name, skip, sep);
@@ -270,6 +390,15 @@ inline void QSM<_T>::hamiltonian()
 	this->H_ += arma::kron(this->Hdot_, EYE(this->dimOut_));
 }
 
+// ##########################################################################################################################################
+
+/*
+* @brief Calculates the local energy of the QSM model. The local energy is calculated for a specific particle at a specific site.
+* @param _elemId: the index of the element in the Hilbert space.
+* @param _elem: the element in the Hilbert space (considered when there are symmetries)
+* @param _site: the site of the particle (or the position in the vector)
+* @note The local energy is calculated in the following way:
+*/
 template<typename _T>
 inline void QSM<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
@@ -280,17 +409,17 @@ inline void QSM<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	size_t _partIdx					= _site - this->Nin_;
 
 	// check the spin of the particle
-	auto [_idx, _val]				= Operators::sigma_x(_elem, this->Ns_, {_site});
+	auto [_idx, _val]				= Operators::sigma_z<_T>(_elem, this->Ns_, { _site });
 
 	// apply magnetic field to the particle (THIRD TERM)
-	this->setHElem(_idx, _elemId, this->h_[_partIdx] * _val);
+	this->setHElem(_elemId, this->h_[_partIdx] * _val, _idx);
 
 	// apply the spin-flip interaction with the dot
-	int _n							= this->n_[_partIdx];
+	uint _n							= this->n_[_partIdx];
 	auto [_idx1, Sx_n]				= Operators::sigma_x(_elem, this->Ns_, {_n});
 	auto [_idx2, Sx_j]				= Operators::sigma_x(_idx1, this->Ns_, {_site});
 	// apply the coupling to the particle (SECOND TERM)
-	this->setHElem(_idx2, _elemId, this->g0_ * this->au_[_partIdx] * Sx_j * Sx_n);
+	this->setHElem(_elemId, this->g0_ * this->au_[_partIdx] * Sx_j * Sx_n, _idx2);
 }
 
 // ##########################################################################################################################################
