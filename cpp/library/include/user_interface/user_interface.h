@@ -1920,7 +1920,8 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		const auto [_minIdxDiag, _maxIdxDiag] = _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
+		u64 _minIdxDiag, _maxIdxDiag;
+		std::tie(_minIdxDiag, _maxIdxDiag) = _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
 		const auto _offdiagPairs = _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
 
 		// save the energies
