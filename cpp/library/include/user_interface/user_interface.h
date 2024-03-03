@@ -1868,7 +1868,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
 	// set the placeholder for the values to save
-	arma::Col<double> _gaps(this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _gaps(this->modP.modRanN_, 3, arma::fill::zeros);
 	arma::Mat<double> _entr(_Dt, this->modP.modRanN_, arma::fill::zeros);
 	arma::Mat<double> _en(_Dt, this->modP.modRanN_, arma::fill::zeros);
 
@@ -1920,9 +1920,9 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag, _maxIdxDiag;
-		std::tie(_minIdxDiag, _maxIdxDiag) = _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
-		const auto _offdiagPairs = _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
+		u64 _minIdxDiag = 0, _maxIdxDiag = 0;
+		std::tie(_minIdxDiag, _maxIdxDiag)	= _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
+		const auto _offdiagPairs			= _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
 
 		// save the energies
 		{
@@ -1948,8 +1948,12 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 			// -----------------------------------------------------------------------------
 			
 			// calculate the eigenlevel statistics
-			_gaps(_r) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
-			LOGINFO(StrParser::colorize(VEQ(_gaps(_r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+			_gaps(_r, 0) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
+			_gaps(_r, 1) = _H->getEigVal(0);
+			_gaps(_r, 2) = _H->getEigVal(_H->getHilbertSize() - 1);			
+			LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+			LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 1)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+			LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 2)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
 			LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
 			
 			// -----------------------------------------------------------------------------
@@ -2002,10 +2006,10 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 					}
 				}
 				// save the offdiagonal
-				saveAlgebraic(dir, "offdiag_sx_l" + randomStr + "_" + STR(_r) + extension, _offDiag[0]);
-				saveAlgebraic(dir, "offdiag_sx_c" + randomStr + "_" + STR(_r) + extension, _offDiag[1]);
-				saveAlgebraic(dir, "offdiag_sz_l" + randomStr + "_" + STR(_r) + extension, _offDiag[2]);
-				saveAlgebraic(dir, "offdiag_sz_c" + randomStr + "_" + STR(_r) + extension, _offDiag[3]);
+				saveAlgebraic(dir, "offdiag_sx_l" + randomStr + extension, _offDiag[0], STR(_r), _r > 0);
+				saveAlgebraic(dir, "offdiag_sx_c" + randomStr + extension, _offDiag[1], STR(_r), _r > 0);
+				saveAlgebraic(dir, "offdiag_sz_l" + randomStr + extension, _offDiag[2], STR(_r), _r > 0);
+				saveAlgebraic(dir, "offdiag_sz_c" + randomStr + extension, _offDiag[3], STR(_r), _r > 0);
 			}
 		}
 		
