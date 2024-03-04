@@ -40,8 +40,14 @@ namespace Operators
 	* @param _M many body matrix
 	* @returns the overlap <\Psi|O|\Psi>
 	*/
-	template<typename _Ct, typename _M>
+	template<typename _M, typename _Ct>
 	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const _M& _mat)
+	{
+		return arma::cdot(_C, _mat * _C);
+	}
+
+	template<typename _M, typename _Ct>
+	inline _Ct applyOverlap(const arma::subview_col<_Ct>& _C, const _M& _mat)
 	{
 		return arma::cdot(_C, _mat * _C);
 	}
@@ -59,6 +65,11 @@ namespace Operators
 		return arma::cdot(_Cleft, _mat * _Cright);
 	}
 
+	template <typename _Ct, typename _M>
+	inline _Ct applyOverlap(const arma::subview_col<_Ct>& _Cleft, const arma::subview_col<_Ct>& _Cright, const _M& _mat)
+	{
+		return arma::cdot(_Cleft, _mat * _Cright);
+	}
 
 	// ##########################################################################################################################################
 

@@ -116,9 +116,7 @@ public:
 	virtual std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2)	const = 0;
 
 	// --------------------------------------------- INITS ----------------------------------------------------
-	virtual auto randomize(double _a,
-							double _s, 
-							const strVec& _which)		-> void										{};
+	virtual auto randomize(double,double,const strVec&)	-> void										{};
 	auto init()											-> void;
 
 	// -------------------------------------------- GETTERS ---------------------------------------------------
@@ -129,20 +127,20 @@ public:
 	auto getEnAv()										const -> double								{ return this->avEn;															};
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
-	auto getHilbertSpace()								const -> Hilbert::HilbertSpace<_T>			{ return this->hilbertSpace;													};							
+	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
 	// hamiltonian
-	auto getHamiltonian()								const -> arma::SpMat<_T>					{ return this->H_;																};								
+	auto getHamiltonian()								const -> const arma::SpMat<_T>&				{ return this->H_;																};								
 	auto getHamiltonianSize()							const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
 	auto getHamiltonianSizeH()							const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
 	auto getSymRot()									const -> arma::SpMat<_T>					{ return this->hilbertSpace.getSymRot();										};
 	// eigenvectors
-	auto getEigVec()									const -> arma::Mat<_T>						{ return this->eigVec_;															};							
-	auto getEigVec(u64 idx)								const -> arma::Col<_T>						{ return this->eigVec_.col(idx);												};			
+	auto getEigVec()									const -> const arma::Mat<_T>&				{ return this->eigVec_;															};							
+	auto getEigVec(u64 idx)								const -> arma::subview_col<_T>				{ return this->eigVec_.col(idx);												};			
 	auto getEigVec(u64 idx, u64 elem)					const -> _T									{ return this->eigVal_(elem, idx);												};				
 	auto getEigVec(std::string _dir, u64 _mid, 
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	// eigenvalues
-	auto getEigVal()									const -> arma::vec							{ return this->eigVal_;															};						
+	auto getEigVal()									const -> const arma::vec&					{ return this->eigVal_;															};						
 	virtual auto getEigVal(std::string _dir,
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
 	auto getEigVal(u64 idx)								const -> double								{ return this->eigVal_(idx);													};	
