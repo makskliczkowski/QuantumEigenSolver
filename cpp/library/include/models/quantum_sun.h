@@ -409,15 +409,16 @@ inline void QSM<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	size_t _partIdx					= _site - this->Nin_;
 
 	// check the spin of the particle
-	auto [_idx, _val]				= Operators::sigma_z<_T>(_elem, this->Ns_, { _site });
+	auto [_idx, _val]				= Operators::SpinOperators::sig_z(_elem, this->Ns_, { _site });
 
 	// apply magnetic field to the particle (THIRD TERM)
 	this->setHElem(_elemId, this->h_[_partIdx] * _val, _idx);
 
 	// apply the spin-flip interaction with the dot
 	uint _n							= this->n_[_partIdx];
-	auto [_idx1, Sx_n]				= Operators::sigma_x(_elem, this->Ns_, {_n});
-	auto [_idx2, Sx_j]				= Operators::sigma_x(_idx1, this->Ns_, {_site});
+	auto [_idx1, Sx_n]				= Operators::SpinOperators::sig_x(_elem, this->Ns_, {_n});
+	auto [_idx2, Sx_j]				= Operators::SpinOperators::sig_x(_idx1, this->Ns_, {_site});
+
 	// apply the coupling to the particle (SECOND TERM)
 	this->setHElem(_elemId, this->g0_ * this->au_[_partIdx] * Sx_j * Sx_n, _idx2);
 }

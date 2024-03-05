@@ -402,10 +402,13 @@ inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPair
 	v_1d<std::tuple<double, u64, u64>> v;
 
 	// rescale by the spectrum total width
-	_tol *= (this->maxEn - this->minEn);
+	//_tol *= (this->maxEn - this->minEn);
+	// rescale by the spectrum total number of modes
+	_tol *= this->Ns_;
 	std::function<bool(double, double)> _cmp = [&](double a, double b) 
 		{ 
-			return std::abs(a - b) < _tol; 
+			//return std::abs(a - b) < _tol; 
+			return std::abs((a + b) / 2.0 - this->avEn) < _tol;
 		};
 	// go through the whole spectrum
 	for (u64 i = _mn; i < _mx; ++i)
@@ -414,7 +417,7 @@ inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPair
 		{
 			// check the energy difference
 			if (_cmp(this->eigVal_(j), this->eigVal_(i)))
-				v.push_back(std::make_tuple(std::abs(this->eigVal_(j) - this->eigVal_(i)) / (this->maxEn - this->minEn), j, i));
+				v.push_back(std::make_tuple(std::abs(this->eigVal_(j) - this->eigVal_(i)), j, i));
 		}
 	}
 
