@@ -1870,7 +1870,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// set the placeholder for the values to save
 	arma::Mat<double> _gaps(this->modP.modRanN_, 3, arma::fill::zeros);
 	arma::Mat<double> _entr(_Dt, this->modP.modRanN_, arma::fill::zeros);
-	arma::Mat<double> _en(_Dt, this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _en(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
 
 	// choose the random position inside the dot for the correlation
 	uint _pos	= this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
@@ -1914,7 +1914,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		{
 			// save the Hamiltonian for small systems
 			if (_r == 0 && _H->getNs() <= 6)
-				arma::Mat<_T>(_H->getHamiltonian()).save(arma::hdf5_name(dir + "H.h5", "H"));
+				arma::Mat<_T>(_H->getHamiltonian()).save(arma::hdf5_name(dir + "H" + randomStr + ".h5", "H"));
 		}
 		
 		// -----------------------------------------------------------------------------
@@ -1926,8 +1926,9 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 
 		// save the energies
 		{
-			for(u64 i = _minIdxDiag; i < _maxIdxDiag; ++i)
-				_en(i - _minIdxDiag, _r) = _H->getEigVal(i);
+			//for(u64 i = _minIdxDiag; i < _maxIdxDiag; ++i)
+			//	_en(i - _minIdxDiag, _r) = _H->getEigVal(i);
+			_en.col(_r) = _H->getEigVal();
 		}
 
 		// -----------------------------------------------------------------------------
@@ -1939,7 +1940,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		// the 2 column will be the right state index
 		// the 3 column will be the matrix element
 		// in the vector we store different operators
-		v_1d<arma::Mat<_T>> _offDiag(_ops.size(), arma::Mat<_T>(_offdiagPairs.size(), 4, arma::fill::zeros));
+		v_1d<arma::Mat<_T>> _offDiag(_ops.size(), arma::Mat<_T>(_offdiagPairs.size(), 5, arma::fill::zeros));
 
 		// -----------------------------------------------------------------------------
 		
@@ -1999,10 +2000,11 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 					// save the off-diagonal elements
 					for (uint i = 0; i < _measured.size(); ++i)
 					{
-						_offDiag[i](_start, 0) = w;
-						_offDiag[i](_start, 1) = high;
-						_offDiag[i](_start, 2) = low;
-						_offDiag[i](_start, 3) = _measured[i];
+						_offDiag[i](_start, 0) = _H->getEigVal(high);
+						_offDiag[i](_start, 1) = _H->getEigVal(low);
+						_offDiag[i](_start, 2) = high;
+						_offDiag[i](_start, 3) = low;
+						_offDiag[i](_start, 4) = _measured[i];
 					}
 				}
 				// save the offdiagonal
