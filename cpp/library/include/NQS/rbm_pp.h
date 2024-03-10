@@ -19,13 +19,11 @@
 	#include "rbm.h"
 #endif // !NQS_H
 
+#define NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,6 +50,7 @@ protected:
 	_T pfaffianNew_				= 0.0;							// store the last pfaffian value for the candidate
 	NQSW X_;													// for stroing the matrix for Pfaffian calculation at each step
 	NQSW Xinv_;													// for stroing the matrix inverse for Pfaffian calculation at each step
+	NQSW XinvSkew_;												// for stroing the matrix inverse for Pfaffian calculation at each step
 	NQSW Xnew_;													// for stroing the matrix for Pfaffian calculation at each step - new candidate
 	
 // for calculating the Pfaffian probabilities from the Hamiltonian
@@ -61,7 +60,6 @@ protected:
 #else
 	NQSW XTmp_;
 #endif
-
 
 	/* ------------------------------------------------------------ */
 	
@@ -135,37 +133,50 @@ public:
 	void setPfaffian_C()										{ this->pfaffianNew_ = this->getPfaffian_C();					};
 	void setPfaffian_C(const NQSS& _n)							{ this->setFPP_C(_n); this->setPfaffian_C();					};
 	void setPfaffian_C(const NQSW& _M)							{ this->pfaffianNew_ = this->getPfaffian(_M);					};
+
+	// -------------------- U P D A T E R S --------------------
+
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	void updateXInv(uint _row);
+	void updateXInv_C(uint _row);
+	void updatePfaffian(uint _row);
+	void updatePfaffian(uint _row, _T& _pfaffian);
+	void updatePfaffian(uint _row, _T& _pfaffian, const arma::Mat<_T>& _X);
+	void updatePfaffian_C(uint _row);
+#endif
+
 	// --------------------- G E T T E R S ---------------------
+	
 	virtual auto getPPMat(const NQSS& _n)	const -> NQSW		= 0;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW		= 0;
 #endif
 	// based on the current vector, obtain a matrix for Pffafian calcuation
-	virtual auto getPPMat()					const -> NQSW		{ return this->getPPMat(this->curVec_);							};
+	virtual auto getPPMat()					const -> NQSW		{ return this->getPPMat(this->curVec_);										};
 	// based on the current matrix, obtain the Pffafian
-	auto getPfaffian()						const -> _T			{ return algebra::pfaffian<_T>(this->X_, this->nParticles_);	};
+	auto getPfaffian()						const -> _T			{ return algebra::Pfaffian::pfaffian<_T>(this->X_, this->nParticles_);		};
 	// based on the current candidate matrix, obtain the Pffafian
-	auto getPfaffian_C()					const -> _T			{ return algebra::pfaffian<_T>(this->Xnew_, this->nParticles_);	};
+	auto getPfaffian_C()					const -> _T			{ return algebra::Pfaffian::pfaffian<_T>(this->Xnew_, this->nParticles_);	};
 	// get the Pffafian value for a given vector
-	auto getPfaffian(const NQSS& _in)		const -> _T			{ return this->getPfaffian(this->getPPMat(_in));				};
+	auto getPfaffian(const NQSS& _in)		const -> _T			{ return this->getPfaffian(this->getPPMat(_in));							};
 	// based on given matrix, obtain the Pffafian
-	static auto getPfaffian(const NQSW& _M)	-> _T				{ return algebra::pfaffian<_T>(_M, _M.n_rows);					};
+	static auto getPfaffian(const NQSW& _M)	-> _T				{ return algebra::Pfaffian::pfaffian<_T>(_M, _M.n_rows);					};
+	
 	// --------------------------------------------------------
+
 	// get the current Pffafian value
-	auto getCurrentPfaffian()				const -> _T			{ return this->pfaffian_;										};
+	auto getCurrentPfaffian()				const -> _T			{ return this->pfaffian_;													};
 	// get the current Pffafian candidate value
-	auto getCurrentPfaffian_C()				const -> _T			{ return this->pfaffianNew_;									};
+	auto getCurrentPfaffian_C()				const -> _T			{ return this->pfaffianNew_;												};
 	// get size of the PP function matrix
-	auto getNPP()							const -> uint		{ return this->nPP_;											};
+	auto getNPP()							const -> uint		{ return this->nPP_;														};
 	// --------------------- F I N A L E -----------------------
 	auto ansatz(const NQSS& _in)			const -> _T			override final;
 };
 
 // ##########################################################################################################################################
 
-// ##########################################################################################################################################
 // ########################################################### C O N S T R U C T ############################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
 
@@ -191,9 +202,7 @@ RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>
 
 // ##########################################################################################################################################
 
-// ##########################################################################################################################################
 // ############################################################## A N S A T Z ###############################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
 
@@ -210,9 +219,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 
 // ##########################################################################################################################################
 
-// ##########################################################################################################################################
 // ######################################################## I N I T I A L I Z E R S #########################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
 
@@ -254,7 +261,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 {
 	// !TODO implement changable number of fermions
 	// allocate weights
-	// Pfaffian matrix for each step
+	// matrix for each step
 	this->X_		= NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
 	this->Xinv_		= NQSW(this->nParticles_, this->nParticles_, arma::fill::zeros);
 
@@ -279,7 +286,8 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 {
-	// matrix for the PP wave function
+	// matrix for the PP wave function - contains all the necessary weights
+	// is initialized according to the distance between the sites
 	this->Fpp_	= NQSB(this->nPP_, arma::fill::zeros);
 	auto _lat	= this->H_->getLat();
 	
@@ -324,9 +332,70 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setInfo()
 
 // ##########################################################################################################################################
 
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+
+/*
+* @brief Updates the Pfaffian matrix for a given row corresponding to the change in the X matrix.
+* This needs the inverse of the X matrix to be updated accordingly as well.
+* @param _row row which has been changed
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updatePfaffian(uint _row)
+{
+	this->pfaffian_ = algebra::Pfaffian::pfaffian_upd_row_n_col(this->pfaffian_, this->Xinv_.row(_row), this->X_.row(_row));
+}
+
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updatePfaffian(uint _row, _T& _pfaffian)
+{
+	_pfaffian = algebra::Pfaffian::pfaffian_upd_row_n_col(_pfaffian, this->Xinv_.row(_row), this->X_.row(_row));
+}
+
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updatePfaffian(uint _row, _T& _pfaffian, const arma::Mat<_T>& _X)
+{
+	_pfaffian = algebra::Pfaffian::pfaffian_upd_row_n_col(_pfaffian, this->Xinv_.row(_row), _X.row(_row));
+}
+
+/*
+* @brief Updates the Pfaffian matrix for a given row corresponding to the change in the Xnew matrix.
+* This needs the inverse of the Xmatrix to be updated accordingly as well.
+* @param _row row which has been changed
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updatePfaffian_C(uint _row)
+{
+	this->pfaffianNew_ = algebra::Pfaffian::pfaffian_upd_row_n_col(this->pfaffian_, this->Xinv_.row(_row), this->Xnew_.row(_row));
+}
+
+
 // ##########################################################################################################################################
+
+/*
+* @brief Updates the X matrix inverse for a given row corresponding to the change in the X matrix.
+* @param _row row which has been changed
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updateXInv(uint _row)
+{
+	this->Xinv_ = algebra::scherman_morrison_skew(this->Xinv_, _row, this->X_.row(_row));
+}
+
+/*
+* @brief Updates the X matrix inverse for a given row corresponding to the change in the Xnew matrix.
+* @param _row row which has been changed
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updateXInv_C(uint _row)
+{
+	this->Xinv_ = algebra::scherman_morrison_skew(this->Xinv_, _row, this->Xnew_.row(_row));
+}
+
+#endif
+
+// ##########################################################################################################################################
+
 // ######################################################### P R O B A B I L I T Y ##########################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
 
@@ -343,7 +412,11 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 {
 	// update pfaffian candidate matrix and its corresponding value
 	this->updFPP_C(fP, fV);
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	this->updatePfaffian_C(fP);
+#else
 	this->setPfaffian_C();
+#endif
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * (this->pfaffianNew_ / this->pfaffian_);
 }
 
@@ -352,6 +425,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 /*
 * @brief Calculates the probability ratio whenever we use multiple flips.
 * Uses the flips stored within the NQS class (flipPlaces_, flipVals_)
+* If multiple flips are used, one should use calculate the Xinv and pfaffian from scratch
 * @param nFlips number of flips to be used
 * @returns probability ratio for a given ansatz based on the current state
 */
@@ -362,7 +436,15 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	// update pfaffian candidate matrix and its corresponding value
 	for (auto i = 0; i < nFlips; ++i)
 		this->updFPP_C(this->flipPlaces_[i], this->flipVals_[i]);
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	for (auto i = 0; i < nFlips; ++i)
+		this->updatePfaffian_C(this->flipPlaces_[i]);
+	//LOG_DEBUG(VEQP(this->pfaffianNew_, 10), "Pfaffian from update");
+	//this->setPfaffian_C();
+	//LOG_DEBUG(VEQP(this->pfaffianNew_, 10), "Pfaffian from scratch");
+#else
 	this->setPfaffian_C();
+#endif
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * (this->pfaffianNew_ / this->pfaffian_);
 }
 
@@ -392,9 +474,19 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	auto thId			= std::this_thread::get_id();
 	this->XTmp_[thId]	= this->X_;
+
 	// update
 	this->updFPP_F(fP, fV, this->XTmp_[thId]);
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	auto _pfaffian		= this->pfaffian_;
+	if (fP.size() == 1)
+		for(const auto& _row: fP)
+			this->updatePfaffian(_row, _pfaffian, this->XTmp_[thId]);
+	else
+		_pfaffian		= this->getPfaffian(this->XTmp_[thId]);
+#else
 	auto _pfaffian		= this->getPfaffian(this->XTmp_[thId]);
+#endif
 #else
 	this->XTmp_			= this->X_;
 	// update
@@ -406,9 +498,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<
 
 // ##########################################################################################################################################
 
-// ##########################################################################################################################################
 // ############################################################# S E T T E R S ##############################################################
-// ##########################################################################################################################################
 
 // ##########################################################################################################################################
 
@@ -431,6 +521,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st, b
 		this->setPfaffian();
 		// set candidate to be the same for the angles update
 		this->Xnew_			= this->X_;
+		this->Xinv_			= arma::inv(this->X_);
 		// set its value to be the same as well
 		this->pfaffianNew_	= this->pfaffian_;
 	}
@@ -458,6 +549,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(u64 _st, bool _set
 		this->setPfaffian();
 		// set candidate to be the same for the angles update
 		this->Xnew_			= this->X_;
+		this->Xinv_			= arma::inv(this->X_);
 		// set its value to be the same as well
 		this->pfaffianNew_	= this->pfaffian_;
 	}
@@ -529,7 +621,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updateWeights()
 	// update RBM weights
 	RBM_S<_spinModes, _Ht, _T, _stateType>::updateWeights();
 	// Fmat is a vector
-	this->Fpp_ -= this->F_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
+	this->Fpp_ += this->F_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
 }
 
 // ##########################################################################################################################################
@@ -551,9 +643,14 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 	RBM_S<_spinModes, _Ht, _T, _stateType>::grad(_v, _plc);
 	// calculate the derivative of the Pffafian 
 	// as 1/Pf(X) * \partial Pf(X) / \partial x = 1/2 Tr(X^{-1} \partial X / \partial x)
+#ifndef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	// calculate the inverse only if necessary (without the updates at each step).
 	this->Xinv_				= arma::inv(this->X_);
-	// NOT MULTIPLYING BY PFAFFIAN WORKS < BUT WHY?! >
-	this->Xinv_ = (this->Xinv_.st() - this->Xinv_);// *(0.5 * this->pfaffian_);
+#endif // !NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+
+	// not multiplying by pfaffian, as it's dividied by it later in the definition of the derivative
+	this->XinvSkew_			= (this->Xinv_.st() - this->Xinv_);
+	//this->XinvSkew_			= (this->Xinv_ - this->Xinv_.st());
 	auto _currDerivative	= this->derivatives_.row(_plc).subvec(this->rbmSize_, this->rbmPPSize_ - 1);
 
 	// find the correct indices on the values that can be updated
@@ -617,6 +714,10 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 	// update the Pffafian matrix
 	// as the candidate pfaffian shall be already updated, use it instead of calculating everything all the time (probably not as efficient)
 	// replace updating the pfaffian back
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	for(uint i = 0; i < nFlips; i++)
+		this->Xinv_	= algebra::scherman_morrison_skew(this->Xinv_, this->flipPlaces_[i], this->Xnew_.row(this->flipPlaces_[i]));
+#endif
 	this->X_		= this->Xnew_;
 	this->pfaffian_ = this->pfaffianNew_;
 }
@@ -657,6 +758,10 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint 
 	//	const auto fP = this->flipPlaces_[i];
 	//	this->updFPP(fP, v(fP));
 	//}
+#ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+	for(uint i = 0; i < nFlips; i++)
+		this->Xinv_	= algebra::scherman_morrison_skew(this->Xinv_, this->flipPlaces_[i], this->Xnew_.row(this->flipPlaces_[i]));
+#endif
 	this->X_		= this->Xnew_;
 	this->pfaffian_ = this->pfaffianNew_;
 }
@@ -664,16 +769,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint 
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// #######################################################################################
-// #######################################################################################
-// #######################################################################################
-// #######################################################################################
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GENERAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_PP_GEN_H
@@ -706,13 +802,10 @@ protected:
 				arma::Mat<_T>& _Xtmp)						override { NQS_LOG_ERROR_SPIN_MODES; };
 };
 #	endif
-//////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SPINS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_PP_2_H
@@ -977,13 +1070,10 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP(std::initializer_list<int> fP, std
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #	endif
-//////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FERMIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
 #	ifndef RBM_PP_4_H
@@ -1012,9 +1102,6 @@ void RBM_PP_S<2, _Ht, _T, _stateType>::updFPP(std::initializer_list<int> fP, std
 #	endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// ##########################################################################################################################################
-// ##########################################################################################################################################
-// ##########################################################################################################################################
 // ##########################################################################################################################################
 
 #endif

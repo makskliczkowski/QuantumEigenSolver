@@ -8,7 +8,7 @@
 /*
 * @brief Class that stores the measurements is able to save them.
 */
-template <typename _T>
+template <typename _T = std::complex<double>>
 class Measurement
 {
 private:
@@ -28,8 +28,11 @@ private:
 	v_3d<arma::SpMat<_T>> MC_;
 
 	// types for the operators
+	//using OPG			= Operators::OpVec_glb_t;						
 	using OPG			= v_1d<Operators::Operator<_T>>;
+	//using OPL			= Operators::OpVec_loc_t;						
 	using OPL			= v_1d<Operators::Operator<_T, uint>>;
+	//using OPC			= Operators::OpVec_cor_t;						
 	using OPC			= v_1d<Operators::Operator<_T, uint, uint>>;
 	using MeasureTuple  = std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>>;
 

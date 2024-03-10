@@ -638,7 +638,7 @@ void UI::makeSimETHSweep()
 	// steps for alpha
 	double _alpha = this->modP.qsm.qsm_alpha_[0];
 	// get the random seed for this realization
-	auto seed = std::random_device()();
+	auto seed [[maybe_unused]] = std::random_device()();
 
 	while (_alpha <= 1.0)
 	{

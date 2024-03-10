@@ -251,6 +251,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinM
 	this->ran_	=	randomGen();
 	this->lat_	=	this->hilbertSpace.getLattice();
 	this->Ns	=	this->lat_->get_Ns();
+	this->Ns_	=	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
 };			
 

@@ -1887,8 +1887,9 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	auto _szc	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
 
 	// create the matrices
-	v_1d<Operators::Operator<_T>> _ops	= { _sx, _sxh, _sxc, _sz, _szc };
-	v_1d<std::string> _opsN				= { "sx_l", "sx_h", "sx_c", "sz_l", "sz_c" };
+	//Operators::OpVec_glb_t _ops			= { _sx, _sxh, _sxc, _sz, _szc };
+	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxh, _sxc, _sz, _szc };
+	v_1d<std::string> _opsN	= { "sx_l", "sx_h", "sx_c", "sz_l", "sz_c" };
 	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
 	_measure.initializeMatrices(_Nh);
 

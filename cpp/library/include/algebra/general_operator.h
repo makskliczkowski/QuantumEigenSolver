@@ -19,7 +19,6 @@
 #ifndef OPALG_H
 #include "operator_algebra.h"
 #endif
-
 // ################################################################ FORWARD DECLARATIONS ########################################################################
 
 namespace Hilbert {
@@ -73,7 +72,6 @@ namespace Operators {
 
 namespace Operators
 {
-
 	/*
 	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
 	* Can take several template arguments
@@ -303,6 +301,14 @@ namespace Operators
 		[[deprecated]]
 		static _T avOp(const arma::Col<_T1>& _alfa, const Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace);
 	};
+
+	// ##########################################################################################################################################
+	
+	// for the containers on the vectors
+	using OpVec_glb_t = v_1d<std::variant<Operators::Operator<cpx>, Operators::Operator<double>>>;
+	using OpVec_loc_t = v_1d<std::variant<Operators::Operator<cpx, uint>, Operators::Operator<double, uint>>>;
+	using OpVec_cor_t = v_1d<std::variant<Operators::Operator<cpx, uint, uint>, Operators::Operator<double, uint, uint>>>;
+
 };
 
 // ##########################################################################################################################################
