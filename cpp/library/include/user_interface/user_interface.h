@@ -557,6 +557,7 @@ public:
 	// ############################################### E T H
 
 	void makeSimETH();
+	void makeSimETHSweep();
 
 };
 
@@ -1851,6 +1852,9 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	_timer.reset();
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
+	// set seed
+	//_H->setSeed(this->ran_.seed());
+
 	// check the random field
 	auto _rH	= this->modP.qsm.qsm_h_r_;
 	auto _rA	= this->modP.qsm.qsm_h_ra_;
@@ -1877,13 +1881,15 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// create the operators
 	auto _sx	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
+	auto _sxh	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, ((this->modP.qsm.qsm_Ntot_ - this->modP.qsm.qsm_N_) / 2) - 1);
 	auto _sxc	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
 	auto _sz	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
 	auto _szc	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
 
 	// create the matrices
-	v_1d<Operators::Operator<_T>> _ops = { _sx, _sxc, _sz, _szc };
-	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops);
+	v_1d<Operators::Operator<_T>> _ops	= { _sx, _sxh, _sxc, _sz, _szc };
+	v_1d<std::string> _opsN				= { "sx_l", "sx_h", "sx_c", "sz_l", "sz_c" };
+	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
 	_measure.initializeMatrices(_Nh);
 
 	// to save the operators (those elements will be stored for each operator separately)
@@ -1891,9 +1897,11 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// the n'th row in the column will be the state index
 	// the columns corresponds to realizations of disorder
 	v_1d<arma::Mat<_T>> _diagElems(_ops.size(), arma::Mat<_T>(_Dt, this->modP.modRanN_, arma::fill::zeros));
+	
 	// go through realizations
 	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
 	{
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 		_timer.checkpoint(STR(_r));
 
 		// -----------------------------------------------------------------------------
@@ -1908,26 +1916,19 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		_H->buildHamiltonian();
 		_H->diagH(false);
 		LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
-
-		// -----------------------------------------------------------------------------
-		
-		{
-			// save the Hamiltonian for small systems
-			if (_r == 0 && _H->getNs() <= 6)
-				arma::Mat<_T>(_H->getHamiltonian()).save(arma::hdf5_name(dir + "H" + randomStr + ".h5", "H"));
-		}
 		
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag = 0, _maxIdxDiag = 0;
+		u64 _minIdxDiag						= 0; 
+		u64 _maxIdxDiag						= 0;
 		std::tie(_minIdxDiag, _maxIdxDiag)	= _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
 		const auto _offdiagPairs			= _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
 
+		// -----------------------------------------------------------------------------
+
 		// save the energies
 		{
-			//for(u64 i = _minIdxDiag; i < _maxIdxDiag; ++i)
-			//	_en(i - _minIdxDiag, _r) = _H->getEigVal(i);
 			_en.col(_r) = _H->getEigVal();
 		}
 
@@ -1935,10 +1936,11 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		
 		// save the offdiagonal elements
 		// this will be stored as a matrix with the following structure:
-		// the 0 column will be the energy difference
-		// the 1 column will be the left state index
-		// the 2 column will be the right state index
-		// the 3 column will be the matrix element
+		// the 0 column will be the higher energy
+		// the 1 column will be the lower energy
+		// the 2 column will be the left state index
+		// the 3 column will be the right state index
+		// the 4 column will be the matrix element
 		// in the vector we store different operators
 		v_1d<arma::Mat<_T>> _offDiag(_ops.size(), arma::Mat<_T>(_offdiagPairs.size(), 5, arma::fill::zeros));
 
@@ -1961,11 +1963,16 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 			
 			// other measures
 			{
+				auto _Hs = _H->getHilbertSpace();
+#ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
-				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+#endif			
+				for (u64 _start = _minIdxDiag; _start <= std::min(_entr.n_rows + _minIdxDiag - 1, _maxIdxDiag); ++_start)
 				{
 					// calculate the entanglement entropy
-					_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), (uint)1, _Ns, (uint)1);
+					//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns - 1, _Hs);
+					//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns, _Hs);
+					_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), 1, _Ns, 1, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
 				}
 			}
 
@@ -1973,11 +1980,13 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 			
 			// diagonal
 			{
-				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
+				for (u64 _start = _minIdxDiag; _start <= std::min(_entr.n_rows + _minIdxDiag - 1, _maxIdxDiag); ++_start)
 				{
 					// calculate the diagonal elements
-					_measure.measure(_H->getEigVec(_start));
-					const auto& _measured = _measure.getValG();
+					const auto& _measured		=_measure.measureG(_H->getEigVec(_start));
 
 					// save the diagonal elements
 					for (uint i = 0; i < _measured.size(); ++i)
@@ -1991,11 +2000,13 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 			
 			// offdiagonal
 			{
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 				for (uint _start = 0; _start < _offdiagPairs.size(); ++_start)
 				{
-					const auto& [w, high, low] = _offdiagPairs[_start];
-					_measure.measure(_H->getEigVec(high), _H->getEigVec(low));
-					const auto& _measured = _measure.getValG();
+					const auto& [w, high, low]	= _offdiagPairs[_start];
+					const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));
 
 					// save the off-diagonal elements
 					for (uint i = 0; i < _measured.size(); ++i)
@@ -2007,14 +2018,15 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 						_offDiag[i](_start, 4) = _measured[i];
 					}
 				}
+
 				// save the offdiagonal
-				saveAlgebraic(dir, "offdiag_sx_l" + randomStr + extension, _offDiag[0], STR(_r), _r > 0);
-				saveAlgebraic(dir, "offdiag_sx_c" + randomStr + extension, _offDiag[1], STR(_r), _r > 0);
-				saveAlgebraic(dir, "offdiag_sz_l" + randomStr + extension, _offDiag[2], STR(_r), _r > 0);
-				saveAlgebraic(dir, "offdiag_sz_c" + randomStr + extension, _offDiag[3], STR(_r), _r > 0);
+				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+				{
+					saveAlgebraic(dir, "offdiag_" + _measure.getOpGN(_opi) + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
+				}
 			}
 		}
-		
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 		// -----------------------------------------------------------------------------
 	}
 
@@ -2024,10 +2036,11 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	saveAlgebraic(dir, "en" + randomStr + extension, _en);
 
 	// diagonal elements
-	saveAlgebraic(dir, "diag_sx_l" + randomStr + extension, _diagElems[0]);
-	saveAlgebraic(dir, "diag_sx_c" + randomStr + extension, _diagElems[1]);
-	saveAlgebraic(dir, "diag_sz_l" + randomStr + extension, _diagElems[2]);
-	saveAlgebraic(dir, "diag_sz_c" + randomStr + extension, _diagElems[3]);
+	for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+	{
+		saveAlgebraic(dir, "diag_" + _measure.getOpGN(_opi) + randomStr + extension, _diagElems[_opi]);
+	}
 
+	// bye
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }

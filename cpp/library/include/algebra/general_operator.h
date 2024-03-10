@@ -90,6 +90,7 @@ namespace Operators
 		// used for checking on which states the operator acts when forgetting and using the matrix only
 		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
 		SymGenerators name_									=			SymGenerators::E;   // name of the operator
+		std::string nameS_									=			"E";				// name of the operator in string
 		
 	public:
 		// ----------------------------------------------------------------------------------------------------
@@ -101,45 +102,46 @@ namespace Operators
 		};
 		
 		// with the usage of the elements in the state vector
-		Operator(size_t Ns) 
-			: Ns_(Ns)
+		Operator(size_t Ns, const std::string& _nameS = "")
+			: Ns_(Ns), nameS_(_nameS)
 		{ 
 			init(); 
 		};
-		Operator(size_t Ns, _T _eigVal) 
-			: Ns_(Ns), eigVal_(_eigVal)
+		Operator(size_t Ns, _T _eigVal, const std::string& _nameS = "") 
+			: Ns_(Ns), eigVal_(_eigVal), nameS_(_nameS)
 		{ 
 			init(); 
 		};
-		Operator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E) 
-			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), name_(_name)
+		Operator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "") 
+			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
 		{ 
 			init(); 
 		};
 
 		// for the usage with the lattice (mostly for spin models, spinless fermions and hardcore bosons)
-		Operator(std::shared_ptr<Lattice> _lat)
-			: Ns_(_lat->get_Ns()), lat_(_lat)
+		Operator(std::shared_ptr<Lattice> _lat, const std::string& _nameS = "")
+			: Ns_(_lat->get_Ns()), lat_(_lat), nameS_(_nameS)
 		{
 			init();
 		};
-		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal)
-			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal)
+		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
+			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), nameS_(_nameS)
 		{
 			init();
 		};
-		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E)
-			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name)
+		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
+			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
 		{
 			init();
 		};
 		Operator(const Operator<_T, _Ts...>& o)
-			: Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_)
+			: Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_), acton_(o.acton_), name_(o.name_), nameS_(o.nameS_)
 		{
 			init();
 		};
 		Operator(Operator<_T, _Ts...>&& o)
-			: Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)), fun_(std::move(o.fun_))
+			: Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)),
+			fun_(std::move(o.fun_)), acton_(std::move(o.acton_)), name_(std::move(o.name_)), nameS_(std::move(o.nameS_))
 		{
 			init();
 		};
@@ -187,6 +189,7 @@ namespace Operators
 		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;								};
 		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);						};
 		auto setName(SymGenerators _name)				-> void							{ this->name_ = _name;								};
+		auto setNameS(const std::string& _name)			-> void							{ this->nameS_ = _name;								};
 		auto setVal(_T _val)							-> void							{ this->eigVal_ = _val;								};
 		auto setNs(size_t Ns)							-> void							{ this->Ns_ = Ns;									};
 		
@@ -196,7 +199,8 @@ namespace Operators
 		auto getVal()									const -> _T						{ return this->eigVal_;								};
 		auto getFun()									const -> repType				{ return this->fun_;								};
 		auto getName()									const -> SymGenerators			{ return this->name_;								};
-		auto getNameS()									const -> std::string			{ return STR(getSTR_SymGenerators(this->name_));	};
+		auto getNameG()									const -> std::string			{ return STR(getSTR_SymGenerators(this->name_));	};
+		auto getNameS()									const -> std::string			{ return this->nameS_;								};
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		/*

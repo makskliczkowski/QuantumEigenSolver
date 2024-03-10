@@ -270,6 +270,11 @@ void UI::funChoice()
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH", LOG_TYPES::CHOICE, 1);
 			this->makeSimETH();
 			break;
+		case 41:
+			// this option utilizes the Hamiltonian for ETH
+			LOGINFO("SIMULATION: HAMILTONIAN - ETH", LOG_TYPES::CHOICE, 1);
+			this->makeSimETHSweep();
+			break;
 		default:
 			// default case of showing the help
 			this->exitWithHelp();
@@ -626,6 +631,32 @@ void UI::makeSimETH()
 	// simulate
 	if (this->defineModels(false, false, false))
 		this->checkETH(this->hamDouble);
+}
+
+void UI::makeSimETHSweep()
+{
+	// steps for alpha
+	double _alpha = this->modP.qsm.qsm_alpha_[0];
+	// get the random seed for this realization
+	auto seed = std::random_device()();
+
+	while (_alpha <= 1.0)
+	{
+		//this->ran_.newSeed(seed);
+
+		// set the alpha
+		for(int i = 0; i < this->modP.qsm.qsm_alpha_.size(); i++)
+			this->modP.qsm.qsm_alpha_[i] = _alpha;
+
+		// define the models
+		this->resetEd();
+		// force complex Hamiltonian
+		this->useComplex_ = false;
+		// simulate
+		if (this->defineModels(false, false, false))
+			this->checkETH(this->hamDouble);
+		_alpha += 0.02;
+	}
 }
 
 // ------------------------------------------------

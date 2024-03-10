@@ -134,7 +134,7 @@ namespace Operators
 			_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -158,7 +158,7 @@ namespace Operators
 				_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -184,7 +184,7 @@ namespace Operators
 			u64 _acts				= (ULLPOW(_Ns)) - 1;
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SX);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			return _op;
 		}

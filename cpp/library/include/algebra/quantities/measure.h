@@ -13,10 +13,14 @@ class Measurement
 {
 private:
 
+	using MeasureGlobal = std::vector<_T>;
+	using MeasureLocal	= std::vector<arma::Col<_T>>;
+	using MeasureCorr	= std::vector<arma::Mat<_T>>;
+
 	// store the operator averages
-	v_1d<_T> valG_;
-	v_1d<arma::Col<_T>> valL_;
-	v_1d<arma::Mat<_T>> valC_;
+	std::vector<_T> valG_;
+	std::vector<arma::Col<_T>> valL_;
+	std::vector<arma::Mat<_T>> valC_;
 
 	// store the many body operator matrices
 	v_1d<arma::SpMat<_T>> MG_;
@@ -27,6 +31,7 @@ private:
 	using OPG			= v_1d<Operators::Operator<_T>>;
 	using OPL			= v_1d<Operators::Operator<_T, uint>>;
 	using OPC			= v_1d<Operators::Operator<_T, uint, uint>>;
+	using MeasureTuple  = std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>>;
 
 protected:
 	std::string dir_	= "";
@@ -49,6 +54,13 @@ public:
 													 const OPL& _opL = {},
 													 const OPC& _opC = {},
 													 uint _threadNum = 1);
+	Measurement(size_t _Ns, const std::string& _dir, const OPG& _opG,
+													 const strVec& _opGN,
+													 const OPL& _opL		= {},
+													 const strVec& _opLN	= {},
+													 const OPC& _opC		= {},
+													 const strVec& _opCN	= {},
+													 uint _threadNum		= 1);
 	Measurement(std::shared_ptr<Lattice> _lat,	const std::string& _dir,
 												const OPG& _opG,
 												const OPL& _opL = {},
@@ -57,11 +69,29 @@ public:
 
 	// measure the observables
 	template<typename _C>
+	std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>> measureS(const _C& _state);
+
+	template<typename _C>
 	void measure(const _C& _state);
 
+	template<typename _C>
+	std::vector<_T> measureG(const _C& _state);
+
+	// ---------------------------------------------------------------
+
 	// measure the observables (offdiagonal)
+
+	template<typename _C>
+	std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>> measureS(const _C& _stateL, const _C& _stateR);
+
 	template<typename _C>
 	void measure(const _C& _stateL, const _C& _stateR);
+
+	//template<typename _C>
+	//void measure(const _C& _stateL, const _C& _stateR, MeasureGlobal& _mg, MeasureLocal& _ms = {}, MeasureCorr& _mc = {});
+
+	template<typename _C>
+	std::vector<_T> measureG(const _C& _stateL, const _C& _stateR);
 
 	// save the measurements
 	void save(const std::string _additional = "", const strVec & _ext = {".h5"});
@@ -76,8 +106,11 @@ public:
 	auto getDir()					const noexcept -> std::string				{ return dir_;			};
 	auto getThreads()				const noexcept -> uint						{ return threads_;		};
 	auto getOpG()					const noexcept -> OPG						{ return opG_;			};
+	auto getOpGN(uint i)			const noexcept -> std::string				{ return opG_[i].getNameS(); };
 	auto getOpL()					const noexcept -> OPL						{ return opL_;			};
+	auto getOpLN(uint i)			const noexcept -> std::string				{ return opL_[i].getNameS(); };
 	auto getOpC()					const noexcept -> OPC						{ return opC_;			};
+	auto getOpCN(uint i)			const noexcept -> std::string				{ return opC_[i].getNameS(); };
 	auto getLat()					const noexcept -> std::shared_ptr<Lattice>	{ return lat_;			};
 	auto getValG()					const noexcept -> const v_1d<_T>&			{ return valG_;			};
 	auto getValL()					const noexcept -> const v_1d<arma::Col<_T>>&{ return valL_;			};
@@ -123,6 +156,31 @@ inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir,
 	CONSTRUCTOR_CALL;
 	// create directory
 	makeDir(_dir);
+}
+
+template<typename _T>
+inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir,
+									const OPG & _opG, const strVec & _opGN,
+									const OPL & _opL, const strVec & _opLN,
+									const OPC & _opC, const strVec & _opCN,
+									uint _threadNum)
+	: Measurement<_T>(_Ns, _dir, _opG, _opL, _opC, _threadNum)
+{
+	if (_opGN.size() == _opG.size())
+	{
+		for(auto i = 0; i < _opGN.size(); ++i)
+			this->opG_[i].setNameS(_opGN[i]);
+	}
+	if (_opLN.size() == _opL.size())
+	{
+		for (auto i = 0; i < _opLN.size(); ++i)
+			this->opL_[i].setNameS(_opLN[i]);
+	}
+	if (_opCN.size() == _opC.size())
+	{
+		for (auto i = 0; i < _opCN.size(); ++i)
+			this->opC_[i].setNameS(_opCN[i]);
+	}
 }
 
 template<typename _T>
@@ -214,79 +272,122 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 
 template<typename _T>
 template<typename _C>
-inline void Measurement<_T>::measure(const _C & _state)
+inline std::vector<_T> Measurement<_T>::measureG(const _C & _state)
 {
 	BEGIN_CATCH_HANDLER
 	{
 		// save into column
-		this->valG_ = v_1d<_T>(this->opG_.size());
+		v_1d<_T> _valG	= v_1d<_T>(this->opG_.size());
 
 		// measure global
 		for (size_t i = 0; i < this->MG_.size(); ++i)
-			this->valG_[i] = Operators::applyOverlap(_state, this->MG_[i]);
+			_valG[i] = Operators::applyOverlap(_state, this->MG_[i]);
 
+		return _valG;
 	}
 	END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	return {};
+}
 
+template<typename _T>
+template<typename _C>
+inline std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>> Measurement<_T>::measureS(const _C & _state)
+{
+	v_1d<_T> _valG			  = this->measureG(_state);
+
+	v_1d<arma::Col<_T>> _valL = v_1d<arma::Col<_T>>(this->Ns_, arma::Col<_T>(this->opL_.size(), arma::fill::zeros));
 	BEGIN_CATCH_HANDLER
 	{
-		this->valL_ = v_1d<arma::Col<_T>>(this->Ns_, arma::Col<_T>(this->opL_.size(), arma::fill::zeros));
-		// measure local
-		for (size_t i = 0; i < this->ML_.size(); ++i)
-			for (auto j = 0; j < this->Ns_; ++j)
-				this->valL_[i](j) = Operators::applyOverlap(_state, this->ML_[i][j]);
+	// measure local
+	for (size_t i = 0; i < this->ML_.size(); ++i)
+		for (auto j = 0; j < this->Ns_; ++j)
+			_valL[i](j) = Operators::applyOverlap(_state, this->ML_[i][j]);
 	}
 	END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
 
+	v_1d<arma::Mat<_T>> _valC = v_1d<arma::Mat<_T>>(this->opC_.size(), arma::Mat<_T>(this->Ns_, this->Ns_, arma::fill::zeros));
 	BEGIN_CATCH_HANDLER
 	{
-		this->valC_ = v_1d<arma::Mat<_T>>(this->opC_.size(), arma::Mat<_T>(this->Ns_, this->Ns_, arma::fill::zeros));
-		// measure local
-		for (size_t i = 0; i < this->MC_.size(); ++i)
-			for (auto j = 0; j < this->Ns_; ++j)
-				for (auto k = 0; k < this->Ns_; ++k)
-					this->valC_[i](j, k) = Operators::applyOverlap(_state, this->MC_[i][j][k]);
+	// measure local
+	for (size_t i = 0; i < this->MC_.size(); ++i)
+		for (auto j = 0; j < this->Ns_; ++j)
+			for (auto k = 0; k < this->Ns_; ++k)
+				_valC[i](j, k) = Operators::applyOverlap(_state, this->MC_[i][j][k]);
 	}
 	END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
+
+	return std::make_tuple(_valG, _valL, _valC);
+}
+
+template<typename _T>
+template<typename _C>
+inline void Measurement<_T>::measure(const _C & _state)
+{
+	const auto& [_valG, _valL, _valC] = this->measureS(_state);
+	this->valG_ = _valG;
+	this->valL_ = _valL;
+	this->valC_ = _valC;
+}
+
+// ############################################################################################################################################################
+
+template<typename _T>
+template<typename _C>
+inline std::vector<_T> Measurement<_T>::measureG(const _C & _stateL, const _C & _stateR)
+{
+	BEGIN_CATCH_HANDLER
+	{
+		// save into column
+		auto _valG = v_1d<_T>(this->opG_.size());
+		// measure global
+		for (size_t i = 0; i < this->MG_.size(); ++i)
+			_valG[i] = Operators::applyOverlap(_stateL, _stateR, this->MG_[i]);
+		return _valG;
+	}
+	END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	return {};
+}
+
+template<typename _T>
+template<typename _C>
+inline std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>> Measurement<_T>::measureS(const _C & _stateL, const _C & _stateR)
+{
+	auto _valG = this->measureG(_stateL, _stateR);
+	auto _valL = v_1d<arma::Col<_T>>(this->Ns_, arma::Col<_T>(this->opL_.size(), arma::fill::zeros));
+	BEGIN_CATCH_HANDLER
+	{
+		// measure local
+
+		for (size_t i = 0; i < this->ML_.size(); ++i)
+			for (auto j = 0; j < this->Ns_; ++j)
+				_valL[i](j) = Operators::applyOverlap(_stateL, _stateR, this->ML_[i][j]);
+	}
+	END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
+
+	auto _valC = v_1d<arma::Mat<_T>>(this->opC_.size(), arma::Mat<_T>(this->Ns_, this->Ns_, arma::fill::zeros));
+	BEGIN_CATCH_HANDLER
+	{
+	// measure correlation
+	for (size_t i = 0; i < this->MC_.size(); ++i)
+		for (auto j = 0; j < this->Ns_; ++j)
+			for (auto k = 0; k < this->Ns_; ++k)
+				_valC[i](j, k) = Operators::applyOverlap(_stateL, _stateR, this->MC_[i][j][k]);
+	}
+	END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
+
+	return std::make_tuple(_valG, _valL, _valC);
 }
 
 template<typename _T>
 template<typename _C>
 inline void Measurement<_T>::measure(const _C & _stateL, const _C & _stateR)
 {
-	BEGIN_CATCH_HANDLER
-	{
-		// save into column
-		this->valG_ = v_1d<_T>(this->opG_.size());
-
-		// measure global
-		for (size_t i = 0; i < this->MG_.size(); ++i)
-			this->valG_[i] = Operators::applyOverlap(_stateL, _stateR, this->MG_[i]);
-
-	}
-	END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
-
-	BEGIN_CATCH_HANDLER
-	{
-		this->valL_ = v_1d<arma::Col<_T>>(this->Ns_, arma::Col<_T>(this->opL_.size(), arma::fill::zeros));
-		// measure local
-		for (size_t i = 0; i < this->ML_.size(); ++i)
-			for (auto j = 0; j < this->Ns_; ++j)
-				this->valL_[i](j) = Operators::applyOverlap(_stateL, _stateR, this->ML_[i][j]);
-	}
-	END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
-
-	BEGIN_CATCH_HANDLER
-	{
-		this->valC_ = v_1d<arma::Mat<_T>>(this->opC_.size(), arma::Mat<_T>(this->Ns_, this->Ns_, arma::fill::zeros));
-		// measure correlation
-		for (size_t i = 0; i < this->MC_.size(); ++i)
-			for (auto j = 0; j < this->Ns_; ++j)
-				for (auto k = 0; k < this->Ns_; ++k)
-					this->valC_[i](j, k) = Operators::applyOverlap(_stateL, _stateR, this->MC_[i][j][k]);
-	}
-	END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
+	const auto& [_valG, _valL, _valC] = this->measureS(_stateL, _stateR);
+	this->valG_ = _valG;
+	this->valL_ = _valL;
+	this->valC_ = _valC;
 }
+
 
 // ############################################################################################################################################################
 

@@ -306,6 +306,9 @@ inline void QSM<_T>::initializeParticles()
 		this->u_[i]	= this->ran_.template random<double>(i - this->xi_[i], i + this->xi_[i]);;
 		this->au_[i]= std::pow(this->a_[i], this->u_[i]);
 	}
+	LOG_DEBUG(this->a_[0], "alpha=");
+	LOG_DEBUG(this->u_, "u=");
+	LOG_DEBUG(this->au_, "alpha^u=");
 
 	// generate the random Hamiltonian for the dot
 	if(typeid(_T) == typeid(double))
