@@ -2019,10 +2019,23 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 					}
 				}
 
-				// save the offdiagonal
-				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+				// save the checkpoints
 				{
-					saveAlgebraic(dir, "offdiag_" + _measure.getOpGN(_opi) + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
+					// save the offdiagonal
+					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+					{
+						saveAlgebraic(dir, "offdiag_" + _measure.getOpGN(_opi) + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
+					}
+
+					// save checkpoint for the diagonals
+					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+					{
+						saveAlgebraic(dir, "diag_" + _measure.getOpGN(_opi) + randomStr + extension, _diagElems[_opi]);
+					}
+					// save the matrices
+					saveAlgebraic(dir, "gap_ratio" + randomStr + extension, _gaps);
+					saveAlgebraic(dir, "entro" + randomStr + extension, _entr);
+					saveAlgebraic(dir, "en" + randomStr + extension, _en);
 				}
 			}
 		}
