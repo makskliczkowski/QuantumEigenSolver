@@ -235,6 +235,7 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 
 	}
 	END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	LOGINFO("Initialized the measurement matrices.", LOG_TYPES::TRACE, 3);
 
 	//BEGIN_CATCH_HANDLER
 	//{

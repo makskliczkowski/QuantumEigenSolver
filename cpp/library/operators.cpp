@@ -22,9 +22,13 @@ namespace Operators
 		*/
 		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
+			auto _val = 1.0;
 			for (auto const& site : sites)
-				base_vec = flip(base_vec, _Ns - 1 - site);
-			return std::make_pair(base_vec, Operators::_SPIN);
+			{
+				base_vec	=	flip(base_vec, _Ns - 1 - site);
+				_val		*=	Operators::_SPIN;
+			}
+			return std::make_pair(base_vec, _val);
 		}
 
 		/*

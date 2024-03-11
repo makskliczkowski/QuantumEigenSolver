@@ -250,7 +250,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinM
 {
 	this->ran_	=	randomGen();
 	this->lat_	=	this->hilbertSpace.getLattice();
-	this->Ns	=	this->lat_->get_Ns();
+	this->Ns	=	this->hilbertSpace.getNs();
 	this->Ns_	=	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
 };			
@@ -384,7 +384,7 @@ template<typename _T, uint _spinModes>
 inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long _l, long long _r) const
 {
 	u64 _min = std::max(0ll, (long long)this->avEnIdx - _l);
-	u64 _max = std::min(this->Nh, this->avEnIdx + _r);
+	u64 _max = std::min(this->Nh - 1, this->avEnIdx + _r);
 	return std::make_pair(_min, _max);
 }
 
