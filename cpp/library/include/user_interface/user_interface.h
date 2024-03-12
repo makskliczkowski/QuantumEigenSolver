@@ -2101,6 +2101,14 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// save the diagonals
 	_diagSaver(this->modP.modRanN_);
 
+	// save the command directly to the file
+	{
+		std::string dir_in = makeDirs(this->mainDir, "QSM_MAT_ELEM");
+		std::ofstream file(dir_in + "qsm_scp.log");
+		file << "scp -3 -r scp://klimak97@ui.wcss.pl:22//" + dir + " ./" << std::endl;
+		file.close();
+	}
+
 	// bye
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
