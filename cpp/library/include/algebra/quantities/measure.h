@@ -78,7 +78,7 @@ public:
 	void measure(const _C& _state);
 
 	template<typename _C>
-	std::vector<_T> measureG(const _C& _state);
+	std::vector<_T> measureG(const _C& _state, int _cut = -1);
 
 	// ---------------------------------------------------------------
 
@@ -94,7 +94,7 @@ public:
 	//void measure(const _C& _stateL, const _C& _stateR, MeasureGlobal& _mg, MeasureLocal& _ms = {}, MeasureCorr& _mc = {});
 
 	template<typename _C>
-	std::vector<_T> measureG(const _C& _stateL, const _C& _stateR);
+	std::vector<_T> measureG(const _C& _stateL, const _C& _stateR, int _cut = -1);
 
 	// save the measurements
 	void save(const std::string _additional = "", const strVec & _ext = {".h5"});
@@ -276,16 +276,20 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 
 template<typename _T>
 template<typename _C>
-inline std::vector<_T> Measurement<_T>::measureG(const _C & _state)
+inline std::vector<_T> Measurement<_T>::measureG(const _C & _state, int _cut)
 {
 	BEGIN_CATCH_HANDLER
 	{
 		// save into column
-		v_1d<_T> _valG	= v_1d<_T>(this->opG_.size());
+		v_1d<_T> _valG	= v_1d<_T>(_cut >= 0 ? _cut : this->opG_.size());
 
 		// measure global
 		for (size_t i = 0; i < this->MG_.size(); ++i)
+		{
+			if ((int)i == _cut)
+				break;
 			_valG[i] = Operators::applyOverlap(_state, this->MG_[i]);
+		}
 
 		return _valG;
 	}
@@ -337,15 +341,20 @@ inline void Measurement<_T>::measure(const _C & _state)
 
 template<typename _T>
 template<typename _C>
-inline std::vector<_T> Measurement<_T>::measureG(const _C & _stateL, const _C & _stateR)
+inline std::vector<_T> Measurement<_T>::measureG(const _C & _stateL, const _C & _stateR, int _cut)
 {
 	BEGIN_CATCH_HANDLER
 	{
 		// save into column
-		auto _valG = v_1d<_T>(this->opG_.size());
+		auto _valG = v_1d<_T>(_cut >= 0 ? _cut : this->opG_.size());
+
 		// measure global
 		for (size_t i = 0; i < this->MG_.size(); ++i)
+		{
+			if ((int)i == _cut)
+				break;
 			_valG[i] = Operators::applyOverlap(_stateL, _stateR, this->MG_[i]);
+		}
 		return _valG;
 	}
 	END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);

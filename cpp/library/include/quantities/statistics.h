@@ -10,7 +10,7 @@
 
 #define SYSTEM_PROPERTIES_MIN_SPACING 1e-15
 #define SYSTEM_PROPERTIES_THROW_DEGENERATE 1
-#define SYSTEM_PROPERTIES_USE_OPENMP 1
+#define SYSTEM_PROPERTIES_USE_OPENMP 0
 
 // -------------------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ namespace SystemProperties
 			auto _v = std::abs(algebra::conjugate(_coeff) * _coeff);
 			ent += _v * std::log(_v);
 		}
-		return -ent / std::log(0.48 * _state.size());
+		return -ent; // std::log(0.48 * _state.size());
 	}
 
 	// ---------------------------------------------------------------------------

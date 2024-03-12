@@ -1852,44 +1852,60 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	_timer.reset();
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
-	// set seed
-	//_H->setSeed(this->ran_.seed());
-
 	// check the random field
 	auto _rH	= this->modP.qsm.qsm_h_r_;
 	auto _rA	= this->modP.qsm.qsm_h_ra_;
 	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
 	u64 _Nh		= ULLPOW(_Ns);
+
 	// stats in the middle number (diagonal part)
 	size_t _Dt	= this->modP.modMidStates_ >= 1.0 ? std::min(u64(this->modP.modMidStates_), _Nh) : std::max(u64(1), u64(_Nh * this->modP.modMidStates_));
-	
+
 	// get info
-	std::string modelInfo	=	_H->getInfo();
-	std::string randomStr   =   FileParser::appWRandom("", _H->ran_);
-	std::string dir			=	makeDirsC(this->mainDir, "QSM_MAT_ELEM", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
-	std::string extension   =   ".h5";
+	std::string modelInfo	= _H->getInfo();
+	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
+	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string extension	= ".h5";
+
 	// set seed
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
 	// set the placeholder for the values to save
-	arma::Mat<double> _gaps		=		-1e5 * arma::Mat<double>(this->modP.modRanN_, 1, arma::fill::ones);
-	arma::Mat<double> _entr		=		-1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _en		=		-1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
+	v_1d<arma::Mat<double>> _ent = v_1d<arma::Mat<double>>(_Ns, -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones));
+	arma::Mat<double> _gaps = -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _ipr1 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _ipr2 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _en	= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
 
-	// choose the random position inside the dot for the correlation
-	uint _pos	= this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
+	// choose the random position inside the dot for the correlation operators
+	uint _pos = this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
 
-	// create the operators
-	auto _sx	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
-	auto _sxh	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, ((this->modP.qsm.qsm_Ntot_ - this->modP.qsm.qsm_N_) / 2));
-	auto _sxc	= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
-	auto _sz	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, this->modP.qsm.qsm_Ntot_ - 1);
-	auto _szc	= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)this->modP.qsm.qsm_Ntot_ - 1});
+	// create the operators (for them we calculate the offdiagonals)
+	auto _sx = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
+	auto _sxc = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
+	auto _szc = Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
+
+	// for those we calculate the diagonals only (for each site)
+	std::vector<Operators::Operator<double>> _sz_is;
+	std::vector<std::string> _sz_i_names;
+	// create the diagonal operators for spin z at each side
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
+		_sz_i_names.push_back("sz_" + STR(i));
+	}
 
 	// create the matrices
-	//Operators::OpVec_glb_t _ops			= { _sx, _sxh, _sxc, _sz, _szc };
-	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxh, _sxc, _sz, _szc };
-	v_1d<std::string> _opsN					= { "sx_l", "sx_h", "sx_c", "sz_l", "sz_c" };
+	//Operators::OpVec_glb_t _ops			= { _sx, _sxh, _sxc, _sz, _szc };	
+	v_1d<Operators::Operator<double>> _ops = { _sx, _sxc, _szc };
+	v_1d<std::string> _opsN = { "sx_l", "sx_c", "sz_c" };
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_ops.push_back(_sz_is[i]);
+		_opsN.push_back(_sz_i_names[i]);
+	}
+
+	// create the measurement class
 	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
 	_measure.initializeMatrices(_Nh);
 
@@ -1898,7 +1914,32 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// the n'th row in the column will be the state index
 	// the columns corresponds to realizations of disorder
 	v_1d<arma::Mat<_T>> _diagElems(_ops.size(), -1e5 * arma::Mat<_T>(_Dt, this->modP.modRanN_, arma::fill::ones));
-	
+
+	// create the saving function
+	std::function<void(uint)> _diagSaver = [&](uint _r)
+		{
+			// save the matrices
+
+			for(uint i = 0; i < _Ns; ++i)
+			{
+				// save the entropies (only append when i > 0)
+				saveAlgebraic(dir, "entro" + randomStr + extension, _ent[i], STR(i), i > 0);
+			}
+			// save the iprs and the energy to the same file
+			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr1, "part_entropy_q=1", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr2, "part_entropy_q=2", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
+
+			// diagonal elements (only append when _opi > 0)
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "diag" + randomStr + extension, _diagElems[_opi], _name, _opi > 0);
+			}
+			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
+		};
+
 	// go through realizations
 	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
 	{
@@ -1939,40 +1980,55 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		// this will be stored as a matrix with the following structure:
 		// the 0 column will be the higher energy
 		// the 1 column will be the lower energy
-		// the 2 column will be the left state index
-		// the 3 column will be the right state index
-		// the 4 column will be the matrix element
+		// the 2 column will be the matrix element
+		// save only for sx_l, sx_c, sz_c
 		// in the vector we store different operators
-		v_1d<arma::Mat<_T>> _offDiag(_ops.size(), -1e5 * arma::Mat<_T>(_offdiagPairs.size(), 3, arma::fill::ones));
+		v_1d<arma::Mat<_T>> _offDiag(3, -1e5 * arma::Mat<_T>(_offdiagPairs.size(), 3, arma::fill::ones));
 
 		// -----------------------------------------------------------------------------
 		
-		// calculator
+		// calculator of the properties
 		{
 			// -----------------------------------------------------------------------------
 			
-			// calculate the eigenlevel statistics
-			_gaps(_r, 0) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
-			//_gaps(_r, 1) = _H->getEigVal(0);
-			//_gaps(_r, 2) = _H->getEigVal(_H->getHilbertSize() - 1);			
-			LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
-			//LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 1)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
-			//LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 2)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
-			LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
-			
+			{
+				// calculate the eigenlevel statistics
+				_gaps(_r) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
+				LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
+			}
+
 			// -----------------------------------------------------------------------------
 			
 			// other measures
 			{
+				// participation ratios
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif							
+				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				{
+					_ipr1(_start - _minIdxDiag, _r) = SystemProperties::information_entropy(_H->getEigVec(_start));
+					_ipr2(_start - _minIdxDiag, _r) = std::log(1.0 / SystemProperties::participation_ratio(_H->getEigVec(_start), 2.0));
+				}
+
+				// -----------------------------------------------------------------------------
+				
+				// entanglement entropy
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif			
-				for (u64 _start = _minIdxDiag; _start <= std::min(_entr.n_rows + _minIdxDiag - 1, _maxIdxDiag); ++_start)
+				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
 				{
-					// calculate the entanglement entropy
-					//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns - 1, _Hs);
-					//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns, _Hs);
-					_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), 1, _Ns, 1, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+					for (int i = 1; i <= _Ns; i++)
+					{
+						// calculate the entanglement entropy
+						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns - 1, _Hs);
+						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns, _Hs);
+						uint _maskA	= 1 << (i - 1);
+						uint _enti	= _Ns - i;
+						_ent[_enti](_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+					}
 				}
 			}
 
@@ -1983,12 +2039,11 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (u64 _start = _minIdxDiag; _start <= std::min(_entr.n_rows + _minIdxDiag - 1, _maxIdxDiag); ++_start)
+				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
 				{
 					// calculate the diagonal elements
-					const auto& _measured = _measure.measureG(_H->getEigVec(_start));
-
-					const long long j = _start - _minIdxDiag;
+					const auto& _measured	= _measure.measureG(_H->getEigVec(_start));
+					const long long j		= _start - _minIdxDiag;
 					// save the diagonal elements
 					for (uint i = 0; i < _measured.size(); ++i)
 					{
@@ -2008,10 +2063,10 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 				{
 					const auto& [w, high, low]	= _offdiagPairs[_start];
 					//const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));
-					const auto& _measured		= _measure.measureG(_H->getEigVec(low), _H->getEigVec(high));
+					const auto& _measured		= _measure.measureG(_H->getEigVec(low), _H->getEigVec(high), _offDiag.size());
 
 					// save the off-diagonal elements
-					for (uint i = 0; i < _measured.size(); ++i)
+					for (uint i = 0; i < _offDiag.size(); ++i)
 					{
 						_offDiag[i](_start, 0) = _H->getEigVal(high);
 						_offDiag[i](_start, 1) = _H->getEigVal(low);
@@ -2021,40 +2076,30 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 					}
 				}
 
-				// save the checkpoints
-				{
-					// save the offdiagonal
-					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-					{
-						saveAlgebraic(dir, "offdiag_" + _measure.getOpGN(_opi) + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
-					}
-
-					// save checkpoint for the diagonals
-					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-					{
-						saveAlgebraic(dir, "diag_" + _measure.getOpGN(_opi) + randomStr + extension, _diagElems[_opi]);
-					}
-					// save the matrices
-					saveAlgebraic(dir, "gap_ratio" + randomStr + extension, _gaps);
-					saveAlgebraic(dir, "entro" + randomStr + extension, _entr);
-					saveAlgebraic(dir, "en" + randomStr + extension, _en);
-				}
 			}
+
+		}
+
+		// save the checkpoints
+		{
+			// save the diagonals
+			_diagSaver(_r);
+
+			// save the offdiagonal
+			for (uint _opi = 0; _opi < _offDiag.size(); ++_opi)
+			{
+				// get the name of the operator
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "offdiag_" + _name + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
+			}
+
 		}
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 		// -----------------------------------------------------------------------------
 	}
 
-	// save the matrices
-	saveAlgebraic(dir, "gap_ratio" + randomStr + extension, _gaps);
-	saveAlgebraic(dir, "entro" + randomStr + extension, _entr);
-	saveAlgebraic(dir, "en" + randomStr + extension, _en);
-
-	// diagonal elements
-	for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-	{
-		saveAlgebraic(dir, "diag_" + _measure.getOpGN(_opi) + randomStr + extension, _diagElems[_opi]);
-	}
+	// save the diagonals
+	_diagSaver(this->modP.modRanN_);
 
 	// bye
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
