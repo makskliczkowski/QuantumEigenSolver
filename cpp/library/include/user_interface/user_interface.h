@@ -1960,6 +1960,17 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 		
 		// -----------------------------------------------------------------------------
+		
+#if QSM_CHECK_HS_NORM
+#	ifdef _DEBUG
+		if((_r == 0 || _r == this->modP.modRanN_ - 1) && _Ns < 11)
+		{
+			_measure.checkG_mat(_H->getEigVec());
+		}
+#	endif
+#endif
+		
+		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
 		u64 _minIdxDiag						= 0; 
@@ -2104,9 +2115,12 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// save the command directly to the file
 	{
 		std::string dir_in = makeDirs(this->mainDir, "QSM_MAT_ELEM");
-		std::ofstream file(dir_in + "qsm_scp.log");
+		std::ofstream file(dir_in + "qsm_scp.log", std::ios::app);
 		file << "scp -3 -r scp://klimak97@ui.wcss.pl:22//" + dir + " ./" << std::endl;
 		file.close();
+		std::ofstream file_rsync(dir_in + "qsm_rsync.log", std::ios::app);
+		file_rsync << "rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./";
+		file_rsync.close();
 	}
 
 	// bye

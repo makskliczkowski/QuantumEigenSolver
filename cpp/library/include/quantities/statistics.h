@@ -18,10 +18,43 @@ namespace SystemProperties
 {
 	// ---------------------------------------------------------------------------
 
-	// -------------------------- EIGENLEVEL STATISTICS -------------------------- 
+	// ------------------- T R A N S F O R M   O P E R A T O R -------------------
 
 	// ---------------------------------------------------------------------------
 
+	/*
+	* @brief Transforms the operator to the new basis
+	* @param _op the operator
+	* @param _basis the new basis
+	* @returns the transformed operator
+	*/
+	template <typename _T>
+	[[nodiscard]]
+	inline arma::Mat<_T> transform_operator(const arma::Mat<_T>& _op, const arma::Mat<_T>& _basis)
+	{
+		arma::Mat<_T> _ret	= _basis * (_op * _basis.t());
+		return _ret;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	// -------------------- M A T R I X   P R O P E R T I E S --------------------
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Calculates the Hilbert Schmidt norm of the matrix.
+	* The Hilbert Schmidt norm is defined as the trace of the square of the matrix
+	* divided by the number of elements in the matrix.
+	* @param _mat - the matrix
+	* @returns the Hilbert Schmidt norm
+	*/
+	template<typename _T>
+	[[nodiscard]]
+	_T hilber_schmidt_norm(const arma::Mat<_T>& _mat)
+	{
+		return arma::trace(_mat * _mat) / (double)_mat.n_rows;
+	}
 
 	// ---------------------------------------------------------------------------
 	

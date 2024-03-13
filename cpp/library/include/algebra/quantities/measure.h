@@ -5,6 +5,7 @@
 #endif
 
 #include "../../quantities/statistics.h"
+
 /*
 * @brief Class that stores the measurements is able to save them.
 */
@@ -103,12 +104,21 @@ public:
 	auto clear() -> void;
 	auto initializeMatrices(u64 _dim) -> void;
 
+	// ########### CHECKERS ############
+	
+	template <typename _C>
+	auto checkG_mat(const _C& _ev)	const noexcept -> bool;
+
+
+
 	// ############ GETTERS ############
 
 	auto getNs()					const noexcept -> size_t					{ return Ns_;			};
 	auto getDir()					const noexcept -> std::string				{ return dir_;			};
 	auto getThreads()				const noexcept -> uint						{ return threads_;		};
 	auto getOpG()					const noexcept -> OPG						{ return opG_;			};
+	auto getOpG_mat()				const noexcept -> v_1d<arma::SpMat<_T>>&	{ return MG_;			};
+	auto getOpG_mat(uint i)			const noexcept -> v_1d<arma::SpMat<_T>>&	{ return MG_[i];		};
 	auto getOpGN(uint i)			const noexcept -> std::string				{ return opG_[i].getNameS(); };
 	auto getOpL()					const noexcept -> OPL						{ return opL_;			};
 	auto getOpLN(uint i)			const noexcept -> std::string				{ return opL_[i].getNameS(); };
@@ -401,6 +411,30 @@ inline void Measurement<_T>::measure(const _C & _stateL, const _C & _stateR)
 	this->valC_ = _valC;
 }
 
+// #############
+
+/*
+* @brief Check the norm of the operators.
+* @param _ev The eigenvector of the system.
+*/
+template<typename _T>
+template<typename _C>
+inline bool Measurement<_T>::checkG_mat(const _C& _ev) const noexcept 
+{
+	LOGINFO("", LOG_TYPES::TRACE, 20, 3);
+	for (int i = 0; i < this->MG_.size(); ++i)
+	{
+		auto _name				= this->opG_[i].getNameS();
+		// check the norm
+		auto _op_transformed	= SystemProperties::transform_operator(arma::Mat<_T>(this->MG_[i]), arma::Mat<_T>(_ev));
+		auto _op_norm			= SystemProperties::hilber_schmidt_norm(_op_transformed);
+		auto _op_norm_nt		= SystemProperties::hilber_schmidt_norm(arma::Mat<_T>(this->MG_[i]));
+		LOGINFO("[" + _name + "]" + VEQ(_op_norm), LOG_TYPES::TRACE, 1);
+		LOGINFO("[" + _name + "]" + VEQ(_op_norm_nt), LOG_TYPES::TRACE, 2);
+	}
+	LOGINFO("", LOG_TYPES::TRACE, 20, 3);
+	return true;
+}
 
 // ############################################################################################################################################################
 

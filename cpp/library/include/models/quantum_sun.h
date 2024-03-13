@@ -13,6 +13,9 @@
 #ifndef QSM_H
 #	define QSM_H
 
+// definitions
+#define QSM_CHECK_HS_NORM 1
+
 template<typename _T>
 class QSM : public Hamiltonian<_T, 2>
 {
@@ -316,7 +319,15 @@ inline void QSM<_T>::initializeParticles()
 	else
 		this->Hdot_ = this->ran_.template CUE<_T>(this->dimIn_);
 	// normalize
-	this->Hdot_		= this->gamma_ / sqrt(this->dimIn_ + 1) * this->Hdot_;
+	this->Hdot_		= this->gamma_ / std::sqrt(this->dimIn_ + 1) * this->Hdot_;
+#if QSM_CHECK_HS_NORM
+	// check the Hilbert-Schmidt norm
+	_T _norm = SystemProperties::hilber_schmidt_norm(this->Hdot_);
+	LOGINFO("QSM_DOT_NORM: " + VEQP(_norm, 5), LOG_TYPES::CHOICE, 3);
+	this->Hdot_		/= std::sqrt(_norm);
+	_norm = SystemProperties::hilber_schmidt_norm(this->Hdot_);
+	LOGINFO("QSM_DOT_NORM_AFTER: " + VEQP(_norm, 5), LOG_TYPES::CHOICE, 4);
+#endif
 }
 
 // ##########################################################################################################################################
