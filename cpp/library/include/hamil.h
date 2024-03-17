@@ -42,18 +42,23 @@ END_ENUM(HAM_SAVE_EXT)													// #
 // #########################################################################
 	
 const std::string DEF_INFO_SEP		= std::string("_");												// defalut separator in info about the model
-#define DISORDER_EQUIV(type, param) type param					= 1;	\
-												type param##0	= 0;	\
-												arma::Col<type> d##param
+#define DISORDER_EQUIV(type, param) type param		= 1;	\
+									type param##0	= 0;	\
+									arma::Col<type> d##param
+
 #define PARAM_W_DISORDER(param, s)	(this->param + this->d##param(s))								// gets the value moved by the disorder strength
+
 #define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 3);	\
 									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 3))
 																									// gets the information about the disorder
 
+// include statistics
+#include "quantities/statistics.h"
+
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ######################################################### H A M I L T O N I A N ##########################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 template <typename _T, uint _spinModes = 2>
@@ -383,9 +388,7 @@ inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 template<typename _T, uint _spinModes>
 inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long _l, long long _r) const
 {
-	u64 _min = std::max(0ll, (long long)this->avEnIdx - _l);
-	u64 _max = std::min(this->Nh - 1, this->avEnIdx + _r);
-	return std::make_pair(_min, _max);
+	return SystemProperties::hs_fraction_around_idx(_l, _r, this->avEnIdx, this->Nh);
 }
 
 // ##########################################################################################################################################
@@ -400,31 +403,7 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long
 template<typename _T, uint _spinModes>
 inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPairsIdx(u64 _mn, u64 _mx, double _tol) const
 {
-	v_1d<std::tuple<double, u64, u64>> v;
-
-	// rescale by the spectrum total width
-	//_tol *= (this->maxEn - this->minEn);
-	// rescale by the spectrum total number of modes
-	_tol *= this->Ns_;
-	std::function<bool(double, double)> _cmp = [&](double a, double b) 
-		{ 
-			//return std::abs(a - b) < _tol; 
-			return std::abs((a + b) / 2.0 - this->avEn) < _tol;
-		};
-	// go through the whole spectrum
-	for (u64 i = _mn; i < _mx; ++i)
-	{
-		for (u64 j = i + 1; j < _mx; ++j)
-		{
-			// check the energy difference
-			if (_cmp(this->eigVal_(j), this->eigVal_(i)))
-				v.push_back(std::make_tuple(std::abs(this->eigVal_(j) - this->eigVal_(i)), j, i));
-		}
-	}
-
-	// sort the omegas, cause why not
-	Containers::sort<0>(v, [](const auto& a, const auto& b) { return a < b; });
-	return v;
+	return SystemProperties::hs_fraction_offdiag(_mn, _mx, this->Nh, this->eigVal_, this->avEn, _tol * this->Ns_, true);
 }
 
 // ##########################################################################################################################################

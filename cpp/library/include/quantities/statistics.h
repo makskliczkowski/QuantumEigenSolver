@@ -18,6 +18,87 @@ namespace SystemProperties
 {
 	// ---------------------------------------------------------------------------
 
+	// -------------------- H I L B E R T   F R A C T I O N S --------------------
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Get the Hilbert space fraction based on the parameter given by the user. It 
+	* depends on the size of the Hilbert space - checks not to make the fraction too big
+	* @param _fraction fraction of the Hilbert space to take
+	* @param _hilbertSize size of the Hilbert space
+	* @returns Hilbert space fraction
+	*/
+	inline u64 hs_fraction_diagonal_cut(long double _fraction, u64 _hilbertSize)
+	{
+		u64 _states = (_fraction >= 1.0) ? std::min(u64(_fraction), _hilbertSize) : std::max(u64(4), u64(_fraction * _hilbertSize));
+		if (_states >= _hilbertSize)
+			return _hilbertSize;
+		return _states;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Get the specific indices in a range around a given index in the Hilber space. 
+	* Checks for the boundaries as well.
+	* @param _l number of elements to the left from the average energy
+	* @param _r number of elements to the right from the average energy
+	* @param _idx index around which to look for the boundaries
+	* @param _hilbertSize size of the Hilbert space
+	* @returns pair of indices of the energy spectrum around the average energy	*/
+	inline std::pair<u64, u64> hs_fraction_around_idx(long long _l, long long _r, u64 _idx, u64 _hilbertSize)
+	{
+		u64 _min = std::max(0ll, (long long)_idx - _l);
+		u64 _max = std::min(_hilbertSize - 1, _idx + _r);
+		return std::make_pair(_min, _max);
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Targets the mean energy to be close to a target energy with some tolerance precision.
+	* @param _l left energy
+	* @param _r right energy
+	* @param _target target energy
+	* @param _tol tolerance of the proximity
+	* @returns whether is close
+	*/
+	inline bool hs_fraction_close_mean(double _l, double _r, double _target = 0.0, double _tol = 0.0015)
+	{
+		return std::abs((_l +_r) / 2.0 - _target) < _tol;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	inline std::vector<std::tuple<double, u64, u64>> hs_fraction_offdiag(u64 _mn, u64 _max, u64 _hilbertSize, 
+																	const arma::Col<double>& _energies,
+																	double _targetEn	= 0.0, 
+																	double _tol			= 0.0015,
+																	bool _sort			= true)
+	{
+		v_1d<std::tuple<double, u64, u64>> _out;
+
+		// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
+		for (u64 i = _mn; i < _max; ++i)
+		{
+			auto _en_l = _energies(i);
+			for (u64 j = i + 1; j < _max; ++j)
+			{
+				auto _en_r = _energies(j);
+				// check the energy difference
+				if (SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _targetEn, _tol))
+					_out.push_back(std::make_tuple(std::fabs(_en_r - _en_l), j, i));
+			}
+		}
+
+		// sort the omegas, cause why not
+		Containers::sort<0>(_out, [](const auto& a, const auto& b) { return a < b; });
+		return _out;
+	}
+
+	// ---------------------------------------------------------------------------
+
 	// ------------------- T R A N S F O R M   O P E R A T O R -------------------
 
 	// ---------------------------------------------------------------------------
@@ -126,7 +207,7 @@ namespace SystemProperties
 
 	template <typename _Container>
 	[[nodiscard]]
-	inline long double eigenlevel_statistics(_Container _energies)
+	inline long double eigenlevel_statistics(const _Container& _energies)
 	{
 		return eigenlevel_statistics(_energies.begin(), _energies.end());
 	}
