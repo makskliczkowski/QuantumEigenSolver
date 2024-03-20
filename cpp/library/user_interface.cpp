@@ -709,6 +709,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	v_1d<arma::Mat<double>> _ent	= v_1d<arma::Mat<double>>(_Ns, -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones));
 	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
 	arma::Mat<double> _gaps			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _gapsV		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _gapsC		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
 	arma::Mat<double> _ipr1			= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
 	arma::Mat<double> _ipr2			= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
 
@@ -732,8 +734,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	}
 
 	// create the matrices
-	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxc, _szc };
-	v_1d<std::string> _opsN					= { "sx_l", "sx_c", "sz_c" };
+	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxc, _szc			};
+	v_1d<std::string> _opsN					= { "sx_l", "sx_c", "sz_c"	};
+
+	// matrices
 	for (auto i = 0; i < _Ns; ++i)
 	{
 		_ops.push_back(_sz_is[i]);
@@ -743,9 +747,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
 	_measure.initializeMatrices(_Nh);
-	
-	// get the number of states in the middle to include
-	u64 _hs_fractions_diag = SystemProperties::hs_fraction_diagonal_cut(0.1, _Nh);
 
 	// to save the operators (those elements will be stored for each operator separately)
 	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
@@ -753,14 +754,45 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// the columns corresponds to realizations of disorder
 	v_1d<arma::Mat<double>> _diagElems(_ops.size(), -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones));
 
-	// (mean, typical, mean2, typical2)
+	// (mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant)
 	// the columns will correspond to realizations
-	v_1d<arma::Mat<double>> _diagElemsStat(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
-	v_1d<arma::Mat<double>> _offdiagElemesStat(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
+	u64 _hs_fractions_diag		= SystemProperties::hs_fraction_diagonal_cut(0.5, _Nh);
+	u64 _hs_fractions_diag_c	= SystemProperties::hs_fraction_diagonal_cut(0.2, _Nh);
+	u64 _hs_fractions_diag_v	= SystemProperties::hs_fraction_diagonal_cut(200, _Nh);
+	v_1d<arma::Mat<double>> _diagElemsStat(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
+	// here we don't need gaussianity
+	v_1d<arma::Mat<double>> _diagElemsStatVanish(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Mat<double>> _diagElemsStatConst(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
+	
+	const double off_extensive_threshold	= 1e-1;
+	const double off_constant_threshold_up	= off_extensive_threshold;
+	const double off_constant_threshold_dn	= 1e-2;
+	const double off_vanishing_threshold	= std::min(5e-1 / _Ns, off_constant_threshold_dn);
+
+	// (mean, typical, mean2, typical2, mean4, meanabs, gaussianity, binder cumulant)
+	v_1d<arma::Mat<double>> _offdiagElemesStat(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
+	// here we don't need gaussianity
+	v_1d<arma::Mat<double>> _offdiagElemesStatConst(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Mat<double>> _offdiagElemesStatVanish(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Mat<double>> _offdiagElemesStatExtensive(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
 
 	// saves the histograms of the second moments for the offdiagonal elements 
 	v_1d<HistogramAverage<double>> _histAv(_ops.size(), HistogramAverage<double>());
 	v_1d<HistogramAverage<double>> _histAvTypical(_ops.size(), HistogramAverage<double>());
+	
+	// ----------------------- nbins operators -----------------------
+	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram());
+	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram());
+	uint _nbinOperators = 10 * _Ns;
+	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
+	{
+		// diagonal
+		_histOperatorsDiag[_opi].reset(_nbinOperators);
+		_histOperatorsDiag[_opi].uniform(1.0, -1.0); 
+		// offdiagonal
+		_histOperatorsOffdiag[_opi].reset(_nbinOperators);
+		_histOperatorsOffdiag[_opi].uniform(1.0, -1.0);
+	}
 
 	// create the saving function
 	std::function<void(uint)> _saver = [&](uint _r)
@@ -774,8 +806,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 
 			// save the iprs and the energy to the same file
 			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _gapsV, "gap_ratio_vanish", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _gapsC, "gap_ratio_const", true);
+			// participation ratio
 			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr1, "part_entropy_q=1", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr2, "part_entropy_q=2", true);
+			// energy
 			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
 
 			// append statistics from the diagonal elements
@@ -783,7 +819,15 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			{
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat[_opi], "diag_" + _name, true);
+				// vanishing etc
+				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStatVanish[_opi], "diag_" + _name + "_vanish", true);
+				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStatConst[_opi], "diag_" + _name + "_const", true);
+
+				// offdiagonal elements
 				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi], "offdiag_" + _name, true);
+				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStatConst[_opi], "offdiag_" + _name + "_const", true);
+				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStatVanish[_opi], "offdiag_" + _name + "_vanish", true);
+				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStatExtensive[_opi], "offdiag_" + _name + "_extensive", true);
 			}
 
 			// diagonal elements (only append when _opi > 0)
@@ -802,6 +846,16 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				saveAlgebraic(dir, "hist" + randomStr + extension, _histAvTypical[_opi].averages_av(true), _name + "_typical", true);
 			}
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].countsCol(), "_counts", true);
+
+			// save the distributions of the operators
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].edgesCol(), _name + "_diag_edges", _opi > 0);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].countsCol(), _name + "_diag_counts", true);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[_opi].edgesCol(), _name + "_offdiag_edges", true);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[_opi].countsCol(), _name + "_offdiag_counts", true);
+			}
 
 			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
 		};
@@ -833,15 +887,21 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag						= 0; 
-		u64 _maxIdxDiag						= 0;
-		std::tie(_minIdxDiag, _maxIdxDiag)	= _H->getEnArndAvIdx(_hs_fractions_diag / 2, _hs_fractions_diag / 2);
-		// this is sorted
-		const auto _offdiagPairs			= _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
+		u64 _minIdxDiag, _maxIdxDiag, _minIdxDiagV, _maxIdxDiagV, _minIdxDiagC, _maxIdxDiagC = 0; 
+
+		// set
+		{
+			std::tie(_minIdxDiag, _maxIdxDiag)		= _H->getEnArndAvIdx(_hs_fractions_diag / 2, _hs_fractions_diag / 2);
+			std::tie(_minIdxDiagV, _maxIdxDiagV)	= _H->getEnArndAvIdx(_hs_fractions_diag_v / 2, _hs_fractions_diag_v / 2);
+			std::tie(_minIdxDiagC, _maxIdxDiagC)	= _H->getEnArndAvIdx(_hs_fractions_diag_c / 2, _hs_fractions_diag_c / 2);
+		}
+
+		// this is sorted and set only for the highest
+		const auto _offdiagPairs = _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
 
 		// -----------------------------------------------------------------------------
 		
-		// set the uniform distribution of frequencies
+		// set the uniform distribution of frequencies in logspace!!!
 		if (_r == 0)
 		{
 			const auto _size = _offdiagPairs.size();
@@ -850,23 +910,26 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			arma::Col<double> _omegas(_size);
 			for(int _iter = 0; _iter < _offdiagPairs.size(); ++_iter)
 			{
-				auto [w, high, low] = _offdiagPairs[_iter];
-				_omegas(_iter)		= w;
+				const auto& [w, high, low] = _offdiagPairs[_iter];
+				_omegas(_iter) = w;
 			}
 
 			// set the histograms
 			auto iqr			= Histogram::iqr(_omegas);
 			auto oMax			= _omegas[_size - 1];
-			u64 _nFrequencies	= Histogram::freedman_diaconis_rule(_size, iqr, oMax, 0.0) * 5;
+			auto oMin			= _omegas[0];
+			auto constMult		= 5.0l;
+			u64 _nFrequencies	= Histogram::freedman_diaconis_rule(_size, iqr, oMax, oMin) * (u64)constMult;
+			_nFrequencies		= std::max(_nFrequencies, (u64)60);
 
 			// set the histograms
 			for (auto iHist = 0; iHist < _ops.size(); ++iHist)
 			{
 				_histAv[iHist].reset(_nFrequencies);
-				_histAv[iHist].uniform(oMax, 0.0);
+				_histAv[iHist].uniformLog(oMax * 5, oMin / 5);
 
 				_histAvTypical[iHist].reset(_nFrequencies);
-				_histAvTypical[iHist].uniform(oMax, 0.0);
+				_histAvTypical[iHist].uniformLog(oMax * constMult, oMin / constMult);
 			}
 		}
 
@@ -886,9 +949,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			// gap ratios
 			{
 				// calculate the eigenlevel statistics
-				arma::Col<double> _encut	= _H->getEigVal().subvec(_minIdxDiag, _maxIdxDiag - 1);
-				_gaps(_r)					= SystemProperties::eigenlevel_statistics(_encut);
+				_gaps(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiag, _maxIdxDiag - 1)));
+				_gapsV(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiagV, _maxIdxDiagV - 1)));
+				_gapsC(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiagC, _maxIdxDiagC - 1)));
 				LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_gapsV(_r, 0)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_gapsC(_r, 0)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
 			}
 
@@ -945,6 +1011,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 
 						if (_start >= _minIdxDiag && _start < _maxIdxDiag)
 						{
+							// add element to the histogram
+							_histOperatorsDiag[i].append(_elem);
+
 							auto _elem2				= _elem * _elem;
 							auto _logElem			= std::log(std::fabs(_elem));
 							auto _logElem2			= std::log(_elem * _elem);
@@ -958,6 +1027,34 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 							_diagElemsStat[i](2, _r) += _elem2;
 							// typical2
 							_diagElemsStat[i](3, _r) += _logElem2;
+							
+							// check constant
+							if (_start >= _minIdxDiagC && _start < _maxIdxDiagC)
+							{
+								// save the statistics
+								// mean
+								_diagElemsStatConst[i](0, _r) += _elem;
+								// typical
+								_diagElemsStatConst[i](1, _r) += _logElem;
+								// mean2
+								_diagElemsStatConst[i](2, _r) += _elem2;
+								// typical2
+								_diagElemsStatConst[i](3, _r) += _logElem2;
+
+								// check vanishing
+								if (_start >= _minIdxDiagV && _start < _maxIdxDiagV)
+								{
+									// save the statistics
+									// mean
+									_diagElemsStatVanish[i](0, _r) += _elem;
+									// typical
+									_diagElemsStatVanish[i](1, _r) += _logElem;
+									// mean2
+									_diagElemsStatVanish[i](2, _r) += _elem2;
+									// typical2
+									_diagElemsStatVanish[i](3, _r) += _logElem2;
+								}
+							}
 						}
 					}
 				}
@@ -965,10 +1062,16 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				// finalize statistics
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
-					_diagElemsStat[i](0, _r) /= _hs_fractions_diag;
-					_diagElemsStat[i](1, _r) /= _hs_fractions_diag;
-					_diagElemsStat[i](2, _r) /= _hs_fractions_diag;
-					_diagElemsStat[i](3, _r) /= _hs_fractions_diag;
+					for (uint ii = 0; ii < 4; ii++)
+					{
+						_diagElemsStat[i](ii, _r)		/= _hs_fractions_diag;
+						_diagElemsStatConst[i](ii, _r)	/= _hs_fractions_diag_c;
+						_diagElemsStatVanish[i](ii, _r) /= _hs_fractions_diag_v;
+					}
+					// save the statistics
+					_diagElemsStat[i](4, _r) = StatisticalMeasures::gaussianity(_diagElems[i].col(_r));
+					_diagElemsStat[i](5, _r) = StatisticalMeasures::kurtosis(_diagElems[i].col(_r));
+					_diagElemsStat[i](6, _r) = StatisticalMeasures::binder_cumulant(_diagElems[i].col(_r));
 				}
 
 				// additionally, for typical values, calculate the exponential of the mean
@@ -976,6 +1079,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				{
 					_diagElemsStat[i](1, _r) = std::exp(_diagElemsStat[i](1, _r));
 					_diagElemsStat[i](3, _r) = std::exp(_diagElemsStat[i](3, _r));
+
+					// add other exponents as well
+					_diagElemsStatConst[i](1, _r) = std::exp(_diagElemsStatConst[i](1, _r));
+					_diagElemsStatConst[i](3, _r) = std::exp(_diagElemsStatConst[i](3, _r));
+					_diagElemsStatVanish[i](1, _r) = std::exp(_diagElemsStatVanish[i](1, _r));
+					_diagElemsStatVanish[i](3, _r) = std::exp(_diagElemsStatVanish[i](3, _r));
 				}
 			}
 
@@ -983,14 +1092,25 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			
 			// offdiagonal
 			{
+				u64 _constantIterator	= 0;
+				u64 _vanishingIterator	= 0;
+				u64 _extensiveIterator	= 0;
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
 				for (uint _start = 0; _start < _offdiagPairs.size(); ++_start)
 				{
 					const auto& [w, high, low]	= _offdiagPairs[_start];
-					//const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));
 					const auto& _measured		= _measure.measureG(_H->getEigVec(low), _H->getEigVec(high));
+
+					// checks for means
+					const bool _isvanishing		= w < off_vanishing_threshold;
+					const bool _isconstant		= w < off_constant_threshold_up && w > off_constant_threshold_dn;
+					const bool _isextensive		= w > off_extensive_threshold;
+
+					_constantIterator			+= _isconstant;
+					_vanishingIterator			+= _isvanishing;
+					_extensiveIterator			+= _isextensive;
 
 					// save the off-diagonal elements
 					for (uint i = 0; i < _ops.size(); ++i)
@@ -999,7 +1119,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 						auto _elem2				= _elem * _elem;
 						auto _logElem			= std::log(std::abs(_elem));
 						auto _logElem2			= std::log(_elem * _elem);
-						// save the statistics
+
 						// mean
 						_offdiagElemesStat[i](0, _r) += _elem;
 						// typical
@@ -1008,6 +1128,50 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 						_offdiagElemesStat[i](2, _r) += _elem2;
 						// typical2
 						_offdiagElemesStat[i](3, _r) += _logElem2;
+						// mean4
+						_offdiagElemesStat[i](4, _r) += _elem2 * _elem2;
+						// meanabs
+						_offdiagElemesStat[i](5, _r) += std::abs(_elem);
+
+						// check binned statistics
+						if (_isextensive)
+						{
+							// mean
+							_offdiagElemesStatExtensive[i](0, _r) += _elem;
+							// typical
+							_offdiagElemesStatExtensive[i](1, _r) += _logElem;
+							// mean2
+							_offdiagElemesStatExtensive[i](2, _r) += _elem2;
+							// typical2
+							_offdiagElemesStatExtensive[i](3, _r) += _logElem2;
+
+						}
+						if (_isconstant)
+						{
+							// mean
+							_offdiagElemesStatConst[i](0, _r) += _elem;
+							// typical
+							_offdiagElemesStatConst[i](1, _r) += _logElem;
+							// mean2
+							_offdiagElemesStatConst[i](2, _r) += _elem2;
+							// typical2
+							_offdiagElemesStatConst[i](3, _r) += _logElem2;
+								
+						}
+						if (_isvanishing)
+						{
+							// mean
+							_offdiagElemesStatVanish[i](0, _r) += _elem;
+							// typical
+							_offdiagElemesStatVanish[i](1, _r) += _logElem;
+							// mean2
+							_offdiagElemesStatVanish[i](2, _r) += _elem2;
+							// typical2
+							_offdiagElemesStatVanish[i](3, _r) += _logElem2;
+						}
+
+						// add to value histogram
+						_histOperatorsOffdiag[i].append(_elem);
 
 						// add to the histograms
 						_histAv[i].append(w, _elem2);
@@ -1018,10 +1182,21 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				// finalize statistics
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
-					_offdiagElemesStat[i](0, _r) /= _offdiagPairs.size();
-					_offdiagElemesStat[i](1, _r) /= _offdiagPairs.size();
-					_offdiagElemesStat[i](2, _r) /= _offdiagPairs.size();
-					_offdiagElemesStat[i](3, _r) /= _offdiagPairs.size();
+					for (uint ii = 0; ii < 4; ii++)
+					{
+						_offdiagElemesStat[i](ii, _r) /= _offdiagPairs.size();
+						_offdiagElemesStatConst[i](ii, _r) /= (long double)_constantIterator;
+						_offdiagElemesStatVanish[i](ii, _r) /= (long double)_vanishingIterator;
+						_offdiagElemesStatExtensive[i](ii, _r) /= (long double)_extensiveIterator;
+					}
+					// mean4
+					_offdiagElemesStat[i](4, _r) /= _offdiagPairs.size();
+					// meanabs
+					_offdiagElemesStat[i](5, _r) /= _offdiagPairs.size();
+
+					// statistics
+					_offdiagElemesStat[i](6, _r) = StatisticalMeasures::gaussianity(_offdiagElemesStat[i](5, _r), _offdiagElemesStat[i](2, _r));
+					_offdiagElemesStat[i](7, _r) = StatisticalMeasures::binder_cumulant(_offdiagElemesStat[i](2, _r), _offdiagElemesStat[i](4, _r));
 				}
 				
 				// additionally, for typical values, calculate the exponential of the mean
@@ -1029,10 +1204,17 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				{
 					_offdiagElemesStat[i](1, _r) = std::exp(_offdiagElemesStat[i](1, _r));
 					_offdiagElemesStat[i](3, _r) = std::exp(_offdiagElemesStat[i](3, _r));
+
+					// other
+					_offdiagElemesStatConst[i](1, _r) = std::exp(_offdiagElemesStatConst[i](1, _r));
+					_offdiagElemesStatConst[i](3, _r) = std::exp(_offdiagElemesStatConst[i](3, _r));
+					_offdiagElemesStatVanish[i](1, _r) = std::exp(_offdiagElemesStatVanish[i](1, _r));
+					_offdiagElemesStatVanish[i](3, _r) = std::exp(_offdiagElemesStatVanish[i](3, _r));
+					_offdiagElemesStatExtensive[i](1, _r) = std::exp(_offdiagElemesStatExtensive[i](1, _r));
+					_offdiagElemesStatExtensive[i](3, _r) = std::exp(_offdiagElemesStatExtensive[i](3, _r));
 				}
 
 			}
-
 		}
 
 		// save the checkpoints
@@ -1050,7 +1232,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// save the command directly to the file
 	{
 		std::string dir_in = makeDirs(this->mainDir, "QSM_MAT_ELEM");
-		std::ofstream file(dir_in + "qsm_scp.log", std::ios::app);
+		std::ofstream file(dir_in + "qsm_scp_newest.log", std::ios::app);
 		file << "scp -3 -r scp://klimak97@ui.wcss.pl:22//" + dir + " ./" << std::endl;
 		file.close();
 		std::ofstream file_rsync(dir_in + "qsm_rsync.log", std::ios::app);

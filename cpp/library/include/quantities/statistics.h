@@ -16,6 +16,42 @@
 
 namespace SystemProperties
 {
+	namespace TimeEvolution
+	{
+		/*
+		* @brief Calculate the time evolution of the state. The 
+		* time evolution is calculated based on the eigenstates and
+		* eigenvalues of the system. The overlaps are also given. This specifies the 
+		* coefficients of the state at time t = 0 with each of the eigenvectors of the system.
+		* @param _eigenstates - the eigenstates of the system
+		* @param _eigvals - the eigenvalues of the system
+		* @param _overlaps - the overlaps of the state with the eigenstates
+		* @returns the time evolved state
+		*/
+		template <typename _T, typename _S>
+		[[nodiscard]]
+		inline arma::Col<std::complex<double>> time_evo(const arma::Mat<_T>& _eigenstates, 
+														const arma::Col<double>& _eigvals,
+														const _S& _overlaps, 
+														const long double _time,
+														size_t _threads = 1)
+		{
+			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
+
+			// go through the eigenstates
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(_threads) reduction(+: _ret)
+#endif // _DEBUG
+			for (auto i = 0; i < _eigenstates.n_cols; ++i)
+			{
+				const auto _exp = std::exp(-I * _time * _eigvals(i));
+				_ret += _exp * _overlaps(i) * _eigenstates.col(i);
+			}
+			return _ret;
+		}
+
+	};
+
 	// ---------------------------------------------------------------------------
 
 	// -------------------- H I L B E R T   F R A C T I O N S --------------------
