@@ -791,7 +791,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 		_histOperatorsDiag[_opi].uniform(1.0, -1.0); 
 		// offdiagonal
 		_histOperatorsOffdiag[_opi].reset(_nbinOperators);
-		_histOperatorsOffdiag[_opi].uniform(1.0, -1.0);
+		_histOperatorsOffdiag[_opi].uniform(0.1, -0.1);
 	}
 
 	// create the saving function
