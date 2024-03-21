@@ -783,7 +783,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// ----------------------- nbins operators -----------------------
 	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram());
 	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram());
-	uint _nbinOperators = 10 * _Ns;
+	uint _nbinOperators = 15 * _Ns;
 	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
 	{
 		// diagonal
