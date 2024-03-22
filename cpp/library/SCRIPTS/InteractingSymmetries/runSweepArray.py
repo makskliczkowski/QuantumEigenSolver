@@ -1,5 +1,5 @@
 import os
-import  subprocess
+import subprocess
 import sys
 import time
 
@@ -29,11 +29,6 @@ with open(f"input{Ns}.ini", "r+") as f:
     right   = tmp[-1].split(" ")[1:]
     tmp     = left[:-1] + [mid] + right
     result  = subprocess.run(wLine(tmp[-1], tmp[2], tmp[4], tmp[3], tmp[5], tmp[5] + str(JobN)), stdout=subprocess.PIPE)
-    # result = subprocess.run(tmp, stdout=subprocess.PIPE)
-   # result = result.stdout.decode('utf-8')
-    #if '0' not in result:
-    #    print(result)
-    #    break
     outp.writelines(str(tmp) + "\n")
     
     # terminate

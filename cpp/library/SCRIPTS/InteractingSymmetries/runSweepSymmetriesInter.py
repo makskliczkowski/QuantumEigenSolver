@@ -7,7 +7,7 @@ Ns      = int(sys.argv[1])
 
 iter    = 0
 outp    =   open(f"output{Ns}.dat", "a+")
-with open(f"input{Ns}.ini", "r+") as f:
+with open(f"input{Ns}_inter.ini", "r+") as f:
     # readlines from the file
     lines = f.readlines()
     for l in lines:
@@ -22,7 +22,7 @@ with open(f"input{Ns}.ini", "r+") as f:
         tmp     = left[:-1] + [mid] + right
         print(tmp)
         # run what is written there
-        result  = subprocess.run(tmp, stdout=subprocess.PIPE)
+        result  = subprocess.run(tmp, stdout=subprocess.PIPE, check=True)
         result  = result.stdout.decode('utf-8')
         # if couldn't run, break!
         if '0' not in result:
