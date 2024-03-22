@@ -32,8 +32,8 @@ echo >> ${a}
 echo "module load HDF5" >> ${a}
 echo >> ${a}
 echo "cd /home/klimak97/CODES/QuantumEigenSolver/cpp/library/" >> ${a}
-echo >> ${a}
-echo "./qsolver.o -fun ${FUN} ${PARS} -bc 0 -l 0 -d 1 -Lx ${L} -Ly 1 -Lz 1 -th ${CPU} -dir DEG_MANIFOLD/ >& ./LOG/log_man_${a}.txt" >> ${a}
+
+echo "./qsolver.o -fun ${FUN} ${PARS} -bc 0 -l 0 -d 1 -Lx ${L} -Ly 1 -Lz 1 -th ${CPU} -dir Patrycja/ >& ./LOG/log_man_${a}.txt" >> ${a}
 sbatch ${a} 
 # echo ${a}
 echo $?
