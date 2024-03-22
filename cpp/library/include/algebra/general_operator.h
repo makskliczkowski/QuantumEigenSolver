@@ -305,9 +305,9 @@ namespace Operators
 	// ##########################################################################################################################################
 	
 	// for the containers on the vectors
-	using OpVec_glb_t = v_1d<std::variant<Operators::Operator<cpx>, Operators::Operator<double>>>;
-	using OpVec_loc_t = v_1d<std::variant<Operators::Operator<cpx, uint>, Operators::Operator<double, uint>>>;
-	using OpVec_cor_t = v_1d<std::variant<Operators::Operator<cpx, uint, uint>, Operators::Operator<double, uint, uint>>>;
+	//using OpVec_glb_t = v_1d<std::variant<Operators::Operator<cpx>, Operators::Operator<double>>>;
+	//using OpVec_loc_t = v_1d<std::variant<Operators::Operator<cpx, uint>, Operators::Operator<double, uint>>>;
+	//using OpVec_cor_t = v_1d<std::variant<Operators::Operator<cpx, uint, uint>, Operators::Operator<double, uint, uint>>>;
 
 };
 
@@ -458,3 +458,29 @@ inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operat
 }
 
 // ##########################################################################################################################################
+
+// ############################################### E X T E N S I V E   O P E R A T O R S ####################################################
+
+// ##########################################################################################################################################
+
+namespace Operators
+{
+	template <typename _T, typename ..._Ts>
+	class OperatorExt : public Operator<_T, _Ts...>
+	{
+		using base_t		= Operator<_T, _Ts...>;
+		typedef typename _OP<_T>::template INP_EXT<_Ts...> repType;	 // type returned for representing, what it does with state and values!
+		using base_t::Ns_;
+		using base_t::lat_;
+		using base_t::eigVal_;
+		using base_t::fun_;
+		using base_t::acton_;
+		using base_t::name_;
+		using base_t::nameS_;
+
+		// used for checking on which states the operator acts when forgetting and using the matrix only
+		u64 acton_				= 0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
+		SymGenerators name_		= SymGenerators::E;		// name of the operator
+		std::string nameS_		= "E";					// name of the operator in string
+	};
+}

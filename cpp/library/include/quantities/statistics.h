@@ -33,7 +33,7 @@ namespace SystemProperties
 		inline arma::Col<std::complex<double>> time_evo(const arma::Mat<_T>& _eigenstates, 
 														const arma::Col<double>& _eigvals,
 														const _S& _overlaps, 
-														const long double _time,
+														const double _time,
 														size_t _threads = 1)
 		{
 			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
@@ -67,6 +67,9 @@ namespace SystemProperties
 	*/
 	inline u64 hs_fraction_diagonal_cut(long double _fraction, u64 _hilbertSize)
 	{
+		if (_fraction == 1.0)
+			return _hilbertSize;
+
 		u64 _states = (_fraction >= 1.0) ? std::min(u64(_fraction), _hilbertSize) : std::max(u64(4), u64(_fraction * _hilbertSize));
 		if (_states >= _hilbertSize)
 			return _hilbertSize;

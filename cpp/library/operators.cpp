@@ -195,6 +195,97 @@ namespace Operators
 
 		// ############################################################################################# 
 
+		/*
+		* @brief Operator S^+ acting on the state | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			auto _val		=	1.0;
+			for (auto const& site : sites)
+			{
+				// this op
+				if (checkBit(base_vec, _Ns - 1 - site))
+				{
+					_val	=	0.0;
+					break;
+				}
+				base_vec	=	flip(base_vec, _Ns - 1 - site);
+				_val		*=	Operators::_SPIN;
+			}
+			return std::make_pair(base_vec, _val);
+		}
+
+		/*
+		* @brief Operator S^+ acting on the state | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_m(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			auto _val		=	1.0;
+			for (auto const& site : sites)
+			{
+				// this op
+				if (!checkBit(base_vec, _Ns - 1 - site))
+				{
+					_val	=	0.0;
+					break;
+				}
+				base_vec	=	flip(base_vec, _Ns - 1 - site);
+				_val		*=	Operators::_SPIN;
+			}
+			return std::make_pair(base_vec, _val);
+		}
+
+		/*
+		* @brief multiplication of S^+S^- | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_pm(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			uint _size			= sites.size();
+			auto _mid			= sites.begin() + std::floor(_size / 2);
+
+			v_1d<uint> _left(sites.begin(), _mid);
+			v_1d<uint> _right(_mid, sites.end());
+
+			auto [_out, _val]	= sig_p(base_vec, _Ns, _left);
+
+			// return the value
+			return sig_m(_out, _Ns, _right);
+		}
+
+		/*
+		* @brief multiplication of S^-S^+ | state >
+		* @param base_vec the base vector to be acted on. This is given by the copy.
+		* @param _Ns lattice dimensionality (base vector length)
+		* @param sites the sites to meassure correlation at. The order of the sites matters!
+		* @returns the pair of the new state and the value of the operator
+		*/
+		std::pair<u64, double> sig_mp(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			uint _size			= sites.size();
+			auto _mid			= sites.begin() + std::floor(_size / 2);
+
+			v_1d<uint> _left(sites.begin(), _mid);
+			v_1d<uint> _right(_mid, sites.end());
+
+			auto [_out, _val]	= sig_m(base_vec, _Ns, _left);
+
+			// return the value
+			return sig_p(_out, _Ns, _right);
+		}
+
+		
 	}
 }
 
