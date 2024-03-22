@@ -294,10 +294,13 @@ inline std::vector<_T> Measurement<_T>::measureG(const _C & _state, int _cut)
 		v_1d<_T> _valG	= v_1d<_T>(_cut >= 0 ? _cut : this->opG_.size());
 
 		// measure global
+#ifndef _DEBUG
+#pragma omp parallel for
+#endif
 		for (size_t i = 0; i < this->MG_.size(); ++i)
 		{
-			if ((int)i == _cut)
-				break;
+			if (_cut > 0 && (int)i >= _cut)
+				continue;
 			_valG[i] = Operators::applyOverlap(_state, this->MG_[i]);
 		}
 
@@ -359,10 +362,13 @@ inline std::vector<_T> Measurement<_T>::measureG(const _C & _stateL, const _C & 
 		auto _valG = v_1d<_T>(_cut >= 0 ? _cut : this->opG_.size());
 
 		// measure global
+#ifndef _DEBUG
+#pragma omp parallel for
+#endif
 		for (size_t i = 0; i < this->MG_.size(); ++i)
 		{
-			if ((int)i == _cut)
-				break;
+			if (_cut > 0 && (int)i >= _cut)
+				continue;
 			_valG[i] = Operators::applyOverlap(_stateL, _stateR, this->MG_[i]);
 		}
 		return _valG;

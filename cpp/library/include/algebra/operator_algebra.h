@@ -112,7 +112,7 @@ namespace Operators {
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 	template <typename _T, typename _T2, typename ..._Ts, typename ..._T2s>
-	inline typename _INP_EXT<std::common_type<_T, _T2>, _Ts..., _T2s...> operator*(_INP_EXT<_T, _Ts...> f, _INP_EXT<_T2, _T2s...> g) 
+	inline _INP_EXT<typename std::common_type<_T, _T2>, _Ts..., _T2s...> operator*(_INP_EXT<_T, _Ts...> f, _INP_EXT<_T2, _T2s...> g) 
 	{
 		using _retype = std::common_type<_T, _T2>;
 		return [f, g](u64 s, _Ts... a1, _T2s... a2)

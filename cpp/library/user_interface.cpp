@@ -997,14 +997,14 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			
 			// diagonal
 			{
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif
 				for (u64 _start = 0; _start < _Nh; ++_start)
 				{
 					// calculate the diagonal elements
 					const auto& _measured = _measure.measureG(_H->getEigVec(_start));
 					// save the diagonal elements
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 					for (uint i = 0; i < _measured.size(); ++i)
 					{
 						const auto _elem			= _measured[i];
@@ -1061,6 +1061,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				}
 				
 				// finalize statistics
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
 					for (uint ii = 0; ii < 4; ii++)
@@ -1076,6 +1079,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				}
 
 				// additionally, for typical values, calculate the exponential of the mean
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
 					_diagElemsStat[i](1, _r) = std::exp(_diagElemsStat[i](1, _r));
@@ -1098,9 +1104,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				u64 _extensiveIterator	= 0;
 				u64 _totalIterator		= 0;
 				const double _avEn		= _H->getEnAv();
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif
 				// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
 				for (u64 i = _minIdxDiag; i < _maxIdxDiag; ++i)
 				{
@@ -1131,6 +1134,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 						_extensiveIterator			+= _isextensive;
 
 						// save the off-diagonal elements
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 						for (uint i = 0; i < _ops.size(); ++i)
 						{
 							auto _elem				= _measured[i];
@@ -1215,6 +1221,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				}
 				
 				// finalize statistics
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
 					for (uint ii = 0; ii < 6; ii++)
@@ -1237,6 +1246,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				}
 				
 				// additionally, for typical values, calculate the exponential of the mean
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 				for (uint i = 0; i < _ops.size(); ++i)
 				{
 					for (auto ii : { 1, 3 })
