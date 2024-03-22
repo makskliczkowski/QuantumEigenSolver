@@ -791,7 +791,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 		_histOperatorsDiag[_opi].uniform(0.5, -0.5); 
 		// offdiagonal
 		_histOperatorsOffdiag[_opi].reset(_nbinOperators);
-		_histOperatorsOffdiag[_opi].uniform(0.1, -0.1);
+		double _offdiagLimit = 0.5 - 0.015 * _Ns;
+		_histOperatorsOffdiag[_opi].uniform(0.5, -0.5);
 	}
 
 	// create the saving function
@@ -1218,6 +1219,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 		}
 
 		// save the checkpoints
+		if ((_Ns < 14 && _r % 50 == 0) || (_Ns >= 14 && _r % 2 == 0))
 		{
 			// save the diagonals
 			_saver(_r);
