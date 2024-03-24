@@ -292,12 +292,12 @@ namespace Operators
 			// if we don't need to apply the symmetries
 			if (_H.getHilbertSize() == _H.getFullHilbertSize())
 			{
-				auto _Min = _op.template generateMat<typename arma::Mat>(_H.getFullHilbertSize(), a...);
+				auto _Min = _op.template generateMat<res_typ, typename arma::Mat>(_H.getFullHilbertSize(), a...);
 				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 			else
 			{
-				auto _Min = _op.template generateMat<typename arma::Mat, res_typ>(_H, a...);
+				auto _Min = _op.template generateMat<res_typ, typename arma::Mat>(_H, a...);
 				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 		}

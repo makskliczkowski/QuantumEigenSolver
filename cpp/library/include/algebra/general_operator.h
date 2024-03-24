@@ -197,7 +197,7 @@ namespace Operators
 		auto getVal()									const -> _T						{ return this->eigVal_;								};
 		auto getFun()									const -> repType				{ return this->fun_;								};
 		auto getName()									const -> SymGenerators			{ return this->name_;								};
-		auto getNameG()									const -> std::string			{ return STR(getSTR_SymGenerators(this->name_));	};
+		auto getNameG()									const -> std::string			{ return SSTR(getSTR_SymGenerators(this->name_));	};
 		auto getNameS()									const -> std::string			{ return this->nameS_;								};
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -284,13 +284,13 @@ namespace Operators
 	
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		
-		template<template <class _TM = _T> class _MatType, HasMatrixType _Concept = _MatType<_T>, typename _InT = u64>
-		typename std::enable_if<std::is_integral<_InT>::value, _MatType<_T>>::type
+		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, HasMatrixType _Concept = _MatType<_TinMat>, typename _InT = u64>
+		typename std::enable_if<std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 		generateMat(_InT _dim, _Ts... _arg) const;
-		template<template <class _TM = _T> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_T>, uint _spinModes = 2>
-		_MatType<typename std::common_type<_T, _T1>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
-		template<template <class _TM = _T> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_T>, uint _spinModes = 2>
-		_MatType<typename std::common_type<_T, _T1, _T2>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
+		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_TinMat>, uint _spinModes = 2>
+		_MatType<typename std::common_type<_TinMat, _T1>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
+		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_TinMat>, uint _spinModes = 2>
+		_MatType<typename std::common_type<_TinMat, _T1, _T2>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
 
 
 		// calculates the matrix element of operator given a single state
@@ -368,14 +368,12 @@ inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, con
 * @returns A matrix representing the operator
 */
 template<typename _T, typename ..._Ts> 
-template<template <class> class _MatType, HasMatrixType _Concept, typename _InT>
-inline typename std::enable_if<std::is_integral<_InT>::value, _MatType<_T>>::type
+template<typename _TinMat, template <class> class _MatType, HasMatrixType _Concept, typename _InT>
+inline typename std::enable_if<std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
-	_MatType<_T> op(_dim, _dim);
-#ifndef _DEBUG
-#pragma omp parallel for
-#endif
+	_MatType<_TinMat> op(_dim, _dim);
+
 	for (u64 _base = 0; _base < _dim; ++_base) 
 	{
 		auto [_idx, _val]	=	this->operator()(_base, _arg...);
@@ -394,15 +392,13 @@ Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 * @returns A matrix representing the operator
 */
 template<typename _T, typename ..._Ts>
-template<template <class> class _MatType, typename _T1, HasMatrixType _Concept, uint _spinModes>
-inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts ..._arg) const
+template<typename _TinMat, template <class> class _MatType, typename _T1, HasMatrixType _Concept, uint _spinModes>
+inline _MatType<typename std::common_type<_TinMat, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts ..._arg) const
 {
-	using res_typ	=	typename std::common_type<_T1, _T>::type;
+	using res_typ	=	typename std::common_type<_T1, _TinMat>::type;
 	u64 Nh			=	_Hil.getHilbertSize();
 	_MatType<res_typ> op(Nh, Nh);
-#ifndef _DEBUG
-#pragma omp parallel for
-#endif
+
 	for (u64 _idx = 0; _idx < Nh; _idx++)
 	{
 		auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
@@ -431,14 +427,14 @@ inline _MatType<typename std::common_type<_T, _T1>::type> Operators::Operator<_T
 * @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
 */
 template<typename _T, typename ..._Ts>
-template<template <class> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept, uint _spinModes>
-inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts ..._arg)
+template<typename _TinMat, template <class> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept, uint _spinModes>
+inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts ..._arg)
 {
-	using res_typ		=	typename std::common_type<_T1, _T, _T2>::type;
+	// using res_typ		=	typename std::common_type<_T1, _T, _T2>::type;
 	u64 NhA				=	_Hil1.getHilbertSize();
 	u64 NhB				=	_Hil2.getHilbertSize();
-	arma::SpMat<_T> op(NhA, NhB);
-#pragma omp parallel for
+	arma::SpMat<_TinMat> op(NhA, NhB);
+
 	for (u64 _idxB = 0; _idxB < NhB; _idxB++) 
 	{
 		// act with an operator on beta sector (right)
@@ -463,24 +459,21 @@ inline _MatType<typename std::common_type<_T, _T1, _T2>::type> Operators::Operat
 
 // ##########################################################################################################################################
 
-namespace Operators
-{
-	template <typename _T, typename ..._Ts>
-	class OperatorExt : public Operator<_T, _Ts...>
-	{
-		using base_t		= Operator<_T, _Ts...>;
-		typedef typename _OP<_T>::template INP_EXT<_Ts...> repType;	 // type returned for representing, what it does with state and values!
-		using base_t::Ns_;
-		using base_t::lat_;
-		using base_t::eigVal_;
-		using base_t::fun_;
-		using base_t::acton_;
-		using base_t::name_;
-		using base_t::nameS_;
+// namespace Operators
+// {
+// 	template <typename _T, typename ..._Ts>
+// 	class OperatorExt : public Operator<_T, _Ts...>
+// 	{
+// 		using base_t		= Operator<_T, _Ts...>;
+// 		typedef typename _OP<_T>::template INP_EXT<_Ts...> repType;	 // type returned for representing, what it does with state and values!
+// 		using base_t::Ns_;
+// 		using base_t::lat_;
+// 		using base_t::eigVal_;
+// 		using base_t::fun_;
+// 		using base_t::acton_;
+// 		using base_t::name_;
+// 		using base_t::nameS_;
 
-		// used for checking on which states the operator acts when forgetting and using the matrix only
-		u64 acton_				= 0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
-		SymGenerators name_		= SymGenerators::E;		// name of the operator
-		std::string nameS_		= "E";					// name of the operator in string
-	};
-}
+// 		// used for checking on which states the operator acts when forgetting and using the matrix only
+// 	};
+// }

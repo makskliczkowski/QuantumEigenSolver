@@ -810,7 +810,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	std::function<void(uint)> _saver = [&](uint _r)
 		{
 			// save the matrices
-			for(uint i = 0; i < _Ns; ++i)
+			for(int i = 0; i < _Ns; ++i)
 			{
 				// save the entropies (only append when i > 0)
 				saveAlgebraic(dir, "entro" + randomStr + extension, _ent[i], STR(i), i > 0);
@@ -967,7 +967,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif							
-				for (u64 _start = 0; _start < _Nh; ++_start)
+				for (long long _start = 0; _start < _Nh; ++_start)
 				{
 					_ipr1(_start, _r) = SystemProperties::information_entropy(_H->getEigVec(_start));
 					_ipr2(_start, _r) = std::log(1.0 / SystemProperties::participation_ratio(_H->getEigVec(_start), 2.0));
@@ -979,7 +979,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif			
-				for (u64 _start = 0; _start < _Nh; ++_start)
+				for (long long _start = 0; _start < _Nh; ++_start)
 				{
 					for (int i = 1; i <= _Ns; i++)
 					{
@@ -1005,7 +1005,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-					for (uint i = 0; i < _measured.size(); ++i)
+					for (int i = 0; i < _measured.size(); ++i)
 					{
 						const auto _elem			= _measured[i];
 						_diagElems[i](_start, _r)	= _elem;
@@ -1064,7 +1064,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (uint i = 0; i < _ops.size(); ++i)
+				for (int i = 0; i < _ops.size(); ++i)
 				{
 					for (uint ii = 0; ii < 4; ii++)
 					{
@@ -1082,7 +1082,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (uint i = 0; i < _ops.size(); ++i)
+				for (int i = 0; i < _ops.size(); ++i)
 				{
 					_diagElemsStat[i](1, _r) = std::exp(_diagElemsStat[i](1, _r));
 					_diagElemsStat[i](3, _r) = std::exp(_diagElemsStat[i](3, _r));
@@ -1137,7 +1137,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-						for (uint i = 0; i < _ops.size(); ++i)
+						for (int i = 0; i < _ops.size(); ++i)
 						{
 							auto _elem				= _measured[i];
 							auto _elem2				= _elem * _elem;
@@ -1224,7 +1224,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (uint i = 0; i < _ops.size(); ++i)
+				for (int i = 0; i < _ops.size(); ++i)
 				{
 					for (uint ii = 0; ii < 6; ii++)
 					{
@@ -1249,7 +1249,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (uint i = 0; i < _ops.size(); ++i)
+				for (int i = 0; i < _ops.size(); ++i)
 				{
 					for (auto ii : { 1, 3 })
 					{

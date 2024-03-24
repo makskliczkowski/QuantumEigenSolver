@@ -810,7 +810,7 @@ namespace Hilbert
 		LOGINFO("Creating the map of representatives", LOG_TYPES::INFO, 1);
 		// go through each state
 #pragma omp parallel for num_threads(this->threadNum)
-		for (u64 j = 0; j < this->NhFull; j++) 
+		for (long long j = 0; j < this->NhFull; j++) 
 		{
 			u64 idx						= INT64_MAX;
 			// check all global conservation
@@ -826,7 +826,7 @@ namespace Hilbert
 				continue;
 			}
 			// already in the map
-			idx							= binarySearch(this->mapping_, 0, static_cast<ull>(this->Nh) - 1, j);
+			idx							= binarySearch(this->mapping_, 0, static_cast<ull>(this->Nh) - 1, (u64)j);
 			if (idx < this->mapping_.size())
 			{
 				this->reprMap_.push_back(std::make_pair(idx, 1.0));

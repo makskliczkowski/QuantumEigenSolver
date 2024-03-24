@@ -359,7 +359,7 @@ namespace SystemProperties
 #if SYSTEM_PROPERTIES_USE_OPENMP
 #	pragma omp parallel for reduction(+: ent)
 #endif
-		for (u64 _k = _min; _k < std::min(_max, _state.size()); ++_k)
+		for (long long _k = _min; _k < std::min(_max, _state.size()); ++_k)
 		{
 			auto _c		= arma::cdot(_newBasis.col(_k), _state);
 			auto _v		= std::abs(algebra::conjugate(_c) * _c);

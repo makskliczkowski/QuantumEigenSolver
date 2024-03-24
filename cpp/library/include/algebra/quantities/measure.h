@@ -238,7 +238,7 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 		// measure global
 		for (const auto& _op : this->opG_)
 		{
-			arma::SpMat<_T> _Min = _op.template generateMat<typename arma::SpMat>(_dim);
+			arma::SpMat<_T> _Min = _op.template generateMat<_T, typename arma::SpMat>(_dim);
 			// push the operator
 			this->MG_.push_back(_Min);
 		}
@@ -297,7 +297,7 @@ inline std::vector<_T> Measurement<_T>::measureG(const _C & _state, int _cut)
 #ifndef _DEBUG
 #pragma omp parallel for
 #endif
-		for (size_t i = 0; i < this->MG_.size(); ++i)
+		for (long long i = 0; i < this->MG_.size(); ++i)
 		{
 			if (_cut > 0 && (int)i >= _cut)
 				continue;
@@ -365,7 +365,7 @@ inline std::vector<_T> Measurement<_T>::measureG(const _C & _stateL, const _C & 
 #ifndef _DEBUG
 #pragma omp parallel for
 #endif
-		for (size_t i = 0; i < this->MG_.size(); ++i)
+		for (long long i = 0; i < this->MG_.size(); ++i)
 		{
 			if (_cut > 0 && (int)i >= _cut)
 				continue;

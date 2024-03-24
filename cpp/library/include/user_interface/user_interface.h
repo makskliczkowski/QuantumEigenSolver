@@ -1278,7 +1278,7 @@ inline void UI::symmetriesTest()
 		LOGINFO("Started entropies for full Hamiltonian", LOG_TYPES::TRACE, 1);
 		// Save the entropies 
 		ENTROPIES.zeros(La, Nh);
-		for (u64 idx = 0; idx < Nh; idx++) {
+		for (long long idx = 0; idx < Nh; idx++) {
 			// get the eigenstate
 			arma::Col<double> state = this->hamDouble->getEigVec(idx);
 			for (uint i = 1; i <= La; i++) {
@@ -1406,7 +1406,7 @@ inline void UI::symmetriesTest()
 							if (Ns < 10)
 								tStates = arma::Mat<cpx>(NhFull, Nh);
 							arma::vec entroInner(Nh);
-							for (u64 i = 0; i < Nh; i++) {
+							for (long long i = 0; i < Nh; i++) {
 								// get the energy to push back
 								auto En = this->hamComplex->getEigVal(i);
 								enSYMS.push_back(En);
@@ -1480,7 +1480,7 @@ inline void UI::symmetriesTest()
 	printSeparated(file2, '\t', 15, false, "E_FULL", "E_SYMS", "S_FULL", "S_SYMS");
 	printSeparated(file2, ',', 3, true, "T", "R", "PX", "PY", "PZ", "U1", "NH");
 
-	for (u64 i = 0; i < this->hamDouble->getHilbertSize(); i++) {
+	for (long long i = 0; i < this->hamDouble->getHilbertSize(); i++) {
 		// get the ed energy
 		auto SORTIDX = idxs[i];
 		auto EED = this->hamDouble->getEigVal(i);
@@ -1768,7 +1768,7 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 #ifndef _DEBUG
 #	pragma omp parallel for num_threads(this->threadNum)
 #endif
-		for (u64 idx = 0; idx < _realizations; idx++)
+		for (long long idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
 			auto coeff			= this->ran_.createRanState<_T>(_gamma);
@@ -1812,7 +1812,7 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 #ifndef _DEBUG
 #	pragma omp parallel for num_threads(this->threadNum)
 #endif
-		for (u64 idx = 0; idx < _realizations; idx++)
+		for (long long idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
 			auto coeff		= this->ran_.createRanState<_T>(_gamma);
@@ -1921,7 +1921,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 		{
 			// save the matrices
 
-			for(uint i = 0; i < _Ns; ++i)
+			for(int i = 0; i < _Ns; ++i)
 			{
 				// save the entropies (only append when i > 0)
 				saveAlgebraic(dir, "entro" + randomStr + extension, _ent[i], STR(i), i > 0);
@@ -2018,7 +2018,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif							
-				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
 				{
 					_ipr1(_start - _minIdxDiag, _r) = SystemProperties::information_entropy(_H->getEigVec(_start));
 					_ipr2(_start - _minIdxDiag, _r) = std::log(1.0 / SystemProperties::participation_ratio(_H->getEigVec(_start), 2.0));
@@ -2030,7 +2030,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif			
-				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
 				{
 					for (int i = 1; i <= _Ns; i++)
 					{
@@ -2051,7 +2051,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (u64 _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
 				{
 					// calculate the diagonal elements
 					const auto& _measured	= _measure.measureG(_H->getEigVec(_start));
@@ -2071,7 +2071,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif
-				for (uint _start = 0; _start < _offdiagPairs.size(); ++_start)
+				for (long long _start = 0; _start < _offdiagPairs.size(); ++_start)
 				{
 					const auto& [w, high, low]	= _offdiagPairs[_start];
 					//const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));

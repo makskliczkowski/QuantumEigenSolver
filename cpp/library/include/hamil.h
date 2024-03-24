@@ -226,8 +226,10 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian()
 */
 template<typename _T, uint _spinModes>
 inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
-	: Hamiltonian<_T, _spinModes>(), Ns_(_Ns), Ns(_Ns)
+	: Hamiltonian<_T, _spinModes>()
 {
+	this->Ns_	= _Ns;
+	this->Ns	= _Ns;
 	this->hilbertSpace = Hilbert::HilbertSpace<_T, _spinModes>(Ns_);
 	this->Nh	=  ULLPOW(Ns_);
 }
