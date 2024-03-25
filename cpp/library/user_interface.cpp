@@ -709,8 +709,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	v_1d<arma::Mat<double>> _ent	= v_1d<arma::Mat<double>>(_Ns, -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones));
 	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
 	arma::Mat<double> _gaps			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _gapsV		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _gapsC		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
 	arma::Mat<double> _ipr1			= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
 	arma::Mat<double> _ipr2			= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
 
@@ -758,12 +756,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// (mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant)
 	// the columns will correspond to realizations
 	u64 _hs_fractions_diag		= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
-	u64 _hs_fractions_diag_c	= SystemProperties::hs_fraction_diagonal_cut(0.2, _Nh);
-	u64 _hs_fractions_diag_v	= SystemProperties::hs_fraction_diagonal_cut(200, _Nh);
 	v_1d<arma::Mat<double>> _diagElemsStat(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
-	// here we don't need gaussianity
-	v_1d<arma::Mat<double>> _diagElemsStatVanish(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
-	v_1d<arma::Mat<double>> _diagElemsStatConst(_ops.size(), arma::Mat<double>(4, this->modP.modRanN_, arma::fill::zeros));
 	
 	const double off_extensive_threshold	= 1e-1;
 	const double off_constant_threshold_up	= off_extensive_threshold;
@@ -818,8 +811,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 
 			// save the iprs and the energy to the same file
 			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _gapsV, "gap_ratio_vanish", true);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _gapsC, "gap_ratio_const", true);
 			// participation ratio
 			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr1, "part_entropy_q=1", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr2, "part_entropy_q=2", true);
@@ -831,9 +822,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			{
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat[_opi], "diag_" + _name, true);
-				// vanishing etc
-				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStatVanish[_opi], "diag_" + _name + "_vanish", true);
-				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStatConst[_opi], "diag_" + _name + "_const", true);
 
 				// offdiagonal elements
 				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi], "offdiag_" + _name, true);
@@ -904,13 +892,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag, _maxIdxDiag, _minIdxDiagV, _maxIdxDiagV, _minIdxDiagC, _maxIdxDiagC = 0; 
+		u64 _minIdxDiag, _maxIdxDiag = 0; 
 
 		// set
 		{
 			std::tie(_minIdxDiag, _maxIdxDiag)		= _H->getEnArndAvIdx(_hs_fractions_diag / 2, _hs_fractions_diag / 2);
-			std::tie(_minIdxDiagV, _maxIdxDiagV)	= _H->getEnArndAvIdx(_hs_fractions_diag_v / 2, _hs_fractions_diag_v / 2);
-			std::tie(_minIdxDiagC, _maxIdxDiagC)	= _H->getEnArndAvIdx(_hs_fractions_diag_c / 2, _hs_fractions_diag_c / 2);
 		}
 
 		// -----------------------------------------------------------------------------
@@ -951,11 +937,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			{
 				// calculate the eigenlevel statistics
 				_gaps(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiag, _maxIdxDiag - 1)));
-				_gapsV(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiagV, _maxIdxDiagV - 1)));
-				_gapsC(_r)					= SystemProperties::eigenlevel_statistics(arma::Col<double>(_H->getEigVal().subvec(_minIdxDiagC, _maxIdxDiagC - 1)));
 				LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_gapsV(_r, 0)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_gapsC(_r, 0)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
 			}
 
@@ -1029,33 +1011,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 							// typical2
 							_diagElemsStat[i](3, _r) += _logElem2;
 							
-							// check constant
-							if (_start >= _minIdxDiagC && _start < _maxIdxDiagC)
-							{
-								// save the statistics
-								// mean
-								_diagElemsStatConst[i](0, _r) += _elem;
-								// typical
-								_diagElemsStatConst[i](1, _r) += _logElem;
-								// mean2
-								_diagElemsStatConst[i](2, _r) += _elem2;
-								// typical2
-								_diagElemsStatConst[i](3, _r) += _logElem2;
-
-								// check vanishing
-								if (_start >= _minIdxDiagV && _start < _maxIdxDiagV)
-								{
-									// save the statistics
-									// mean
-									_diagElemsStatVanish[i](0, _r) += _elem;
-									// typical
-									_diagElemsStatVanish[i](1, _r) += _logElem;
-									// mean2
-									_diagElemsStatVanish[i](2, _r) += _elem2;
-									// typical2
-									_diagElemsStatVanish[i](3, _r) += _logElem2;
-								}
-							}
 						}
 					}
 				}
@@ -1069,8 +1024,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 					for (uint ii = 0; ii < 4; ii++)
 					{
 						_diagElemsStat[i](ii, _r)		/= _hs_fractions_diag;
-						_diagElemsStatConst[i](ii, _r)	/= _hs_fractions_diag_c;
-						_diagElemsStatVanish[i](ii, _r) /= _hs_fractions_diag_v;
 					}
 					// save the statistics
 					_diagElemsStat[i](4, _r) = StatisticalMeasures::gaussianity(_diagElems[i].col(_r));
@@ -1086,12 +1039,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 				{
 					_diagElemsStat[i](1, _r) = std::exp(_diagElemsStat[i](1, _r));
 					_diagElemsStat[i](3, _r) = std::exp(_diagElemsStat[i](3, _r));
-
-					// add other exponents as well
-					_diagElemsStatConst[i](1, _r) = std::exp(_diagElemsStatConst[i](1, _r));
-					_diagElemsStatConst[i](3, _r) = std::exp(_diagElemsStatConst[i](3, _r));
-					_diagElemsStatVanish[i](1, _r) = std::exp(_diagElemsStatVanish[i](1, _r));
-					_diagElemsStatVanish[i](3, _r) = std::exp(_diagElemsStatVanish[i](3, _r));
 				}
 			}
 
