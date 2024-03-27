@@ -368,4 +368,26 @@ namespace SystemProperties
 		return -ent / std::log(0.48 * _state.size());
 	}
 
+	// ---------------------------------------------------------------------------
+
+	// ------------------------- O T H E R   H A M I L ---------------------------
+
+	// ---------------------------------------------------------------------------
+	
+	/*
+	* @brief Calculates the mean level spacing of the Hamiltonian matrix. See the 
+	* reference Suntajs, Vidmar, Ergodicity Breaking transition in zero dimensions, PRL 2022 for more details.
+	* @param _H - the Hamiltonian matrix
+	* @returns the mean level spacing
+	*/
+	template <typename _T>
+	[[nodiscard]]
+	inline long double mean_lvl_gamma(const _T& _H)
+	{
+		const auto _Nh		= _H.n_rows;
+		const auto _trace	= arma::trace(_H) / (long double)_Nh;
+		const auto _trace2	= arma::trace(arma::square(_H)) / (long double)_Nh;
+		return _trace2 - _trace * _trace;
+	}
+
 };

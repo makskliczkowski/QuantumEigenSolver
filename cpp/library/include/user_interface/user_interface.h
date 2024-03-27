@@ -496,6 +496,7 @@ private:
 	template<typename _T>
 	void checkETH(std::shared_ptr<Hamiltonian<_T>> _H);
 	void checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H);
+	void checkETH_level_prop(std::shared_ptr<Hamiltonian<double>> _H);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineLattice();
