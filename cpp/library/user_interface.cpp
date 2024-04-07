@@ -283,7 +283,17 @@ void UI::funChoice()
 		case 43:
 			// this option utilizes the Hamiltonian for ETH statistics
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics sweep", LOG_TYPES::CHOICE, 1);
-			this->makeSimETHSweep();
+			this->makeSimETH();
+			break;
+		case 44:
+			// this option utilizes the Hamiltonian for ETH statistics - offdiagonal elements scaling
+			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics offdiagonal elements scaling", LOG_TYPES::CHOICE, 1);
+			this->makeSimETH();
+			break;
+		case 45:
+			// this option utilizes the Hamiltonian time evolution for ETH statistics
+			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics time evolution", LOG_TYPES::CHOICE, 1);
+			this->makeSimETH();
 			break;
 		default:
 			// default case of showing the help
@@ -645,6 +655,10 @@ void UI::makeSimETH()
 			this->checkETH(this->hamDouble);
 		else if (this->chosenFun == 42)
 			this->checkETH_statistics(this->hamDouble);
+		else if (this->chosenFun == 44)
+			this->checkETH_scaling_offdiag(this->hamDouble);
+		else if (this->chosenFun == 45)
+			this->checkETH_time_evo(this->hamDouble);
 	}
 }
 
@@ -685,6 +699,332 @@ void UI::makeSimETHSweep()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
+{
+	_timer.reset();
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
+
+	// check the random field
+	auto _rH	= this->modP.qsm.qsm_h_r_;
+	auto _rA	= this->modP.qsm.qsm_h_ra_;
+	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
+	u64 _Nh		= ULLPOW(_Ns);
+
+	// get info
+	std::string modelInfo	= _H->getInfo();
+	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
+	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_SCALING_OFF", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string extension	= ".h5";
+
+	// set seed
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
+	u64 _hs_fractions_diag			= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
+
+	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
+	// GAMMA (see 2022, Suntajs, PRL)
+	arma::Mat<double> _meanlvl		= -1e5 * arma::Mat<double>(4, this->modP.modRanN_, arma::fill::ones);
+
+	// create the operators
+	auto _sx						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
+	// couplings to calculate the Hybrydization condition!
+	auto _sxc0						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+	auto _sxc1						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 1, (uint)_Ns - 1 });
+	auto _sxc2						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 2, (uint)_Ns - 1 });
+	// couplings for the sz!
+	auto _szc0						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+	auto _szc1						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 1, (uint)_Ns - 1 });
+	auto _szc2						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 2, (uint)_Ns - 1 });
+	// couplings outside the grain
+	auto _szco1						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3, (uint)_Ns - 1});
+	auto _szco2						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 4, (uint)_Ns - 1});
+	auto _szco3						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3, 5 });
+	auto _szcoh						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)_Ns - 1});
+
+	// for each site
+	std::vector<Operators::Operator<double>> _sz_is;
+	std::vector<std::string> _sz_i_names;
+
+	// create the diagonal operators for spin z at each side
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
+		_sz_i_names.push_back("sz_" + STR(i));
+	}
+
+	// create the matrices
+	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxc0, _sxc1, _sxc2, _szc0, _szc1, _szc2, _szco1, _szco2, _szco3, _szcoh };
+	v_1d<std::string> _opsN					= { "sx_l", "sxc_0", "sxc_1", "sxc_2", "szc_0", "szc_1", "szc_2", "szco_3_L", "szco_4_L", "szco_3_5", "szco_l2_l"};
+
+	// matrices for the local sz
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_ops.push_back(_sz_is[i]);
+		_opsN.push_back(_sz_i_names[i]);
+	}
+
+	// create the measurement class
+	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
+	_measure.initializeMatrices(_Nh);
+
+	// (mean, typical, mean2, typical2, mean4, meanabs, gaussianity, binder cumulant)
+	v_1d<arma::Mat<double>> _offdiagElemesStat_high(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Mat<double>> _offdiagElemesStat_low(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
+
+	// ----------------------- nbins operators -----------------------
+	v_1d<Histogram> _histOperatorsOffdiag_high(_ops.size(), Histogram());
+	v_1d<Histogram> _histOperatorsOffdiag_low(_ops.size(), Histogram());
+	uint _nbinOperators = 15 * _Ns;
+
+	// create the histograms for the operators
+	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
+	{
+		// offdiagonal
+		double _offdiagLimit	= 0.5 - 0.025 * _Ns;
+		_histOperatorsOffdiag_low[_opi].reset(_nbinOperators);
+		_histOperatorsOffdiag_low[_opi].uniform(_offdiagLimit, -_offdiagLimit);	
+		_histOperatorsOffdiag_high[_opi].reset(_nbinOperators);
+		_histOperatorsOffdiag_high[_opi].uniform(_offdiagLimit, -_offdiagLimit);
+	}
+
+	// create the saving function
+	std::function<void(uint)> _saver	= [&](uint _r)
+		{
+			// variance in th Hamiltonian
+			saveAlgebraic(dir, "stat" + randomStr + extension, _meanlvl, "mean_level_gamma", false);
+		
+			// append statistics from the diagonal elements
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+
+				// offdiagonal elements
+				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat_high[_opi], "offdiag_high_" + _name, true);
+				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat_low[_opi], "offdiag_low_" + _name, true);
+
+
+				// save the means!
+				if (_r == this->modP.modRanN_)
+				{
+					arma::Col<double> _meanOffdiag_high = arma::mean(_offdiagElemesStat_high[_opi], 1);
+					saveAlgebraic(dir, "stat" + randomStr + extension, _meanOffdiag_high, "mean_offdiag_high_" + _name, true);
+					arma::Col<double> _meanOffdiag_low = arma::mean(_offdiagElemesStat_low[_opi], 1);
+					saveAlgebraic(dir, "stat" + randomStr + extension, _meanOffdiag_low, "mean_offdiag_low_" + _name, true);
+				}
+			}
+
+			// save the distributions of the operators - histograms for the values
+			saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag_high[0].edgesCol(), "offdiag_edges_high", false);
+			saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag_low[0].edgesCol(), "offdiag_edges_low", true);
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag_high[_opi].countsCol(), _name + "_offdiag_counts_high", true);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag_low[_opi].countsCol(), _name + "_offdiag_counts_low", true);
+			}
+
+			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
+		};
+	double _alpha						= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_alpha();
+	double _g0							= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_g0();
+
+	// go through realizations
+	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
+	{
+		// ----------------------------------------------------------------------------
+		
+		// checkpoints etc
+		{
+			LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+			_timer.checkpoint(STR(_r));
+
+			// -----------------------------------------------------------------------------
+
+			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
+			_H->clearH();
+			_H->randomize(this->modP.qsm.qsm_h_ra_, _rH, { "h" });
+
+			// -----------------------------------------------------------------------------
+
+			// set the Hamiltonian
+			_H->buildHamiltonian();
+			_H->diagH(false);
+			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
+		}
+
+		// -----------------------------------------------------------------------------
+				
+		// get the average energy index and the points around it on the diagonal
+		u64 _minIdxDiag, _maxIdxDiag = 0; 
+
+		// set
+		{
+			std::tie(_minIdxDiag, _maxIdxDiag)		= _H->getEnArndAvIdx(_hs_fractions_diag / 2, _hs_fractions_diag / 2);
+		}
+
+		// -----------------------------------------------------------------------------
+		
+		//double _th_freq		= QSM<double>::get_thouless_freq_est(_alpha, _Ns - this->modP.qsm.qsm_N_, _g0);
+		double _th_freq		= QSM<double>::get_thouless_freq_est(_alpha, _g0, _Ns);
+		// calculator of the properties
+		{
+			// -----------------------------------------------------------------------------
+
+			// mean level spacing
+			{
+				_meanlvl(0, _r)		= SystemProperties::mean_lvl_gamma(_H->getHamiltonian());
+				_meanlvl(1, _r)		= SystemProperties::mean_lvl_heis_time(_meanlvl(0, _r), _Ns);
+
+				// get the average energy index and the points around it on the diagonal
+				u64 _hs_fractions_diagi = SystemProperties::hs_fraction_diagonal_cut(0.5, _Nh);
+				const auto [_min, _max] = _H->getEnArndAvIdx(_hs_fractions_diagi / 2, _hs_fractions_diagi / 2);
+				auto _E					= _H->getEigVal().subvec(_min, _max);
+				_meanlvl(2, _r)			= 1.0 / SystemProperties::mean_lvl_spacing(_E);
+				_meanlvl(3, _r)			= 1.0 / SystemProperties::mean_lvl_spacing_typ(_E);
+
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(0, _r)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1, _r)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3, _r)), StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
+			}
+
+			// -----------------------------------------------------------------------------
+
+			// other measures
+			{
+				// get the matrices
+				const auto& _matrices	= _measure.getOpG_mat();
+				const double _omax		= _H->getEigVal(_Nh - 1) - _H->getEigVal(0);
+				// -----------------------------------------------------------------------------
+
+				// offdiagonal
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
+				for(int _opi = 0; _opi < _matrices.size(); _opi++)
+				{
+					const auto& _mat			= _matrices[_opi];
+					arma::Mat<double> _overlaps	= Operators::applyOverlapMat(_H->getEigVec(), _mat);
+
+					u64 _totalIterator_h= 0;
+					u64 _totalIterator_l= 0;
+					const double _avEn	= _H->getEnAv();
+
+					// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
+					for (u64 i = 0; i < _Nh; ++i)
+					{
+						const auto _en_l = _H->getEigVal(i);
+
+						for (u64 j = i + 1; j < _Nh; ++j)
+						{
+							const auto _en_r = _H->getEigVal(j);
+
+							// check the energy difference
+							if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
+								continue;
+
+
+							// calculate the frequency
+							const double w			= std::abs(_en_l - _en_r);
+
+							// calculate the values
+							const auto& _measured	= _overlaps(i, j);
+
+							// save the off-diagonal elements
+
+							auto _elem		= _measured;
+							auto _elem2		= _elem * _elem;
+							auto _logElem	= std::log(std::abs(_elem));
+							auto _logElem2	= std::log(_elem * _elem);
+
+							if (w < _th_freq * 5)
+							{
+								_totalIterator_l++;
+
+								// mean
+								_offdiagElemesStat_low[_opi](0, _r) += _elem;
+								// typical
+								_offdiagElemesStat_low[_opi](1, _r) += _logElem;
+								// mean2
+								_offdiagElemesStat_low[_opi](2, _r) += _elem2;
+								// typical2
+								_offdiagElemesStat_low[_opi](3, _r) += _logElem2;
+								// mean4
+								_offdiagElemesStat_low[_opi](4, _r) += _elem2 * _elem2;
+								// meanabs
+								_offdiagElemesStat_low[_opi](5, _r) += std::abs(_elem);
+
+								// add to value histogram
+								_histOperatorsOffdiag_low[_opi].append(_elem);
+							}
+
+							if (w > _th_freq * 10 && w < 0.8 * _omax)
+							{
+								_totalIterator_h++;
+
+								// mean
+								_offdiagElemesStat_high[_opi](0, _r) += _elem;
+								// typical
+								_offdiagElemesStat_high[_opi](1, _r) += _logElem;
+								// mean2
+								_offdiagElemesStat_high[_opi](2, _r) += _elem2;
+								// typical2
+								_offdiagElemesStat_high[_opi](3, _r) += _logElem2;
+								// mean4
+								_offdiagElemesStat_high[_opi](4, _r) += _elem2 * _elem2;
+								// meanabs
+								_offdiagElemesStat_high[_opi](5, _r) += std::abs(_elem);
+
+								// add to value histogram
+								_histOperatorsOffdiag_high[_opi].append(_elem);
+							}
+						}
+					}
+
+					// finalize statistics
+					{
+						for (uint ii = 0; ii < 6; ii++)
+						{
+							_offdiagElemesStat_high[_opi](ii, _r) /= (long double)_totalIterator_h;
+							_offdiagElemesStat_low[_opi](ii, _r) /= (long double)_totalIterator_l;
+						}
+						// statistics
+						_offdiagElemesStat_high[_opi](6, _r)	= StatisticalMeasures::gaussianity(_offdiagElemesStat_high[_opi](5, _r), _offdiagElemesStat_high[_opi](2, _r));
+						_offdiagElemesStat_high[_opi](7, _r)	= StatisticalMeasures::binder_cumulant(_offdiagElemesStat_high[_opi](2, _r), _offdiagElemesStat_high[_opi](4, _r));
+						_offdiagElemesStat_low[_opi](6, _r)		= StatisticalMeasures::gaussianity(_offdiagElemesStat_low[_opi](5, _r), _offdiagElemesStat_low[_opi](2, _r));
+						_offdiagElemesStat_low[_opi](7, _r)		= StatisticalMeasures::binder_cumulant(_offdiagElemesStat_low[_opi](2, _r), _offdiagElemesStat_low[_opi](4, _r));
+					}
+
+					// additionally, for typical values, calculate the exponential of the mean
+					{
+						for (auto ii : { 1, 3 })
+						{
+							_offdiagElemesStat_high[_opi](ii, _r)	= std::exp(_offdiagElemesStat_high[_opi](ii, _r));
+							_offdiagElemesStat_low[_opi](ii, _r)	= std::exp(_offdiagElemesStat_low[_opi](ii, _r));
+						}
+					}
+				}
+			}
+		}
+		// save the checkpoints
+		if (_Ns >= 14 && _r % 2 == 0)
+		{
+			// save the diagonals
+			_saver(_r);
+		}
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+		// -----------------------------------------------------------------------------
+	}
+
+	// save the diagonals
+	_saver(this->modP.modRanN_);
+
+	// bye
+	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 {
 	_timer.reset();
@@ -699,7 +1039,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// get info
 	std::string modelInfo	= _H->getInfo();
 	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
-	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_STATISTICS", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_STATISTICS_COR", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
 	std::string extension	= ".h5";
 
 	// set seed
@@ -711,38 +1051,15 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// GAMMA (see 2022, Suntajs, PRL)
 	arma::Col<double> _meanlvl		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
 
-	// create the operators
-	auto _sx						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
-	// couplings to calculate the Hybrydization condition!
-	auto _sxc0						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
-	auto _sxc1						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 1, (uint)_Ns - 1 });
-	auto _sxc2						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 2, (uint)_Ns - 1 });
-	// couplings for the sz!
-	auto _szc0						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
-	auto _szc1						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 1, (uint)_Ns - 1 });
-	auto _szc2						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 2, (uint)_Ns - 1 });
-
-	// for each site
-	std::vector<Operators::Operator<double>> _sz_is;
-	std::vector<std::string> _sz_i_names;
-
-	// create the diagonal operators for spin z at each side
-	for (auto i = 0; i < _Ns; ++i)
-	{
-		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
-		_sz_i_names.push_back("sz_" + STR(i));
-	}
+	// couplings outside the grain
+	auto _szco1						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3, (uint)_Ns - 1});
+	auto _szco2						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 4, (uint)_Ns - 1});
+	auto _szco3						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3, 5 });
+	auto _szcoh						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)_Ns - 1});
 
 	// create the matrices
-	v_1d<Operators::Operator<double>> _ops	= { _sx, _sxc0, _sxc1, _sxc2, _szc0, _szc1, _szc2 };
-	v_1d<std::string> _opsN					= { "sx_l", "sxc_0", "sxc_1", "sxc_2", "szc_0", "szc_1", "szc_2"};
-
-	// matrices for the local sz
-	for (auto i = 0; i < _Ns; ++i)
-	{
-		_ops.push_back(_sz_is[i]);
-		_opsN.push_back(_sz_i_names[i]);
-	}
+	v_1d<Operators::Operator<double>> _ops	= { _szco1, _szco2, _szco3, _szcoh };
+	v_1d<std::string> _opsN					= { "szco_3_L", "szco_4_L", "szco_3_5", "szco_l2_l"};
 
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
@@ -1216,7 +1533,6 @@ void UI::checkETH_level_prop(std::shared_ptr<Hamiltonian<double>> _H)
 	// the columns will correspond to realizations
 	u64 _hs_fractions_diag		= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
 	// due to mobility edges, for the statistics we'll save two sets of data
-	u64 _hs_fractions_diag_stat = SystemProperties::hs_fraction_diagonal_cut(0.1, _Nh);
 	v_1d<arma::Mat<double>> _diagElemsStat(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
 	v_1d<arma::Mat<double>> _diagElemsStat_cut(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
 	
@@ -1695,6 +2011,207 @@ void UI::checkETH_level_prop(std::shared_ptr<Hamiltonian<double>> _H)
 		file_rsync << "rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./";
 		file_rsync.close();
 	}
+
+	// bye
+	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H)
+{
+	_timer.reset();
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
+
+	// check the random field
+	auto _rH	= this->modP.qsm.qsm_h_r_;
+	auto _rA	= this->modP.qsm.qsm_h_ra_;
+	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
+	u64 _Nh		= ULLPOW(_Ns);
+
+	// get info
+	std::string modelInfo	= _H->getInfo();
+	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
+	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_TIME_EVO", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string extension	= ".h5";
+
+	// set seed
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
+	// create the operators
+	auto _sx						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
+	// couplings for the sz!
+	auto _szc0						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+
+	// for each site
+	std::vector<Operators::Operator<double>> _sz_is;
+	std::vector<std::string> _sz_i_names;
+
+	// create the diagonal operators for spin z at each side
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
+		_sz_i_names.push_back("sz_" + STR(i));
+	}
+
+	// create the matrices
+	v_1d<Operators::Operator<double>> _ops	= { _sx, _szc0 };
+	v_1d<std::string> _opsN					= { "sx_l", "szc_0" };
+
+	// matrices for the local sz
+	for (auto i = 0; i < _Ns; ++i)
+	{
+		_ops.push_back(_sz_is[i]);
+		_opsN.push_back(_sz_i_names[i]);
+	}
+
+	// create the measurement class
+	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
+	_measure.initializeMatrices(_Nh);
+
+	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
+	// GAMMA (see 2022, Suntajs, PRL)
+	// gamma0_2, t_heisenberg_gamma, _t_heisenberg_mean, _t_heisenberg_typ
+	arma::Mat<double> _meanlvl		= -1e5 * arma::Mat<double>(4, this->modP.modRanN_, arma::fill::ones);
+	u64 _hs_fractions_diag			= SystemProperties::hs_fraction_diagonal_cut(0.5, _Nh);
+
+
+	// time evolution saved here
+	long double _heisenberg_time_est	= ULLPOW((_Ns));
+	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 200), 5000);
+	
+	// create initial states for the quench
+	arma::Col<cpx> _initial_state_dn(_Nh, arma::fill::zeros);
+	_initial_state_dn(0)				= 1.0;
+
+	// save the time evolution here
+	v_1d<arma::Mat<double>> _timeEvolution(_ops.size(), arma::Mat<double>(_timespace.size(), this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Mat<double>> _microcanonical(_ops.size(), arma::Mat<double>(3, this->modP.modRanN_, arma::fill::zeros));
+	v_1d<arma::Col<double>> _diagonal(_ops.size(), arma::Col<double>(_Nh, arma::fill::zeros));
+
+	// create the saving function
+	std::function<void(uint)> _saver = [&](uint _r)
+		{
+			// variance in th Hamiltonian
+			saveAlgebraic(dir, "stat" + randomStr + extension, _meanlvl, "mean_level_gamma", false);
+
+			// save the matrices for time evolution
+			saveAlgebraic(dir, "evo" + randomStr + extension, _timespace, "time", false);
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolution[_opi], _name + "_evo", true);
+				saveAlgebraic(dir, "evo" + randomStr + extension, _microcanonical[_opi], _name + "_microc", true);
+			}
+
+			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
+		};
+
+	// go through realizations
+	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
+	{
+		// ----------------------------------------------------------------------------
+		
+		// checkpoints etc
+		{
+			LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+			_timer.checkpoint(STR(_r));
+
+			// -----------------------------------------------------------------------------
+
+			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
+			_H->clearH();
+			_H->randomize(this->modP.qsm.qsm_h_ra_, _rH, { "h" });
+
+			// -----------------------------------------------------------------------------
+
+			// set the Hamiltonian
+			_H->buildHamiltonian();
+			_H->diagH(false);
+			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
+		}
+
+		// -----------------------------------------------------------------------------
+
+		//double _heis_freq	= 0.0;
+		//double _th_freq		= QSM<double>::get_thouless_freq_est(_H->get_alpha(), _Ns);
+		// calculator of the properties
+		{
+			// -----------------------------------------------------------------------------
+
+			// mean level spacing
+			{
+				_meanlvl(0, _r)		= SystemProperties::mean_lvl_gamma(_H->getHamiltonian());
+				_meanlvl(1, _r)		= SystemProperties::mean_lvl_heis_time(_meanlvl(_r), _Ns);
+
+				// get the average energy index and the points around it on the diagonal
+				const auto [_min, _max] = _H->getEnArndAvIdx(_hs_fractions_diag / 2, _hs_fractions_diag / 2);
+				auto _E					= _H->getEigVal().subvec(_min, _max);
+				_meanlvl(2, _r)			= 1.0 / SystemProperties::mean_lvl_spacing(_E);
+				_meanlvl(3, _r)			= 1.0 / SystemProperties::mean_lvl_spacing_typ(_E);
+
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(0, _r)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1, _r)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3, _r)), StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
+			}
+
+			// -----------------------------------------------------------------------------
+
+			// other measures
+			{
+				// get the matrices
+				const auto& _matrices				= _measure.getOpG_mat();
+				const arma::Col<double> _overlaps	= _H->getEigVec().t() * arma::real(_initial_state_dn);
+				const arma::Col<double> _soverlaps	= arma::square(arma::abs(_overlaps));
+
+				// microcanonical and diagonal ensembles
+#pragma omp parallel for num_threads(this->threadNum)
+				for (int _opi = 0; _opi < _ops.size(); ++_opi)
+				{
+					int _hs_fractions_diag_in		= 200;
+					const auto [_min, _max]			= _H->getEnArndAvIdx(_hs_fractions_diag_in / 2, _hs_fractions_diag_in / 2);
+
+					for (int i = 0; i < _Nh; ++i)
+						_diagonal[_opi](i)			= Operators::applyOverlap(_H->getEigVec(i), _matrices[_opi]);
+					//_diagonal[_opi]				= Operators::applyOverlapMat(_H->getEigVec(), _matrices[_opi]).diag();
+
+					// save the microcanonical average
+					_microcanonical[_opi](0, _r)	= arma::dot(_diagonal[_opi], _soverlaps);
+					_microcanonical[_opi](1, _r)	= arma::dot(_diagonal[_opi].subvec(_min, _max), _soverlaps.subvec(_min, _max));
+					_microcanonical[_opi](2, _r)	= arma::mean(_diagonal[_opi].subvec(_min, _max));
+				}
+
+				// -----------------------------------------------------------------------------
+
+#pragma omp parallel for num_threads(this->threadNum)
+				for (int _ti = 0; _ti < _timespace.size(); _ti++)
+				{
+					const auto _time = _timespace(_ti);
+					const auto _st	 = SystemProperties::TimeEvolution::time_evo(_H->getEigVec(), _H->getEigVal(), _overlaps, _time);
+
+					// for each operator we can now apply the expectation value
+					
+					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+					{
+						const cpx _rt					= arma::as_scalar(arma::cdot(_st, arma::Col<cpx>(_matrices[_opi] * _st)));
+						_timeEvolution[_opi](_ti, _r)	= std::real(_rt); 
+					}
+				}
+			}
+		}
+		// save the checkpoints
+		if (_Ns >= 14 && _r % 2 == 0)
+		{
+			// save the diagonals
+			_saver(_r);
+		}
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+		// -----------------------------------------------------------------------------
+	}
+
+	// save the diagonals
+	_saver(this->modP.modRanN_);
 
 	// bye
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);

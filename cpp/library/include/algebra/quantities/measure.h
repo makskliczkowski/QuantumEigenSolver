@@ -113,30 +113,30 @@ public:
 
 	// ############ GETTERS ############
 
-	auto getNs()					const noexcept -> size_t					{ return Ns_;			};
-	auto getDir()					const noexcept -> std::string				{ return dir_;			};
-	auto getThreads()				const noexcept -> uint						{ return threads_;		};
-	auto getOpG()					const noexcept -> OPG						{ return opG_;			};
-	auto getOpG_mat()				const noexcept -> v_1d<arma::SpMat<_T>>&	{ return MG_;			};
-	auto getOpG_mat(uint i)			const noexcept -> v_1d<arma::SpMat<_T>>&	{ return MG_[i];		};
-	auto getOpGN(uint i)			const noexcept -> std::string				{ return opG_[i].getNameS(); };
-	auto getOpL()					const noexcept -> OPL						{ return opL_;			};
-	auto getOpLN(uint i)			const noexcept -> std::string				{ return opL_[i].getNameS(); };
-	auto getOpC()					const noexcept -> OPC						{ return opC_;			};
-	auto getOpCN(uint i)			const noexcept -> std::string				{ return opC_[i].getNameS(); };
-	auto getLat()					const noexcept -> std::shared_ptr<Lattice>	{ return lat_;			};
-	auto getValG()					const noexcept -> const v_1d<_T>&			{ return valG_;			};
-	auto getValL()					const noexcept -> const v_1d<arma::Col<_T>>&{ return valL_;			};
-	auto getValC()					const noexcept -> const v_1d<arma::Mat<_T>>&{ return valC_;			};
+	auto getNs()					const noexcept -> size_t						{ return Ns_;			};
+	auto getDir()					const noexcept -> std::string					{ return dir_;			};
+	auto getThreads()				const noexcept -> uint							{ return threads_;		};
+	auto getOpG()					const noexcept -> OPG							{ return opG_;			};
+	auto getOpG_mat()				const noexcept -> const v_1d<arma::SpMat<_T>>&	{ return MG_;			};
+	auto getOpG_mat(uint i)			const noexcept -> arma::SpMat<_T>&				{ return MG_[i];		};
+	auto getOpGN(uint i)			const noexcept -> std::string					{ return opG_[i].getNameS(); };
+	auto getOpL()					const noexcept -> OPL							{ return opL_;			};
+	auto getOpLN(uint i)			const noexcept -> std::string					{ return opL_[i].getNameS(); };
+	auto getOpC()					const noexcept -> OPC							{ return opC_;			};
+	auto getOpCN(uint i)			const noexcept -> std::string					{ return opC_[i].getNameS(); };
+	auto getLat()					const noexcept -> std::shared_ptr<Lattice>		{ return lat_;			};
+	auto getValG()					const noexcept -> const v_1d<_T>&				{ return valG_;			};
+	auto getValL()					const noexcept -> const v_1d<arma::Col<_T>>&	{ return valL_;			};
+	auto getValC()					const noexcept -> const v_1d<arma::Mat<_T>>&	{ return valC_;			};
 
 	// ############ SETTERS ############
 
-	auto setNs(size_t _Ns)					noexcept -> void					{ Ns_ = _Ns;			};
-	auto setDir(const std::string& _dir)	noexcept -> void					{ dir_ = _dir;			};
-	auto setThreads(uint _threads)			noexcept -> void					{ threads_ = _threads;	};
-	auto setOpG(const OPG& _opG)			noexcept -> void					{ opG_ = _opG;			};
-	auto setOpL(const OPL& _opL)			noexcept -> void					{ opL_ = _opL;			};
-	auto setOpC(const OPC& _opC)			noexcept -> void					{ opC_ = _opC;			};
+	auto setNs(size_t _Ns)					noexcept -> void						{ Ns_ = _Ns;			};
+	auto setDir(const std::string& _dir)	noexcept -> void						{ dir_ = _dir;			};
+	auto setThreads(uint _threads)			noexcept -> void						{ threads_ = _threads;	};
+	auto setOpG(const OPG& _opG)			noexcept -> void						{ opG_ = _opG;			};
+	auto setOpL(const OPL& _opL)			noexcept -> void						{ opL_ = _opL;			};
+	auto setOpC(const OPC& _opC)			noexcept -> void						{ opC_ = _opC;			};
 };
 
 // ############################################################################################################################################################

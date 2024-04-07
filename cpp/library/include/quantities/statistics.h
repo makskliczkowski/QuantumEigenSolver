@@ -37,15 +37,15 @@ namespace SystemProperties
 														size_t _threads = 1)
 		{
 			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
-
+			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);
+		
 			// go through the eigenstates
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(_threads) reduction(+: _ret)
-#endif // _DEBUG
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(_threads) reduction(+: _ret)
+//#endif // _DEBUG
 			for (auto i = 0; i < _eigenstates.n_cols; ++i)
 			{
-				const auto _exp = std::exp(-I * _time * _eigvals(i));
-				_ret += _exp * _overlaps(i) * _eigenstates.col(i);
+				_ret += _exp(i) * _overlaps(i) * _eigenstates.col(i);
 			}
 			return _ret;
 		}
@@ -375,6 +375,24 @@ namespace SystemProperties
 	// ---------------------------------------------------------------------------
 	
 	/*
+	* @brief Calculate the mean level spacing of the Hamiltonian matrix.
+	* @param _E - the eigenvalues of the Hamiltonian matrix
+	*/
+	template <typename _T>
+	[[nodiscard]]
+	inline double mean_lvl_spacing(const _T& _E)
+	{
+		return arma::mean(arma::diff(_E));
+	}
+
+	template <typename _T>
+	[[nodiscard]]
+	inline double mean_lvl_spacing_typ(const _T& _E)
+	{
+		return std::exp(arma::mean(arma::log(arma::diff(_E))));
+	}
+
+	/*
 	* @brief Calculates the mean level spacing of the Hamiltonian matrix. See the 
 	* reference Suntajs, Vidmar, Ergodicity Breaking transition in zero dimensions, PRL 2022 for more details.
 	* @param _H - the Hamiltonian matrix
@@ -390,4 +408,41 @@ namespace SystemProperties
 		return _trace2 - _trace * _trace;
 	}
 
+	/*
+	*/
+	inline double mean_lvl_xi(double gamma2)
+	{
+		auto _gamma			= std::sqrt(gamma2);
+		auto _NE			= 1000;
+		arma::vec _energies = arma::linspace(0, _gamma, _NE);
+		auto _dE			= _gamma / (double)_NE;
+		arma::vec _values	= arma::exp(-arma::square(_energies) / 2.0 / gamma2) / std::sqrt(TWOPI * gamma2);
+		return arma::sum(_values * _dE);
+	}
+
+	/*
+	* @brief Calculates the Heisenberg time from the mean level spacing obtained from the Hamiltonian matrix.
+	* @param gamma2 - the mean level spacing
+	* @param L - the system size
+	* @returns the Heisenberg time
+	*/
+	inline double mean_lvl_heis_time(double gamma2, int L)
+	{
+		const auto xi = mean_lvl_xi(gamma2);
+		return xi * (long double)(ULLPOW(L)) / std::sqrt(gamma2);
+
+	}
+
+	/*
+	* @brief Calculates the Heisenberg frequency from the mean level spacing obtained from the Hamiltonian matrix.
+	* @param gamma2 - the mean level spacing
+	* @param L - the system size
+	* @returns the Heisenberg frequency
+	*/
+	inline double mean_lvl_heis_freq(double gamma2, int L)
+	{
+		return 1.0 / mean_lvl_heis_time(gamma2, L);
+	}
+
+	// ---------------------------------------------------------------------------
 };

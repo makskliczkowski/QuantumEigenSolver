@@ -46,6 +46,20 @@ namespace Operators
 		return arma::cdot(_C, _mat * _C);
 	}
 
+	/*
+	* @brief Applies the overlap between all the states in the matrix.
+	* @param _eigvecs the eigenvectors matrix
+	* @param _mat the many body matrix
+	* @returns the overlap matrix
+	*/
+	template<typename _T, typename _M2>
+	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, const _M2& _mat)
+	{
+		return _eigvecs.t() * _mat * _eigvecs;
+	}
+
+	// _____________________________________________________________________________________________________________________________
+
 	template<typename _M, typename _Ct>
 	inline _Ct applyOverlap(const arma::subview_col<_Ct>& _C, const _M& _mat)
 	{

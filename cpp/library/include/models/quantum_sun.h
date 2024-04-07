@@ -97,6 +97,75 @@ public:
 		int prec = 2)							const override final;
 	void updateInfo()							override final		{ this->info_ = this->info({}, ",", 3); };
 
+	// ###############################################################################################
+
+	static double get_thouless_freq_est(double _alpha, double g_0, double _L)	
+	{ 
+		double _freq = 0.0;
+		
+		if (g_0 == 0.5)
+		{
+			if (_alpha > 0.95)
+			{
+				_freq = 0.39 * std::exp(-4.05 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.88)
+			{
+				_freq = 0.83 * std::exp(-2.05 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.8)
+			{
+				_freq = 2.2 * std::exp(-1.65 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.77)
+			{
+				_freq = 2.55 * std::exp(-1.13 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.74)
+			{
+				_freq = 4.5 * std::exp(-1.2 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else
+			{
+				_freq = 4.5 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
+			}	 
+		}
+		else if (g_0 == 1.0)
+		{
+			if (_alpha > 0.95)
+			{
+				_freq = 0.39 * std::exp(-2.05 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.88)
+			{
+				_freq = 0.48 * std::exp(-1.18 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.8)
+			{
+				_freq = 1.0 * std::exp(-1.14 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.77)
+			{
+				_freq = 2.55 * std::exp(-1.13 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.74)
+			{
+				_freq = 4.5 * std::exp(-1.2 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else
+			{
+				_freq = 4.5 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+		}
+		else
+		{
+			_freq = 2 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
+		}
+
+		return _freq;
+	};
+	double get_alpha()							const				{ return this->a_[0];	};
+	double get_g0()								const				{ return this->g0_;		};
 };
 
 // ##########################################################################################################################################
