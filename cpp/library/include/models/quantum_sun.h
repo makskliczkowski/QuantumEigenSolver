@@ -127,7 +127,7 @@ public:
 			}
 			else
 			{
-				_freq = 4.5 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
+				_freq = 15 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
 			}	 
 		}
 		else if (g_0 == 1.0)
@@ -142,19 +142,23 @@ public:
 			}
 			else if (_alpha > 0.8)
 			{
-				_freq = 1.0 * std::exp(-1.14 * std::log(1.0 / _alpha / _alpha) * _L);
+				_freq = 2.55 * std::exp(-1.14 * std::log(1.0 / _alpha / _alpha) * _L);
 			}
 			else if (_alpha > 0.77)
 			{
-				_freq = 2.55 * std::exp(-1.13 * std::log(1.0 / _alpha / _alpha) * _L);
+				_freq = 4.55 * std::exp(-1.06 * std::log(1.0 / _alpha / _alpha) * _L);
 			}
 			else if (_alpha > 0.74)
 			{
-				_freq = 4.5 * std::exp(-1.2 * std::log(1.0 / _alpha / _alpha) * _L);
+				_freq = 7.5 * std::exp(-1.2 * std::log(1.0 / _alpha / _alpha) * _L);
+			}
+			else if (_alpha > 0.7)
+			{
+				_freq = 15 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
 			}
 			else
 			{
-				_freq = 4.5 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
+				_freq = 20 * std::exp(-1.0 * std::log(1.0 / _alpha / _alpha) * _L);
 			}
 		}
 		else
@@ -166,6 +170,7 @@ public:
 	};
 	double get_alpha()							const				{ return this->a_[0];	};
 	double get_g0()								const				{ return this->g0_;		};
+	double get_mobility_edge(double _E)			const;
 };
 
 // ##########################################################################################################################################
@@ -325,6 +330,26 @@ inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>&& _hil, const size_t _N,
 	//change info
 	this->info_ = this->info();
 	this->updateInfo();
+}
+
+// ##########################################################################################################################################
+
+// ############################################################### M E T H S ################################################################
+
+// ##########################################################################################################################################
+
+/*
+* @brief Returns the mobility edge of the QSM model. The mobility edge is calculated using the standard deviation of the eigenvalues of the Hamiltonian.
+* It is calculated as in: Konrad Pawlik, Piotr Sierant, Lev Vidmar, Jakub Zakrzewski (2023)
+*/
+template<typename _T>
+inline double QSM<_T>::get_mobility_edge(double _E) const
+{
+	double _std = arma::stddev(this->eigVal_) / std::sqrt(this->Ns_);
+	double _eps = (_E - this->eigVal_(0)) / (this->eigVal_(this->Nh - 1) - this->eigVal_(0));
+	double _bwd = (this->eigVal_(this->Nh_ - 1) - this->eigVal_(0));
+	_bwd		= _bwd / (double)this->Ns_;
+	return std::exp(_bwd * _bwd * (_eps - 0.5) * (_eps - 0.5) / _std / _std / 4.0) / std::sqrt(2.0);
 }
 
 // ##########################################################################################################################################

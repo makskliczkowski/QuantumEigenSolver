@@ -127,6 +127,9 @@ public:
 	// -------------------------------------------- GETTERS ---------------------------------------------------
 	auto getDegeneracies()								const -> v_2d<u64>;
 	auto getEnArndAvIdx(long long _l, long long _r)		const -> std::pair<u64, u64>;
+	auto getEnArndEIdx(long long _l, long long _r, u64)	const -> std::pair<u64, u64>;
+	auto getEnArndEnEps(u64 _Eidx, double _eps)			const -> std::pair<u64, u64>;
+
 	auto getEnPairsIdx(u64 _mn, u64 _mx, double _tol)	const -> v_1d<std::tuple<double, u64, u64>>;
 	auto getEnAvIdx()									const -> u64								{ return this->avEnIdx;															};								
 	auto getEnAv()										const -> double								{ return this->avEn;															};
@@ -134,7 +137,8 @@ public:
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
 	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
 	// hamiltonian
-	auto getHamiltonian()								const -> const arma::SpMat<_T>&				{ return this->H_;																};								
+	auto getHamiltonian()								const -> const arma::SpMat<_T>&				{ return this->H_;																};
+	auto getHamiltonian(u64 i, u64 j)					const -> _T									{ return this->H_(i, j);														};
 	auto getHamiltonianSize()							const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
 	auto getHamiltonianSizeH()							const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
 	auto getSymRot()									const -> arma::SpMat<_T>					{ return this->hilbertSpace.getSymRot();										};
@@ -169,6 +173,8 @@ protected:
 	virtual void hamiltonian();
 	auto setHElem(u64 k, _T val, u64 newIdx)			-> void;									// sets the Hamiltonian elements in a virtual way
 	auto calcAvEn()										-> void;									// calculate the average energy
+public:
+	auto calcEnIdx(double _E)							-> u64;										// calculate the index of the energy closest to the given energy
 
 public:
 	auto buildHamiltonian()								-> void;
@@ -232,6 +238,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
 	this->Ns	= _Ns;
 	this->hilbertSpace = Hilbert::HilbertSpace<_T, _spinModes>(Ns_);
 	this->Nh	=  ULLPOW(Ns_);
+	this->Nh_	=  ULLPOW(Ns_);
 }
 
 /*
@@ -246,6 +253,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, 
 	this->Ns	=	this->hilbertSpace.getNs();
 	this->Ns_   =	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
+	this->Nh_	=	this->Nh;
 };
 
 /*
@@ -260,6 +268,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinM
 	this->Ns	=	this->hilbertSpace.getNs();
 	this->Ns_	=	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
+	this->Nh_	=	this->Nh;
 };			
 
 // ##########################################################################################################################################
@@ -379,6 +388,24 @@ inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 	this->avEnIdx				= _it - std::begin(tmp);
 }
 
+/*
+* @brief Calculates the index of the energy closest to the given energy
+* @param _E energy to be compared with
+* @returns index of the energy closest to the given energy
+*/
+template<typename _T, uint _spinModes>
+inline u64 Hamiltonian<_T, _spinModes>::calcEnIdx(double _E)
+{
+	// calculates the energy difference to find the closest element (the smallest)
+	v_1d<double> tmp(Nh, 0.0);
+	for (int i = 0; i < Nh; i++)
+		tmp[i] = std::abs(this->getEigVal(i) - _E);
+
+	// get the iterator
+	v_1d<double>::iterator _it	= std::min_element(std::begin(tmp), std::end(tmp));
+	return _it - std::begin(tmp);
+}
+
 // ##########################################################################################################################################
 
 /*
@@ -391,6 +418,43 @@ template<typename _T, uint _spinModes>
 inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long _l, long long _r) const
 {
 	return SystemProperties::hs_fraction_around_idx(_l, _r, this->avEnIdx, this->Nh);
+}
+
+// ##########################################################################################################################################
+
+/*
+* @brief Calculates the index closest to the given energy in the Hamiltonian.
+* @param _l number of elements to the left from the given energy
+* @param _r number of elements to the right from the given energy
+* @param _idx index of the energy to be compared with
+* @returns pair of indices of the energy spectrum around the given energy
+*/
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEIdx(long long _l, long long _r, u64 _idx) const
+{
+	return SystemProperties::hs_fraction_around_idx(_l, _r, _idx, this->Nh);
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Calculates the indices of the energy pairs in the spectrum that are close to each other within the given tolerance
+* This is based on the energy density! E/V
+* @param _Eidx index of the energy spectrum
+* @param _eps tolerance of the energy difference
+*/
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEnEps(u64 _Eidx, double _eps) const
+{
+	u64 _imax = _Eidx;
+	u64 _imin = _Eidx;
+	// find the maximum index
+	while (((this->eigVal_(_imax) - this->eigVal_(_Eidx)) / this->Ns) < _eps && _imax < this->Nh)
+		_imax++;
+	// find the minimum index
+	while (((this->eigVal_(_Eidx) - this->eigVal_(_imin)) / this->Ns) < _eps && _imin >= 0)
+		_imin--;
+	return std::make_pair(_imin, _imax);
 }
 
 // ##########################################################################################################################################

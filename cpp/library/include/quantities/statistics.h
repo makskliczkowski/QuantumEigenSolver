@@ -50,7 +50,185 @@ namespace SystemProperties
 			return _ret;
 		}
 
+		// ---------------------------------------------------------------------------
+
+		enum class QuenchTypes
+		{
+			// random
+			RANDP,		
+			RANDN,
+			RANDU,
+			// antiferromagnetic
+			AF_UP,
+			AF_DN,
+			// ferromagnetic
+			F_UP,
+			F_DN,
+			// domain walls
+			DW_HALF_UP,
+			DW_HALF_DN,
+			DW_THIRD_UP,
+			DW_THIRD_DN,
+		};
+
+		/*
+		* @brief Create the initial state after the quench. The quench is defined by the initial state
+		* and the type of the quench. The quench can be random, antiferromagnetic, ferromagnetic, or domain walls.
+		* @param _type - the type of the quench
+		* @param _Nh - the size of the Hilbert space
+		* @param _Ns - the number of spins
+		* @returns the initial state
+		*/
+		template <typename _T>
+		[[nodiscard]]
+		inline arma::Col<_T> create_initial_quench_state(QuenchTypes _type, u64 _Nh, uint _Ns)
+		{
+			arma::Col<_T> _ret(_Nh, arma::fill::zeros);
+			switch (_type)
+			{
+			case SystemProperties::TimeEvolution::QuenchTypes::RANDP:
+			{
+				u64 _idx = 0;
+				for (int i = 0; i < _Ns; ++i)
+				{
+					double _p = arma::randu<double>(arma::distr_param(0.0, 1.0));
+					if (_p < 0.5)
+						_idx |= 1 << i;
+				}
+				_ret(_idx) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::RANDN:
+			{
+				_ret = arma::randn<arma::Col<_T>>(_ret.n_elem);
+				_ret /= arma::norm(_ret);
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::RANDU:
+			{
+				_ret = arma::randu<arma::Col<_T>>(_ret.n_elem);
+				_ret /= arma::norm(_ret);
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::AF_UP:
+			{
+				u64 _idx = _Ns % 2 == 0 ? _Nh / 3 : (_Nh + 1) / 3;
+				_ret(_idx) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::AF_DN:
+			{
+				u64 _idx = _Ns % 2 == 0 ? _Nh / 3 : (_Nh + 1) / 3;
+				Binary::flipAll(_idx, _Ns);
+				_ret(_idx) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::F_UP:
+			{
+				_ret(_Nh - 1) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::F_DN:
+			{
+				_ret(0) = 1.0;
+				break;
+			}
+			// domain walls
+			case SystemProperties::TimeEvolution::QuenchTypes::DW_HALF_UP:
+			{
+				_ret(ULLPOW((int(_Ns / 2) - 1))) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::DW_HALF_DN:
+			{
+
+				u64 _idx = ULLPOW(((_Ns / 2) - 1));
+				Binary::flipAll(_idx, _Ns);
+				_ret(_idx) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::DW_THIRD_UP:
+			{
+				u64 _idx = ULLPOW((int(_Ns / 3) - 1));
+				_ret(_idx) = 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::DW_THIRD_DN:
+			{
+				u64 _idx = ULLPOW((int(_Ns / 3) - 1));
+				Binary::flipAll(_idx, _Ns);
+				_ret(_idx) = 1.0;
+				break;
+			}
+			default:
+				_ret(0) = 1.0;
+				break;
+			}
+			return _ret;
+		}
+
+		// ---------------------------------------------------------------------------
+
+		/*
+		* @brief Calculate the mean energy after quench
+		* @param _H - the Hamiltonian matrix
+		* @param _state - the state
+		* @returns the mean energy
+		*/
+		template <typename _T, typename _M>
+		[[nodiscard]]
+		inline typename std::common_type<_T,_M>::type calc_mean_energy_quench(const arma::SpMat<_M>& _H, const arma::Col<_T>& _state)
+		{
+			using _R	= typename std::common_type<_T, _M>::type;
+			auto _out	= arma::cdot(_state, _H * _state);
+			return algebra::cast<_R>(_out);
+		}
+
 	};
+
+	// ---------------------------------------------------------------------------
+
+	// -------------------------- P R O P E R T I E S ----------------------------
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Caculate the Local density of states (LDOS) of the system. Otherwise known as the
+	* strength function. The LDOS is calculated based on the energies and overlaps of the system.
+	* @param _energies - the energies of the system
+	* @param _ovelaps - the overlaps of the system
+	* @param _degenerate - whether the system is degenerate
+	* @returns the LDOS
+	* @references PHYSICAL REVIEW B 99, 174313 (2019)
+	*/
+	template <typename _T>
+	[[nodiscard]]
+	inline arma::Col<double> calculate_LDOS(const arma::Col<double>& _energies, const arma::Col<_T>& _ovelaps, bool _degenerate = false)
+	{
+		if(!_degenerate)
+			return arma::square(arma::abs(_ovelaps));
+		else 
+			{
+			arma::Col<double> _ret(_energies.size(), arma::fill::zeros);
+			for (u64 i = 0; i < _energies.size(); ++i)
+			{
+				auto _en = _energies(i);
+				for (u64 j = 0; j < _energies.size(); ++j)
+				{
+					if (std::abs(_en - _energies(j)) < SYSTEM_PROPERTIES_MIN_SPACING)
+						_ret(i) += std::norm(_ovelaps(j));
+				}
+			}
+			return _ret;
+		}
+	}
+
+	template <typename _T>
+	[[nodiscard]]
+	inline arma::uvec calculate_DOS(const _T& _energies, size_t _nbins = 100)
+	{
+		return arma::hist(_energies, _nbins);
+	}
 
 	// ---------------------------------------------------------------------------
 
@@ -106,6 +284,37 @@ namespace SystemProperties
 	inline bool hs_fraction_close_mean(double _l, double _r, double _target = 0.0, double _tol = 0.0015)
 	{
 		return std::abs((_l +_r) / 2.0 - _target) < _tol;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Targets the energy difference to be close to a target energy with some tolerance precision.
+	* @param _l left energy
+	* @param _r right energy
+	* @param _target target energy
+	* @param _tol tolerance of the proximity
+	* @returns whether is close
+	*/
+	inline bool hs_fraction_diff_close_en(double _l, double _r, double _target = 0.0, double _tol = 0.0015)
+	{
+		return std::abs(std::abs(_l - _r) - _target) < _tol;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Targets the energy difference to be close to a target energy with some tolerance precision.
+	* @param _l left energy
+	* @param _r right energy
+	* @param _min minimum energy difference
+	* @param _max maximum energy difference
+	* @returns whether is close
+	*/
+	inline bool hs_fraction_diff_between(double _l, double _r, double _min, double _max)
+	{
+		auto _w = std::abs(_l - _r);
+		return _w >= _min && _w <= _max;
 	}
 
 	// ---------------------------------------------------------------------------
