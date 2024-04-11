@@ -2161,7 +2161,13 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H)
 			{
 				u64 _minin			= _mins[_ifrac];
 				u64 _maxin			= _maxs[_ifrac];
-				if(_minin >= _maxin - 1)
+				if (_minin <= 0)
+					_minin = 0;
+				if (_maxin >= _Nh - 1)
+					_maxin = _Nh - 1;
+
+				// check the bounds
+				if(_minin >= _maxin)
 				{
 					if(_minin > 0)
 						_minin--;
