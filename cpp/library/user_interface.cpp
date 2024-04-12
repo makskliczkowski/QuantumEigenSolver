@@ -2167,7 +2167,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H)
 					_maxin = _Nh - 1;
 
 				// check the bounds
-				if(_minin >= _maxin)
+				while(_minin >= _maxin)
 				{
 					if(_minin > 0)
 						_minin--;
@@ -2207,6 +2207,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H)
 			const double _E						= arma::cdot(_initial_state, _init_stat_H);
 			const double _E2					= arma::cdot(_init_stat_H, _init_stat_H);
 			u64 _Eidx							= _H->calcEnIdx(_E);
+			LOGINFO(VEQ(_Eidx), LOG_TYPES::TRACE, 1);
 			_energydensities(1, _r)				= _E;
 			_energydensities(2, _r)				= _E2;
 			_energydensities(3, _r)				= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_mobility_edge(_E);

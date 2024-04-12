@@ -452,7 +452,7 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEnEps(u64 _Eidx
 	while (((this->eigVal_(_imax) - this->eigVal_(_Eidx)) / this->Ns) < _eps && _imax < this->Nh)
 		_imax++;
 	// find the minimum index
-	while (((this->eigVal_(_Eidx) - this->eigVal_(_imin)) / this->Ns) < _eps && _imin >= 0)
+	while (((this->eigVal_(_Eidx) - this->eigVal_(_imin)) / this->Ns) < _eps && _imin > 0)
 		_imin--;
 	return std::make_pair(_imin, _imax);
 }
