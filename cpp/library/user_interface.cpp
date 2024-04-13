@@ -713,7 +713,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 	// get info
 	std::string modelInfo	= _H->getInfo();
 	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
-	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_SCALING_OFF", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM_SCALING_OFFD", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
 	std::string extension	= ".h5";
 
 	// set seed
@@ -768,7 +768,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 	_measure.initializeMatrices(_Nh);
 
 	// (mean, typical, mean2, typical2, mean4, meanabs, gaussianity, binder cumulant)
-	size_t _offdiag_elem_num = 200;
+	size_t _offdiag_elem_num = 1000;
 	v_1d<arma::Mat<double>> _offdiagElemesStat_high(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
 	v_1d<arma::Mat<double>> _offdiagElements_high(_ops.size(), -1e5 * arma::Mat<double>(this->modP.modRanN_, _offdiag_elem_num, arma::fill::ones));
 	v_1d<arma::Mat<double>> _offdiagElemesStat_low(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
@@ -898,7 +898,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1, _r)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3, _r)), StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(4, _r)), StrParser::StrColors::black), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(4, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
 			}
 
 			// -----------------------------------------------------------------------------
@@ -910,6 +910,10 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				const double _bw		= _H->getEigVal(_Nh - 1) - _H->getEigVal(0);
 				// -----------------------------------------------------------------------------
 
+				double _lowbound				= std::sqrt(_h_freq * _th_freq);
+				double _highbound				= 0.2; // std::sqrt(_th_freq * _bw);
+				LOGINFO(StrParser::colorize(VEQ(_lowbound), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_highbound), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
 				// offdiagonal
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
@@ -936,10 +940,8 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 							// check the energy difference
 							if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
 								continue;
-							double _lowbound		= std::sqrt(_h_freq * _th_freq);
-							bool _isAroundLow		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _lowbound * 0.2, _lowbound * 5);
-							double _highbound		= _th_freq * 10 < 0.8 * _bw ? _th_freq * 10 : 0.5 * _bw;
-							bool _isAroundHigh		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _highbound * 0.2, _highbound * 5);
+							bool _isAroundLow		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _lowbound / 5.0, _lowbound * 5.0);
+							bool _isAroundHigh		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _highbound / 2.0, _highbound * 2.0);
 
 							// check the frequency
 							if(!_isAroundLow && !_isAroundHigh)
@@ -1035,7 +1037,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 			}
 		}
 		// save the checkpoints
-		if (_Ns >= 14 && _r % int(this->modP.modRanN_ / 5) == 0)
+		if (_Ns >= 12 && _r % int(this->modP.modRanN_ / 5) == 0)
 		{
 			// save the diagonals
 			_saver(_r);
@@ -2129,7 +2131,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H)
 	arma::Mat<double> _energydensitiesAF(4, this->modP.modRanN_);
 	arma::Mat<double> _energydensitiesRP(4, this->modP.modRanN_);
 
-	v_1d<double> _toCheckEps			= { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3 };
+	v_1d<double> _toCheckEps			= { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4 };
 	// to save the microcanonical averages
 	v_1d<arma::Mat<double>> _microcanonicalF(_ops.size(), arma::Mat<double>(1 + _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros));
 	v_1d<arma::Mat<double>> _microcanonicalAF(_ops.size(), arma::Mat<double>(1 + _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros));
