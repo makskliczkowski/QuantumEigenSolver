@@ -373,7 +373,7 @@ inline typename std::enable_if<std::is_integral<_InT>::value, _MatType<_TinMat>>
 Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
 	_MatType<_TinMat> op(_dim, _dim);
-
+#pragma omp parallel for
 	for (u64 _base = 0; _base < _dim; ++_base) 
 	{
 		auto [_idx, _val]	=	this->operator()(_base, _arg...);

@@ -69,6 +69,9 @@ namespace SystemProperties
 			DW_HALF_DN,
 			DW_THIRD_UP,
 			DW_THIRD_DN,
+			// energy
+			MEAN,
+			SEEK
 		};
 
 		/*
@@ -166,6 +169,35 @@ namespace SystemProperties
 			}
 			return _ret;
 		}
+
+		template <typename _T, typename _ET>
+		[[nodiscard]]
+		inline arma::Col<_T> create_initial_quench_state(QuenchTypes _type, u64 _Nh, uint _Ns, double _Eseek, const _ET& _energies)
+		{
+			arma::Col<_T> _ret(_Nh, arma::fill::zeros);
+			
+			switch (_type)
+			{
+			case SystemProperties::TimeEvolution::QuenchTypes::SEEK:
+			{
+				auto _idx	= arma::index_min(arma::abs(_energies - _Eseek));
+				_ret(_idx)	= 1.0;
+				break;
+			}
+			case SystemProperties::TimeEvolution::QuenchTypes::MEAN:
+			{
+				auto _mean	= arma::mean(_energies);
+				auto _idx	= arma::index_min(arma::abs(_energies - _mean));
+				_ret(_idx)	= 1.0;				
+				break;
+			}
+			default:
+				return create_initial_quench_state<_T>(_type, _Nh, _Ns);
+				break;
+			}
+			return _ret;
+		}
+
 
 		// ---------------------------------------------------------------------------
 

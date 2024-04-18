@@ -85,6 +85,7 @@ protected:
 	// ------------------------------------------- CLASS FIELDS ---------------------------------------------
 	u64 avEnIdx											= -1;														
 	double avEn											= 0.0;
+	double stdEn										= 0.0;
 	double minEn										= 0.0;
 	double maxEn										= 0.0;
 	
