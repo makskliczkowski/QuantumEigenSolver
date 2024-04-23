@@ -1,0 +1,117 @@
+# -fun information: 
+#	10 - NQS
+###
+# 	20 - test the symmetries in interacting models
+#	21 - run single interacting Hamiltonian with or without symmetries
+#	22 - sweep all the symmetries for a specified Hamiltonian
+# 	23 - save the Hilbert space sizes for a specific Hamiltonian and its symmetries
+# 	24 - save the eigenstates of a Hamiltonian in a specific symmetry sector or without the resolved symmetries
+# 	25 - save the degeneracies of a specific Hamiltonian
+# 	26 - save and create the degeneracies of a specific Hamiltonian (w or w/o symmetries)
+###
+#	30 - run the simulation for entropies of a quadratic Hamiltonian
+# 	31 - run the simulation for the spectral functions of the quadratic Hamiltonians
+### 
+#   40 - run the QSM ETH simulation - Ljubljana 2024
+#   41 - run the QSM ETH simulation - sweep parameters - Ljubljana 2024
+#   42 - run the QSM ETH simulation - statistics - Ljubljana 2024
+#   43 - run the QSM ETH simulation - statistics - sweep parameters - Ljubljana 2024
+# 	44 - run the QSM ETH simulation - statistics - scaling the offdiagonal elements - Ljubljana 2024
+# 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
+
+-fun 31
+##################################### MODEL CHOICE #####################################
+#+++ Interacting models +++:
+# 	0  - Transverse Ising
+# 	1  - XYZ
+# 	2  - Heisenberg-Kitaev
+#   3  - QSM
+
+### CHOOSE MODEL AND RANDOMNESS
+-mod 3
+-modRanN 10
+-modRanSeed 0
+# number of midspectrum states for the diagonal elements
+-modMidStates 0.7
+# difference between energies for the offdiagonal elements (this is the maximal difference divided by average energy)
+-modEnDiff 0.025
+
+#+++ NQS types +++
+# 	0 -	RBM
+#	1 - RBM+PP
+-nqst 1
+#################################### LATTICE CHOICE ####################################
+-th 1
+-bc 0
+-Lx 4 -Ly 4 -Lz 1
+-l 0
+-d 2
+############################# INTERACTING MODEL PARAMETERS #############################
+-hx 0.0 -hz 0.0 -eta1 0.0 -eta2 0.0 -J1 -1.0 -J2 0.0 -dlt1 -0.5 -dlt2 0
+#### Heisenberg-Kitaev
+-heiJ 1.0 -heiHz 0.0 -heiHx 0.0 -heiDlt 1.0 -Kx -0.5 -Ky 1.0 -Kz 1.0
+#### QSM
+# vectors
+-qsm_alpha 0.96
+-qsm_xi 0.2 
+-qsm_h r;1.0;0.5
+# other
+-qsm_g0 1.0
+-qsm_gamma 1.0
+-qsm_N 3
+-qsm_Ntot 6
+################################## SYMMETRY PARAMETERS #################################
+-S 0 -x 1 -k 0 -px 1 -pz 1
+
+################################# QUADRATIC PARAMETERS #################################
+# Quadratic models:
+#	0  		- FF
+# 	1  		- AUBRY_ANDRES
+# 	2  		- SYK2
+# 	3  		- ANDERSON
+-modQ 1
+# 	q_R 	- number of realizations of the mixed (unmixed) states
+# 	q_CN 	- number of combinations from which to choose the random states from (only applies when number of sites > 22)
+# 	q_gamma - number of states to combine together
+# 	q_man	- shall I use degenerate manifold? It currently applies to FF
+# 	q_mb 	- shall I also calculate the many body state (currently Slater determinant only)
+-q_R 3
+-q_CN 100
+-q_gamma 4
+-q_man 0
+-q_mb 1
+-q_S 0
+
+#### Aubry Andre 
+-aa_lambda 4.0
+-aa_beta 1.618
+-aa_J -1.0
+-aa_phi 0.0
+
+######################################### NQS ##########################################
+# 	m 	- Monte Carlo steps (epochs in this sense)
+#	bs 	- Block size in NQS (sweeps within a given block)
+# 	nb 	- Number of blocks (sweeps for covariance matrix) in NQS
+
+# for the NQS
+-m 200 -bs 8 -nb 200
+-nh 14 -nf 1 -nt 0
+-lr 0.1
+# for the samples and collecting averages:
+# 	-mcS : true number of samples in the end
+# 	-bsS : correlation length analog
+# 	-nbS : bucket size
+-mcS 200 -bsS 32 -nbS 50
+-Phi 0
+### load weights :)
+# -lNQS C:\University\PHD\CODES\VQMC\QSolver\cpp\library\DATA\nqs\HEX,PBC,d=2,Ns=16,Lx=4,Ly=2,Lz=1\,heikit,Ns=16,J=1.000,Kx=-0.500,Ky=1.000,Kz=1.000,delta=1.000,hz=0.000,hx=0.000,BC=0\RBM,mod=HEI_KIT_M,nv=16,nh=32,nS=2,lr=1.00e-02\WEIGHTS\
+####################################### DIRECTORY ######################################
+-dir ./MIROSLAV_STATE_NEW
+
+# rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./
+# rsync --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:
+
+# delete only specific folders
+# find -type f -name './*Ns=8*/*.tmp_*' -delete
+# find folders 
+# ls -l > /home/klimak97/jobs.txt
