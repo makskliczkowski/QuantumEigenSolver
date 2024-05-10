@@ -77,6 +77,8 @@ public:
 					this->setHElem(i, PARAM_W_DISORDER(t_, i), nei);
 			}
 		}
+
+		this->H_ = this->H_ + this->H_.t();
 	}
 	// ------------------ M A N Y   B O D Y ------------------
 

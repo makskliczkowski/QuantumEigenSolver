@@ -19,7 +19,7 @@
 # 	44 - run the QSM ETH simulation - statistics - scaling the offdiagonal elements - Ljubljana 2024
 # 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 
--fun 31
+-fun 44
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
 # 	0  - Transverse Ising
@@ -41,11 +41,12 @@
 #	1 - RBM+PP
 -nqst 1
 #################################### LATTICE CHOICE ####################################
--th 1
+-th 8
 -bc 0
--Lx 4 -Ly 4 -Lz 1
+# -Lx 2000 -Ly 70 -Lz 1
+-Lx 10 -Ly 1 -Lz 1
 -l 0
--d 2
+-d 1
 ############################# INTERACTING MODEL PARAMETERS #############################
 -hx 0.0 -hz 0.0 -eta1 0.0 -eta2 0.0 -J1 -1.0 -J2 0.0 -dlt1 -0.5 -dlt2 0
 #### Heisenberg-Kitaev
@@ -59,14 +60,14 @@
 -qsm_g0 1.0
 -qsm_gamma 1.0
 -qsm_N 3
--qsm_Ntot 6
+-qsm_Ntot 9
 ################################## SYMMETRY PARAMETERS #################################
 -S 0 -x 1 -k 0 -px 1 -pz 1
 
 ################################# QUADRATIC PARAMETERS #################################
 # Quadratic models:
 #	0  		- FF
-# 	1  		- AUBRY_ANDRES
+# 	1  		- AUBRY_ANDRE
 # 	2  		- SYK2
 # 	3  		- ANDERSON
 -modQ 1
@@ -83,9 +84,9 @@
 -q_S 0
 
 #### Aubry Andre 
--aa_lambda 4.0
--aa_beta 1.618
--aa_J -1.0
+-aa_lambda 0.5
+-aa_beta 1.6180339
+-aa_J 1.0
 -aa_phi 0.0
 
 ######################################### NQS ##########################################
@@ -106,7 +107,7 @@
 ### load weights :)
 # -lNQS C:\University\PHD\CODES\VQMC\QSolver\cpp\library\DATA\nqs\HEX,PBC,d=2,Ns=16,Lx=4,Ly=2,Lz=1\,heikit,Ns=16,J=1.000,Kx=-0.500,Ky=1.000,Kz=1.000,delta=1.000,hz=0.000,hx=0.000,BC=0\RBM,mod=HEI_KIT_M,nv=16,nh=32,nS=2,lr=1.00e-02\WEIGHTS\
 ####################################### DIRECTORY ######################################
--dir ./MIROSLAV_STATE_NEW
+-dir ./MIROSLAV_STATE_NEWEST
 
 # rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./
 # rsync --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:
@@ -115,3 +116,4 @@
 # find -type f -name './*Ns=8*/*.tmp_*' -delete
 # find folders 
 # ls -l > /home/klimak97/jobs.txt
+# 

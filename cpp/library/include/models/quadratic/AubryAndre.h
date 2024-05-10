@@ -38,7 +38,7 @@ public:
 		this->dB		= this->ran_.template createRanVec<double>(this->Ns, this->B0);
 		this->dP		= this->ran_.template createRanVec<double>(this->Ns, this->P0);
 		this->dLd		= this->ran_.template createRanVec<double>(this->Ns, this->Ld0);
-		LOGINFO("I am Aubry-Andre model: ", LOG_TYPES::CHOICE, 2);
+		LOGINFO("I am Aubry-Andre model (1): ", LOG_TYPES::CHOICE, 2);
 	};
 
 	// ### H A M I L T O N I A N ###
@@ -46,20 +46,35 @@ public:
 	void hamiltonian() override
 	{
 		this->init();
-		for (int i = 0; i < this->Ns; i++)
+		auto _Lx = this->lat_->get_Lx();
+		auto _Ly = this->lat_->get_Ly();
+		
+		for (int m = 0; m < _Lx; ++m)
 		{
-			auto Vs			=	PARAM_W_DISORDER(Ld, i) * std::cos(TWOPI * PARAM_W_DISORDER(B, i) * i + PARAM_W_DISORDER(P, i));
-			uint NUM_OF_NN	=	(uint)this->lat_->get_nn_ForwardNum(i);
-			// diagonal
-			this->setHElem(i, Vs, i);
-			// -------------- CHECK NN ---------------
-			for (uint nn = 0; nn < NUM_OF_NN; nn++) {
-				uint N_NUMBER = this->lat_->get_nn_ForwardNum(i, nn);
-				if (int nei = this->lat_->get_nn(i, N_NUMBER); nei >= 0)
-					this->setHElem(i, -PARAM_W_DISORDER(J, i), nei);
+			for (int n = 0; n < _Ly; ++n)
+			{
+				const auto _idx	= _Lx * n + m;
+				const auto _w	= PARAM_W_DISORDER(Ld, _idx) * PARAM_W_DISORDER(J, _idx);
+				const auto Vs	= _w * (std::cos(TWOPI * PARAM_W_DISORDER(B, _idx) * (m + n) + PARAM_W_DISORDER(P, _idx)) +
+										std::cos(TWOPI * PARAM_W_DISORDER(B, _idx) * (m - n) + PARAM_W_DISORDER(P, _idx)));
+
+				// get the number of NN to include
+				uint NUM_OF_NN	= (uint)this->lat_->get_nn_ForwardNum(_idx);
+
+				// diagonal (modulation)
+				this->setHElem(_idx, Vs, _idx);
+
+				// -------------- CHECK NN ---------------
+				for (uint nn = 0; nn < NUM_OF_NN; nn++) 
+				{
+					uint N_NUMBER = this->lat_->get_nn_ForwardNum(_idx, nn);
+					if (int nei = this->lat_->get_nn(_idx, N_NUMBER); nei >= 0)
+						this->setHElem(_idx, -PARAM_W_DISORDER(J, _idx), nei);
+				}
 			}
 		}
 		this->H_ = this->H_ + this->H_.t();
+		this->H_.diag() /= 4.0;
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------

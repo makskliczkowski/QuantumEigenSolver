@@ -227,9 +227,13 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(q_shuffle, bool, true);				// shuffle the states?
 
 		// ########### AUBRY_ANDRE #############
-
-		UI_PARAM_STEP(double, Beta, (1 + std::sqrt(5)) / 2);	// phase mult
-		UI_PARAM_STEP(double, Phi, 1.0);							// phase add
+		struct
+		{
+			UI_PARAM_STEP(double, aa_J, 1.0);						// hopping
+			UI_PARAM_STEP(double, aa_lambda, 0.5);					// modulation strength
+			UI_PARAM_STEP(double, aa_beta, (1 + std::sqrt(5)) / 2);	// phase multiplication
+			UI_PARAM_STEP(double, aa_phi, 1.0);						// phase addition
+		} aubry_andre;
 
 		// -------------------------------------
 		void setDefault() 
@@ -278,8 +282,10 @@ namespace UI_PARAMS
 			{
 				// aubry-andre
 				{
-					UI_PARAM_SET_DEFAULT_STEP(Beta);
-					UI_PARAM_SET_DEFAULT_STEP(Phi);
+					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_J);
+					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_lambda);
+					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_beta);
+					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_phi);
 				}
 			}
 		}
@@ -491,6 +497,9 @@ private:
 	template<typename _T>
 	void quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
 
+	template<typename _T>
+	void quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
+
 	// ##################### SPIN MODELS ###################
 
 	template<typename _T>
@@ -557,6 +566,7 @@ public:
 	// ############################################### Q U A D R A T I C
 
 	void makeSymQuadraticManifold();
+	void makeSimQuadraticSpectralFunction();
 
 	// ############################################### E T H
 
@@ -775,8 +785,10 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H)
 		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
 		break;
 	case MY_MODELS_Q::AUBRY_ANDRE_M:
-		_H = std::make_shared<AubryAndre<_T>>(this->latP.lat, this->modP.J1_, this->modP.dlt1_, this->modP.Beta_, this->modP.Phi_,
-			this->modP.J10_, this->modP.dlt10_, this->modP.Beta0_, this->modP.Phi0_, 0.0);
+		_H = std::make_shared<AubryAndre<_T>>(this->latP.lat, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
+											  this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
+											  this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
+											  this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
 		break;
 	case MY_MODELS_Q::SYK2_M:
 		_H = std::make_shared<SYK2<_T>>(this->latP.lat, 0.0);
@@ -1846,6 +1858,83 @@ inline void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>
 	// save entropies
 	LOGINFO("Finished entropies! " + VEQ(_gamma) + ", " + VEQ(_realizations), LOG_TYPES::TRACE, 2);
 	LOGINFO(_timer.point("entropy"), "Entropies time:", 3);
+}
+
+template<typename _T>
+inline void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
+{
+	uint Ns					= _H->getNs();
+	//uint Nh					= _H->getHilbertSize();
+	uint _type				= _H->getTypeI();
+
+	// --- create the directories ---
+	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), "QuadraticSpectral");
+
+	// ------ use those files -------
+	std::string modelInfo	= _H->getInfo();
+
+	// --- save energies txt check ---
+	std::string filename	= filenameQuadraticRandom(modelInfo, _type, _H->ran_);
+
+	// check the model (if necessery to build hamilonian, do it)
+	
+	{
+		_H->buildHamiltonian();
+		_H->diagH(false);
+		LOGINFO(_timer.start(), "Diagonalization", 3);
+	}
+
+	// save single particle energies
+	if (!fs::exists(filename + ".h5"))
+		_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
+
+	// _minimal energy
+	double _Egs		= -(double)Ns;//_H->getManyBodyEnergy(_mbgs);
+	double _Ees		= Ns;//_H->getManyBodyEnergy(_mbex);
+	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(250));
+	auto _dw		= _omegas(1) - _omegas(0);
+
+	// calculate the DFT matrix
+	std::shared_ptr<Lattice> _lat = _H->getLat();
+
+	arma::Mat<double> _outspectrals(_omegas.n_elem, Ns, arma::fill::zeros);
+	arma::Col<double> _Dos(_omegas.n_elem, arma::fill::zeros);
+	arma::Mat<_T> _Hmat = arma::Mat<_T>(_H->getHamiltonian());
+
+	// go through omegas
+//#pragma omp parallel for num_threads(this->threadNum)
+//	for(int _omega = 0; _omega < _omegas.size(); ++_omega)
+//	{
+//		LOGINFO("Doing omega: " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::TRACE, 3);
+//		auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _Hmat, _dw / 2);
+//
+//		// calculate the total matrix
+//		arma::Mat<cpx> _spectk		= SystemProperties::function_fourier(_spectr, _lat.get());
+//		arma::Mat<double> _spect	= SystemProperties::Spectral::Noninteracting::spectral_function(_spectk);
+//
+//		// save the first row
+//		_outspectrals.row(_omega)	= _spect.diag().as_row();
+//		_Dos(_omega)				= arma::accu(_spect);
+//	}
+//
+//	// normalize
+//	double _integral = arma::as_scalar(arma::trapz(_omegas, _Dos));
+//	_Dos /= _integral;
+//	
+//	for (int k = 0; k < Ns; ++k)
+//	{
+//		double _integral = arma::as_scalar(arma::trapz(_omegas, _outspectrals.col(k)));
+//		_outspectrals.col(k) /= _integral;
+//	}
+
+	saveAlgebraic(dir, filename + "_spectral.h5", _outspectrals, "spectrals", false);
+	saveAlgebraic(dir, filename + "_spectral.h5", _Dos, "dos", true);
+
+	auto _edgs = arma::linspace(_H->getEigVal(0), _H->getEigVal(Ns - 1), 40);
+	auto _edos = SystemProperties::Spectral::Noninteracting::dos_gauss(_H->getEigVal());
+	saveAlgebraic(dir, filename + "_spectral.h5", _edos, "edos", true);
+	saveAlgebraic(dir, filename + "_spectral.h5", _edgs, "edos_bins", true);
+	saveAlgebraic(dir, filename + "_spectral.h5", _omegas, "omegas", true);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

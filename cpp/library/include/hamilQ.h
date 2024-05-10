@@ -116,8 +116,10 @@ public:
 		this->ran_	= randomGen();
 		this->lat_	= _lat;
 		this->Ns	= _lat->get_Ns();
+		this->Ns_	= _lat->get_Ns();
 		this->size_ = this->particleConverving_ ? this->Ns : 2 * this->Ns;
 		this->Nh	= this->size_;
+		this->Nh_	= this->size_;
 		this->init();
 	}
 

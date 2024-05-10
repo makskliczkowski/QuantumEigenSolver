@@ -686,4 +686,267 @@ namespace SystemProperties
 	}
 
 	// ---------------------------------------------------------------------------
+
+	// -------------------- F O U R I E R   T R A N S F O R M --------------------
+
+	// ---------------------------------------------------------------------------
+
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Mat<cpx> function_fourier(const _Mt& _G)
+	{			
+		return arma::fft(_G);
+	}
+
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Mat<cpx> function_fourier(const _Mt& _G, const arma::Mat<cpx>& _DFT)
+	{
+		return _DFT * _G;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	template <typename _Mt>
+	[[nodiscard]]
+	inline cpx function_fourier(const _Mt& _G, Lattice* _lat, const int k)
+	{
+		auto _k = _lat->get_kVec(k);
+		cpx _ret = 0.0;
+
+		// go through lattice vectors
+//#pragma omp parallel for reduction(+: _ret)
+		for (int i = 0; i < _G.n_rows; i++)
+		{
+			auto _r1 = _lat->get_rVec(i);
+			for (int j = 0; j < _G.n_cols; j++)
+			{
+				auto _r2 = _lat->get_rVec(j);
+				_ret += _G(i, j) * std::exp(I * cpx(arma::dot(_k, (_r1 - r2))));
+			}
+		}
+		return _ret;
+	}
+
+	template<typename _Mt, typename _Vt>
+	[[nodiscard]]
+	inline cpx function_fourier(const _Mt& _G, Lattice* _lat, const _Vt& _k)
+	{
+		cpx _ret = 0.0;
+
+		// go through lattice vectors
+//#pragma omp parallel for reduction(+: _ret)
+		for (int i = 0; i < _G.n_rows; i++)
+		{
+			auto _r1 = _lat->get_rVec(i);
+			for (int j = 0; j < _G.n_cols; j++)
+			{
+				auto _r2 = _lat->get_rVec(j);
+				_ret += _G(i, j) * std::exp(I * cpx(arma::dot(_k, (_r1 - _r2))));
+			}
+		}
+		return _ret;
+	}
+
+	/*
+	* @brief Calculate the Fourier transform of the function stored in the matrix G in the real space.
+	* The first thing to do is to calculate the function as a diffrence of the positions in the matrix.
+	* @param _G - the matrix with the function
+	* @param _lat - the lattice
+	* @param k1 - the first k vector
+	* @param k2 - the second k vector
+	* @returns the Fourier transformed function
+	*/
+	template <typename _Mt>
+	[[nodiscard]]
+	inline cpx function_fourier(const _Mt& _G, Lattice* _lat, const int k1, const int k2)
+	{
+		auto _k1 = _lat->get_kVec(k1);
+		auto _k2 = _lat->get_kVec(k2);
+
+		cpx _ret = 0.0;
+		// go through lattice vectors
+//#pragma omp parallel for reduction(+: _ret)
+		for (int i = 0; i < _G.n_rows; i++)
+		{
+			const auto _r1 = _lat->get_rVec(i);
+			for (int j = 0; j < _G.n_cols; j++)
+			{
+				const auto _r2 = _lat->get_rVec(j);
+				_ret += _G(i, j) * std::exp(I * cpx(arma::dot(_k1, _r1) - arma::dot(_k2, _r2)));
+			}
+		}
+		return _ret;
+	}
+
+	template <typename _Mt, typename _Vt>
+	[[nodiscard]]
+	inline cpx function_fourier(const _Mt& _G, Lattice* _lat, const _Vt& _k1, const _Vt& _k2)
+	{
+		cpx _ret = 0.0;
+
+		// go through lattice vectors
+//#pragma omp parallel for reduction(+: _ret)
+		for (int i = 0; i < _G.n_rows; i++)
+		{
+			const auto _r1 = _lat->get_rVec(i);
+			for (int j = 0; j < _G.n_cols; j++)
+			{
+				const auto _r2 = _lat->get_rVec(j);
+				_ret += _G(i, j) * std::exp(I * (arma::dot(_k1, _r1) - arma::dot(_k2, _r2)));
+			}
+		}
+		return _ret;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Mat<cpx> function_fourier(const _Mt& _G, Lattice* _lat)
+	{
+		const uint k_num = _lat->get_Ns();
+		arma::Mat<cpx> _transform(k_num, k_num, arma::fill::zeros);
+
+		// all the vectors in the inverse space
+		for (int k1 = 0; k1 < k_num; k1++)
+		{
+			const auto _k1			= _lat->get_kVec(k1);
+			for (int k2 = 0; k2 < k_num; k2++)
+			{
+				const auto _k2		= _lat->get_kVec(k2);
+				_transform(k1, k2)	= function_fourier(_G, _lat, _k1, _k2);
+			}
+		}
+		return _transform;
+	}
+
+	template<typename _Mt>
+	[[nodiscard]]
+	inline arma::Mat<cpx> function_fourier_translational_inv(const _Mt& _G, Lattice* _lat)
+	{
+		const uint k_num = _lat->get_Ns();
+		arma::Mat<cpx> _transform(k_num, k_num, arma::fill::zeros);
+
+		// all the vectors in the inverse space
+		for (int k1 = 0; k1 < k_num; k1++)
+		{
+			const auto _k1		= _lat->get_kVec(k1);
+			_transform(k1, k1)	= function_fourier(_G, _lat, _k1);
+		}
+		return _transform;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Calculate the Fourier transform of the function stored in the matrix G in the real space.
+	* The first thing to do is to calculate the function as a diffrence of the positions in the matrix.
+	* @param _G - the matrix with the function
+	* @param _DFT - the DFT matrix
+	* @returns the Fourier transformed function
+	*/
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Col<cpx> function_fourier_t(const _Mt& _G, const arma::Mat<cpx>& _DFT)
+	{
+		arma::Col<cpx> _ret(_G.n_cols, arma::fill::zeros);
+
+		// go through the matrix sites
+		for (auto i = 0; i < _G.n_cols; ++i)
+		{
+			for (auto j = i; j < _G.n_rows; ++j)
+			{
+				auto _idx	= std::abs(i - j);
+				_ret(_idx)	+= _G(i, j);
+			}
+		}
+		// normalize
+		_ret /= (1.0 * _G.n_cols);
+
+		return _DFT * _ret;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	namespace Spectral
+	{
+		namespace Noninteracting
+		{
+			template <typename _Vt>
+			[[nodiscard]]
+			inline arma::uvec dos(const _Vt& _E, int bins = 100)
+			{
+				return arma::hist(arma::vec(_E), bins);
+			}
+
+			template <typename _Vt>
+			[[nodiscard]]
+			inline arma::uvec dos(const _Vt& _E, const arma::vec& bins)
+			{
+				return arma::hist(arma::vec(_E), bins);
+			}
+
+			template <typename _Vt>
+			[[nodiscard]]
+			inline arma::mat dos_gauss(const _Vt& _E, double _sig = 1e-2)
+			{
+				auto _N		= int(_E.n_elem / 12);
+				arma::mat _dos(_N, 2, arma::fill::zeros);
+				_dos.col(0) = arma::linspace(_E(0), _E(_E.n_elem - 1), _N);
+				for (const auto _Ein : _E)
+				{
+					_dos.col(1) += arma::normpdf(_dos.col(0), _Ein, _sig);
+				}
+				return _dos;
+			}
+
+			/*
+			* @brief Calculate the spectral function for noninteracting systems (time resolved Green's function).
+			* The spectral function is calculated based on the Hamiltonian matrix and the energy.
+			* This is calculated as $$ G(\omega) = \frac{1}{\omega - H + i\eta} $$.
+			* @param _omega - the energy
+			* @param _H		- the Hamiltonian matrix
+			* @param _eta	- the broadening parameter
+			* @returns the Green's function matrix
+			*/
+			template <typename _Mt>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(double _omega, const arma::Mat<_Mt>& _H, double _eta = 1e-1)
+			{
+				arma::Mat<cpx> _out(_H.n_rows, _H.n_cols, arma::fill::zeros);
+				arma::Mat<cpx> _eye(_H.n_rows, _H.n_cols, arma::fill::eye);
+				_out		=  _out - _H;
+				_out.diag()	+= _omega + I * _eta;
+
+				return arma::solve(_out, _eye, arma::solve_opts::likely_sympd	);
+				//return arma::inv_sympd(_out);
+			}
+
+			template <typename _T>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::SpMat<_T>& _H, double _eta = 1e-1)
+			{
+				arma::SpMat<cpx> _out(_H.n_rows, _H.n_cols);
+				_out		=  _out - _H;
+				_out.diag()	+= cpx(_omega, _eta);
+				return arma::spsolve(_out, arma::Mat<cpx>(_out.n_rows, _out.n_cols, arma::fill::eye));
+			}
+
+			// ---------------------------------------------------------------------------
+
+			/*
+			* @brief Calculate the spectral function for noninteracting systems (time resolved Green's function).
+			* The spectral function is calculated based on the time resolved Green's function in the k-space.
+			* @param _G - the time resolved Green's function
+			* @returns the spectral function matrix
+			*/
+			template <typename _Mt>
+			[[nodiscard]]
+			inline arma::Mat<double> spectral_function(const _Mt& _G)
+			{
+				return -(1.0 / PI) * arma::imag(_G);
+			}
+		};
+	};
 };
