@@ -722,7 +722,7 @@ namespace SystemProperties
 			for (int j = 0; j < _G.n_cols; j++)
 			{
 				auto _r2 = _lat->get_rVec(j);
-				_ret += _G(i, j) * std::exp(I * cpx(arma::dot(_k, (_r1 - r2))));
+				_ret += _G(i, j) * std::exp(I * cpx(arma::dot(_k, (_r1 - _r2))));
 			}
 		}
 		return _ret;
