@@ -790,6 +790,8 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 	size_t _offdiag_elem_num = 1000;
 	v_1d<arma::Mat<double>> _offdiagElemesStat_low(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
 	v_1d<arma::Mat<double>> _offdiagElements_low(_ops.size(), -1e5 * arma::Mat<double>(this->modP.modRanN_, _offdiag_elem_num, arma::fill::ones));
+	arma::Mat<double> _energies			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
+	v_1d<arma::Mat<double>> _diagonals	= v_1d<arma::Mat<double>>(_ops.size(), arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros));
 
 	// ----------------------- nbins operators -----------------------
 	v_1d<Histogram> _histOperatorsOffdiag_low(_ops.size(), Histogram());
@@ -813,12 +815,17 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(2).as_col()), "1_over_mean_level_spacing", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(3).as_col()), "1_over_mean_level_spacing_typ", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(4).as_col()), "th_freq", true);
-		
+			saveAlgebraic(dir, "stat" + randomStr + extension, _energies, "energies", true);
+
 			// append statistics from the diagonal elements
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
 
+				// diagonal
+				saveAlgebraic(dir, "diag" + randomStr + extension, _diagonals[_opi], _name, _opi > 0);
+
+				// offdiagonal elements
 				saveAlgebraic(dir, "offdiagval" + randomStr + extension, _offdiagElements_low[_opi], "offdiag/low/" + _name, true);
 
 				// offdiagonal elements
@@ -866,6 +873,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 			// set the Hamiltonian
 			_H->buildHamiltonian();
 			_H->diagH(false);
+			_energies.col(_r) = _H->getEigVal();
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 		}
 
@@ -916,6 +924,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				// get the matrices
 				const auto& _matrices	= _measure.getOpG_mat();
 				const double _bw		= _H->getEigVal(_Nh - 1) - _H->getEigVal(0);
+
 				// -----------------------------------------------------------------------------
 
 				double _lowbound				= std::sqrt(_h_freq * _th_freq);
@@ -928,6 +937,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				{
 					const auto& _mat			= _matrices[_opi];
 					arma::Mat<double> _overlaps	= Operators::applyOverlapMat(_H->getEigVec(), _mat);
+					_diagonals[_opi].col(_r)	= _overlaps.diag();
 
 					// save the iterators
 					u64 _totalIterator_l		= 0;
@@ -946,7 +956,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 							if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
 								continue;
 
-							bool _isAroundLow		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _lowbound / 3.0, _lowbound * 3.0);
+							bool _isAroundLow		= SystemProperties::hs_fraction_diff_between(_en_l, _en_r, _lowbound / 5.0, _lowbound * 5.0);
 
 							// check the frequency
 							if(!_isAroundLow)
@@ -1014,7 +1024,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 			}
 		}
 		// save the checkpoints
-		if (_Ns >= 12 && _r % int(this->modP.modRanN_ / 5) == 0)
+		if ((_Ns >= 14 && (_r % 4 == 0)) || (_Ns < 14 && (_r % 25 == 0)))
 		{
 			// save the diagonals
 			_saver(_r);
