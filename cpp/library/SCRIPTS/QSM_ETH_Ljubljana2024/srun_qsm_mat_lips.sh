@@ -20,7 +20,7 @@ mkdir -p ${savedir}
 # create log directory
 SAVDIR=${savedir}/DATA
 mkdir -p $SAVDIR
-LOGDIR=${RUN_DIR}/LOG/QSM
+LOGDIR=${RUN_DIR}/LOG/QSM_F
 mkdir -p $LOGDIR
 SLURMDIR=${RUN_DIR}/SLURM
 mkdir -p $SLURMDIR
