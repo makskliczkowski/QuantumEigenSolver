@@ -18,6 +18,7 @@
 #   43 - run the QSM ETH simulation - statistics - sweep parameters - Ljubljana 2024
 # 	44 - run the QSM ETH simulation - statistics - scaling the offdiagonal elements - Ljubljana 2024
 # 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
+# 	46 - run the QSM ETH simulation - statistics - sweep time evolution - Ljubljana 2024
 
 -fun 43
 ##################################### MODEL CHOICE #####################################
@@ -64,12 +65,12 @@
 -qsm_g0 1.0
 -qsm_gamma 1.0
 -qsm_N 3
--qsm_Ntot 9
+-qsm_Ntot 12
 #### ROSENZWEIG-PORTER
 -rp_g 0.5;1.0;1.2;1.5;2.0;3.0;4.0
 -rp_single_particle 0
--rp_be_real 0
--rp_g_sweep_n 7
+-rp_be_real 1
+-rp_g_sweep_n 7	
 
 ################################## SYMMETRY PARAMETERS #################################
 -S 0 -x 1 -k 0 -px 1 -pz 1

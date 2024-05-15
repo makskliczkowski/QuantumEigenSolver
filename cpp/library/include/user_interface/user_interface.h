@@ -505,9 +505,9 @@ protected:
 private:
 	// standard elements
 	template<typename _T>
-	std::tuple<std::string, std::string, std::string> get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir);
+	void get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string& _dir, std::string& modelInfo, std::string& randomStr, std::string& ext);
 	template<typename _T>
-	std::tuple<std::string, std::string, std::string, std::string> get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir);
+	void get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string& _dir, std::string& modelInfo, std::string& ext);
 
 	// reset model
 	void resetEd()										{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset();		};
@@ -887,24 +887,22 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 template<typename _T>
-inline std::tuple<std::string,std::string,std::string> UI::get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir)
+inline void UI::get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string& _dir, std::string& modelInfo, std::string& ext)
 {
-	std::string modelInfo = _H->getInfo();
-	return std::make_tuple(	modelInfo, 
-							makeDirsC(this->mainDir, _dir, modelInfo), 
-							".h5");
+	_H->updateInfo();
+	modelInfo	= _H->getInfo();
+	_dir		= makeDirsC(this->mainDir, _dir, modelInfo);
+	ext			= ".h5";
 }
 
 template<typename _T>
-inline std::tuple<std::string, std::string, std::string, std::string> UI::get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir)
+inline void UI::get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string& _dir, std::string& modelInfo, std::string& randomStr, std::string& ext)
 {
-	std::string modelInfo = _H->getInfo();
-	std::string randomStr = FileParser::appWRandom("", _H->ran_);
-
-	return std::make_tuple(	modelInfo, 
-							makeDirsC(this->mainDir, _dir, modelInfo), 
-							randomStr,
-							".h5");
+	_H->updateInfo();
+	modelInfo	= _H->getInfo();
+	randomStr	= FileParser::appWRandom("", _H->ran_);
+	_dir		= makeDirsC(this->mainDir, _dir, modelInfo);
+	ext			= ".h5";
 }
 
 // ##########################################################################################################################################

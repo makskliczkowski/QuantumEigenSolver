@@ -101,9 +101,9 @@ void UI::makeSimETHSweep()
 			else if (this->chosenFun == 46)
 			{
 				if (_takeComplex)
-					this->checkETH_statistics(this->hamComplex);
+					this->checkETH_time_evo(this->hamComplex);
 				else
-					this->checkETH_statistics(this->hamDouble);
+					this->checkETH_time_evo(this->hamDouble);
 			}
 		}
 	}
@@ -122,7 +122,9 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	u64 _Nh		= ULLPOW(_Ns);
 
 	// get info
-	const auto [modelInfo, dir, randomStr, extension] = this->get_inf_dir_ext_r(_H, "ETH_MAT_OFFD_SCALING");
+	std::string modelInfo, dir = "ETH_MAT_OFFD_SCALING", randomStr, extension;
+	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
+
 	v_1d<Operators::Operator<double>> _ops;
 	strVec _opsN;
 
@@ -426,7 +428,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	strVec _opsN;
 
 	// get info
-	const auto [modelInfo, dir, randomStr, extension] = this->get_inf_dir_ext_r(_H, "ETH_MAT_STAT");
+	std::string modelInfo, dir = "ETH_MAT_STAT", randomStr, extension;
+	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
 	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
@@ -530,8 +533,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
-				arma::Col<double> _cast = algebra::cast<double>(_diagElems[_opi]);
-				saveAlgebraic(dir, "diag" + randomStr + extension, _cast, _name, _opi > 0);
+				saveAlgebraic(dir, "diag" + randomStr + extension, algebra::cast<double>(_diagElems[_opi]), _name, _opi > 0);
 			}
 
 			// save the histograms of the operators for the f functions
@@ -660,7 +662,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 					// go through the operators
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(_Ns <= 14 this->threadNum_ : 2)
+#pragma omp parallel for num_threads(_Ns <= 14 ? this->threadNum : 2)
 #endif
 					for (int _opi = 0; _opi < _matrices.size(); _opi++)
 					{
@@ -1396,7 +1398,8 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	v_1d<std::string> _opsN;
 
 	// get info
-	const auto [modelInfo, dir, randomStr, extension] = this->get_inf_dir_ext_r(_H, "ETH_MAT_TIME_EVO");
+	std::string modelInfo, dir = "ETH_MAT_TIME_EVO", randomStr, extension;
+	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// couplings for the sz!
 	{
@@ -1575,7 +1578,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 						_timeEntropyME[_enti](_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
 					}
 					if(_Ns < 12)
-						_timeEntropyBipartiteME(_ti, _r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, ULLPOW((int(_Ns / 2))));
+						_timeEntropyBipartiteME(_ti, _r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, (ULLPOW((int(_Ns / 2)))) - 1);
 				}
 			}
 
@@ -1606,6 +1609,9 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "evo" + randomStr + extension, _timespace, "time", false);
 			for(int i = 0; i < _Ns; i++)
 				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyME[i], "entanglement_entropy/ME/" + STR((i + 1)), true);
+			
+			saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyBipartiteME, "entanglement_entropy/ME/bipartite", true);
+			
 			// save the averages epsilon
 			saveAlgebraic(dir, "avs" + randomStr + extension, arma::vec(_toCheckEps), "eps", false);
 
@@ -1624,6 +1630,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 				// diagonal ensemble
 				saveAlgebraic(dir, "avs" + randomStr + extension, _diagonalME[_opi], _name + "/diag/ME", true);
+				saveAlgebraic(dir, "avs" + randomStr + extension, _diagonal2ME[_opi], _name + "/diag2/ME", true);
 
 				// microcanonical
 				saveAlgebraic(dir, "avs" + randomStr + extension, arma::mat(_microcanonicalME[_opi].rows(1, _toCheckEps.size())), _name + "/micro/ME", true);
@@ -1634,9 +1641,6 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
 		};
-
-	double _alpha	= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_alpha();
-	double _g0		= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_g0();
 
 	// go through realizations
 	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
@@ -1679,7 +1683,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// mean level spacing
 			{
-				long double _th_freq	= QSM<double>::get_thouless_freq_est(_alpha, _g0, _Ns);
+				long double _th_freq	= QSM<double>::get_thouless_freq_est(0.9, 1.0, _Ns);
 				long double _h_freq		= 1.0 / _Nh;
 				// energies
 				_energies.col(_r)	= _H->getEigVal();
