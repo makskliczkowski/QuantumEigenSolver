@@ -10,8 +10,8 @@
 #	include "../hamil.h"
 #endif
 
-#ifndef RP_H
-#	define RP_H
+#ifndef ROSENZWEIG_PORTER_H
+#	define ROSENZWEIG_PORTER_H
 #include "../quantities/statistics.h"
 
 template<typename _T>

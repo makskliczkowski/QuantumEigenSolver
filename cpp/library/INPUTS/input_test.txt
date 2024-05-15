@@ -26,6 +26,7 @@
 # 	1  - XYZ
 # 	2  - Heisenberg-Kitaev
 #   3  - QSM
+# 	4  - Rosenzweig-Porter
 
 ### CHOOSE MODEL AND RANDOMNESS
 -mod 3
@@ -51,6 +52,9 @@
 -hx 0.0 -hz 0.0 -eta1 0.0 -eta2 0.0 -J1 -1.0 -J2 0.0 -dlt1 -0.5 -dlt2 0
 #### Heisenberg-Kitaev
 -heiJ 1.0 -heiHz 0.0 -heiHx 0.0 -heiDlt 1.0 -Kx -0.5 -Ky 1.0 -Kz 1.0
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%% RANDOM 
+
 #### QSM
 # vectors
 -qsm_alpha 0.96
@@ -61,6 +65,9 @@
 -qsm_gamma 1.0
 -qsm_N 3
 -qsm_Ntot 9
+#### ROSENZWEIG-PORTER
+-rp_gamma 1.0
+
 ################################## SYMMETRY PARAMETERS #################################
 -S 0 -x 1 -k 0 -px 1 -pz 1
 

@@ -63,8 +63,12 @@
 #ifndef HEISENBERG_KITAEV_H								 // #
 #	include "../models/heisenberg-kitaev.h"				 // #
 #endif													 // #
+// random Hamiltonians									 // #
 #ifndef QSM_H											 // #
 #	include "../models/quantum_sun.h"					 // #
+#endif													 // #
+#ifndef ROSENZWEIG_PORTER_H								 // #
+#	include "../models/rosenzweig-porter.h"				 // #
 #endif													 // #
 // ##########################################################
 
@@ -178,6 +182,7 @@ namespace UI_PARAMS
 		v_1d<double> heiDlt_;
 		v_1d<double> heiHx_;
 		v_1d<double> heiHz_;
+
 		void resizeHeisenberg(const size_t Ns)
 		{
 			this->heiJ_.resize(Ns);
@@ -188,7 +193,7 @@ namespace UI_PARAMS
 
 		// ############### QSM #################
 
-		struct
+		struct qsm_t
 		{
 			UI_PARAM_CREATE_DEFAULTD(qsm_N, size_t, 1);
 			UI_PARAM_CREATE_DEFAULTD(qsm_Ntot, size_t, 1);
@@ -212,6 +217,13 @@ namespace UI_PARAMS
 			};
 		} qsm;
 
+		// ######### ROSENZWEIG PORTER #########
+
+		struct rosenzweig_porter_t
+		{
+			UI_PARAM_CREATE_DEFAULTV(rp_g, double);
+		} rosenzweig_porter;
+
 		// #####################################
 		// ######### Q U A D R A T I C #########
 		// #####################################
@@ -227,7 +239,8 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(q_shuffle, bool, true);				// shuffle the states?
 
 		// ########### AUBRY_ANDRE #############
-		struct
+		
+		struct aubry_andre_t
 		{
 			UI_PARAM_STEP(double, aa_J, 1.0);						// hopping
 			UI_PARAM_STEP(double, aa_lambda, 0.5);					// modulation strength
@@ -236,6 +249,11 @@ namespace UI_PARAMS
 		} aubry_andre;
 
 		// -------------------------------------
+
+		// #####################################
+
+		// -------------------------------------
+
 		void setDefault() 
 		{
 			UI_PARAM_SET_DEFAULT(modTyp);
@@ -276,8 +294,14 @@ namespace UI_PARAMS
 					this->qsm.qsm_xi_		= v_1d<double>(1, 1.0);
 					this->qsm.qsm_h_		= v_1d<double>(1, 1.0);
 				}
+				// Rosenzweig-Porter
+				{
+					this->rosenzweig_porter.rp_g_ = v_1d<double>(1, 1.0);
+				}
 			}
 
+			// -------------------------------------
+			
 			// QUADRATIC
 			{
 				// aubry-andre
@@ -1892,7 +1916,7 @@ inline void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_
 	double _Egs		= -(double)Ns;//_H->getManyBodyEnergy(_mbgs);
 	double _Ees		= Ns;//_H->getManyBodyEnergy(_mbex);
 	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(250));
-	auto _dw		= _omegas(1) - _omegas(0);
+	//auto _dw		= _omegas(1) - _omegas(0);
 
 	// calculate the DFT matrix
 	std::shared_ptr<Lattice> _lat = _H->getLat();

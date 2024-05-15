@@ -17,14 +17,16 @@
 // ############################ EXISTING MODELS ############################
 enum MY_MODELS 															// #
 {																		// #	
-	ISING_M, XYZ_M, HEI_KIT_M, QSM_M, NONE 								// #
+	ISING_M, XYZ_M, HEI_KIT_M, RP_M, QSM_M, NONE 						// #
 };																		// #
 BEGIN_ENUM(MY_MODELS)													// #
 {																		// #
 	DECL_ENUM_ELEMENT(ISING_M),											// #
 	DECL_ENUM_ELEMENT(XYZ_M),											// #
 	DECL_ENUM_ELEMENT(HEI_KIT_M),										// #
+	// random Hamiltonians												// #
 	DECL_ENUM_ELEMENT(QSM_M),											// #
+	DECL_ENUM_ELEMENT(RP_M),											// #
 	DECL_ENUM_ELEMENT(NONE)												// #
 }																		// #
 END_ENUM(MY_MODELS)									 					// #	
