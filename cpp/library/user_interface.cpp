@@ -751,57 +751,39 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 
 	// create the operators
 	// couplings to calculate the Hybrydization condition!
-	auto _sxc0						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+	auto _sxc0						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)(_Ns - 1)});
 
 	// couplings for the sz!
-	auto _szc0						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+	auto _szc0						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)(_Ns - 1)});
 
 	// couplings outside the grain
-	auto _szco1						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3, (uint)_Ns - 1});
-
-	// for each site
-	std::vector<Operators::Operator<double>> _sz_is;
-	std::vector<std::string> _sz_i_names;
-
-	// create the diagonal operators for spin z at each side
-	v_1d<int> _sz_i = { 0, 3, (int)_Ns - 1 };
-	for (int i : _sz_i)
-	{
-		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
-		_sz_i_names.push_back("sz_" + STR(i));
-	}
+	auto _szl						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint) (_Ns - 1)});
+	auto _sz3						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3});
 
 	// create the matrices
-	v_1d<Operators::Operator<double>> _ops	= { _sxc0, _szc0, _szco1 };
-	v_1d<std::string> _opsN					= { "sxc_0", "szc_0", "szco_3_L" };
-
-	// matrices for the local sz
-	for (int i = 0; i < _sz_is.size(); i++)
-	{
-		_ops.push_back(_sz_is[i]);
-		_opsN.push_back(_sz_i_names[i]);
-	}
+	v_1d<Operators::Operator<double>> _ops	= { _sxc0, _szc0, _szl, _sz3 };
+	v_1d<std::string> _opsN					= { "sxc/0", "szc/0", "sz/l", "sz/3" };
 
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
 	_measure.initializeMatrices(_Nh);
 
 	// (mean, typical, mean2, typical2, mean4, meanabs, gaussianity, binder cumulant)
-	size_t _offdiag_elem_num = 1000;
+	size_t _offdiag_elem_num			= 1000;
+	uint _nbinOperators					= 15 * _Ns;
 	v_1d<arma::Mat<double>> _offdiagElemesStat_low(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
 	v_1d<arma::Mat<double>> _offdiagElements_low(_ops.size(), -1e5 * arma::Mat<double>(this->modP.modRanN_, _offdiag_elem_num, arma::fill::ones));
-	arma::Mat<double> _energies			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
 	v_1d<arma::Mat<double>> _diagonals	= v_1d<arma::Mat<double>>(_ops.size(), arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros));
+	arma::Mat<double> _energies			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
 
 	// ----------------------- nbins operators -----------------------
 	v_1d<Histogram> _histOperatorsOffdiag_low(_ops.size(), Histogram());
-	uint _nbinOperators = 15 * _Ns;
 
 	// create the histograms for the operators
 	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
 	{
 		// offdiagonal
-		double _offdiagLimit	= 0.5 - 0.025 * _Ns;
+		double _offdiagLimit = 0.5 - 0.025 * _Ns;
 		_histOperatorsOffdiag_low[_opi].reset(_nbinOperators);
 		_histOperatorsOffdiag_low[_opi].uniform(_offdiagLimit, -_offdiagLimit);	
 	}
@@ -892,6 +874,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 		//double _th_freq		= QSM<double>::get_thouless_freq_est(_alpha, _Ns - this->modP.qsm.qsm_N_, _g0);
 		long double _th_freq	= QSM<double>::get_thouless_freq_est(_alpha, _g0, _Ns);
 		long double _h_freq		= 1.0 / _Nh;
+		
 		// calculator of the properties
 		{
 			// -----------------------------------------------------------------------------
@@ -922,17 +905,15 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 			// other measures
 			{
 				// get the matrices
-				const auto& _matrices	= _measure.getOpG_mat();
-				const double _bw		= _H->getEigVal(_Nh - 1) - _H->getEigVal(0);
+				const auto& _matrices			= _measure.getOpG_mat();
+				const double _bw				= _H->getEigVal(_Nh - 1) - _H->getEigVal(0);
 
 				// -----------------------------------------------------------------------------
 
 				double _lowbound				= std::sqrt(_h_freq * _th_freq);
 				LOGINFO(StrParser::colorize(VEQ(_lowbound), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+
 				// offdiagonal
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif
 				for(int _opi = 0; _opi < _matrices.size(); _opi++)
 				{
 					const auto& _mat			= _matrices[_opi];
@@ -944,13 +925,16 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 					const double _avEn			= _H->getEnAv();
 
 					// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
 					for (u64 i = 0; i < _Nh; ++i)
 					{
-						const auto _en_l = _H->getEigVal(i);
+						const auto _en_l		= _H->getEigVal(i);
 
 						for (u64 j = i + 1; j < _Nh; ++j)
 						{
-							const auto _en_r = _H->getEigVal(j);
+							const auto _en_r	= _H->getEigVal(j);
 
 							// check the energy difference
 							if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
@@ -1023,6 +1007,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				}
 			}
 		}
+		
 		// save the checkpoints
 		if ((_Ns >= 14 && (_r % 4 == 0)) || (_Ns < 14 && (_r % 25 == 0)))
 		{
@@ -1048,10 +1033,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
 	// check the random field
-	auto _rH	= this->modP.qsm.qsm_h_r_;
-	auto _rA	= this->modP.qsm.qsm_h_ra_;
-	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
-	u64 _Nh		= ULLPOW(_Ns);
+	auto _rH				= this->modP.qsm.qsm_h_r_;
+	auto _rA				= this->modP.qsm.qsm_h_ra_;
+	size_t _Ns				= this->modP.qsm.qsm_Ntot_;
+	u64 _Nh					= ULLPOW(_Ns);
 
 	// get info
 	std::string modelInfo	= _H->getInfo();
@@ -1072,9 +1057,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	auto _szcom1					= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)_Ns - 2, (uint)_Ns - 1});
 	auto _szcoh						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)_Ns - 1});
 	auto _szl						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)_Ns - 1});
+	auto _sz3						= Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3 });
+	auto _sxsx						= Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 });
+
 	// create the matrices
-	v_1d<Operators::Operator<double>> _ops	= { _szcom1, _szcoh, _szl };
-	v_1d<std::string> _opsN					= { "szco_lm1", "szco_l2_l", "sz_l" };
+	v_1d<Operators::Operator<double>> _ops	= { _szcom1, _szcoh, _szl, _sz3, _sxsx };
+	strVec _opsN							= { "szco_lm1", "szco_l2_l", "sz_l", "sz_3", "sxc_l" };
 
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
@@ -1084,19 +1072,20 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
 	// the n'th row in the column will be the state index
 	// the columns corresponds to realizations of disorder
-	v_1d<arma::Mat<double>> _diagElems(_ops.size(), -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones));
+	VMAT<double> _diagElems(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
 
 	// (mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant)
 	// the columns will correspond to realizations
 	u64 _hs_fractions_diag		= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
 	// due to mobility edges, for the statistics we'll save two sets of data
 	u64 _hs_fractions_diag_stat = SystemProperties::hs_fraction_diagonal_cut(0.1, _Nh);
+
 	// mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant
-	v_1d<arma::Mat<double>> _diagElemsStat(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
-	v_1d<arma::Mat<double>> _diagElemsStat_cut(_ops.size(), arma::Mat<double>(7, this->modP.modRanN_, arma::fill::zeros));
+	VMAT<double> _diagElemsStat(_ops.size(), 7, this->modP.modRanN_, arma::fill::zeros);
+	VMAT<double> _diagElemsStat_cut(_ops.size(), 7, this->modP.modRanN_, arma::fill::zeros);
 
 	// (mean, typical, mean2, typical2, mean4, meanabs, gaussianity, binder cumulant)
-	v_1d<arma::Mat<double>> _offdiagElemesStat(_ops.size(), arma::Mat<double>(8, this->modP.modRanN_, arma::fill::zeros));
+	VMAT<double> _offdiagElemesStat(_ops.size(), 8, this->modP.modRanN_, arma::fill::zeros);
 
 	// saves the histograms of the second moments for the offdiagonal elements -- those are the f-functions for the omega dependence
 	v_1d<HistogramAverage<double>> _histAv(_ops.size(), HistogramAverage<double>());
@@ -1105,7 +1094,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 	// ----------------------- nbins operators -----------------------
 	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram());
 	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram());
-	uint _nbinOperators = 15 * _Ns;
+	uint _nbinOperators			= 15 * _Ns;
 
 	// create the histograms for the operators
 	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
@@ -1273,6 +1262,41 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H)
 			{
 
 				// -----------------------------------------------------------------------------
+
+				// all elements together
+				{
+					// get matrices
+					const auto _matrices = _measure.getOpG_mat();
+
+					// go through the operators
+					for (int _opi = 0; _opi < _matrices.size(); _opi++)
+					{
+						const auto& _mat = _matrices[_opi];
+						arma::Mat<double> _overlaps = Operators::applyOverlapMat(_H->getEigVec(), _mat);
+						_diagElems[_opi].col(_r) = _overlaps.diag();
+
+						// save the iterators
+						u64 _totalIterator_l = 0;
+						const double _avEn = _H->getEnAv();
+
+						// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threadNum)
+#endif
+						for (u64 i = 0; i < _Nh; ++i)
+						{
+							const auto _en_l = _H->getEigVal(i);
+
+							// get diagonal statistics
+
+
+							for (u64 j = i + 1; j < _Nh; ++j)
+							{
+							}
+
+						}
+					}
+				}
 
 				// diagonal
 				{

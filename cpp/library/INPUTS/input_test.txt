@@ -19,7 +19,7 @@
 # 	44 - run the QSM ETH simulation - statistics - scaling the offdiagonal elements - Ljubljana 2024
 # 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 
--fun 44
+-fun 43
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
 # 	0  - Transverse Ising
@@ -116,4 +116,4 @@
 # find -type f -name './*Ns=8*/*.tmp_*' -delete
 # find folders 
 # ls -l > /home/klimak97/jobs.txt
-# 
+# rsync -rv --rsh --ignore-existing --progress -e 'ssh -p 22' kliczkowski@f1login.ijs.si:/scratch/kliczkowski/ ./
