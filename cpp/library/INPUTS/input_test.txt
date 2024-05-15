@@ -19,7 +19,7 @@
 # 	44 - run the QSM ETH simulation - statistics - scaling the offdiagonal elements - Ljubljana 2024
 # 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 
--fun 43
+-fun 44
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
 # 	0  - Transverse Ising

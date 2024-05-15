@@ -166,7 +166,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 				saveAlgebraic(dir, "diag" + randomStr + extension, _diagonals[_opi], _name, _opi > 0);
 
 				// offdiagonal elements
-				saveAlgebraic(dir, "offdiagval" + randomStr + extension, _offdiagElements_low[_opi], "offdiag/low/" + _name, true);
+				saveAlgebraic(dir, "offdiagval" + randomStr + extension, _offdiagElements_low[_opi], "offdiag/low/" + _name, _opi > 0);
 
 				// offdiagonal elements
 				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat_low[_opi], "offdiag/low/" + _name, true);
@@ -319,24 +319,24 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 							if (_isAroundLow)
 							{
 								// mean
-								_offdiagElemesStat_low[_opi](0, _r) += _elem;
+								_offdiagElemesStat_low(_opi, 0, _r) += _elem;
 								// typical
-								_offdiagElemesStat_low[_opi](1, _r) += _logElem;
+								_offdiagElemesStat_low(_opi, 1, _r) += _logElem;
 								// mean2
-								_offdiagElemesStat_low[_opi](2, _r) += _elem2;
+								_offdiagElemesStat_low(_opi, 2, _r) += _elem2;
 								// typical2
-								_offdiagElemesStat_low[_opi](3, _r) += _logElem2;
+								_offdiagElemesStat_low(_opi, 3, _r) += _logElem2;
 								// mean4
-								_offdiagElemesStat_low[_opi](4, _r) += _elem2 * _elem2;
+								_offdiagElemesStat_low(_opi, 4, _r) += _elem2 * _elem2;
 								// meanabs
-								_offdiagElemesStat_low[_opi](5, _r) += std::abs(_elem);
+								_offdiagElemesStat_low(_opi, 5, _r) += std::abs(_elem);
 
 								// add to value histogram
 								_histOperatorsOffdiag_low[_opi].append(_elem);
 
 								// save the values
 								if(_totalIterator_l < _offdiag_elem_num)
-									_offdiagElements_low[_opi](_r, _totalIterator_l) = _elem;
+									_offdiagElements_low(_opi, _r, _totalIterator_l) = _elem;
 
 								_totalIterator_l++;
 							}
@@ -350,15 +350,15 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H)
 							_offdiagElemesStat_low[_opi](ii, _r) /= (long double)_totalIterator_l;
 						}
 						// statistics
-						_offdiagElemesStat_low[_opi](6, _r)		= StatisticalMeasures::gaussianity(_offdiagElemesStat_low[_opi](5, _r), _offdiagElemesStat_low[_opi](2, _r));
-						_offdiagElemesStat_low[_opi](7, _r)		= StatisticalMeasures::binder_cumulant(_offdiagElemesStat_low[_opi](2, _r), _offdiagElemesStat_low[_opi](4, _r));
+						_offdiagElemesStat_low(_opi, 6, _r)		= StatisticalMeasures::gaussianity(_offdiagElemesStat_low(_opi, 5, _r), _offdiagElemesStat_low(_opi, 2, _r));
+						_offdiagElemesStat_low(_opi, 7, _r)		= StatisticalMeasures::binder_cumulant(_offdiagElemesStat_low(_opi, 2, _r), _offdiagElemesStat_low(_opi, 4, _r));
 					}
 
 					// additionally, for typical values, calculate the exponential of the mean
 					{
 						for (auto ii : { 1, 3 })
 						{
-							_offdiagElemesStat_low[_opi](ii, _r)	= std::exp(_offdiagElemesStat_low[_opi](ii, _r));
+							_offdiagElemesStat_low(_opi, ii, _r)= std::exp(_offdiagElemesStat_low(_opi, ii, _r));
 						}
 					}
 				}

@@ -17,7 +17,7 @@
 // ############################ EXISTING MODELS ############################
 enum MY_MODELS 															// #
 {																		// #	
-	ISING_M, XYZ_M, HEI_KIT_M, RP_M, QSM_M, NONE 						// #
+	ISING_M, XYZ_M, HEI_KIT_M, QSM_M, RP_M, NONE 						// #
 };																		// #
 BEGIN_ENUM(MY_MODELS)													// #
 {																		// #
