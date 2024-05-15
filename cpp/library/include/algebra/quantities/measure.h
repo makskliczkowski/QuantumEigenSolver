@@ -52,24 +52,31 @@ protected:
 	OPC opC_;
 public:
 	~Measurement();
-	Measurement(size_t _Ns,	const strVec& _operators);
+	Measurement(size_t _Ns,	const strVec& _operators, u64 _initial = 0);
 	Measurement(std::shared_ptr<Lattice> _lat,	const strVec& _operators);
 	Measurement(size_t _Ns, const std::string& _dir, const OPG& _opG,
 													 const OPL& _opL = {},
 													 const OPC& _opC = {},
-													 uint _threadNum = 1);
+													 uint _threadNum = 1,
+													 u64 _initial	 = 0);
 	Measurement(size_t _Ns, const std::string& _dir, const OPG& _opG,
 													 const strVec& _opGN,
 													 const OPL& _opL		= {},
 													 const strVec& _opLN	= {},
 													 const OPC& _opC		= {},
 													 const strVec& _opCN	= {},
-													 uint _threadNum		= 1);
+													 uint _threadNum		= 1,
+													 u64 _initial			= 0);
+	Measurement(size_t _Ns, const std::string& _dir, const OPG& _opG,
+													 const strVec& _opGN,
+													 uint _threadNum		= 1,
+													 u64 _initial			= 0);
 	Measurement(std::shared_ptr<Lattice> _lat,	const std::string& _dir,
 												const OPG& _opG,
 												const OPL& _opL = {},
 												const OPC& _opC = {},
-												uint _threadNum = 1);
+												uint _threadNum = 1,
+												u64 _initial	= 0);
 
 	// measure the observables
 	template<typename _C>
@@ -149,10 +156,10 @@ Measurement<_T>::~Measurement()
 }
 
 template<typename _T>
-inline Measurement<_T>::Measurement(size_t _Ns, const strVec & _operators)
+inline Measurement<_T>::Measurement(size_t _Ns, const strVec & _operators, u64 _initial)
 	: threads_(1), Ns_(_Ns)
 {
-
+	if(_initial > 0) this->initializeMatrices(_initial);
 }
 
 template<typename _T>
@@ -163,12 +170,15 @@ inline Measurement<_T>::Measurement(std::shared_ptr<Lattice> _lat, const strVec 
 
 template<typename _T>
 inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir, 
-									const OPG & _opG, const OPL & _opL, const OPC & _opC, uint _threadNum)
+									const OPG & _opG, const OPL & _opL, const OPC & _opC, uint _threadNum, u64 _initial)
 	: dir_(_dir), threads_(_threadNum), Ns_(_Ns), opG_(_opG), opL_(_opL), opC_(_opC)
 {
 	CONSTRUCTOR_CALL;
 	// create directory
 	makeDir(_dir);
+	// initialize the matrices
+	if (_initial > 0)
+		this->initializeMatrices(_initial);
 }
 
 template<typename _T>
@@ -176,8 +186,9 @@ inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir,
 									const OPG & _opG, const strVec & _opGN,
 									const OPL & _opL, const strVec & _opLN,
 									const OPC & _opC, const strVec & _opCN,
-									uint _threadNum)
-	: Measurement<_T>(_Ns, _dir, _opG, _opL, _opC, _threadNum)
+									uint _threadNum,
+									u64 _initial)
+	: Measurement<_T>(_Ns, _dir, _opG, _opL, _opC, _threadNum, _initial)
 {
 	if (_opGN.size() == _opG.size())
 	{
@@ -198,12 +209,31 @@ inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir,
 
 template<typename _T>
 inline Measurement<_T>::Measurement(std::shared_ptr<Lattice> _lat, const std::string & _dir, 
-									const OPG & _opG, const OPL & _opL, const OPC & _opC, uint _threadNum)
+									const OPG & _opG, const OPL & _opL, const OPC & _opC, uint _threadNum, u64 _initial)
 	: dir_(_dir), threads_(_threadNum), lat_(_lat), opG_(_opG), opL_(_opL), opC_(_opC)
 {
 	CONSTRUCTOR_CALL;
 	// create directory
 	makeDir(_dir);
+	// initialize the matrices
+	if (_initial)
+		this->initializeMatrices(_initial);
+}
+
+template<typename _T>
+inline Measurement<_T>::Measurement(size_t _Ns, 
+									const std::string& _dir, 
+									const OPG& _opG,
+									const strVec& _opGN,
+									uint _threadNum,
+									u64 _initial)
+	: Measurement<_T>(_Ns, _dir, _opG, {}, {}, _threadNum, _initial)
+{
+	if (_opGN.size() == _opG.size())
+	{
+		for(auto i = 0; i < _opGN.size(); ++i)
+			this->opG_[i].setNameS(_opGN[i]);
+	}
 }
 
 // ############################################################################################################################################################

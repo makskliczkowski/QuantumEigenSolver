@@ -18,17 +18,29 @@ template<typename _T>
 class RosenzweigPorter : public Hamiltonian<_T, 2>
 {
 public:
-	using NQSFun = typename Hamiltonian<_T>::NQSFun; 
+	using NQSFun = typename Hamiltonian<_T>::NQSFun;
 protected:
-	double gamma_	=	1.0;		// Hilbert-Schmidt norm of the coupling operator normalizer
+	double gamma_ = 1.0;		// Hilbert-Schmidt norm of the coupling operator normalizer
+	double gammaP_ = 1.0;
+	double gammaP_inv_ = 1.0;
+	arma::Col<double> diag_;
 public:
 	void randomize(double _a, double _s, const strVec& _which)	override final;
 public:
 	~RosenzweigPorter() override;
+
 	RosenzweigPorter(const size_t _N, double _gamma = 0.0);
+	RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma = 0.0);
+	RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma = 0.0);
 
 	// ############################################ Meth #############################################
 
+	void initgamma(double _gamma)
+	{ 
+		this->gamma_ = _gamma; 
+		this->gammaP_ = std::pow(this->Nh, _gamma);
+		this->gammaP_inv_ = std::pow(this->Nh, -0.5 * _gamma); 
+	};
 	void hamiltonian()							override final;
 
 	// ########################################### Methods ###########################################
@@ -84,6 +96,33 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
 	//change info
 	this->info_ = this->info();
 	this->updateInfo();
+
+	this->initgamma(_gamma);
+}
+
+template<typename _T>
+inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma)
+	: Hamiltonian<_T, 2>(_hil), gamma_(_gamma)
+{
+	CONSTRUCTOR_CALL;
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
+
+	this->initgamma(_gamma);
+
+}
+
+template<typename _T>
+inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma)
+	: Hamiltonian<_T, 2>(_hil), gamma_(_gamma)
+{
+	CONSTRUCTOR_CALL;
+	//change info
+	this->info_ = this->info();
+	this->updateInfo();
+
+	this->initgamma(_gamma);
 }
 
 // ##########################################################################################################################################
@@ -103,7 +142,12 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
 template<typename _T>
 inline void RosenzweigPorter<_T>::randomize(double _around, double _str, const strVec& _which)
 {
-	this->H_.diag() = this->ran_.randomNormal(0.0, 1.0, this->Nh_);
+	if (_which.empty())
+	{
+		LOGINFOG("Empty randomization list.", LOG_TYPES::INFO, 1);
+		return;
+	}
+	this->diag_	= this->ran_.template randomNormal<double, double, arma::Col>(_around, _str, this->Nh);
 }
 
 // ##########################################################################################################################################
@@ -123,6 +167,10 @@ template<typename _T>
 inline std::string RosenzweigPorter<_T>::info(const strVec & skip, std::string sep, int prec) const
 {
 	std::string name		= sep + "rp,Ns=" + STR(this->Ns);
+	if (std::is_same<_T, std::complex<double>>::value) 
+		name += sep + "gue";
+	else
+		name += sep + "goe";
 	name +=	sep +	VEQV(gamm, gamma_);
 	name += this->hilbertSpace.getSymInfo();
 	return this->Hamiltonian<_T>::info(name, skip, sep);
@@ -151,10 +199,12 @@ inline void RosenzweigPorter<_T>::hamiltonian()
 	}
 	this->init();
 
-	this->randomize();
+	this->randomize(0.0, 1.0, {"g"});
+
+	this->H_.diag() = algebra::cast<_T>(this->diag_);
 
 	// build the Hamiltonian (offdiagonal)
-	this->H_ += this->ran_.template CUE(this->Nh_);
+	this->H_ += this->gammaP_inv_ * this->ran_.template GUE<_T>(this->Nh_);
 }
 
 // ##########################################################################################################################################

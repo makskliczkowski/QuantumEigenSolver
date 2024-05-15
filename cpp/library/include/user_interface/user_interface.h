@@ -222,6 +222,15 @@ namespace UI_PARAMS
 		struct rosenzweig_porter_t
 		{
 			UI_PARAM_CREATE_DEFAULTV(rp_g, double);
+			UI_PARAM_CREATE_DEFAULTD(rp_single_particle, bool, 0);
+			UI_PARAM_CREATE_DEFAULTD(rp_be_real, bool, 1);
+			UI_PARAM_CREATE_DEFAULTD(rp_g_sweep_n, int, 1);
+
+			void resizeRP()
+			{
+				this->rp_g_.resize(this->rp_g_sweep_n_);
+			};
+
 		} rosenzweig_porter;
 
 		// #####################################
@@ -494,6 +503,12 @@ protected:
 	void setDefaultMap()								final override;
 
 private:
+	// standard elements
+	template<typename _T>
+	std::tuple<std::string, std::string, std::string> get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir);
+	template<typename _T>
+	std::tuple<std::string, std::string, std::string, std::string> get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir);
+
 	// reset model
 	void resetEd()										{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset();		};
 	void resetQuadratic()								{ if (this->qhamComplex) this->qhamComplex.reset(); if (this->qhamDouble) this->qhamDouble.reset(); };
@@ -528,10 +543,14 @@ private:
 
 	template<typename _T>
 	void checkETH(std::shared_ptr<Hamiltonian<_T>> _H);
-	void checkETH_statistics(std::shared_ptr<Hamiltonian<double>> _H);
-	void checkETH_level_prop(std::shared_ptr<Hamiltonian<double>> _H);
-	void checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<double>> _H);
-	void checkETH_time_evo(std::shared_ptr<Hamiltonian<double>> _H);
+	template<typename _T>
+	void checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H);
+	template<typename _T>
+	void checkETH_level_prop(std::shared_ptr<Hamiltonian<_T>> _H);
+	template<typename _T>
+	void checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H);
+	template<typename _T>
+	void checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H);
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineLattice();
@@ -739,6 +758,9 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
 			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
 		break;
+	case MY_MODELS::RP_M:
+		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), this->modP.rosenzweig_porter.rp_g_[0]);
+		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
 			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
@@ -748,6 +770,8 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			false);
 		break;
 	}
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
 	return true;
 }
 
@@ -775,10 +799,14 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H)
 			this->modP.Kx_, this->modP.Ky_, this->modP.Kz_,
 			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
+		// --------------------------- RANDOM MODELS ---------------------------
 	case MY_MODELS::QSM_M:
 		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
 			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
 			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		break;
+	case MY_MODELS::RP_M:
+		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), this->modP.rosenzweig_porter.rp_g_[0]);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
@@ -789,6 +817,8 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H)
 			false);
 		break;
 	}
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
 	return true;
 }
 
@@ -852,6 +882,29 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		LOGINFO("I don't know any other NQS types :<", LOG_TYPES::INFO, 1);
 		break;
 	}
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T>
+inline std::tuple<std::string,std::string,std::string> UI::get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir)
+{
+	std::string modelInfo = _H->getInfo();
+	return std::make_tuple(	modelInfo, 
+							makeDirsC(this->mainDir, _dir, modelInfo), 
+							".h5");
+}
+
+template<typename _T>
+inline std::tuple<std::string, std::string, std::string, std::string> UI::get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::string _dir)
+{
+	std::string modelInfo = _H->getInfo();
+	std::string randomStr = FileParser::appWRandom("", _H->ran_);
+
+	return std::make_tuple(	modelInfo, 
+							makeDirsC(this->mainDir, _dir, modelInfo), 
+							randomStr,
+							".h5");
 }
 
 // ##########################################################################################################################################
@@ -2023,8 +2076,7 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	}
 
 	// create the measurement class
-	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN);
-	_measure.initializeMatrices(_Nh);
+	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
 
 	// to save the operators (those elements will be stored for each operator separately)
 	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
@@ -2243,3 +2295,5 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 	// bye
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

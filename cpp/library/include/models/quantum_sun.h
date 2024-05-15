@@ -66,7 +66,7 @@ public:
 		const v_1d<double>& _a,
 		const v_1d<double>& _h,
 		const v_1d<double>& _xi);
-	QSM(const Hilbert::HilbertSpace<_T>&& _hil,
+	QSM(Hilbert::HilbertSpace<_T>&& _hil,
 		const size_t _N,
 		const double _gamma,
 		const double _g0,
@@ -314,7 +314,7 @@ inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>& _hil, const size_t _N,
 * @note The random neighbors and distances for the particles outside the dot are initialized automatically
 */
 template<typename _T>
-inline QSM<_T>::QSM(const Hilbert::HilbertSpace<_T>&& _hil, const size_t _N, 
+inline QSM<_T>::QSM(Hilbert::HilbertSpace<_T>&& _hil, const size_t _N, 
 	const double _gamma, const double _g0,
 	const v_1d<double>& _a, const v_1d<double>& _h, const v_1d<double>& _xi)
 	: Hamiltonian<_T, 2>(std::move(_hil)), Nin_(_N), gamma_(_gamma), g0_(_g0), a_(_a), h_(_h), xi_(_xi)

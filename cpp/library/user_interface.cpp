@@ -183,7 +183,11 @@ void UI::parseModel(int argc, cmdArg& argv)
 			}
 			// - ROSENZWEIG-PORTER -
 			{
+				SETOPTION(modP.rosenzweig_porter, rp_g_sweep_n);
+				modP.rosenzweig_porter.resizeRP();
 				SETOPTIONVECTOR(modP.rosenzweig_porter, rp_g);
+				SETOPTION(modP.rosenzweig_porter, rp_single_particle);
+				SETOPTION(modP.rosenzweig_porter, rp_be_real);
 			}
 		}
 	}
@@ -295,7 +299,7 @@ void UI::funChoice()
 		case 43:
 			// this option utilizes the Hamiltonian for ETH statistics
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics sweep", LOG_TYPES::CHOICE, 1);
-			this->makeSimETH();
+			this->makeSimETHSweep();
 			break;
 		case 44:
 			// this option utilizes the Hamiltonian for ETH statistics - offdiagonal elements scaling
@@ -306,6 +310,11 @@ void UI::funChoice()
 			// this option utilizes the Hamiltonian time evolution for ETH statistics
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics time evolution", LOG_TYPES::CHOICE, 1);
 			this->makeSimETH();
+			break;
+		case 46:
+			// this option utilizes the Hamiltonian time evolution for ETH statistics
+			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics time evolution sweep", LOG_TYPES::CHOICE, 1);
+			this->makeSimETHSweep();
 			break;
 		default:
 			// default case of showing the help

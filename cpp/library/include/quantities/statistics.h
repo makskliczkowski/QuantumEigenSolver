@@ -643,10 +643,11 @@ namespace SystemProperties
 	[[nodiscard]]
 	inline long double mean_lvl_gamma(const _T& _H)
 	{
+		using inner_type	= typename _T::elem_type;
 		const auto _Nh		= _H.n_rows;
-		const auto _trace	= arma::trace(_H) / (long double)_Nh;
-		const auto _trace2	= arma::trace(arma::square(_H)) / (long double)_Nh;
-		return _trace2 - _trace * _trace;
+		const auto _trace	= algebra::cast<inner_type>(arma::trace(_H)) / (double)_Nh;
+		const auto _trace2	= algebra::cast<inner_type>(arma::trace(arma::square(_H))) / (double)_Nh;
+		return algebra::cast<double>(_trace2 - _trace * _trace);
 	}
 
 	/*
