@@ -18,6 +18,7 @@ ARMADIR=/home/kliczkowski/LIBRARY/armadillo-12.8.0
 
 
 icpx ./main.cpp ./operators.cpp ./user_interface.cpp \
+        ./src/user_interface/ui_check_eth.cpp \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp \
         ${CPPSOURCE}/ui.cpp ${CPPSOURCE}/Lattices/hexagonal.cpp \
