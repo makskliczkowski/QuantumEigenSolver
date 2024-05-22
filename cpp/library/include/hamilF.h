@@ -28,7 +28,7 @@ END_ENUMC(MY_MODELS_F)													// #
 // #########################################################################
 
 /*
-* @brief Allows one to construct a non-interacting Hamiltonian - can be transformed to spinless fermions
+* @brief Allows one to construct a interacting Hamiltonian
 */
 template <typename _T>
 class FermionicHamiltonian : public Hamiltonian<_T, 4>

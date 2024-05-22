@@ -32,7 +32,7 @@ public:
 		: QuadraticHamiltonian<_T>(_lat, _constant, true), J(_J), J0(_J0),
 		B(_beta), B0(_beta0), P(_phi), P0(_phi0), Ld(_disorder), Ld0(_l0)
 	{
-		this->type_		= MY_MODELS_Q::AUBRY_ANDRE_M;
+		this->type_		= MY_MODELS::AUBRY_ANDRE_M;
 		this->info_		= this->info();
 		this->dJ		= this->ran_.template createRanVec<double>(this->Ns, this->J0);
 		this->dB		= this->ran_.template createRanVec<double>(this->Ns, this->B0);
@@ -40,7 +40,26 @@ public:
 		this->dLd		= this->ran_.template createRanVec<double>(this->Ns, this->Ld0);
 		LOGINFO("I am Aubry-Andre model (1): ", LOG_TYPES::CHOICE, 2);
 	};
-
+	AubryAndre(uint _Ns,double _J, 
+						double _disorder, 
+						double _beta		= (1.0 + std::sqrt(5)) / 2.0,
+						double _phi			= 0.0,
+						double _J0			= 0.0,
+						double _l0			= 0.0,
+						double _beta0		= 0.0,
+						double _phi0		= 0.0,
+						double _constant	= 0.0)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true), J(_J), J0(_J0),
+		B(_beta), B0(_beta0), P(_phi), P0(_phi0), Ld(_disorder), Ld0(_l0)
+	{
+		this->type_		= MY_MODELS::AUBRY_ANDRE_M;
+		this->info_		= this->info();
+		this->dJ		= this->ran_.template createRanVec<double>(this->Ns, this->J0);
+		this->dB		= this->ran_.template createRanVec<double>(this->Ns, this->B0);
+		this->dP		= this->ran_.template createRanVec<double>(this->Ns, this->P0);
+		this->dLd		= this->ran_.template createRanVec<double>(this->Ns, this->Ld0);
+		LOGINFO("I am Aubry-Andre model (1): ", LOG_TYPES::CHOICE, 2);
+	};
 	// ### H A M I L T O N I A N ###
 
 	void hamiltonian() override

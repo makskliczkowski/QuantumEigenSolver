@@ -58,6 +58,10 @@ void UI::setDefault()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+// ########################## MOLTO IMPORTANTE ##########################
+
+// ######################################################################
+
 /*
 * @brief model parser
 * @param argc number of line arguments
@@ -98,6 +102,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(latP,		Ly			);
 		SETOPTION(latP,		Lz			);
 		SETOPTION(latP,		bc			);
+		SETOPTION(latP,		Ntot		);
 	}
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
@@ -113,7 +118,6 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 		// ---- quadratic ----
 		{
-			SETOPTIONV(modP, modTypQ,			"modQ");
 			SETOPTIONV(modP, q_manybody,		"q_mb");
 			SETOPTIONV(modP, q_manifold,		"q_man");
 			SETOPTIONV(modP, q_gamma,			"q_gamma");
@@ -127,6 +131,12 @@ void UI::parseModel(int argc, cmdArg& argv)
 				SETOPTION_STEP(modP.aubry_andre, aa_phi);
 				SETOPTION_STEP(modP.aubry_andre, aa_J);
 				SETOPTION_STEP(modP.aubry_andre, aa_lambda);
+			}
+
+			// --- power-law ---
+			{
+				SETOPTION(modP.power_law_random_bandwidth, plrb_a);
+				SETOPTION(modP.power_law_random_bandwidth, plrb_b);
 			}
 		}
 		
@@ -170,7 +180,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 			{
 				SETOPTION(modP.qsm, qsm_gamma);
 				SETOPTION(modP.qsm, qsm_g0);
-				SETOPTION(modP.qsm, qsm_Ntot);
+				this->modP.qsm.qsm_Ntot_ = this->latP.Ntot_;
 				SETOPTION(modP.qsm, qsm_N);
 
 				// resize
@@ -188,6 +198,17 @@ void UI::parseModel(int argc, cmdArg& argv)
 				SETOPTIONVECTOR(modP.rosenzweig_porter, rp_g);
 				SETOPTION(modP.rosenzweig_porter, rp_single_particle);
 				SETOPTION(modP.rosenzweig_porter, rp_be_real);
+			}
+			// ---- ULTRAMETRIC ----
+			{
+				this->modP.ultrametric.um_Ntot_ = this->latP.Ntot_;
+				SETOPTION(modP.ultrametric, um_N);	
+				SETOPTION(modP.ultrametric, um_g);
+				
+				this->modP.ultrametric.resizeUM();
+
+				SETOPTIONVECTOR(modP.ultrametric, um_alpha);
+
 			}
 		}
 	}
@@ -309,12 +330,12 @@ void UI::funChoice()
 		case 45:
 			// this option utilizes the Hamiltonian time evolution for ETH statistics
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics time evolution", LOG_TYPES::CHOICE, 1);
-			this->makeSimETH();
+			this->makeSimETHSweep();
 			break;
 		case 46:
 			// this option utilizes the Hamiltonian time evolution for ETH statistics
 			LOGINFO("SIMULATION: HAMILTONIAN - ETH - statistics time evolution sweep", LOG_TYPES::CHOICE, 1);
-			this->makeSimETHSweep();
+			this->makeSimETH();
 			break;
 		default:
 			// default case of showing the help
@@ -332,21 +353,28 @@ void UI::funChoice()
 */
 bool UI::defineLattice()
 {
+	return this->defineLattice(this->latP.lat, this->latP.typ_);
+}
+
+/*
+* @brief Defines the lattice in the system
+* @param _lat lattice to be defined
+* @return true if the lattice was defined
+*/
+bool UI::defineLattice(std::shared_ptr<Lattice> _lat, LatticeTypes _typ)
+{
 	BEGIN_CATCH_HANDLER
 	{
-		switch (this->latP.typ_)
+		switch (_typ)
 		{
 		case LatticeTypes::SQ:
-			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
+			_lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
 			break;
 		case LatticeTypes::HEX:
-			this->latP.lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
+			_lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
 			break;
 		default:
-			this->latP.lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_,
-				this->latP.dim_, this->latP.bc_);
+			_lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
 			break;
 		};
 	}
@@ -358,6 +386,7 @@ bool UI::defineLattice()
 
 /*
 * @brief defines the models based on the input parameters - interacting
+* Using the Hamiltonians defined within the class...
 */
 bool UI::defineModels(bool _createLat, bool _checkSyms, bool _useHilbert) 
 {
@@ -369,7 +398,7 @@ bool UI::defineModels(bool _createLat, bool _checkSyms, bool _useHilbert)
 		this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
 
 	// go complex if needed
-	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
+	const bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
 	
 	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
 	
@@ -383,9 +412,9 @@ bool UI::defineModels(bool _createLat, bool _checkSyms, bool _useHilbert)
 	else
 	{
 		if (_takeComplex)
-			return this->defineModel(this->hamComplex);
+			return this->defineModel(this->hamComplex, this->latP.Ntot_);
 		else
-			return this->defineModel(this->hamDouble);
+			return this->defineModel(this->hamDouble, this->latP.Ntot_);
 	}
 }
 
@@ -403,40 +432,15 @@ bool UI::defineModelsQ(bool _createLat)
 		this->defineLattice();
 
 	// check if is complex
-	this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
+	this->isComplex_	= this->symP.checkComplex(_createLat ? this->latP.lat->get_Ns() : this->latP.Ntot_);
 	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
 	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
 	
 	// check if is complex and define the Hamiltonian
 	if (_takeComplex)
-		return this->defineModelQ<cpx>(this->qhamComplex);
+		return this->defineModelQ<cpx>(this->qhamComplex, this->latP.Ntot_);
 	else
-		return this->defineModelQ<double>(this->qhamDouble);
-}
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-/*
-* @brief Based on symmetry parametes, create local and global symmetries
-*/
-std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> UI::createSymmetries()
-{
-	v_1d<GlobalSyms::GlobalSym> _glbSyms					= {};
-	v_1d<std::pair<Operators::SymGenerators, int>> _locSyms = {};
-	if (this->symP.S_ == true)
-	{
-		// create Hilbert space
-		this->isComplex_	= this->symP.checkComplex(this->latP.lat->get_Ns());
-
-		// ------ LOCAL ------
-		_locSyms			= this->symP.getLocGenerator();
-
-		// ------ GLOBAL ------
-		// check U1
-		if (this->symP.U1_ != -INT_MAX)
-			_glbSyms.push_back(GlobalSyms::getU1Sym(this->latP.lat, this->symP.U1_));
-	};
-	return std::make_pair(_glbSyms, _locSyms);
+		return this->defineModelQ<double>(this->qhamDouble, this->latP.Ntot_);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -676,5 +680,7 @@ void UI::makeSimQuadraticSpectralFunction()
 			this->quadraticSpectralFunction<double>(this->qhamDouble);
 	}
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // ------------------------------------------------

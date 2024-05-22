@@ -1,9 +1,8 @@
 #pragma once
 /***********************************
-* Is an instance of the QSM model.
+* Is an instance of the RP model.
 * Derives from a general Hamiltonian.
-* For more information see the QSM model.
-* https://arxiv.org/pdf/2308.07431.pdf
+* For more information see the RP model.
 ************************************/
 
 #ifndef HAMIL_H
@@ -15,15 +14,17 @@
 #include "../quantities/statistics.h"
 
 template<typename _T>
-class RosenzweigPorter : public Hamiltonian<_T, 2>
+class RosenzweigPorter : public HamiltonianDense<_T, 2>
 {
 public:
-	using NQSFun = typename Hamiltonian<_T>::NQSFun;
+	using NQSFun = typename HamiltonianDense<_T>::NQSFun;
 protected:
-	double gamma_ = 1.0;		// Hilbert-Schmidt norm of the coupling operator normalizer
-	double gammaP_ = 1.0;
-	double gammaP_inv_ = 1.0;
+	double gamma_		= 1.0;
+	double gammaP_		= 1.0;
+	double gammaP_inv_	= 1.0;
 	arma::Col<double> diag_;
+
+	void checkQuadratic() override;
 public:
 	void randomize(double _a, double _s, const strVec& _which)	override final;
 public:
@@ -83,6 +84,21 @@ inline RosenzweigPorter<_T>::~RosenzweigPorter()
 
 // ##########################################################################################################################################
 
+template<typename _T>
+inline void RosenzweigPorter<_T>::checkQuadratic()
+{
+	if (!Binary::isPowOf2(this->Ns_)) 
+	{
+		LOGINFOG("The number of particles is not a power of 2.", LOG_TYPES::WARNING, 1);
+		this->isManyBody_	= true;
+		this->isQuadratic_	= true;
+		this->Nh_ = this->Ns_;
+		this->Nh = this->Ns_;
+	}
+}
+
+// ##########################################################################################################################################
+
 /*
 * @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
 * @param _N: the number of particles in the system.
@@ -90,38 +106,44 @@ inline RosenzweigPorter<_T>::~RosenzweigPorter()
 */
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
-	: Hamiltonian<_T, 2>(_N), gamma_(_gamma)
+	: HamiltonianDense<_T, 2>(_N), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
 	this->info_ = this->info();
-	this->updateInfo();
+	// check whether the model shall be interpreted only as quadratic system!
+	this->checkQuadratic();
 
+	this->updateInfo();
 	this->initgamma(_gamma);
 }
 
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma)
-	: Hamiltonian<_T, 2>(_hil), gamma_(_gamma)
+	: HamiltonianDense<_T, 2>(_hil), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
 	this->info_ = this->info();
-	this->updateInfo();
+	// check whether the model shall be interpreted only as quadratic system!
+	this->checkQuadratic();
 
+	this->updateInfo();
 	this->initgamma(_gamma);
 
 }
 
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma)
-	: Hamiltonian<_T, 2>(_hil), gamma_(_gamma)
+	: HamiltonianDense<_T, 2>(_hil), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
 	this->info_ = this->info();
-	this->updateInfo();
+	// check whether the model shall be interpreted only as quadratic system!
+	this->checkQuadratic();
 
+	this->updateInfo();
 	this->initgamma(_gamma);
 }
 
@@ -166,14 +188,14 @@ inline void RosenzweigPorter<_T>::randomize(double _around, double _str, const s
 template<typename _T>
 inline std::string RosenzweigPorter<_T>::info(const strVec & skip, std::string sep, int prec) const
 {
-	std::string name		= sep + "rp,Ns=" + STR(this->Ns);
+	std::string name = sep + "rp,Ns=" + STR(this->Ns);
 	if (std::is_same<_T, std::complex<double>>::value) 
 		name += sep + "gue";
 	else
 		name += sep + "goe";
 	name +=	sep +	VEQV(gamm, gamma_);
 	name += this->hilbertSpace.getSymInfo();
-	return this->Hamiltonian<_T>::info(name, skip, sep);
+	return this->HamiltonianDense<_T>::info(name, skip, sep);
 }
 
 // ##########################################################################################################################################

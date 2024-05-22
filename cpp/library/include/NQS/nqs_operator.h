@@ -115,7 +115,7 @@ namespace Operators
 		// ######## SETTERS ########
 		auto resetSamples()				-> void { this->samples_ = {};															};
 		auto resetMB()					-> void { manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);				};
-		auto resetValue()				-> void { currentValue_ = arma::Mat<cpx>(sizeX_, sizeY_, arma::fill::zeros);			};
+		auto resetValue()				-> void { currentValue_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);				};
 		auto reset()					-> void;
 		auto normalize(uint N)			-> void; 
 		template <typename _T2>
@@ -126,8 +126,8 @@ namespace Operators
 		auto mbmat()					const -> arma::Mat<_T>							{ return this->manyBodyMatrix_;			};
 		auto mbval()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
 		auto name()						const -> std::string							{ return this->name_;					};
-		auto var()						const -> arma::Mat<cpx>							{ return Vectors::var(samples_);		};
-		auto mean()						const -> arma::Mat<cpx>							{ return Vectors::mean(samples_);		};
+		auto var()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::var(samples_));		};
+		auto mean()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::mean(samples_));		};
 		auto value()					const -> arma::Mat<cpx>							{ return currentValue_;					};
 		auto value(uint i)				const -> arma::Mat<cpx>							{ return samples_[i];					};
 		auto samples()					const -> v_1d<arma::Mat<cpx>>					{ return this->samples_;				};
@@ -343,10 +343,10 @@ namespace Operators
 			// transform to state
 			INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
 			// calculate the probability ratio
-			_valTotal += _val * _fun(this->state_);
+			_valTotal += _val * algebra::cast<_T>(_fun(this->state_));
 		}
 		this->updCurrent(_valTotal, a...);
-		return toType<_T>(_valTotal.real(), _valTotal.imag());
+		return algebra::cast<_T>(_valTotal);
 	}
 
 	////////////////////////////////////////////////////////////////////////////

@@ -55,13 +55,23 @@ public:
 	FreeFermions(std::shared_ptr<Lattice> _lat, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true), t_(_t), t_0(_t0)
 	{
-		this->type_			=		MY_MODELS_Q::FREE_FERMIONS_M;
+		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
 		this->info_			=		this->info();
 		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
 		this->getSPEnMat();
 		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
 	};
-	
+
+	FreeFermions(uint _Ns, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true), t_(_t), t_0(_t0)
+	{
+		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
+		this->info_			=		this->info();
+		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
+		this->getSPEnMat();
+		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
+	};
+
 	// --------------- H A M I L T O N I A N ---------------
 
 	void hamiltonian() override

@@ -20,18 +20,30 @@
 # 	45 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 # 	46 - run the QSM ETH simulation - statistics - sweep time evolution - Ljubljana 2024
 
--fun 43
+-fun 42
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
-# 	0  - Transverse Ising
-# 	1  - XYZ
-# 	2  - Heisenberg-Kitaev
-#   3  - QSM
-# 	4  - Rosenzweig-Porter
+# 	1  - Transverse Ising
+# 	2  - XYZ
+# 	3  - Heisenberg-Kitaev
+#   4  - QSM
+# 	5  - Rosenzweig-Porter
+#	6  - Ultrametric 
+#+++ Quadratic models +++:
+#	100  	- FF
+# 	101  	- AUBRY_ANDRE
+# 	102  	- SYK2
+# 	103  	- ANDERSON
+# 	104		- POWER LAW RANDOM BANDWIDTH
 
+# 	q_R 	- number of realizations of the mixed (unmixed) states
+# 	q_CN 	- number of combinations from which to choose the random states from (only applies when number of sites > 22)
+# 	q_gamma - number of states to combine together
+# 	q_man	- shall I use degenerate manifold? It currently applies to FF
+# 	q_mb 	- shall I also calculate the many body state (currently Slater determinant only)
 ### CHOOSE MODEL AND RANDOMNESS
--mod 4
--modRanN 10
+-mod 104
+-modRanN 2
 -modRanSeed 0
 # number of midspectrum states for the diagonal elements
 -modMidStates 0.7
@@ -43,12 +55,14 @@
 #	1 - RBM+PP
 -nqst 1
 #################################### LATTICE CHOICE ####################################
--th 8
+-th 1
 -bc 0
 # -Lx 2000 -Ly 70 -Lz 1
 -Lx 10 -Ly 1 -Lz 1
 -l 0
 -d 1
+# for the models that are not defined on a lattice
+-Ntot 8
 ############################# INTERACTING MODEL PARAMETERS #############################
 -hx 0.0 -hz 0.0 -eta1 0.0 -eta2 0.0 -J1 -1.0 -J2 0.0 -dlt1 -0.5 -dlt2 0
 #### Heisenberg-Kitaev
@@ -65,28 +79,24 @@
 -qsm_g0 1.0
 -qsm_gamma 1.0
 -qsm_N 3
--qsm_Ntot 12
 #### ROSENZWEIG-PORTER
--rp_g 0.5;1.0;1.2;1.5;2.0;3.0;4.0
+#-rp_g 1.1;1.2;1.3;1.4;1.6;1.7;1.8;1.9
+-rp_g 3.0
 -rp_single_particle 0
 -rp_be_real 1
--rp_g_sweep_n 7	
+-rp_g_sweep_n 8
+#### ULTRAMETRIC
+-um_g 1.0
+-um_alpha 0.9
+-um_N 3
+#### POWER LAW RANDOM BANDWIDTH
+
+
 
 ################################## SYMMETRY PARAMETERS #################################
 -S 0 -x 1 -k 0 -px 1 -pz 1
 
 ################################# QUADRATIC PARAMETERS #################################
-# Quadratic models:
-#	0  		- FF
-# 	1  		- AUBRY_ANDRE
-# 	2  		- SYK2
-# 	3  		- ANDERSON
--modQ 1
-# 	q_R 	- number of realizations of the mixed (unmixed) states
-# 	q_CN 	- number of combinations from which to choose the random states from (only applies when number of sites > 22)
-# 	q_gamma - number of states to combine together
-# 	q_man	- shall I use degenerate manifold? It currently applies to FF
-# 	q_mb 	- shall I also calculate the many body state (currently Slater determinant only)
 -q_R 3
 -q_CN 100
 -q_gamma 4
@@ -118,7 +128,7 @@
 ### load weights :)
 # -lNQS C:\University\PHD\CODES\VQMC\QSolver\cpp\library\DATA\nqs\HEX,PBC,d=2,Ns=16,Lx=4,Ly=2,Lz=1\,heikit,Ns=16,J=1.000,Kx=-0.500,Ky=1.000,Kz=1.000,delta=1.000,hz=0.000,hx=0.000,BC=0\RBM,mod=HEI_KIT_M,nv=16,nh=32,nS=2,lr=1.00e-02\WEIGHTS\
 ####################################### DIRECTORY ######################################
--dir ./MIROSLAV_STATE_NEWEST
+-dir ./UPDATE_MODELS
 
 # rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./
 # rsync --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:

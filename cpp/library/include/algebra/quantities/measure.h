@@ -30,11 +30,11 @@ private:
 
 	// types for the operators
 	//using OPG			= Operators::OpVec_glb_t;						
-	using OPG			= v_1d<Operators::Operator<_T>>;
+	using OPG			= v_1d<std::shared_ptr<Operators::Operator<_T>>>;
 	//using OPL			= Operators::OpVec_loc_t;						
-	using OPL			= v_1d<Operators::Operator<_T, uint>>;
+	using OPL			= v_1d<std::shared_ptr<Operators::Operator<_T, uint>>>;
 	//using OPC			= Operators::OpVec_cor_t;						
-	using OPC			= v_1d<Operators::Operator<_T, uint, uint>>;
+	using OPC			= v_1d<std::shared_ptr<Operators::Operator<_T, uint, uint>>>;
 	using MeasureTuple  = std::tuple<std::vector<_T>, std::vector<arma::Col<_T>>, std::vector<arma::Mat<_T>>>;
 
 protected:
@@ -126,11 +126,11 @@ public:
 	auto getOpG()					const noexcept -> OPG							{ return opG_;			};
 	auto getOpG_mat()				const noexcept -> const v_1d<arma::SpMat<_T>>&	{ return MG_;			};
 	auto getOpG_mat(uint i)			const noexcept -> arma::SpMat<_T>&				{ return MG_[i];		};
-	auto getOpGN(uint i)			const noexcept -> std::string					{ return opG_[i].getNameS(); };
+	auto getOpGN(uint i)			const noexcept -> std::string					{ return opG_[i]->getNameS(); };
 	auto getOpL()					const noexcept -> OPL							{ return opL_;			};
-	auto getOpLN(uint i)			const noexcept -> std::string					{ return opL_[i].getNameS(); };
+	auto getOpLN(uint i)			const noexcept -> std::string					{ return opL_[i]->getNameS(); };
 	auto getOpC()					const noexcept -> OPC							{ return opC_;			};
-	auto getOpCN(uint i)			const noexcept -> std::string					{ return opC_[i].getNameS(); };
+	auto getOpCN(uint i)			const noexcept -> std::string					{ return opC_[i]->getNameS(); };
 	auto getLat()					const noexcept -> std::shared_ptr<Lattice>		{ return lat_;			};
 	auto getValG()					const noexcept -> const v_1d<_T>&				{ return valG_;			};
 	auto getValL()					const noexcept -> const v_1d<arma::Col<_T>>&	{ return valL_;			};
@@ -232,7 +232,7 @@ inline Measurement<_T>::Measurement(size_t _Ns,
 	if (_opGN.size() == _opG.size())
 	{
 		for(auto i = 0; i < _opGN.size(); ++i)
-			this->opG_[i].setNameS(_opGN[i]);
+			this->opG_[i]->setNameS(_opGN[i]);
 	}
 }
 
@@ -265,10 +265,16 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 
 	BEGIN_CATCH_HANDLER
 	{
+
 		// measure global
-		for (const auto& _op : this->opG_)
+		for (std::shared_ptr<Operators::Operator<_T>> _op : this->opG_)
 		{
-			arma::SpMat<_T> _Min = _op.template generateMat<_T, typename arma::SpMat>(_dim);
+			auto _isquadratic = _op->getIsQuadratic();
+			arma::SpMat<_T> _Min;
+			if (!_isquadratic)
+				_Min = _op->template generateMat<_T, typename arma::SpMat>(_dim);
+			else
+				_Min = std::dynamic_pointer_cast<Operators::QuadraticOperator<_T>>(_op)->template generateMat<_T, u64, true>(_dim);
 			// push the operator
 			this->MG_.push_back(_Min);
 		}

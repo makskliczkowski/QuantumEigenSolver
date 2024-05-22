@@ -102,6 +102,25 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
+	/*
+	* @brief For Quadratic Operators, we will treat the operators as acting on the integer index as it was not the configuration!
+	*/
+	namespace QuadraticOperators
+	{
+		std::pair<u64, double> site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site);
+		Operators::QuadraticOperator<double> site_occupation(size_t _Ns, const uint _site);
+
+		std::pair<u64, double> nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus);
+		Operators::QuadraticOperator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus);
+
+		Operators::QuadraticOperator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum);
+		Operators::QuadraticOperator<double> quasimomentum_occupation(size_t _Ns);
+
+		Operators::QuadraticOperator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz);
+	}
+
+	// ##########################################################################################################################################
+
 	std::pair<u64, double> sigma_x(u64 base_vec, int L, const v_1d<uint>& sites);
 	Operators::Operator<double> makeSigmaX(std::shared_ptr<Lattice> lat, uint site);
 

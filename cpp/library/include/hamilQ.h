@@ -15,33 +15,21 @@
 #define HAMIL_QUADRATIC_H
 
 // ########################### EXISTING MODELS #############################
-enum class MY_MODELS_Q													// #
-{																		// #
-	FREE_FERMIONS_M, AUBRY_ANDRE_M, SYK2_M, ANDERSON_M, NONE			// #
-};																		// #
-BEGIN_ENUMC(MY_MODELS_Q)												// #
-{																		// #
-		DECL_ENUM_ELEMENT(FREE_FERMIONS_M),								// #
-		DECL_ENUM_ELEMENT(AUBRY_ANDRE_M),								// #
-		DECL_ENUM_ELEMENT(SYK2_M),										// #
-		DECL_ENUM_ELEMENT(ANDERSON_M),									// #
-		DECL_ENUM_ELEMENT(NONE)											// #
-}																		// #
-END_ENUMC(MY_MODELS_Q)													// #	
 ////////////////////////////////////////////////////////////////////////////
 template <>																// #
-inline std::string str_p(const MY_MODELS_Q v, 							// #
+inline std::string str_p(const MY_MODELS v, 							// #
 	const int n, 														// #
 	bool scientific)													// #
 {																		// #
-	return str_p(static_cast<std::underlying_type_t<MY_MODELS_Q>>(v),	// # 
+	return str_p(static_cast<std::underlying_type_t<MY_MODELS>>(v),		// # 
 		n, scientific);													// #
 }																		// #
 ////////////////////////////////////////////////////////////////////////////
 inline bool isQuadraticRandom(uint _type)								// #
 {																		// #
-	return	_type == (uint)MY_MODELS_Q::ANDERSON_M ||					// #
-			_type == (uint)MY_MODELS_Q::SYK2_M;							// #
+	return	_type == (uint)MY_MODELS::ANDERSON_M ||						// #
+			_type == (uint)MY_MODELS::SYK2_M	 ||						// #
+			_type == (uint)MY_MODELS::POWER_LAW_RANDOM_BANDED_M;		// #
 }																		// #
 inline std::string filenameQuadraticRandom(std::string _f,				// #
 	uint _type,															// #
@@ -65,7 +53,7 @@ public:
 	using		manyBodyTuple		= std::tuple<v_1d<double>, v_1d<arma::uvec>>;
 
 protected:
-	MY_MODELS_Q type_				= MY_MODELS_Q::NONE;
+	MY_MODELS  type_				= MY_MODELS::NONE;
 	uint		size_				= 1;
 	// check the particle conservation
 	bool		particleConverving_ = true;
@@ -109,6 +97,20 @@ public:
 	// --------------- C O N S T R U C T O R S ---------------
 	virtual ~QuadraticHamiltonian()	= default;
 	QuadraticHamiltonian()			= default;
+	QuadraticHamiltonian(size_t _Ns, _T _constant, bool _partCons = true)
+	{
+		LOGINFO("Creating quadratic model: ", LOG_TYPES::CHOICE, 1);
+		this->ran_	= randomGen();
+		this->Ns	= _Ns;
+		this->Ns_	= _Ns;
+		this->size_ = _partCons ? _Ns : 2 * _Ns;
+		this->Nh	= this->size_;
+		this->Nh_	= this->size_;
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
+		this->init();
+
+	}
 	QuadraticHamiltonian(std::shared_ptr<Lattice> _lat, _T _constant, bool _partCons = true)
 		: particleConverving_(_partCons), constant_(_constant)
 	{
@@ -120,6 +122,8 @@ public:
 		this->size_ = this->particleConverving_ ? this->Ns : 2 * this->Ns;
 		this->Nh	= this->size_;
 		this->Nh_	= this->size_;
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
 		this->init();
 	}
 
@@ -127,7 +131,7 @@ public:
 	virtual auto getTransMat()		-> arma::Mat<_T>		{ return this->eigVec_;							};	// returns the unitary base transformation {<x|q>}
 	virtual auto getSPEnMat()		-> arma::Col<double>	{ return this->eigVal_;							};	// returns the single particle energies
 	auto getTypeI()					const -> uint			{ return (uint)this->type_;						};	// get type integer
-	auto getType()					const -> std::string	{ return getSTR_MY_MODELS_Q((uint)this->type_); };	// get type string
+	auto getType()					const -> std::string	{ return getSTR_MY_MODELS(this->type_);	};	// get type string
 
 	// ------------------- O V E R R I D E -------------------
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)		override {										};

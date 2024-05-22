@@ -15,7 +15,14 @@ public:
 	SYK2(std::shared_ptr<Lattice> _lat, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true)
 	{
-		this->type_ = MY_MODELS_Q::SYK2_M;
+		this->type_ = MY_MODELS::SYK2_M;
+		this->info_ = this->info();
+		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
+	};
+	SYK2(uint _Ns, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true)
+	{
+		this->type_ = MY_MODELS::SYK2_M;
 		this->info_ = this->info();
 		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
 	};

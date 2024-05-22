@@ -1,4 +1,5 @@
 #include "./include/algebra/operators.h"
+#include <complex>
 
 namespace Operators
 {
@@ -287,6 +288,241 @@ namespace Operators
 
 		
 	}
+
+
+	// ##############################################################################################################################
+
+	// ###################################################### Q U A D R A T I C #####################################################
+
+	// ##############################################################################################################################
+
+	namespace QuadraticOperators
+	{
+		// #############################################################################################
+
+		std::pair<u64,double> Operators::QuadraticOperators::site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site)
+		{
+			if(_operatorIdx == _site)
+				return std::make_pair(_operatorIdx, (_Ns -  1) / std::sqrt(_Ns - 1));
+			return std::make_pair(_operatorIdx, 0.0);
+		}
+
+		Operators::QuadraticOperator<double> Operators::QuadraticOperators::site_occupation(size_t _Ns, const uint _site)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					_out(_site, _site) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					return _out;
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+					_out(_site, _site) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					return _out;
+				};
+
+			// set the operator
+			QuadraticOperator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;		
+		}
+
+		// #############################################################################################
+
+		std::pair<u64,double> Operators::QuadraticOperators::nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus)
+		{
+			if(_operatorIdx == _site_minus)
+				return std::make_pair(_site_plus, std::sqrt(_Ns / 2));
+			if (_operatorIdx == _site_plus)
+				return std::make_pair(_site_minus, std::sqrt(_Ns / 2));
+		}
+
+		Operators::QuadraticOperator<double> Operators::QuadraticOperators::nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus)
+		{
+			// create the function
+			_OP<double>::GLB fun_ = [_Ns, _site_plus, _site_minus](u64 state) { return nn_correlation(state, _Ns, _site_plus, _site_minus); };
+			// create the function
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					_out(_site_minus, _site_plus) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					_out(_site_plus, _site_minus) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					return _out;
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+					_out(_site_minus, _site_plus) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					_out(_site_plus, _site_minus) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					return _out;
+				};
+
+			// set the operator
+			QuadraticOperator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;		
+		}
+
+		// #############################################################################################
+
+		Operators::QuadraticOperator<std::complex<double>> Operators::QuadraticOperators::quasimomentum_occupation(size_t _Ns, const uint _momentum)
+		{
+			// create the function
+			std::function<arma::SpMat<std::complex<double>>()> _mat_sparse = [_Ns, _momentum]()
+				{
+					arma::SpMat<std::complex<double>> _out(_Ns, _Ns);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						for (auto j = 0; j < _Ns; j++)
+						{
+							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
+						}
+					}
+					return arma::SpMat<std::complex<double>>(_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+				};
+			std::function<arma::Mat<std::complex<double>>()> _mat_dense = [_Ns, _momentum]()
+				{
+					arma::Mat<std::complex<double>> _out(_Ns, _Ns, arma::fill::zeros);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						for (auto j = 0; j < _Ns; j++)
+						{
+							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
+						}
+					}
+					return (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+				};
+
+			// set the operator
+			QuadraticOperator<std::complex<double>> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;				
+		}
+
+		Operators::QuadraticOperator<double> Operators::QuadraticOperators::quasimomentum_occupation(size_t _Ns)
+		{
+			// create the function
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						for (auto j = 0; j < _Ns; j++)
+						{
+							_out(i, i) = 1.0 / (double)(_Ns);
+						}
+					}
+					return arma::SpMat<double>(_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						for (auto j = 0; j < _Ns; j++)
+						{
+							_out(i, i) = 1.0 / (double)(_Ns);
+						}
+					}
+					return (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+				};
+
+			// set the operator
+			QuadraticOperator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;				
+		}
+
+		// #############################################################################################
+
+		Operators::QuadraticOperator<double> Operators::QuadraticOperators::kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz)
+		{
+			auto _norm = 2;
+			if (_Ny > 1) _norm = 4;
+			if (_Nz > 1) _norm = 6;
+			auto _Ns = _Nx * _Ny * _Nz;
+
+			// create the function
+			std::function<arma::SpMat<double>()> _mat_sparse = [_norm, _Ns, _Nx, _Ny, _Nz]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						// x
+						_out(i, modEUC<int>(i + 1, _Nx)) = -1.0;
+						_out(i, modEUC<int>(i - 1, _Nx)) = -1.0;
+						_out(modEUC<int>(i + 1, _Nx), i) = -1.0;
+						_out(modEUC<int>(i - 1, _Nx), i) = -1.0;
+
+						// y 
+						if (_Ny > 1)
+						{
+							_out(i, modEUC<int>(i + _Nx, _Nx * _Ny)) = -1.0;
+							_out(i, modEUC<int>(i - _Nx, _Nx * _Ny)) = -1.0;
+							_out(modEUC<int>(i + _Nx, _Nx * _Ny), i) = -1.0;
+							_out(modEUC<int>(i - _Nx, _Nx * _Ny), i) = -1.0;
+						}
+
+						// z 
+						if (_Nz > 1)
+						{
+							_out(i, modEUC<int>(i + _Nx * _Ny, _Ns)) = -1.0;
+							_out(i, modEUC<int>(i - _Nx * _Ny, _Ns)) = -1.0;
+							_out(modEUC<int>(i + _Nx * _Ny, _Ns), i) = -1.0;
+							_out(modEUC<int>(i - _Nx * _Ny, _Ns), i) = -1.0;
+						}
+
+					}
+					return _out / std::sqrt(_norm);
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_norm, _Ns, _Nx, _Ny, _Nz]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+					for (auto i = 0; i < _Ns; i++)
+					{
+						// x
+						_out(i, modEUC<int>(i + 1, _Nx)) = -1.0;
+						_out(i, modEUC<int>(i - 1, _Nx)) = -1.0;
+						_out(modEUC<int>(i + 1, _Nx), i) = -1.0;
+						_out(modEUC<int>(i - 1, _Nx), i) = -1.0;
+
+						// y 
+						if (_Ny > 1)
+						{
+							_out(i, modEUC<int>(i + _Nx, _Nx * _Ny)) = -1.0;
+							_out(i, modEUC<int>(i - _Nx, _Nx * _Ny)) = -1.0;
+							_out(modEUC<int>(i + _Nx, _Nx * _Ny), i) = -1.0;
+							_out(modEUC<int>(i - _Nx, _Nx * _Ny), i) = -1.0;
+						}
+
+						// z 
+						if (_Nz > 1)
+						{
+							_out(i, modEUC<int>(i + _Nx * _Ny, _Ns)) = -1.0;
+							_out(i, modEUC<int>(i - _Nx * _Ny, _Ns)) = -1.0;
+							_out(modEUC<int>(i + _Nx * _Ny, _Ns), i) = -1.0;
+							_out(modEUC<int>(i - _Nx * _Ny, _Ns), i) = -1.0;
+						}
+
+					}
+					return _out / std::sqrt(_norm);
+				};
+
+			// set the operator
+			QuadraticOperator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;				
+		}
+	}
+
 }
 
 // ##############################################################################################################################

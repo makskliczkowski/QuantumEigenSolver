@@ -4,43 +4,51 @@
 
 void UI::makeSimETH()
 {
-	// define the models
-	this->resetEd();
-	// force complex Hamiltonian
+	bool _isquadratic = check_noninteracting(this->modP.modTyp_);
 
-	if(this->modP.modTyp_ == MY_MODELS::QSM_M)
-		this->useComplex_ = false;
-	else if(this->modP.modTyp_ == MY_MODELS::RP_M)
+	// define the models
+	if (this->modP.modTyp_ == MY_MODELS::RP_M)
 		this->useComplex_ = !this->modP.rosenzweig_porter.rp_be_real_;
+	else
+		this->useComplex_ = false;
 
 	// go complex if needed
 	bool _takeComplex = (this->isComplex_ || this->useComplex_);	
 
-	// simulate
-	if (this->defineModels(false, false, false))
+	// define the models depending on which to choose
+	bool _isok = false;
+	if (check_noninteracting(this->modP.modTyp_))
+		_isok = this->defineModelsQ(false);
+	else
+		_isok = this->defineModels(false, false, false);
+	
+	// go through the function choice
+	if (_isok)
 	{
 		if (this->chosenFun == 40)
-			this->checkETH(this->hamDouble);
+		{
+			//this->checkETH(this->hamDouble);
+		}
 		else if (this->chosenFun == 42)
 		{
 			if (_takeComplex)
-				this->checkETH_statistics(this->hamComplex);
+				this->checkETH_statistics(!_isquadratic ? this->hamComplex : this->qhamComplex);
 			else
-				this->checkETH_statistics(this->hamDouble);
+				this->checkETH_statistics(!_isquadratic ? this->hamDouble : this->qhamDouble);
 		}
 		else if (this->chosenFun == 44)
 		{
 			if (_takeComplex)
-				this->checkETH_scaling_offdiag(this->hamComplex);
+				this->checkETH_scaling_offdiag(!_isquadratic ? this->hamComplex : this->qhamComplex);
 			else
-				this->checkETH_scaling_offdiag(this->hamDouble);
+				this->checkETH_scaling_offdiag(!_isquadratic ? this->hamDouble : this->qhamDouble);
 		}
-		else if (this->chosenFun == 45)
+		else if (this->chosenFun == 46)
 		{
 			if (_takeComplex)
-				this->checkETH_time_evo(this->hamComplex);
+				this->checkETH_time_evo(!_isquadratic ? this->hamComplex : this->qhamComplex);
 			else
-				this->checkETH_time_evo(this->hamDouble);
+				this->checkETH_time_evo(!_isquadratic ? this->hamDouble : this->qhamDouble);
 		}
 	}
 }
@@ -111,6 +119,81 @@ void UI::makeSimETHSweep()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth_getoperators(bool _isquadratic, bool _ismanybody)
+{
+	const size_t _Ns = this->latP.Ntot_;
+	//const size_t _Nh = ULLPOW(_Ns);
+	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
+	strVec _opsN;
+
+	// operators!
+	{
+		// add many body operators if applicable
+		if (_ismanybody)
+		{
+			// add z spins 
+			for (uint i = 0; i < _Ns; ++i)
+			{
+				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { i })));
+				_opsN.push_back("mb/sz/" + STR(i));
+			}
+			// add other operators
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
+			_opsN.push_back("mb/szc/" + STR(_Ns - 2) + "_" + STR(_Ns - 1));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)(_Ns - 1) })));
+			_opsN.push_back("mb/szc/" + STR(_Ns / 2) + "_" + STR(_Ns - 1));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 })));
+			_opsN.push_back("mb/sxc/0_" + STR(_Ns - 1));
+		}
+
+		// add quadratic operators if applicable
+		if (_isquadratic)
+		{
+			// add other operators
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Ns)));
+			_opsN.push_back("sp/kin");
+			
+			for (uint i = 0; i < _Ns; ++i)
+			{
+				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Ns, i)));
+				_opsN.push_back("sp/occ/" + STR(i));
+			}
+		}
+	}
+
+	return std::make_pair(_ops, _opsN);
+}
+
+// ###############################################################################################
+
+template<typename _T>
+void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H)
+{
+	bool isQuadratic		= _H->getIsQuadratic(), 
+		 isManyBody			= _H->getIsManyBody();
+
+	_H->clearH();
+
+	if (isManyBody)
+	{
+		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
+			_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
+			_H->randomize(0, 1.0, { "g" });
+		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+			_H->randomize(0, 1.0, {});
+		//else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+	}
+
+	// -----------------------------------------------------------------------------
+
+	// set the Hamiltonian
+	_H->buildHamiltonian();
+	_H->diagH(false);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 template<typename _T>
 void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 {
@@ -125,8 +208,10 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	std::string modelInfo, dir = "ETH_MAT_OFFD_SCALING", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
-	v_1d<Operators::Operator<double>> _ops;
-	strVec _opsN;
+	bool isQuadratic		= _H->getIsQuadratic(), 
+		isManyBody			= _H->getIsManyBody();
+
+	const auto [_ops, _opsN]= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
 	u64 _hs_fractions_diag			= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
 
@@ -134,21 +219,6 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	// GAMMA (see 2022, Suntajs, PRL)
 	// gamma0, h_gamma, h_mean_lvl_mean, h_mean_lvl_typ, t_th_est
 	arma::Mat<double> _meanlvl		= -1e5 * arma::Mat<double>(5, this->modP.modRanN_, arma::fill::ones);
-
-	// create the operators
-	{
-		if (!this->modP.rosenzweig_porter.rp_single_particle_)
-		{
-			// create the matrices
-			_ops = {
-				Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)(_Ns - 1) }),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 0, (uint)(_Ns - 1) }),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 1) }),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3 })
-			};
-			_opsN = { "sxc/0", "szc/0", "sz/l", "sz/3" };
-		}
-	}
 
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
@@ -413,7 +483,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// ###############################################################################################
 
 template<typename _T>
 void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
@@ -422,39 +492,24 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
 	// check the random field
-	size_t _Ns				= this->modP.qsm.qsm_Ntot_;
+	size_t _Ns				= this->latP.Ntot_;
 	u64 _Nh					= ULLPOW(_Ns);
-	v_1d<Operators::Operator<double>> _ops;
-	strVec _opsN;
+	bool isQuadratic		= _H->getIsQuadratic(), 
+		 isManyBody			= _H->getIsManyBody();
+
+	const auto [_ops, _opsN]= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
 	// get info
 	std::string modelInfo, dir = "ETH_MAT_STAT", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
-	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::ones);
 	arma::Col<double> _gaps			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	// GAMMA (see 2022, Suntajs, PRL)
 	arma::Col<double> _meanlvl		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
 
-	// operators!
-	{
-		if (!this->modP.rosenzweig_porter.rp_single_particle_)
-		{
-			// create the matrices
-			_ops = {
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1)}),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)(_Ns - 1)}),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 1)}),
-				Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { 3 }),
-				Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 })
-			};
-			_opsN = { "szco_lm1", "szco_l2_l", "sz_l", "sz_3", "sxc_l" };
-		}
-	}
-
 	// create the measurement class
-	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
+	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
 
 	// to save the operators (those elements will be stored for each operator separately)
 	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
@@ -482,7 +537,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// ----------------------- nbins operators -----------------------
 	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram());
 	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram());
-	uint _nbinOperators			= 15 * _Ns;
+	uint _nbinOperators = 15 * _Ns;
 
 	// create the histograms for the operators
 	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
@@ -567,23 +622,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// checkpoints etc
 		{
 			LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-			_timer.checkpoint(STR(_r));
-
-			// -----------------------------------------------------------------------------
-
 			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
-			_H->clearH();
-
-			if (this->modP.modTyp_ == MY_MODELS::QSM_M)
-				_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
-			else if (this->modP.modTyp_ == MY_MODELS::RP_M)
-				_H->randomize(0, 1.0, { "g" });
-
-			// -----------------------------------------------------------------------------
-
-			// set the Hamiltonian
-			_H->buildHamiltonian();
-			_H->diagH(false);
+			_timer.checkpoint(STR(_r));
+			this->ui_eth_randomize(_H);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 		}
 
@@ -644,7 +685,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// mean level spacing
 			{
-				_meanlvl(_r) = SystemProperties::mean_lvl_gamma(_H->getHamiltonian());
+				_meanlvl(_r) = check_dense(this->modP.modTyp_) ? std::dynamic_pointer_cast<HamiltonianDense<_T>>(_H)->getMeanLevelSpacing() : _H->getMeanLevelSpacing();
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(_r, 0)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 			}
 
@@ -1394,25 +1435,14 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	// check the random field
 	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
 	u64 _Nh		= ULLPOW(_Ns);
-	v_1d<Operators::Operator<double>> _ops;
-	v_1d<std::string> _opsN;
+	bool isQuadratic		= _H->getIsQuadratic(), 
+		isManyBody			= _H->getIsManyBody();
+
+	const auto [_ops, _opsN]= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
 	// get info
 	std::string modelInfo, dir = "ETH_MAT_TIME_EVO", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
-
-	// couplings for the sz!
-	{
-		// create the matrices
-		_ops							= { 
-			Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { ((uint)_Ns - 2), ((uint)_Ns - 1) }), 
-			Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { ((uint)(_Ns / 2)), ((uint)_Ns - 1)}), 
-			Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { ((uint)_Ns - 1) }), 
-			Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { ((uint)_Ns - 2) }), 
-			Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { ((uint)(_Ns / 2)) }) 
-		};
-		_opsN							= { "szc/l_lm1", "szc/l2_l", "sz/l", "sz/lm1", "sz/l2"};
-	}
 
 	// create the measurement class
 	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);

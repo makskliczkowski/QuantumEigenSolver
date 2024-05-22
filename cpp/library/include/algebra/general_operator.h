@@ -79,6 +79,14 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	class Operator 
 	{
+	protected:
+
+		template <typename _MatType>
+		using qMatType = std::function<_MatType()>;
+
+		qMatType<arma::SpMat<_T>> qMatSparse_;												// sparse matrix representation of the operator
+		qMatType<arma::Mat<_T>> qMatDense_;													// dense matrix representation of the operator
+
 		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
 		size_t Ns_											=			1;					// number of elements in the vector (for one to know how to act on it)
 		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, the lattice can be empty if not needed
@@ -86,6 +94,7 @@ namespace Operators
 		repType fun_										=			E;					// function allowing to use the symmetry operation
 		
 		// used for checking on which states the operator acts when forgetting and using the matrix only
+		bool isQuadratic_									=			false;
 		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
 		SymGenerators name_									=			SymGenerators::E;   // name of the operator
 		std::string nameS_									=			"E";				// name of the operator in string
@@ -133,13 +142,13 @@ namespace Operators
 			init();
 		};
 		Operator(const Operator<_T, _Ts...>& o)
-			: Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_), acton_(o.acton_), name_(o.name_), nameS_(o.nameS_)
+			: qMatSparse_(o.qMatSparse_), qMatDense_(o.qMatDense_), Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_), isQuadratic_(o.isQuadratic_), acton_(o.acton_), name_(o.name_), nameS_(o.nameS_)
 		{
 			init();
 		};
 		Operator(Operator<_T, _Ts...>&& o)
-			: Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)),
-			fun_(std::move(o.fun_)), acton_(std::move(o.acton_)), name_(std::move(o.name_)), nameS_(std::move(o.nameS_))
+			: qMatSparse_(std::move(o.qMatSparse_)), qMatDense_(std::move(o.qMatDense_)), Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)),
+			fun_(std::move(o.fun_)), isQuadratic_(std::move(o.isQuadratic_)), acton_(std::move(o.acton_)), name_(std::move(o.name_)), nameS_(std::move(o.nameS_))
 		{
 			init();
 		};
@@ -182,7 +191,8 @@ namespace Operators
 		virtual void init() {};
 		
 		// -------------------- SETTERS -------------------
-
+		
+		auto setIsQuadratic(bool _is)					-> void							{ this->isQuadratic_ = _is;							}	
 		auto setActOn(u64 _acton)						-> void							{ this->acton_ = _acton;							};
 		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;								};
 		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);						};
@@ -190,8 +200,11 @@ namespace Operators
 		auto setNameS(const std::string& _name)			-> void							{ this->nameS_ = _name;								};
 		auto setVal(_T _val)							-> void							{ this->eigVal_ = _val;								};
 		auto setNs(size_t Ns)							-> void							{ this->Ns_ = Ns;									};
+		void setQMatSparse(qMatType<arma::SpMat<_T>>&& _qMat)							{ this->qMatSparse_ = std::move(_qMat);				};
+		void setQMatDense(qMatType<arma::Mat<_T>>&& _qMat)								{ this->qMatDense_ = std::move(_qMat);				};
 		
 		// -------------------- GETTERS --------------------
+		auto getIsQuadratic()							const -> bool					{ return this->isQuadratic_;						};
 		auto getActOn()									const -> u64					{ return this->acton_;								};
 		auto getNs()									const -> size_t					{ return this->Ns_;									};
 		auto getVal()									const -> _T						{ return this->eigVal_;								};
@@ -452,6 +465,143 @@ inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::O
 			op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
 	}
 }
+
+
+// ##########################################################################################################################################
+
+// ############################################### Q U A D R A T I C   O P E R A T O R S ####################################################
+
+// ##########################################################################################################################################
+
+namespace Operators
+{
+	template<typename _T, typename ..._Ts>
+	class QuadraticOperator : public Operators::Operator<_T, _Ts...>
+	{
+	protected:
+		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
+		
+		// sparse matrix
+		bool isSparse_ = false;
+
+	public:
+		// ----------------------------------------------------------------------------------------------------
+
+		virtual ~QuadraticOperator() = default;
+		QuadraticOperator()
+			: Operator<_T, _Ts...>()
+		{ 
+			this->init(); 
+			this->setIsQuadratic(true);
+		};
+
+		// with the usage of the elements in the state vector
+		QuadraticOperator(size_t Ns, const std::string& _nameS = "")
+			: Operator<_T, _Ts...>(Ns, _nameS)
+		{ 
+			this->init(); 
+			this->setIsQuadratic(true);
+		};
+		QuadraticOperator(size_t Ns, _T _eigVal, const std::string& _nameS = "") 
+			: Operator<_T, _Ts...>(Ns, _eigVal, _nameS)
+		{ 
+			this->init(); 
+			this->setIsQuadratic(true);
+		};
+		QuadraticOperator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "") 
+			: Operator<_T, _Ts...>(Ns, _eigVal, _fun, _name, _nameS)
+		{ 
+			this->init(); 
+			this->setIsQuadratic(true);
+		};
+
+		// for the usage with the lattice (mostly for spin models, spinless fermions and hardcore bosons)
+		QuadraticOperator(std::shared_ptr<Lattice> _lat, const std::string& _nameS = "")
+			: Operator<_T, _Ts...>(_lat, _nameS)
+		{
+			this->init();
+			this->setIsQuadratic(true);
+		};
+		QuadraticOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
+			: Operator<_T, _Ts...>(_lat, _eigVal, _nameS)
+		{
+			this->init();
+			this->setIsQuadratic(true);
+		};
+		QuadraticOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
+			: Operator<_T, _Ts...>(_lat, _eigVal, _fun, _name, _nameS)
+		{
+			init();
+		};
+		QuadraticOperator(const QuadraticOperator<_T, _Ts...>& o) : Operator<_T, _Ts...>(o)
+		{
+			this->Ns_ = o.Ns_;
+			this->lat_ = o.lat_;
+			this->fun_ = o.fun_;
+			this->eigVal_ = o.eigVal_;
+			this->name_ = o.name_;
+			this->nameS_ = o.nameS_;
+			this->init();
+			this->setIsQuadratic(true);
+		};
+		QuadraticOperator(QuadraticOperator<_T, _Ts...>&& o) : Operator<_T, _Ts...>(o)
+		{
+			this->Ns_ = o.Ns_;
+			this->lat_ = o.lat_;
+			this->fun_ = o.fun_;
+			this->eigVal_ = o.eigVal_;
+			this->name_ = o.name_;
+			this->nameS_ = o.nameS_;
+
+			this->init();
+			this->setIsQuadratic(true);
+		};
+
+		// ----------------------------------------------------------------------------------------------------
+
+		QuadraticOperator<_T, _Ts...>& operator=(const QuadraticOperator<_T, _Ts...>& _other)
+		{
+			this->Ns_		=		_other.Ns_;
+			this->lat_		=		_other.lat_;
+			this->fun_		=		_other.fun_;
+			this->eigVal_	=		_other.eigVal_;
+			this->name_		=		_other.name_;
+			return *this;
+		}
+
+		QuadraticOperator<_T, _Ts...>& operator=(const QuadraticOperator<_T, _Ts...>&& _other)
+		{
+			this->Ns_		=		std::move(_other.Ns_);
+			this->lat_		=		std::move(_other.lat_);
+			this->fun_		=		std::move(_other.fun_);
+			this->eigVal_	=		std::move(_other.eigVal_);
+			this->name_		=		std::move(_other.name_);
+			return *this;
+		}
+
+	public:
+
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		
+		template<typename _TinMat = _T, typename _InT = u64, bool _sparse = true>
+		arma::SpMat<_TinMat> generateMat(_InT _dim, _Ts... _arg) const
+		{
+			if(this->qMatSparse_)
+				return this->qMatSparse_();
+			return arma::SpMat<_T>();
+		}
+		template<typename _TinMat = _T, typename _InT = u64>
+		arma::Mat<_TinMat> generateMat(_InT _dim, _Ts... _arg) const
+		{
+			if(this->qMatDense_)
+				return this->qMatDense_();
+			return arma::Mat<_T>();		
+		}
+	};
+
+}
+
+
 
 // ##########################################################################################################################################
 
