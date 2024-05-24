@@ -55,11 +55,11 @@ public:
 				}
 
 				// set Hamiltonian element
-				this->H_(i, j) = _ranval / std::sqrt(1.0 + _distance);
+				this->H_.set(i, j, _ranval / std::sqrt(1.0 + _distance));
 			}
 		}
 
-		this->H_ = this->ran_.template GOE<_T>(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
+		//this->H_ += this->ran_.template GOE<_T>(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------

@@ -300,14 +300,14 @@ namespace Operators
 	{
 		// #############################################################################################
 
-		std::pair<u64,double> Operators::QuadraticOperators::site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site)
+		std::pair<u64,double> site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site)
 		{
 			if(_operatorIdx == _site)
 				return std::make_pair(_operatorIdx, (_Ns -  1) / std::sqrt(_Ns - 1));
 			return std::make_pair(_operatorIdx, 0.0);
 		}
 
-		Operators::QuadraticOperator<double> Operators::QuadraticOperators::site_occupation(size_t _Ns, const uint _site)
+		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site)
 		{
 			// create the function
 			_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
@@ -325,7 +325,8 @@ namespace Operators
 				};
 
 			// set the operator
-			QuadraticOperator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
 			return _op;		
@@ -333,15 +334,16 @@ namespace Operators
 
 		// #############################################################################################
 
-		std::pair<u64,double> Operators::QuadraticOperators::nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus)
+		std::pair<u64,double>nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus)
 		{
 			if(_operatorIdx == _site_minus)
 				return std::make_pair(_site_plus, std::sqrt(_Ns / 2));
 			if (_operatorIdx == _site_plus)
 				return std::make_pair(_site_minus, std::sqrt(_Ns / 2));
+			return std::make_pair(_operatorIdx, 0.0);
 		}
 
-		Operators::QuadraticOperator<double> Operators::QuadraticOperators::nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus)
+		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus)
 		{
 			// create the function
 			_OP<double>::GLB fun_ = [_Ns, _site_plus, _site_minus](u64 state) { return nn_correlation(state, _Ns, _site_plus, _site_minus); };
@@ -362,7 +364,8 @@ namespace Operators
 				};
 
 			// set the operator
-			QuadraticOperator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
 			return _op;		
@@ -370,7 +373,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		Operators::QuadraticOperator<std::complex<double>> Operators::QuadraticOperators::quasimomentum_occupation(size_t _Ns, const uint _momentum)
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum)
 		{
 			// create the function
 			std::function<arma::SpMat<std::complex<double>>()> _mat_sparse = [_Ns, _momentum]()
@@ -399,13 +402,14 @@ namespace Operators
 				};
 
 			// set the operator
-			QuadraticOperator<std::complex<double>> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<std::complex<double>> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
 			return _op;				
 		}
 
-		Operators::QuadraticOperator<double> Operators::QuadraticOperators::quasimomentum_occupation(size_t _Ns)
+		Operators::Operator<double> quasimomentum_occupation(size_t _Ns)
 		{
 			// create the function
 			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns]()
@@ -434,7 +438,8 @@ namespace Operators
 				};
 
 			// set the operator
-			QuadraticOperator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
 			return _op;				
@@ -442,7 +447,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		Operators::QuadraticOperator<double> Operators::QuadraticOperators::kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz)
+		Operators::Operator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz)
 		{
 			auto _norm = 2;
 			if (_Ny > 1) _norm = 4;
@@ -516,7 +521,8 @@ namespace Operators
 				};
 
 			// set the operator
-			QuadraticOperator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
 			return _op;				

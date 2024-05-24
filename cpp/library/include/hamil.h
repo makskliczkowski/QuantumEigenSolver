@@ -7,9 +7,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
-#ifndef SYMMETRIES_H
-	#include "algebra/operators.h"
-#endif // !SYMMETRIES_H
+#include "hamilMatrix.h"
 
 #ifndef HAMIL_H
 #define HAMIL_H
@@ -96,7 +94,7 @@ const std::string DEF_INFO_SEP		= std::string("_");												// defalut separa
 
 // ##########################################################################################################################################
 
-template <typename _T, uint _spinModes = 2, class MatType = arma::SpMat<_T>>
+template <typename _T, uint _spinModes = 2>
 class Hamiltonian 
 {
 public:
@@ -118,6 +116,7 @@ protected:
 	u64 Nh												= 1;
 	bool isQuadratic_									= false;
 	bool isManyBody_									= true;
+	bool isSparse_										= true;
 
 	// ------------------------------------------- CLASS FIELDS ---------------------------------------------
 	u64 avEnIdx											= -1;														
@@ -127,8 +126,8 @@ protected:
 	double maxEn										= 0.0;
 	
 	// matrices
+	HamiltonianMatrix<_T> H_;							// the Hamiltonian
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
-	MatType H_;											// the Hamiltonian
 	arma::Mat<_T> K_;									// the Krylov Vectors (if needed)
 	arma::vec eigVal_;									// eigenvalues vector
 public:
@@ -175,8 +174,8 @@ public:
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
 	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
 	// hamiltonian
-	virtual auto getMeanLevelSpacing()					const -> double								{ return SystemProperties::mean_lvl_gamma(this->H_);							};
-	auto getHamiltonian()								const -> const MatType&						{ return this->H_;																};
+	virtual auto getMeanLevelSpacing()					const -> double								{ return this->H_.meanLevelSpacing();											};
+	auto getHamiltonian()								const -> const HamiltonianMatrix<_T>&		{ return this->H_;																};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
 	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
 	virtual auto getHamiltonianSizeH()					const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
@@ -262,8 +261,8 @@ public:
 
 // ##########################################################################################################################################
 
-template<typename _T, uint _spinModes, class MatType>
-inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian()
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian()
 	: ran_(randomGen())
 {
 	CONSTRUCTOR_CALL;
@@ -273,9 +272,9 @@ inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian()
 * @brief Constructor of the Hamiltonian class for the systems that don't require the lattice
 * @param _Ns number of particles in the system
 */
-template<typename _T, uint _spinModes, class MatType>
-inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(const size_t _Ns)
-	: Hamiltonian<_T, _spinModes, MatType>()
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
+	: Hamiltonian<_T, _spinModes>()
 {
 	this->Ns_	= _Ns;
 	this->Ns	= _Ns;
@@ -287,9 +286,9 @@ inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(const size_t _Ns)
 /*
 * @brief Constructor of the Hamiltonian with the Hilbert space
 */
-template<typename _T, uint _spinModes, class MatType>
-inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert)
-	: Hamiltonian<_T, _spinModes, MatType>()
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert)
+	: Hamiltonian<_T, _spinModes>()
 {
 	this->hilbertSpace = hilbert;
 	this->lat_	=	this->hilbertSpace.getLattice();
@@ -302,8 +301,8 @@ inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(const Hilbert::HilbertS
 /*
 * @brief Constructor with move semantics for the Hilbert space
 */
-template<typename _T, uint _spinModes, class MatType>
-inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
 	: hilbertSpace(std::move(hilbert))
 {
 	this->ran_	=	randomGen();
@@ -325,8 +324,8 @@ inline Hamiltonian<_T, _spinModes, MatType>::Hamiltonian(Hilbert::HilbertSpace<_
 * @param skip vector of elements to be skipped in the info showcase
 * @returns trimmed information about the model
 */
-template<typename _T, uint _spinModes, class MatType>
-std::string Hamiltonian<_T, _spinModes, MatType>::info(std::string name, const v_1d<std::string>& skip, std::string sep) const
+template<typename _T, uint _spinModes>
+std::string Hamiltonian<_T, _spinModes>::info(std::string name, const v_1d<std::string>& skip, std::string sep) const
 {
 	auto tmp = (name == "") ? splitStr(this->info_, ",") : splitStr(name, ",");
 	std::string tmp_str = "";
@@ -343,8 +342,8 @@ std::string Hamiltonian<_T, _spinModes, MatType>::info(std::string name, const v
 
 // ##########################################################################################################################################
 
-template<typename _T, uint _spinModes, class MatType>
-Hamiltonian<_T, _spinModes, MatType>::~Hamiltonian()
+template<typename _T, uint _spinModes>
+Hamiltonian<_T, _spinModes>::~Hamiltonian()
 {
 	DESTRUCTOR_CALL;
 	LOGINFO("Base Hamiltonian destructor called.", LOG_TYPES::INFO, 3);
@@ -359,8 +358,8 @@ Hamiltonian<_T, _spinModes, MatType>::~Hamiltonian()
 * Generates the total Hamiltonian of the system. The diagonal part is straightforward,
 * while the non-diagonal terms need the specialized setHamiltonainElem(...) function
 */
-template<typename _T, uint _spinModes, class MatType>
-void Hamiltonian<_T, _spinModes, MatType>::hamiltonian()
+template<typename _T, uint _spinModes>
+void Hamiltonian<_T, _spinModes>::hamiltonian()
 {
 	if (this->Nh == 0)
 	{
@@ -381,13 +380,13 @@ void Hamiltonian<_T, _spinModes, MatType>::hamiltonian()
 /*
 * @brief Initialize Hamiltonian matrix.
 */
-template<typename _T, uint _spinModes, class MatType>
-void Hamiltonian<_T, _spinModes, MatType>::init()
+template<typename _T, uint _spinModes>
+void Hamiltonian<_T, _spinModes>::init()
 {
 	// hamiltonian memory reservation
 	BEGIN_CATCH_HANDLER
 	{
-		this->H_ = MatType(this->Nh, this->Nh);
+		this->H_ = HamiltonianMatrix<_T>(this->Nh, this->isSparse_);
 	}
 	END_CATCH_HANDLER("Memory exceeded", std::runtime_error("Memory for the Hamiltonian setting exceeded"););
 };
@@ -397,8 +396,8 @@ void Hamiltonian<_T, _spinModes, MatType>::init()
 /*
 * @builds Hamiltonian and gets specific info! 
 */
-template<typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::buildHamiltonian()
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::buildHamiltonian()
 {
 	auto _t = NOW;
 	LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
@@ -412,8 +411,8 @@ inline void Hamiltonian<_T, _spinModes, MatType>::buildHamiltonian()
 /*
 * @brief Calculates the index closest to the average energy in the Hamiltonian. The index is stored in the avEnIdx variable.
 */
-template<typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::calcAvEn()
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 {
 	// calculates the middle spectrum element
 	this->avEn	= arma::mean(this->eigVal_);
@@ -436,8 +435,8 @@ inline void Hamiltonian<_T, _spinModes, MatType>::calcAvEn()
 * @param _E energy to be compared with
 * @returns index of the energy closest to the given energy
 */
-template<typename _T, uint _spinModes, class MatType>
-inline u64 Hamiltonian<_T, _spinModes, MatType>::calcEnIdx(double _E)
+template<typename _T, uint _spinModes>
+inline u64 Hamiltonian<_T, _spinModes>::calcEnIdx(double _E)
 {
 	// calculates the energy difference to find the closest element (the smallest)
 	v_1d<double> tmp(Nh, 0.0);
@@ -457,8 +456,8 @@ inline u64 Hamiltonian<_T, _spinModes, MatType>::calcEnIdx(double _E)
 * @param _r number of elements to the right from the average energy
 * @returns pair of indices of the energy spectrum around the average energy
 */
-template<typename _T, uint _spinModes, class MatType>
-inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndAvIdx(long long _l, long long _r) const
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long _l, long long _r) const
 {
 	return SystemProperties::hs_fraction_around_idx(_l, _r, this->avEnIdx, this->Nh);
 }
@@ -472,8 +471,8 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndAvIdx(
 * @param _idx index of the energy to be compared with
 * @returns pair of indices of the energy spectrum around the given energy
 */
-template<typename _T, uint _spinModes, class MatType>
-inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndEIdx(long long _l, long long _r, u64 _idx) const
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEIdx(long long _l, long long _r, u64 _idx) const
 {
 	return SystemProperties::hs_fraction_around_idx(_l, _r, _idx, this->Nh);
 }
@@ -486,8 +485,8 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndEIdx(l
 * @param _Eidx index of the energy spectrum
 * @param _eps tolerance of the energy difference
 */
-template<typename _T, uint _spinModes, class MatType>
-inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndEnEps(u64 _Eidx, double _eps) const
+template<typename _T, uint _spinModes>
+inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEnEps(u64 _Eidx, double _eps) const
 {
 	u64 _imax = _Eidx;
 	u64 _imin = _Eidx;
@@ -509,8 +508,8 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes, MatType>::getEnArndEnEps(
 * @param _tol tolerance of the energy difference
 * @returns vector of tuples of the energy difference and the indices of the energy spectrum
 */
-template<typename _T, uint _spinModes, class MatType>
-inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes, MatType>::getEnPairsIdx(u64 _mn, u64 _mx, double _tol) const
+template<typename _T, uint _spinModes>
+inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPairsIdx(u64 _mn, u64 _mx, double _tol) const
 {
 	return SystemProperties::hs_fraction_offdiag(_mn, _mx, this->Nh, this->eigVal_, this->avEn, _tol * this->Ns_, true);
 }
@@ -528,8 +527,8 @@ inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes, MatType>::
 * @param _tmpVec to be used as reference vector
 * @param _tol tolerance of the coefficient absolute value
 */
-template<typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::printBaseState(std::ostream& output, u64 _s, _T val, v_1d<int>& _tmpVec, double _tol)
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::printBaseState(std::ostream& output, u64 _s, _T val, v_1d<int>& _tmpVec, double _tol)
 {
 	INT_TO_BASE(_s, _tmpVec);
 	if (!EQP(std::abs(val), 0.0, _tol)) 
@@ -545,9 +544,9 @@ inline void Hamiltonian<_T, _spinModes, MatType>::printBaseState(std::ostream& o
 * @param Ns number of lattice sites
 * @param tol tolerance of the coefficients absolute value
 */
-template<typename _T, uint _spinModes, class MatType>
+template<typename _T, uint _spinModes>
 template <template <typename> class _V, typename _TV>
-inline void Hamiltonian<_T, _spinModes, MatType>::prettyPrint(std::ostream& output, const _V<_TV>& state, uint Ns, double tol)
+inline void Hamiltonian<_T, _spinModes>::prettyPrint(std::ostream& output, const _V<_TV>& state, uint Ns, double tol)
 {
 	v_1d<int> tmpVec(Ns);
 	for (u64 k = 0; k < state.size(); k++)
@@ -567,8 +566,8 @@ inline void Hamiltonian<_T, _spinModes, MatType>::prettyPrint(std::ostream& outp
 * @param value value of the given matrix element to be set
 * @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
 */
-template<typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::setHElem(u64 k, _T val, u64 newIdx)
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
 {
 	u64 kMap = this->hilbertSpace.getMapping(k);
 	BEGIN_CATCH_HANDLER
@@ -577,10 +576,12 @@ inline void Hamiltonian<_T, _spinModes, MatType>::setHElem(u64 k, _T val, u64 ne
 		{
 			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
 			// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-			this->H_(idx, k) += val * symEig;
+			this->H_.add(idx, k, val * symEig);
+			//this->H_(idx, k) += val * symEig;
 		}
 		else
-			this->H_(k, k) += val;
+			this->H_.add(k, k, val);
+			//this->H_(k, k) += val;
 	}
 	END_CATCH_HANDLER("Exception in setting the Hamiltonian elements: " + VEQ(k) + "," + VEQ(kMap) + "," + VEQ(newIdx), exit(-1););
 }
@@ -595,11 +596,25 @@ inline void Hamiltonian<_T, _spinModes, MatType>::setHElem(u64 k, _T val, u64 ne
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
-template <typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::diagH(bool woEigVec)
+template <typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
 {
-	if (woEigVec)	Diagonalizer<_T>::diagS(this->eigVal_, this->H_);
-	else				Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_);
+	if (woEigVec)
+	{
+		if (this->isSparse_)
+			Diagonalizer<_T>::diagS(this->eigVal_, this->H_.getSparse());
+		else
+			Diagonalizer<_T>::diagS(this->eigVal_, this->H_.getDense());
+
+	}
+	else
+	{
+		if(this->isSparse_)
+			Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getSparse());
+		else
+			Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getDense());
+
+	}
 	this->calcAvEn();
 }
 
@@ -622,8 +637,8 @@ inline void Hamiltonian<_T, _spinModes, MatType>::diagH(bool woEigVec)
 * @param tol tolerance of the Lanczos method
 * @param form form of the diagonalization
 */
-template <typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
+template <typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdim, uint maxiter, double tol, std::string form) 
 {
 	BEGIN_CATCH_HANDLER
 	{
@@ -641,7 +656,7 @@ inline void Hamiltonian<_T, _spinModes, MatType>::diagH(bool woEigVec, uint k, u
 		else if (form == "lanczos")
 		{
 			LOGINFO("Diagonalizing Hamiltonian. Using: Lanczos", LOG_TYPES::INFO, 3);
-			LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_, k, &this->ran_);
+			LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getSparse(), k, &this->ran_);
 			//this->calcAvEn();
 		}
 		else
@@ -656,13 +671,13 @@ inline void Hamiltonian<_T, _spinModes, MatType>::diagH(bool woEigVec, uint k, u
 
 // ##########################################################################################################################################
 
-template<typename _T, uint _spinModes, class MatType>
-inline void Hamiltonian<_T, _spinModes, MatType>::diagHs(bool woEigVec)
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::diagHs(bool woEigVec)
 {
 	BEGIN_CATCH_HANDLER
 	{
-		if (woEigVec)				arma::eigs_sym(this->eigVal_, this->H_, this->getHilbertSize());
-		else						arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_, this->getHilbertSize());
+		if (woEigVec)				arma::eigs_sym(this->eigVal_, this->H_.getSparse(), this->getHilbertSize());
+		else						arma::eigs_sym(this->eigVal_, this->eigVec_, this->H_.getSparse(), this->getHilbertSize());
 	}
 	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
 	this->calcAvEn();
@@ -680,8 +695,8 @@ inline void Hamiltonian<_T, _spinModes, MatType>::diagHs(bool woEigVec)
 * @param _typ type of the file extension (dat, h5 or other).
 * @param _app shall append?
 */
-template<typename _T, uint _spinModes, class MatType>
-inline auto Hamiltonian<_T, _spinModes, MatType>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool _app) const -> void
+template<typename _T, uint _spinModes>
+inline auto Hamiltonian<_T, _spinModes>::getEigVal(std::string _dir, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
 	std::string extension = "." + SSTR(getSTR_HAM_SAVE_EXT(_typ));
 	std::ofstream file;
@@ -721,8 +736,8 @@ inline auto Hamiltonian<_T, _spinModes, MatType>::getEigVal(std::string _dir, HA
 * @param _typ type of the file extension (dat, h5 or other).
 * @param _app shall append?
 */
-template<typename _T, uint _spinModes, class MatType>
-inline auto Hamiltonian<_T, _spinModes, MatType>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ, bool _app) const -> void
+template<typename _T, uint _spinModes>
+inline auto Hamiltonian<_T, _spinModes>::getEigVec(std::string _dir, u64 _mid, HAM_SAVE_EXT _typ, bool _app) const -> void
 {
 	const auto inLeft			= (this->avEnIdx - u64(_mid / 2)) >= 0 ? (this->avEnIdx - u64(_mid / 2)) : 0;
 	const auto inRight			= (this->avEnIdx + u64(_mid / 2)) < this->Nh ? (this->avEnIdx + u64(_mid / 2)) : (this->Nh - 1);
@@ -757,8 +772,8 @@ inline auto Hamiltonian<_T, _spinModes, MatType>::getEigVec(std::string _dir, u6
 * @brief Calculates the degeneracy histogram of the eigenvalues.
 * @returns The degeneracy histogram of the degeneracies in the eigenspectrum.
 */
-template<typename _T, uint _spinModes, class MatType>
-inline auto Hamiltonian<_T, _spinModes, MatType>::getDegeneracies() const -> v_2d<u64>
+template<typename _T, uint _spinModes>
+inline auto Hamiltonian<_T, _spinModes>::getDegeneracies() const -> v_2d<u64>
 {
 	// map of degeneracies (vector - V[degeneracy] = {indices in the manifold}
 	v_2d<u64> degeneracyMap		=	v_1d<v_1d<u64>>(Ns * 10, v_1d<u64>(0));
@@ -804,139 +819,17 @@ inline auto Hamiltonian<_T, _spinModes, MatType>::getDegeneracies() const -> v_2
 // ##########################################################################################################################################
 
 template <typename _T, uint _spinModes = 2>
-class HamiltonianDense : public Hamiltonian<_T>
+class HamiltonianDense : public virtual Hamiltonian<_T, _spinModes>
 {
-protected:
-	using NQSFun										= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
-	arma::Mat<_T> H_;
-public:
 
-	// hamiltonian
-	auto getHamiltonian()								const -> const arma::Mat<_T>& 				{ return this->H_; };
-	auto getHamiltonian(u64 i, u64 j)					const -> _T	override						{ return this->H_(i, j); };
-	auto getHamiltonianSize()							const -> double	override					{ return this->H_.size() * sizeof(this->H_(0, 0));	};								
-	auto getHamiltonianSizeH()							const -> double	override					{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
-	auto getMeanLevelSpacing()							const -> double	override					{ return SystemProperties::mean_lvl_gamma(this->H_); };
-
-	// ----------------------------------------- HAMILTONIAN ---------------------------------------------------
-protected:
-	virtual auto checkQuadratic()						-> void override			{ this->isQuadratic_ = false; };
-	virtual auto hamiltonian()							-> void override;
-	virtual auto setHElem(u64 k, _T val, u64 newIdx)	-> void override;			// sets the Hamiltonian elements in a virtual way
-public:
-	auto init()											-> void override;
-
-public:
-	auto diagH(bool woEigVec = false)					-> void override;			// diagonalize the Hamiltonian
-
-public:
-	// ------------------------------------------ LOCAL ENERGY -------------------------------------------------
-	virtual void locEnergy(	u64 _elemId, 
-							u64 _elem, 
-							uint _site) override		= 0; 
-	virtual cpx locEnergy(u64 _id, uint s, NQSFun f1)	override = 0;				// returns the local energy for VQMC purposes
-	virtual cpx locEnergy(const arma::Col<double>& v, 
-							uint site,
-							NQSFun f1) override			{ return 0; };				// returns the local energy for VQMC purposes
-
-	virtual void clearH() override						{ this->H_.reset(); };		// resets the hamiltonian memory to 0
 public:
 	// -------------------------------------------- CONSTRUCTORS --------------------------------------------
 
-	virtual ~HamiltonianDense() override				= default;
-	HamiltonianDense() : Hamiltonian<_T, _spinModes>() {};
-	HamiltonianDense(const size_t _Ns) : Hamiltonian<_T, _spinModes>(_Ns) {};
-	HamiltonianDense(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) {};
-	HamiltonianDense(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) {};
+	virtual ~HamiltonianDense() override = default;
+	HamiltonianDense() : Hamiltonian<_T, _spinModes>(), isSparse_(false) { this->isSparse_ = false; };
+	HamiltonianDense(const size_t _Ns) : Hamiltonian<_T, _spinModes>(_Ns), isSparse_(false) { this->isSparse_ = false; };
+	HamiltonianDense(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) { this->isSparse_ = false; };
+	HamiltonianDense(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) { this->isSparse_ = false; };
 };
-
-// ##########################################################################################################################################
-
-// ######################################################### H A M I L T O N I A N ##########################################################
-
-// ##########################################################################################################################################
-
-/*
-* @brief Sets the non-diagonal elements of the Hamimltonian matrix with symmetry sectors: therefore the matrix elements are summed over the SEC
-* @param k index of the basis state acted upon with the Hamiltonian
-* @param value value of the given matrix element to be set
-* @param new_idx resulting vector form acting with the Hamiltonian operator on the k-th basis state
-*/
-template<typename _T, uint _spinModes>
-inline void HamiltonianDense<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
-{
-	u64 kMap = this->hilbertSpace.getMapping(k);
-	BEGIN_CATCH_HANDLER
-	{
-		if (kMap != newIdx)
-		{
-			auto [idx, symEig] = this->hilbertSpace.findRep(newIdx, this->hilbertSpace.getNorm(k));
-			// set Hamiltonian element. If map is empty, returns the same element as wanted - the symmetry is None
-			this->H_(idx, k) += val * symEig;
-		}
-		else
-			this->H_(k, k) += val;
-	}
-	END_CATCH_HANDLER("Exception in setting the Hamiltonian elements: " + VEQ(k) + "," + VEQ(kMap) + "," + VEQ(newIdx), exit(-1););
-}
-
-// ##########################################################################################################################################
-
-// ######################################################### D I A G O N A L I Z E ##########################################################
-
-// ##########################################################################################################################################
-
-/*
-* @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
-* @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
-*/
-template <typename _T, uint _spinModes>
-inline void HamiltonianDense<_T, _spinModes>::diagH(bool woEigVec)
-{
-	if (woEigVec)	Diagonalizer<_T>::diagS(this->eigVal_, this->H_);
-	else			Diagonalizer<_T>::diagS(this->eigVal_, this->eigVec_, this->H_);
-	this->calcAvEn();
-}
-
-// ##########################################################################################################################################
-
-/*
-* Generates the total Hamiltonian of the system. The diagonal part is straightforward,
-* while the non-diagonal terms need the specialized setHamiltonainElem(...) function
-*/
-template<typename _T, uint _spinModes>
-void HamiltonianDense<_T, _spinModes>::hamiltonian()
-{
-	if (this->Nh == 0)
-	{
-		LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
-		return;
-	}
-	this->init();
-	for (u64 k = 0; k < this->Nh; ++k)
-	{
-		u64 kMap = this->hilbertSpace.getMapping(k);
-		for (uint site_ = 0; site_ <= this->Ns - 1; ++site_)
-			this->locEnergy(k, kMap, site_);
-	}
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Initialize Hamiltonian matrix.
-*/
-template<typename _T, uint _spinModes>
-void HamiltonianDense<_T, _spinModes>::init()
-{
-	// hamiltonian memory reservation
-	BEGIN_CATCH_HANDLER
-	{
-		this->H_ = arma::Mat<_T>(this->Nh, this->Nh);
-	}
-	END_CATCH_HANDLER("Memory exceeded", std::runtime_error("Memory for the Hamiltonian setting exceeded"););
-};
-
-// ##########################################################################################################################################
 
 #endif

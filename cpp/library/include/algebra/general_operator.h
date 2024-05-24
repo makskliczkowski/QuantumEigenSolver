@@ -93,8 +93,10 @@ namespace Operators
 		_T eigVal_											=			1.0;				// eigenvalue for symmetry generator (if there is an inner value)
 		repType fun_										=			E;					// function allowing to use the symmetry operation
 		
+		// quadratic
+		bool isQuadratic_									=			false;				// based on this, we will create the operator differently
+
 		// used for checking on which states the operator acts when forgetting and using the matrix only
-		bool isQuadratic_									=			false;
 		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
 		SymGenerators name_									=			SymGenerators::E;   // name of the operator
 		std::string nameS_									=			"E";				// name of the operator in string
@@ -385,6 +387,15 @@ template<typename _TinMat, template <class> class _MatType, HasMatrixType _Conce
 inline typename std::enable_if<std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
+	// check whether the operator is quadratic
+	if (this->isQuadratic_)
+	{
+		if constexpr (std::is_same_v<_TinMat, arma::Mat<_T>>)
+			return this->qMatDense_();
+		else if constexpr (std::is_same_v<_TinMat, arma::SpMat<_T>>)
+			return this->qMatSparse_();
+	}
+	// otherwise create the operator matrix
 	_MatType<_TinMat> op(_dim, _dim);
 #pragma omp parallel for
 	for (u64 _base = 0; _base < _dim; ++_base) 
@@ -465,143 +476,6 @@ inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::O
 			op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
 	}
 }
-
-
-// ##########################################################################################################################################
-
-// ############################################### Q U A D R A T I C   O P E R A T O R S ####################################################
-
-// ##########################################################################################################################################
-
-namespace Operators
-{
-	template<typename _T, typename ..._Ts>
-	class QuadraticOperator : public Operators::Operator<_T, _Ts...>
-	{
-	protected:
-		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
-		
-		// sparse matrix
-		bool isSparse_ = false;
-
-	public:
-		// ----------------------------------------------------------------------------------------------------
-
-		virtual ~QuadraticOperator() = default;
-		QuadraticOperator()
-			: Operator<_T, _Ts...>()
-		{ 
-			this->init(); 
-			this->setIsQuadratic(true);
-		};
-
-		// with the usage of the elements in the state vector
-		QuadraticOperator(size_t Ns, const std::string& _nameS = "")
-			: Operator<_T, _Ts...>(Ns, _nameS)
-		{ 
-			this->init(); 
-			this->setIsQuadratic(true);
-		};
-		QuadraticOperator(size_t Ns, _T _eigVal, const std::string& _nameS = "") 
-			: Operator<_T, _Ts...>(Ns, _eigVal, _nameS)
-		{ 
-			this->init(); 
-			this->setIsQuadratic(true);
-		};
-		QuadraticOperator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "") 
-			: Operator<_T, _Ts...>(Ns, _eigVal, _fun, _name, _nameS)
-		{ 
-			this->init(); 
-			this->setIsQuadratic(true);
-		};
-
-		// for the usage with the lattice (mostly for spin models, spinless fermions and hardcore bosons)
-		QuadraticOperator(std::shared_ptr<Lattice> _lat, const std::string& _nameS = "")
-			: Operator<_T, _Ts...>(_lat, _nameS)
-		{
-			this->init();
-			this->setIsQuadratic(true);
-		};
-		QuadraticOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
-			: Operator<_T, _Ts...>(_lat, _eigVal, _nameS)
-		{
-			this->init();
-			this->setIsQuadratic(true);
-		};
-		QuadraticOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
-			: Operator<_T, _Ts...>(_lat, _eigVal, _fun, _name, _nameS)
-		{
-			init();
-		};
-		QuadraticOperator(const QuadraticOperator<_T, _Ts...>& o) : Operator<_T, _Ts...>(o)
-		{
-			this->Ns_ = o.Ns_;
-			this->lat_ = o.lat_;
-			this->fun_ = o.fun_;
-			this->eigVal_ = o.eigVal_;
-			this->name_ = o.name_;
-			this->nameS_ = o.nameS_;
-			this->init();
-			this->setIsQuadratic(true);
-		};
-		QuadraticOperator(QuadraticOperator<_T, _Ts...>&& o) : Operator<_T, _Ts...>(o)
-		{
-			this->Ns_ = o.Ns_;
-			this->lat_ = o.lat_;
-			this->fun_ = o.fun_;
-			this->eigVal_ = o.eigVal_;
-			this->name_ = o.name_;
-			this->nameS_ = o.nameS_;
-
-			this->init();
-			this->setIsQuadratic(true);
-		};
-
-		// ----------------------------------------------------------------------------------------------------
-
-		QuadraticOperator<_T, _Ts...>& operator=(const QuadraticOperator<_T, _Ts...>& _other)
-		{
-			this->Ns_		=		_other.Ns_;
-			this->lat_		=		_other.lat_;
-			this->fun_		=		_other.fun_;
-			this->eigVal_	=		_other.eigVal_;
-			this->name_		=		_other.name_;
-			return *this;
-		}
-
-		QuadraticOperator<_T, _Ts...>& operator=(const QuadraticOperator<_T, _Ts...>&& _other)
-		{
-			this->Ns_		=		std::move(_other.Ns_);
-			this->lat_		=		std::move(_other.lat_);
-			this->fun_		=		std::move(_other.fun_);
-			this->eigVal_	=		std::move(_other.eigVal_);
-			this->name_		=		std::move(_other.name_);
-			return *this;
-		}
-
-	public:
-
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-		
-		template<typename _TinMat = _T, typename _InT = u64, bool _sparse = true>
-		arma::SpMat<_TinMat> generateMat(_InT _dim, _Ts... _arg) const
-		{
-			if(this->qMatSparse_)
-				return this->qMatSparse_();
-			return arma::SpMat<_T>();
-		}
-		template<typename _TinMat = _T, typename _InT = u64>
-		arma::Mat<_TinMat> generateMat(_InT _dim, _Ts... _arg) const
-		{
-			if(this->qMatDense_)
-				return this->qMatDense_();
-			return arma::Mat<_T>();		
-		}
-	};
-
-}
-
-
 
 // ##########################################################################################################################################
 

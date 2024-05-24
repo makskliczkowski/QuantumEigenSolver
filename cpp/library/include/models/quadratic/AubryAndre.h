@@ -92,8 +92,11 @@ public:
 				}
 			}
 		}
-		this->H_ = this->H_ + this->H_.t();
-		this->H_.diag() /= 4.0;
+		this->H_.symmetrize();
+		if(this->isSparse_)
+			this->H_.getSparse().diag() /= 4.0;
+		else
+			this->H_.getDense().diag() /= 4.0;
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------

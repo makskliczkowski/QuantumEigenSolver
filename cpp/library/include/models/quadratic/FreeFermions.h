@@ -55,6 +55,7 @@ public:
 	FreeFermions(std::shared_ptr<Lattice> _lat, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true), t_(_t), t_0(_t0)
 	{
+		this->isSparse_		=		false;
 		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
 		this->info_			=		this->info();
 		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
@@ -65,6 +66,7 @@ public:
 	FreeFermions(uint _Ns, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_Ns, _constant, true), t_(_t), t_0(_t0)
 	{
+		this->isSparse_		=		false;
 		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
 		this->info_			=		this->info();
 		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
@@ -87,8 +89,7 @@ public:
 					this->setHElem(i, PARAM_W_DISORDER(t_, i), nei);
 			}
 		}
-
-		this->H_ = this->H_ + this->H_.t();
+		this->H_.symmetrize();
 	}
 	// ------------------ M A N Y   B O D Y ------------------
 

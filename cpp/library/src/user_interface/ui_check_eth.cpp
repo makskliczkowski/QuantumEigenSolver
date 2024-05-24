@@ -134,7 +134,7 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			// add z spins 
 			for (uint i = 0; i < _Ns; ++i)
 			{
-				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { i })));
+				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i)));
 				_opsN.push_back("mb/sz/" + STR(i));
 			}
 			// add other operators
@@ -169,7 +169,7 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 template<typename _T>
 void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H)
 {
-	bool isQuadratic		= _H->getIsQuadratic(), 
+	bool isQuadratic [[maybe_unused]] = _H->getIsQuadratic(),
 		 isManyBody			= _H->getIsManyBody();
 
 	_H->clearH();
@@ -339,7 +339,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// mean level spacing
 			{
-				_meanlvl(0, _r)		= SystemProperties::mean_lvl_gamma(_H->getHamiltonian());
+				_meanlvl(0, _r)		= _H->getMeanLevelSpacing();
 				_meanlvl(1, _r)		= SystemProperties::mean_lvl_heis_time(_meanlvl(0, _r), _Ns);
 
 				// get the average energy index and the points around it on the diagonal
@@ -1718,7 +1718,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				// energies
 				_energies.col(_r)	= _H->getEigVal();
 				// mean levels (gamma, heisenberg)
-				_meanlvl(0, _r)		= SystemProperties::mean_lvl_gamma(_H->getHamiltonian());
+				_meanlvl(0, _r)		= _H->getMeanLevelSpacing();
 				_meanlvl(1, _r)		= SystemProperties::mean_lvl_heis_time(_meanlvl(0, _r), _Ns);
 
 				// get the average energy index and the points around it on the diagonal

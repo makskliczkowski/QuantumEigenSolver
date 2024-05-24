@@ -269,12 +269,7 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 		// measure global
 		for (std::shared_ptr<Operators::Operator<_T>> _op : this->opG_)
 		{
-			auto _isquadratic = _op->getIsQuadratic();
-			arma::SpMat<_T> _Min;
-			if (!_isquadratic)
-				_Min = _op->template generateMat<_T, typename arma::SpMat>(_dim);
-			else
-				_Min = std::dynamic_pointer_cast<Operators::QuadraticOperator<_T>>(_op)->template generateMat<_T, u64, true>(_dim);
+			arma::SpMat<_T> _Min = _op->template generateMat<_T, typename arma::SpMat>(_dim);
 			// push the operator
 			this->MG_.push_back(_Min);
 		}

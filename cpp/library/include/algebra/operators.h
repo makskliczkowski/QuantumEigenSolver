@@ -108,15 +108,15 @@ namespace Operators
 	namespace QuadraticOperators
 	{
 		std::pair<u64, double> site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site);
-		Operators::QuadraticOperator<double> site_occupation(size_t _Ns, const uint _site);
+		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site);
 
 		std::pair<u64, double> nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus);
-		Operators::QuadraticOperator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus);
+		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus);
 
-		Operators::QuadraticOperator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum);
-		Operators::QuadraticOperator<double> quasimomentum_occupation(size_t _Ns);
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum);
+		Operators::Operator<double> quasimomentum_occupation(size_t _Ns);
 
-		Operators::QuadraticOperator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz);
+		Operators::Operator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz);
 	}
 
 	// ##########################################################################################################################################
