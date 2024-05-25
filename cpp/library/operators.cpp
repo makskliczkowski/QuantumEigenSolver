@@ -314,13 +314,15 @@ namespace Operators
 			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
-					_out(_site, _site) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					_out(_site, _site) = 1.0;
+					_out = (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
 					return _out;
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site, _site) = (_Ns - 1) / std::sqrt(_Ns - 1);
+					_out(_site, _site) = 1.0;
+					_out = (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
 					return _out;
 				};
 
@@ -351,16 +353,16 @@ namespace Operators
 			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
-					_out(_site_minus, _site_plus) = (_Ns - 1) / std::sqrt(_Ns - 1);
-					_out(_site_plus, _site_minus) = (_Ns - 1) / std::sqrt(_Ns - 1);
-					return _out;
+					_out(_site_minus, _site_plus) = 1.0;
+					_out(_site_plus, _site_minus) = 1.0;
+					return _out * std::sqrt(_Ns / 2.0);
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site_minus, _site_plus) = (_Ns - 1) / std::sqrt(_Ns - 1);
-					_out(_site_plus, _site_minus) = (_Ns - 1) / std::sqrt(_Ns - 1);
-					return _out;
+					_out(_site_minus, _site_plus) = 1.0;
+					_out(_site_plus, _site_minus) = 1.0;
+					return _out * std::sqrt(_Ns / 2.0);
 				};
 
 			// set the operator
