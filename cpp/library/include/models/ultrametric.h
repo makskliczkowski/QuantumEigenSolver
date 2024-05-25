@@ -11,7 +11,7 @@
 
 #ifndef ULTRAMETRIC_H
 #	define ULTRAMETRIC_H
-#include "../quantities/statistics.h"
+#	define ULTRAMETRIC_USE_DIFFERENT_BLOCKS
 
 #include "../quantities/statistics.h"
 
@@ -320,32 +320,38 @@ inline void Ultrametric<_T>::hamiltonian()
 		return;
 	}
 	this->init();
-	bool _useDifferentBlocks = false;
 
 	// go through all the elements of the Hilbert space
-	for (size_t k = 1; k <= this->Nout_; ++k) 
-	{
+#ifdef ULTRAMETRIC_USE_DIFFERENT_BLOCKS
+	for (size_t k = 0; k <= this->Nout_; ++k) {
+#else
+	for (size_t k = 1; k <= this->Nout_; ++k) {
+#endif
 		// set the dimensions
-		auto _dimrest	=	ULLPOW((this->Nout_ - k));
-		auto _dim		=	ULLPOW((this->Nin_ + k));
+		auto _dimrest	=	ULLPOW((this->Nout_ - k));	// L - k -> number of diagonal blocks of size 2^{N+k}
+		auto _dim		=	ULLPOW((this->Nin_ + k));	// N + k -> size of the diagonal blocks
 		auto _mult		=	k == 0 ? 1.0 : (this->g0_ * this->au_[k - 1]  / std::sqrt(_dim + 1));
-		// repeat the blocks multiple times (sample the diagonal blocks independently)
-		arma::Mat<_T> Hk(this->Nh, this->Nh, arma::fill::zeros);
-		if (_useDifferentBlocks)
-			for (int i = 0; i < _dimrest; ++i)
-			{
-				Hk.submat(i * _dim, i * _dim, (i + 1) * _dim - 1, (i + 1) * _dim - 1) += this->ran_.template GOE<_T>(_dim);
-				//this->H_.print("H=" + VEQ(k) + ":" + VEQ(i));
-			}
-		else
-			Hk = arma::kron(this->ran_.template GOE<_T>(_dim), EYE(_dimrest));
 
+#ifdef ULTRAMETRIC_USE_DIFFERENT_BLOCKS
+		arma::Mat<_T> Hk(this->Nh, this->Nh, arma::fill::zeros);
+		// create various blocks of the Hamiltonian
+		for (int i = 0; i < _dimrest; ++i)
+		{
+			Hk.submat(i * _dim, i * _dim, (i + 1) * _dim - 1, (i + 1) * _dim - 1) += this->ran_.template GOE<_T>(_dim);
+			//this->H_.print("H=" + VEQ(k) + ":" + VEQ(i));
+		}
 		this->H_ += _mult * Hk;
+#else
+		// repeat the blocks multiple times (sample the diagonal blocks independently)
+		this->H_ += _mult * arma::kron(this->ran_.template GOE<_T>(_dim), EYE(_dimrest));
+#endif
 	}
 	// add the random Hamiltonian of the dot. This is treated as an operator acting only on the left 
 	// side of the tensor product and the identity on the right side (A^A \otimes I^B)
 	// (THIRD TERM)
+#ifndef ULTRAMETRIC_USE_DIFFERENT_BLOCKS
 	this->H_ += arma::kron(this->Hdot_, EYE(this->dimOut_));
+#endif
 	//saveAlgebraic("C:/University/PHD/CODES/VQMC/QSolver/cpp/library/", "H.h5", arma::Mat<_T>(H_), "H", false);
 }
 

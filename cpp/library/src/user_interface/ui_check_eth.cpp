@@ -152,7 +152,8 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
 			_opsN.push_back("sp/kin");
 			
-			v_1d<size_t> _toTake = (_Ns <= 16) ? Vectors::vecAtoB<size_t>(_Ns) : v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
+			//v_1d<size_t> _toTake = (_Ns <= 16) ? Vectors::vecAtoB<size_t>(_Ns) : v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
+			v_1d<size_t> _toTake = v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
 
 			for (auto i: _toTake)
 			{
@@ -1434,29 +1435,27 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
 
 	// check the random field
-	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
-	u64 _Nh		= ULLPOW(_Ns);
+	size_t _Ns				= this->latP.Ntot_;
+	u64 _Nh					= _H->getHilbertSize();
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		isManyBody			= _H->getIsManyBody();
 
-	const auto [_ops, _opsN]= this->ui_eth_getoperators(isQuadratic, isManyBody);
+	const auto [_ops, _opsN]= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
 	// get info
 	std::string modelInfo, dir = "ETH_MAT_TIME_EVO", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// create the measurement class
-	Measurement<double> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
+	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
-	// GAMMA (see 2022, Suntajs, PRL)
-	// gamma0_2, t_heisenberg_gamma, _t_heisenberg_mean, _t_heisenberg_typ
-	arma::Mat<double> _meanlvl			= -1e5 * arma::Mat<double>(5, this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _meanlvl			= -1e5 * arma::Mat<double>(4, this->modP.modRanN_, arma::fill::ones);
 	u64 _hs_fractions_diag				= SystemProperties::hs_fraction_diagonal_cut(0.5, _Nh);
 
 	// time evolution saved here
 	long double _heisenberg_time_est	= ULLPOW((_Ns));
-	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 100), 2500);
+	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 10), 1500);
 	// create initial states for the quench
 	arma::Col<_T> _initial_state_me;
 
@@ -1569,7 +1568,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				std::tie(_mins[_ifrac], _maxs[_ifrac]) = _H->getEnArndEnEps(_Eidx, _toCheckEps[_ifrac]);
 
 			// microcanonical and diagonal ensembles
-#pragma omp parallel for num_threads(_ops.size())
+#pragma omp parallel for num_threads(this->threadNum)
 			for (int _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				// ferromagnetic
@@ -1580,7 +1579,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			
 			// save zero time value
 			{
-	#pragma omp parallel for num_threads(_ops.size())
+	#pragma omp parallel for num_threads(this->threadNum)
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 					_timeZero[_opi](_r) = arma::as_scalar(arma::cdot(_initial_state, _matrices[_opi] * _initial_state));
 			}
@@ -1599,6 +1598,10 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 					_timeEvolution[_opi](_ti, _r)	= algebra::cast<_T>(_rt);
 				}
 
+				// say the time
+				if (_ti % 100 == 0)
+					LOGINFO(VEQ(_ti), LOG_TYPES::TRACE, 3);
+
 				// calculate the entanglement entropy for each site
 				{
 					for (int i = 1; i <= _Ns; i++)
@@ -1608,7 +1611,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 						uint _enti						= _Ns - i;
 						_timeEntropyME[_enti](_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
 					}
-					if(_Ns < 12)
+					if(_Ns <= 14)
 						_timeEntropyBipartiteME(_ti, _r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, (ULLPOW((int(_Ns / 2)))) - 1);
 				}
 			}
@@ -1626,7 +1629,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(1).as_col()), "heis_time_gamma", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(2).as_col()), "1_over_mean_level_spacing", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(3).as_col()), "1_over_mean_level_spacing_typ", true);
-			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(4).as_col()), "th_time_est", true);
+			//saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(4).as_col()), "th_time_est", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _energies, "energies", true);
 
 			// save the ldos's
@@ -1714,7 +1717,6 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// mean level spacing
 			{
-				long double _th_freq	= QSM<double>::get_thouless_freq_est(0.9, 1.0, _Ns);
 				long double _h_freq		= 1.0 / _Nh;
 				// energies
 				_energies.col(_r)	= _H->getEigVal();
@@ -1729,12 +1731,10 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				// get the Heisenberg frequency from the mean level spacing
 				_h_freq					= SystemProperties::mean_lvl_spacing_typ(_E);
 				_meanlvl(3, _r)			= 1.0 / _h_freq;
-				_meanlvl(4, _r)			= 1.0 / _th_freq;
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(0, _r)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1, _r)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3, _r)), StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(4, _r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(0, _r)) + ": mean level spacing", StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1, _r)) + ": mean level Heisenberg time", StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2, _r)) + ": mean level spacing around energy " + VEQP(_min, 3), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3, _r)) + ": mean level spacing aroung energy - typical", StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
 			}
 
 			// -----------------------------------------------------------------------------
@@ -1744,15 +1744,18 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				// calculate the diagonals
 				const auto& _matrices				= _measure.getOpG_mat();
 
-#pragma omp parallel for num_threads(_ops.size())
+#pragma omp parallel for num_threads(_Ns < 14 ? this->threadNum : 2)
 				for (int _opi = 0; _opi < _ops.size(); ++_opi)
 				{
-					for (int i = 0; i < _Nh; ++i)
-						_diagonals[_opi](i, _r)		= Operators::applyOverlap(_H->getEigVec(i), _matrices[_opi]);
+					// overlaps 
+					_diagonals[_opi].col(_r) = Operators::applyOverlapMat(_H->getEigVec(), _matrices[_opi]).diag();
+					
+					//for (int i = 0; i < _Nh; ++i)
+					//	_diagonals[_opi](i, _r)		= Operators::applyOverlap(_H->getEigVec(i), _matrices[_opi]);
 				}
 
 				// evolve the states
-				_evolveState(_r, _initial_state_me, _ldos_me, _energydensitiesME, 
+				_evolveState(_r, _initial_state_me, _ldos_me, _energydensitiesME,  
 					_diagonalME, _diagonal2ME, _microcanonicalME, _timeEvolutionME, _timeZeroME, _matrices);
 			}
 		}

@@ -42,12 +42,14 @@ public:
 			return;
 		}
 		this->init();
+
+		// go through the Hamiltonian and set the elements
 		for (size_t i = 0; i < this->Ns; i++)
 		{
 			for (size_t j = i; j < this->Ns; j++)
 			{
-				double _ranval = this->ran_.random(-1.0, 1.0);
-				double _distance = 0.0;
+				double _ranval		= this->ran_.random(-1.0, 1.0);
+				double _distance	= 0.0;
 				if (i != j)
 				{
 					_distance = std::abs(int(i - j)) / this->b_;
@@ -55,11 +57,11 @@ public:
 				}
 
 				// set Hamiltonian element
-				this->H_.set(i, j, _ranval / std::sqrt(1.0 + _distance));
+				auto _val = _ranval / std::sqrt(1.0 + _distance);
+				this->H_.set(i, j, _val);
+				this->H_.set(j, i, _val);
 			}
 		}
-
-		//this->H_ += this->ran_.template GOE<_T>(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
