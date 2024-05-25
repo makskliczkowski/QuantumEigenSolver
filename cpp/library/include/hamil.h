@@ -137,10 +137,10 @@ public:
 	// -------------------------------------------- CONSTRUCTORS --------------------------------------------
 	
 	virtual ~Hamiltonian();
-	Hamiltonian();
-	Hamiltonian(const size_t _Ns);
-	Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert);
-	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert);
+	Hamiltonian(bool _isSparse = true);
+	Hamiltonian(const size_t _Ns, bool _isSparse = true);
+	Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert, bool _isSparse = true);
+	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert, bool _isSparse = true);
 
 	// ------------------------------------------- PRINTERS ---------------------------------------------------
 
@@ -262,8 +262,8 @@ public:
 // ##########################################################################################################################################
 
 template<typename _T, uint _spinModes>
-inline Hamiltonian<_T, _spinModes>::Hamiltonian()
-	: ran_(randomGen())
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(bool _isSparse)
+	: isSparse_(_isSparse), ran_(randomGen())
 {
 	CONSTRUCTOR_CALL;
 }
@@ -273,8 +273,8 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian()
 * @param _Ns number of particles in the system
 */
 template<typename _T, uint _spinModes>
-inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
-	: Hamiltonian<_T, _spinModes>()
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns, bool _isSparse)
+	: Hamiltonian<_T, _spinModes>(_isSparse)
 {
 	this->Ns_	= _Ns;
 	this->Ns	= _Ns;
@@ -287,8 +287,8 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns)
 * @brief Constructor of the Hamiltonian with the Hilbert space
 */
 template<typename _T, uint _spinModes>
-inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert)
-	: Hamiltonian<_T, _spinModes>()
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert, bool _isSparse)
+	: Hamiltonian<_T, _spinModes>(_isSparse)
 {
 	this->hilbertSpace = hilbert;
 	this->lat_	=	this->hilbertSpace.getLattice();
@@ -302,8 +302,8 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, 
 * @brief Constructor with move semantics for the Hilbert space
 */
 template<typename _T, uint _spinModes>
-inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert)
-	: hilbertSpace(std::move(hilbert))
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert, bool _isSparse)
+	: hilbertSpace(std::move(hilbert)), isSparse_(_isSparse)
 {
 	this->ran_	=	randomGen();
 	this->lat_	=	this->hilbertSpace.getLattice();
@@ -422,6 +422,7 @@ inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 
 	// calculates the energy difference to find the closest element (the smallest)
 	v_1d<double> tmp(Nh, 0.0);
+#pragma omp parallel for
 	for (int i = 0; i < Nh; i++)
 		tmp[i] = std::abs(this->getEigVal(i) - this->avEn);
 
@@ -815,21 +816,5 @@ inline auto Hamiltonian<_T, _spinModes>::getDegeneracies() const -> v_2d<u64>
 // ##########################################################################################################################################
 
 // ##########################################################################################################################################
-
-// ##########################################################################################################################################
-
-template <typename _T, uint _spinModes = 2>
-class HamiltonianDense : public virtual Hamiltonian<_T, _spinModes>
-{
-
-public:
-	// -------------------------------------------- CONSTRUCTORS --------------------------------------------
-
-	virtual ~HamiltonianDense() override = default;
-	HamiltonianDense() : Hamiltonian<_T, _spinModes>(), isSparse_(false) { this->isSparse_ = false; };
-	HamiltonianDense(const size_t _Ns) : Hamiltonian<_T, _spinModes>(_Ns), isSparse_(false) { this->isSparse_ = false; };
-	HamiltonianDense(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) { this->isSparse_ = false; };
-	HamiltonianDense(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert) : Hamiltonian<_T, _spinModes>(hilbert) { this->isSparse_ = false; };
-};
 
 #endif

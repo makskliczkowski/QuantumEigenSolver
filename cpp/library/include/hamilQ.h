@@ -97,7 +97,7 @@ public:
 	// --------------- C O N S T R U C T O R S ---------------
 	virtual ~QuadraticHamiltonian()	= default;
 	QuadraticHamiltonian()			= default;
-	QuadraticHamiltonian(size_t _Ns, _T _constant, bool _partCons = true)
+	QuadraticHamiltonian(size_t _Ns, _T _constant, bool _partCons = true, bool _isSparse = true)
 	{
 		LOGINFO("Creating quadratic model: ", LOG_TYPES::CHOICE, 1);
 		this->ran_	= randomGen();
@@ -108,10 +108,11 @@ public:
 		this->Nh_	= this->size_;
 		this->isManyBody_	= false;
 		this->isQuadratic_	= true;
+		this->isSparse_		= _isSparse;
 		this->init();
 
 	}
-	QuadraticHamiltonian(std::shared_ptr<Lattice> _lat, _T _constant, bool _partCons = true)
+	QuadraticHamiltonian(std::shared_ptr<Lattice> _lat, _T _constant, bool _partCons = true, bool _isSparse = true)
 		: particleConverving_(_partCons), constant_(_constant)
 	{
 		LOGINFO("Creating quadratic model: ", LOG_TYPES::CHOICE, 1);
@@ -124,6 +125,7 @@ public:
 		this->Nh_	= this->size_;
 		this->isManyBody_	= false;
 		this->isQuadratic_	= true;
+		this->isSparse_		= _isSparse;
 		this->init();
 	}
 

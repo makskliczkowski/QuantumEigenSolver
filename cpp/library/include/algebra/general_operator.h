@@ -390,20 +390,31 @@ Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 	// check whether the operator is quadratic
 	if (this->isQuadratic_)
 	{
-		if constexpr (std::is_same_v<_TinMat, arma::Mat<_T>>)
+#ifdef _DEBUG
+		LOGINFO("Operator is quadratic, going into!", LOG_TYPES::INFO, 1);
+#endif
+		if constexpr (std::is_same_v<_MatType<_TinMat>, arma::Mat<_TinMat>>)
 			return this->qMatDense_();
-		else if constexpr (std::is_same_v<_TinMat, arma::SpMat<_T>>)
+		else if constexpr (std::is_same_v<_MatType<_TinMat>, arma::SpMat<_TinMat>>)
 			return this->qMatSparse_();
+		else
+		{
+			LOGINFO("Type is neither arma::Mat nor arma::SpMat", LOG_TYPES::ERROR, 0);
+			throw std::logic_error("Unsupported matrix type in operator class");
+		}
 	}
-	// otherwise create the operator matrix
-	_MatType<_TinMat> op(_dim, _dim);
-#pragma omp parallel for
-	for (u64 _base = 0; _base < _dim; ++_base) 
+	else
 	{
-		auto [_idx, _val]	=	this->operator()(_base, _arg...);
-		op(_idx, _base)		+=	_val;
+		// otherwise create the operator matrix
+		_MatType<_TinMat> op(_dim, _dim);
+	#pragma omp parallel for
+		for (u64 _base = 0; _base < _dim; ++_base) 
+		{
+			auto [_idx, _val]	=	this->operator()(_base, _arg...);
+			op(_idx, _base)		+=	_val;
+		}
+		return op;
 	}
-	return op;
 }
 
 // ##########################################################################################################################################

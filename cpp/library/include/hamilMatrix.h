@@ -148,6 +148,10 @@ public:
 	auto meanLevelSpacing()	const -> double;
 	auto diag()				const -> arma::Col<_T>;
 	auto diag(size_t _k)	const -> arma::Col<_T>;
+	auto diagD()			-> arma::diagview<_T>				{ return this->H_dense_.diag(); }
+	auto diagD(size_t k)	-> arma::diagview<_T>				{ return this->H_dense_.diag(k); }
+	auto diagSp()			-> arma::spdiagview<_T>				{ return this->H_sparse_.diag(); }
+	auto diagSp(size_t k)	-> arma::spdiagview<_T>				{ return this->H_sparse_.diag(k); }
 	auto getNh()			const -> u64						{ return this->Nh_; }
 	auto isSparse()			const -> bool						{ return this->isSparse_; }
 	auto getSparse()		-> arma::SpMat<_T>&					{ return this->H_sparse_; }
@@ -241,6 +245,8 @@ public:
 		{  
 			this->isSparse_		= other.isSparse_;
 			this->Nh_			= other.Nh_;
+			this->n_cols		= other.n_cols;
+			this->n_rows		= other.n_rows;
 			if (isSparse_)
 			{
 				this->H_dense_.clear();
@@ -374,7 +380,7 @@ public:
 		return result;
 	}
 
-	HamiltonianMatrix<_T> operator+=(const arma::Mat<_T>& rhs)
+	HamiltonianMatrix<_T>& operator+=(const arma::Mat<_T>& rhs)
 	{
 		if (this->isSparse_)
 			this->H_sparse_ += algebra::cast<_T>(rhs);
@@ -396,7 +402,7 @@ public:
 		return result;
 	}
 
-	HamiltonianMatrix<_T> operator+=(const arma::SpMat<_T>& rhs)
+	HamiltonianMatrix<_T>& operator+=(const arma::SpMat<_T>& rhs)
 	{
 		if (this->isSparse_)
 			this->H_sparse_ += algebra::cast<_T>(rhs);

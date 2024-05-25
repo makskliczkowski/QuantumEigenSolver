@@ -16,10 +16,10 @@
 #include "../quantities/statistics.h"
 
 template<typename _T>
-class Ultrametric : public HamiltonianDense<_T, 2>
+class Ultrametric : public Hamiltonian<_T, 2>
 {
 public:
-	using NQSFun = typename HamiltonianDense<_T>::NQSFun; 
+	using NQSFun = typename Hamiltonian<_T>::NQSFun; 
 protected:
 	// particle in a dot
 	arma::Mat<_T> Hdot_;			// Hamiltonian of the dot particles (random matrix)
@@ -125,7 +125,7 @@ inline void Ultrametric<_T>::checkSizes()
 */
 template<typename _T>
 inline Ultrametric<_T>::Ultrametric(const size_t _Nall)
-	: HamiltonianDense<_T, 2>(_Nall)
+	: Hamiltonian<_T, 2>(_Nall, false)
 {
 	CONSTRUCTOR_CALL;
 	//change info
@@ -172,7 +172,7 @@ inline Ultrametric<_T>::Ultrametric(const size_t _Nall, const size_t _N, const d
 template<typename _T>
 inline Ultrametric<_T>::Ultrametric(const Hilbert::HilbertSpace<_T>& _hil, const size_t _N, const double _g0, 
 	const v_1d<double>& _a)
-	: HamiltonianDense<_T, 2>(_hil), Nin_(_N), g0_(_g0), a_(_a)
+	: Hamiltonian<_T, 2>(_hil, false), Nin_(_N), g0_(_g0), a_(_a)
 {
 	// we will keep the particles from the dot at the beginning of the vectors
 	// remember that this Hamiltonian is zero-dimensional, so we don't need to worry about the order of the particles
@@ -205,7 +205,7 @@ inline Ultrametric<_T>::Ultrametric(const Hilbert::HilbertSpace<_T>& _hil, const
 template<typename _T>
 inline Ultrametric<_T>::Ultrametric(Hilbert::HilbertSpace<_T>&& _hil, const size_t _N, const double _g0,
 	const v_1d<double>& _a)
-	: HamiltonianDense<_T, 2>(std::move(_hil)), Nin_(_N), g0_(_g0), a_(_a)
+	: Hamiltonian<_T, 2>(std::move(_hil), false), Nin_(_N), g0_(_g0), a_(_a)
 {
 	// we will keep the particles from the dot at the beginning of the vectors
 	// remember that this Hamiltonian is zero-dimensional, so we don't need to worry about the order of the particles
@@ -295,7 +295,7 @@ inline std::string Ultrametric<_T>::info(const strVec & skip, std::string sep, i
 	name += sep +	VEQV(g0, g0_);
 	if(std::find(skip.begin(), skip.end(), "alpha") == skip.end())
 		name += sep +	(_different_alpha	? "alpha=r"	:	VEQVP(alpha, a_[0], 3));
-	return this->HamiltonianDense<_T>::info(name, skip, sep);
+	return this->Hamiltonian<_T>::info(name, skip, sep);
 }
 
 // ##########################################################################################################################################

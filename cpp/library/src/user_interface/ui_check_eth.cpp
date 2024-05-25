@@ -119,10 +119,9 @@ void UI::makeSimETHSweep()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth_getoperators(bool _isquadratic, bool _ismanybody)
+std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth_getoperators(const size_t _Nh, bool _isquadratic, bool _ismanybody)
 {
 	const size_t _Ns = this->latP.Ntot_;
-	//const size_t _Nh = ULLPOW(_Ns);
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 
@@ -150,12 +149,14 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		if (_isquadratic)
 		{
 			// add other operators
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Ns)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
 			_opsN.push_back("sp/kin");
 			
-			for (uint i = 0; i < _Ns; ++i)
+			v_1d<size_t> _toTake = (_Ns <= 16) ? Vectors::vecAtoB<size_t>(_Ns) : v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
+
+			for (auto i: _toTake)
 			{
-				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Ns, i)));
+				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i)));
 				_opsN.push_back("sp/occ/" + STR(i));
 			}
 		}
@@ -493,11 +494,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// check the random field
 	size_t _Ns				= this->latP.Ntot_;
-	u64 _Nh					= ULLPOW(_Ns);
+	u64 _Nh					= _H->getHilbertSize();
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		 isManyBody			= _H->getIsManyBody();
 
-	const auto [_ops, _opsN]= this->ui_eth_getoperators(isQuadratic, isManyBody);
+	const auto [_ops, _opsN]= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
 	// get info
 	std::string modelInfo, dir = "ETH_MAT_STAT", randomStr, extension;
@@ -631,7 +632,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag, _maxIdxDiag, _minIdxDiag_cut, _maxIdxDiag_cut = 0; 
+		u64 _minIdxDiag = 0, _maxIdxDiag = 0, _minIdxDiag_cut = 0, _maxIdxDiag_cut = 0; 
 
 		// set
 		{
@@ -646,7 +647,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		{
 
 			double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 5;
-			double oMin			= 1.0l / _Nh / 10;
+			double oMin			= 1.0l / _Nh / 2.0;
 			u64 _nFrequencies	= 12 * _Ns;
 
 			// set the histograms
@@ -685,7 +686,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// mean level spacing
 			{
-				_meanlvl(_r) = check_dense(this->modP.modTyp_) ? std::dynamic_pointer_cast<HamiltonianDense<_T>>(_H)->getMeanLevelSpacing() : _H->getMeanLevelSpacing();
+				_meanlvl(_r) = _H->getMeanLevelSpacing();
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(_r, 0)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 			}
 

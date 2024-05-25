@@ -18,14 +18,14 @@ class PowerLawRandomBanded : public QuadraticHamiltonian<_T>
 public:
 	~PowerLawRandomBanded()		= default;
 	PowerLawRandomBanded(size_t _Ns, double _a = 1.0, double _b = 1.0, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>(_Ns, _constant, true), a_(_a), b_(_b)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true, false), a_(_a), b_(_b)
 	{
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
 	PowerLawRandomBanded(std::shared_ptr<Lattice> _lat, double _a = 1.0, double _b = 1.0, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>(_lat, _constant, true), a_(_a), b_(_b)
+		: QuadraticHamiltonian<_T>(_lat, _constant, true, false), a_(_a), b_(_b)
 	{
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
@@ -66,7 +66,7 @@ public:
 
 	std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
-		std::string name = sep + "PLRB,Ns=" + STR(this->Ns);
+		std::string name = sep + "plrb,Ns=" + STR(this->Ns);
 		name += ",a=" + STRP(a_, 3);
 		name += ",b=" + STRP(b_, 3);
 		return this->QuadraticHamiltonian<_T>::info(name, skip, sep);

@@ -585,7 +585,7 @@ private:
 	// ##################### SPIN MODELS ###################
 
 	std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec>
-		ui_eth_getoperators(bool _isquadratic = true, bool _ismanybody = true);
+		ui_eth_getoperators(const size_t _Nh, bool _isquadratic = true, bool _ismanybody = true);
 	template<typename _T>
 	void ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H);
 	template<typename _T>
@@ -909,7 +909,8 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, std:
 											  this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
 		break;
 	case MY_MODELS::SYK2_M:
-		_H = std::make_shared<SYK2<_T>>(this->latP.lat, 0.0);
+		_H = std::make_shared<SYK2<_T>>(this->latP.lat, this->modP.power_law_random_bandwidth.plrb_a_, 
+			this->modP.power_law_random_bandwidth.plrb_b_);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
 		_H = std::make_shared<PowerLawRandomBanded<_T>>(this->latP.lat, 0.0);
@@ -942,7 +943,8 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, uint
 		_H = std::make_shared<SYK2<_T>>(_Ns, 0.0);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, 0.0);
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_, 
+														this->modP.power_law_random_bandwidth.plrb_b_);
 		break;
 	default:
 		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J1_, this->modP.J10_, 0.0);

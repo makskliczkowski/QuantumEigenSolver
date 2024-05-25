@@ -14,10 +14,10 @@
 #include "../quantities/statistics.h"
 
 template<typename _T>
-class RosenzweigPorter : public HamiltonianDense<_T, 2>
+class RosenzweigPorter : public Hamiltonian<_T, 2>
 {
 public:
-	using NQSFun = typename HamiltonianDense<_T>::NQSFun;
+	using NQSFun = typename Hamiltonian<_T>::NQSFun;
 protected:
 	double gamma_		= 1.0;
 	double gammaP_		= 1.0;
@@ -87,13 +87,18 @@ inline RosenzweigPorter<_T>::~RosenzweigPorter()
 template<typename _T>
 inline void RosenzweigPorter<_T>::checkQuadratic()
 {
-	if (!Binary::isPowOf2(this->Ns_)) 
+	if (this->Ns > 16) 
 	{
 		LOGINFOG("The number of particles is not a power of 2.", LOG_TYPES::WARNING, 1);
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
+		this->Nh_			= this->Ns_;
+		this->Nh			= this->Ns_;
+	}
+	else
+	{
 		this->isManyBody_	= true;
 		this->isQuadratic_	= true;
-		this->Nh_ = this->Ns_;
-		this->Nh = this->Ns_;
 	}
 }
 
@@ -106,7 +111,7 @@ inline void RosenzweigPorter<_T>::checkQuadratic()
 */
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
-	: HamiltonianDense<_T, 2>(_N), gamma_(_gamma)
+	: Hamiltonian<_T, 2>(_N, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
@@ -120,7 +125,7 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
 
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma)
-	: HamiltonianDense<_T, 2>(_hil), gamma_(_gamma)
+	: Hamiltonian<_T, 2>(_hil, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
@@ -135,7 +140,7 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _
 
 template<typename _T>
 inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma)
-	: HamiltonianDense<_T, 2>(_hil), gamma_(_gamma)
+	: Hamiltonian<_T, 2>(_hil, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
 	//change info
@@ -195,7 +200,7 @@ inline std::string RosenzweigPorter<_T>::info(const strVec & skip, std::string s
 		name += sep + "goe";
 	name +=	sep +	VEQV(gamm, gamma_);
 	name += this->hilbertSpace.getSymInfo();
-	return this->HamiltonianDense<_T>::info(name, skip, sep);
+	return this->Hamiltonian<_T>::info(name, skip, sep);
 }
 
 // ##########################################################################################################################################
@@ -223,7 +228,7 @@ inline void RosenzweigPorter<_T>::hamiltonian()
 
 	this->randomize(0.0, 1.0, {"g"});
 
-	this->H_.diag() = algebra::cast<_T>(this->diag_);
+	this->H_.diagD() = algebra::cast<_T>(this->diag_);
 
 	// build the Hamiltonian (offdiagonal)
 	this->H_ += this->gammaP_inv_ * this->ran_.template GUE<_T>(this->Nh_);
