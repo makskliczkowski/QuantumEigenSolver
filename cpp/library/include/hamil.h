@@ -279,7 +279,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns, bool _isSparse
 	this->Ns_	= _Ns;
 	this->Ns	= _Ns;
 	this->hilbertSpace = Hilbert::HilbertSpace<_T, _spinModes>(Ns_);
-	this->Nh	=  std::powl(_spinModes, Ns_);
+	this->Nh	=  std::pow(_spinModes, Ns_);
 	this->Nh_	=  this->Nh;
 }
 
