@@ -249,7 +249,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		isManyBody			= _H->getIsManyBody();
 
-	std::vector<Operators::Operator<double>> _ops;
+	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
@@ -537,7 +537,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		 isManyBody			= _H->getIsManyBody();
 
-	std::vector<Operators::Operator<double>> _ops;
+	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
@@ -1480,7 +1480,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		isManyBody			= _H->getIsManyBody();
 
-	std::vector<Operators::Operator<double>> _ops;
+	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(isQuadratic, isManyBody);
 
