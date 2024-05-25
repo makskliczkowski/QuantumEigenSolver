@@ -65,7 +65,7 @@ public:
 
 	// Constructor for dense matrices
 	HamiltonianMatrix(const arma::Mat<_T>& _H)
-		: isSparse_(false), Nh_(_H.n_rows), H_dense_(_H), 
+		: isSparse_(false), Nh_(_H.n_rows), H_dense_(_H)
 	{
 		this->n_cols	= _H.n_cols;
 		this->n_rows	= _H.n_rows;
