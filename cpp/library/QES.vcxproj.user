@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>-f INPUTS/input_test.txt</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-Ntot 8 -qsm_h r;1.0;0.5 -fun 42 -mod 5 -modRanN 400 -modRanSeed 0 -modMidStates 0.75 -modEnDiff 0.005 -qsm_alpha 2.75 -qsm_xi 0.2 -qsm_g0 1.0 -qsm_gamma 1.0 -qsm_N 3 -rp_g 2.750 -rp_be_real 1 -th 2 -dir /scratch/kliczkowski/RANDOM_MODELS//DATA/</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>
