@@ -32,23 +32,53 @@ void UI::makeSimETH()
 		else if (this->chosenFun == 42)
 		{
 			if (_takeComplex)
-				this->checkETH_statistics(!_isquadratic ? this->hamComplex : this->qhamComplex);
+			{
+				if (!_isquadratic)
+					this->checkETH_statistics(this->hamComplex);
+				else
+					this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+			}
 			else
-				this->checkETH_statistics(!_isquadratic ? this->hamDouble : this->qhamDouble);
+			{
+				if (!_isquadratic)
+					this->checkETH_statistics(this->hamDouble);
+				else
+					this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));	
+			}
 		}
 		else if (this->chosenFun == 44)
 		{
 			if (_takeComplex)
-				this->checkETH_scaling_offdiag(!_isquadratic ? this->hamComplex : this->qhamComplex);
+			{
+				if (!_isquadratic)
+					this->checkETH_scaling_offdiag(this->hamComplex);
+				else
+					this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+			}
 			else
-				this->checkETH_scaling_offdiag(!_isquadratic ? this->hamDouble : this->qhamDouble);
+			{
+				if (!_isquadratic)
+					this->checkETH_scaling_offdiag(this->hamDouble);
+				else
+					this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+			}
 		}
 		else if (this->chosenFun == 46)
 		{
 			if (_takeComplex)
-				this->checkETH_time_evo(!_isquadratic ? this->hamComplex : this->qhamComplex);
+			{
+				if (!_isquadratic)
+					this->checkETH_time_evo(this->hamComplex);
+				else
+					this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+			}
 			else
-				this->checkETH_time_evo(!_isquadratic ? this->hamDouble : this->qhamDouble);
+			{
+				if (!_isquadratic)
+					this->checkETH_time_evo(this->hamDouble);
+				else
+					this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+			}
 		}
 	}
 }
