@@ -28,7 +28,7 @@ mkdir -p $SLURMDIR
 # parameters
 SSYYMS=$(tr -d ' ' <<< "$PARS")
 
-b="qsm_mat_ns=${Ns},${SSYYMS}"
+b="mat_ns=${Ns},fun=${FUN},${SSYYMS}"
 arhname="Ns=${Ns},${b},${SLURM_JOBID}.tar.gz"
 a="ns=${Ns}"
 echo "#!/bin/bash" >> ${a}
