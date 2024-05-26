@@ -744,9 +744,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					const auto& _matrices = _measure.getOpG_mat();
 
 					// go through the operators
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(_Ns <= 14 ? this->threadNum : 2)
-#endif
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(_Ns <= 14 ? this->threadNum : 2)
+//#endif
 					for (int _opi = 0; _opi < _matrices.size(); _opi++)
 					{
 						arma::Mat<_T> _overlaps		= Operators::applyOverlapMat(_H->getEigVec(), _matrices[_opi]);

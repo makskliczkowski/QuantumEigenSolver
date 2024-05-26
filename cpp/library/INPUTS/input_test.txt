@@ -62,7 +62,7 @@
 -l 0
 -d 1
 # for the models that are not defined on a lattice
--Ntot 8
+-Ntot 6
 ############################# INTERACTING MODEL PARAMETERS #############################
 -hx 0.0 -hz 0.0 -eta1 0.0 -eta2 0.0 -J1 -1.0 -J2 0.0 -dlt1 -0.5 -dlt2 0
 #### Heisenberg-Kitaev
@@ -139,3 +139,5 @@
 # find folders 
 # ls -l > /home/klimak97/jobs.txt
 # rsync -rv --rsh --ignore-existing --progress -e 'ssh -p 22' kliczkowski@f1login.ijs.si:/scratch/kliczkowski/ ./
+
+# -f INPUTS/input_test.txt
