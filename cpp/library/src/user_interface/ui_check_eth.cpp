@@ -605,26 +605,26 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
 
 			// append statistics from the diagonal elements
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
-				auto _name = _measure.getOpGN(_opi);
-				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat[_opi], "diag_" + _name, true);
-				saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat_cut[_opi], "diag_" + _name + "_0.1", true);
+			//for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			//{
+				//auto _name = _measure.getOpGN(_opi);
+				//saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat[_opi], "diag_" + _name, true);
+				//saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat_cut[_opi], "diag_" + _name + "_0.1", true);
 
 				// offdiagonal elements
-				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi], "offdiag_" + _name, true);
+				//saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi], "offdiag_" + _name, true);
 
 				// save the means!
-				if (_r == this->modP.modRanN_)
-				{
-					arma::Col<double> _meanDiag = arma::mean(_diagElemsStat[_opi], 1);
-					saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag, "mean_diag_" + _name, true);
-					arma::Col<double> _meanDiag_cut = arma::mean(_diagElemsStat_cut[_opi], 1);
-					saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag_cut, "mean_diag_" + _name + "_0.1", true);
-					arma::Col<double> _meanOffdiag = arma::mean(_offdiagElemesStat[_opi], 1);
-					saveAlgebraic(dir, "stat" + randomStr + extension, _meanOffdiag, "mean_offdiag_" + _name, true);
-				}
-			}
+				//if (_r == this->modP.modRanN_)
+				//{
+					//arma::Col<double> _meanDiag = arma::mean(_diagElemsStat[_opi], 1);
+					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag, "mean_diag_" + _name, true);
+					//arma::Col<double> _meanDiag_cut = arma::mean(_diagElemsStat_cut[_opi], 1);
+					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag_cut, "mean_diag_" + _name + "_0.1", true);
+					//arma::Col<double> _meanOffdiag = arma::mean(_offdiagElemesStat[_opi], 1);
+					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanOffdiag, "mean_offdiag_" + _name, true);
+				//}
+			//}
 
 			// diagonal operators saved (only append when _opi > 0)
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
@@ -855,31 +855,31 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						LOGINFO("Finalizing statistics for operator: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 
 						// diagonal
-						{
-							{
-								for (uint ii = 0; ii < 4; ii++)
-								{
-									_diagElemsStat[_opi](ii, _r)		/= _hs_fractions_diag;
-									_diagElemsStat_cut[_opi](ii, _r)	/= _hs_fractions_diag_stat;
-								}
-								// save the statistics
-								_diagElemsStat[_opi](4, _r) = StatisticalMeasures::gaussianity<_T>(_diagElems[_opi].col(_r));
-								_diagElemsStat[_opi](5, _r) = StatisticalMeasures::kurtosis<_T>(_diagElems[_opi].col(_r));
-								_diagElemsStat[_opi](6, _r) = StatisticalMeasures::binder_cumulant<_T>(_diagElems[_opi].col(_r));
-								// save the statistics
-								_diagElemsStat_cut[_opi](4, _r) = StatisticalMeasures::gaussianity<double>(_diagElemsStat_cut[_opi].col(_r));
-								_diagElemsStat_cut[_opi](5, _r) = StatisticalMeasures::kurtosis<double>(_diagElemsStat_cut[_opi].col(_r));
-								_diagElemsStat_cut[_opi](6, _r) = StatisticalMeasures::binder_cumulant<double>(_diagElemsStat_cut[_opi].col(_r));
-							}
+						//{
+						//	{
+						//		for (uint ii = 0; ii < 4; ii++)
+						//		{
+						//			_diagElemsStat[_opi](ii, _r)		/= _hs_fractions_diag;
+						//			_diagElemsStat_cut[_opi](ii, _r)	/= _hs_fractions_diag_stat;
+						//		}
+						//		// save the statistics
+						//		_diagElemsStat[_opi](4, _r) = StatisticalMeasures::gaussianity<_T>(_diagElems[_opi].col(_r));
+						//		_diagElemsStat[_opi](5, _r) = StatisticalMeasures::kurtosis<_T>(_diagElems[_opi].col(_r));
+						//		_diagElemsStat[_opi](6, _r) = StatisticalMeasures::binder_cumulant<_T>(_diagElems[_opi].col(_r));
+						//		// save the statistics
+						//		_diagElemsStat_cut[_opi](4, _r) = StatisticalMeasures::gaussianity<double>(_diagElemsStat_cut[_opi].col(_r));
+						//		_diagElemsStat_cut[_opi](5, _r) = StatisticalMeasures::kurtosis<double>(_diagElemsStat_cut[_opi].col(_r));
+						//		_diagElemsStat_cut[_opi](6, _r) = StatisticalMeasures::binder_cumulant<double>(_diagElemsStat_cut[_opi].col(_r));
+						//	}
 
-							// additionally, for typical values, calculate the exponential of the mean
-							{
-								_diagElemsStat[_opi](1, _r)		= std::exp(_diagElemsStat[_opi](1, _r));
-								_diagElemsStat[_opi](3, _r)		= std::exp(_diagElemsStat[_opi](3, _r));
-								_diagElemsStat_cut[_opi](1, _r) = std::exp(_diagElemsStat_cut[_opi](1, _r));
-								_diagElemsStat_cut[_opi](3, _r) = std::exp(_diagElemsStat_cut[_opi](3, _r));
-							}
-						}
+						//	// additionally, for typical values, calculate the exponential of the mean
+						//	{
+						//		_diagElemsStat[_opi](1, _r)		= std::exp(_diagElemsStat[_opi](1, _r));
+						//		_diagElemsStat[_opi](3, _r)		= std::exp(_diagElemsStat[_opi](3, _r));
+						//		_diagElemsStat_cut[_opi](1, _r) = std::exp(_diagElemsStat_cut[_opi](1, _r));
+						//		_diagElemsStat_cut[_opi](3, _r) = std::exp(_diagElemsStat_cut[_opi](3, _r));
+						//	}
+						//}
 
 						LOGINFO("Finished the diagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 
