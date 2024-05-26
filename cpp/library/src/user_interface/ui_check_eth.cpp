@@ -881,26 +881,30 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 							}
 						}
 
+						LOGINFO("Finished the diagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
+
 						// offdiagonal
-						{
+						//{
 
-							{
-								for (uint ii = 0; ii < 6; ii++)
-									_offdiagElemesStat[_opi](ii, _r) /= (long double)_totalIterator_off;
+						//	{
+						//		for (uint ii = 0; ii < 6; ii++)
+						//			_offdiagElemesStat[_opi](ii, _r) /= (long double)_totalIterator_off;
 
-								// statistics
-								_offdiagElemesStat[_opi](6, _r) = StatisticalMeasures::gaussianity(_offdiagElemesStat[_opi](5, _r), _offdiagElemesStat[_opi](2, _r));
-								_offdiagElemesStat[_opi](7, _r) = StatisticalMeasures::binder_cumulant(_offdiagElemesStat[_opi](2, _r), _offdiagElemesStat[_opi](4, _r));
-							}
+						//		// statistics
+						//		_offdiagElemesStat[_opi](6, _r) = StatisticalMeasures::gaussianity(_offdiagElemesStat[_opi](5, _r), _offdiagElemesStat[_opi](2, _r));
+						//		_offdiagElemesStat[_opi](7, _r) = StatisticalMeasures::binder_cumulant(_offdiagElemesStat[_opi](2, _r), _offdiagElemesStat[_opi](4, _r));
+						//	}
 
-							// additionally, for typical values, calculate the exponential of the mean
-							{
-								for (auto ii : { 1, 3 })
-								{
-									_offdiagElemesStat[_opi](ii, _r) = std::exp(_offdiagElemesStat[_opi](ii, _r));
-								}
-							}
-						}
+						//	// additionally, for typical values, calculate the exponential of the mean
+						//	{
+						//		for (auto ii : { 1, 3 })
+						//		{
+						//			_offdiagElemesStat[_opi](ii, _r) = std::exp(_offdiagElemesStat[_opi](ii, _r));
+						//		}
+						//	}
+						//}
+
+						LOGINFO("Finished the offdiagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 
 						// save the diagonal part
 						_diagElems[_opi].col(_r)	= _overlaps.diag();
