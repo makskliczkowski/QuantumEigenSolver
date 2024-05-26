@@ -151,7 +151,7 @@ public:
 template <typename _T>
 Measurement<_T>::~Measurement() 
 { 
-	LOGINFO("Destroying the measurement of the NQS averages.", LOG_TYPES::TRACE, 3);
+	LOGINFO("Destroying the measurement of the Measurement averages.", LOG_TYPES::TRACE, 3);
 	this->clear();
 }
 
