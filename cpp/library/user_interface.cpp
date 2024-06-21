@@ -124,6 +124,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 			SETOPTIONV(modP, q_realizationNum,	"q_R");
 			SETOPTIONV(modP, q_randomCombNum,	"q_CN");
 			SETOPTIONV(modP, q_shuffle,			"q_S");
+			SETOPTIONV(modP, q_broad,			"q_broad");
 			
 			// -- aubry-andre ---
 			{
@@ -361,7 +362,7 @@ bool UI::defineLattice()
 * @param _lat lattice to be defined
 * @return true if the lattice was defined
 */
-bool UI::defineLattice(std::shared_ptr<Lattice> _lat, LatticeTypes _typ)
+bool UI::defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ)
 {
 	BEGIN_CATCH_HANDLER
 	{
@@ -432,15 +433,25 @@ bool UI::defineModelsQ(bool _createLat)
 		this->defineLattice();
 
 	// check if is complex
-	this->isComplex_	= this->symP.checkComplex(_createLat ? this->latP.lat->get_Ns() : this->latP.Ntot_);
+	this->isComplex_	= this->modP.checkComplex();
 	bool _takeComplex	= (this->isComplex_ || this->useComplex_);	
 	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
 	
 	// check if is complex and define the Hamiltonian
-	if (_takeComplex)
-		return this->defineModelQ<cpx>(this->qhamComplex, this->latP.Ntot_);
+	if (this->latP.lat)
+	{
+		if (_takeComplex)
+			return this->defineModelQ<cpx>(this->qhamComplex, this->latP.lat);
+		else
+			return this->defineModelQ<double>(this->qhamDouble, this->latP.lat);
+	}
 	else
-		return this->defineModelQ<double>(this->qhamDouble, this->latP.Ntot_);
+	{
+		if (_takeComplex)
+			return this->defineModelQ<cpx>(this->qhamComplex, this->latP.Ntot_);
+		else
+			return this->defineModelQ<double>(this->qhamDouble, this->latP.Ntot_);
+	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -672,7 +683,7 @@ void UI::makeSimQuadraticSpectralFunction()
 	// reset Hamiltonians - memory release
 	this->resetQuadratic();
 	this->useComplex_ = false;
-	if (this->defineModelsQ(true))
+	if (this->defineModelsQ(isLatticeModel(this->modP.modTyp_)))
 	{
 		if(this->useComplex_)
 			this->quadraticSpectralFunction<cpx>(this->qhamComplex);

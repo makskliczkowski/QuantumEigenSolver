@@ -39,8 +39,8 @@ public:
 
 	std::string info(const v_1d<std::string>& skip = {}, std::string sep = "_", int prec = 2) const override
 	{
-		auto Ns = this->lat_->get_Ns();
-		auto BC = this->lat_->get_BC();
+		auto Ns = this->Ns_;
+		auto BC = this->lat_ ? this->lat_->get_BC() : BoundaryConditions::PBC;
 		std::string name = sep + "SYK2,Ns=" + STR(Ns);
 		name += ",BC=" + SSTR(getSTR_BoundaryConditions(BC));
 		return this->QuadraticHamiltonian<_T>::info(name, skip, sep);

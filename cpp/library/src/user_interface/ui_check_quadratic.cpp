@@ -258,53 +258,95 @@ void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	if (!fs::exists(filename + ".h5"))
 		_H->getEigVal(dir, HAM_SAVE_EXT::h5, false);
 
+	arma::Col<double> _D	= _H->getEigVal();
+	arma::Mat<_T> _Hmat		= arma::Mat<_T>(_H->getHamiltonian());
+	arma::Mat<_T> _Umat		= _H->getEigVec();
+
 	// _minimal energy
-	double _Egs		= -(double)Ns;//_H->getManyBodyEnergy(_mbgs);
-	double _Ees		= Ns;//_H->getManyBodyEnergy(_mbex);
-	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(250));
-	//auto _dw		= _omegas(1) - _omegas(0);
+	uint _oNum		= 500;
+	double _Egs		= -8;//2 * _D(0);
+	double _Ees		= 8;//2 * _D(Ns - 1);
+	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(_oNum));
+	auto _dw		= _omegas(1) - _omegas(0);
 
 	// calculate the DFT matrix
 	std::shared_ptr<Lattice> _lat = _H->getLat();
+	auto _exps		= _lat->calculate_dft_vectors();
+	auto _expst		= _exps.t();
+	//_lat->calculate_dft_matrix_vec(true);
 
+	// output
 	arma::Mat<double> _outspectrals(_omegas.n_elem, Ns, arma::fill::zeros);
-	arma::Col<double> _Dos(_omegas.n_elem, arma::fill::zeros);
-	arma::Mat<_T> _Hmat = arma::Mat<_T>(_H->getHamiltonian());
+	arma::Mat<double> _outspectrals_r(_omegas.n_elem, Ns, arma::fill::zeros);
+	arma::Col<double> _Dos_r(_omegas.n_elem, arma::fill::zeros);
+	arma::Col<double> _Dos_k(_omegas.n_elem, arma::fill::zeros);
+
 
 	// go through omegas
-//#pragma omp parallel for num_threads(this->threadNum)
-//	for(int _omega = 0; _omega < _omegas.size(); ++_omega)
-//	{
-//		LOGINFO("Doing omega: " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::TRACE, 3);
-//		auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _Hmat, _dw / 2);
-//
-//		// calculate the total matrix
-//		arma::Mat<cpx> _spectk		= SystemProperties::function_fourier(_spectr, _lat.get());
-//		arma::Mat<double> _spect	= SystemProperties::Spectral::Noninteracting::spectral_function(_spectk);
-//
-//		// save the first row
-//		_outspectrals.row(_omega)	= _spect.diag().as_row();
-//		_Dos(_omega)				= arma::accu(_spect);
-//	}
-//
-//	// normalize
-//	double _integral = arma::as_scalar(arma::trapz(_omegas, _Dos));
-//	_Dos /= _integral;
-//	
-//	for (int k = 0; k < Ns; ++k)
-//	{
-//		double _integral = arma::as_scalar(arma::trapz(_omegas, _outspectrals.col(k)));
-//		_outspectrals.col(k) /= _integral;
-//	}
+#pragma omp parallel for num_threads(this->threadNum)
+	for(int _omega = 0; _omega < _omegas.size(); ++_omega)
+	{
+		auto _tstart = NOW;
+		auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _Hmat, this->modP.q_broad_);
+		if (_omega % 10 == 0)
+			LOGINFO(STRP(DURATIONMS(NOW, _tstart), 6) + "ms - Time for omega (exact - SF): " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::CHOICE, 3);
 
-	saveAlgebraic(dir, filename + "_spectral.h5", _outspectrals, "spectrals", false);
-	saveAlgebraic(dir, filename + "_spectral.h5", _Dos, "dos", true);
+		//_spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _D, _Umat, _dw / 2);
+		//LOGINFO(STRP(DURATIONMS(_tstart, NOW), 6) + "Time for omega (not exact): " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::CHOICE, 3);
 
-	auto _edgs = arma::linspace(_H->getEigVal(0), _H->getEigVal(Ns - 1), 40);
-	auto _edos = SystemProperties::Spectral::Noninteracting::dos_gauss(_H->getEigVal());
-	saveAlgebraic(dir, filename + "_spectral.h5", _edos, "edos", true);
-	saveAlgebraic(dir, filename + "_spectral.h5", _edgs, "edos_bins", true);
-	saveAlgebraic(dir, filename + "_spectral.h5", _omegas, "omegas", true);
+		// calculate the total matrix
+		arma::Col<cpx> _spectkdft	= SystemProperties::function_fourier_diag_k(_spectr, _exps, _expst);
+
+		if (_omega % 10 == 0)
+			LOGINFO(STRP(DURATIONMS(NOW, _tstart), 6) + "ms - Fourier transform time for omega (dft - SF): " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::CHOICE, 4);
+
+		auto _spect_k				= SystemProperties::Spectral::Noninteracting::spectral_function(_spectkdft);
+		auto _spect_r				= SystemProperties::Spectral::Noninteracting::spectral_function(_spectr);
+		// calculate the k-space matrix
+
+		// save the first row
+		_outspectrals.row(_omega)	= _spect_k.as_row();
+		_outspectrals_r.row(_omega) = _spect_r.diag().as_row();
+		_Dos_r(_omega)				+= arma::trace(_spect_r);
+		_Dos_k(_omega)				+= arma::as_scalar(arma::sum(_spect_k));
+		
+		// printer
+		if (_omega % 10 == 0)
+			LOGINFO(_tstart, "Time for omega: " + STR(_omega) + "/" + STR(_omegas.size()), 2);
+	}
+
+	// save me!
+	{
+		// normalize the DOS from the spectral function
+		{
+			double _integral	= arma::as_scalar(arma::trapz(_omegas, _Dos_r));
+			_Dos_r				/= _integral;
+			_integral			= arma::as_scalar(arma::trapz(_omegas, _Dos_k));
+			_Dos_k				/= _integral;
+		}
+
+		// normalize the spectral functions
+		for (int k = 0; k < Ns; ++k)
+		{
+			double _integral = arma::as_scalar(arma::trapz(_omegas, _outspectrals.col(k)));
+			_outspectrals.col(k) /= _integral;
+		}
+
+		saveAlgebraic(dir, filename + "_spectral.h5", _outspectrals, "spectrals_k", false);
+		saveAlgebraic(dir, filename + "_spectral.h5", _outspectrals_r, "spectrals_r", true);
+		saveAlgebraic(dir, filename + "_spectral.h5", _Dos_r, "dos_r", true);
+		saveAlgebraic(dir, filename + "_spectral.h5", _Dos_k, "dos_k", true);
+		saveAlgebraic(dir, filename + "_spectral.h5", _omegas, "omegas", true);
+
+		// eDOS from the energies
+		{
+			auto _Dos			= SystemProperties::Spectral::Noninteracting::dos_gauss(_omegas, _D, 1e-1);
+			double _integral	= arma::as_scalar(arma::trapz(_omegas, _Dos));
+			_Dos				/= _integral;
+			saveAlgebraic(dir, filename + "_spectral.h5", _Dos, "edos", true);
+		}
+
+	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

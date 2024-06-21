@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-Ntot 10 -qsm_h r;1.0;0.5 -fun 42 -mod 6 -modRanN 1000 -modRanSeed 0 -modMidStates 0.75 -modEnDiff 0.005 -qsm_alpha 0.55 -qsm_xi 0.2 -qsm_g0 1.0 -qsm_gamma 1.0 -qsm_N 3 -um_g 1.0 -um_alpha 0.550 -um_N 3 -th 1 -dir /scratch/kliczkowski/RANDOM_MODELS//DATA/</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-f ./INPUTS/input_test.txt</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

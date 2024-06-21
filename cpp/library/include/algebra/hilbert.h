@@ -861,7 +861,7 @@ namespace Hilbert
 		}
 
 		u64 start		= 0;
-		u64 powNs		= NhFull;
+		u64 powNs		= this->NhFull;
 		u64 stop		= powNs;
 #ifndef DEBUG
 		int numThreads = this->threadNum;

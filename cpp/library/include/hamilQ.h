@@ -31,6 +31,19 @@ inline bool isQuadraticRandom(uint _type)								// #
 			_type == (uint)MY_MODELS::SYK2_M	 ||						// #
 			_type == (uint)MY_MODELS::POWER_LAW_RANDOM_BANDED_M;		// #
 }																		// #
+inline bool isLatticeModel(MY_MODELS _m)
+{
+	switch (_m)
+	{
+	// quadratic
+	case MY_MODELS::RP_M:
+		return false;
+	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+		return false;
+	default:
+		return true;
+	}
+}
 inline std::string filenameQuadraticRandom(std::string _f,				// #
 	uint _type,															// #
 	randomGen& ran)														// #
@@ -133,7 +146,7 @@ public:
 	virtual auto getTransMat()		-> arma::Mat<_T>		{ return this->eigVec_;							};	// returns the unitary base transformation {<x|q>}
 	virtual auto getSPEnMat()		-> arma::Col<double>	{ return this->eigVal_;							};	// returns the single particle energies
 	auto getTypeI()					const -> uint			{ return (uint)this->type_;						};	// get type integer
-	auto getType()					const -> std::string	{ return getSTR_MY_MODELS(this->type_);	};	// get type string
+	auto getType()					const->std::string override;												// get type string
 
 	// ------------------- O V E R R I D E -------------------
 	void locEnergy(u64 _elemId, u64 _elem, uint _site)		override {										};
@@ -229,6 +242,13 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(u64 _state)
 		if (checkBit(_state, this->Ns))
 			_idxs.push_back(i);
 	return this->getManyBodyEnergy(_idxs);
+}
+
+template<typename _T>
+inline std::string QuadraticHamiltonian<_T>::getType() const
+{
+	uint _typ = (uint)this->type_ + MY_MODELS_MAX_INTERACTING - (uint)MY_MODELS::FREE_FERMIONS_M;
+	return eSTRMY_MODELS[_typ];
 }
 
 // ##################################################################################################################################

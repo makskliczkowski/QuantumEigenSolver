@@ -89,21 +89,38 @@ void UI::makeSimETHSweep()
 {
 	// steps for alpha
 	v_1d<double> _params;
-	if (this->modP.modTyp_ == MY_MODELS::QSM_M)
+	switch (this->modP.modTyp_)
+	{
+	case MY_MODELS::QSM_M:
 		_params = this->modP.qsm.qsm_alpha_;
-	else if (this->modP.modTyp_ == MY_MODELS::RP_M)
+		break;
+	case MY_MODELS::RP_M:
 		_params = this->modP.rosenzweig_porter.rp_g_;
-
-	if(this->modP.modTyp_ == MY_MODELS::QSM_M)
-		this->useComplex_ = false;
-	else if(this->modP.modTyp_ == MY_MODELS::RP_M)
-		this->useComplex_ = !this->modP.rosenzweig_porter.rp_be_real_;
-
-	// go complex if needed
-	bool _takeComplex = (this->isComplex_ || this->useComplex_);	
+		break;
+	case MY_MODELS::ULTRAMETRIC_M:
+		_params = this->modP.ultrametric.um_alpha_;
+		break;
+	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+		_params = { this->modP.power_law_random_bandwidth.plrb_a_ };
+		break;
+	default:
+		return;
+	}
 
 	// get the random seed for this realization
 	auto seed [[maybe_unused]]	= std::random_device()();
+
+	// is it quadratic?
+	bool _isquadratic = check_noninteracting(this->modP.modTyp_);
+
+	// define the models
+	if (this->modP.modTyp_ == MY_MODELS::RP_M)
+		this->useComplex_ = !this->modP.rosenzweig_porter.rp_be_real_;
+	else
+		this->useComplex_ = false;
+
+	// go complex if needed
+	bool _takeComplex = (this->isComplex_ || this->useComplex_);	
 
 	for(int _pi = 0; _pi < _params.size(); _pi++)
 	{
@@ -111,37 +128,81 @@ void UI::makeSimETHSweep()
 
 		// set the alpha
 		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
-			for (int i = 0; i < this->modP.qsm.qsm_alpha_.size(); i++)
-				this->modP.qsm.qsm_alpha_[i] = _param;
+			this->modP.qsm.qsm_alpha_ = v_1d<double>(this->modP.qsm.qsm_alpha_.size(), _param);
 		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
-			this->modP.rosenzweig_porter.rp_g_[0] = this->modP.rosenzweig_porter.rp_g_[_pi];
+			this->modP.rosenzweig_porter.rp_g_ = v_1d<double>(this->modP.rosenzweig_porter.rp_g_.size(), _param);
+		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+			this->modP.ultrametric.um_alpha_ = v_1d<double>(this->modP.ultrametric.um_alpha_.size(), _param);
+		else if (this->modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
+			this->modP.power_law_random_bandwidth.plrb_a_ = _param;
 
 		// define the models
 		this->resetEd();
 
-		// simulate
-		if (this->defineModels(false, false, false))
+		// define the models depending on which to choose
+		bool _isok = false;
+		if (check_noninteracting(this->modP.modTyp_))
+			_isok = this->defineModelsQ(false);
+		else
+			_isok = this->defineModels(false, false, false);
+
+		// go through the function choice
+		if (_isok)
 		{
-			if (this->chosenFun == 41)
+			if (this->chosenFun == 40)
 			{
-	/*			if(_takeComplex)
-					this->checkETH(this->hamComplex);
-				else
-					this->checkETH(this->hamDouble);*/
+				//this->checkETH(this->hamDouble);
 			}
 			else if (this->chosenFun == 43)
 			{
-				if(_takeComplex)
-					this->checkETH_statistics(this->hamComplex);
+				if (_takeComplex)
+				{
+					if (!_isquadratic)
+						this->checkETH_statistics(this->hamComplex);
+					else
+						this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				}
 				else
-					this->checkETH_statistics(this->hamDouble);
+				{
+					if (!_isquadratic)
+						this->checkETH_statistics(this->hamDouble);
+					else
+						this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+				}
 			}
-			else if (this->chosenFun == 46)
+			else if (this->chosenFun == 41)
 			{
 				if (_takeComplex)
-					this->checkETH_time_evo(this->hamComplex);
+				{
+					if (!_isquadratic)
+						this->checkETH_scaling_offdiag(this->hamComplex);
+					else
+						this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				}
 				else
-					this->checkETH_time_evo(this->hamDouble);
+				{
+					if (!_isquadratic)
+						this->checkETH_scaling_offdiag(this->hamDouble);
+					else
+						this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+				}
+			}
+			else if (this->chosenFun == 45)
+			{
+				if (_takeComplex)
+				{
+					if (!_isquadratic)
+						this->checkETH_time_evo(this->hamComplex);
+					else
+						this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				}
+				else
+				{
+					if (!_isquadratic)
+						this->checkETH_time_evo(this->hamDouble);
+					else
+						this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+				}
 			}
 		}
 	}
@@ -163,8 +224,11 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			// add z spins 
 			for (uint i = 0; i < _Ns; ++i)
 			{
-				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i)));
-				_opsN.push_back("mb/sz/" + STR(i));
+				auto _op	= std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, i));
+				auto _name	= "mb/sz/" + STR(i);
+				_op->setNameS(_name);
+				_ops.push_back(_op);
+				_opsN.push_back(_name);
 			}
 			// add other operators
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
@@ -558,6 +622,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// the n'th row in the column will be the state index
 	// the columns corresponds to realizations of disorder
 	VMAT<_T> _diagElems(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
+	// constraint the offdiagonals also to _Nh elements only
+	VMAT<_T> _offdiagElems(_ops.size(), 5 * _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
 
 	// (mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant)
 	// the columns will correspond to realizations
@@ -577,22 +643,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	v_1d<HistogramAverage<double>> _histAvTypical(_ops.size(), HistogramAverage<double>());
 	
 	// ----------------------- nbins operators -----------------------
-	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram());
-	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram());
-	uint _nbinOperators = 15 * _Ns;
-
-	// create the histograms for the operators
-	for (uint _opi = 0; _opi < _ops.size(); ++_opi) 
-	{
-		// diagonal
-		_histOperatorsDiag[_opi].reset(_nbinOperators);
-		_histOperatorsDiag[_opi].uniform(0.5, -0.5); 
-
-		// offdiagonal
-		double _offdiagLimit	= 0.5 - 0.025 * _Ns;
-		_histOperatorsOffdiag[_opi].reset(_nbinOperators);
-		_histOperatorsOffdiag[_opi].uniform(_offdiagLimit, -_offdiagLimit);
-	}
+	uint _nbinOperators = std::min((size_t)(12 * _Ns), (size_t)300);
+	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram(_nbinOperators));
+	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram(_nbinOperators));
 
 	// create the saving function
 	std::function<void(uint)> _saver = [&](uint _r)
@@ -604,33 +657,18 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			// energy
 			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
 
-			// append statistics from the diagonal elements
-			//for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			//{
-				//auto _name = _measure.getOpGN(_opi);
-				//saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat[_opi], "diag_" + _name, true);
-				//saveAlgebraic(dir, "stat" + randomStr + extension, _diagElemsStat_cut[_opi], "diag_" + _name + "_0.1", true);
-
-				// offdiagonal elements
-				//saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi], "offdiag_" + _name, true);
-
-				// save the means!
-				//if (_r == this->modP.modRanN_)
-				//{
-					//arma::Col<double> _meanDiag = arma::mean(_diagElemsStat[_opi], 1);
-					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag, "mean_diag_" + _name, true);
-					//arma::Col<double> _meanDiag_cut = arma::mean(_diagElemsStat_cut[_opi], 1);
-					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanDiag_cut, "mean_diag_" + _name + "_0.1", true);
-					//arma::Col<double> _meanOffdiag = arma::mean(_offdiagElemesStat[_opi], 1);
-					//saveAlgebraic(dir, "stat" + randomStr + extension, _meanOffdiag, "mean_offdiag_" + _name, true);
-				//}
-			//}
-
 			// diagonal operators saved (only append when _opi > 0)
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "diag" + randomStr + extension, algebra::cast<double>(_diagElems[_opi]), _name, _opi > 0);
+			}
+
+			// offdiagonal operators saved (only append when _opi > 0)
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			{
+				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "offdiag" + randomStr + extension, algebra::cast<double>(_offdiagElems[_opi]), _name, _opi > 0);
 			}
 
 			// save the histograms of the operators for the f functions
@@ -644,11 +682,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].countsCol(), "_counts", true);
 
 			// save the distributions of the operators - histograms for the values
-			saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[0].edgesCol(), "diag_edges", false);
-			saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[0].edgesCol(), "offdiag_edges", true);
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].edgesCol(), _name + "_diag_edges", _opi > 0);
+				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[_opi].edgesCol(), _name + "_offdiag_edges", true);
 				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].countsCol(), _name + "_diag_counts", true);
 				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[_opi].countsCol(), _name + "_offdiag_counts", true);
 			}
@@ -683,36 +721,14 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 		// -----------------------------------------------------------------------------
 		
-		// set the uniform distribution of frequencies in logspace for the f-functions!!!
-		if (_r == 0)
 		{
+			// -----------------------------------------------------------------------------
 
-			double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 5;
-			double oMin			= 1.0l / _Nh / 2.0;
-			u64 _nFrequencies	= 12 * _Ns;
-
-			// set the histograms
-			for (auto iHist = 0; iHist < _ops.size(); ++iHist)
+			// save the energies
 			{
-				_histAv[iHist].reset(_nFrequencies);
-				_histAv[iHist].uniformLog(oMax, oMin);
-
-				_histAvTypical[iHist].reset(_nFrequencies);
-				_histAvTypical[iHist].uniformLog(oMax, oMin);
+				_en.col(_r) = _H->getEigVal();
 			}
-		}
 
-		// -----------------------------------------------------------------------------
-
-		// save the energies
-		{
-			_en.col(_r) = _H->getEigVal();
-		}
-
-		// -----------------------------------------------------------------------------
-		
-		// calculator of the properties
-		{
 			// -----------------------------------------------------------------------------
 
 			// gap ratios
@@ -732,6 +748,32 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			}
 
 			// -----------------------------------------------------------------------------
+		}
+
+		// -----------------------------------------------------------------------------
+
+		// set the uniform distribution of frequencies in logspace for the f-functions!!!
+		if (_r == 0)
+		{
+
+			double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
+			double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
+
+			// set the histograms
+			for (auto iHist = 0; iHist < _ops.size(); ++iHist)
+			{
+				_histAv[iHist].reset(_nbinOperators);
+				_histAv[iHist].uniformLog(oMax, oMin);
+
+				_histAvTypical[iHist].reset(_nbinOperators);
+				_histAvTypical[iHist].uniformLog(oMax, oMin);
+			}
+		}
+
+		// -----------------------------------------------------------------------------
+		
+		// calculator of the properties
+		{
 
 			// other measures
 			{
@@ -753,7 +795,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						arma::Mat<_T> _overlaps		= Operators::applyOverlapMat(_H->getEigVec(), _matrices[_opi]);
 
 						// save the iterators
-						u64 _totalIterator_off		= 0;
+						u64 _totalIterator_off [[maybe_unused]] = 0;
 						const double _avEn			= _H->getEnAv();
 
 						// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
@@ -773,9 +815,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 									const auto _elem2		= _elemabs * _elemabs;
 									const auto _logElem		= std::log(_elemabs);
 									const auto _logElem2	= std::log(_elemabs * _elemabs);
-
-									// add element to the histogram
-									_histOperatorsDiag[_opi].append(_elemreal);
 
 									// save the statistics
 									// mean
@@ -840,12 +879,13 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 									// meanabs
 									_offdiagElemesStat[_opi](5, _r) += _elemabs;
 
-									// add to value histogram
-									_histOperatorsOffdiag[_opi].append(_elemreal);
-
 									// add to the histograms
 									_histAv[_opi].append(w, _elem2);
 									_histAvTypical[_opi].append(w, _logElem2);
+
+									// save the values
+									if (_totalIterator_off <= _offdiagElems.n_rows(_opi))
+										_offdiagElems.set(_opi, _totalIterator_off - 1, _r, _elemreal);
 								}
 							}
 						}
@@ -908,6 +948,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 						// save the diagonal part
 						_diagElems[_opi].col(_r)	= _overlaps.diag();
+
+						// save the histograms of the diagonals and offdiagonals!
+						_histOperatorsDiag[_opi].setHistogramCounts(_diagElems[_opi].col(_r), _r == 0);
+						_histOperatorsOffdiag[_opi].setHistogramCounts(_offdiagElems[_opi].col(_r), _r == 0);
+
 					}
 
 				}

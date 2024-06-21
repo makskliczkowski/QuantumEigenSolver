@@ -315,14 +315,14 @@ namespace Operators
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
 					_out(_site, _site) = 1.0;
-					_out = (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					_out = (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 					return _out;
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
 					_out(_site, _site) = 1.0;
-					_out = (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					_out = (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 					return _out;
 				};
 
@@ -353,16 +353,17 @@ namespace Operators
 			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
-					_out(_site_minus, _site_plus) = 1.0;
-					_out(_site_plus, _site_minus) = 1.0;
-					return _out * std::sqrt(_Ns / 2.0);
+					std::cout << _site_minus << " " << _site_plus << "Ns:" << _Ns << std::endl;
+					_out(_site_minus, _site_plus) = std::sqrt(_Ns / 2.0);
+					_out(_site_plus, _site_minus) = std::sqrt(_Ns / 2.0);
+					return _out;
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site_minus, _site_plus) = 1.0;
-					_out(_site_plus, _site_minus) = 1.0;
-					return _out * std::sqrt(_Ns / 2.0);
+					_out(_site_minus, _site_plus) = std::sqrt(_Ns / 2.0);
+					_out(_site_plus, _site_minus) = std::sqrt(_Ns / 2.0);
+					return _out;
 				};
 
 			// set the operator
@@ -388,7 +389,7 @@ namespace Operators
 							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
 						}
 					}
-					return arma::SpMat<std::complex<double>>(_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					return arma::SpMat<std::complex<double>>(_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 				};
 			std::function<arma::Mat<std::complex<double>>()> _mat_dense = [_Ns, _momentum]()
 				{
@@ -400,7 +401,7 @@ namespace Operators
 							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
 						}
 					}
-					return (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					return (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 				};
 
 			// set the operator
@@ -421,10 +422,10 @@ namespace Operators
 					{
 						for (auto j = 0; j < _Ns; j++)
 						{
-							_out(i, i) = 1.0 / (double)(_Ns);
+							_out(i, j) = 1.0 / (double)(_Ns);
 						}
 					}
-					return arma::SpMat<double>(_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					return arma::SpMat<double>(_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns]()
 				{
@@ -436,7 +437,7 @@ namespace Operators
 							_out(i, i) = 1.0 / (double)(_Ns);
 						}
 					}
-					return (_Ns * _out - 1.0) / std::sqrt(_Ns - 1);
+					return (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
 				};
 
 			// set the operator

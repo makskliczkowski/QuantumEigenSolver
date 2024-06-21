@@ -706,6 +706,29 @@ namespace SystemProperties
 		return _DFT * _G;
 	}
 
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Col<std::complex<double>> function_fourier_diag(const _Mt& _G, const arma::Mat<cpx>& _DFT)
+	{
+		return algebra::matDiagProduct(_DFT, _G);
+	}
+
+	template <typename _Mt>
+	[[nodiscard]]
+	inline arma::Col<std::complex<double>> function_fourier_diag_k(const _Mt& _G, const arma::Mat<cpx>& _exps, const arma::Mat<cpx>& _expst)
+	{
+		// Compute the result using matrix multiplication
+		arma::Mat<cpx> temp		= _exps * _G;	// row times columns and sum
+		// Compute the diagonal elements
+		arma::Col<cpx> _ret(_G.n_rows, arma::fill::zeros);
+
+		// rows are exponents for given k
+		_ret = algebra::matDiagProduct(temp, _expst);
+		//for (int k = 0; k < temp.n_rows; ++k)
+
+		return _ret;
+	}
+
 	// ---------------------------------------------------------------------------
 
 	template <typename _Mt>
@@ -888,6 +911,11 @@ namespace SystemProperties
 				return arma::hist(arma::vec(_E), bins);
 			}
 
+			/*
+			* @brief Calculate the electronic Density of States. Use gaussian broadening to ensure smoothness of the SFs.
+			* @param _E energie to be used for the eDOS
+			* @param _Sig broadening of gaussians
+			*/
 			template <typename _Vt>
 			[[nodiscard]]
 			inline arma::mat dos_gauss(const _Vt& _E, double _sig = 1e-2)
@@ -902,6 +930,21 @@ namespace SystemProperties
 				return _dos;
 			}
 
+			template <typename _Vt>
+			[[nodiscard]]
+			inline arma::mat dos_gauss(const arma::Col<double>& _edgs, const _Vt& _E, double _sig = 1e-2)
+			{
+				auto _N		= _edgs.n_elem;
+				arma::Col<double> _dos(_N, arma::fill::zeros);
+				for (const auto _Ein : _E)
+				{
+					_dos += arma::normpdf(_edgs, _Ein, _sig);
+				}
+				return _dos;
+			}
+			
+			// ---------------------------------------------------------------------------
+
 			/*
 			* @brief Calculate the spectral function for noninteracting systems (time resolved Green's function).
 			* The spectral function is calculated based on the Hamiltonian matrix and the energy.
@@ -913,14 +956,14 @@ namespace SystemProperties
 			*/
 			template <typename _Mt>
 			[[nodiscard]]
-			inline arma::Mat<cpx> time_resolved_greens_function(double _omega, const arma::Mat<_Mt>& _H, double _eta = 1e-1)
+			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::Mat<_Mt>& _H, double _eta = 1e-1)
 			{
 				arma::Mat<cpx> _out(_H.n_rows, _H.n_cols, arma::fill::zeros);
 				arma::Mat<cpx> _eye(_H.n_rows, _H.n_cols, arma::fill::eye);
 				_out		=  _out - _H;
 				_out.diag()	+= _omega + I * _eta;
 
-				return arma::solve(_out, _eye, arma::solve_opts::likely_sympd	);
+				return arma::solve(_out, _eye, arma::solve_opts::likely_sympd);
 				//return arma::inv_sympd(_out);
 			}
 
@@ -932,6 +975,43 @@ namespace SystemProperties
 				_out		=  _out - _H;
 				_out.diag()	+= cpx(_omega, _eta);
 				return arma::spsolve(_out, arma::Mat<cpx>(_out.n_rows, _out.n_cols, arma::fill::eye));
+			}
+
+			template <typename _Mt>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::Col<double>& _D, const arma::Mat<_Mt>& _U, double _eta = 1e-1)
+			{
+				arma::Col<cpx> _diaginv = 1.0 / (_D - _omega + I * _eta);
+				return algebra::matTimesDiagMat(_U, _diaginv) * _U.t();
+			}
+
+			template <typename _T>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::Col<double>& _D, const arma::SpMat<_T>& _U, double _eta = 1e-1)
+			{
+				arma::Col<cpx> _diaginv = 1.0 / (_D - _omega + I * _eta);
+				return algebra::matTimesDiagMat(_U, _diaginv) * _U.t();
+			}
+
+
+			template <typename _T>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(const arma::Col<double>& _omegas, const arma::Col<double>& _D, const arma::Mat<_T>& _U, double _eta = 1e-1)
+			{
+				arma::Mat<cpx> _diaginv(_D.n_elem, _omegas.n_elem, arma::fill::zeros);
+				for(int i = 0; i < _omegas.n_elem; ++i)
+					_diaginv.col(i) = 1.0 / (_D - _omegas(i) + I * _eta);
+				return (_U * _diaginv.t()) * _U.t();
+			}
+
+			template <typename _T>
+			[[nodiscard]]
+			inline arma::Mat<cpx> time_resolved_greens_function(const arma::Col<double>& _omegas, const arma::Col<double>& _D, const arma::SpMat<_T>& _U, double _eta = 1e-1)
+			{
+				arma::Mat<cpx> _diaginv(_D.n_elem, _omegas.n_elem, arma::fill::zeros);
+				for(int i = 0; i < _omegas.n_elem; ++i)
+					_diaginv.col(i) = 1.0 / (_D - _omegas(i) + I * _eta);
+				return (_U * _diaginv.t()) * _U.t();
 			}
 
 			// ---------------------------------------------------------------------------

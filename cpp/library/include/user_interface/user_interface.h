@@ -279,6 +279,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(q_randomCombNum, uint, 100);		// number of random combinations for the average (to choose from)
 		UI_PARAM_CREATE_DEFAULT(q_realizationNum, uint, 100);		// number of realizations for the average
 		UI_PARAM_CREATE_DEFAULT(q_shuffle, bool, true);				// shuffle the states?
+		UI_PARAM_CREATE_DEFAULTD(q_broad, double, 0.1);				// broadening for spectral function
 
 		// ########### AUBRY_ANDRE ############
 		
@@ -601,7 +602,7 @@ private:
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% D E F I N I T I O N S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	bool defineLattice();
-	bool defineLattice(std::shared_ptr<Lattice> _lat, LatticeTypes _typ = LatticeTypes::SQ);
+	bool defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ = LatticeTypes::SQ);
 
 	// models
 	bool defineModels(bool _createLat = true, bool _checkSyms = true, bool _useHilbert = true);
@@ -909,11 +910,11 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, std:
 											  this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
 		break;
 	case MY_MODELS::SYK2_M:
-		_H = std::make_shared<SYK2<_T>>(this->latP.lat, this->modP.power_law_random_bandwidth.plrb_a_, 
-			this->modP.power_law_random_bandwidth.plrb_b_);
+		_H = std::make_shared<SYK2<_T>>(this->latP.lat);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(this->latP.lat, 0.0);
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(this->latP.lat, this->modP.power_law_random_bandwidth.plrb_a_, 
+			this->modP.power_law_random_bandwidth.plrb_b_);
 		break;
 	default:
 		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);

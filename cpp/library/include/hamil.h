@@ -49,6 +49,8 @@ BEGIN_ENUM(MY_MODELS)													// #
 END_ENUM(MY_MODELS)									 					// #	
 // #########################################################################
 
+constexpr int MY_MODELS_MAX_INTERACTING = (int)MY_MODELS::ULTRAMETRIC_M;
+
 inline bool check_noninteracting(MY_MODELS _type)
 {
 	return _type >= FREE_FERMIONS_M;
@@ -195,7 +197,7 @@ public:
 	auto getInfo(const strVec& skip = {},
 		std::string sep = DEF_INFO_SEP, int prec = 2)	const -> std::string						{ return this->info_;															};
 	// types
-	auto getType()										const -> std::string						{ return SSTR(getSTR_MY_MODELS(this->type_));									};
+	virtual auto getType()								const -> std::string						{ return SSTR(getSTR_MY_MODELS(this->type_));									};
 	auto getTypeI()										const -> uint								{ return this->type_;															};
 	// lattice (if applicable)
 	auto getLat()										const -> std::shared_ptr<Lattice>			{ return this->lat_;															};
