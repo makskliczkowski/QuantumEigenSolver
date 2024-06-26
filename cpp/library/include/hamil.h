@@ -12,6 +12,12 @@
 #ifndef HAMIL_H
 #define HAMIL_H
 
+// --- ED
+constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
+constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
+constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
+constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
+
 // ############################ EXISTING MODELS ############################
 enum MY_MODELS 															// #
 {																		// #	

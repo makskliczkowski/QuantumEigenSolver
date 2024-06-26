@@ -124,11 +124,6 @@ constexpr int UI_LIMITS_NQS_ED									= ULLPOW(18);
 constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
-// --- ED
-constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
-constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
-constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 // --- QUADRATIC
 constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 24;
 
