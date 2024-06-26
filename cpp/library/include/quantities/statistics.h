@@ -981,7 +981,7 @@ namespace SystemProperties
 			[[nodiscard]]
 			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::Col<double>& _D, const arma::Mat<_Mt>& _U, double _eta = 1e-1)
 			{
-				arma::Col<cpx> _diaginv = 1.0 / (_D - _omega + I * _eta);
+				arma::Col<cpx> _diaginv = 1.0 / (_omega - I * _eta - _D);
 				return algebra::matTimesDiagMat(_U, _diaginv) * _U.t();
 			}
 
@@ -989,7 +989,7 @@ namespace SystemProperties
 			[[nodiscard]]
 			inline arma::Mat<cpx> time_resolved_greens_function(const double _omega, const arma::Col<double>& _D, const arma::SpMat<_T>& _U, double _eta = 1e-1)
 			{
-				arma::Col<cpx> _diaginv = 1.0 / (_D - _omega + I * _eta);
+				arma::Col<cpx> _diaginv = 1.0 / (_omega + I * _eta - _D);
 				return algebra::matTimesDiagMat(_U, _diaginv) * _U.t();
 			}
 

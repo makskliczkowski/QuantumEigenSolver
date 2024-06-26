@@ -300,34 +300,98 @@ namespace Operators
 	{
 		// #############################################################################################
 
-		std::pair<u64,double> site_occupation(u64 _operatorIdx, size_t _Ns, const uint _site)
-		{
-			if(_operatorIdx == _site)
-				return std::make_pair(_operatorIdx, (_Ns -  1) / std::sqrt(_Ns - 1));
-			return std::make_pair(_operatorIdx, 0.0);
-		}
-
-		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site)
+		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site, bool _standarize)
 		{
 			// create the function
-			_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site]()
+			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site, _standarize]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
 					_out(_site, _site) = 1.0;
-					_out = (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() -= arma::ones(_Ns) / std::sqrt(_Ns - 1);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
 					return _out;
 				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site]()
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site, _standarize]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
 					_out(_site, _site) = 1.0;
-					_out = (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() -= arma::ones(_Ns) / std::sqrt(_Ns - 1);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
 					return _out;
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;		
+		}
+
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize)
+		{
+			// create the function
+			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _sites, _coeffs, _standarize]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					
+					// set the values
+					for (auto i = 0; i < _sites.size(); i++)
+						_out(_sites[i], _sites[i]) = _coeffs[i];
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+					{
+						_out.diag() -= arma::trace(_out) / (_Ns);
+						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
+						_out		= _out / std::sqrt(_Hs);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
+					return _out;
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _sites, _coeffs, _standarize]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+
+					// set the values
+					for (auto i = 0; i < _sites.size(); i++)
+						_out(_sites[i], _sites[i]) = _coeffs[i];
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+					{
+						_out.diag() -= arma::trace(_out) / (_Ns);
+						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
+						_out		= _out / std::sqrt(_Hs);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
+					return _out;
+				};
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
@@ -336,38 +400,31 @@ namespace Operators
 
 		// #############################################################################################
 
-		std::pair<u64,double>nn_correlation(u64 _operatorIdx, size_t _Ns, const uint _site_plus, const uint _site_minus)
-		{
-			if(_operatorIdx == _site_minus)
-				return std::make_pair(_site_plus, std::sqrt(_Ns / 2));
-			if (_operatorIdx == _site_plus)
-				return std::make_pair(_site_minus, std::sqrt(_Ns / 2));
-			return std::make_pair(_operatorIdx, 0.0);
-		}
-
-		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus)
+		/*
+		* @brief Standard hopping!
+		*/
+		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus, bool _standarize)
 		{
 			// create the function
-			_OP<double>::GLB fun_ = [_Ns, _site_plus, _site_minus](u64 state) { return nn_correlation(state, _Ns, _site_plus, _site_minus); };
+			//_OP<double>::GLB fun_ = [_Ns, _site_plus, _site_minus](u64 state) { return nn_correlation(state, _Ns, _site_plus, _site_minus); };
 			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus]()
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus, _standarize]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
-					std::cout << _site_minus << " " << _site_plus << "Ns:" << _Ns << std::endl;
-					_out(_site_minus, _site_plus) = std::sqrt(_Ns / 2.0);
-					_out(_site_plus, _site_minus) = std::sqrt(_Ns / 2.0);
+					_out(_site_minus, _site_plus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
+					_out(_site_plus, _site_minus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
 					return _out;
 				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus]()
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus, _standarize]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site_minus, _site_plus) = std::sqrt(_Ns / 2.0);
-					_out(_site_plus, _site_minus) = std::sqrt(_Ns / 2.0);
+					_out(_site_minus, _site_plus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
+					_out(_site_plus, _site_minus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
 					return _out;
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
 			_op.setQMatSparse(std::move(_mat_sparse));
 			_op.setQMatDense(std::move(_mat_dense));
@@ -376,32 +433,48 @@ namespace Operators
 
 		// #############################################################################################
 
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum)
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum, bool _standarize)
 		{
 			// create the function
-			std::function<arma::SpMat<std::complex<double>>()> _mat_sparse = [_Ns, _momentum]()
+			std::function<arma::SpMat<std::complex<double>>()> _mat_sparse = [_Ns, _momentum, _standarize]()
 				{
 					arma::SpMat<std::complex<double>> _out(_Ns, _Ns);
 					for (auto i = 0; i < _Ns; i++)
 					{
 						for (auto j = 0; j < _Ns; j++)
 						{
-							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
+							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns);
 						}
 					}
-					return arma::SpMat<std::complex<double>>(_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
+
+					// return the operator
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
+						return _out;
+					}
+					return _out;
 				};
-			std::function<arma::Mat<std::complex<double>>()> _mat_dense = [_Ns, _momentum]()
+			std::function<arma::Mat<std::complex<double>>()> _mat_dense = [_Ns, _momentum, _standarize]()
 				{
 					arma::Mat<std::complex<double>> _out(_Ns, _Ns, arma::fill::zeros);
 					for (auto i = 0; i < _Ns; i++)
 					{
 						for (auto j = 0; j < _Ns; j++)
 						{
-							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * std::abs(i - j) / _Ns)) / (double)(_Ns);
+							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns);
 						}
 					}
-					return (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
+
+					// return the operator
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
+						return _out;
+					}
+					return _out;
 				};
 
 			// set the operator
@@ -412,10 +485,10 @@ namespace Operators
 			return _op;				
 		}
 
-		Operators::Operator<double> quasimomentum_occupation(size_t _Ns)
+		Operators::Operator<double> quasimomentum_occupation(size_t _Ns, bool _standarize)
 		{
 			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns]()
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _standarize]()
 				{
 					arma::SpMat<double> _out(_Ns, _Ns);
 					for (auto i = 0; i < _Ns; i++)
@@ -425,9 +498,15 @@ namespace Operators
 							_out(i, j) = 1.0 / (double)(_Ns);
 						}
 					}
-					return arma::SpMat<double>(_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
-				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns]()
+					// return the operator
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
+						return _out;
+					}
+					return _out;				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _standarize]()
 				{
 					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
 					for (auto i = 0; i < _Ns; i++)
@@ -437,8 +516,14 @@ namespace Operators
 							_out(i, i) = 1.0 / (double)(_Ns);
 						}
 					}
-					return (_Ns * _out - arma::eye(_Ns, _Ns)) / std::sqrt(_Ns - 1);
-				};
+					// return the operator
+					if (_standarize)
+					{
+						_out		*= _Ns / std::sqrt(_Ns - 1);
+						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
+						return _out;
+					}
+					return _out;				};
 
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);

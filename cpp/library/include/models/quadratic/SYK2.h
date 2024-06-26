@@ -13,14 +13,14 @@ class SYK2 : public QuadraticHamiltonian<_T>
 public:
 	~SYK2()		= default;
 	SYK2(std::shared_ptr<Lattice> _lat, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>(_lat, _constant, true)
+		: QuadraticHamiltonian<_T>(_lat, _constant, true, false)
 	{
 		this->type_ = MY_MODELS::SYK2_M;
 		this->info_ = this->info();
 		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
 	};
 	SYK2(uint _Ns, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>(_Ns, _constant, true)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true, false)
 	{
 		this->type_ = MY_MODELS::SYK2_M;
 		this->info_ = this->info();
@@ -32,7 +32,7 @@ public:
 	void hamiltonian() override										
 	{ 
 		this->init();
-		this->H_ = this->ran_.template GOE<_T>(this->Nh, this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
+		this->H_ = this->ran_.template GOE<_T>(this->Nh, this->Nh) / std::sqrt(this->Nh) + algebra::cast<_T>(I) * arma::zeros(this->Nh, this->Nh); 
 	}
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------

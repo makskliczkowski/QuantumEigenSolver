@@ -29,7 +29,7 @@ void UI::makeSimETH()
 		{
 			//this->checkETH(this->hamDouble);
 		}
-		else if (this->chosenFun == 42)
+		else if (this->chosenFun == 42 || this->chosenFun == 43)
 		{
 			if (_takeComplex)
 			{
@@ -63,7 +63,7 @@ void UI::makeSimETH()
 					this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
 			}
 		}
-		else if (this->chosenFun == 46)
+		else if (this->chosenFun == 46 || this->chosenFun == 45)
 		{
 			if (_takeComplex)
 			{
@@ -104,112 +104,46 @@ void UI::makeSimETHSweep()
 		_params = { this->modP.power_law_random_bandwidth.plrb_a_ };
 		break;
 	default:
-		return;
+		_params = { 1.0 };
 	}
 
-	// get the random seed for this realization
-	auto seed [[maybe_unused]]	= std::random_device()();
-
-	// is it quadratic?
-	bool _isquadratic = check_noninteracting(this->modP.modTyp_);
-
-	// define the models
-	if (this->modP.modTyp_ == MY_MODELS::RP_M)
-		this->useComplex_ = !this->modP.rosenzweig_porter.rp_be_real_;
-	else
-		this->useComplex_ = false;
-
-	// go complex if needed
-	bool _takeComplex = (this->isComplex_ || this->useComplex_);	
-
-	for(int _pi = 0; _pi < _params.size(); _pi++)
+	for (int _Ns = 0; _Ns < this->latP.Ntots_.size(); _Ns++)
 	{
-		const auto _param = _params[_pi];
+		// change the Ntot
+		this->latP.Ntot_ = this->latP.Ntots_[_Ns];
 
-		// set the alpha
-		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
-			this->modP.qsm.qsm_alpha_ = v_1d<double>(this->modP.qsm.qsm_alpha_.size(), _param);
-		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
-			this->modP.rosenzweig_porter.rp_g_ = v_1d<double>(this->modP.rosenzweig_porter.rp_g_.size(), _param);
-		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
-			this->modP.ultrametric.um_alpha_ = v_1d<double>(this->modP.ultrametric.um_alpha_.size(), _param);
-		else if (this->modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
-			this->modP.power_law_random_bandwidth.plrb_a_ = _param;
-
-		// define the models
-		this->resetEd();
-
-		// define the models depending on which to choose
-		bool _isok = false;
-		if (check_noninteracting(this->modP.modTyp_))
-			_isok = this->defineModelsQ(false);
-		else
-			_isok = this->defineModels(false, false, false);
-
-		// go through the function choice
-		if (_isok)
+		// go through the parameters
+		for (int _pi = 0; _pi < _params.size(); _pi++)
 		{
-			if (this->chosenFun == 40)
-			{
-				//this->checkETH(this->hamDouble);
-			}
-			else if (this->chosenFun == 43)
-			{
-				if (_takeComplex)
-				{
-					if (!_isquadratic)
-						this->checkETH_statistics(this->hamComplex);
-					else
-						this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
-				}
-				else
-				{
-					if (!_isquadratic)
-						this->checkETH_statistics(this->hamDouble);
-					else
-						this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
-				}
-			}
-			else if (this->chosenFun == 41)
-			{
-				if (_takeComplex)
-				{
-					if (!_isquadratic)
-						this->checkETH_scaling_offdiag(this->hamComplex);
-					else
-						this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
-				}
-				else
-				{
-					if (!_isquadratic)
-						this->checkETH_scaling_offdiag(this->hamDouble);
-					else
-						this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
-				}
-			}
-			else if (this->chosenFun == 45)
-			{
-				if (_takeComplex)
-				{
-					if (!_isquadratic)
-						this->checkETH_time_evo(this->hamComplex);
-					else
-						this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
-				}
-				else
-				{
-					if (!_isquadratic)
-						this->checkETH_time_evo(this->hamDouble);
-					else
-						this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
-				}
-			}
+			const auto _param = _params[_pi];
+
+			// set the alpha
+			if (this->modP.modTyp_ == MY_MODELS::QSM_M)
+				this->modP.qsm.qsm_alpha_ = v_1d<double>(this->latP.Ntot_, _param);
+			else if (this->modP.modTyp_ == MY_MODELS::RP_M)
+				this->modP.rosenzweig_porter.rp_g_ = v_1d<double>(this->latP.Ntot_, _param);
+			else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+				this->modP.ultrametric.um_alpha_ = v_1d<double>(this->latP.Ntot_ - this->modP.ultrametric.um_N_, _param);
+			else if (this->modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
+				this->modP.power_law_random_bandwidth.plrb_a_ = _param;
+
+			// define the models
+			this->resetEd();
+
+			// simulate
+			this->makeSimETH();
 		}
 	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
+* @brief Based on the model type, obtain both quadratic and many body operators
+* @param _Nh: Hilbert space size
+* @param _isquadratic: is the model quadratic
+* @param _ismanybody: is the model many body
+*/
 std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth_getoperators(const size_t _Nh, bool _isquadratic, bool _ismanybody)
 {
 	const size_t _Ns = this->latP.Ntot_;
@@ -227,15 +161,17 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 				auto _op	= std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, i));
 				auto _name	= "mb/sz/" + STR(i);
 				_op->setNameS(_name);
+
+				// push it
 				_ops.push_back(_op);
 				_opsN.push_back(_name);
 			}
 			// add other operators
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
 			_opsN.push_back("mb/szc/" + STR(_Ns - 2) + "_" + STR(_Ns - 1));
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { (uint)(_Ns / 2), (uint)(_Ns - 1) })));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns / 2), (uint)(_Ns - 1) })));
 			_opsN.push_back("mb/szc/" + STR(_Ns / 2) + "_" + STR(_Ns - 1));
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { 0, (uint)_Ns - 1 })));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
 			_opsN.push_back("mb/sxc/0_" + STR(_Ns - 1));
 		}
 
@@ -244,13 +180,21 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		{
 			// add other operators
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
-			_opsN.push_back("sp/quasimomentum/0");
+			_opsN.push_back("sp/quasimomentum_norm/0");
+			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh, false)));
+			//_opsN.push_back("sp/quasimomentum/0");
 
 			// correlation
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, _Nh - 1)));
-			_opsN.push_back("sp/nn_correlation/0_" + STR(_Nh - 1));
+			_opsN.push_back("sp/nn_correlation_norm/0_" + STR(_Nh - 1));
+			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, _Nh - 1, false)));
+			//_opsN.push_back("sp/nn_correlation/0_" + STR(_Nh - 1));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1)));
-			_opsN.push_back("sp/nn_correlation/0_1");
+			_opsN.push_back("sp/nn_correlation_norm/0_1");
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 2)));
+			_opsN.push_back("sp/nn_correlation_norm/0_2");
+			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1, false)));
+			//_opsN.push_back("sp/nn_correlation/0_1");
 			
 			//v_1d<size_t> _toTake = (_Ns <= 16) ? Vectors::vecAtoB<size_t>(_Ns) : v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
 			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Nh / 2), _Nh - 1});
@@ -258,8 +202,23 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			for (auto i: _toTake)
 			{
 				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i)));
-				_opsN.push_back("sp/occ/" + STR(i));
+				_opsN.push_back("sp/occ_norm/" + STR(i));
+				//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i, false)));
+				//_opsN.push_back("sp/occ/" + STR(i));
 			}
+
+			// random
+			size_t _coeffs = size_t(0.01 * _Nh);
+			v_1d<uint> _ridx;
+			v_1d<double> _rcoefs; 
+			
+			for (int i = 0; i < _coeffs; i++)
+			{
+				_rcoefs.push_back(this->ran_.template random<double>(0.0, 1.0));
+				_ridx.push_back(this->ran_.template randomInt<uint>(0, _Nh - 1));
+			}
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _ridx, _rcoefs, true)));
+			_opsN.push_back("sp/occ_r_norm");
 		}
 	}
 
@@ -600,6 +559,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	u64 _Nh					= _H->getHilbertSize();
 	bool isQuadratic		= _H->getIsQuadratic(), 
 		 isManyBody			= _H->getIsManyBody();
+
+	// do both!, cause why the hell not
+	isQuadratic				= true;
+	isManyBody				= true;
 
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
@@ -960,7 +923,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		}
 
 		// save the checkpoints
-		if ((_Ns >= 14 && _r % 2 == 0) || (_Ns < 14 && _r % 20 == 0))
+		if ((_Ns >= 14 && _r % 2 == 0) || (_Ns < 14 && _r % 50 == 0))
 			_saver(_r);
 
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);

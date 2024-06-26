@@ -103,6 +103,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(latP,		Lz			);
 		SETOPTION(latP,		bc			);
 		SETOPTION(latP,		Ntot		);
+		SETOPTIONVECTORRESIZE(latP, Ntots, 10);
 	}
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
@@ -138,6 +139,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 			{
 				SETOPTION(modP.power_law_random_bandwidth, plrb_a);
 				SETOPTION(modP.power_law_random_bandwidth, plrb_b);
+				SETOPTION(modP.power_law_random_bandwidth, plrb_mb);
 			}
 		}
 		

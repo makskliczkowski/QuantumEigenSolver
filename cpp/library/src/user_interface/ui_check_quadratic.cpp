@@ -261,11 +261,12 @@ void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	arma::Col<double> _D	= _H->getEigVal();
 	arma::Mat<_T> _Hmat		= arma::Mat<_T>(_H->getHamiltonian());
 	arma::Mat<_T> _Umat		= _H->getEigVec();
+	arma::Mat<cpx>_Umatcpx  = algebra::cast<cpx>(_Umat);
 
 	// _minimal energy
-	uint _oNum		= 500;
-	double _Egs		= -8;//2 * _D(0);
-	double _Ees		= 8;//2 * _D(Ns - 1);
+	uint _oNum		= 1000;
+	double _Egs		= -10;//2 * _D(0);
+	double _Ees		= 10;//2 * _D(Ns - 1);
 	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(_oNum));
 	auto _dw		= _omegas(1) - _omegas(0);
 
@@ -287,11 +288,11 @@ void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	for(int _omega = 0; _omega < _omegas.size(); ++_omega)
 	{
 		auto _tstart = NOW;
-		auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _Hmat, this->modP.q_broad_);
+		//auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _Hmat, this->modP.q_broad_);
+		auto _spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _D, _Umatcpx, this->modP.q_broad_);
 		if (_omega % 10 == 0)
 			LOGINFO(STRP(DURATIONMS(NOW, _tstart), 6) + "ms - Time for omega (exact - SF): " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::CHOICE, 3);
 
-		//_spectr = SystemProperties::Spectral::Noninteracting::time_resolved_greens_function(_omegas(_omega), _D, _Umat, _dw / 2);
 		//LOGINFO(STRP(DURATIONMS(_tstart, NOW), 6) + "Time for omega (not exact): " + STR(_omega) + "/" + STR(_omegas.size()), LOG_TYPES::CHOICE, 3);
 
 		// calculate the total matrix

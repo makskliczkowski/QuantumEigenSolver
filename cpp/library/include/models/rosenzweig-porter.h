@@ -87,9 +87,9 @@ inline RosenzweigPorter<_T>::~RosenzweigPorter()
 template<typename _T>
 inline void RosenzweigPorter<_T>::checkQuadratic()
 {
-	if (this->Ns > 16) 
+	if (this->Ns > UI_LIMITS_MAXFULLED) 
 	{
-		LOGINFOG("The number of particles is not a power of 2.", LOG_TYPES::WARNING, 1);
+		LOGINFOG("The number of particles is too big for it being quadratic. Be reasonable!", LOG_TYPES::WARNING, 1);
 		this->isManyBody_	= false;
 		this->isQuadratic_	= true;
 		this->Nh_			= this->Ns_;

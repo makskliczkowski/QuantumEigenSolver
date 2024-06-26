@@ -15,18 +15,32 @@ class PowerLawRandomBanded : public QuadraticHamiltonian<_T>
 {
 	double a_ = 1.0;
 	double b_ = 1.0;
+protected:
+	void checkQuadratic() override;
 public:
-	~PowerLawRandomBanded()		= default;
-	PowerLawRandomBanded(size_t _Ns, double _a = 1.0, double _b = 1.0, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>(_Ns, _constant, true, false), a_(_a), b_(_b)
+	~PowerLawRandomBanded()
 	{
+		DESTRUCTOR_CALL;
+	}
+	PowerLawRandomBanded(size_t _Ns, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>((_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns, _constant, true, false), a_(_a), b_(_b)
+	{
+		this->Ns_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Ns	= this->Ns_;
+		this->Nh_	= this->Ns_;
+		this->Nh	= this->Ns_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
-	PowerLawRandomBanded(std::shared_ptr<Lattice> _lat, double _a = 1.0, double _b = 1.0, double _constant = 0.0)
+	PowerLawRandomBanded(std::shared_ptr<Lattice> _lat, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true, false), a_(_a), b_(_b)
 	{
+		auto _Ns	= _lat->get_Ns();
+		this->Ns_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Ns	= this->Ns_;
+		this->Nh_	= this->Ns_;
+		this->Nh	= this->Ns_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
@@ -76,5 +90,23 @@ public:
 	void updateInfo()									override final { this->info_ = this->info(); };
 };
 
+template<typename _T>
+inline void PowerLawRandomBanded<_T>::checkQuadratic()
+{
+	if (this->Ns > UI_LIMITS_MAXFULLED) 
+	{
+		LOGINFOG("The number of particles is too big for it being quadratic. Be reasonable!", LOG_TYPES::WARNING, 1);
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
+		this->Nh_			= this->Ns_;
+		this->Nh			= this->Ns_;
+	}
+	else
+	{
+		this->isManyBody_	= true;
+		this->isQuadratic_	= true;
+	}
+}
 
-#endif // !SYK2_M_H
+#endif // !POWER_LAW_RANDOM_BANDED_H
+

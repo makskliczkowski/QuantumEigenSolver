@@ -297,6 +297,8 @@ namespace UI_PARAMS
 		{
 			UI_PARAM_CREATE_DEFAULTD(plrb_a, double, 1.0);
 			UI_PARAM_CREATE_DEFAULTD(plrb_b, double, 1.0);
+			UI_PARAM_CREATE_DEFAULTD(plrb_mb, bool, false);
+
 		} power_law_random_bandwidth;
 
 		// -------------------------------------
@@ -392,6 +394,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(dim, uint, 1);
 		// for the Hamiltonians that only use the total number of particles, not lattices!
 		UI_PARAM_CREATE_DEFAULT(Ntot, uint, 1);
+		UI_PARAM_CREATE_DEFAULTV(Ntots, int);
 
 		std::shared_ptr<Lattice> lat;
 
@@ -914,7 +917,7 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, std:
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
 		_H = std::make_shared<PowerLawRandomBanded<_T>>(this->latP.lat, this->modP.power_law_random_bandwidth.plrb_a_, 
-			this->modP.power_law_random_bandwidth.plrb_b_);
+			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
 		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
@@ -945,7 +948,8 @@ inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, uint
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
 		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_, 
-														this->modP.power_law_random_bandwidth.plrb_b_);
+														this->modP.power_law_random_bandwidth.plrb_b_, 
+														this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
 		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J1_, this->modP.J10_, 0.0);
