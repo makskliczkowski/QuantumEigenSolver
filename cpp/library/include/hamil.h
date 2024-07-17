@@ -59,7 +59,9 @@ constexpr int MY_MODELS_MAX_INTERACTING = (int)MY_MODELS::ULTRAMETRIC_M;
 
 inline bool check_noninteracting(MY_MODELS _type)
 {
-	return _type >= FREE_FERMIONS_M;
+	bool _isNoninteracting	= _type >= FREE_FERMIONS_M;
+	_isNoninteracting		&= _type == MY_MODELS::RP_M;
+	return _isNoninteracting;
 }
 
 inline bool check_dense(MY_MODELS _type)

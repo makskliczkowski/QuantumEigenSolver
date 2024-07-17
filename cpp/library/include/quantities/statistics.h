@@ -10,6 +10,7 @@
 
 #define SYSTEM_PROPERTIES_MIN_SPACING 1e-15
 #define SYSTEM_PROPERTIES_THROW_DEGENERATE 1
+#define SYSTEM_PROPERTIES_COEFF_THRESHOLD 1e-9
 #define SYSTEM_PROPERTIES_USE_OPENMP 0
 
 // -------------------------------------------------------------------------------
@@ -520,8 +521,11 @@ namespace SystemProperties
 #if SYSTEM_PROPERTIES_USE_OPENMP
 #	pragma omp parallel for reduction(+: pr)
 #endif
-		for (auto& _coeff: _state) 
-			pr += std::pow(std::abs(algebra::conjugate(_coeff) * _coeff), q);
+		for (auto& _coeff : _state)
+		{
+			if(!EQP(_coeff, 0.0, SYSTEM_PROPERTIES_COEFF_THRESHOLD))
+				pr += std::pow(std::abs(algebra::conjugate(_coeff) * _coeff), 2 * q);
+		}
 		return pr;
 	}
 
@@ -565,13 +569,17 @@ namespace SystemProperties
 	inline long double information_entropy(const _C& _state) 
 	{
 		long double ent = 0;
+#ifdef _DEBUG
+		if (_state.size() < 1000)
+			_state.print("State");
+#endif
 #if SYSTEM_PROPERTIES_USE_OPENMP
 #	pragma omp parallel for reduction(+: ent)
 #endif
 		for (auto& _coeff : _state)
 		{
 			auto _v = std::abs(algebra::conjugate(_coeff) * _coeff);
-			ent += _v * std::log(_v);
+			ent += EQP(_coeff, 0.0, SYSTEM_PROPERTIES_COEFF_THRESHOLD) ? 0.0 : _v * std::log(_v);
 		}
 		return -ent; // std::log(0.48 * _state.size());
 	}
@@ -607,6 +615,22 @@ namespace SystemProperties
 			ent			+= _v * std::log(_v);
 		}
 		return -ent / std::log(0.48 * _state.size());
+	}
+
+
+	/*
+	* @brief Calculates the participation ratio of the state
+	* @param _state - the state
+	* @param q - the exponent
+	* @returns the participation ratio
+	*/
+	template <typename _C> 
+	[[nodiscard]]
+	inline long double participation_entropy(const _C& _state, double q = 1.0)
+	{
+		if (q == 1.0)
+			return information_entropy(_state);
+		return 1.0 / (1.0 - q) * std::log(participation_ratio(_state, q));
 	}
 
 	// ---------------------------------------------------------------------------

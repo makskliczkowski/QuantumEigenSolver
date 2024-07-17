@@ -7,16 +7,18 @@
 // ##########################################################################################################################################
 
 template<typename _T>
-void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
+void UI::quadraticStatesManifold(std::shared_ptr<Hamiltonian<_T>>& _Ham)
 {
+	auto _H					= std::dynamic_pointer_cast<QuadraticHamiltonian<_T>>(_Ham);
 	uint Ns					= _H->getNs();
+	// single particle Hilbert space
 	uint Nh					= _H->getHilbertSize();
 	uint _type				= _H->getTypeI();
 
 	// --- create the directories ---
 	bool _manifold			= (_type == (uint)MY_MODELS::FREE_FERMIONS_M) && this->modP.q_manifold_;
 	std::string str0		= "QuadraticEntropies" + std::string(this->modP.q_shuffle_ ? "S" : "") + std::string((_manifold) ? "Manifold" : "");
-	std::string dir			= makeDirsC(this->mainDir, _H->getType(), this->latP.lat->get_info(), str0);
+	std::string dir			= makeDirsC(this->mainDir, str0, _H->getType(), this->latP.lat ? this->latP.lat->get_info() : "");
 
 	// ------ use those files -------
 	std::string modelInfo	= _H->getInfo();
@@ -24,14 +26,15 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	u64 _gamma				= this->modP.q_gamma_;
 	// how many states to take for the average (realizations of the combinations N * \Gamma states)
 	u64 _realizations		= this->modP.q_realizationNum_;
-	// number of combinations to take from single particle states (is \Gamma)
+	// number of combinations to take from single particle states (combinations from which to choose the \Gamma states - for small system sizes we skip this)
 	u64 _combinations		= this->modP.q_randomCombNum_;
 
 	// --- save energies txt check ---
 	std::string filename	= filenameQuadraticRandom(dir + modelInfo + VEQV(_R, _realizations) + VEQV(_C, _combinations) +
 							  VEQV(_Gamma, _gamma), _type, _H->ran_);
 
-	IF_EXCEPTION(_combinations < _gamma, "Bad number of combinations. Must be bigger than the number of states");
+	//IF_EXCEPTION(_combinations < _gamma, "Bad number of combinations. Must be bigger than the number of states");
+	IF_EXCEPTION(_gamma > Ns / 2, "Bad number of gamma. Must be bigger than the number of states to be taken");
 
 	// check the model (if necessery to build hamilonian, do it)
 	if (_type != (uint)MY_MODELS::FREE_FERMIONS_M)
@@ -42,10 +45,10 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	}
 
 	// go through the information
-	LOGINFO("Spectrum size:						  " + STR(Nh), LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking states to mix (Gamma):		  " + STR(_gamma), LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num states (combinations):	  " + STR(_combinations), LOG_TYPES::TRACE, 3);
-	LOGINFO("Taking num realizations (averages):  " + STR(_realizations), LOG_TYPES::TRACE, 3);
+	LOGINFO("Spectrum size: " + STR(Nh), LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking states to mix (Gamma): " + STR(_gamma), LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num states (combinations): " + STR(_combinations), LOG_TYPES::TRACE, 3);
+	LOGINFO("Taking num realizations (averages): " + STR(_realizations), LOG_TYPES::TRACE, 3);
 
 	// save single particle energies
 	if (!fs::exists(filename + ".h5"))
@@ -56,6 +59,12 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	arma::mat ENERGIES(_realizations, _gamma, arma::fill::zeros);
 	arma::vec ENTROPIES_SP(_realizations, arma::fill::zeros);
 	arma::vec ENTROPIES_MB(_realizations, arma::fill::zeros);
+	
+	// participation entropies
+	arma::vec ENTROPIES_PH(_realizations, arma::fill::zeros);
+	arma::vec ENTROPIES_P1(_realizations, arma::fill::zeros);
+	arma::vec ENTROPIES_P2(_realizations, arma::fill::zeros);
+	arma::vec ENTROPIES_P3(_realizations, arma::fill::zeros);
 
 	// many body orbitals (constructed of vectors of indices of single particle states)
 	v_1d<double> energies;
@@ -72,8 +81,11 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		_H->getManyBodyOrbitals(Ns / 2, _SPOrbitals, orbs);
 	else
 		_H->getManyBodyOrbitals(Ns / 2, _SPOrbitals, orbs, _combinations, this->threadNum);
+
+	// shuffle the orbitals before taking the energies
 	if(this->modP.q_shuffle_)
 		std::shuffle(orbs.begin(), orbs.end(), this->ran_.eng());
+
 	// obtain the energies
 	_H->getManyBodyEnergies(energies, orbs, this->threadNum);
 
@@ -83,13 +95,13 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	arma::Mat<_T> Ws		= W.submat(0, 0, W.n_rows - 1, _bonds - 1);
 	// conjugate transpose it - to be used later
 	arma::Mat<_T> WsC		= Ws.t();
-	// Hilbert space
-	auto _hilbert			= Hilbert::HilbertSpace<_T>(this->latP.lat);
-	auto _Nh			    = _hilbert.getHilbertSize();
+	// Hilbert space size (in MB picture)
+	auto _hilbertSize		= Ns < UI_LIMITS_QUADRATIC_STATEFULL ? ULLPOW(Ns) : Ns;
+
 	LOGINFO(_timer.point("combinations"), "Combinations time:", 3);
 
 	// -------------------------------- CORRELATION --------------------------------
-	auto _appendEntroSP = [&](u64 _idx, const std::vector<std::vector<uint>>& _orbitals, arma::Col<_T>& _coeff)
+	auto _appendEntroSP = [&](u64 _idx, const std::vector<std::vector<uint>>& _orbitals, arma::Col<cpx>& _coeff)
 		{
 			// iterate through the state
 			auto J				= SingleParticle::CorrelationMatrix::corrMatrix(Ns, Ws, WsC, _orbitals, _coeff, this->ran_);
@@ -97,14 +109,24 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		};
 
 	// --------------------------------- MANY BODY ---------------------------------
-	auto _appendEntroMB = [&](u64 _idx, const std::vector<std::vector<uint>>& _orbitals, arma::Col<_T>& _coeff)
+	auto _appendEntroMB = [&](u64 _idx, const std::vector<std::vector<uint>>& _orbitals, arma::Col<cpx>& _coeff)
 		{
 			// use the slater matrix to obtain the many body state
 			arma::Mat<_T> _slater(Ns / 2, Ns / 2, arma::fill::zeros);
-			arma::Col<cpx> _state(_Nh, arma::fill::zeros);
+			arma::Col<cpx> _state(_hilbertSize, arma::fill::zeros);
 			for (int i = 0; i < _orbitals.size(); ++i)
-				_state += _coeff(i) * _H->getManyBodyState(_orbitals[i], _hilbert, _slater);
-			ENTROPIES_MB(_idx) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, _bonds, _hilbert);;
+				_state += _coeff(i) * _H->getManyBodyState(_orbitals[i], _hilbertSize, _slater);
+
+			//_state /= arma::norm(_state);
+
+			// calculate the entropy
+			ENTROPIES_MB(_idx) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_state, _bonds, Ns, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+		
+			// calculate the participation entropies
+			ENTROPIES_PH(_idx) = SystemProperties::participation_entropy(_state, 0.5);
+			ENTROPIES_P1(_idx) = SystemProperties::participation_entropy(_state, 1);
+			ENTROPIES_P2(_idx) = SystemProperties::participation_entropy(_state, 2);
+			ENTROPIES_P3(_idx) = SystemProperties::participation_entropy(_state, 3);
 		};
 	// ----------------------------------- SAVER -----------------------------------
 	auto _saveEntro = [&](bool _save)
@@ -116,13 +138,19 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 #endif
 				{
 					LOGINFO("Checkpoint", LOG_TYPES::TRACE, 4);
-					ENTROPIES_SP.save(arma::hdf5_name(filename + "_SP.h5", "entropy"));
-					ENERGIES.save(arma::hdf5_name(filename + "_EN.h5", "energy"));
+					saveAlgebraic("", filename + ".h5", ENTROPIES_SP, "SP", false);
+					saveAlgebraic("", filename + ".h5", ENTROPIES_PH, "P_0.5", true);
+					saveAlgebraic("", filename + ".h5", ENTROPIES_P1, "P_1", true);
+					saveAlgebraic("", filename + ".h5", ENTROPIES_P2, "P_2", true);
+					saveAlgebraic("", filename + ".h5", ENTROPIES_P3, "P_3", true);
+					saveAlgebraic("", filename + ".h5", _H->getEigVal(), "energy", true);
+
 					if (this->modP.q_manybody_)
-						ENTROPIES_MB.save(arma::hdf5_name(filename + "_MB.h5", "entropy"));
+						saveAlgebraic("", filename + ".h5", ENTROPIES_MB, "MB", true);
 				}
 			}
 		};
+
 	// ------------------------------------ MAIN -----------------------------------
 	_timer.checkpoint("entropy");
 	pBar pbar(5, _realizations, _timer.point(0));
@@ -132,10 +160,10 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	if (_manifold && _gamma != 1)
 	{
 		// zip the energies and orbitals together
-		auto _zippedEnergies = Containers::zip(energies, orbs);
+		auto _zippedEnergies	= Containers::zip(energies, orbs);
 
 		// get map with frequencies of specific energies
-		auto _frequencies = Vectors::freq<10>(energies, _gamma - 1);
+		auto _frequencies		= Vectors::freq<10>(energies, _gamma - 1);
 		if (_frequencies.size() == 0)
 			throw std::runtime_error("Bad number of frequencies. Must be bigger than $\\Gamma$.");
 
@@ -156,7 +184,7 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		for (long long idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
-			auto coeff			= this->ran_.createRanState<_T>(_gamma);
+			auto coeff			= this->ran_.createRanState<cpx>(_gamma);
 
 			// get the random state
 			long long idxState	= this->ran_.randomInt(0, _zippedEnergies.size() - _gamma);
@@ -200,7 +228,8 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 		for (long long idx = 0; idx < _realizations; idx++)
 		{
 			// generate coefficients (create random state consisting of stateNum = \Gamma states)
-			auto coeff		= this->ran_.createRanState<_T>(_gamma);
+			auto coeff		= this->ran_.createRanState<cpx>(_gamma);
+
 			// get the random state
 			auto idxState	= this->ran_.randomInt<uint>(0, energies.size() - _gamma);
 
@@ -211,8 +240,10 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 				orbitals.push_back(orbs[i]);
 				ENERGIES(idx, i - idxState) = energies[i];
 			}
+
 			// SP
 			_appendEntroSP(idx, orbitals, coeff);
+
 			// MB
 			if (this->modP.q_manybody_)
 				_appendEntroMB(idx, orbitals, coeff);
@@ -231,8 +262,9 @@ void UI::quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 }
 
 template<typename _T>
-void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
+void UI::quadraticSpectralFunction(std::shared_ptr<Hamiltonian<_T>>& _Ham)
 {
+	auto _H					= std::dynamic_pointer_cast<QuadraticHamiltonian<_T>>(_Ham);
 	uint Ns					= _H->getNs();
 	//uint Nh					= _H->getHilbertSize();
 	uint _type				= _H->getTypeI();
@@ -268,7 +300,7 @@ void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 	double _Egs		= -10;//2 * _D(0);
 	double _Ees		= 10;//2 * _D(Ns - 1);
 	auto _omegas	= arma::linspace(_Egs, _Ees, arma::uword(_oNum));
-	auto _dw		= _omegas(1) - _omegas(0);
+	auto _dw [[maybe_unused]] = _omegas(1) - _omegas(0);
 
 	// calculate the DFT matrix
 	std::shared_ptr<Lattice> _lat = _H->getLat();
@@ -353,8 +385,8 @@ void UI::quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H)
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // %%%%%%%%%%%%%%%%%%%%% DEFINE THE TEMPLATES %%%%%%%%%%%%%%%%%%%%%
-//template void UI::quadraticStatesManifold<double>(std::shared_ptr<QuadraticHamiltonian<double>> _H);
-template void UI::quadraticStatesManifold<cpx>(std::shared_ptr<QuadraticHamiltonian<cpx>> _H);
+template void UI::quadraticStatesManifold<double>(std::shared_ptr<Hamiltonian<double>>& _H);
+template void UI::quadraticStatesManifold<cpx>(std::shared_ptr<Hamiltonian<cpx>>& _H);
 
-template void UI::quadraticSpectralFunction<double>(std::shared_ptr<QuadraticHamiltonian<double>> _H);
-template void UI::quadraticSpectralFunction<cpx>(std::shared_ptr<QuadraticHamiltonian<cpx>> _H);
+template void UI::quadraticSpectralFunction<double>(std::shared_ptr<Hamiltonian<double>>& _H);
+template void UI::quadraticSpectralFunction<cpx>(std::shared_ptr<Hamiltonian<cpx>>& _H);

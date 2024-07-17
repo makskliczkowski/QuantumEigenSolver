@@ -125,7 +125,8 @@ constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
 // --- QUADRATIC
-constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 24;
+constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 20;
+constexpr int UI_LIMITS_QUADRATIC_STATEFULL						= 32;
 
 // ##########################################################
 
@@ -530,12 +531,12 @@ protected:
 	// ^^^^^^^^^ FOR DOUBLE ^^^^^^^^^					
 	Hilbert::HilbertSpace<double>						hilDouble;
 	std::shared_ptr<Hamiltonian<double>>				hamDouble;
-	std::shared_ptr<QuadraticHamiltonian<double>>		qhamDouble;
+	//std::shared_ptr<QuadraticHamiltonian<double>>		qhamDouble;
 
 	// ^^^^^^^^ FOR COMPLEX ^^^^^^^^^
 	Hilbert::HilbertSpace<cpx>							hilComplex;
 	std::shared_ptr<Hamiltonian<cpx>>					hamComplex;
-	std::shared_ptr<QuadraticHamiltonian<cpx>>			qhamComplex;
+	//std::shared_ptr<QuadraticHamiltonian<cpx>>			qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
 	std::shared_ptr<NQS<2, cpx>>						nqsCpx;
@@ -552,8 +553,8 @@ private:
 	void get_inf_dir_ext(std::shared_ptr<Hamiltonian<_T>> _H, std::string& _dir, std::string& modelInfo, std::string& ext);
 
 	// reset model
-	void resetEd()										{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset();		};
-	void resetQuadratic()								{ if (this->qhamComplex) this->qhamComplex.reset(); if (this->qhamDouble) this->qhamDouble.reset(); };
+	void resetEd()										{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset();	};
+	void resetQuadratic()								{ if (this->hamComplex) this->hamComplex.reset(); if (this->hamDouble) this->hamDouble.reset(); };
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% I N N E R    M E T H O D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -576,10 +577,10 @@ private:
 	// ##################### QUADRATIC #####################
 
 	template<typename _T>
-	void quadraticStatesManifold(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
+	void quadraticStatesManifold(std::shared_ptr<Hamiltonian<_T>>& _H);
 
 	template<typename _T>
-	void quadraticSpectralFunction(std::shared_ptr<QuadraticHamiltonian<_T>> _H);
+	void quadraticSpectralFunction(std::shared_ptr<Hamiltonian<_T>>& _H);
 
 	// ##################### SPIN MODELS ###################
 
@@ -615,11 +616,7 @@ private:
 	template<typename _T>
 	bool defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns);
 	template<typename _T>
-
-	// quadratic
-	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, std::shared_ptr<Lattice> _lat);
-	template<typename _T>
-	bool defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, uint _Ns);
+	bool defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<Lattice>& _lat);
 
 	// NQS
 	template<typename _T, uint _spinModes = 2>
@@ -762,6 +759,9 @@ inline void UI::setDefaultMap()
 
 // ##########################################################################################################################################
 
+/*
+* @brief Based on the input by the user, creates a Hilbert space for future purposes
+*/
 template<typename _T>
 inline bool UI::defineHilbert(Hilbert::HilbertSpace<_T>& _Hil)
 {
@@ -787,12 +787,14 @@ inline bool UI::defineHilbert(Hilbert::HilbertSpace<_T>& _Hil)
 template<typename _T>
 inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Hamiltonian<_T>>& _H)
 {
+	// if user provides the Hilbert space, use it!
 	if (!defineHilbert<_T>(_Hil))
 		return false;
 
 	// switch the model types
 	switch (this->modP.modTyp_)
 	{
+	// !!!!!!!!!!!!!!!!!!!!!!! SPIN !!!!!!!!!!!!!!!!!!!!!!!
 	case MY_MODELS::ISING_M:
 		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
 			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
@@ -816,10 +818,29 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
 		break;
 	case MY_MODELS::RP_M:
-		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), this->modP.rosenzweig_porter.rp_g_[0]);
+		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
+			this->modP.rosenzweig_porter.rp_g_[0], !this->modP.rosenzweig_porter.rp_single_particle_);
 		break;
 	case MY_MODELS::ULTRAMETRIC_M:
 		_H = std::make_shared<Ultrametric<_T>>(std::move(_Hil), this->modP.ultrametric.um_N_, this->modP.ultrametric.um_g_, this->modP.ultrametric.um_alpha_);
+		break;
+
+	// !!!!!!!!!!!!!!!!!!!!!!! QUADRATIC FERMIONS !!!!!!!!!!!!!!!!!!!!!!!
+	case MY_MODELS::FREE_FERMIONS_M:
+		_H = std::make_shared<FreeFermions<_T>>(std::move(_Hil), this->modP.J1_, this->modP.J10_, 0.0);
+		break;
+	case MY_MODELS::AUBRY_ANDRE_M:
+		_H = std::make_shared<AubryAndre<_T>>(std::move(_Hil), this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
+											this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
+											this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
+											this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
+		break;
+	case MY_MODELS::SYK2_M:
+		_H = std::make_shared<SYK2<_T>>(std::move(_Hil));
+		break;
+	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(std::move(_Hil), this->modP.power_law_random_bandwidth.plrb_a_,
+			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
@@ -836,9 +857,12 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 }
 
 template<typename _T>
-inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
+inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<Lattice>& _lat)
 {
-	Hilbert::HilbertSpace<_T> _Hil(_Ns);
+	// construct only if necessary
+	//if (this->modP.modTyp_ < MY_MODELS::FREE_FERMIONS_M)
+	Hilbert::HilbertSpace<_T> _Hil(_lat);
+	
 	// switch the model types
 	switch (this->modP.modTyp_)
 	{
@@ -866,10 +890,28 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
 		break;
 	case MY_MODELS::RP_M:
-		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), this->modP.rosenzweig_porter.rp_g_[0]);
+		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
+			this->modP.rosenzweig_porter.rp_g_[0], !this->modP.rosenzweig_porter.rp_single_particle_);
 		break;
 	case MY_MODELS::ULTRAMETRIC_M:
 		_H = std::make_shared<Ultrametric<_T>>(std::move(_Hil), this->modP.ultrametric.um_N_, this->modP.ultrametric.um_g_, this->modP.ultrametric.um_alpha_);
+		break;
+		// --------------------------- QUADRATIC MODELS ---------------------------
+	case MY_MODELS::FREE_FERMIONS_M:
+		_H = std::make_shared<FreeFermions<_T>>(_lat, this->modP.J1_, this->modP.J10_, 0.0);
+		break;
+	case MY_MODELS::AUBRY_ANDRE_M:
+		_H = std::make_shared<AubryAndre<_T>>(_lat, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
+			this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
+			this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
+			this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
+		break;
+	case MY_MODELS::SYK2_M:
+		_H = std::make_shared<SYK2<_T>>(_lat, 0.0);
+		break;
+	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(_lat, this->modP.power_law_random_bandwidth.plrb_a_,
+			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
@@ -885,72 +927,74 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 	return true;
 }
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-/*
-* @brief Defines the quadratic model based on the input file...
-*/
 template<typename _T>
-inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, std::shared_ptr<Lattice> _lat)
+inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 {
-	bool _isGood = true;
-
-	// switch the type of quadratic model
+	// construct only if necessary
+	Hilbert::HilbertSpace<_T> _Hil(_Ns);
+	
+	// switch the model types
 	switch (this->modP.modTyp_)
 	{
-	case MY_MODELS::FREE_FERMIONS_M:
-		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
+	case MY_MODELS::ISING_M:
+		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
 		break;
-	case MY_MODELS::AUBRY_ANDRE_M:
-		_H = std::make_shared<AubryAndre<_T>>(this->latP.lat, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
-											  this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
-											  this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
-											  this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
+	case MY_MODELS::XYZ_M:
+		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+			false);
 		break;
-	case MY_MODELS::SYK2_M:
-		_H = std::make_shared<SYK2<_T>>(this->latP.lat);
+	case MY_MODELS::HEI_KIT_M:
+		_H = std::make_shared<HeisenbergKitaev<_T>>(std::move(_Hil), 
+			this->modP.Kx_, this->modP.Ky_, this->modP.Kz_,
+			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
-	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(this->latP.lat, this->modP.power_law_random_bandwidth.plrb_a_, 
-			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
+		// --------------------------- RANDOM MODELS ---------------------------
+	case MY_MODELS::QSM_M:
+		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
 		break;
-	default:
-		_H = std::make_shared<FreeFermions<_T>>(this->latP.lat, this->modP.J1_, this->modP.J10_, 0.0);
+	case MY_MODELS::RP_M:
+		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
+			this->modP.rosenzweig_porter.rp_g_[0], !this->modP.rosenzweig_porter.rp_single_particle_);
 		break;
-	}
-	return _isGood;
-}
-
-template<typename _T>
-inline bool UI::defineModelQ(std::shared_ptr<QuadraticHamiltonian<_T>>& _H, uint _Ns)
-{
-	bool _isGood = true;
-
-	// switch the type of quadratic model
-	switch (this->modP.modTyp_)
-	{
+	case MY_MODELS::ULTRAMETRIC_M:
+		_H = std::make_shared<Ultrametric<_T>>(std::move(_Hil), this->modP.ultrametric.um_N_, this->modP.ultrametric.um_g_, this->modP.ultrametric.um_alpha_);
+		break;
+		// --------------------------- QUADRATIC MODELS ---------------------------
 	case MY_MODELS::FREE_FERMIONS_M:
 		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J1_, this->modP.J10_, 0.0);
 		break;
 	case MY_MODELS::AUBRY_ANDRE_M:
 		_H = std::make_shared<AubryAndre<_T>>(_Ns, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
-													this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
-													this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
-													this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
+			this->modP.aubry_andre.aa_beta_, this->modP.aubry_andre.aa_phi_,
+			this->modP.aubry_andre.aa_J0_, this->modP.aubry_andre.aa_lambda0_,
+			this->modP.aubry_andre.aa_beta0_, this->modP.aubry_andre.aa_phi0_, 0.0);
 		break;
 	case MY_MODELS::SYK2_M:
 		_H = std::make_shared<SYK2<_T>>(_Ns, 0.0);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_, 
-														this->modP.power_law_random_bandwidth.plrb_b_, 
-														this->modP.power_law_random_bandwidth.plrb_mb_);
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_,
+			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J1_, this->modP.J10_, 0.0);
+		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
+			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
+			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
+			false);
 		break;
 	}
-	return _isGood;
+	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+
+	return true;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1013,281 +1057,281 @@ inline void UI::get_inf_dir_ext_r(std::shared_ptr<Hamiltonian<_T>> _H, std::stri
 template<typename _T>
 inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 {
-	_timer.reset();
-	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
-
-	// check the random field
-	auto _rH	= this->modP.qsm.qsm_h_r_;
-	auto _rA	= this->modP.qsm.qsm_h_ra_;
-	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
-	u64 _Nh		= ULLPOW(_Ns);
-
-	// stats in the middle number (diagonal part)
-	size_t _Dt	= this->modP.modMidStates_ >= 1.0 ? std::min(u64(this->modP.modMidStates_), _Nh) : std::max(u64(1), u64(_Nh * this->modP.modMidStates_));
-
-	// get info
-	std::string modelInfo	= _H->getInfo();
-	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
-	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
-	std::string extension	= ".h5";
-
-	// set seed
-	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
-
-	// set the placeholder for the values to save
-	v_1d<arma::Mat<double>> _ent = v_1d<arma::Mat<double>>(_Ns, -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones));
-	arma::Mat<double> _gaps = -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _ipr1 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _ipr2 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _en	= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
-
-	// choose the random position inside the dot for the correlation operators
-	uint _pos = this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
-
-	// create the operators (for them we calculate the offdiagonals)
-	auto _sx = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
-	auto _sxc = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
-	auto _szc = Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
-
-	// for those we calculate the diagonals only (for each site)
-	std::vector<Operators::Operator<double>> _sz_is;
-	std::vector<std::string> _sz_i_names;
-	// create the diagonal operators for spin z at each side
-	for (auto i = 0; i < _Ns; ++i)
-	{
-		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
-		_sz_i_names.push_back("sz_" + STR(i));
-	}
-
-	// create the matrices
-	//Operators::OpVec_glb_t _ops			= { _sx, _sxh, _sxc, _sz, _szc };	
-	v_1d<Operators::Operator<double>> _ops = { _sx, _sxc, _szc };
-	v_1d<std::string> _opsN = { "sx_l", "sx_c", "sz_c" };
-	for (auto i = 0; i < _Ns; ++i)
-	{
-		_ops.push_back(_sz_is[i]);
-		_opsN.push_back(_sz_i_names[i]);
-	}
-
-	// create the measurement class
-	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
-
-	// to save the operators (those elements will be stored for each operator separately)
-	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
-	// the n'th row in the column will be the state index
-	// the columns corresponds to realizations of disorder
-	v_1d<arma::Mat<_T>> _diagElems(_ops.size(), -1e5 * arma::Mat<_T>(_Dt, this->modP.modRanN_, arma::fill::ones));
-
-	// create the saving function
-	std::function<void(uint)> _diagSaver = [&](uint _r)
-		{
-			// save the matrices
-
-			for(int i = 0; i < _Ns; ++i)
-			{
-				// save the entropies (only append when i > 0)
-				saveAlgebraic(dir, "entro" + randomStr + extension, _ent[i], STR(i), i > 0);
-			}
-			// save the iprs and the energy to the same file
-			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr1, "part_entropy_q=1", true);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr2, "part_entropy_q=2", true);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
-
-			// diagonal elements (only append when _opi > 0)
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
-				auto _name = _measure.getOpGN(_opi);
-				saveAlgebraic(dir, "diag" + randomStr + extension, _diagElems[_opi], _name, _opi > 0);
-			}
-			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
-		};
-
-	// go through realizations
-	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
-	{
-		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-		_timer.checkpoint(STR(_r));
-
-		// -----------------------------------------------------------------------------
-		
-		LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
-		_H->clearH();
-		_H->randomize(this->modP.qsm.qsm_h_ra_, _rH, {"h"});
-
-		// -----------------------------------------------------------------------------
-
-		// set the Hamiltonian
-		_H->buildHamiltonian();
-		_H->diagH(false);
-		LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
-		
-		// -----------------------------------------------------------------------------
-		
-#if QSM_CHECK_HS_NORM
-#	ifdef _DEBUG
-		if((_r == 0 || _r == this->modP.modRanN_ - 1) && _Ns < 11)
-		{
-			_measure.checkG_mat(_H->getEigVec());
-		}
-#	endif
-#endif
-		
-		// -----------------------------------------------------------------------------
-				
-		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag						= 0; 
-		u64 _maxIdxDiag						= 0;
-		std::tie(_minIdxDiag, _maxIdxDiag)	= _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
-		const auto _offdiagPairs			= _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
-
-		// -----------------------------------------------------------------------------
-
-		// save the energies
-		{
-			_en.col(_r) = _H->getEigVal();
-		}
-
-		// -----------------------------------------------------------------------------
-		
-		// save the offdiagonal elements
-		// this will be stored as a matrix with the following structure:
-		// the 0 column will be the higher energy
-		// the 1 column will be the lower energy
-		// the 2 column will be the matrix element
-		// save only for sx_l, sx_c, sz_c
-		// in the vector we store different operators
-		v_1d<arma::Mat<_T>> _offDiag(3, -1e5 * arma::Mat<_T>(_offdiagPairs.size(), 3, arma::fill::ones));
-
-		// -----------------------------------------------------------------------------
-		
-		// calculator of the properties
-		{
-			// -----------------------------------------------------------------------------
-			
-			{
-				// calculate the eigenlevel statistics
-				_gaps(_r) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
-				LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
-				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
-			}
-
-			// -----------------------------------------------------------------------------
-			
-			// other measures
-			{
-				// participation ratios
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif							
-				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
-				{
-					_ipr1(_start - _minIdxDiag, _r) = SystemProperties::information_entropy(_H->getEigVec(_start));
-					_ipr2(_start - _minIdxDiag, _r) = std::log(1.0 / SystemProperties::participation_ratio(_H->getEigVec(_start), 2.0));
-				}
-
-				// -----------------------------------------------------------------------------
-				
-				// entanglement entropy
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif			
-				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
-				{
-					for (int i = 1; i <= _Ns; i++)
-					{
-						// calculate the entanglement entropy
-						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns - 1, _Hs);
-						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns, _Hs);
-						uint _maskA	= 1 << (i - 1);
-						uint _enti	= _Ns - i;
-						_ent[_enti](_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
-					}
-				}
-			}
-
-			// -----------------------------------------------------------------------------
-			
-			// diagonal
-			{
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif
-				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
-				{
-					// calculate the diagonal elements
-					const auto& _measured	= _measure.measureG(_H->getEigVec(_start));
-					const long long j		= _start - _minIdxDiag;
-					// save the diagonal elements
-					for (uint i = 0; i < _measured.size(); ++i)
-					{
-						_diagElems[i](j, _r) = _measured[i];
-					}
-				}
-			}
-
-			// -----------------------------------------------------------------------------
-			
-			// offdiagonal
-			{
-#ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum)
-#endif
-				for (long long _start = 0; _start < _offdiagPairs.size(); ++_start)
-				{
-					const auto& [w, high, low]	= _offdiagPairs[_start];
-					//const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));
-					const auto& _measured		= _measure.measureG(_H->getEigVec(low), _H->getEigVec(high), _offDiag.size());
-
-					// save the off-diagonal elements
-					for (uint i = 0; i < _offDiag.size(); ++i)
-					{
-						_offDiag[i](_start, 0) = _H->getEigVal(high);
-						_offDiag[i](_start, 1) = _H->getEigVal(low);
-						//_offDiag[i](_start, 2) = high;
-						//_offDiag[i](_start, 3) = low;
-						_offDiag[i](_start, 2) = _measured[i];
-					}
-				}
-
-			}
-
-		}
-
-		// save the checkpoints
-		{
-			// save the diagonals
-			_diagSaver(_r);
-
-			// save the offdiagonal
-			for (uint _opi = 0; _opi < _offDiag.size(); ++_opi)
-			{
-				// get the name of the operator
-				auto _name = _measure.getOpGN(_opi);
-				saveAlgebraic(dir, "offdiag_" + _name + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
-			}
-
-		}
-		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-		// -----------------------------------------------------------------------------
-	}
-
-	// save the diagonals
-	_diagSaver(this->modP.modRanN_);
-
-	// save the command directly to the file
-	{
-		std::string dir_in = makeDirs(this->mainDir, "QSM_MAT_ELEM");
-		std::ofstream file(dir_in + "qsm_scp.log", std::ios::app);
-		file << "scp -3 -r scp://klimak97@ui.wcss.pl:22//" + dir + " ./" << std::endl;
-		file.close();
-		std::ofstream file_rsync(dir_in + "qsm_rsync.log", std::ios::app);
-		file_rsync << "rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./";
-		file_rsync.close();
-	}
-
-	// bye
-	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
+//	_timer.reset();
+//	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
+//
+//	// check the random field
+//	auto _rH	= this->modP.qsm.qsm_h_r_;
+//	auto _rA	= this->modP.qsm.qsm_h_ra_;
+//	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
+//	u64 _Nh		= ULLPOW(_Ns);
+//
+//	// stats in the middle number (diagonal part)
+//	size_t _Dt	= this->modP.modMidStates_ >= 1.0 ? std::min(u64(this->modP.modMidStates_), _Nh) : std::max(u64(1), u64(_Nh * this->modP.modMidStates_));
+//
+//	// get info
+//	std::string modelInfo	= _H->getInfo();
+//	std::string randomStr	= FileParser::appWRandom("", _H->ran_);
+//	std::string dir			= makeDirsC(this->mainDir, "QSM_MAT_ELEM", modelInfo, (_rH != 0) ? VEQV(dh, _rA) + "_" + STRP(_rH, 3) : "");
+//	std::string extension	= ".h5";
+//
+//	// set seed
+//	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
+//
+//	// set the placeholder for the values to save
+//	v_1d<arma::Mat<double>> _ent = v_1d<arma::Mat<double>>(_Ns, -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones));
+//	arma::Mat<double> _gaps = -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+//	arma::Mat<double> _ipr1 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
+//	arma::Mat<double> _ipr2 = -1e5 * arma::Mat<double>(_Dt, this->modP.modRanN_, arma::fill::ones);
+//	arma::Mat<double> _en	= -1e5 * arma::Mat<double>(_H->getHilbertSize(), this->modP.modRanN_, arma::fill::zeros);
+//
+//	// choose the random position inside the dot for the correlation operators
+//	uint _pos = this->ran_.randomInt(0, this->modP.qsm.qsm_N_);
+//
+//	// create the operators (for them we calculate the offdiagonals)
+//	auto _sx = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, _Ns - 1);
+//	auto _sxc = Operators::SpinOperators::sig_x(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
+//	auto _szc = Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, { _pos, (uint)_Ns - 1 });
+//
+//	// for those we calculate the diagonals only (for each site)
+//	std::vector<Operators::Operator<double>> _sz_is;
+//	std::vector<std::string> _sz_i_names;
+//	// create the diagonal operators for spin z at each side
+//	for (auto i = 0; i < _Ns; ++i)
+//	{
+//		_sz_is.push_back(Operators::SpinOperators::sig_z(this->modP.qsm.qsm_Ntot_, i));
+//		_sz_i_names.push_back("sz_" + STR(i));
+//	}
+//
+//	// create the matrices
+//	//Operators::OpVec_glb_t _ops			= { _sx, _sxh, _sxc, _sz, _szc };	
+//	v_1d<Operators::Operator<double>> _ops = { _sx, _sxc, _szc };
+//	v_1d<std::string> _opsN = { "sx_l", "sx_c", "sz_c" };
+//	for (auto i = 0; i < _Ns; ++i)
+//	{
+//		_ops.push_back(_sz_is[i]);
+//		_opsN.push_back(_sz_i_names[i]);
+//	}
+//
+//	// create the measurement class
+//	Measurement<_T> _measure(this->modP.qsm.qsm_Ntot_, dir, _ops, _opsN, 1, _Nh);
+//
+//	// to save the operators (those elements will be stored for each operator separately)
+//	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
+//	// the n'th row in the column will be the state index
+//	// the columns corresponds to realizations of disorder
+//	v_1d<arma::Mat<_T>> _diagElems(_ops.size(), -1e5 * arma::Mat<_T>(_Dt, this->modP.modRanN_, arma::fill::ones));
+//
+//	// create the saving function
+//	std::function<void(uint)> _diagSaver = [&](uint _r)
+//		{
+//			// save the matrices
+//
+//			for(int i = 0; i < _Ns; ++i)
+//			{
+//				// save the entropies (only append when i > 0)
+//				saveAlgebraic(dir, "entro" + randomStr + extension, _ent[i], STR(i), i > 0);
+//			}
+//			// save the iprs and the energy to the same file
+//			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
+//			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr1, "part_entropy_q=1", true);
+//			saveAlgebraic(dir, "stat" + randomStr + extension, _ipr2, "part_entropy_q=2", true);
+//			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
+//
+//			// diagonal elements (only append when _opi > 0)
+//			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+//			{
+//				auto _name = _measure.getOpGN(_opi);
+//				saveAlgebraic(dir, "diag" + randomStr + extension, _diagElems[_opi], _name, _opi > 0);
+//			}
+//			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
+//		};
+//
+//	// go through realizations
+//	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
+//	{
+//		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+//		_timer.checkpoint(STR(_r));
+//
+//		// -----------------------------------------------------------------------------
+//		
+//		LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
+//		_H->clearH();
+//		_H->randomize(this->modP.qsm.qsm_h_ra_, _rH, {"h"});
+//
+//		// -----------------------------------------------------------------------------
+//
+//		// set the Hamiltonian
+//		_H->buildHamiltonian();
+//		_H->diagH(false);
+//		LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
+//		
+//		// -----------------------------------------------------------------------------
+//		
+//#if QSM_CHECK_HS_NORM
+//#	ifdef _DEBUG
+//		if((_r == 0 || _r == this->modP.modRanN_ - 1) && _Ns < 11)
+//		{
+//			_measure.checkG_mat(_H->getEigVec());
+//		}
+//#	endif
+//#endif
+//		
+//		// -----------------------------------------------------------------------------
+//				
+//		// get the average energy index and the points around it on the diagonal
+//		u64 _minIdxDiag						= 0; 
+//		u64 _maxIdxDiag						= 0;
+//		std::tie(_minIdxDiag, _maxIdxDiag)	= _H->getEnArndAvIdx(_Dt / 2, _Dt / 2);
+//		const auto _offdiagPairs			= _H->getEnPairsIdx(_minIdxDiag, _maxIdxDiag, this->modP.modEnDiff_);
+//
+//		// -----------------------------------------------------------------------------
+//
+//		// save the energies
+//		{
+//			_en.col(_r) = _H->getEigVal();
+//		}
+//
+//		// -----------------------------------------------------------------------------
+//		
+//		// save the offdiagonal elements
+//		// this will be stored as a matrix with the following structure:
+//		// the 0 column will be the higher energy
+//		// the 1 column will be the lower energy
+//		// the 2 column will be the matrix element
+//		// save only for sx_l, sx_c, sz_c
+//		// in the vector we store different operators
+//		v_1d<arma::Mat<_T>> _offDiag(3, -1e5 * arma::Mat<_T>(_offdiagPairs.size(), 3, arma::fill::ones));
+//
+//		// -----------------------------------------------------------------------------
+//		
+//		// calculator of the properties
+//		{
+//			// -----------------------------------------------------------------------------
+//			
+//			{
+//				// calculate the eigenlevel statistics
+//				_gaps(_r) = SystemProperties::eigenlevel_statistics(_H->getEigVal());
+//				LOGINFO(StrParser::colorize(VEQ(_gaps(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+//				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
+//			}
+//
+//			// -----------------------------------------------------------------------------
+//			
+//			// other measures
+//			{
+//				// participation ratios
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadNum)
+//#endif							
+//				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+//				{
+//					_ipr1(_start - _minIdxDiag, _r) = SystemProperties::information_entropy(_H->getEigVec(_start));
+//					_ipr2(_start - _minIdxDiag, _r) = std::log(1.0 / SystemProperties::participation_ratio(_H->getEigVec(_start), 2.0));
+//				}
+//
+//				// -----------------------------------------------------------------------------
+//				
+//				// entanglement entropy
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadNum)
+//#endif			
+//				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+//				{
+//					for (int i = 1; i <= _Ns; i++)
+//					{
+//						// calculate the entanglement entropy
+//						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns - 1, _Hs);
+//						//_entr(_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), _Ns, _Hs);
+//						uint _maskA	= 1 << (i - 1);
+//						uint _enti	= _Ns - i;
+//						_ent[_enti](_start - _minIdxDiag, _r) = Entropy::Entanglement::Bipartite::vonNeuman<_T>(_H->getEigVec(_start), 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+//					}
+//				}
+//			}
+//
+//			// -----------------------------------------------------------------------------
+//			
+//			// diagonal
+//			{
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadNum)
+//#endif
+//				for (long long _start = _minIdxDiag; _start < _maxIdxDiag; ++_start)
+//				{
+//					// calculate the diagonal elements
+//					const auto& _measured	= _measure.measureG(_H->getEigVec(_start));
+//					const long long j		= _start - _minIdxDiag;
+//					// save the diagonal elements
+//					for (uint i = 0; i < _measured.size(); ++i)
+//					{
+//						_diagElems[i](j, _r) = _measured[i];
+//					}
+//				}
+//			}
+//
+//			// -----------------------------------------------------------------------------
+//			
+//			// offdiagonal
+//			{
+//#ifndef _DEBUG
+//#pragma omp parallel for num_threads(this->threadNum)
+//#endif
+//				for (long long _start = 0; _start < _offdiagPairs.size(); ++_start)
+//				{
+//					const auto& [w, high, low]	= _offdiagPairs[_start];
+//					//const auto& _measured		= _measure.measureG(_H->getEigVec(high), _H->getEigVec(low));
+//					const auto& _measured		= _measure.measureG(_H->getEigVec(low), _H->getEigVec(high), _offDiag.size());
+//
+//					// save the off-diagonal elements
+//					for (uint i = 0; i < _offDiag.size(); ++i)
+//					{
+//						_offDiag[i](_start, 0) = _H->getEigVal(high);
+//						_offDiag[i](_start, 1) = _H->getEigVal(low);
+//						//_offDiag[i](_start, 2) = high;
+//						//_offDiag[i](_start, 3) = low;
+//						_offDiag[i](_start, 2) = _measured[i];
+//					}
+//				}
+//
+//			}
+//
+//		}
+//
+//		// save the checkpoints
+//		{
+//			// save the diagonals
+//			_diagSaver(_r);
+//
+//			// save the offdiagonal
+//			for (uint _opi = 0; _opi < _offDiag.size(); ++_opi)
+//			{
+//				// get the name of the operator
+//				auto _name = _measure.getOpGN(_opi);
+//				saveAlgebraic(dir, "offdiag_" + _name + randomStr + extension, _offDiag[_opi], STR(_r), _r > 0);
+//			}
+//
+//		}
+//		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+//		// -----------------------------------------------------------------------------
+//	}
+//
+//	// save the diagonals
+//	_diagSaver(this->modP.modRanN_);
+//
+//	// save the command directly to the file
+//	{
+//		std::string dir_in = makeDirs(this->mainDir, "QSM_MAT_ELEM");
+//		std::ofstream file(dir_in + "qsm_scp.log", std::ios::app);
+//		file << "scp -3 -r scp://klimak97@ui.wcss.pl:22//" + dir + " ./" << std::endl;
+//		file.close();
+//		std::ofstream file_rsync(dir_in + "qsm_rsync.log", std::ios::app);
+//		file_rsync << "rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./";
+//		file_rsync.close();
+//	}
+//
+//	// bye
+//	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

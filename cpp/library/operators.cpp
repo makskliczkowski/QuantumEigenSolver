@@ -343,6 +343,65 @@ namespace Operators
 			return _op;		
 		}
 
+		// #############################################################################################
+
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs, bool _standarize)
+		{
+			// create the function
+			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _coeffs, _standarize]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+					
+					// set the values
+					for (size_t i = 0; i < _coeffs.size(); i++)
+						_out(i, i) = _coeffs[i];
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+					{
+						_out.diag() -= arma::trace(_out) / (_Ns);
+						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
+						_out		= _out / std::sqrt(_Hs);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
+					return _out;
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _coeffs, _standarize]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+
+					// set the values
+					for (auto i = 0; i < _coeffs.size(); i++)
+						_out(i, i) = _coeffs[i];
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+					{
+						_out.diag() -= arma::trace(_out) / (_Ns);
+						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
+						_out		= _out / std::sqrt(_Hs);
+					}
+#ifdef _DEBUG
+					std::cout << arma::trace(_out) << std::endl;
+					std::cout << arma::trace(_out * _out) << std::endl;
+#endif
+					return _out;
+				};
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;		
+		}
+
+		// #############################################################################################
+
 		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize)
 		{
 			// create the function

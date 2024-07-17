@@ -4,7 +4,7 @@
 
 void UI::makeSimETH()
 {
-	bool _isquadratic = check_noninteracting(this->modP.modTyp_);
+	bool _isquadratic [[maybe_unused]] = check_noninteracting(this->modP.modTyp_);
 
 	// define the models
 	if (this->modP.modTyp_ == MY_MODELS::RP_M)
@@ -33,51 +33,33 @@ void UI::makeSimETH()
 		{
 			if (_takeComplex)
 			{
-				if (!_isquadratic)
-					this->checkETH_statistics(this->hamComplex);
-				else
-					this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				this->checkETH_statistics(this->hamComplex);
 			}
 			else
 			{
-				if (!_isquadratic)
-					this->checkETH_statistics(this->hamDouble);
-				else
-					this->checkETH_statistics(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));	
+				this->checkETH_statistics(this->hamDouble);
 			}
 		}
 		else if (this->chosenFun == 44)
 		{
 			if (_takeComplex)
 			{
-				if (!_isquadratic)
-					this->checkETH_scaling_offdiag(this->hamComplex);
-				else
-					this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				this->checkETH_scaling_offdiag(this->hamComplex);
 			}
 			else
 			{
-				if (!_isquadratic)
-					this->checkETH_scaling_offdiag(this->hamDouble);
-				else
-					this->checkETH_scaling_offdiag(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+				this->checkETH_scaling_offdiag(this->hamDouble);
 			}
 		}
 		else if (this->chosenFun == 46 || this->chosenFun == 45)
 		{
 			if (_takeComplex)
 			{
-				if (!_isquadratic)
-					this->checkETH_time_evo(this->hamComplex);
-				else
-					this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<cpx>>(this->qhamComplex));
+				this->checkETH_time_evo(this->hamComplex);
 			}
 			else
 			{
-				if (!_isquadratic)
-					this->checkETH_time_evo(this->hamDouble);
-				else
-					this->checkETH_time_evo(std::reinterpret_pointer_cast<Hamiltonian<double>>(this->qhamDouble));
+				this->checkETH_time_evo(this->hamDouble);
 			}
 		}
 	}
@@ -156,7 +138,10 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		if (_ismanybody)
 		{
 			// add z spins 
-			for (uint i = 0; i < _Ns; ++i)
+			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
+
+			for (uint i : _toTake)
+			//for (uint i = 0; i < _Ns; ++i)
 			{
 				auto _op	= std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, i));
 				auto _name	= "mb/sz/" + STR(i);
@@ -179,8 +164,11 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		if (_isquadratic)
 		{
 			// add other operators
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
-			_opsN.push_back("sp/quasimomentum_norm/0");
+			if (_Nh < ULLPOW(16))
+			{
+				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
+				_opsN.push_back("sp/quasimomentum_norm/0");
+			}
 			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh, false)));
 			//_opsN.push_back("sp/quasimomentum/0");
 
@@ -191,8 +179,8 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			//_opsN.push_back("sp/nn_correlation/0_" + STR(_Nh - 1));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1)));
 			_opsN.push_back("sp/nn_correlation_norm/0_1");
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 2)));
-			_opsN.push_back("sp/nn_correlation_norm/0_2");
+			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 2)));
+			//_opsN.push_back("sp/nn_correlation_norm/0_2");
 			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1, false)));
 			//_opsN.push_back("sp/nn_correlation/0_1");
 			
@@ -207,18 +195,25 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 				//_opsN.push_back("sp/occ/" + STR(i));
 			}
 
-			// random
+			// random superposition (only part)
 			size_t _coeffs = size_t(0.01 * _Nh);
 			v_1d<uint> _ridx;
 			v_1d<double> _rcoefs; 
 			
 			for (int i = 0; i < _coeffs; i++)
 			{
-				_rcoefs.push_back(this->ran_.template random<double>(0.0, 1.0));
+				_rcoefs.push_back(this->ran_.template random<double>(-1.0, 1.0));
 				_ridx.push_back(this->ran_.template randomInt<uint>(0, _Nh - 1));
 			}
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _ridx, _rcoefs, true)));
 			_opsN.push_back("sp/occ_r_norm");
+
+			// random superposition (all of 'em)
+			_rcoefs = v_1d<double>(_Nh, 1.0);
+			for(int i = 0; i < _Nh; i++)
+				_rcoefs[i] = this->ran_.template random<double>(-1.0, 1.0);
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _rcoefs, true)));
+			_opsN.push_back("sp/occ_r_all_norm");
 		}
 	}
 
@@ -263,6 +258,8 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// check the random field
 	size_t _Ns	= this->modP.qsm.qsm_Ntot_;
+
+	// many body Hilbert space size
 	u64 _Nh		= ULLPOW(_Ns);
 
 	// get info
@@ -276,7 +273,8 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 	strVec _opsN;
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
-	u64 _hs_fractions_diag			= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
+	// get the diagonal fraction
+	u64 _hs_fractions_diag	= SystemProperties::hs_fraction_diagonal_cut(this->modP.modMidStates_, _Nh);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
 	// GAMMA (see 2022, Suntajs, PRL)
@@ -383,7 +381,7 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 		// -----------------------------------------------------------------------------
 				
 		// get the average energy index and the points around it on the diagonal
-		u64 _minIdxDiag, _maxIdxDiag = 0; 
+		u64 _minIdxDiag = 0, _maxIdxDiag = 0; 
 
 		// set
 		{
@@ -564,11 +562,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	isQuadratic				= true;
 	isManyBody				= true;
 
+	// get the operators
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
-	// get info
+	// get info about the model
 	std::string modelInfo, dir = "ETH_MAT_STAT", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
@@ -586,7 +585,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// the columns corresponds to realizations of disorder
 	VMAT<_T> _diagElems(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
 	// constraint the offdiagonals also to _Nh elements only
-	VMAT<_T> _offdiagElems(_ops.size(), 5 * _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
+	VMAT<_T> _offdiagElems(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
+	VMAT<_T> _offdiagElemsLow(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::ones, -1e5);
+	arma::Mat<double> _offdiagElemsOmega = -1e5 * arma::Mat<double>(_offdiagElems.n_rows(0), this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _offdiagElemsOmegaLow = -1e5 * arma::Mat<double>(_offdiagElemsLow.n_rows(0), this->modP.modRanN_, arma::fill::ones);
 
 	// (mean, typical, mean2, typical2, gaussianity, kurtosis, binder cumulant)
 	// the columns will correspond to realizations
@@ -632,7 +634,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			{
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "offdiag" + randomStr + extension, algebra::cast<double>(_offdiagElems[_opi]), _name, _opi > 0);
+				saveAlgebraic(dir, "offdiag" + randomStr + extension, algebra::cast<double>(_offdiagElemsLow[_opi]), _name, true);
 			}
+			saveAlgebraic(dir, "offdiag" + randomStr + extension, _offdiagElemsOmega, "omega_high", true);
+			saveAlgebraic(dir, "offdiag" + randomStr + extension, _offdiagElemsOmegaLow, "omega_low", true);
 
 			// save the histograms of the operators for the f functions
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].edgesCol(), "omegas", false);
@@ -746,11 +751,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				// all elements together
 				{
 					// get matrices
-					const auto& _matrices = _measure.getOpG_mat();
+					const auto& _matrices	= _measure.getOpG_mat();
+					const double _avEn		= _H->getEnAv();
 
 					// go through the operators
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(_Ns <= 14 ? this->threadNum : 2)
+#pragma omp parallel for num_threads(_Ns < 13 ? this->threadNum : 1)
 #endif
 					for (int _opi = 0; _opi < _matrices.size(); _opi++)
 					{
@@ -759,9 +765,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 						// save the iterators
 						u64 _totalIterator_off [[maybe_unused]] = 0;
-						const double _avEn			= _H->getEnAv();
+						u64 _totalIterator_off_low [[maybe_unused]] = 0;
+						double _limlow	= std::sqrt(1.0 / _Nh * std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)));
+						double _limhigh = 0.5;
 
-						// go through the whole spectrum (do not save pairs, only one element as it's Hermitian.
+						// go through the whole spectrum (do not save pairs, only one element as it's Hermitian conjugate.
 						for (u64 i = 0; i < _Nh; ++i)
 						{
 							const auto _en_l = _H->getEigVal(i);
@@ -811,7 +819,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 								if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
 									continue;
 
-								_totalIterator_off++;
 
 								// calculate the frequency
 								const double w			= std::abs(_en_l - _en_r);
@@ -847,8 +854,20 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 									_histAvTypical[_opi].append(w, _logElem2);
 
 									// save the values
-									if (_totalIterator_off <= _offdiagElems.n_rows(_opi))
+									if ((_totalIterator_off < _offdiagElems.n_rows(_opi) && w > _limhigh))
+									{
+										_totalIterator_off++;
 										_offdiagElems.set(_opi, _totalIterator_off - 1, _r, _elemreal);
+										if (_opi == 0)
+											_offdiagElemsOmega(_totalIterator_off - 1, _r) = std::abs(w);
+									}
+									if (_totalIterator_off_low < _offdiagElemsLow.n_rows(_opi) && w <= _limlow)
+									{
+										_totalIterator_off_low++;
+										_offdiagElemsLow.set(_opi, _totalIterator_off_low - 1, _r, _elemreal);
+										if (_opi == 0)
+											_offdiagElemsOmegaLow(_totalIterator_off_low - 1, _r) = std::abs(w);
+									}
 								}
 							}
 						}
@@ -884,7 +903,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						//	}
 						//}
 
-						LOGINFO("Finished the diagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
+						// LOGINFO("Finished the diagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 
 						// offdiagonal
 						//{
@@ -907,10 +926,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						//	}
 						//}
 
-						LOGINFO("Finished the offdiagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
+						//LOGINFO("Finished the offdiagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 
 						// save the diagonal part
-						_diagElems[_opi].col(_r)	= _overlaps.diag();
+						_diagElems[_opi].col(_r) = _overlaps.diag();
 
 						// save the histograms of the diagonals and offdiagonals!
 						_histOperatorsDiag[_opi].setHistogramCounts(_diagElems[_opi].col(_r), _r == 0);

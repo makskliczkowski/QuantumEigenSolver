@@ -66,7 +66,6 @@ public:
 	using		manyBodyTuple		= std::tuple<v_1d<double>, v_1d<arma::uvec>>;
 
 protected:
-	MY_MODELS  type_				= MY_MODELS::NONE;
 	uint		size_				= 1;
 	// check the particle conservation
 	bool		particleConverving_ = true;
@@ -107,6 +106,9 @@ public:
 	template<typename _T1, typename _T2>
 	arma::Col<_T> getManyBodyState(const _T1& _singlePartOrbs, const Hilbert::HilbertSpace<_T2>& _hilbert, arma::Mat<_T2>& _slater);
 
+	template<typename _T1, typename _T2>
+	arma::Col<_T> getManyBodyState(const _T1& _singlePartOrbs, const u64 _hilbertSize, arma::Mat<_T2>& _slater);
+
 	// --------------- C O N S T R U C T O R S ---------------
 	virtual ~QuadraticHamiltonian()	= default;
 	QuadraticHamiltonian()			= default;
@@ -124,6 +126,32 @@ public:
 		this->isSparse_		= _isSparse;
 		this->init();
 
+	}
+	QuadraticHamiltonian(Hilbert::HilbertSpace<_T, 2>& _hil, _T _constant, bool _partCons = true, bool _isSparse = true)
+		: Hamiltonian<_T, 2>(_hil, _isSparse), particleConverving_(_partCons), constant_(_constant)
+	{
+		LOGINFO("Creating quadratic model: ", LOG_TYPES::CHOICE, 1);
+		this->ran_	= randomGen();
+		this->size_ = _partCons ? this->Ns : 2 * this->Ns;
+		this->Nh	= this->size_;
+		this->Nh_	= this->size_;
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
+		this->isSparse_		= _isSparse;
+		this->init();
+	}
+	QuadraticHamiltonian(Hilbert::HilbertSpace<_T, 2>&& _hil, _T _constant, bool _partCons = true, bool _isSparse = true)
+		: Hamiltonian<_T, 2>(_hil, _isSparse), particleConverving_(_partCons), constant_(_constant)
+	{
+		LOGINFO("Creating quadratic model: ", LOG_TYPES::CHOICE, 1);
+		this->ran_	= randomGen();
+		this->size_ = _partCons ? this->Ns : 2 * this->Ns;
+		this->Nh	= this->size_;
+		this->Nh_	= this->size_;
+		this->isManyBody_	= false;
+		this->isQuadratic_	= true;
+		this->isSparse_		= _isSparse;
+		this->init();
 	}
 	QuadraticHamiltonian(std::shared_ptr<Lattice> _lat, _T _constant, bool _partCons = true, bool _isSparse = true)
 		: particleConverving_(_partCons), constant_(_constant)
@@ -247,7 +275,11 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(u64 _state)
 template<typename _T>
 inline std::string QuadraticHamiltonian<_T>::getType() const
 {
-	uint _typ = (uint)this->type_ + MY_MODELS_MAX_INTERACTING - (uint)MY_MODELS::FREE_FERMIONS_M;
+	uint _typ = 0;
+	if ((uint)this->type_ + MY_MODELS_MAX_INTERACTING < (uint)MY_MODELS::FREE_FERMIONS_M)
+		_typ = (uint)this->type_ - 1;
+	else
+		_typ = (uint)this->type_ + MY_MODELS_MAX_INTERACTING - (uint)MY_MODELS::FREE_FERMIONS_M;
 	return eSTRMY_MODELS[_typ];
 }
 
@@ -272,6 +304,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyOrbitals(uint N, v_1d<uint> _or
 
 	// clear me!
 	manyBodyOrbitals.clear();
+	// !TODO Implement the combination of orbitals without constructing the vector!
 	manyBodyOrbitals = Vectors::combinations(_orbitals, N);
 }
 
@@ -526,5 +559,29 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const _T1& _sing
 	}
 	return _stateOut;
 }
+
+template<typename _T>
+template<typename _T1, typename _T2>
+inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const _T1& _singlePartOrbs, const u64 _hilbertSize, arma::Mat<_T2>& _slater)
+{
+	// check the number of single particle orbitals
+	auto _singlePartOrb = _singlePartOrbs.size();
+
+	if (!this->particleConverving_)
+		throw std::runtime_error("This Hamiltonian does not have the eigenstates in Slater determinant form!");
+
+	// save the state 
+	arma::Col<_T> _stateOut(_hilbertSize, arma::fill::zeros);
+
+	// go through the Hilbert space basis
+	for (u64 _state = 0; _state < _hilbertSize; ++_state)
+	{
+		if (std::popcount(_state) != _singlePartOrb)
+			continue;
+		// set the element of the vector to slater determinant
+		auto _prodSlatter	= arma::prod(arma::eig_gen(this->getSlater(_singlePartOrbs, _state, _slater)));
+		_stateOut(_state)	= toType<_T>(std::real(_prodSlatter), std::imag(_prodSlatter));
+	}
+	return _stateOut;}
 
 #endif

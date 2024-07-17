@@ -23,12 +23,12 @@ public:
 		DESTRUCTOR_CALL;
 	}
 	PowerLawRandomBanded(size_t _Ns, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
-		: QuadraticHamiltonian<_T>((_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns, _constant, true, false), a_(_a), b_(_b)
+		: QuadraticHamiltonian<_T>(_Ns, _constant, true, false), a_(_a), b_(_b)
 	{
-		this->Ns_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Ns_	= _Ns;
 		this->Ns	= this->Ns_;
-		this->Nh_	= this->Ns_;
-		this->Nh	= this->Ns_;
+		this->Nh_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
@@ -37,14 +37,41 @@ public:
 		: QuadraticHamiltonian<_T>(_lat, _constant, true, false), a_(_a), b_(_b)
 	{
 		auto _Ns	= _lat->get_Ns();
-		this->Ns_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Ns_	= _Ns;
 		this->Ns	= this->Ns_;
-		this->Nh_	= this->Ns_;
-		this->Nh	= this->Ns_;
+		this->Nh_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
+	// Hilbert space constructor
+	PowerLawRandomBanded(const Hilbert::HilbertSpace<_T>& _hil, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(_hil, _constant, true, false), a_(_a), b_(_b)
+	{
+		auto _Ns	= _hil.get_Ns();
+		this->Ns_	= _Ns;
+		this->Ns	= this->Ns_;
+		this->Nh_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Nh	= this->Nh_;
+		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
+		this->info_ = this->info();
+		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+	};
+	// Hilbert space constructor move
+	PowerLawRandomBanded(Hilbert::HilbertSpace<_T>&& _hil, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(std::move(_hil), _constant, true, false), a_(_a), b_(_b)
+	{
+		auto _Ns	= this->Ns_;
+		this->Ns_	= _Ns;
+		this->Ns	= this->Ns_;
+		this->Nh_	= (_mb && _Ns < UI_LIMITS_MAXFULLED) ? ULLPOW(_Ns) : _Ns;
+		this->Nh	= this->Nh_;
+		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
+		this->info_ = this->info();
+		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+	};
+
 
 	// ### H A M I L T O N I A N ###
 
@@ -58,9 +85,9 @@ public:
 		this->init();
 
 		// go through the Hamiltonian and set the elements
-		for (size_t i = 0; i < this->Ns; i++)
+		for (size_t i = 0; i < this->Nh_; i++)
 		{
-			for (size_t j = i; j < this->Ns; j++)
+			for (size_t j = i; j < this->Nh_; j++)
 			{
 				double _ranval		= this->ran_.random(-1.0, 1.0);
 				double _distance	= 0.0;

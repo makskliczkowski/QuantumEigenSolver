@@ -65,6 +65,45 @@ namespace Entropy
 				return entropy;
 			};
 
+			/*
+			* @brief Calculates the von Neuman entropy
+			* @param _s			state to construct the density matrix from
+			* @param _sizeA		subsystem size
+			* @param _hilb		size of the Hilbert space in many body system
+			* @param _ch		method choice
+			* @returns the bipartite entanglement entropy
+			*/
+			template <typename _T>
+			[[nodiscard]]
+			double vonNeuman(const arma::Col<_T>& _s,
+							uint _sizeA,
+							uint _Ns,
+							DensityMatrix::RHO_METHODS _ch	= DensityMatrix::RHO_METHODS::SCHMIDT,
+							uint _localHilbert				= 2)
+			{
+				// get the reduced density matrix
+				auto rho = redDensMat<_T>(_s, _sizeA, _Ns, _ch, _localHilbert);
+
+				// get the values
+				arma::vec vals;
+				if (_ch == RHO_METHODS::SCHMIDT)
+				{
+					vals = arma::svd(rho);
+					vals = arma::square(vals);
+				}
+				else
+					arma::eig_sym(vals, rho);
+
+				// calculate entropy
+				double entropy = 0.0;
+
+				// go through the values
+				for (const auto& val: vals)
+					if (val > 0.0)
+						entropy += -val * std::log(val);
+				return entropy;
+			};
+
 			// ##########################################################################################################################################
 
 			template <typename _T, typename _TV>

@@ -52,6 +52,7 @@ protected:
 	DISORDER_EQUIV(double, t_);
 public:
 	~FreeFermions()		= default;
+	// Lattice constructor
 	FreeFermions(std::shared_ptr<Lattice> _lat, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true), t_(_t), t_0(_t0)
 	{
@@ -62,7 +63,7 @@ public:
 		this->getSPEnMat();
 		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
 	};
-
+	// Lattice size constructor
 	FreeFermions(uint _Ns, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_Ns, _constant, true), t_(_t), t_0(_t0)
 	{
@@ -70,6 +71,28 @@ public:
 		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
 		this->info_			=		this->info();
 		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
+		this->getSPEnMat();
+		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
+	};
+	// Hilbert space constructor
+	FreeFermions(Hilbert::HilbertSpace<_T>& _hil, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(_hil, _constant, true), t_(_t), t_0(_t0)
+	{
+		this->isSparse_		=		false;
+		this->type_			=		MY_MODELS::FREE_FERMIONS_M;
+		this->info_			=		this->info();
+		this->dt_			=		this->ran_.template createRanVec<double>(this->Ns, this->t_0);
+		this->getSPEnMat();
+		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
+	};
+	// Hilbert space move constructor
+	FreeFermions(Hilbert::HilbertSpace<_T>&& _hil, double _t = 1.0, double _t0 = 0.0, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(std::move(_hil), _constant, true), t_(_t), t_0(_t0)
+	{
+		this->isSparse_		= false;
+		this->type_			= MY_MODELS::FREE_FERMIONS_M;
+		this->info_			= this->info();
+		this->dt_			= this->ran_.template createRanVec<double>(this->Ns, this->t_0);
 		this->getSPEnMat();
 		LOGINFO("I am Free Fermions model: ", LOG_TYPES::CHOICE, 2);
 	};

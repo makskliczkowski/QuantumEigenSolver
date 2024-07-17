@@ -26,6 +26,23 @@ public:
 		this->info_ = this->info();
 		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
 	};
+	// Hilbert space constructor
+	SYK2(const Hilbert::HilbertSpace<_T>& _hil, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(_hil, _constant, true, false)
+	{
+		this->type_ = MY_MODELS::SYK2_M;
+		this->info_ = this->info();
+		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
+	};
+	// Hilbert space constructor move 
+	SYK2(Hilbert::HilbertSpace<_T>&& _hil, double _constant = 0.0)
+		: QuadraticHamiltonian<_T>(std::move(_hil), _constant, true, false)
+	{
+		this->type_ = MY_MODELS::SYK2_M;
+		this->info_ = this->info();
+		LOGINFO("I am SYK2 model: ", LOG_TYPES::CHOICE, 2);
+	};
+
 
 	// ### H A M I L T O N I A N ###
 

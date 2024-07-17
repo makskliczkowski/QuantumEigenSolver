@@ -108,6 +108,7 @@ namespace Operators
 	namespace QuadraticOperators
 	{
 		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site, bool _standarize = true);
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs, bool _standarize);
 		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize);
 
 		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus, bool _standarize = true);

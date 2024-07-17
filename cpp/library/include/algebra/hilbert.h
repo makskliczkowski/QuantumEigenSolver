@@ -1019,8 +1019,8 @@ namespace SingleParticle
 		* @param _rawRho shall return a raw rho 2*(c+c) correlation, or total correlation matrix ([c+,c])
 		* @returns single particle correlation matrix for a single product state in quasiparticle basis
 		*/
-		template<typename _T1>
-		inline arma::Mat<_T1> corrMatrix(uint						_Ns,
+		template<typename _T2, typename _T1>
+		inline arma::Mat<_T2> corrMatrix(uint						_Ns,
 										 const arma::Mat<_T1>&		_W_A, 
 										 const arma::Mat<_T1>&		_W_A_CT,
 										 const arma::uvec&			_state,
@@ -1028,11 +1028,19 @@ namespace SingleParticle
 		{			
 			if (!_rawRho)
 			{
-				auto prefactors					= 2 * States::transformIdxToState(_Ns, _state) - 1;
+				auto prefactors					= States::transformIdxToStateR(_Ns, _state);
+				prefactors						= 2 * prefactors - 1;		
+
 				arma::Mat<_T1> W_A_CT_P			= _W_A_CT;
-				for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
-					W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
-				return W_A_CT_P * _W_A;
+				//W_A_CT_P.each_row()				%= prefactors;
+				for (arma::uword i = 0; i < W_A_CT_P.n_rows; ++i)
+				{
+					W_A_CT_P.row(i) = W_A_CT_P.row(i) * prefactors;
+				}
+
+				//return W_A_CT_P * _W_A;
+				return arma::conv_to<arma::Mat<_T2>>::from(W_A_CT_P * _W_A);
+				//return algebra::cast<_T2>(W_A_CT_P * _W_A);
 			}
 			// raw rho matrix (without delta_ij)
 			//arma::Mat<_T1> _J(_W_A_CT.n_rows, _W_A_CT.n_rows, arma::fill::zeros);
@@ -1040,13 +1048,13 @@ namespace SingleParticle
 			//arma::Mat<_T1> _right		=	_W_A.rows(state_);
 			//_J							=	(2.0 * _W_A_CT.cols(state_) * _W_A.rows(state_));
 			//return _J;
-			return arma::Mat<_T1>(2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state));
+			return arma::conv_to<arma::Mat<_T2>>::from(2.0 * _W_A_CT.cols(_state) * _W_A.rows(_state));
 		};
 
 		// ------------------------------------------------------
 
-		template<typename _V = uint, typename _AV = std::allocator<_V>, typename _T1 = double>
-		inline arma::Mat<_T1> corrMatrix(uint							_Ns,
+		template<typename _V = uint, typename _AV = std::allocator<_V>, typename _T1 = double, typename _T2 = std::complex<double>>
+		inline arma::Mat<_T2> corrMatrix(uint							_Ns,
 										 const arma::Mat<_T1>&			_W_A, 
 										 const arma::Mat<_T1>&			_W_A_CT,
 										 const std::vector<_V, _AV>&	_state,
@@ -1054,14 +1062,21 @@ namespace SingleParticle
 		{
 			if (!_rawRho)
 			{
-				auto prefactors					= 2 * States::transformIdxToState(_Ns, _state) - 1;
+				auto prefactors					= States::transformIdxToStateR(_Ns, _state);
+				prefactors						= 2 * prefactors - 1;	
+				//auto prefactors					= 2 * States::transformIdxToState(_Ns, _state) - 1;
+				//arma::Mat<_T2> W_A_CT_P(_W_A_CT.n_rows, _W_A_CT.n_cols, arma::fill::zeros);
 				arma::Mat<_T1> W_A_CT_P			= _W_A_CT;
-				for (auto _row = 0; _row < W_A_CT_P.n_rows; ++_row)
-					W_A_CT_P.row(_row)			= W_A_CT_P.row(_row) * prefactors;
-				return W_A_CT_P * _W_A;
+				//W_A_CT_P.each_row()				%= prefactors;
+				for (arma::uword i = 0; i < W_A_CT_P.n_rows; ++i)
+				{
+					W_A_CT_P.row(i) = W_A_CT_P.row(i) * prefactors;
+				}
+				return arma::conv_to<arma::Mat<_T2>>::from(W_A_CT_P * _W_A);
+				//return algebra::cast<_T2>(W_A_CT_P * _W_A);
 			}
 			// raw rho matrix (without delta_ij)
-			return corrMatrix<_T1>(_Ns, _W_A, _W_A_CT, arma::conv_to<arma::uvec>::from(_state), _rawRho);
+			return corrMatrix<_T2>(_Ns, _W_A, _W_A_CT, arma::conv_to<arma::uvec>::from(_state), _rawRho);
 		};
 
 		// #######################################################
@@ -1092,10 +1107,10 @@ namespace SingleParticle
 			if (_gamma == 1)
 			{
 				if(!_rawRho)
-					return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
+					return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - arma::Mat<res_typ>(_W_A.n_cols, _W_A.n_cols, arma::fill::eye);
 					//return corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true) - DIAG(arma::eye(_W_A.n_cols, _W_A.n_cols));
 				else
-					return algebra::cast<_T2>(corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true));
+					return algebra::cast<res_typ>(corrMatrix(_Ns, _W_A, _W_A_CT, _states[0], true));
 			}
 
 			// define J
@@ -1104,7 +1119,7 @@ namespace SingleParticle
 
 			// check the size of coefficients, otherwise create new if they are bad...
 			if(_coeff.n_elem != _gamma)
-				_coeff		=		_gen.createRanState<cpx>(_gamma);
+				_coeff		=		_gen.createRanState<_T2>(_gamma);
 			// save the conjugate coefficients to be quicker
 			auto _coeffC	=		arma::conj(_coeff);
 

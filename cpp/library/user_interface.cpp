@@ -440,19 +440,19 @@ bool UI::defineModelsQ(bool _createLat)
 	LOGINFO("Making : " + std::string(_takeComplex ? " complex" : " real"), LOG_TYPES::INFO, 3);
 	
 	// check if is complex and define the Hamiltonian
-	if (this->latP.lat)
+	if (this->latP.lat && _createLat)
 	{
 		if (_takeComplex)
-			return this->defineModelQ<cpx>(this->qhamComplex, this->latP.lat);
+			return this->defineModel<cpx>(this->hamComplex, this->latP.lat);
 		else
-			return this->defineModelQ<double>(this->qhamDouble, this->latP.lat);
+			return this->defineModel<double>(this->hamDouble, this->latP.lat);
 	}
 	else
 	{
 		if (_takeComplex)
-			return this->defineModelQ<cpx>(this->qhamComplex, this->latP.Ntot_);
+			return this->defineModel<cpx>(this->hamComplex, this->latP.Ntot_);
 		else
-			return this->defineModelQ<double>(this->qhamDouble, this->latP.Ntot_);
+			return this->defineModel<double>(this->hamDouble, this->latP.Ntot_);
 	}
 }
 
@@ -673,9 +673,27 @@ void UI::makeSymQuadraticManifold()
 {
 	// reset Hamiltonians - memory release
 	this->resetQuadratic();
-	this->useComplex_ = true;
-	if (this->defineModelsQ(true))
-		this->quadraticStatesManifold<cpx>(this->qhamComplex);
+	//this->useComplex_ = true;
+	if (check_noninteracting(this->modP.modTyp_))
+	{
+		if (this->defineModels(false))
+		{
+			if (this->isComplex_)
+				this->quadraticStatesManifold<cpx>(this->hamComplex);
+			else
+				this->quadraticStatesManifold<double>(this->hamDouble);
+		}
+	}
+	else 
+	{
+		if (this->defineModelsQ(false))
+		{
+			if (this->isComplex_)
+				this->quadraticStatesManifold<cpx>(this->hamComplex);
+			else
+				this->quadraticStatesManifold<double>(this->hamDouble);
+		}
+	}
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -688,9 +706,9 @@ void UI::makeSimQuadraticSpectralFunction()
 	if (this->defineModelsQ(isLatticeModel(this->modP.modTyp_)))
 	{
 		if(this->useComplex_)
-			this->quadraticSpectralFunction<cpx>(this->qhamComplex);
+			this->quadraticSpectralFunction<cpx>(this->hamComplex);
 		else
-			this->quadraticSpectralFunction<double>(this->qhamDouble);
+			this->quadraticSpectralFunction<double>(this->hamDouble);
 	}
 }
 

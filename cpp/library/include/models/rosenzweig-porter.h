@@ -5,8 +5,8 @@
 * For more information see the RP model.
 ************************************/
 
-#ifndef HAMIL_H
-#	include "../hamil.h"
+#ifndef HAMILQ_H
+#	include "../hamilQ.h"
 #endif
 
 #ifndef ROSENZWEIG_PORTER_H
@@ -14,10 +14,10 @@
 #include "../quantities/statistics.h"
 
 template<typename _T>
-class RosenzweigPorter : public Hamiltonian<_T, 2>
+class RosenzweigPorter : public QuadraticHamiltonian<_T>
 {
 public:
-	using NQSFun = typename Hamiltonian<_T>::NQSFun;
+	using NQSFun = typename QuadraticHamiltonian<_T>::NQSFun;
 protected:
 	double gamma_		= 1.0;
 	double gammaP_		= 1.0;
@@ -30,9 +30,9 @@ public:
 public:
 	~RosenzweigPorter() override;
 
-	RosenzweigPorter(const size_t _N, double _gamma = 0.0);
-	RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma = 0.0);
-	RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma = 0.0);
+	RosenzweigPorter(const size_t _N, double _gamma = 0.0, bool _mb = false);
+	RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma = 0.0, bool _mb = false);
+	RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma = 0.0, bool _mb = false);
 
 	// ############################################ Meth #############################################
 
@@ -87,9 +87,9 @@ inline RosenzweigPorter<_T>::~RosenzweigPorter()
 template<typename _T>
 inline void RosenzweigPorter<_T>::checkQuadratic()
 {
-	if (this->Ns > UI_LIMITS_MAXFULLED) 
+	if (this->Ns > UI_LIMITS_MAXFULLED || !this->isManyBody_) 
 	{
-		LOGINFOG("The number of particles is too big for it being quadratic. Be reasonable!", LOG_TYPES::WARNING, 1);
+		//LOGINFOG("The number of particles is too big for it being quadratic. Be reasonable!", LOG_TYPES::WARNING, 1);
 		this->isManyBody_	= false;
 		this->isQuadratic_	= true;
 		this->Nh_			= this->Ns_;
@@ -99,6 +99,8 @@ inline void RosenzweigPorter<_T>::checkQuadratic()
 	{
 		this->isManyBody_	= true;
 		this->isQuadratic_	= true;
+		this->Nh_			= ULLPOW(this->Ns_);
+		this->Nh			= this->Nh_;
 	}
 }
 
@@ -110,10 +112,13 @@ inline void RosenzweigPorter<_T>::checkQuadratic()
 * @param _gamma: multiplier of the offdiagonal couplings in the Hamiltonian.
 */
 template<typename _T>
-inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
-	: Hamiltonian<_T, 2>(_N, false), gamma_(_gamma)
+inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma, bool _mb)
+	: QuadraticHamiltonian<_T>(_N, 0.0, true, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
+	this->type_ = MY_MODELS::RP_M;
+	this->isManyBody_ = _mb;
+	this->isQuadratic_ = true;
 	//change info
 	this->info_ = this->info();
 	// check whether the model shall be interpreted only as quadratic system!
@@ -124,10 +129,13 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const size_t _N, double _gamma)
 }
 
 template<typename _T>
-inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma)
-	: Hamiltonian<_T, 2>(_hil, false), gamma_(_gamma)
+inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _hil, double _gamma, bool _mb)
+	: QuadraticHamiltonian<_T>(_hil, 0.0, true, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
+	this->type_ = MY_MODELS::RP_M;
+	this->isManyBody_ = _mb;
+	this->isQuadratic_ = true;
 	//change info
 	this->info_ = this->info();
 	// check whether the model shall be interpreted only as quadratic system!
@@ -139,10 +147,13 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(const Hilbert::HilbertSpace<_T>& _
 }
 
 template<typename _T>
-inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma)
-	: Hamiltonian<_T, 2>(_hil, false), gamma_(_gamma)
+inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, double _gamma, bool _mb)
+	: QuadraticHamiltonian<_T>(std::move(_hil), 0.0, true, false), gamma_(_gamma)
 {
 	CONSTRUCTOR_CALL;
+	this->type_			= MY_MODELS::RP_M;
+	this->isManyBody_	= _mb;
+	this->isQuadratic_	= true;
 	//change info
 	this->info_ = this->info();
 	// check whether the model shall be interpreted only as quadratic system!

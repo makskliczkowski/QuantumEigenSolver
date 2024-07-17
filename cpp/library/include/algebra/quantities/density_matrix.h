@@ -142,7 +142,9 @@ namespace DensityMatrix
 		return arma::reshape(_s, dimA, dimB);
 	}
 
-	// ###############################################################
+	// ##############################################################################################################################
+
+	// ##############################################################################################################################
 
 	/*
 	* @brief Using reshape method to calculate the reduced density matrix
@@ -199,7 +201,9 @@ namespace DensityMatrix
 		return _psi;
 	}
 
-	// ###############################################################
+	// ##############################################################################################################################
+	
+	// ##############################################################################################################################
 
 	/*
 	* @brief Calculates the reduced density matrix with one of the methods
@@ -210,9 +214,10 @@ namespace DensityMatrix
 	* @returns the bipartite reduced density matrix
 	*/
 	template <typename _T>
-	inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, uint _sizeA,
-		Hilbert::HilbertSpace<_T>& _hilb,
-		RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
+	inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s,
+									uint _sizeA,
+									Hilbert::HilbertSpace<_T>& _hilb,
+									RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
 	{
 		switch (_ch) {
 		case RHO_METHODS::STANDARD:
@@ -275,7 +280,7 @@ namespace DensityMatrix
 		}
 	}
 	
-	// ###############################################################
+	// ##############################################################################################################################
 };
 
 #endif
