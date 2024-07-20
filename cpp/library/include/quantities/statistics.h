@@ -478,10 +478,14 @@ namespace SystemProperties
 	{
 		const size_t size       = std::distance(begin, end);
 		// reset container
-		_vec					= _Container(size - 2);
+		if(_vec.size() != size - 2)
+			_vec				= _Container(size - 2);
 
-		for (auto it = begin; it != end; ++it) 
-			_vec[std::distance(begin, it)] = eigenlevel_statistics(it, it + 3);
+		for (auto it = begin; it != end - 2; ++it)
+		{
+			auto _dist = std::distance(begin, it);
+			_vec[_dist] = eigenlevel_statistics(it, it + 3);
+		}
 	}
 
 	// ---------------------------------------------------------------------------

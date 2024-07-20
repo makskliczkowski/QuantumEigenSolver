@@ -593,8 +593,6 @@ private:
 	template<typename _T>
 	void checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H);
 	template<typename _T>
-	void checkETH_level_prop(std::shared_ptr<Hamiltonian<_T>> _H);
-	template<typename _T>
 	void checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H);
 	template<typename _T>
 	void checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H);
