@@ -500,6 +500,20 @@ inline void QSM<_T>::hamiltonian()
 	// side of the tensor product and the identity on the right side (A^A \otimes I^B)
 	// (THIRD TERM)
 	this->H_ += arma::kron(this->Hdot_, EYE(this->dimOut_));
+
+#ifdef _DEBUG
+	{
+		Operators::Operator<double> sz	= Operators::SpinOperators::sig_z(this->Ns_, { this->Ns_ - 1 });
+		arma::SpMat<double> _Min		= sz.template generateMat<double, typename arma::SpMat>(this->Nh_);
+		auto _traceout					= arma::trace(_Min * this->H_.getSparse());
+		auto _lastH						= this->h_[this->Nout_ - 1];
+
+		std::ofstream _file;
+		openFile(_file, "QSM_TRACE.txt", std::ios::app);
+		_file << this->Ns_ << "\t" << STRP(_lastH, 5) << "\t" << STRP(_traceout / double(this->Nh_), 5) << std::endl;
+		_file.close();
+	};
+#endif 
 }
 
 // ##########################################################################################################################################

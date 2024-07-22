@@ -1276,7 +1276,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			_H->clearH();
 
 			if (this->modP.modTyp_ == QSM_M)
-				_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_alpha_r_, { "h" });
+				_H->randomize(this->modP.qsm.qsm_h_ra_, 0.5, { "h" });
 			else
 				_H->randomize(0.0, 1.0, { "g" });
 
