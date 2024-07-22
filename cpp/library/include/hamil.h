@@ -186,6 +186,7 @@ public:
 	// hamiltonian
 	virtual auto getMeanLevelSpacing()					const -> double								{ return this->H_.meanLevelSpacing();											};
 	auto getHamiltonian()								const -> const HamiltonianMatrix<_T>&		{ return this->H_;																};
+	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
 	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
 	virtual auto getHamiltonianSizeH()					const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };

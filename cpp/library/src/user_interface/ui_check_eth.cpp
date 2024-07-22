@@ -229,7 +229,7 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 // ###############################################################################################
 
 template<typename _T>
-void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H)
+void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r)
 {
 	bool isQuadratic [[maybe_unused]] = _H->getIsQuadratic(),
 		 isManyBody			= _H->getIsManyBody();
@@ -239,7 +239,18 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H)
 	if (isManyBody)
 	{
 		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
+		{
+			//if (_r % 2 == 0)
+						//_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
 			_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+			//else
+			//{
+			//	auto _Ns	= this->latP.Ntot_;
+			//	std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
+			//	auto _h		= _Hp->getMagnetic(_Ns - 3 - 1);
+			//	_Hp->setMagnetic(_Ns - 3 - 1, -_h);
+			//}
+		}
 		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
 			_H->randomize(0, 1.0, { "g" });
 		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
@@ -1041,7 +1052,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	long double _heisenberg_time_est	= _Nh;
 	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 100), 2500);
 	// create initial states for the quench
-	arma::Col<_T> _initial_state_me;
+	arma::Col<_T> _initial_state_me		= arma::Col<_T>(_Nh, arma::fill::zeros);
 
 	// saves the energies and the LDOSs of the initial states
 	arma::Mat<double> _energies			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
@@ -1267,30 +1278,16 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 		
 		// checkpoints etc
 		{
+			// -----------------------------------------------------------------------------
 			LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
 			_timer.checkpoint(STR(_r));
 
-			// -----------------------------------------------------------------------------
-
-			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
-			_H->clearH();
-
-			if (this->modP.modTyp_ == QSM_M)
-				_H->randomize(this->modP.qsm.qsm_h_ra_, 0.5, { "h" });
-			else
-				_H->randomize(0.0, 1.0, { "g" });
-
-			// -----------------------------------------------------------------------------
-
-			// set the Hamiltonian
-			_H->buildHamiltonian();
-			_H->diagH(false);
+			this->ui_eth_randomize(_H, _r);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 
-			// -----------------------------------------------------------------------------
-
-			// set the initial state (seek the quench near the average energy)
-			_initial_state_me = SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::SEEK, _Nh, _Ns, _H->getEnAv(), _H->getHamiltonian().diag());
+			// create the initial state
+			_initial_state_me	= SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::SEEK, _Nh, _Ns, _H->getEnAv(), _H->getDiag());
 		}
 
 		// -----------------------------------------------------------------------------

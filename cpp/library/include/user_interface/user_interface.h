@@ -587,7 +587,7 @@ private:
 	std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec>
 		ui_eth_getoperators(const size_t _Nh, bool _isquadratic = true, bool _ismanybody = true);
 	template<typename _T>
-	void ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H);
+	void ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r = 0);
 	template<typename _T>
 	void checkETH(std::shared_ptr<Hamiltonian<_T>> _H);
 	template<typename _T>

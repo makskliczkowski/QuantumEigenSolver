@@ -44,6 +44,14 @@ protected:
 	void initializeParticles();
 
 public:
+
+	// ############################################ Getters ############################################
+
+	double getMagnetic(int _idx)								const	{ return this->h_[_idx]; };
+
+	// ############################################ Setters ############################################
+	void setMagnetic(const v_1d<double>& _h)					{ this->h_ = _h; };
+	void setMagnetic(int _idx, double _h)						{ this->h_[_idx] = _h; };
 	void setRandomXi(double _around, double _strength)			{ this->xi_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
 	void setRandomAlpha(double _around, double _strength)		{ this->a_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
 	void setRandomMagnetic(double _around, double _strength)	{ this->h_ = this->ran_.template rvector<v_1d<double>>(this->Nout_, _strength, _around); };
