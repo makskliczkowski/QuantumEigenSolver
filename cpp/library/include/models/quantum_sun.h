@@ -494,6 +494,16 @@ inline void QSM<_T>::hamiltonian()
 	}
 	this->init();
 
+	// print disorder 
+	for(int i = 0; i < this->Nout_; ++i)
+	{
+		LOGINFO("QSM: i=" + STR(i) + " -> h=" + STRP(this->h_[i], 5) + ", a^u=" + STRP(this->au_[i], 5), LOG_TYPES::INFO, 2);
+	}
+
+#ifdef _DEBUG
+	std::cout << this->H_.getSparse() << std::endl;
+#endif
+
 	// go through all the elements of the Hilbert space
 	for (u64 k = 0; k < this->Nh; ++k) 
 	{
@@ -508,6 +518,10 @@ inline void QSM<_T>::hamiltonian()
 	// side of the tensor product and the identity on the right side (A^A \otimes I^B)
 	// (THIRD TERM)
 	this->H_ += arma::kron(this->Hdot_, EYE(this->dimOut_));
+
+//#ifdef _DEBUG
+//	std::cout << this->H_.getSparse() << std::endl;
+//#endif
 
 #ifdef _DEBUG
 	{

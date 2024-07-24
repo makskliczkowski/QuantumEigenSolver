@@ -86,6 +86,40 @@ namespace Operators
 	}
 
 	// ##########################################################################################################################################
+	
+	/*
+	* @brief Standarizes the operator so that it is traceless and has a unit norm 1. The norm is calculated as the Frobenius norm.
+	* @param _mat the matrix to standarize 
+	*/
+	template<typename _MatT>
+	inline void standarizeOperator(_MatT& _mat)
+	{
+		auto _nrows = _mat.n_rows;
+		_mat.diag() -= arma::trace(_mat) / (_nrows);
+		auto _Hs	= arma::trace(arma::square(_mat)) / (double)_nrows;
+		_mat		= _mat / std::sqrt(_Hs);	
+	}
+	
+	// ##########################################################################################################################################
+	
+	/*
+	* @brief Prints the operator information. This is only available in debug mode.
+	* @param _mat the matrix to print the information about
+	*/
+	template<typename _MatT>
+	inline void operatorInfo(const _MatT& _mat)
+	{
+#ifdef _DEBUG
+		stout << "Operator Info: "				<< EL;
+		stout << "Operator Trace: "				<< arma::trace(_mat) << EL;
+		stout << "Operator Frobenius Norm: "	<< arma::norm(_mat, "fro") << EL;
+		stout << "Operator Max: "				<< arma::max(_mat) << EL;
+		stout << "Operator Min: "				<< arma::min(_mat) << EL;
+		stout << "Operator Mean: "				<< arma::mean(_mat) << EL;
+#endif
+	}
+
+	// ##########################################################################################################################################
 
 	namespace SpinOperators
 	{
@@ -107,14 +141,26 @@ namespace Operators
 	*/
 	namespace QuadraticOperators
 	{
+		// -------- n_i Operators --------
+
 		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site, bool _standarize = true);
 		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs, bool _standarize);
 		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize);
 
+		// -------- n_q Operators --------
+		
+		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum, bool _standarize = true);
+
+		// ------ n_i n_j Operators ------
+
 		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus, bool _standarize = true);
+
+		// --- quasimomentum Operators ---
 
 		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum, bool _standarize = true);
 		Operators::Operator<double> quasimomentum_occupation(size_t _Ns, bool _standarize = true);
+
+		// ----- kinectic Operators ------
 
 		Operators::Operator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz);
 	}

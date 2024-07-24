@@ -21,7 +21,7 @@
 * @tparam _T: Type of the matrix elements.
 */
 template <typename _T>
-class HamiltonianMatrix
+class GeneralizedMatrix
 {
 public:
 	size_t n_rows	= 0;
@@ -43,16 +43,16 @@ public:
 	// Constructors
 
 	// Destructor
-	~HamiltonianMatrix()
+	~GeneralizedMatrix()
 	{
 		DESTRUCTOR_CALL;
 	}
 
 	// Default constructor
-	HamiltonianMatrix() = default;
+	GeneralizedMatrix() = default;
 
 	// Constructor for distinguishing between sparse and dense matrices
-	HamiltonianMatrix(u64 _Nh, bool _isSparse = true)
+	GeneralizedMatrix(u64 _Nh, bool _isSparse = true)
 		: isSparse_(_isSparse), Nh_(_Nh)
 	{
 		if (isSparse_)
@@ -64,7 +64,7 @@ public:
 	}
 
 	// Constructor for dense matrices
-	HamiltonianMatrix(const arma::Mat<_T>& _H)
+	GeneralizedMatrix(const arma::Mat<_T>& _H)
 		: isSparse_(false), Nh_(_H.n_rows), H_dense_(_H)
 	{
 		this->n_cols	= _H.n_cols;
@@ -73,7 +73,7 @@ public:
 	}
 
 	// Constructor for sparse matrices
-	HamiltonianMatrix(const arma::SpMat<_T>& _H)
+	GeneralizedMatrix(const arma::SpMat<_T>& _H)
 		: isSparse_(true), Nh_(_H.n_rows), H_sparse_(_H)
 	{
 		this->n_cols	= _H.n_cols;
@@ -82,7 +82,7 @@ public:
 	}
 
 	// copy constructor
-	HamiltonianMatrix(const HamiltonianMatrix& _H)
+	GeneralizedMatrix(const GeneralizedMatrix& _H)
 	{
 		this->isSparse_ = _H.isSparse_;
 		this->Nh_		= _H.Nh_;
@@ -103,7 +103,7 @@ public:
 	}
 
 	// move constructor
-	HamiltonianMatrix(HamiltonianMatrix&& _H) noexcept
+	GeneralizedMatrix(GeneralizedMatrix&& _H) noexcept
 	{
 		this->isSparse_ = _H.isSparse_;
 		this->Nh_		= _H.Nh_;
@@ -147,8 +147,8 @@ public:
 	// ##################################
 
 	// Getters
-	auto t()				const -> HamiltonianMatrix<_T>		{ return this->isSparse_ ? HamiltonianMatrix<_T>(this->H_sparse_.t()) : HamiltonianMatrix<_T>(this->H_dense_.t()); }
-	auto st()				const -> HamiltonianMatrix<_T>		{ return this->isSparse_ ? HamiltonianMatrix<_T>(this->H_sparse_.st()) : HamiltonianMatrix<_T>(this->H_dense_.st()); }
+	auto t()				const -> GeneralizedMatrix<_T>		{ return this->isSparse_ ? GeneralizedMatrix<_T>(this->H_sparse_.t()) : GeneralizedMatrix<_T>(this->H_dense_.t()); }
+	auto st()				const -> GeneralizedMatrix<_T>		{ return this->isSparse_ ? GeneralizedMatrix<_T>(this->H_sparse_.st()) : GeneralizedMatrix<_T>(this->H_dense_.st()); }
 	auto meanLevelSpacing()	const -> double;
 	auto diag()				const -> arma::Col<_T>;
 	auto diag(size_t _k)	const -> arma::Col<_T>;
@@ -220,7 +220,7 @@ public:
 	// Overloaded operators
 	
 	// Copy assignment operator
-	HamiltonianMatrix<_T>& operator=(const HamiltonianMatrix<_T>& other) 
+	GeneralizedMatrix<_T>& operator=(const GeneralizedMatrix<_T>& other) 
 	{
 		// Check for self-assignment
 		if (this != &other) 
@@ -242,7 +242,7 @@ public:
 	}
 
 	// Move assignment operator
-	HamiltonianMatrix<_T>& operator=(HamiltonianMatrix<_T>&& other) noexcept 
+	GeneralizedMatrix<_T>& operator=(GeneralizedMatrix<_T>&& other) noexcept 
 	{
 		// Check for self-assignment
 		if (this != &other) 
@@ -265,7 +265,7 @@ public:
 		return *this;
 	}
 
-	HamiltonianMatrix<_T>& operator=(const arma::Mat<_T>& _H)
+	GeneralizedMatrix<_T>& operator=(const arma::Mat<_T>& _H)
 	{
 		this->isSparse_		= false;
 		this->H_sparse_.clear();
@@ -275,7 +275,7 @@ public:
 		return *this;
 	}
 
-	HamiltonianMatrix<_T>& operator=(const arma::SpMat<_T>& _H)
+	GeneralizedMatrix<_T>& operator=(const arma::SpMat<_T>& _H)
 	{
 		this->isSparse_ = true;
 		this->H_dense_.clear();
@@ -285,7 +285,7 @@ public:
 		return *this;
 	}
 
-	HamiltonianMatrix<_T>& operator=(const arma::Mat<_T>&& _H)
+	GeneralizedMatrix<_T>& operator=(const arma::Mat<_T>&& _H)
 	{
 		this->isSparse_ = false;
 		this->H_sparse_.clear();
@@ -295,7 +295,7 @@ public:
 		return *this;
 	}
 
-	HamiltonianMatrix<_T>& operator=(const arma::SpMat<_T>&& _H)
+	GeneralizedMatrix<_T>& operator=(const arma::SpMat<_T>&& _H)
 	{
 		this->isSparse_ = true;
 		this->H_dense_.clear();
@@ -352,11 +352,11 @@ public:
 
 	// Override addition operator for dense and sparse matrices
 	template<typename _T2>
-	HamiltonianMatrix<typename std::common_type<_T, _T2>> operator+(const HamiltonianMatrix<_T2>& other) const 
+	GeneralizedMatrix<typename std::common_type<_T, _T2>> operator+(const GeneralizedMatrix<_T2>& other) const 
 	{
 		using _common = typename std::common_type<_T, _T2>;
 
-		HamiltonianMatrix<_common> result(this->Nh_, this->isSparse_);
+		GeneralizedMatrix<_common> result(this->Nh_, this->isSparse_);
 
 		if (this->isSparse_ && other.isSparse_)
 			result.H_sparse_ = algebra::cast<_common>(this->H_sparse_) + algebra::cast<_common>(other.H_sparse_);
@@ -373,10 +373,10 @@ public:
 
 	// Addition operator overload to add HamiltonianMatrix with arma::Mat
 	template<typename _T2>
-	friend HamiltonianMatrix<typename std::common_type<_T, _T2>> operator+(const HamiltonianMatrix<_T2>& lhs, const arma::Mat<_T2>& rhs)
+	friend GeneralizedMatrix<typename std::common_type<_T, _T2>> operator+(const GeneralizedMatrix<_T2>& lhs, const arma::Mat<_T2>& rhs)
 	{
 		using _common = typename std::common_type<_T, _T2>;
-		HamiltonianMatrix<_common> result(lhs);
+		GeneralizedMatrix<_common> result(lhs);
 		if (lhs.isSparse_)
 			result.H_sparse_ += algebra::cast<_common>(rhs);
 		else
@@ -384,7 +384,7 @@ public:
 		return result;
 	}
 
-	HamiltonianMatrix<_T>& operator+=(const arma::Mat<_T>& rhs)
+	GeneralizedMatrix<_T>& operator+=(const arma::Mat<_T>& rhs)
 	{
 		if (this->isSparse_)
 			this->H_sparse_ += algebra::cast<_T>(rhs);
@@ -395,10 +395,10 @@ public:
 
 	// Addition operator overload to add HamiltonianMatrix with arma::SpMat
 	template<typename _T2>
-	friend HamiltonianMatrix<typename std::common_type<_T, _T2>> operator+(const HamiltonianMatrix<_T2>& lhs, const arma::SpMat<_T2>& rhs)
+	friend GeneralizedMatrix<typename std::common_type<_T, _T2>> operator+(const GeneralizedMatrix<_T2>& lhs, const arma::SpMat<_T2>& rhs)
 	{
 		using _common = typename std::common_type<_T, _T2>;
-		HamiltonianMatrix<_common> result(lhs);
+		GeneralizedMatrix<_common> result(lhs);
 		if (lhs.isSparse_)
 			result.H_sparse_ += algebra::cast<_common>(rhs);
 		else
@@ -406,7 +406,7 @@ public:
 		return result;
 	}
 
-	HamiltonianMatrix<_T>& operator+=(const arma::SpMat<_T>& rhs)
+	GeneralizedMatrix<_T>& operator+=(const arma::SpMat<_T>& rhs)
 	{
 		if (this->isSparse_)
 			this->H_sparse_ += algebra::cast<_T>(rhs);
@@ -453,7 +453,7 @@ public:
 // ############################################################################################################
 
 template<typename _T>
-inline auto HamiltonianMatrix<_T>::meanLevelSpacing() const -> double
+inline auto GeneralizedMatrix<_T>::meanLevelSpacing() const -> double
 {
 	if(this->isSparse_)
 		return SystemProperties::mean_lvl_gamma(this->H_sparse_);
@@ -463,7 +463,7 @@ inline auto HamiltonianMatrix<_T>::meanLevelSpacing() const -> double
 // ############################################################################################################
 
 template<typename _T>
-inline arma::Col<_T> HamiltonianMatrix<_T>::diag() const
+inline arma::Col<_T> GeneralizedMatrix<_T>::diag() const
 {
 	if (this->isSparse_)
 		return static_cast<arma::Col<_T>>(this->H_sparse_.diag());
@@ -473,7 +473,7 @@ inline arma::Col<_T> HamiltonianMatrix<_T>::diag() const
 // ############################################################################################################
 
 template<typename _T>
-inline arma::Col<_T> HamiltonianMatrix<_T>::diag(size_t _k) const
+inline arma::Col<_T> GeneralizedMatrix<_T>::diag(size_t _k) const
 {
 	if (this->isSparse_)
 		return static_cast<arma::Col<_T>>(this->H_sparse_.diag(_k));
@@ -483,7 +483,7 @@ inline arma::Col<_T> HamiltonianMatrix<_T>::diag(size_t _k) const
 // ############################################################################################################
 
 template<typename _T>
-inline auto HamiltonianMatrix<_T>::symmetrize() -> void
+inline auto GeneralizedMatrix<_T>::symmetrize() -> void
 {
 	if (this->isSparse_)
 		this->H_sparse_ = 0.5 * (this->H_sparse_ + this->H_sparse_.t());

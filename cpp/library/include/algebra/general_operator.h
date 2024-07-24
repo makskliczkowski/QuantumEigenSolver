@@ -89,15 +89,15 @@ namespace Operators
 
 		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
 		size_t Ns_											=			1;					// number of elements in the vector (for one to know how to act on it)
-		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, the lattice can be empty if not needed
+		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, !! the lattice can be empty if not needed !!
 		_T eigVal_											=			1.0;				// eigenvalue for symmetry generator (if there is an inner value)
 		repType fun_										=			E;					// function allowing to use the symmetry operation
 		
 		// quadratic
-		bool isQuadratic_									=			false;				// based on this, we will create the operator differently
+		bool isQuadratic_									=			false;				// based on this, we will create the operator differently (we want act on a many body state per se)
 
 		// used for checking on which states the operator acts when forgetting and using the matrix only
-		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied
+		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied! For many body
 		SymGenerators name_									=			SymGenerators::E;   // name of the operator
 		std::string nameS_									=			"E";				// name of the operator in string
 		
@@ -105,6 +105,8 @@ namespace Operators
 		// ----------------------------------------------------------------------------------------------------
 
 		virtual ~Operator()									=			default;
+
+		// standard constructor
 		Operator() 
 		{ 
 			init(); 
@@ -116,11 +118,15 @@ namespace Operators
 		{ 
 			init(); 
 		};
+
+		// with the eigenvalue and the name of the operator
 		Operator(size_t Ns, _T _eigVal, const std::string& _nameS = "") 
 			: Ns_(Ns), eigVal_(_eigVal), nameS_(_nameS)
 		{ 
 			init(); 
 		};
+
+		// with the eigenvalue, the function and the name of the operator
 		Operator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "") 
 			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
 		{ 
@@ -133,21 +139,32 @@ namespace Operators
 		{
 			init();
 		};
+
+		// for the usage with the lattice and the eigenvalue
 		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
 			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), nameS_(_nameS)
 		{
 			init();
 		};
+
+		// for the usage with the lattice, the eigenvalue, the function and the name of the operator
 		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
 			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
 		{
 			init();
 		};
+
+		// copy constructor
 		Operator(const Operator<_T, _Ts...>& o)
-			: qMatSparse_(o.qMatSparse_), qMatDense_(o.qMatDense_), Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), fun_(o.fun_), isQuadratic_(o.isQuadratic_), acton_(o.acton_), name_(o.name_), nameS_(o.nameS_)
+			: qMatSparse_(o.qMatSparse_), qMatDense_(o.qMatDense_), 
+			Ns_(o.Ns_), lat_(o.lat_), eigVal_(o.eigVal_), 
+			fun_(o.fun_), isQuadratic_(o.isQuadratic_), 
+			acton_(o.acton_), name_(o.name_), nameS_(o.nameS_)
 		{
 			init();
 		};
+
+		// move constructor
 		Operator(Operator<_T, _Ts...>&& o)
 			: qMatSparse_(std::move(o.qMatSparse_)), qMatDense_(std::move(o.qMatDense_)), Ns_(std::move(o.Ns_)), lat_(std::move(o.lat_)), eigVal_(std::move(o.eigVal_)),
 			fun_(std::move(o.fun_)), isQuadratic_(std::move(o.isQuadratic_)), acton_(std::move(o.acton_)), name_(std::move(o.name_)), nameS_(std::move(o.nameS_))
@@ -194,14 +211,17 @@ namespace Operators
 		
 		// -------------------- SETTERS -------------------
 		
-		auto setIsQuadratic(bool _is)					-> void							{ this->isQuadratic_ = _is;							}	
+		auto setIsQuadratic(bool _is)					-> void							{ this->isQuadratic_ = _is;							};	
 		auto setActOn(u64 _acton)						-> void							{ this->acton_ = _acton;							};
+		// functions
 		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;								};
 		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);						};
+		// names
 		auto setName(SymGenerators _name)				-> void							{ this->name_ = _name;								};
 		auto setNameS(const std::string& _name)			-> void							{ this->nameS_ = _name;								};
 		auto setVal(_T _val)							-> void							{ this->eigVal_ = _val;								};
 		auto setNs(size_t Ns)							-> void							{ this->Ns_ = Ns;									};
+		// quadratic matrices creators
 		void setQMatSparse(qMatType<arma::SpMat<_T>>&& _qMat)							{ this->qMatSparse_ = std::move(_qMat);				};
 		void setQMatDense(qMatType<arma::Mat<_T>>&& _qMat)								{ this->qMatDense_ = std::move(_qMat);				};
 		
@@ -215,11 +235,11 @@ namespace Operators
 		auto getNameG()									const -> std::string			{ return SSTR(getSTR_SymGenerators(this->name_));	};
 		auto getNameS()									const -> std::string			{ return this->nameS_;								};
 
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 		/*
 		* Joins the operators into one operator. This combines the operators acting on the same Hilbert space.
 		*/
-
 		template <typename T_ = _T, 
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
 		Operator<T_, _Ts...> operator%(const Operator<double, _Ts...>& op) const
@@ -239,7 +259,7 @@ namespace Operators
 			return Operators::Operator<cpx, _Ts...>(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ % op.fun_, Operators::SymGenerators::OTHER);
 		}
 
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C O N C A T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C O N C A T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		template <typename T_ = _T, typename ..._T2s,
 			typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr>
@@ -261,31 +281,13 @@ namespace Operators
 			return Operators::Operator<cpx, _Ts..., _T2s...>(this->lat_, this->eigVal_ * op.eigVal_, this->fun_ * op.fun_, Operators::SymGenerators::OTHER);
 		}
 
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   C A S T %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		//template <typename T_ = _T,
-		//	typename std::enable_if<std::is_same<T_, cpx>::value>::type* = nullptr> 
-		//[[maybe_unused]] operator Operator<cpx, _Ts...>()							{ return *this; };
-
-		//template <typename T_ = _T,
-		//	typename std::enable_if<!std::is_same<T_, cpx>::value>::type* = nullptr> 
-		//[[maybe_unused]] operator Operator<cpx, _Ts...>()
-		//{
-		//	auto _fun = [&](u64 s, _Ts... args) {
-		//		const auto [s1, v1] = this->fun_(s, args...);
-		//		return std::make_pair(s1, cpx(v1));
-		//	};
-		//	return Operator<cpx, _Ts...>(this->lat_, cpx(this->eigVal_), _fun);
-		//};
-
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   P O W E R %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-	
 		template <typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type* = nullptr>
 		[[nodiscard]]
 		Operator<_T, _Ts...> operator^(_T1 _n);
 			
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
 		* @brief representative eigenvalue calculator
@@ -297,15 +299,19 @@ namespace Operators
 		*/
 		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)				{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
 	
-		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 		
 		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, HasMatrixType _Concept = _MatType<_TinMat>, typename _InT = u64>
 		typename std::enable_if<std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 		generateMat(_InT _dim, _Ts... _arg) const;
+
 		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, HasMatrixType _Concept = _MatType<_TinMat>, uint _spinModes = 2>
-		_MatType<typename std::common_type<_TinMat, _T1>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
+		_MatType<typename std::common_type<_TinMat, _T1>::type> 
+		generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
+
 		template<typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, typename _T2, HasMatrixType _Concept = _MatType<_TinMat>, uint _spinModes = 2>
-		_MatType<typename std::common_type<_TinMat, _T1, _T2>::type> generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
+		_MatType<typename std::common_type<_TinMat, _T1, _T2>::type> 
+		generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
 
 
 		// calculates the matrix element of operator given a single state
@@ -494,21 +500,21 @@ inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::O
 
 // ##########################################################################################################################################
 
-// namespace Operators
-// {
-// 	template <typename _T, typename ..._Ts>
-// 	class OperatorExt : public Operator<_T, _Ts...>
-// 	{
-// 		using base_t		= Operator<_T, _Ts...>;
-// 		typedef typename _OP<_T>::template INP_EXT<_Ts...> repType;	 // type returned for representing, what it does with state and values!
-// 		using base_t::Ns_;
-// 		using base_t::lat_;
-// 		using base_t::eigVal_;
-// 		using base_t::fun_;
-// 		using base_t::acton_;
-// 		using base_t::name_;
-// 		using base_t::nameS_;
+ namespace Operators
+ {
+ 	//template <typename _T, typename ..._Ts>
+ 	//class OperatorExt : std::vector<Operator<_T, _Ts...>>
+ 	//{
+ 	//	using base_t = Operator<_T, _Ts...>;
+ 	//	//typedef typename _OP<_T>::template INP_EXT<_Ts...> repType;	 // type returned for representing, what it does with state and values!
+ 	//	using base_t::Ns_;
+ 	//	using base_t::lat_;
+ 	//	using base_t::eigVal_;
+ 	//	using base_t::fun_;
+ 	//	using base_t::acton_;
+ 	//	using base_t::name_;
+ 	//	using base_t::nameS_;
 
-// 		// used for checking on which states the operator acts when forgetting and using the matrix only
-// 	};
-// }
+ 	//	// used for checking on which states the operator acts when forgetting and using the matrix only
+ 	//};
+ }

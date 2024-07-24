@@ -136,7 +136,7 @@ protected:
 	double maxEn										= 0.0;
 	
 	// matrices
-	HamiltonianMatrix<_T> H_;							// the Hamiltonian
+	GeneralizedMatrix<_T> H_;							// the Hamiltonian
 	arma::Mat<_T> eigVec_;								// matrix of the eigenvectors in increasing order
 	arma::Mat<_T> K_;									// the Krylov Vectors (if needed)
 	arma::vec eigVal_;									// eigenvalues vector
@@ -185,7 +185,7 @@ public:
 	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
 	// hamiltonian
 	virtual auto getMeanLevelSpacing()					const -> double								{ return this->H_.meanLevelSpacing();											};
-	auto getHamiltonian()								const -> const HamiltonianMatrix<_T>&		{ return this->H_;																};
+	auto getHamiltonian()								const -> const GeneralizedMatrix<_T>&		{ return this->H_;																};
 	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
 	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
@@ -397,7 +397,7 @@ void Hamiltonian<_T, _spinModes>::init()
 	// hamiltonian memory reservation
 	BEGIN_CATCH_HANDLER
 	{
-		this->H_ = HamiltonianMatrix<_T>(this->Nh, this->isSparse_);
+		this->H_ = GeneralizedMatrix<_T>(this->Nh, this->isSparse_);
 	}
 	END_CATCH_HANDLER("Memory exceeded", std::runtime_error("Memory for the Hamiltonian setting exceeded"););
 };

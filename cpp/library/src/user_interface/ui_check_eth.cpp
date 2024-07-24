@@ -240,16 +240,16 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r)
 	{
 		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
 		{
-			//if (_r % 2 == 0)
-						//_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
-			_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
-			//else
-			//{
-			//	auto _Ns	= this->latP.Ntot_;
-			//	std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
-			//	auto _h		= _Hp->getMagnetic(_Ns - 3 - 1);
-			//	_Hp->setMagnetic(_Ns - 3 - 1, -_h);
-			//}
+			if (_r % 2 == 0)
+						_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+			//_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+			else
+			{
+				auto _Ns	= this->latP.Ntot_;
+				std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
+				auto _h		= _Hp->getMagnetic(_Ns - 3 - 1);
+				_Hp->setMagnetic(_Ns - 3 - 1, -_h);
+			}
 		}
 		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
 			_H->randomize(0, 1.0, { "g" });

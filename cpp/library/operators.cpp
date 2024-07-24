@@ -359,15 +359,10 @@ namespace Operators
 
 					// make it traceless and Hilbert-Schmidt norm equal to 1
 					if (_standarize)
-					{
-						_out.diag() -= arma::trace(_out) / (_Ns);
-						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
-						_out		= _out / std::sqrt(_Hs);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
 					return _out;
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _coeffs, _standarize]()
@@ -380,15 +375,10 @@ namespace Operators
 
 					// make it traceless and Hilbert-Schmidt norm equal to 1
 					if (_standarize)
-					{
-						_out.diag() -= arma::trace(_out) / (_Ns);
-						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
-						_out		= _out / std::sqrt(_Hs);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
 					return _out;
 				};
 
@@ -416,15 +406,10 @@ namespace Operators
 
 					// make it traceless and Hilbert-Schmidt norm equal to 1
 					if (_standarize)
-					{
-						_out.diag() -= arma::trace(_out) / (_Ns);
-						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
-						_out		= _out / std::sqrt(_Hs);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
 					return _out;
 				};
 			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _sites, _coeffs, _standarize]()
@@ -437,15 +422,68 @@ namespace Operators
 
 					// make it traceless and Hilbert-Schmidt norm equal to 1
 					if (_standarize)
-					{
-						_out.diag() -= arma::trace(_out) / (_Ns);
-						auto _Hs	= arma::trace(_out * _out) / (double)_Ns;
-						_out		= _out / std::sqrt(_Hs);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
+					return _out;
+				};
+
+			// set the operator
+			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			_op.setIsQuadratic(true);
+			_op.setQMatSparse(std::move(_mat_sparse));
+			_op.setQMatDense(std::move(_mat_dense));
+			return _op;		
+		}
+
+		// #############################################################################################
+		
+		/*
+		* @brief Create the operator for the nq modulation of the occupation number
+		* @param _Ns the number of sites
+		* @param _momentum the momentum to be added
+		* @param _standarize if the operator should be standarized
+		*/
+		Operators::Operator<double> Operators::QuadraticOperators::site_nq(size_t _Ns, const uint _momentum, bool _standarize)
+		{
+			// create the function
+			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _momentum, _standarize]()
+				{
+					arma::SpMat<double> _out(_Ns, _Ns);
+
+					const auto _k = TWOPI * double(_momentum) / double(_Ns);
+
+					// set the values
+					for (auto i = 0; i < _Ns; i++)
+						_out(i, i) = std::cos(_k * i);
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
+
+					return _out;
+				};
+			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _momentum, _standarize]()
+				{
+					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+
+					const auto _k = TWOPI * double(_momentum) / double(_Ns);
+
+					// set the values
+					for (auto i = 0; i < _Ns; i++)
+						_out(i, i) = std::cos(_k * i);
+
+					// make it traceless and Hilbert-Schmidt norm equal to 1
+					if (_standarize)
+						standarizeOperator(_out);
+
+					// info
+					operatorInfo(_out);
+
 					return _out;
 				};
 
