@@ -98,11 +98,12 @@ namespace Hilbert
 					 clk::time_point _t					= NOW,
 					 bool _generateMapping				= true);
 		HilbertSpace(const HilbertSpace<_T, _spinModes>& _H);
-		HilbertSpace(HilbertSpace<_T, _spinModes>&& _H);
+		HilbertSpace(HilbertSpace<_T, _spinModes>&& _H) noexcept;
 		template <typename _T2 = _T>
 		HilbertSpace(const HilbertSpace<_T2, _spinModes>& _H, bool otherType);
 	
 		// -------------------------- ASSIGN OPERATOR -------------------------
+		
 		HilbertSpace<_T, _spinModes>& operator=(const HilbertSpace<_T, _spinModes>& _H)
 		{
 			if (this != &_H) 
@@ -111,23 +112,48 @@ namespace Hilbert
 				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
 				std::lock(lhs_lk, rhs_lk);
 
-				this->Ns						= _H.Ns;
-				this->Nh						= _H.Nh;
-				this->lat					= _H.lat;
-				this->Nint					= _H.Nint;
-				this->NhFull				= _H.NhFull;
+				this->Ns				= _H.Ns;
+				this->Nh				= _H.Nh;
+				this->lat				= _H.lat;
+				this->Nint				= _H.Nint;
+				this->NhFull			= _H.NhFull;
 				this->threadNum			= _H.threadNum;
 				this->symGroupSec_		= _H.symGroupSec_;
 				this->symGroupGlobal_	= _H.symGroupGlobal_;
-				this->normalization_		= _H.normalization_;
+				this->normalization_	= _H.normalization_;
 				this->symGroup_			= _H.symGroup_;
-				this->fullMap_				= _H.fullMap_;
-				this->mapping_				= _H.mapping_;
-				this->t_						= _H.t_;
+				this->fullMap_			= _H.fullMap_;
+				this->mapping_			= _H.mapping_;
+				this->t_				= _H.t_;
 			}
 			return *this;
 		};
+		
+		HilbertSpace<_T, _spinModes>& operator=(HilbertSpace<_T, _spinModes>&& _H) noexcept
+		{
+			if (this != &_H) 
+			{
+				WriteLock lhs_lk(this->Mutex, std::defer_lock);
+				ReadLock  rhs_lk(_H.Mutex	, std::defer_lock);
+				std::lock(lhs_lk, rhs_lk);
 
+				this->Ns				= std::move(_H.Ns);
+				this->Nh				= std::move(_H.Nh);
+				this->lat				= std::move(_H.lat);
+				this->Nint				= std::move(_H.Nint);
+				this->NhFull			= std::move(_H.NhFull);
+				this->threadNum			= std::move(_H.threadNum);
+				this->symGroupSec_		= std::move(_H.symGroupSec_);
+				this->symGroupGlobal_	= std::move(_H.symGroupGlobal_);
+				this->normalization_	= std::move(_H.normalization_);
+				this->symGroup_			= std::move(_H.symGroup_);
+				this->fullMap_			= std::move(_H.fullMap_);
+				this->mapping_			= std::move(_H.mapping_);
+				this->t_				= std::move(_H.t_);
+			}
+			return *this;
+		}
+		
 		// ------------------------- MAP INITIALIZERS -------------------------
 		void hi();
 		void init();
@@ -295,7 +321,7 @@ namespace Hilbert
 	* @brief Move constructor
 	*/
 	template<typename _T, uint _spinModes>
-	HilbertSpace<_T, _spinModes>::HilbertSpace(HilbertSpace<_T, _spinModes>&& _H)
+	HilbertSpace<_T, _spinModes>::HilbertSpace(HilbertSpace<_T, _spinModes>&& _H) noexcept
 		: Nhl(std::move(_H.Nhl)),
 		t_(std::move(_H.t_)),
 		threadNum(std::move(_H.threadNum)),
@@ -310,7 +336,7 @@ namespace Hilbert
 		normalization_(std::move(_H.normalization_)),
 		mapping_(std::move(_H.mapping_)),
 		fullMap_(std::move(_H.fullMap_)),
-		reprMap_(std::move(_H.reprMap_))
+		reprMap_(std::move(_H.reprMap_)) 
 	{
 		WriteLock lhs_lk(this->Mutex, std::defer_lock);
 		ReadLock  rhs_lk(_H.Mutex, std::defer_lock);

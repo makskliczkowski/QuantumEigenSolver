@@ -55,7 +55,25 @@ namespace Operators
 	template<typename _T, typename _M2>
 	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, const _M2& _mat)
 	{
-		return _eigvecs.t() * _mat * _eigvecs;
+		return _eigvecs.t() * (_mat * _eigvecs);
+	}
+
+	template<typename _T, typename _T2>
+	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, const GeneralizedMatrix<_T2>& _mat)
+	{
+		if (_mat.isSparse())
+			return _eigvecs.t() * (_mat.toDense() * _eigvecs);
+		else
+			return _eigvecs.t() * (_mat.getDense() * _eigvecs);
+	}
+
+	template<typename _T, typename _T2>
+	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, GeneralizedMatrix<_T2>& _mat)
+	{
+		if (_mat.isSparse())
+			return _eigvecs.t() * (_mat.toDense() * _eigvecs);
+		else
+			return _eigvecs.t() * (_mat.getDense() * _eigvecs);
 	}
 
 	// _____________________________________________________________________________________________________________________________
@@ -88,26 +106,11 @@ namespace Operators
 	// ##########################################################################################################################################
 	
 	/*
-	* @brief Standarizes the operator so that it is traceless and has a unit norm 1. The norm is calculated as the Frobenius norm.
-	* @param _mat the matrix to standarize 
-	*/
-	template<typename _MatT>
-	inline void standarizeOperator(_MatT& _mat)
-	{
-		auto _nrows = _mat.n_rows;
-		_mat.diag() -= arma::trace(_mat) / (_nrows);
-		auto _Hs	= arma::trace(arma::square(_mat)) / (double)_nrows;
-		_mat		= _mat / std::sqrt(_Hs);	
-	}
-	
-	// ##########################################################################################################################################
-	
-	/*
 	* @brief Prints the operator information. This is only available in debug mode.
 	* @param _mat the matrix to print the information about
 	*/
-	template<typename _MatT>
-	inline void operatorInfo(const _MatT& _mat)
+	template<typename _T, template<class _T2 = _T> typename _MatT>
+	inline void operatorInfo(const _MatT<_T>& _mat)
 	{
 #ifdef _DEBUG
 		stout << "Operator Info: "				<< EL;
@@ -119,8 +122,23 @@ namespace Operators
 #endif
 	}
 
+	template<typename _T>
+	inline void operatorInfo(const GeneralizedMatrix<_T>& _mat)
+	{
+#ifdef _DEBUG
+		stout << "Operator Info: "				<< EL;
+		stout << "Operator Trace: "				<< _mat.trace() << EL;
+		stout << "Operator Frobenius Norm: "	<< _mat.norm("fro") << EL;
+		stout << "Operator Max: "				<< _mat.max() << EL;
+		stout << "Operator Min: "				<< _mat.min() << EL;
+		stout << "Operator Mean: "				<< _mat.mean() << EL;
+	}
+
 	// ##########################################################################################################################################
 
+	/*
+	* @brief The spin operator namespace. Contains the most common spin operators.
+	*/
 	namespace SpinOperators
 	{
 		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
@@ -143,22 +161,22 @@ namespace Operators
 	{
 		// -------- n_i Operators --------
 
-		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site, bool _standarize = true);
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs, bool _standarize);
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize);
+		Operators::Operator<double> site_occupation(size_t _Ns, const size_t _site);
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs);
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<size_t>& _sites, const v_1d<double>& _coeffs);
 
 		// -------- n_q Operators --------
 		
-		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum, bool _standarize = true);
+		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum);
 
 		// ------ n_i n_j Operators ------
 
-		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus, bool _standarize = true);
+		Operators::Operator<double> nn_correlation(size_t _Ns, const size_t _site_plus, const size_t _site_minus);
 
 		// --- quasimomentum Operators ---
 
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum, bool _standarize = true);
-		Operators::Operator<double> quasimomentum_occupation(size_t _Ns, bool _standarize = true);
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum);
+		Operators::Operator<double> quasimomentum_occupation(size_t _Ns);
 
 		// ----- kinectic Operators ------
 
@@ -227,6 +245,8 @@ namespace Operators
 	std::pair<u64, double> c_dn(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCDn(std::shared_ptr<Lattice> _lat, uint _site);
 };
+
+#endif
 
 //class avOperators {
 //public:

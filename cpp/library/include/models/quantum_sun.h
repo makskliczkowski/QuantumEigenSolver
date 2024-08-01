@@ -526,7 +526,7 @@ inline void QSM<_T>::hamiltonian()
 #ifdef _DEBUG
 	{
 		Operators::Operator<double> sz	= Operators::SpinOperators::sig_z(this->Ns_, { this->Ns_ - 1 });
-		arma::SpMat<double> _Min		= sz.template generateMat<double, typename arma::SpMat>(this->Nh_);
+		arma::SpMat<double> _Min		= sz.template generateMat<false, double, typename arma::SpMat>(this->Nh_);
 		auto _traceout					= arma::trace(_Min * this->H_.getSparse());
 		auto _lastH						= this->h_[this->Nout_ - 1];
 

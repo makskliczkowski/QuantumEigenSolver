@@ -7,10 +7,11 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
-#include "hamilMatrix.h"
-
 #ifndef HAMIL_H
 #define HAMIL_H
+
+// include statistics
+#include "quantities/statistics.h"
 
 // --- ED
 constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
@@ -94,10 +95,6 @@ const std::string DEF_INFO_SEP		= std::string("_");												// defalut separa
 #define PARAMS_S_DISORDER(p, toSet)	toSet += SSTR(",") + SSTR(#p) + SSTR("=")  + STRP(this->p, 3);	\
 									toSet += ((this->p##0 == 0.0) ? "" : SSTR(",") + SSTR(#p) + SSTR("0=") + STRP(this->p##0, 3))
 																									// gets the information about the disorder
-
-// include statistics
-#include "quantities/statistics.h"
-
 // ##########################################################################################################################################
 
 // ######################################################### H A M I L T O N I A N ##########################################################
@@ -188,7 +185,7 @@ public:
 	auto getHamiltonian()								const -> const GeneralizedMatrix<_T>&		{ return this->H_;																};
 	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
-	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_(0, 0));								};								
+	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_.get(0, 0));								};								
 	virtual auto getHamiltonianSizeH()					const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
 	auto getSymRot()									const -> arma::SpMat<_T>					{ return this->hilbertSpace.getSymRot();										};
 	// eigenvectors

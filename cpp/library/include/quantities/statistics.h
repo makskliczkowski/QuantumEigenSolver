@@ -6,7 +6,13 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
-#include "../hamil.h"
+#ifndef SYMMETRIES_H
+#	include "../hilbert_sym.h"
+#endif // !SYMMETRIES_H
+
+#ifndef OPERATORS_H
+#	include "../algebra/operators.h"
+#endif // !OPERATORS_H
 
 #define SYSTEM_PROPERTIES_MIN_SPACING 1e-15
 #define SYSTEM_PROPERTIES_THROW_DEGENERATE 1

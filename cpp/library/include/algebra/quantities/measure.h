@@ -24,9 +24,11 @@ private:
 	std::vector<arma::Mat<_T>> valC_;
 
 	// store the many body operator matrices
-	v_1d<arma::SpMat<_T>> MG_;
-	v_2d<arma::SpMat<_T>> ML_;
-	v_3d<arma::SpMat<_T>> MC_;
+	using MatrixType	= GeneralizedMatrix<_T>;
+
+	v_1d<MatrixType> MG_;
+	v_2d<MatrixType> ML_;
+	v_3d<MatrixType> MC_;
 
 	// types for the operators
 	//using OPG			= Operators::OpVec_glb_t;						
@@ -124,8 +126,8 @@ public:
 	auto getDir()					const noexcept -> std::string					{ return dir_;			};
 	auto getThreads()				const noexcept -> uint							{ return threads_;		};
 	auto getOpG()					const noexcept -> OPG							{ return opG_;			};
-	auto getOpG_mat()				const noexcept -> const v_1d<arma::SpMat<_T>>&	{ return MG_;			};
-	auto getOpG_mat(uint i)			const noexcept -> arma::SpMat<_T>&				{ return MG_[i];		};
+	auto getOpG_mat()				const noexcept -> const v_1d<MatrixType>&		{ return MG_;			};
+	auto getOpG_mat(uint i)			const noexcept -> const MatrixType&				{ return MG_.at(i);		};
 	auto getOpGN(uint i)			const noexcept -> std::string					{ return opG_[i]->getNameS(); };
 	auto getOpL()					const noexcept -> OPL							{ return opL_;			};
 	auto getOpLN(uint i)			const noexcept -> std::string					{ return opL_[i]->getNameS(); };
@@ -159,7 +161,8 @@ template<typename _T>
 inline Measurement<_T>::Measurement(size_t _Ns, const strVec & _operators, u64 _initial)
 	: threads_(1), Ns_(_Ns)
 {
-	if(_initial > 0) this->initializeMatrices(_initial);
+	if(_initial > 0)
+		this->initializeMatrices(_initial);
 }
 
 template<typename _T>
@@ -258,6 +261,10 @@ inline auto Measurement<_T>::clear() -> void
 
 // ############################################################################################################################################################
 
+/*
+* @brief Initialize the matrices for the measurement. The matrices are stored in the measurement object.
+* @param _dim The dimension of the system.
+*/
 template<typename _T>
 inline void Measurement<_T>::initializeMatrices(u64 _dim)
 {
@@ -269,9 +276,21 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 		// measure global
 		for (std::shared_ptr<Operators::Operator<_T>> _op : this->opG_)
 		{
-			arma::SpMat<_T> _Min = _op->template generateMat<_T, typename arma::SpMat>(_dim);
-			// push the operator
-			this->MG_.push_back(_Min);
+			bool _isquadratic = _op->getIsQuadratic();
+			if (_isquadratic)
+			{
+				// inner matrix
+				GeneralizedMatrix<_T> _Min = _op->template generateMat<true, _T, GeneralizedMatrix>(_dim);
+				// push the operator
+				this->MG_.push_back(_Min);
+			}
+			else
+			{
+				// inner matrix
+				GeneralizedMatrix<_T> _Min = _op->template generateMat<true, _T, GeneralizedMatrix>(_dim);
+				// push the operator
+				this->MG_.push_back(_Min);
+			}
 		}
 
 	}

@@ -143,8 +143,8 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		if (_ismanybody)
 		{
 			// add z spins 
-			//v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
-			v_1d<size_t> _toTake = v_1d<size_t>({ _Ns - 1});
+			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
+			//v_1d<size_t> _toTake = v_1d<size_t>({ _Ns - 1});
 
 			for (uint i : _toTake)
 			//for (uint i = 0; i < _Ns; ++i)
@@ -157,69 +157,55 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 				_ops.push_back(_op);
 				_opsN.push_back(_name);
 			}
+
 			// add other operators
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
-			//_opsN.push_back("mb/szc/" + STR(_Ns - 2) + "_" + STR(_Ns - 1));
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns / 2), (uint)(_Ns - 1) })));
-			//_opsN.push_back("mb/szc/" + STR(_Ns / 2) + "_" + STR(_Ns - 1));
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
-			//_opsN.push_back("mb/sxc/0_" + STR(_Ns - 1));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
+			_opsN.push_back("mb/szc/" + STR(_Ns - 2) + "-" + STR(_Ns - 1));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(0), (uint)(1) })));
+			_opsN.push_back("mb/szc/" + STR(0) + "-" + STR(1));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
+			_opsN.push_back("mb/sxc/0-" + STR(_Ns - 1));
 		}
 
 		// add quadratic operators if applicable
 		if (_isquadratic)
 		{
 			// add other operators
-			if (_Nh < ULLPOW(16))
+			if (_Nh <= ULLPOW(16))
 			{
 				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
 				_opsN.push_back("sp/quasimomentum_norm/0");
 			}
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh, false)));
-			//_opsN.push_back("sp/quasimomentum/0");
 
 			// correlation
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, _Nh - 1)));
 			_opsN.push_back("sp/nn_correlation_norm/0_" + STR(_Nh - 1));
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, _Nh - 1, false)));
-			//_opsN.push_back("sp/nn_correlation/0_" + STR(_Nh - 1));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1)));
 			_opsN.push_back("sp/nn_correlation_norm/0_1");
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 2)));
-			//_opsN.push_back("sp/nn_correlation_norm/0_2");
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1, false)));
-			//_opsN.push_back("sp/nn_correlation/0_1");
-			
-			//v_1d<size_t> _toTake = (_Ns <= 16) ? Vectors::vecAtoB<size_t>(_Ns) : v_1d<size_t>({ 0, 1, (size_t)(_Nh / 2), _Nh - 2, _Nh - 1});
+
 			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Nh / 2), _Nh - 1});
 
 			for (auto i: _toTake)
 			{
 				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i)));
 				_opsN.push_back("sp/occ_norm/" + STR(i));
-				//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i, false)));
-				//_opsN.push_back("sp/occ/" + STR(i));
 			}
-
-			// random superposition (only part)
-			size_t _coeffs = size_t(0.01 * _Nh);
-			v_1d<uint> _ridx;
-			v_1d<double> _rcoefs; 
-			
-			for (int i = 0; i < _coeffs; i++)
-			{
-				_rcoefs.push_back(this->ran_.template random<double>(-1.0, 1.0));
-				_ridx.push_back(this->ran_.template randomInt<uint>(0, _Nh - 1));
-			}
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _ridx, _rcoefs, true)));
-			_opsN.push_back("sp/occ_r_norm");
 
 			// random superposition (all of 'em)
+			v_1d<double> _rcoefs; 
 			_rcoefs = v_1d<double>(_Nh, 1.0);
 			for(int i = 0; i < _Nh; i++)
 				_rcoefs[i] = this->ran_.template random<double>(-1.0, 1.0);
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _rcoefs, true)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _rcoefs)));
 			_opsN.push_back("sp/occ_r_all_norm");
+
+			// nq - pi
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI)));
+			_opsN.push_back("sp/nq_norm/pi");
+
+			// nq - pi / 4
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI / 4.0)));
+			_opsN.push_back("sp/nq_norm/pi_4");
 		}
 	}
 
@@ -228,11 +214,17 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 
 // ###############################################################################################
 
+/*
+* @brief Randomize the Hamiltonian to get another realization of the system. 
+* @param _H: Hamiltonian to randomize
+* @param _r: realization number
+* @param _spinchanged: which spin to change (if applicable)
+*/
 template<typename _T>
-void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r)
+void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spinchanged)
 {
-	bool isQuadratic [[maybe_unused]] = _H->getIsQuadratic(),
-		 isManyBody			= _H->getIsManyBody();
+	bool isQuadratic [[maybe_unused]]	= _H->getIsQuadratic(),
+		 isManyBody	 [[maybe_unused]]	= _H->getIsManyBody();
 
 	_H->clearH();
 
@@ -240,22 +232,28 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r)
 	{
 		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
 		{
-			if (_r % 2 == 0)
-						_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
-			//_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+			if (_spinchanged == 0)
+				_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
 			else
 			{
 				auto _Ns	= this->latP.Ntot_;
-				std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
-				auto _h		= _Hp->getMagnetic(_Ns - 3 - 1);
-				_Hp->setMagnetic(_Ns - 3 - 1, -_h);
+				auto _N		= this->modP.qsm.qsm_N_;
+				if (_r % 2 == 0 || (_spinchanged > _Ns - _N))
+					_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
+				else
+				{
+					// set only the _spinchanged magnetic field to a different spin, which is the same as the one before but with a different sign
+					// this is to check the ETH properties when one perturbs the system just slightly. Other magnetic fields are the same.
+					std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
+					auto _h = _Hp->getMagnetic(_Ns - _N - _spinchanged);
+					_Hp->setMagnetic(_Ns - 3 - _spinchanged, -_h);
+				}
 			}
 		}
 		else if (this->modP.modTyp_ == MY_MODELS::RP_M)
 			_H->randomize(0, 1.0, { "g" });
 		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
 			_H->randomize(0, 1.0, {});
-		//else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
 	}
 
 	// -----------------------------------------------------------------------------
@@ -1132,7 +1130,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 							VMAT<double>& _microvals,
 							VMAT<_T>& _timeEvolution,
 							v_1d<arma::Col<_T>>& _timeZero,
-							const v_1d<arma::SpMat<double>>& _matrices)
+							const v_1d<GeneralizedMatrix<double>>& _matrices)
 		{
 			// calculate the overlaps of the initial state with the eigenvectors
 			const arma::Col<_T> _overlaps		= _H->getEigVec().t() * _initial_state;
@@ -1176,20 +1174,20 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			{
 	#pragma omp parallel for num_threads(this->threadNum)
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-					_timeZero[_opi](_r) = arma::as_scalar(arma::cdot(_initial_state, _matrices[_opi] * _initial_state));
+					_timeZero[_opi](_r) = arma::as_scalar(arma::cdot(_initial_state, (_matrices[_opi] * _initial_state)));
 			}
 
 			// evolution
 #pragma omp parallel for num_threads(this->threadNum)
 			for (int _ti = 0; _ti < _timespace.size(); _ti++)
 			{
-				const auto _time = _timespace(_ti);
-				const auto _st	 = SystemProperties::TimeEvolution::time_evo(_H->getEigVec(), _H->getEigVal(), _overlaps, _time);
+				const auto _time							= _timespace(_ti);
+				const arma::Col<std::complex<double>> _st	= SystemProperties::TimeEvolution::time_evo(_H->getEigVec(), _H->getEigVal(), _overlaps, _time);
 
 				// for each operator we can now apply the expectation value		
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
-					const cpx _rt					= arma::as_scalar(arma::cdot(_st, arma::Col<cpx>(_matrices[_opi] * _st)));
+					const cpx _rt					= arma::as_scalar(arma::cdot(_st, (_matrices[_opi] * _st)));
 					_timeEvolution[_opi](_ti, _r)	= algebra::cast<_T>(_rt);
 				}
 

@@ -14,6 +14,10 @@ namespace Operators
 	{
 		// ############################################################################################# 
 
+		// ######################################## SIGMA X ############################################
+
+		// #############################################################################################
+
 		/*
 		* @brief multiplication of sigma_xi | state >
 		* @param base_vec the base vector to be acted on. This is given by the copy.
@@ -106,6 +110,10 @@ namespace Operators
 
 		// ############################################################################################# 
 
+		// ######################################## SIGMA Z ############################################
+
+		// #############################################################################################
+
 		/*
 		* @brief multiplication of sigma_zi | state >
 		* @param base_vec the base vector to be acted on. This is given by the copy.
@@ -195,6 +203,10 @@ namespace Operators
 		}
 
 		// ############################################################################################# 
+
+		// ######################################## SIGMA P ############################################
+
+		// #############################################################################################
 
 		/*
 		* @brief Operator S^+ acting on the state | state >
@@ -300,140 +312,112 @@ namespace Operators
 	{
 		// #############################################################################################
 
-		Operators::Operator<double> site_occupation(size_t _Ns, const uint _site, bool _standarize)
+		/*
+		* @brief Create the occupation operator for single particle basis. Each state corresponds to single particle vector |... 1 ... 0 ...>, with 1 at the site _site.
+		* @param _Ns the number of sites
+		* @param _site the site to be acted on
+		* @param _standarize if the operator should be standarized
+		*/
+		Operators::Operator<double> site_occupation(size_t _Ns, const size_t _site)
 		{
 			// create the function
-			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site, _standarize]()
+			_OP<double>::GLB fun_ = [_site](u64 _state) { return (_site == _state) ? std::make_pair(_state, 1.0) : std::make_pair(_state, 0.0); };
+
+			GeneralizedMatrixFunction<double> _mat = [_site](size_t _Ns)
 				{
-					arma::SpMat<double> _out(_Ns, _Ns);
-					_out(_site, _site) = 1.0;
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() -= arma::ones(_Ns) / std::sqrt(_Ns - 1);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
-					return _out;
-				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site, _standarize]()
-				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site, _site) = 1.0;
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() -= arma::ones(_Ns) / std::sqrt(_Ns - 1);
-					}
-#ifdef _DEBUG
-					std::cout << arma::trace(_out) << std::endl;
-					std::cout << arma::trace(_out * _out) << std::endl;
-#endif
+					GeneralizedMatrix<double> _out(_Ns, true);
+					_out.set(_site, _site, 1.0);
+
+					// info
+					operatorInfo(_out);
+
 					return _out;
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
+			_op.setFun(std::move(fun_));
 			return _op;		
 		}
 
 		// #############################################################################################
 
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs, bool _standarize)
+		/*
+		* @brief Create the operator that has random coefficients at all diagonal sites. The coefficients are given by the vector _coeffs.
+		* @param _Ns the number of sites
+		* @param _coeffs the coefficients to be used
+		* @param _standarize if the operator should be standarized
+		* @returns the operator
+		*/
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs)
 		{
 			// create the function
-			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _coeffs, _standarize]()
+			_OP<double>::GLB fun_ = [_coeffs](u64 state) 
+			{ 
+				return std::make_pair(state, _coeffs[state]);
+			};
+
+			GeneralizedMatrixFunction<double> _mat = [_coeffs](size_t _Ns)
 				{
-					arma::SpMat<double> _out(_Ns, _Ns);
-					
+					GeneralizedMatrix<double> _out(_Ns, true);
+
 					// set the values
 					for (size_t i = 0; i < _coeffs.size(); i++)
-						_out(i, i) = _coeffs[i];
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
-
+						_out.set(i, i, _coeffs[i]);
+					
 					// info
 					operatorInfo(_out);
-					return _out;
-				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _coeffs, _standarize]()
-				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
 
-					// set the values
-					for (auto i = 0; i < _coeffs.size(); i++)
-						_out(i, i) = _coeffs[i];
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
-
-					// info
-					operatorInfo(_out);
 					return _out;
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
+			_op.setFun(std::move(fun_));
 			return _op;		
 		}
 
 		// #############################################################################################
 
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<uint>& _sites, const v_1d<double>& _coeffs, bool _standarize)
+		/*
+		* @brief Create the operator that has a random coefficients at the sites given by the vector _sites. The coefficients are given by the vector _coeffs.
+		* @param _Ns the number of sites
+		* @param _sites the sites to be acted on
+		* @param _coeffs the coefficients to be used
+		* @param _standarize if the operator should be standarized
+		* @returns the operator
+		*/
+		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<size_t>& _sites, const v_1d<double>& _coeffs)
 		{
 			// create the function
-			//_OP<double>::GLB fun_ = [_Ns, _site](u64 state) { return site_occupation(state, _Ns, (uint)_site); };
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _sites, _coeffs, _standarize]()
+			_OP<double>::GLB fun_ = [_sites](u64 state) 
 				{
-					arma::SpMat<double> _out(_Ns, _Ns);
-					
-					// set the values
-					for (auto i = 0; i < _sites.size(); i++)
-						_out(_sites[i], _sites[i]) = _coeffs[i];
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
-
-					// info
-					operatorInfo(_out);
-					return _out;
+					for (size_t i = 0; i < _sites.size(); i++)
+						if (_sites[i] == state)
+							return std::make_pair(state, 1.0);
+					return std::make_pair(state, 0.0);
 				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _sites, _coeffs, _standarize]()
+
+			GeneralizedMatrixFunction<double> _mat = [_sites, _coeffs](size_t _Ns)
 				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
+					GeneralizedMatrix<double> _out(_Ns, true);
 
 					// set the values
 					for (auto i = 0; i < _sites.size(); i++)
-						_out(_sites[i], _sites[i]) = _coeffs[i];
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
+						_out.set(_sites[i], _sites[i], _coeffs[i]);
 
 					// info
 					operatorInfo(_out);
+
 					return _out;
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
+			_op.setFun(std::move(fun_));
 			return _op;		
 		}
 
@@ -445,41 +429,22 @@ namespace Operators
 		* @param _momentum the momentum to be added
 		* @param _standarize if the operator should be standarized
 		*/
-		Operators::Operator<double> Operators::QuadraticOperators::site_nq(size_t _Ns, const uint _momentum, bool _standarize)
+		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum)
 		{
-			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _momentum, _standarize]()
-				{
-					arma::SpMat<double> _out(_Ns, _Ns);
+			const auto _k = TWOPI * double(_momentum) / double(_Ns);
 
-					const auto _k = TWOPI * double(_momentum) / double(_Ns);
-
-					// set the values
-					for (auto i = 0; i < _Ns; i++)
-						_out(i, i) = std::cos(_k * i);
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
-
-					// info
-					operatorInfo(_out);
-
-					return _out;
+			_OP<double>::GLB fun_ = [_k](u64 _state) 
+				{ 
+					return std::make_pair(_state, std::cos(_k * _state));
 				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _momentum, _standarize]()
-				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
 
-					const auto _k = TWOPI * double(_momentum) / double(_Ns);
+			GeneralizedMatrixFunction<double> _mat = [_k](size_t _Ns)
+				{
+					GeneralizedMatrix<double> _out(_Ns, true);
 
 					// set the values
 					for (auto i = 0; i < _Ns; i++)
-						_out(i, i) = std::cos(_k * i);
-
-					// make it traceless and Hilbert-Schmidt norm equal to 1
-					if (_standarize)
-						standarizeOperator(_out);
+						_out.set(i, i, std::cos(_k * i));	
 
 					// info
 					operatorInfo(_out);
@@ -488,228 +453,167 @@ namespace Operators
 				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
-			return _op;		
+			_op.setFun(std::move(fun_));
+			return _op;			
 		}
 
 		// #############################################################################################
 
 		/*
 		* @brief Standard hopping!
+		* @param _Ns the number of sites
+		* @param _site_plus the site to be acted on
+		* @param _site_minus the site to be acted on
+		* @returns the operator
 		*/
-		Operators::Operator<double> nn_correlation(size_t _Ns, const uint _site_plus, const uint _site_minus, bool _standarize)
+		Operators::Operator<double> nn_correlation(size_t _Ns, const size_t _site_plus, const size_t _site_minus)
 		{
-			// create the function
-			//_OP<double>::GLB fun_ = [_Ns, _site_plus, _site_minus](u64 state) { return nn_correlation(state, _Ns, _site_plus, _site_minus); };
-			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _site_plus, _site_minus, _standarize]()
-				{
-					arma::SpMat<double> _out(_Ns, _Ns);
-					_out(_site_minus, _site_plus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
-					_out(_site_plus, _site_minus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
-					return _out;
+			_OP<double>::GLB fun_ = [_site_plus, _site_minus](u64 state) 
+				{ 
+					if(state == _site_minus)
+						return std::make_pair(_site_plus, 1.0);
+					if(state == _site_plus)
+						return std::make_pair(_site_minus, 1.0);
+					return std::make_pair(state, 0.0);
 				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _site_plus, _site_minus, _standarize]()
+
+			GeneralizedMatrixFunction<double> _mat = [_site_plus, _site_minus](size_t _Ns)
 				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					_out(_site_minus, _site_plus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
-					_out(_site_plus, _site_minus) = _standarize ? std::sqrt(_Ns / 2.0) : 1.0;
+					GeneralizedMatrix<double> _out(_Ns, true);
+
+					// set the values
+					_out.set(_site_plus, _site_minus, 1.0);
+					_out.set(_site_minus, _site_plus, 1.0);
+
+					// info
+					operatorInfo(_out);
+
 					return _out;
 				};
 
-			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			// set the operator			
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
-			return _op;		
+			_op.setFun(std::move(fun_));
+			return _op;			
 		}
 
 		// #############################################################################################
 
 		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum, bool _standarize)
 		{
-			// create the function
-			std::function<arma::SpMat<std::complex<double>>()> _mat_sparse = [_Ns, _momentum, _standarize]()
-				{
-					arma::SpMat<std::complex<double>> _out(_Ns, _Ns);
-					for (auto i = 0; i < _Ns; i++)
-					{
-						for (auto j = 0; j < _Ns; j++)
-						{
-							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns);
-						}
-					}
+			_OP<std::complex<double>>::GLB fun_ = [](u64 _state) 
+				{ 
+					return std::make_pair(_state, 1.0);
+				};
 
-					// return the operator
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
-						return _out;
-					}
+			GeneralizedMatrixFunction<std::complex<double>> _mat = [_momentum](size_t _Ns)
+				{
+					GeneralizedMatrix<std::complex<double>> _out(_Ns, true);
+
+					// set the values
+					for (auto i = 0; i < _Ns; i++)
+						for (auto j = 0; j < _Ns; j++)
+							_out.set(i, j, std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns));
+
+					// info
+					operatorInfo(_out);
+
 					return _out;
 				};
-			std::function<arma::Mat<std::complex<double>>()> _mat_dense = [_Ns, _momentum, _standarize]()
-				{
-					arma::Mat<std::complex<double>> _out(_Ns, _Ns, arma::fill::zeros);
-					for (auto i = 0; i < _Ns; i++)
-					{
-						for (auto j = 0; j < _Ns; j++)
-						{
-							_out(i, i) = std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns);
-						}
-					}
 
-					// return the operator
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
-						return _out;
-					}
-					return _out;
-				};
 
 			// set the operator
-			Operator<std::complex<double>> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<std::complex<double>> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
-			return _op;				
+			_op.setFun(std::move(fun_));
+			return _op;			
 		}
 
-		Operators::Operator<double> quasimomentum_occupation(size_t _Ns, bool _standarize)
+		/*
+		* @brief Create the operator for the quasimomentum occupation number
+		* @param _Ns the number of sites
+		* @returns the operator
+		*/
+		Operators::Operator<double> quasimomentum_occupation(size_t _Ns)
 		{
-			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_Ns, _standarize]()
+			_OP<double>::GLB fun_ = [](u64 _state) 
+				{ 
+					return std::make_pair(_state, 1.0);
+				};
+
+			GeneralizedMatrixFunction<double> _mat = [](size_t _Ns)
 				{
-					arma::SpMat<double> _out(_Ns, _Ns);
+					GeneralizedMatrix<double> _out(_Ns, true);
+
+					// set the values
 					for (auto i = 0; i < _Ns; i++)
-					{
 						for (auto j = 0; j < _Ns; j++)
-						{
-							_out(i, j) = 1.0 / (double)(_Ns);
-						}
-					}
-					// return the operator
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
-						return _out;
-					}
-					return _out;				};
-			std::function<arma::Mat<double>()> _mat_dense = [_Ns, _standarize]()
-				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					for (auto i = 0; i < _Ns; i++)
-					{
-						for (auto j = 0; j < _Ns; j++)
-						{
-							_out(i, i) = 1.0 / (double)(_Ns);
-						}
-					}
-					// return the operator
-					if (_standarize)
-					{
-						_out		*= _Ns / std::sqrt(_Ns - 1);
-						_out.diag() = _out.diag() - arma::ones(_Ns) / std::sqrt(_Ns - 1);
-						return _out;
-					}
-					return _out;				};
+							_out.set(i, j, 1.0 / (double)(_Ns));
+
+					// info
+					operatorInfo(_out);
+
+					return _out;
+				};
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
+			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
-			return _op;				
+			_op.setFun(std::move(_mat));
+			return _op;			
 		}
 
 		// #############################################################################################
 
 		Operators::Operator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz)
 		{
-			auto _norm = 2;
-			if (_Ny > 1) _norm = 4;
-			if (_Nz > 1) _norm = 6;
+			//auto _norm = 2;
+			//if (_Ny > 1) _norm = 4;
+			//if (_Nz > 1) _norm = 6;
 			auto _Ns = _Nx * _Ny * _Nz;
 
 			// create the function
-			std::function<arma::SpMat<double>()> _mat_sparse = [_norm, _Ns, _Nx, _Ny, _Nz]()
+			GeneralizedMatrixFunction<double> _mat = [_Nx, _Ny, _Nz](size_t _Ns)
 				{
-					arma::SpMat<double> _out(_Ns, _Ns);
+					GeneralizedMatrix<double> _out(_Ns, true);
+
 					for (auto i = 0; i < _Ns; i++)
 					{
 						// x
-						_out(i, modEUC<int>(i + 1, _Nx)) = -1.0;
-						_out(i, modEUC<int>(i - 1, _Nx)) = -1.0;
-						_out(modEUC<int>(i + 1, _Nx), i) = -1.0;
-						_out(modEUC<int>(i - 1, _Nx), i) = -1.0;
+						_out.set(i, modEUC<int>(i + 1, _Nx), -1.0);
+						_out.set(i, modEUC<int>(i - 1, _Nx), -1.0);
+						_out.set(modEUC<int>(i + 1, _Nx), i, -1.0);
+						_out.set(modEUC<int>(i - 1, _Nx), i, -1.0);
 
 						// y 
 						if (_Ny > 1)
 						{
-							_out(i, modEUC<int>(i + _Nx, _Nx * _Ny)) = -1.0;
-							_out(i, modEUC<int>(i - _Nx, _Nx * _Ny)) = -1.0;
-							_out(modEUC<int>(i + _Nx, _Nx * _Ny), i) = -1.0;
-							_out(modEUC<int>(i - _Nx, _Nx * _Ny), i) = -1.0;
+							_out.set(i, modEUC<int>(i + _Nx, _Nx * _Ny), -1.0);
+							_out.set(i, modEUC<int>(i - _Nx, _Nx * _Ny), -1.0);
+							_out.set(modEUC<int>(i + _Nx, _Nx * _Ny), i, -1.0);
+							_out.set(modEUC<int>(i - _Nx, _Nx * _Ny), i, -1.0);
 						}
 
 						// z 
 						if (_Nz > 1)
 						{
-							_out(i, modEUC<int>(i + _Nx * _Ny, _Ns)) = -1.0;
-							_out(i, modEUC<int>(i - _Nx * _Ny, _Ns)) = -1.0;
-							_out(modEUC<int>(i + _Nx * _Ny, _Ns), i) = -1.0;
-							_out(modEUC<int>(i - _Nx * _Ny, _Ns), i) = -1.0;
+							_out.set(i, modEUC<int>(i + _Nx * _Ny, _Ns), -1.0);
+							_out.set(i, modEUC<int>(i - _Nx * _Ny, _Ns), -1.0);
+							_out.set(modEUC<int>(i + _Nx * _Ny, _Ns), i, -1.0);
+							_out.set(modEUC<int>(i - _Nx * _Ny, _Ns), i, -1.0);
 						}
 
 					}
-					return _out / std::sqrt(_norm);
-				};
-			std::function<arma::Mat<double>()> _mat_dense = [_norm, _Ns, _Nx, _Ny, _Nz]()
-				{
-					arma::Mat<double> _out(_Ns, _Ns, arma::fill::zeros);
-					for (auto i = 0; i < _Ns; i++)
-					{
-						// x
-						_out(i, modEUC<int>(i + 1, _Nx)) = -1.0;
-						_out(i, modEUC<int>(i - 1, _Nx)) = -1.0;
-						_out(modEUC<int>(i + 1, _Nx), i) = -1.0;
-						_out(modEUC<int>(i - 1, _Nx), i) = -1.0;
-
-						// y 
-						if (_Ny > 1)
-						{
-							_out(i, modEUC<int>(i + _Nx, _Nx * _Ny)) = -1.0;
-							_out(i, modEUC<int>(i - _Nx, _Nx * _Ny)) = -1.0;
-							_out(modEUC<int>(i + _Nx, _Nx * _Ny), i) = -1.0;
-							_out(modEUC<int>(i - _Nx, _Nx * _Ny), i) = -1.0;
-						}
-
-						// z 
-						if (_Nz > 1)
-						{
-							_out(i, modEUC<int>(i + _Nx * _Ny, _Ns)) = -1.0;
-							_out(i, modEUC<int>(i - _Nx * _Ny, _Ns)) = -1.0;
-							_out(modEUC<int>(i + _Nx * _Ny, _Ns), i) = -1.0;
-							_out(modEUC<int>(i - _Nx * _Ny, _Ns), i) = -1.0;
-						}
-
-					}
-					return _out / std::sqrt(_norm);
+					return _out;
 				};
 
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, {}, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setQMatSparse(std::move(_mat_sparse));
-			_op.setQMatDense(std::move(_mat_dense));
+			_op.setFun(std::move(_mat));
 			return _op;				
 		}
 	}
