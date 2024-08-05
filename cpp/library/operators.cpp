@@ -298,7 +298,6 @@ namespace Operators
 			return sig_p(_out, _Ns, _right);
 		}
 
-		
 	}
 
 

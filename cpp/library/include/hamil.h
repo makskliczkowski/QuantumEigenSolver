@@ -144,12 +144,73 @@ public:
 	// -------------------------------------------- CONSTRUCTORS --------------------------------------------
 	
 	virtual ~Hamiltonian();
+	Hamiltonian(const Hamiltonian<_T, _spinModes>& _other);
+	Hamiltonian(Hamiltonian<_T, _spinModes>&& _other);
 	Hamiltonian(bool _isSparse = true);
 	Hamiltonian(const size_t _Ns, bool _isSparse = true);
 	Hamiltonian(const Hilbert::HilbertSpace<_T, _spinModes>& hilbert, bool _isSparse = true);
 	Hamiltonian(Hilbert::HilbertSpace<_T, _spinModes>&& hilbert, bool _isSparse = true);
 
-	// ------------------------------------------- PRINTERS ---------------------------------------------------
+public:
+	// --------------------------------------------- OPERATORS -----------------------------------------------
+
+	Hamiltonian<_T, _spinModes>& operator=(const Hamiltonian<_T, _spinModes>& _other)
+	{
+		if (this != _other)
+		{
+			this->hilbertSpace	= _other.hilbertSpace;
+			this->lat_			= _other.lat_;
+			this->Ns_			= _other.Ns_;
+			this->Ns			= _other.Ns;
+			this->Nh_			= _other.Nh_;
+			this->Nh			= _other.Nh;
+			this->isQuadratic_	= _other.isQuadratic_;
+			this->isManyBody_	= _other.isManyBody_;
+			this->isSparse_		= _other.isSparse_;
+			this->avEnIdx		= _other.avEnIdx;
+			this->avEn			= _other.avEn;
+			this->stdEn			= _other.stdEn;
+			this->minEn			= _other.minEn;
+			this->maxEn			= _other.maxEn;
+			this->H_			= _other.H_;
+			this->eigVec_		= _other.eigVec_;
+			this->K_			= _other.K_;
+			this->eigVal_		= _other.eigVal_;
+			this->ran_			= _other.ran_;
+			this->info_			= _other.info_;
+		}
+		return *this;
+	}
+
+	Hamiltonian<_T, _spinModes> operator=(Hamiltonian<_T, _spinModes>&& _other)
+	{
+		if (this != _other)
+		{
+			this->hilbertSpace	= std::move(_other.hilbertSpace);
+			this->lat_			= _other.lat_;
+			this->Ns_			= _other.Ns_;
+			this->Ns			= _other.Ns;
+			this->Nh_			= _other.Nh_;
+			this->Nh			= _other.Nh;
+			this->isQuadratic_	= _other.isQuadratic_;
+			this->isManyBody_	= _other.isManyBody_;
+			this->isSparse_		= _other.isSparse_;
+			this->avEnIdx		= _other.avEnIdx;
+			this->avEn			= _other.avEn;
+			this->stdEn			= _other.stdEn;
+			this->minEn			= _other.minEn;
+			this->maxEn			= _other.maxEn;
+			this->H_			= std::move(_other.H_);
+			this->eigVec_		= std::move(_other.eigVec_);
+			this->K_			= std::move(_other.K_);
+			this->eigVal_		= std::move(_other.eigVal_);
+			this->ran_			= _other.ran_;
+			this->info_			= _other.info_;
+		}
+		return *this;
+	}
+
+	// ---------------------------------------------- PRINTERS -----------------------------------------------
 
 	static void printBaseState(	std::ostream& output,	u64 _s, _T val, v_1d<int>& _tmpVec,	double _tol = 5e-2);
 
@@ -320,6 +381,58 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinM
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
 	this->Nh_	=	this->Nh;
 };			
+
+/*
+* @brief Copy constructor of the Hamiltonian class. It copies all the elements of the Hamiltonian. 
+*/
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hamiltonian<_T,_spinModes>& _other)
+	: hilbertSpace(_other.hilbertSpace), ran_(_other.ran_), info_(_other.info_), type_(_other.type_),
+	Ns_(_other.Ns_), 
+	Ns(_other.Ns), 
+	Nh_(_other.Nh_), 
+	Nh(_other.Nh), 
+	isQuadratic_(_other.isQuadratic_),
+	isManyBody_(_other.isManyBody_), 
+	isSparse_(_other.isSparse_), 
+	avEnIdx(_other.avEnIdx), 
+	avEn(_other.avEn),
+	stdEn(_other.stdEn), 
+	minEn(_other.minEn), 
+	maxEn(_other.maxEn), 
+	H_(_other.H_), 
+	eigVec_(_other.eigVec_),
+	K_(_other.K_), 
+	eigVal_(_other.eigVal_)
+{
+	CONSTRUCTOR_CALL;
+}
+
+/*
+* @brief Move constructor of the Hamiltonian class. It moves all the elements of the Hamiltonian.
+*/
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hamiltonian<_T,_spinModes>&& _other)
+	: hilbertSpace(std::move(_other.hilbertSpace)), ran_(_other.ran_), info_(_other.info_), type_(_other.type_),
+	Ns_(_other.Ns_),
+	Ns(_other.Ns),
+	Nh_(_other.Nh_),
+	Nh(_other.Nh),
+	isQuadratic_(_other.isQuadratic_),
+	isManyBody_(_other.isManyBody_),
+	isSparse_(_other.isSparse_),
+	avEnIdx(_other.avEnIdx),
+	avEn(_other.avEn),
+	stdEn(_other.stdEn),
+	minEn(_other.minEn),
+	maxEn(_other.maxEn),
+	H_(std::move(_other.H_)),
+	eigVec_(std::move(_other.eigVec_)),
+	K_(std::move(_other.K_)),
+	eigVal_(std::move(_other.eigVal_))
+{
+	CONSTRUCTOR_CALL;
+}
 
 // ##########################################################################################################################################
 
@@ -500,11 +613,23 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEnEps(u64 _Eidx
 	u64 _imax = _Eidx;
 	u64 _imin = _Eidx;
 	// find the maximum index
-	while (((this->eigVal_(_imax) - this->eigVal_(_Eidx)) / this->Ns) < _eps && _imax < this->Nh)
+	while ((std::abs(this->eigVal_(_imax) - this->eigVal_(_Eidx))) < _eps && _imax < this->Nh)
 		_imax++;
 	// find the minimum index
-	while (((this->eigVal_(_Eidx) - this->eigVal_(_imin)) / this->Ns) < _eps && _imin > 0)
+	while ((std::abs(this->eigVal_(_Eidx) - this->eigVal_(_imin))) < _eps && _imin > 0)
 		_imin--;
+	// if the difference is too small, return the closest 10 elements
+	if (_imax - _imin <= 1)
+	{
+		if (_Eidx > 5 && _Eidx < this->Nh_ - 4)
+		{
+			return std::make_pair(_Eidx - 5, _Eidx + 5);
+		}
+		else
+		{
+			return std::make_pair(_Eidx - 1, _Eidx + 1);
+		}
+	}
 	return std::make_pair(_imin, _imax);
 }
 

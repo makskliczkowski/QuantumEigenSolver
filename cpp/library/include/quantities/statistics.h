@@ -254,6 +254,7 @@ namespace SystemProperties
 				auto _en = _energies(i);
 				for (u64 j = 0; j < _energies.size(); ++j)
 				{
+					// std::norm returns the |z|^2
 					if (std::abs(_en - _energies(j)) < SYSTEM_PROPERTIES_MIN_SPACING)
 						_ret(i) += std::norm(_ovelaps(j));
 				}

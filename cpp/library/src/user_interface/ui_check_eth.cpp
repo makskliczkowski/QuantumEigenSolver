@@ -124,6 +124,12 @@ void UI::makeSimETHSweep()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+constexpr static bool check_saving_size(u64 _Nh, uint _r)
+{
+	return ((_Nh > ULLPOW(14)) || (BETWEEN(_Nh, 10, 15) && (_r % 10 == 0)) || ((_Nh <= 1024) && (_r % 50 == 0)));
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief Based on the model type, obtain both quadratic and many body operators
@@ -142,53 +148,53 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		// add many body operators if applicable
 		if (_ismanybody)
 		{
+			auto _type				= "mb";
 			// add z spins 
-			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
+			v_1d<size_t> _toTake	= v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
 			//v_1d<size_t> _toTake = v_1d<size_t>({ _Ns - 1});
 
 			for (uint i : _toTake)
 			//for (uint i = 0; i < _Ns; ++i)
 			{
 				auto _op	= std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, i));
-				auto _name	= "mb/sz/" + STR(i);
-				_op->setNameS(_name);
 
 				// push it
 				_ops.push_back(_op);
-				_opsN.push_back(_name);
+				_opsN.push_back(Operators::createOperatorName(_type, "sz", STR(i)));
 			}
 
 			// add other operators
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
-			_opsN.push_back("mb/szc/" + STR(_Ns - 2) + "-" + STR(_Ns - 1));
+			_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(_Ns - 2), STR(_Ns - 1)));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(0), (uint)(1) })));
-			_opsN.push_back("mb/szc/" + STR(0) + "-" + STR(1));
+			_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(0), STR(1)));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
-			_opsN.push_back("mb/sxc/0-" + STR(_Ns - 1));
+			_opsN.push_back(Operators::createOperatorName(_type, "sxc", STR(0), STR(_Ns - 1)));
 		}
 
 		// add quadratic operators if applicable
 		if (_isquadratic)
 		{
+			auto _type				= "sp";
+
 			// add other operators
 			if (_Nh <= ULLPOW(16))
 			{
 				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::quasimomentum_occupation(_Nh)));
-				_opsN.push_back("sp/quasimomentum_norm/0");
+				_opsN.push_back(Operators::createOperatorName(_type, "quasimomentum_occupation", "0"));
 			}
 
 			// correlation
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, _Nh - 1)));
-			_opsN.push_back("sp/nn_correlation_norm/0_" + STR(_Nh - 1));
+			_opsN.push_back(Operators::createOperatorName(_type, "nn_correlation", "0", STR(_Nh - 1)));
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::nn_correlation(_Nh, 0, 1)));
-			_opsN.push_back("sp/nn_correlation_norm/0_1");
+			_opsN.push_back(Operators::createOperatorName(_type, "nn_correlation", "0", "1"));
 
 			v_1d<size_t> _toTake = v_1d<size_t>({ 0, (size_t)(_Nh / 2), _Nh - 1});
-
 			for (auto i: _toTake)
 			{
 				_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation(_Nh, i)));
-				_opsN.push_back("sp/occ_norm/" + STR(i));
+				_opsN.push_back(Operators::createOperatorName(_type, "site_occupation", STR(i)));
 			}
 
 			// random superposition (all of 'em)
@@ -197,15 +203,15 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			for(int i = 0; i < _Nh; i++)
 				_rcoefs[i] = this->ran_.template random<double>(-1.0, 1.0);
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_occupation_r(_Nh, _rcoefs)));
-			_opsN.push_back("sp/occ_r_all_norm");
+			_opsN.push_back(Operators::createOperatorName(_type, "site_occupation_r"));
 
 			// nq - pi
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI)));
-			_opsN.push_back("sp/nq_norm/pi");
+			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi"));
 
 			// nq - pi / 4
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI / 4.0)));
-			_opsN.push_back("sp/nq_norm/pi_4");
+			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi" OPERATOR_SEP_DIV "4"));
 		}
 	}
 
@@ -543,11 +549,8 @@ void UI::checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H)
 		}
 		
 		// save the checkpoints
-		if ((_Ns >= 14 && (_r % 4 == 0)) || (_Ns < 14 && (_r % 25 == 0)))
-		{
-			// save the diagonals
+		if (check_saving_size(_Nh, _r))
 			_saver(_r);
-		}
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 		// -----------------------------------------------------------------------------
 	}
@@ -997,7 +1000,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		}
 
 		// save the checkpoints
-		if ((_Ns >= 14 && _r % 2 == 0) || (_Ns < 14 && _r % 50 == 0))
+		if (check_saving_size(_Nh, _r))
 			_saver(_r);
 
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
@@ -1056,66 +1059,68 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	arma::Mat<double> _energies			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
 	// save the LDOS
 	arma::Mat<double> _ldos_me			= arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::zeros);
-	// to save the energy densities (mean energy[system], mean energy state, <state|H2|state>, mobility_edge_point)
-	arma::Mat<_T> _energydensitiesME(4, this->modP.modRanN_);
+	// to save the energy densities (mean energy[system], mean energy[state], <state|H2|state>)
+	arma::Mat<_T> _energydensitiesME(3, this->modP.modRanN_);
 	// to save the diagonal elements
 	VMAT<_T> _diagonals(_ops.size(), _Nh, this->modP.modRanN_, arma::fill::zeros);
 
 	// save the time evolution here
 	VMAT<_T> _timeEvolutionME(_ops.size(), _timespace.size(), this->modP.modRanN_, arma::fill::zeros);
-	VMAT<double> _timeEntropyME(_Ns, _timespace.size(), this->modP.modRanN_, arma::fill::zeros);
+	// entropies to take
+	v_1d<int> _entropiesSites			= {1, int(_Ns / 2), _Ns - 1, _Ns};
+	VMAT<double> _timeEntropyME(4, _timespace.size(), this->modP.modRanN_, arma::fill::zeros);
 	arma::Mat<double> _timeEntropyBipartiteME(_timespace.size(), this->modP.modRanN_, arma::fill::zeros);
 	v_1d<arma::Col<_T>> _timeZeroME(_ops.size(), arma::Col<_T>(this->modP.modRanN_, arma::fill::zeros));
 
 	// ------------------------- MICROCANONICAL AVERAGES -------------------------
 
-	const v_1d<double> _toCheckEps = { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4 };
+	const v_1d<double> _toCheckEps		= { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4 };
 
 	// to save the microcanonical averages
-	VMAT<double> _microcanonicalME(_ops.size(), 1 + _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros);
+	arma::Mat<double> _diagonalME(_ops.size(), this->modP.modRanN_, arma::fill::zeros);
 
-	// to save the diagonal ensemble averages
-	VMAT<_T> _diagonalME(_ops.size(), _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros);
-	VMAT<double> _diagonal2ME(_ops.size(), _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros);
+	// to save the diagonal ensemble averages (might be useful for comparison to the microcanonical averages)
+	VMAT<_T> _microcanonicalME(_ops.size(), _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros);
+	VMAT<double> _microcanonical2ME(_ops.size(), _toCheckEps.size(), this->modP.modRanN_, arma::fill::zeros);
 
 	// -------------------------------- SAVER ------------------------------------
 
 	auto _microcanonical_saver	= [&](	uint _r,
 										uint _opi, 
-										VMAT<_T>& _diagonalvals,
-										VMAT<double>& _diagonalvals2,
-										VMAT<double>& _microvals,
+										VMAT<_T>& _microvals,
+										VMAT<double>& _microvals2,
+										arma::Mat<double>& _diagvals,
 										const arma::Col<double>& _soverlaps, 
 										const v_1d<u64>& _mins,
 										const v_1d<u64>& _maxs)
 		{
+			// get the diagonal elements for a given realization and operator _opi
 			const auto& _diagonal	= _diagonals[_opi].col(_r);
-			// long time average (all states)
-			_microvals[_opi](0, _r)	= algebra::cast<double>(arma::dot(_diagonal, _soverlaps));
+			// long time average (but for all states times the overlaps)
+			_diagvals(_opi, _r)		= algebra::cast<double>(arma::dot(_diagonal, _soverlaps));
 
 			uint _size				= _toCheckEps.size();
+			u64 _Nh_minus_1			= _Nh - 1;
 			for (int _ifrac = 0; _ifrac < _size; _ifrac++)
 			{
 				u64 _minin			= _mins[_ifrac];
 				u64 _maxin			= _maxs[_ifrac];
-				if (_minin <= 0)
-					_minin = 0;
-				if (_maxin >= _Nh - 1)
-					_maxin = _Nh - 1;
 
-				// check the bounds
-				while(_minin >= _maxin)
+				_minin				= std::max(_minin, 0ull);
+				_maxin				= std::min(_maxin, _Nh_minus_1);
+
+				if (_minin >= _maxin) 
 				{
-					if(_minin > 0)
-						_minin--;
-					if(_maxin < _Nh - 1)
-						_maxin++;
+					_minin = _minin > 0 ? _minin - 1 : 0;
+					_maxin = _maxin < _Nh_minus_1 ? _maxin + 1 : _Nh_minus_1;
 				}
-				// around the energy (\sum c_n^2 a_nn) (in the energy window)
-				_microvals[_opi](1 + _ifrac, _r)	= algebra::cast<double>(arma::dot(_diagonal.subvec(_minin, _maxin), _soverlaps.subvec(_minin, _maxin)));
-				// around the energy, just ann
-				_diagonalvals[_opi](_ifrac, _r)		= arma::mean(_diagonal.subvec(_minin, _maxin));
-				_diagonalvals2[_opi](_ifrac, _r)	= arma::mean(arma::square(arma::abs(_diagonal.subvec(_minin, _maxin))));
+
+				// around the energy (\sum c_n^2 a_nn) (in the energy window - this is the diagonal ensemble within the energy window)
+				//_diagvals[_opi](1 + _ifrac, _r)	= algebra::cast<double>(arma::dot(_diagonal.subvec(_minin, _maxin), _soverlaps.subvec(_minin, _maxin)));
+				// around the energy, just the microcanonical average
+				auto sub_diagonal					= _diagonal.subvec(_minin, _maxin);
+				_microvals[_opi](_ifrac, _r)		= arma::mean(sub_diagonal);
+				_microvals2[_opi](_ifrac, _r)		= arma::mean(arma::square(arma::abs(sub_diagonal)));
 			}
 		};
 
@@ -1125,21 +1130,25 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 							const arma::Col<_T>& _initial_state,
 							arma::Mat<double>& _ldoses,
 							arma::Mat<_T>& _energydensities,
-							VMAT<_T>& _diagonalvals,
-							VMAT<double>& _diagonalvals2,
-							VMAT<double>& _microvals,
+							VMAT<_T>& _microvals,
+							VMAT<double>& _microvals2,
+							arma::Mat<double>& _diagvals,
 							VMAT<_T>& _timeEvolution,
 							v_1d<arma::Col<_T>>& _timeZero,
 							const v_1d<GeneralizedMatrix<double>>& _matrices)
 		{
-			// calculate the overlaps of the initial state with the eigenvectors
-			const arma::Col<_T> _overlaps		= _H->getEigVec().t() * _initial_state;
+			// calculate the overlaps of the initial state with the eigenvectors 
+			// (states are columns and vector is column as well, so we need to have the transpose)
+			const auto& _eigvecs				= _H->getEigVec();
+			const auto& _eigvals				= _H->getEigVal();
+			const arma::Col<_T> _overlaps		= _eigvecs.st() * _initial_state;
 			const arma::Col<double> _soverlaps	= arma::square(arma::abs(_overlaps));
+
 			// calculate the average energy index
 			double _meanE						= _H->getEnAv();
 
 			// save the energies
-			_ldoses.col(_r)						= SystemProperties::calculate_LDOS(_H->getEigVal(), _overlaps);
+			_ldoses.col(_r)						= SystemProperties::calculate_LDOS(_eigvals, _overlaps);
 			_energydensities(0, _r)				= _meanE;
 
 			// apply the Hamiltonian to the initial state
@@ -1147,16 +1156,14 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			const auto _E						= (arma::cdot(_initial_state, _init_stat_H));
 			const auto _E2						= (arma::cdot(_init_stat_H, _init_stat_H));
 			u64 _Eidx							= _H->calcEnIdx(algebra::cast<double>(_E));
-			LOGINFO(VEQ(_Eidx), LOG_TYPES::TRACE, 1);
+			LOGINFO(VEQ(_Eidx), LOG_TYPES::TRACE, 4);
+			LOGINFO(VEQP(_E, 5), LOG_TYPES::TRACE, 4);
+			LOGINFO(VEQP(_E2, 5), LOG_TYPES::TRACE, 4);
 			_energydensities(1, _r)				= _E;
 			_energydensities(2, _r)				= _E2;
-			//if (this->modP.modTyp_ == QSM_M)
-			//	_energydensities(3, _r)			= std::reinterpret_pointer_cast<QSM<double>>(_H)->get_mobility_edge(_E);
 
 			// calculate the bounds
 			std::vector<u64> _mins(_toCheckEps.size()), _maxs(_toCheckEps.size());
-
-			// around the given energy _E
 			for (int _ifrac = 0; _ifrac < _toCheckEps.size(); _ifrac++)
 				std::tie(_mins[_ifrac], _maxs[_ifrac]) = _H->getEnArndEnEps(_Eidx, _toCheckEps[_ifrac]);
 
@@ -1165,7 +1172,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			for (int _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				// ferromagnetic
-				_microcanonical_saver(_r, _opi, _diagonalvals, _diagonalvals2, _microvals, _soverlaps, _mins, _maxs);
+				_microcanonical_saver(_r, _opi, _microvals, _microvals2, _diagvals, _soverlaps, _mins, _maxs);
 			}
 
 			// -----------------------------------------------------------------------------
@@ -1182,7 +1189,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			for (int _ti = 0; _ti < _timespace.size(); _ti++)
 			{
 				const auto _time							= _timespace(_ti);
-				const arma::Col<std::complex<double>> _st	= SystemProperties::TimeEvolution::time_evo(_H->getEigVec(), _H->getEigVal(), _overlaps, _time);
+				const arma::Col<std::complex<double>> _st	= SystemProperties::TimeEvolution::time_evo(_eigvecs, _eigvals, _overlaps, _time);
 
 				// for each operator we can now apply the expectation value		
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
@@ -1193,19 +1200,20 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 				// say the time
 				if (_ti % 100 == 0)
-					LOGINFO(VEQ(_ti), LOG_TYPES::TRACE, 3);
+					LOGINFO(VEQ(_ti) + "/" + STR(_timespace.size()), LOG_TYPES::TRACE, 3);
 
 				// calculate the entanglement entropy for each site
 				{
-					for (int i = 1; i <= _Ns; i++)
+					//for (int i = 1; i <= _Ns; i++)
+					auto _iter = 0;
+					for (const auto i: _entropiesSites)
 					{
 						// calculate the entanglement entropy
-						uint _maskA						= 1 << (i - 1);
-						uint _enti						= _Ns - i;
-						_timeEntropyME[_enti](_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+						uint _maskA							= 1 << (i - 1);
+						_timeEntropyME[_iter++](_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, 1, _Ns, _maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
 					}
-					if(_Ns <= 14)
-						_timeEntropyBipartiteME(_ti, _r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, (ULLPOW((int(_Ns / 2)))) - 1);
+					if(_Nh <= UI_LIMITS_MAXFULLED / 4)
+						_timeEntropyBipartiteME(_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, (ULLPOW((int(_Ns / 2)))) - 1);
 				}
 			}
 
@@ -1222,26 +1230,27 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(1).as_col()), "heis_time_gamma", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(2).as_col()), "1_over_mean_level_spacing", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(3).as_col()), "1_over_mean_level_spacing_typ", true);
-			//saveAlgebraic(dir, "stat" + randomStr + extension, arma::vec(_meanlvl.row(4).as_col()), "th_time_est", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _energies, "energies", true);
 
 			// save the ldos's
 			saveAlgebraic(dir, "ldos" + randomStr + extension, _ldos_me, "ME", false);
 
 			// save the energy densities
-			saveAlgebraic(dir, "energydens" + randomStr + extension, arma::Col<_T>(_energydensitiesME.row(0).as_col() / _Ns), "mean", false);
-			saveAlgebraic(dir, "energydens" + randomStr + extension, arma::Mat<_T>(_energydensitiesME.rows(1, 3) / _Ns), "ME", true);
+			saveAlgebraic(dir, "energydens" + randomStr + extension, arma::Col<_T>(_energydensitiesME.row(0).as_col()), "mean", false);
+			saveAlgebraic(dir, "energydens" + randomStr + extension, arma::Col<_T>(_energydensitiesME.row(1).as_col()), "mean_state", true);
+			saveAlgebraic(dir, "energydens" + randomStr + extension, arma::Col<_T>(_energydensitiesME.row(2).as_col()), "mean_state2", true);
 			
 			// save the matrices for time evolution
 			saveAlgebraic(dir, "evo" + randomStr + extension, _timespace, "time", false);
-			for(int i = 0; i < _Ns; i++)
-				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyME[i], "entanglement_entropy/ME/" + STR((i + 1)), true);
-			
+			//for(int i = 0; i < _Ns; i++)
+			for(int i = 0; i < _entropiesSites.size(); ++i)
+				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyME[i], "entanglement_entropy/ME/" + STR((_entropiesSites[i])), true);
 			saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyBipartiteME, "entanglement_entropy/ME/bipartite", true);
 			
 			// save the averages epsilon
 			saveAlgebraic(dir, "avs" + randomStr + extension, arma::vec(_toCheckEps), "eps", false);
-
+			
+			// go through the operators
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
@@ -1256,14 +1265,11 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				saveAlgebraic(dir, "evo" + randomStr + extension, _timeZeroME[_opi], _name + "/zero/ME", true);
 
 				// diagonal ensemble
-				saveAlgebraic(dir, "avs" + randomStr + extension, _diagonalME[_opi], _name + "/diag/ME", true);
-				saveAlgebraic(dir, "avs" + randomStr + extension, _diagonal2ME[_opi], _name + "/diag2/ME", true);
-
-				// microcanonical
-				saveAlgebraic(dir, "avs" + randomStr + extension, arma::mat(_microcanonicalME[_opi].rows(1, _toCheckEps.size())), _name + "/micro/ME", true);
+				saveAlgebraic(dir, "avs" + randomStr + extension, _microcanonicalME[_opi], _name + "/micro/ME", true);
+				saveAlgebraic(dir, "avs" + randomStr + extension, _microcanonical2ME[_opi], _name + "/micro2/ME", true);
 
 				// long time average
-				saveAlgebraic(dir, "avs" + randomStr + extension, arma::vec(_microcanonicalME[_opi].row(0).as_col()), _name + "/long/ME", true);
+				saveAlgebraic(dir, "avs" + randomStr + extension, arma::vec(_diagonalME.row(_opi).as_col()), _name + "/diagonal/ME", true);
 			}
 
 			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
@@ -1322,28 +1328,23 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			{
 				// calculate the diagonals
 				const auto& _matrices				= _measure.getOpG_mat();
+				const auto& _eigvec					= _H->getEigVec();
 
 #pragma omp parallel for num_threads(_Ns < 14 ? this->threadNum : 2)
 				for (int _opi = 0; _opi < _ops.size(); ++_opi)
 				{
-					// overlaps 
-					_diagonals[_opi].col(_r) = Operators::applyOverlapMat(_H->getEigVec(), _matrices[_opi]).diag();
-					
-					//for (int i = 0; i < _Nh; ++i)
-					//	_diagonals[_opi](i, _r)		= Operators::applyOverlap(_H->getEigVec(i), _matrices[_opi]);
+					_diagonals[_opi].col(_r) = Operators::applyOverlapMat(_eigvec, _matrices[_opi]).diag();
 				}
 
 				// evolve the states
 				_evolveState(_r, _initial_state_me, _ldos_me, _energydensitiesME,  
-					_diagonalME, _diagonal2ME, _microcanonicalME, _timeEvolutionME, _timeZeroME, _matrices);
+					_microcanonicalME, _microcanonical2ME, _diagonalME, _timeEvolutionME, _timeZeroME, _matrices);
 			}
 		}
 		// save the checkpoints
-		if ((_Ns >= 14 && (_r % 4 == 0)) || (_Ns < 14 && (_r % 25 == 0)))
-		{
-			// save the diagonals
+		if (check_saving_size(_Nh, _r))
 			_saver(_r);
-		}
+
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 		// -----------------------------------------------------------------------------
 	}

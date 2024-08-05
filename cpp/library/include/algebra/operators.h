@@ -14,6 +14,10 @@
 #	include "quantities/entropy.h"
 #endif // !ENTROPY_H
 
+#define OPERATOR_SEP "/"
+#define OPERATOR_SEP_CORR "-"
+#define OPERATOR_SEP_DIV "_"
+
 namespace Operators 
 {
 	// ##########################################################################################################################################
@@ -21,6 +25,23 @@ namespace Operators
 	constexpr double _SPIN			=		0.5;
 	constexpr double _SPIN_RBM		=		_SPIN;
 
+	// ##########################################################################################################################################
+	
+	inline std::string createOperatorName(const std::string& _name, const std::string& _type)
+	{
+		return _type + std::string(OPERATOR_SEP) + _name;
+	}
+
+	inline std::string createOperatorName(const std::string& _name, const std::string& _type, const std::string& _site)
+	{
+		return _type + std::string(OPERATOR_SEP) + _name + OPERATOR_SEP + _site;
+	}
+
+	inline std::string createOperatorName(const std::string& _name, const std::string& _type, const std::string& _site, const std::string& _site2)
+	{
+		return _type + std::string(OPERATOR_SEP) + _name + OPERATOR_SEP + _site + OPERATOR_SEP_CORR + _site2;
+	}
+	
 	// ##########################################################################################################################################
 
 	/*
@@ -62,16 +83,7 @@ namespace Operators
 	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, const GeneralizedMatrix<_T2>& _mat)
 	{
 		if (_mat.isSparse())
-			return _eigvecs.t() * (_mat.toDense() * _eigvecs);
-		else
-			return _eigvecs.t() * (_mat.getDense() * _eigvecs);
-	}
-
-	template<typename _T, typename _T2>
-	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, GeneralizedMatrix<_T2>& _mat)
-	{
-		if (_mat.isSparse())
-			return _eigvecs.t() * (_mat.toDense() * _eigvecs);
+			return _eigvecs.t() * (arma::SpMat<_T2>(_mat.getSparse()) * _eigvecs);
 		else
 			return _eigvecs.t() * (_mat.getDense() * _eigvecs);
 	}

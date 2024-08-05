@@ -428,10 +428,10 @@ inline void QSM<_T>::initializeParticles()
 	this->Hdot_		= this->gamma_ / std::sqrt(this->dimIn_ + 1) * this->Hdot_;
 #if QSM_CHECK_HS_NORM
 	// check the Hilbert-Schmidt norm
-	_T _norm = SystemProperties::hilber_schmidt_norm(this->Hdot_);
+	_T _norm		= SystemProperties::hilber_schmidt_norm(this->Hdot_);
 	LOGINFO("QSM_DOT_NORM: " + VEQP(_norm, 5), LOG_TYPES::CHOICE, 3);
 	this->Hdot_		/= std::sqrt(_norm);
-	_norm = SystemProperties::hilber_schmidt_norm(this->Hdot_);
+	_norm			= SystemProperties::hilber_schmidt_norm(this->Hdot_);
 	LOGINFO("QSM_DOT_NORM_AFTER: " + VEQP(_norm, 5), LOG_TYPES::CHOICE, 4);
 #endif
 }
@@ -495,14 +495,9 @@ inline void QSM<_T>::hamiltonian()
 	this->init();
 
 	// print disorder 
+	LOGINFO("QSM: alpha=" + STRP(this->a_[0], 5) + ", xi=" + STRP(this->xi_[0], 5), LOG_TYPES::INFO, 2);
 	for(int i = 0; i < this->Nout_; ++i)
-	{
 		LOGINFO("QSM: i=" + STR(i) + " -> h=" + STRP(this->h_[i], 5) + ", a^u=" + STRP(this->au_[i], 5), LOG_TYPES::INFO, 2);
-	}
-
-#ifdef _DEBUG
-	std::cout << this->H_.getSparse() << std::endl;
-#endif
 
 	// go through all the elements of the Hilbert space
 	for (u64 k = 0; k < this->Nh; ++k) 

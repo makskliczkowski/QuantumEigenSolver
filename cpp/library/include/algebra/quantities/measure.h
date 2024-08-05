@@ -287,7 +287,7 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 			else
 			{
 				// inner matrix
-				GeneralizedMatrix<_T> _Min = _op->template generateMat<true, _T, GeneralizedMatrix>(_dim);
+				GeneralizedMatrix<_T> _Min = _op->template generateMat<false, _T, GeneralizedMatrix>(_dim);
 				// push the operator
 				this->MG_.push_back(_Min);
 			}
