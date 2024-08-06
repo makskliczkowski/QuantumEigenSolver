@@ -14,12 +14,14 @@
 #	include "../algebra/operators.h"
 #endif // !OPERATORS_H
 
-#define SYSTEM_PROPERTIES_MIN_SPACING 1e-15
-#define SYSTEM_PROPERTIES_THROW_DEGENERATE 1
-#define SYSTEM_PROPERTIES_COEFF_THRESHOLD 1e-9
-#define SYSTEM_PROPERTIES_USE_OPENMP 0
+constexpr auto SYSTEM_PROPERTIES_MIN_SPACING = 1e-15;
+constexpr auto SYSTEM_PROPERTIES_THROW_DEGENERATE = 1;
+constexpr auto SYSTEM_PROPERTIES_COEFF_THRESHOLD = 1e-9;
+constexpr auto SYSTEM_PROPERTIES_USE_OPENMP = 0;
 
 // -------------------------------------------------------------------------------
+#ifndef SYSTEM_PROPERTIES_H
+#define SYSTEM_PROPERTIES_H
 
 namespace SystemProperties
 {
@@ -1066,3 +1068,5 @@ namespace SystemProperties
 		};
 	};
 };
+
+#endif // __SYSTEM_PROPERTIES_H__
