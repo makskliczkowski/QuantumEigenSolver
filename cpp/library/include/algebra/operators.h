@@ -144,6 +144,7 @@ namespace Operators
 		stout << "Operator Max: "				<< _mat.max() << EL;
 		stout << "Operator Min: "				<< _mat.min() << EL;
 		stout << "Operator Mean: "				<< _mat.mean() << EL;
+#endif
 	}
 
 	// ##########################################################################################################################################
@@ -542,5 +543,3 @@ namespace Operators
 //	if (cal_entro)
 //		av_op.ent_entro = this->entanglement_entropy_sweep(eigvec);
 //}
-
-#endif

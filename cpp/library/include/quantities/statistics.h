@@ -226,7 +226,7 @@ namespace SystemProperties
 			return algebra::cast<_R>(_out);
 		}
 
-	};
+	}
 
 	// ---------------------------------------------------------------------------
 
@@ -1066,8 +1066,8 @@ namespace SystemProperties
 			{
 				return -(1.0 / PI) * arma::imag(_G);
 			}
-		};
-	};
-};
+		}
+	}
+}
 
 #endif // __SYSTEM_PROPERTIES_H__

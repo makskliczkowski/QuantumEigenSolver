@@ -154,61 +154,8 @@ public:
 public:
 	// --------------------------------------------- OPERATORS -----------------------------------------------
 
-	Hamiltonian<_T, _spinModes>& operator=(const Hamiltonian<_T, _spinModes>& _other)
-	{
-		if (this != _other)
-		{
-			this->hilbertSpace	= _other.hilbertSpace;
-			this->lat_			= _other.lat_;
-			this->Ns_			= _other.Ns_;
-			this->Ns			= _other.Ns;
-			this->Nh_			= _other.Nh_;
-			this->Nh			= _other.Nh;
-			this->isQuadratic_	= _other.isQuadratic_;
-			this->isManyBody_	= _other.isManyBody_;
-			this->isSparse_		= _other.isSparse_;
-			this->avEnIdx		= _other.avEnIdx;
-			this->avEn			= _other.avEn;
-			this->stdEn			= _other.stdEn;
-			this->minEn			= _other.minEn;
-			this->maxEn			= _other.maxEn;
-			this->H_			= _other.H_;
-			this->eigVec_		= _other.eigVec_;
-			this->K_			= _other.K_;
-			this->eigVal_		= _other.eigVal_;
-			this->ran_			= _other.ran_;
-			this->info_			= _other.info_;
-		}
-		return *this;
-	}
-
-	Hamiltonian<_T, _spinModes> operator=(Hamiltonian<_T, _spinModes>&& _other)
-	{
-		if (this != _other)
-		{
-			this->hilbertSpace	= std::move(_other.hilbertSpace);
-			this->lat_			= _other.lat_;
-			this->Ns_			= _other.Ns_;
-			this->Ns			= _other.Ns;
-			this->Nh_			= _other.Nh_;
-			this->Nh			= _other.Nh;
-			this->isQuadratic_	= _other.isQuadratic_;
-			this->isManyBody_	= _other.isManyBody_;
-			this->isSparse_		= _other.isSparse_;
-			this->avEnIdx		= _other.avEnIdx;
-			this->avEn			= _other.avEn;
-			this->stdEn			= _other.stdEn;
-			this->minEn			= _other.minEn;
-			this->maxEn			= _other.maxEn;
-			this->H_			= std::move(_other.H_);
-			this->eigVec_		= std::move(_other.eigVec_);
-			this->K_			= std::move(_other.K_);
-			this->eigVal_		= std::move(_other.eigVal_);
-			this->ran_			= _other.ran_;
-			this->info_			= _other.info_;
-		}
-		return *this;
-	}
+	Hamiltonian<_T, _spinModes>& operator=(const Hamiltonian<_T, _spinModes>& _other);
+	Hamiltonian<_T, _spinModes> operator=(Hamiltonian<_T, _spinModes>&& _other);
 
 	// ---------------------------------------------- PRINTERS -----------------------------------------------
 
@@ -380,7 +327,75 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hilbert::HilbertSpace<_T, _spinM
 	this->Ns_	=	this->Ns;
 	this->Nh	=	this->hilbertSpace.getHilbertSize();
 	this->Nh_	=	this->Nh;
-};			
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T, _spinModes>& Hamiltonian<_T, _spinModes>::operator=(const Hamiltonian<_T, _spinModes>& _other)
+{
+	if (this != _other)
+	{
+		this->hilbertSpace	= _other.hilbertSpace;
+		this->lat_			= _other.lat_;
+		this->Ns_			= _other.Ns_;
+		this->Ns			= _other.Ns;
+		this->Nh_			= _other.Nh_;
+		this->Nh			= _other.Nh;
+		this->isQuadratic_	= _other.isQuadratic_;
+		this->isManyBody_	= _other.isManyBody_;
+		this->isSparse_		= _other.isSparse_;
+		this->avEnIdx		= _other.avEnIdx;
+		this->avEn			= _other.avEn;
+		this->stdEn			= _other.stdEn;
+		this->minEn			= _other.minEn;
+		this->maxEn			= _other.maxEn;
+		this->H_			= _other.H_;
+		this->eigVec_		= _other.eigVec_;
+		this->K_			= _other.K_;
+		this->eigVal_		= _other.eigVal_;
+		this->ran_			= _other.ran_;
+		this->info_			= _other.info_;
+	}
+	return *this;
+}
+
+template<typename _T, uint _spinModes>
+inline Hamiltonian<_T,_spinModes> Hamiltonian<_T, _spinModes>::operator=(Hamiltonian<_T,_spinModes>&& _other)
+{
+	if (this != &_other)
+	{
+		this->hilbertSpace = std::move(_other.hilbertSpace);
+		this->lat_ = std::move(_other.lat_);
+		this->Ns_ = _other.Ns_;
+		this->Ns = _other.Ns;
+		this->Nh_ = _other.Nh_;
+		this->Nh = _other.Nh;
+		this->isQuadratic_ = _other.isQuadratic_;
+		this->isManyBody_ = _other.isManyBody_;
+		this->isSparse_ = _other.isSparse_;
+		this->avEnIdx = _other.avEnIdx;
+		this->avEn = _other.avEn;
+		this->stdEn = _other.stdEn;
+		this->minEn = _other.minEn;
+		this->maxEn = _other.maxEn;
+		this->H_ = std::move(_other.H_);
+		this->eigVec_ = std::move(_other.eigVec_);
+		this->K_ = std::move(_other.K_);
+		this->eigVal_ = std::move(_other.eigVal_);
+		this->ran_ = std::move(_other.ran_);
+		this->info_ = std::move(_other.info_);
+		// Optional: nullify or reset _other's members if needed
+		_other.lat_ = nullptr;
+		_other.H_ = GeneralizedMatrix<_T>();
+		_other.eigVal_ = arma::vec();
+		_other.eigVec_ = arma::Mat<_T>();
+		// Continue as needed
+	}
+	return *this;
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------------------
 
 /*
 * @brief Copy constructor of the Hamiltonian class. It copies all the elements of the Hamiltonian. 
