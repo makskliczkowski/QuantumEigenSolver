@@ -1067,7 +1067,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	// save the time evolution here
 	VMAT<_T> _timeEvolutionME(_ops.size(), _timespace.size(), this->modP.modRanN_, arma::fill::zeros);
 	// entropies to take
-	v_1d<int> _entropiesSites			= {1, int(_Ns / 2), _Ns - 1, _Ns};
+	v_1d<int> _entropiesSites			= {1, int(_Ns / 2), (int)(_Ns - 1), (int)_Ns};
 	VMAT<double> _timeEntropyME(4, _timespace.size(), this->modP.modRanN_, arma::fill::zeros);
 	arma::Mat<double> _timeEntropyBipartiteME(_timespace.size(), this->modP.modRanN_, arma::fill::zeros);
 	v_1d<arma::Col<_T>> _timeZeroME(_ops.size(), arma::Col<_T>(this->modP.modRanN_, arma::fill::zeros));
