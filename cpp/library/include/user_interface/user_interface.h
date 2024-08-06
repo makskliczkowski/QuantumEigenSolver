@@ -16,30 +16,6 @@
 #	include <mutex>
 #endif
 
-// ######################### MODELS #########################
-#if 1
-#ifndef ISING_H											 // #
-#	include "../models/ising.h"							 // #
-#endif // !ISING_H										 // #
-#ifndef XYZ_H											 // #
-#	include "../models/XYZ.h"							 // #
-#endif // !XYZ_H										 // #
-#ifndef HEISENBERG_KITAEV_H								 // #
-#	include "../models/heisenberg-kitaev.h"				 // #
-#endif													 // #
-// random Hamiltonians									 // #
-#ifndef QSM_H											 // #
-#	include "../models/quantum_sun.h"					 // #
-#endif													 // #
-#ifndef ROSENZWEIG_PORTER_H								 // #
-#	include "../models/rosenzweig-porter.h"				 // #
-#endif													 // #
-#ifndef ULTRAMETRIC_H									 // #
-#	include "../models/ultrametric.h"					 // #
-#endif													 // #
-#endif
-// ##########################################################
-
 // ######################### NQS ############################
 #if 1													 // #
 #define NQS_SAVE_WEIGHTS								 // #
@@ -76,6 +52,31 @@
 #	include "../NQS/rbm.h"								 // #
 #endif													 // #
 #endif 													 // #
+// ##########################################################
+
+
+// ######################### MODELS #########################
+#if 1
+#ifndef ISING_H											 // #
+#	include "../models/ising.h"							 // #
+#endif // !ISING_H										 // #
+#ifndef XYZ_H											 // #
+#	include "../models/XYZ.h"							 // #
+#endif // !XYZ_H										 // #
+#ifndef HEISENBERG_KITAEV_H								 // #
+#	include "../models/heisenberg-kitaev.h"				 // #
+#endif													 // #
+// random Hamiltonians									 // #
+#ifndef QSM_H											 // #
+#	include "../models/quantum_sun.h"					 // #
+#endif													 // #
+#ifndef ROSENZWEIG_PORTER_H								 // #
+#	include "../models/rosenzweig-porter.h"				 // #
+#endif													 // #
+#ifndef ULTRAMETRIC_H									 // #
+#	include "../models/ultrametric.h"					 // #
+#endif													 // #
+#endif
 // ##########################################################
 
 // ######################## MODELS Q ########################
