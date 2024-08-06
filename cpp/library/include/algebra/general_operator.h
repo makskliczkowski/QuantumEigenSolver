@@ -8,6 +8,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
+#ifndef GENERAL_OPERATOR_H
 #ifndef LATTICE_H
 #include "../../source/src/lattices.h"
 #endif
@@ -868,3 +869,5 @@ inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::O
 	// ##########################################################################################################################################
 
 }
+
+#endif // !GENERAL_OPERATOR_H

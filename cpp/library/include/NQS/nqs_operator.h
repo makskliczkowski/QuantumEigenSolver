@@ -8,10 +8,10 @@
 ***************************************/
 
 // #################################
-#ifndef HAMIL_H					// #
-#	include "../hamil.h"		// #
+//#ifndef HAMIL_H					// #
 #	include "../algebra/general_operator.h"
-#endif // !HAMIL_H				// #
+//#	include "../hamil.h"		// #
+//#endif // !HAMIL_H				// #
 // #################################
 
 // #################################
@@ -385,8 +385,8 @@ namespace Operators
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 // Average operators in the NQS
-#	ifndef NQS_AV_H
-#		define NQS_AV_H
+#ifndef NQS_AV_H
+#	define NQS_AV_H
 namespace NQSAv
 {
 //	// CREATE A MAPPING TO DECIDE WHICH OPERATORS TO USE
@@ -701,5 +701,5 @@ namespace NQSAv
 
 	////////////////////////////////////////////////////////////////////////////
 };
-#	endif 
+#endif 
 //////////////////////////////////////////////////////////////////////////////////////////
