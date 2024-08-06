@@ -8,10 +8,9 @@
 ***************************************/
 
 // #################################
-//#ifndef HAMIL_H					// #
-#	include "../algebra/general_operator.h"
-//#	include "../hamil.h"		// #
-//#endif // !HAMIL_H				// #
+#ifndef HAMIL_H
+#	include "../hamil.h"
+#endif
 // #################################
 
 // #################################

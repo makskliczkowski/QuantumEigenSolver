@@ -1,12 +1,13 @@
 #pragma once
-#ifndef HILBERTSYM_H
-#define HILBERTSYM_H
-
 /*******************************
 * Definitions for the operators 
 * and Hiblert space that handles
 * the symmetries etc.
 *******************************/
+
+#ifndef HILBERTSYM_H
+#define HILBERTSYM_H
+
 
 #include "algebra/general_operator.h"
 

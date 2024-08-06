@@ -6,6 +6,9 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
+#ifndef SYSTEM_PROPERTIES_H
+#define SYSTEM_PROPERTIES_H
+
 #ifndef SYMMETRIES_H
 #	include "../hilbert_sym.h"
 #endif // !SYMMETRIES_H
@@ -20,8 +23,6 @@ constexpr auto SYSTEM_PROPERTIES_COEFF_THRESHOLD = 1e-9;
 constexpr auto SYSTEM_PROPERTIES_USE_OPENMP = 0;
 
 // -------------------------------------------------------------------------------
-#ifndef SYSTEM_PROPERTIES_H
-#define SYSTEM_PROPERTIES_H
 
 namespace SystemProperties
 {
