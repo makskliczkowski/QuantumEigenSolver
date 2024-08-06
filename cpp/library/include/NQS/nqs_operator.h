@@ -10,6 +10,7 @@
 // #################################
 #ifndef HAMIL_H					// #
 #	include "../hamil.h"		// #
+#	include "../algebra/general_operator.h"
 #endif // !HAMIL_H				// #
 // #################################
 

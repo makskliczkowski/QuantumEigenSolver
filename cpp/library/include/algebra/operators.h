@@ -14,9 +14,9 @@
 #	include "quantities/entropy.h"
 #endif // !ENTROPY_H
 
-#define OPERATOR_SEP "/"
-#define OPERATOR_SEP_CORR "-"
-#define OPERATOR_SEP_DIV "_"
+constexpr auto OPERATOR_SEP			= "/";
+constexpr auto OPERATOR_SEP_CORR	= "-";
+constexpr auto OPERATOR_SEP_DIV		= "_";
 
 namespace Operators 
 {

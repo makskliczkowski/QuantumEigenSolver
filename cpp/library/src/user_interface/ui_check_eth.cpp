@@ -211,7 +211,7 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 
 			// nq - pi / 4
 			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI / 4.0)));
-			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi" OPERATOR_SEP_DIV "4"));
+			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi" + std::string(OPERATOR_SEP_DIV) + "4"));
 		}
 	}
 
