@@ -472,9 +472,9 @@ namespace Operators
 			_OP<double>::GLB fun_ = [_site_plus, _site_minus](u64 state) 
 				{ 
 					if(state == _site_minus)
-						return std::make_pair(_site_plus, 1.0);
+						return std::make_pair((u64)_site_plus, 1.0);
 					if(state == _site_plus)
-						return std::make_pair(_site_minus, 1.0);
+						return std::make_pair((u64)_site_minus, 1.0);
 					return std::make_pair(state, 0.0);
 				};
 
