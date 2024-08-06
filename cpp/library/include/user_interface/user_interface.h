@@ -109,9 +109,6 @@
 
 // ##################### STATISTICAL ########################
 #if 1													 // #
-#ifndef STATISTICS_H									 // #
-#include "../quantities/statistics.h"					 // #
-#endif													 // #
 #include "../algebra/quantities/measure.h"				 // #
 #endif													 // #
 // ##########################################################

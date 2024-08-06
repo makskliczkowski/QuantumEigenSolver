@@ -11,8 +11,6 @@
 
 #ifndef ROSENZWEIG_PORTER_H
 #	define ROSENZWEIG_PORTER_H
-#include "../quantities/statistics.h"
-
 template<typename _T>
 class RosenzweigPorter : public QuadraticHamiltonian<_T>
 {

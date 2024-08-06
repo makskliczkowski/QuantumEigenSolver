@@ -15,9 +15,6 @@
 
 // definitions
 #define QSM_CHECK_HS_NORM 1
-
-#include "../quantities/statistics.h"
-
 template<typename _T>
 class QSM : public Hamiltonian<_T, 2>
 {

@@ -13,8 +13,6 @@
 #	define ULTRAMETRIC_H
 #	define ULTRAMETRIC_USE_DIFFERENT_BLOCKS
 
-#include "../quantities/statistics.h"
-
 template<typename _T>
 class Ultrametric : public Hamiltonian<_T, 2>
 {
