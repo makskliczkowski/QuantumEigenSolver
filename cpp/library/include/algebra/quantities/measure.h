@@ -13,6 +13,7 @@ template <typename _T = std::complex<double>>
 class Measurement
 {
 private:
+	bool matInitialized_= false;
 
 	using MeasureGlobal = std::vector<_T>;
 	using MeasureLocal	= std::vector<arma::Col<_T>>;
@@ -48,10 +49,13 @@ protected:
 	std::shared_ptr<Lattice> lat_;
 	// global operators
 	OPG opG_;
+	strVec opGN_;
 	// local operators
 	OPL opL_;
+	strVec opLN_;
 	// correlation operators
 	OPC opC_;
+	strVec opCN_;
 public:
 	~Measurement();
 	Measurement(size_t _Ns,	const strVec& _operators, u64 _initial = 0);
@@ -161,7 +165,7 @@ template<typename _T>
 inline Measurement<_T>::Measurement(size_t _Ns, const strVec & _operators, u64 _initial)
 	: threads_(1), Ns_(_Ns)
 {
-	if(_initial > 0)
+	if(_initial > 0 && !this->matInitialized_)
 		this->initializeMatrices(_initial);
 }
 
@@ -180,7 +184,7 @@ inline Measurement<_T>::Measurement(size_t _Ns, const std::string & _dir,
 	// create directory
 	makeDir(_dir);
 	// initialize the matrices
-	if (_initial > 0)
+	if (_initial > 0 && !this->matInitialized_)
 		this->initializeMatrices(_initial);
 }
 
@@ -219,7 +223,7 @@ inline Measurement<_T>::Measurement(std::shared_ptr<Lattice> _lat, const std::st
 	// create directory
 	makeDir(_dir);
 	// initialize the matrices
-	if (_initial)
+	if (_initial && !this->matInitialized_)
 		this->initializeMatrices(_initial);
 }
 
@@ -230,13 +234,18 @@ inline Measurement<_T>::Measurement(size_t _Ns,
 									const strVec& _opGN,
 									uint _threadNum,
 									u64 _initial)
-	: Measurement<_T>(_Ns, _dir, _opG, {}, {}, _threadNum, _initial)
+	: dir_(_dir), threads_(_threadNum), Ns_(_Ns), opG_(_opG), opGN_(_opGN), opL_({}), opC_({})
 {
+	CONSTRUCTOR_CALL;
+	// create directory
+	makeDir(_dir);
+	// set the names
 	if (_opGN.size() == _opG.size())
-	{
 		for(auto i = 0; i < _opGN.size(); ++i)
 			this->opG_[i]->setNameS(_opGN[i]);
-	}
+	// initialize the matrices
+	if (_initial > 0 && !this->matInitialized_)
+		this->initializeMatrices(_initial);
 }
 
 // ############################################################################################################################################################
@@ -276,6 +285,7 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 		// measure global
 		for (std::shared_ptr<Operators::Operator<_T>> _op : this->opG_)
 		{
+			// check if the operator is quadratic
 			bool _isquadratic = _op->getIsQuadratic();
 			if (_isquadratic)
 			{
@@ -330,6 +340,8 @@ inline void Measurement<_T>::initializeMatrices(u64 _dim)
 	//	}
 	//}
 	//END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+	this->matInitialized_ = true;
 }
 
 // ############################################################################################################################################################

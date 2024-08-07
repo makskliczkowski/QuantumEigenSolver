@@ -206,11 +206,11 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			_opsN.push_back(Operators::createOperatorName(_type, "site_occupation_r"));
 
 			// nq - pi
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, _Nh / 2)));
 			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi"));
 
 			// nq - pi / 4
-			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, PI / 4.0)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::QuadraticOperators::site_nq(_Nh, _Nh / 8)));
 			_opsN.push_back(Operators::createOperatorName(_type, "nq", "pi" + std::string(OPERATOR_SEP_DIV) + "4"));
 		}
 	}
@@ -606,6 +606,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	arma::Mat<double> _gapsall		= -1e5 * arma::Mat<double>(_Nh - 2, this->modP.modRanN_, arma::fill::ones);
 	// mean lvl
 	arma::Col<double> _meanlvl		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Col<double> _bandwidth	= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Col<double> _H2			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
 
 	// create the measurement class
 	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
@@ -699,6 +701,10 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
 		};
 
+	// bandwidth limits
+	double oMaxBW = 1.0;
+	double oMinBW = 1.0 / _Nh;
+
 	// go through realizations
 	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
 	{
@@ -726,6 +732,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 		// -----------------------------------------------------------------------------
 		
+		// energy concerned
 		{
 			// -----------------------------------------------------------------------------
 
@@ -756,6 +763,14 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(_r, 0)), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 			}
 
+			// bandwidth
+			{
+				_bandwidth(_r)	= _H->getBandwidth();
+				_H2(_r)			= _H->getEnergyWidth();
+				LOGINFO(StrParser::colorize(VEQ(_bandwidth(_r, 0)), StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_H2(_r, 0)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+			}
+
 			// -----------------------------------------------------------------------------
 		}
 
@@ -764,9 +779,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// set the uniform distribution of frequencies in logspace for the f-functions!!!
 		if (_r == 0)
 		{
-
-			double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
-			double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
+			// values that are the limits when the 
+			double oMax			= oMaxBW * _bandwidth(0);
+			double oMin			= oMinBW * _bandwidth(0);
+			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
+			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 
 			// set the histograms
 			for (auto iHist = 0; iHist < _ops.size(); ++iHist)
@@ -801,7 +818,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						_entroFirst(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, 1, uint(_Ns));
 						_entroLast(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, 1, uint(_Ns), 1, Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT, 2);
 					}
-
 				}
 
 				// -----------------------------------------------------------------------------
@@ -814,7 +830,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 					// go through the operators
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(_Ns < 13 ? this->threadNum : 1)
+#pragma omp parallel for num_threads(_Nh <= ULLPOW(13) ? this->threadNum : 1)
 #endif
 					for (int _opi = 0; _opi < _matrices.size(); _opi++)
 					{
@@ -874,9 +890,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 								const auto _en_r = _H->getEigVal(j);
 
 								// check the energy difference
-								if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_))
+								if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_ * _bandwidth(_r)))
 									continue;
-
 
 								// calculate the frequency
 								const double w			= std::abs(_en_l - _en_r);

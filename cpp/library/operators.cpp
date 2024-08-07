@@ -327,16 +327,13 @@ namespace Operators
 					GeneralizedMatrix<double> _out(_Ns, true);
 					_out.set(_site, _site, 1.0);
 
-					// info
-					operatorInfo(_out);
-
 					return _out;
 				};
 
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setFun(std::move(fun_));
+			_op.setFun(std::move(_mat));
 			return _op;		
 		}
 
@@ -364,9 +361,6 @@ namespace Operators
 					// set the values
 					for (size_t i = 0; i < _coeffs.size(); i++)
 						_out.set(i, i, _coeffs[i]);
-					
-					// info
-					operatorInfo(_out);
 
 					return _out;
 				};
@@ -374,7 +368,7 @@ namespace Operators
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setFun(std::move(fun_));
+			_op.setFun(std::move(_mat));
 			return _op;		
 		}
 
@@ -407,16 +401,13 @@ namespace Operators
 					for (auto i = 0; i < _sites.size(); i++)
 						_out.set(_sites[i], _sites[i], _coeffs[i]);
 
-					// info
-					operatorInfo(_out);
-
 					return _out;
 				};
 
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setFun(std::move(fun_));
+			_op.setFun(std::move(_mat));
 			return _op;		
 		}
 
@@ -428,7 +419,7 @@ namespace Operators
 		* @param _momentum the momentum to be added
 		* @param _standarize if the operator should be standarized
 		*/
-		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum)
+		Operators::Operator<double> site_nq(size_t _Ns, const size_t _momentum)
 		{
 			const auto _k = TWOPI * double(_momentum) / double(_Ns);
 
@@ -445,16 +436,13 @@ namespace Operators
 					for (auto i = 0; i < _Ns; i++)
 						_out.set(i, i, std::cos(_k * i));	
 
-					// info
-					operatorInfo(_out);
-
 					return _out;
 				};
 
 			// set the operator
 			Operator<double> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setFun(std::move(fun_));
+			_op.setFun(std::move(_mat));
 			return _op;			
 		}
 
@@ -486,9 +474,6 @@ namespace Operators
 					_out.set(_site_plus, _site_minus, 1.0);
 					_out.set(_site_minus, _site_plus, 1.0);
 
-					// info
-					operatorInfo(_out);
-
 					return _out;
 				};
 
@@ -501,7 +486,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum, bool _standarize)
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const size_t _momentum, bool _standarize)
 		{
 			_OP<std::complex<double>>::GLB fun_ = [](u64 _state) 
 				{ 
@@ -510,15 +495,12 @@ namespace Operators
 
 			GeneralizedMatrixFunction<std::complex<double>> _mat = [_momentum](size_t _Ns)
 				{
-					GeneralizedMatrix<std::complex<double>> _out(_Ns, true);
+					GeneralizedMatrix<std::complex<double>> _out(_Ns, false);
 
 					// set the values
 					for (auto i = 0; i < _Ns; i++)
 						for (auto j = 0; j < _Ns; j++)
 							_out.set(i, j, std::exp(I * double(TWOPI) * double(_momentum * (i - j) / _Ns)) / (double)(_Ns));
-
-					// info
-					operatorInfo(_out);
 
 					return _out;
 				};
@@ -527,7 +509,7 @@ namespace Operators
 			// set the operator
 			Operator<std::complex<double>> _op(_Ns, 1.0, fun_, SymGenerators::OTHER);
 			_op.setIsQuadratic(true);
-			_op.setFun(std::move(fun_));
+			_op.setFun(std::move(_mat));
 			return _op;			
 		}
 
@@ -545,15 +527,13 @@ namespace Operators
 
 			GeneralizedMatrixFunction<double> _mat = [](size_t _Ns)
 				{
-					GeneralizedMatrix<double> _out(_Ns, true);
+					GeneralizedMatrix<double> _out(_Ns, false);
 
 					// set the values
+					auto _val = 1.0 / (double)(_Ns);
 					for (auto i = 0; i < _Ns; i++)
 						for (auto j = 0; j < _Ns; j++)
-							_out.set(i, j, 1.0 / (double)(_Ns));
-
-					// info
-					operatorInfo(_out);
+							_out.set(i, j, _val);
 
 					return _out;
 				};

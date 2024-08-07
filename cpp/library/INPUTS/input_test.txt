@@ -20,7 +20,7 @@
 # 	45 - run the QSM ETH simulation - statistics - sweep time evolution - Ljubljana 2024
 # 	46 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 
--fun 46
+-fun 42
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
 # 	1  - Transverse Ising
@@ -62,7 +62,7 @@
 -l 0
 -d 1
 # for the models that are not defined on a lattice
--Ntot 10
+-Ntot 8
 -Ntots 7, 8, 9, 10
 #-Ntots 64;128;256;512;1024
 #-Ntots 11;2000

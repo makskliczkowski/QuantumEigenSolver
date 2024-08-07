@@ -47,6 +47,54 @@ namespace Operators {
 		_mat		= _mat / std::sqrt(_Hs);	
 	}
 
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Prints the operator information. This is only available in debug mode.
+	* @param _mat the matrix to print the information about
+	*/
+	template<typename _T, template<class _T2 = _T> typename _MatT>
+	inline void operatorInfo(const _MatT<_T>& _mat)
+	{
+#ifdef _DEBUG
+		try {
+			stout << "---------------"				<< EL;
+			stout << "Operator Info: "				<< EL;
+			stout << "Operator Trace: "				<< arma::trace(_mat) << EL;
+			stout << "Operator Frobenius Norm: "	<< arma::trace(_mat * _mat) / (double)_mat.n_rows << EL;
+			stout << "Operator Max: "				<< arma::max(_mat) << EL;
+			stout << "Operator Min: "				<< arma::min(_mat) << EL;
+			stout << "Operator Mean: "				<< arma::mean(_mat) << EL;
+			stout << "---------------"				<< EL;
+		}
+		catch (const std::exception& e)
+		{
+			LOGINFO("Error in operatorInfo: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+		}
+#endif
+	}
+
+	template<typename _T>
+	inline void operatorInfo(const GeneralizedMatrix<_T>& _mat)
+	{
+#ifdef _DEBUG
+		try {
+			stout << "---------------"				<< EL;
+			stout << "Operator Info: "				<< EL;
+			stout << "Operator Trace: "				<< _mat.trace() << EL;
+			stout << "Operator Frobenius Norm: "	<< _mat.hsnorm() << EL;
+			stout << "Operator Max: "				<< _mat.max() << EL;
+			stout << "Operator Min: "				<< _mat.min() << EL;
+			stout << "Operator Mean: "				<< _mat.mean() << EL;
+			stout << "---------------"				<< EL;
+		}
+		catch (const std::exception& e)
+		{
+			LOGINFO("Error in operatorInfo: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+		}
+#endif
+	}
+
 	// ################################################################# G E N E R A L ##########################################################################
 
 
@@ -436,6 +484,10 @@ template<bool _standarize, typename _TinMat, template <class> class _MatType, ty
 typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 	Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
+#ifdef _DEBUG
+	LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+#endif
+
 	_MatType<_TinMat> op(_dim, _dim);
 
 	// check whether the operator is quadratic
@@ -466,9 +518,13 @@ typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_In
 
 	}
 
+
 	// standarize the operator
-	if(_standarize)
+	if (_standarize)
+	{
 		Operators::standarizeOperator(op);
+		Operators::operatorInfo(op);
+	}
 	return op;
 }
 
@@ -486,14 +542,15 @@ template<bool _standarize, typename _TinMat, template <class> class _MatType, ty
 typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
 Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 {
+#ifdef _DEBUG
+	LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+#endif
+
 	GeneralizedMatrix<_TinMat> op(_dim);
 
 	// check whether the operator is quadratic
 	if (this->overridenMatFun_ && this->isQuadratic_)
 	{
-#ifdef _DEBUG
-		LOGINFO("Operator is quadratic, going into!", LOG_TYPES::INFO, 1);
-#endif
 		op = this->overridenMatFun_(_dim);
 	}
 	else
@@ -510,7 +567,10 @@ Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 
 	// standarize the operator
 	if (_standarize)
+	{
 		op.standarize();
+		Operators::operatorInfo(op);
+	}
 	return op;
 }
 

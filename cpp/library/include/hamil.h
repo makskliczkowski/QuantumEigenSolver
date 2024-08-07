@@ -188,12 +188,15 @@ public:
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
 	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
+	// energy
+	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_)) / (long double)this->Nh_;		};
+	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
+	virtual auto getEnergyWidth()						const -> double								{ return algebra::cast<double>(this->H_.getEnergyWidth());						};
 	// hamiltonian
-	virtual auto getMeanLevelSpacing()					const -> double								{ return this->H_.meanLevelSpacing();											};
 	auto getHamiltonian()								const -> const GeneralizedMatrix<_T>&		{ return this->H_;																};
 	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
-	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_.get(0, 0));								};								
+	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_.get(0, 0));							};								
 	virtual auto getHamiltonianSizeH()					const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
 	auto getSymRot()									const -> arma::SpMat<_T>					{ return this->hilbertSpace.getSymRot();										};
 	// eigenvectors

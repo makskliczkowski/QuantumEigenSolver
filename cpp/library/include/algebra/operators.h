@@ -27,17 +27,17 @@ namespace Operators
 
 	// ##########################################################################################################################################
 	
-	inline std::string createOperatorName(const std::string& _name, const std::string& _type)
+	inline std::string createOperatorName(const std::string& _type, const std::string& _name)
 	{
 		return _type + std::string(OPERATOR_SEP) + _name;
 	}
 
-	inline std::string createOperatorName(const std::string& _name, const std::string& _type, const std::string& _site)
+	inline std::string createOperatorName(const std::string& _type, const std::string& _name, const std::string& _site)
 	{
 		return _type + std::string(OPERATOR_SEP) + _name + OPERATOR_SEP + _site;
 	}
 
-	inline std::string createOperatorName(const std::string& _name, const std::string& _type, const std::string& _site, const std::string& _site2)
+	inline std::string createOperatorName(const std::string& _type, const std::string& _name, const std::string& _site, const std::string& _site2)
 	{
 		return _type + std::string(OPERATOR_SEP) + _name + OPERATOR_SEP + _site + OPERATOR_SEP_CORR + _site2;
 	}
@@ -116,38 +116,6 @@ namespace Operators
 	}
 
 	// ##########################################################################################################################################
-	
-	/*
-	* @brief Prints the operator information. This is only available in debug mode.
-	* @param _mat the matrix to print the information about
-	*/
-	template<typename _T, template<class _T2 = _T> typename _MatT>
-	inline void operatorInfo(const _MatT<_T>& _mat)
-	{
-#ifdef _DEBUG
-		stout << "Operator Info: "				<< EL;
-		stout << "Operator Trace: "				<< arma::trace(_mat) << EL;
-		stout << "Operator Frobenius Norm: "	<< arma::norm(_mat, "fro") << EL;
-		stout << "Operator Max: "				<< arma::max(_mat) << EL;
-		stout << "Operator Min: "				<< arma::min(_mat) << EL;
-		stout << "Operator Mean: "				<< arma::mean(_mat) << EL;
-#endif
-	}
-
-	template<typename _T>
-	inline void operatorInfo(const GeneralizedMatrix<_T>& _mat)
-	{
-#ifdef _DEBUG
-		stout << "Operator Info: "				<< EL;
-		stout << "Operator Trace: "				<< _mat.trace() << EL;
-		stout << "Operator Frobenius Norm: "	<< _mat.norm("fro") << EL;
-		stout << "Operator Max: "				<< _mat.max() << EL;
-		stout << "Operator Min: "				<< _mat.min() << EL;
-		stout << "Operator Mean: "				<< _mat.mean() << EL;
-#endif
-	}
-
-	// ##########################################################################################################################################
 
 	/*
 	* @brief The spin operator namespace. Contains the most common spin operators.
@@ -180,7 +148,7 @@ namespace Operators
 
 		// -------- n_q Operators --------
 		
-		Operators::Operator<double> site_nq(size_t _Ns, const uint _momentum);
+		Operators::Operator<double> site_nq(size_t _Ns, const size_t _momentum);
 
 		// ------ n_i n_j Operators ------
 
@@ -188,7 +156,7 @@ namespace Operators
 
 		// --- quasimomentum Operators ---
 
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const uint _momentum);
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const size_t _momentum);
 		Operators::Operator<double> quasimomentum_occupation(size_t _Ns);
 
 		// ----- kinectic Operators ------
