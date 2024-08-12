@@ -101,11 +101,14 @@ const std::string DEF_INFO_SEP		= std::string("_");												// defalut separa
 
 // ##########################################################################################################################################
 
+//template <typename T>
+//concept Arithmetic = std::is_arithmetic_v<T>;
+
 template <typename _T, uint _spinModes = 2>
 class Hamiltonian 
 {
 public:
-	// definitions
+	// definitions 
 	using NQSFun										= std::function<cpx(std::initializer_list<int>, std::initializer_list<double>)>;
 	const uint Nhl										= _spinModes;
 
@@ -155,7 +158,7 @@ public:
 	// --------------------------------------------- OPERATORS -----------------------------------------------
 
 	Hamiltonian<_T, _spinModes>& operator=(const Hamiltonian<_T, _spinModes>& _other);
-	Hamiltonian<_T, _spinModes> operator=(Hamiltonian<_T, _spinModes>&& _other);
+	Hamiltonian<_T, _spinModes>& operator=(Hamiltonian<_T, _spinModes>&& _other) noexcept;
 
 	// ---------------------------------------------- PRINTERS -----------------------------------------------
 
@@ -181,7 +184,6 @@ public:
 	auto getEnArndAvIdx(long long _l, long long _r)		const -> std::pair<u64, u64>;
 	auto getEnArndEIdx(long long _l, long long _r, u64)	const -> std::pair<u64, u64>;
 	auto getEnArndEnEps(u64 _Eidx, double _eps)			const -> std::pair<u64, u64>;
-
 	auto getEnPairsIdx(u64 _mn, u64 _mx, double _tol)	const -> v_1d<std::tuple<double, u64, u64>>;
 	auto getEnAvIdx()									const -> u64								{ return this->avEnIdx;															};								
 	auto getEnAv()										const -> double								{ return this->avEn;															};
@@ -221,8 +223,8 @@ public:
 	auto getNs()										const -> uint								{ return this->Ns_;																};
 	auto getBC()										const -> BoundaryConditions					{ return this->lat_->get_BC();													};
 	// quadratic
-	auto getIsQuadratic()								const -> bool								{ return this->isQuadratic_; };
-	auto getIsManyBody()								const -> bool								{ return this->isManyBody_; };
+	auto getIsQuadratic()								const -> bool								{ return this->isQuadratic_;													};
+	auto getIsManyBody()								const -> bool								{ return this->isManyBody_;														};
 
 	// ------------------------------------------- SETTERS -----------------------------------------------------
 	
@@ -230,8 +232,8 @@ public:
 
 	// ----------------------------------------- HAMILTONIAN ---------------------------------------------------
 protected:
-	virtual auto checkQuadratic()						-> void										{ this->isQuadratic_ = false; };
 	virtual void hamiltonian();
+	virtual auto checkQuadratic()						-> void										{ this->isQuadratic_ = false;													};
 	virtual auto setHElem(u64 k, _T val, u64 newIdx)	-> void;									// sets the Hamiltonian elements in a virtual way
 	auto calcAvEn()										-> void;									// calculate the average energy
 public:
@@ -268,7 +270,7 @@ public:
 	void clearEigVec()									{ this->eigVec_.reset();					}; // resets the eigenvectors memory to 0
 	void clearEigVal()									{ this->eigVal_.reset();					}; // resets the energy memory to 0
 	virtual void clearH()								{ this->H_.reset();							}; // resets the hamiltonian memory to 0
-	void clear()										{ this->clearEigVec(); this->clearEigVal(); this->clearH();	}; 
+	void clear();
 
 	// --------------------------------------------- OTHER -----------------------------------------------------
 };
@@ -364,7 +366,7 @@ inline Hamiltonian<_T, _spinModes>& Hamiltonian<_T, _spinModes>::operator=(const
 }
 
 template<typename _T, uint _spinModes>
-inline Hamiltonian<_T,_spinModes> Hamiltonian<_T, _spinModes>::operator=(Hamiltonian<_T,_spinModes>&& _other)
+inline Hamiltonian<_T,_spinModes>& Hamiltonian<_T, _spinModes>::operator=(Hamiltonian<_T,_spinModes>&& _other) noexcept
 {
 	if (this != &_other)
 	{
@@ -820,6 +822,20 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 	}
 	END_CATCH_HANDLER("Memory exceeded. DIM(H)=" + STR(this->H_.size() * sizeof(this->H_(0, 0))) + " bytes", ;);
 }
+
+
+// ##########################################################################################################################################
+
+/*
+* @brief Clears the memory of the Hamiltonian, eigenvectors and eigenvalues
+*/
+template<typename _T, uint _spinModes>
+inline void Hamiltonian<_T, _spinModes>::clear()
+{ 
+	this->clearEigVec(); 
+	this->clearEigVal(); 
+	this->clearH();
+}; 
 
 // ##########################################################################################################################################
 

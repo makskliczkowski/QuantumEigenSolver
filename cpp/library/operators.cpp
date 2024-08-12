@@ -319,6 +319,8 @@ namespace Operators
 		*/
 		Operators::Operator<double> site_occupation(size_t _Ns, const size_t _site)
 		{
+			if (_site >= _Ns) throw std::out_of_range("Site index is out of range.");
+
 			// create the function
 			_OP<double>::GLB fun_ = [_site](u64 _state) { return (_site == _state) ? std::make_pair(_state, 1.0) : std::make_pair(_state, 0.0); };
 
@@ -326,7 +328,6 @@ namespace Operators
 				{
 					GeneralizedMatrix<double> _out(_Ns, true);
 					_out.set(_site, _site, 1.0);
-
 					return _out;
 				};
 
@@ -486,7 +487,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const size_t _momentum, bool _standarize)
+		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const size_t _momentum)
 		{
 			_OP<std::complex<double>>::GLB fun_ = [](u64 _state) 
 				{ 

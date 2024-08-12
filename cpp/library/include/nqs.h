@@ -336,7 +336,7 @@ inline bool NQS<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 	LOGINFO("Saving the checkpoint configuration.", LOG_TYPES::INFO, 2, '#');
 
 	// save the weights to a given path
-	auto _isSaved = saveAlgebraic<_T>(_path, _file, this->F_, "weights");
+	auto _isSaved = saveAlgebraic(_path, _file, this->F_, "weights");
 
 	// if not saved properly
 	if (!_isSaved && (_file != "weights.h5"))
@@ -360,7 +360,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, std::string _file)
 {
 	LOGINFO("Loading the checkpoint weights:", LOG_TYPES::INFO, 2);
-	return loadAlgebraic<_T>(_path, _file, this->F_, "weights");
+	return loadAlgebraic(_path, _file, this->F_, "weights");
 }
 
 // ##########################################################################################################################################

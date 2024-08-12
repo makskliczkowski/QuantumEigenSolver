@@ -8,6 +8,7 @@
 
 /*
 * @brief Class that stores the measurements is able to save them.
+* !TODO: Transform this to std::variant!
 */
 template <typename _T = std::complex<double>>
 class Measurement

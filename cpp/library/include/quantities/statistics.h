@@ -444,22 +444,31 @@ namespace SystemProperties
 	*/
 	template <typename _iterator>
 	[[nodiscard]]
-	inline long double eigenlevel_statistics(_iterator begin, _iterator end)
+	inline long double eigenlevel_statistics(const _iterator& begin, const _iterator& end)
 	{
 		// number of elements inside the range 
 		// (move them, so that we can define
 		// previous and next element)
-		const _iterator first	= std::next(begin);
-		const _iterator last	= std::prev(end);
-		auto E_prev				= *begin;
+		//const _iterator first	= std::next(begin);
+		//const _iterator last	= std::prev(end);
+		//auto E_prev				= *begin;
+		auto it					= begin;
+		auto E_prev				= *it;
+		++it;
+		auto E_cur				= *it;
 
 		long double r			= 0.0;
-		for (auto it = first; it != last; ++it) 
+		size_t _count			= 0;
+		//for (auto it = first; it != last; ++it) 
+		for(++it; it != end; ++it)
 		{
-			auto E_next			= *std::next(it);
+			//auto E_next			= *std::next(it);
+			auto E_next					= *it;
 
-			const double delta_n        = (*it) - E_prev;
-			const double delta_n_next   = E_next - (*it);
+			//const double delta_n        = (*it) - E_prev;
+			//const double delta_n_next   = E_next - (*it);
+			const double delta_n        = E_cur - E_prev;
+			const double delta_n_next   = E_next - (E_cur);
 
 			const double min = std::min(delta_n, delta_n_next);
 			const double max = std::max(delta_n, delta_n_next);
@@ -476,15 +485,34 @@ namespace SystemProperties
 			}
 			r += min / max;
 
-			E_prev = (*it);
+			//E_prev = (*it);
+			E_prev = E_cur;
+			E_cur  = E_next;
+			++_count;
 		}
-		return r / std::distance(first, last);
+		//return r / std::distance(first, last);
+		return r / _count;
 	}
 
 	// ---------------------------------------------------------------------------
 
+	//template <typename _iterator, typename _Container>
+	//inline void eigenlevel_statistics(_iterator begin, _iterator end, _Container& _vec)
+	//{
+	//	const size_t size       = std::distance(begin, end);
+	//	// reset container
+	//	if(_vec.size() != size - 2)
+	//		_vec				= _Container(size - 2);
+
+	//	for (auto it = begin; it != end - 2; ++it)
+	//	{
+	//		auto _dist = std::distance(begin, it);
+	//		_vec[_dist] = eigenlevel_statistics(it, it + 3);
+	//	}
+	//}
+
 	template <typename _iterator, typename _Container>
-	inline void eigenlevel_statistics(_iterator begin, _iterator end, _Container& _vec)
+	inline void eigenlevel_statistics(const _iterator& begin, const _iterator& end, _Container& _vec)
 	{
 		const size_t size       = std::distance(begin, end);
 		// reset container
@@ -503,6 +531,15 @@ namespace SystemProperties
 	template <typename _Container>
 	[[nodiscard]]
 	inline long double eigenlevel_statistics(const _Container& _energies)
+	{
+		return eigenlevel_statistics(_energies.begin(), _energies.end());
+	}
+
+	// ---------------------------------------------------------------------------
+
+	template <typename _Container>
+	[[nodiscard]]
+	inline long double eigenlevel_statistics(_Container& _energies)
 	{
 		return eigenlevel_statistics(_energies.begin(), _energies.end());
 	}
