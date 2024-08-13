@@ -204,6 +204,7 @@ public:
 	// eigenvectors
 	auto getEigVec()									const -> const arma::Mat<_T>&				{ return this->eigVec_;															};							
 	auto getEigVec(u64 idx)								const -> arma::subview_col<_T>				{ return this->eigVec_.col(idx);												};			
+	auto getEigVecCol(u64 idx)							const -> arma::Col<_T>						{ return this->eigVec_.col(idx);												};
 	auto getEigVec(u64 idx, u64 elem)					const -> _T									{ return this->eigVal_(elem, idx);												};				
 	auto getEigVec(std::string _dir, u64 _mid, 
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;

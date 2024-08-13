@@ -504,7 +504,6 @@ namespace UI_PARAMS
 */
 class UI : public UserInterface 
 {
-
 protected:
 
 	// LATTICE params
@@ -587,8 +586,33 @@ private:
 	void ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r = 0, uint _spinChanged = 0);
 	template<typename _T>
 	void checkETH(std::shared_ptr<Hamiltonian<_T>> _H);
+	
 	template<typename _T>
 	void checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H);
+
+	template<typename _T>
+	std::array<double, 6> checkETH_statistics_mat_elems(
+		u64 _start,
+		u64 _end,
+		u64 _Nh,
+		std::atomic<size_t>& _statiter,
+		std::shared_ptr<Hamiltonian<_T>> _H,
+		const arma::Mat<_T>& _overlaps,
+		HistogramAverage<double>& _histAv,
+		HistogramAverage<double>& _histAvTypical,
+		arma::Mat<double>& _offdiagElemsOmega,
+		arma::Mat<double>& _offdiagElemsOmegaLow,
+		VMAT<_T>& _offdiagElems,
+		VMAT<_T>& _offdiagElemsLow,
+		VMAT<double>& _offdiagElemesStat,
+		const double _bandwidth = 2.0,
+		const double _avEn = 0.0,
+		int _opi = 0,
+		int _r = 0,
+		int _th	= -1
+	);
+
+
 	template<typename _T>
 	void checkETH_scaling_offdiag(std::shared_ptr<Hamiltonian<_T>> _H);
 	template<typename _T>

@@ -3,9 +3,9 @@
 //#define LOG_FILE					//
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#ifdef _DEBUG
- //#	include "vld.h"
-#endif
+//#ifdef _DEBUG
+ #	include "vld.h"
+//#endif
 constexpr auto ARMA_VEC_SEED = 0;
 
 // %%%%%%%%%%%%% N Q S %%%%%%%%%%%%%%%
