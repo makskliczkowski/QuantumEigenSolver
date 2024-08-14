@@ -48,6 +48,9 @@ namespace SystemProperties
 		{
 			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
 			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);
+
+			// try armadillo multiplication
+			//return _eigenstates * (_exp % _overlaps);
 		
 			// go through the eigenstates
 //#ifndef _DEBUG
@@ -198,6 +201,7 @@ namespace SystemProperties
 			{
 				auto _mean	= arma::mean(_energies);
 				auto _idx	= arma::index_min(arma::abs(_energies - _mean));
+				LOGINFO(VEQ(_mean) + ":" + VEQ(_idx), LOG_TYPES::TRACE, 3);
 				_ret(_idx)	= 1.0;				
 				break;
 			}
