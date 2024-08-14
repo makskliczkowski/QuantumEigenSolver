@@ -46,11 +46,12 @@ namespace SystemProperties
 														const double _time,
 														size_t _threads = 1)
 		{
-			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
 			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);
-
 			// try armadillo multiplication
-			//return _eigenstates * (_exp % _overlaps);
+			return _eigenstates * (_exp % _overlaps);
+
+			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
+
 		
 			// go through the eigenstates
 //#ifndef _DEBUG
