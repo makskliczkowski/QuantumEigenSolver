@@ -48,20 +48,20 @@ namespace SystemProperties
 		{
 			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);
 			// try armadillo multiplication
-			return _eigenstates * (_exp % _overlaps);
+			//return _eigenstates * (_exp % _overlaps);
 
-			//arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
+			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
 
 		
 			// go through the eigenstates
 //#ifndef _DEBUG
 //#pragma omp parallel for num_threads(_threads) reduction(+: _ret)
 //#endif // _DEBUG
-			//for (auto i = 0; i < _eigenstates.n_cols; ++i)
-			//{
-				//_ret += _exp(i) * _overlaps(i) * _eigenstates.col(i);
-			//}
-			//return _ret;
+			for (auto i = 0; i < _eigenstates.n_cols; ++i)
+			{
+				_ret += _exp(i) * _overlaps(i) * _eigenstates.col(i);
+			}
+			return _ret;
 		}
 
 		// ---------------------------------------------------------------------------
