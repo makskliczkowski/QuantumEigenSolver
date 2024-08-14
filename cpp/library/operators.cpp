@@ -897,3 +897,78 @@ Operators::Operator<double> Operators::makeCDn(std::shared_ptr<Lattice> _lat, ui
 	_OP<double>::GLB fun_ = [&](u64 state) { return Operators::c_dn(state, _lat->get_Ns(), { _site }); };
 	return Operator<double>(_lat, 1.0, fun_, (SymGenerators)FermionicOperators::C_DOWN_DAG);
 }
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+// ##############################################################################################################################
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Create a parser for the operator names. It allows to parse the names of the operators and return the corresponding operator.
+* @param _inputs the input strings
+*/
+strVec Operators::OperatorNameParser::parse(const strVec & _inputs)
+{
+	strVec _out = {};
+
+	// go through all the strings
+	for (const auto& _str : _inputs)
+	{
+		// check if the string is empty
+		strVec _outstings = this->parse(_str);
+		for (const auto& _outstr : _outstings)
+		{
+			if (_outstr.size() != 0)
+				_out.push_back(_outstr);
+		}
+	}
+
+	return _out;
+}
+
+strVec Operators::OperatorNameParser::parse(const std::string & _input)
+{
+	strVec _out = {};
+
+	// go through all the strings
+	if(_input.find(OPERATOR_SEP) != std::string::npos)
+	{
+		// Assume default format {operator}/1.L.1
+		strVec _splitted = Vectors::split(_input, OPERATOR_SEP);
+		for
+	}
+	else
+	{
+		_out.push_back(parseDefault(_input));
+	}
+
+	return _out;
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+std::string Operators::OperatorNameParser::parseSingleOperator(const std::string & _input)
+{
+	auto _posSep = _input.find(OPERATOR_SEP);
+	if (_posSep == std::string::npos)
+		throw std::invalid_argument("The operator name: " + _input + " is not valid.");
+
+	// get the operator name
+	const auto _opName		= _input.substr(0, _posSep);
+	const auto _indexStr	= _input.substr(_posSep + 1);
+
+	if(_indexStr == "L")
+		return 
+
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+std::string Operators::OperatorNameParser::parseDefault(const std::string & _input)
+{
+	return parseSingleOperator(_input + "/1.L.1");
+}
+
+// #############################################################################################################################
+

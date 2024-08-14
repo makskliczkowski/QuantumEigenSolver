@@ -41,7 +41,7 @@ namespace Operators
 	{
 		return _type + std::string(OPERATOR_SEP) + _name + OPERATOR_SEP + _site + OPERATOR_SEP_CORR + _site2;
 	}
-	
+
 	// ##########################################################################################################################################
 
 	/*
@@ -225,6 +225,31 @@ namespace Operators
 
 	std::pair<u64, double> c_dn(u64 base_vec, uint L, v_1d<uint> _sites);
 	Operators::Operator<double> makeCDn(std::shared_ptr<Lattice> _lat, uint _site);
+
+	// ##########################################################################################################################################
+
+	class OperatorNameParser
+	{
+	private:
+		size_t L_;
+	public:
+		OperatorNameParser(size_t L) : L_(L) {};
+		
+		// parse input 
+		strVec parse(const strVec& _inputs);
+
+	private:
+		// parse single input
+		strVec parse(const std::string& _input);
+
+		// parse default (without the site separator)
+		std::string parseDefault(const std::string& _input);
+
+		// parse with the sites after "/"
+		std::string parseSingleOperator(const std::string& _input);
+
+	};
+
 };
 
 #endif
