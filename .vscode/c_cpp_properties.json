@@ -4,12 +4,14 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/thinkpad/libraries/armadillo-12.0.0/include/"
+                "/home/thinkpad/libraries/armadillo-12.0.0/include/",
+                "/home/klimak/libraries/armadillo-14.0.2/include/",
+                "*/${ARMADILLO_INCL_DIR}"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "cppStandard": "c++20",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],

@@ -16,6 +16,8 @@
 
 constexpr auto OPERATOR_SEP			= "/";
 constexpr auto OPERATOR_SEP_CORR	= "-";
+constexpr auto OPERATOR_SEP_MULT 	= ",";
+constexpr auto OPERATOR_SEP_RANGE	= ".";
 constexpr auto OPERATOR_SEP_DIV		= "_";
 
 namespace Operators 
@@ -243,10 +245,34 @@ namespace Operators
 		strVec parse(const std::string& _input);
 
 		// parse default (without the site separator)
-		std::string parseDefault(const std::string& _input);
+		strVec parseDefault(const std::string& _input);
 
 		// parse with the sites after "/"
 		std::string parseSingleOperator(const std::string& _input);
+
+		// parse with correlation after "-"
+		strVec parseCorrelationOperator(const std::string& _input);
+
+		// parse multiple operators
+		strVec parseMultipleOperators(const std::string& _input);
+
+		// parse range of sites
+		strVec parseRangeOperators(const std::string& _input);
+
+		// --------------------------------------------------------------------------------------------
+		
+		// resolve the operator name from the input sites
+		std::pair<std::string, std::string> resolveOperatorSeparator(const std::string& _input);
+
+		// resolve the site
+		int resolveSite(const std::string& _site);
+
+		std::vector<int> resolveSites(const strVec& _sites);
+
+		strVec resolveSitesMultiple(const std::string& _sites);
+
+		// resolve the correlation recursively
+		void resolveCorrelation(const std::vector<strVec>& _list, strVec& _currentCombination, size_t _depth, strVec& _out);
 
 	};
 

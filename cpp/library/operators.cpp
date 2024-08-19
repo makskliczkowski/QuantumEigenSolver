@@ -908,7 +908,7 @@ Operators::Operator<double> Operators::makeCDn(std::shared_ptr<Lattice> _lat, ui
 * @brief Create a parser for the operator names. It allows to parse the names of the operators and return the corresponding operator.
 * @param _inputs the input strings
 */
-strVec Operators::OperatorNameParser::parse(const strVec & _inputs)
+strVec Operators::OperatorNameParser::parse(const strVec& _inputs)
 {
 	strVec _out = {};
 
@@ -927,20 +927,30 @@ strVec Operators::OperatorNameParser::parse(const strVec & _inputs)
 	return _out;
 }
 
-strVec Operators::OperatorNameParser::parse(const std::string & _input)
+/*
+* @brief Parse the operator name and return the corresponding operator.
+* @param _input the input string
+* @returns the operator names as strings
+*/
+strVec Operators::OperatorNameParser::parse(const std::string& _input)
 {
 	strVec _out = {};
 
 	// go through all the strings
-	if(_input.find(OPERATOR_SEP) != std::string::npos)
-	{
+	if(_input.find(OPERATOR_SEP) != std::string::npos) {
 		// Assume default format {operator}/1.L.1
-		strVec _splitted = Vectors::split(_input, OPERATOR_SEP);
-		for
-	}
-	else
-	{
-		_out.push_back(parseDefault(_input));
+		_out = this->parseDefault(_input); 
+	} else if(_input.find(OPERATOR_SEP_CORR) != std::string::npos) {
+		// This is the correlation operator then, must be handled separately
+		// {operator}/{index1}_{index2}_..._{indexN}
+		_out = this->parseCorrelationOperator(_input);
+	} else if(_input.find(OPERATOR_SEP_MULT) != std::string::npos) {
+		// This is the multiple operator then, must be handled separately
+		_out = this->parseMultipleOperators(_input);
+	} else if (_input.find(OPERATOR_SEP_RANGE) != std::string::npos) {
+		_out = this->parseRangeOperators(_input);
+	} else {
+		_out.push_back(this->parseSingleOperator(_input));
 	}
 
 	return _out;
@@ -948,7 +958,112 @@ strVec Operators::OperatorNameParser::parse(const std::string & _input)
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-std::string Operators::OperatorNameParser::parseSingleOperator(const std::string & _input)
+/*
+* @brief Parse the site given as a string and return the corresponding site.
+* The format is {site} or {site}/{div} where div is the divisor of the site.
+* @param _input the input string
+*/
+int Operators::OperatorNameParser::resolveSite(const std::string &_site)
+{
+	if(_site == "L") {
+		return this->L_;
+	} else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
+		auto _div = std::stoi(splitStr(_site, OPERATOR_SEP_DIV)[1]);
+		return this->L_ / _div;
+	}
+	return std::stoi(_site);
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Given single site ranges (something that occurs after /) resolve the sites.
+* @param _sites the sites to resolve
+*/
+strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_sites)
+{
+    strVec _out = {};
+
+	if (_sites.find(OPERATOR_SEP_MULT) != std::string::npos) {
+		for (const auto& _str : splitStr(_sites, OPERATOR_SEP_MULT))
+			_out.push_back(std::to_string(this->resolveSite(_str)));
+	} else if (_sites.find(OPERATOR_SEP_RANGE) != std::string::npos) {
+		auto _str = splitStr(_sites, OPERATOR_SEP_RANGE);	
+		if (_str.size() == 3)
+		{
+			// throw std::invalid_argument("The range: " + _sites + " is not valid.");		
+			auto _start = this->resolveSite(_str[0]);
+			auto _end 	= this->resolveSite(_str[1]);
+			auto _step 	= this->resolveSite(_str[2]);
+
+			for (auto i = _start; i <= _end; i += _step)
+				_out.push_back(std::to_string(i));
+		}
+	} else {
+		_out.push_back(_sites);
+	}
+	return _out;
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Parse the list of string sites and change them to the integer sites.
+* @param _sites the sites to resolve
+*/
+std::vector<int> Operators::OperatorNameParser::resolveSites(const strVec &_sites)
+{
+	std::vector<int> _out = {};
+
+	for (const auto& _site : _sites)
+		_out.push_back(this->resolveSite(_site));
+	return _out;
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Resolve the correlation operator. For a given depth in the list of all combinations, resolve the correlation.
+* It can be {{1, 2}, {3, 4}, {5, 6}} and then the depth is recursively resolved.
+* @param _list the list of the lists of all the sites
+* @param _currentCombination the current combination
+* @param _depth the current depth
+* @param _out the output
+*/
+void Operators::OperatorNameParser::resolveCorrelation(const std::vector<strVec>& _list, strVec &_currentCombination, size_t _depth, strVec &_out)
+{
+	// if we already reached the depth
+	if (_depth == _list.size())
+	{
+		std::string _str = "";
+		for (const auto& _el : _currentCombination)
+			_str += _el + OPERATOR_SEP_CORR;
+	
+		// remove the last separator
+		_str.pop_back();
+		_out.push_back(_str);
+
+		return;
+	}
+
+	// go through all the elements of the current depth
+	for (const auto& _el : _list[_depth])
+	{
+		_currentCombination.push_back(_el);
+		resolveCorrelation(_list, _currentCombination, _depth + 1, _out);
+		_currentCombination.pop_back();
+	}
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Checks whether the operator name is correctly formatted and returns the operator name and the index.
+* The format is {operator}/{index} where the index is the index of the operator (site) or multiple sites (operators).
+* @param _input the input string
+* @returns the pair of the operator name and the index
+*/
+std::pair<std::string, std::string> Operators::OperatorNameParser::resolveOperatorSeparator(const std::string &_input)
 {
 	auto _posSep = _input.find(OPERATOR_SEP);
 	if (_posSep == std::string::npos)
@@ -958,17 +1073,110 @@ std::string Operators::OperatorNameParser::parseSingleOperator(const std::string
 	const auto _opName		= _input.substr(0, _posSep);
 	const auto _indexStr	= _input.substr(_posSep + 1);
 
-	if(_indexStr == "L")
-		return 
-
+	return std::make_pair(_opName, _indexStr);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-std::string Operators::OperatorNameParser::parseDefault(const std::string & _input)
+/*
+* @brief Parse the operator name and return the corresponding operator for a single operator.
+* The format is {operator}/{index} where the index is the index of the operator (site).
+* @param _input the input string
+*/
+std::string Operators::OperatorNameParser::parseSingleOperator(const std::string & _input)
 {
-	return parseSingleOperator(_input + "/1.L.1");
+	// get the operator name
+	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
+
+	// site index
+	auto _index = this->resolveSite(_indexStr);
+
+	// return the operator name
+	return _opName + OPERATOR_SEP + std::to_string(_index);
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Parse the operator name and return the corresponding operator for a default operator.
+* The format is {operator} and it assumes that we have {operator}/1.L.1.
+*/
+strVec Operators::OperatorNameParser::parseDefault(const std::string & _input)
+{
+	return this->parse(_input + "/1.L.1");
 }
 
 // #############################################################################################################################
 
+/*
+* @brief Parse the operator name and return the corresponding operator for correlation operators.
+* The format is {operator}/{index1}_{index2}_..._{indexN} where the index is the index of the operator (site).
+*/
+strVec Operators::OperatorNameParser::parseCorrelationOperator(const std::string &_input)
+{
+	// get the operator name
+	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
+
+	// split for the potential indices (for each element there might be multiple sites)
+	strVec _potentialIndicies 		= splitStr(_indexStr, OPERATOR_SEP_CORR);
+
+	std::vector<strVec> _out 		= {};
+
+	// go through all the potential indices and resolve them
+	for (int i = 0; i < _potentialIndicies.size(); ++i)
+		_out.push_back(resolveSitesMultiple(_potentialIndicies[i]));
+
+	if (_out.size() == 0)
+		return {};
+
+	strVec _outOps 	= {};
+	strVec _current	= {};
+
+	// resolve the correlation
+	resolveCorrelation(_out, _current, 0, _outOps);
+
+	for (auto& _o: _outOps)
+		_o = _opName + OPERATOR_SEP + _o;
+
+	return _outOps;
+}
+
+// #############################################################################################################################
+
+/*
+* @brief Multiple operators of the form 
+* {operator}/{index1},{index2},...{indexN} where the index is the index of the operator (site).
+*/
+strVec Operators::OperatorNameParser::parseMultipleOperators(const std::string &_input)
+{
+	// get the operator name
+	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
+
+	// split for the potential indices
+	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr);
+
+	for (int i = 0; i < _potentialIndicies.size(); ++i)
+		_potentialIndicies[i] = _opName + OPERATOR_SEP + _potentialIndicies[i];
+
+	return _potentialIndicies;
+}
+
+// #############################################################################################################################
+
+/*
+* @brief Parse the operator name and return the corresponding operator for range operators.
+* The format is {operator}/{start}.{stop}_{step}
+*/
+strVec Operators::OperatorNameParser::parseRangeOperators(const std::string &_input)
+{
+	// get the operator name
+	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
+
+	// split for the potential indices
+	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr);
+
+	for (int i = 0; i < _potentialIndicies.size(); ++i)
+		_potentialIndicies[i] = _opName + OPERATOR_SEP + _potentialIndicies[i];
+
+	return _potentialIndicies;
+}
