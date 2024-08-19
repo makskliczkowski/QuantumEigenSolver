@@ -86,5 +86,7 @@
         "**/.vscode": true
     },
     "explorerExclude.backup": {},
-    "cmake.sourceDirectory": "/home/klimak/Codes/QuantumEigenSolver/cpp/library"
+    "cmake.sourceDirectory": "/home/klimak/Codes/QuantumEigenSolver/cpp/library",
+    "C_Cpp.intelliSenseEngineFallback": "enabled",
+    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json"
 }

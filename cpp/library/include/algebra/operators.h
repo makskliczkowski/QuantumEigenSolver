@@ -230,6 +230,40 @@ namespace Operators
 	Operators::Operator<double> makeCDn(std::shared_ptr<Lattice> _lat, uint _site);
 
 	// ##########################################################################################################################################
+	namespace OperatorTypes
+	{
+		// known operators
+		enum OperatorsAvailable { 
+			E =	0, 
+			Sx, 
+			Sy, 
+			Sz,
+			// quadratic
+			ni, 			// site occupation
+			nq,				// site modulation 
+			nn,				// site correlation 
+			nk,				// quasi-momentum occupation
+			nr, 			// site occupation (Random)
+			E2,				// identity squared - not used
+		};
+
+		BEGIN_ENUM(OperatorsAvailable)
+		{
+			DECL_ENUM_ELEMENT(E),
+			DECL_ENUM_ELEMENT(Sx),
+			DECL_ENUM_ELEMENT(Sy),
+			DECL_ENUM_ELEMENT(Sz),
+			DECL_ENUM_ELEMENT(ni),
+			DECL_ENUM_ELEMENT(nq),
+			DECL_ENUM_ELEMENT(nn),
+			DECL_ENUM_ELEMENT(nk),
+			DECL_ENUM_ELEMENT(nr),
+			DECL_ENUM_ELEMENT(E2)
+		}
+		END_ENUM(OperatorsAvailable)
+	}
+
+	// ##########################################################################################################################################
 
 	class OperatorNameParser
 	{
@@ -237,7 +271,23 @@ namespace Operators
 		size_t L_;
 		std::string Lstr_;
 	public:
-		OperatorNameParser(size_t L) : L_(L), Lstr_(std::to_string(L)) {};
+		// create a map of operators
+		std::map<std::string, Operators::OperatorTypes::OperatorsAvailable> operator_map_;
+
+		// --------------------------------------------------------------------------------------------
+
+		OperatorNameParser(size_t L) : L_(L), Lstr_(std::to_string(L)) 
+		{
+			for(int fooInt = static_cast<int>(OperatorTypes::OperatorsAvailable::E); fooInt != static_cast<int>(OperatorTypes::OperatorsAvailable::E2); fooInt++ )
+			{
+				if(fooInt == static_cast<int>(OperatorTypes::OperatorsAvailable::E2) || fooInt == static_cast<int>(OperatorTypes::OperatorsAvailable::E)) 
+					continue;
+				
+				// setup the name 
+				std::string fooStr 		= OperatorTypes::getSTR_OperatorsAvailable(static_cast<OperatorTypes::OperatorsAvailable>(fooInt));
+				operator_map_[fooStr] 	= static_cast<OperatorTypes::OperatorsAvailable>(fooInt);
+			}
+		};
 		
 		// parse input 
 		strVec parse(const strVec& _inputs);
@@ -267,14 +317,99 @@ namespace Operators
 		std::pair<std::string, std::string> resolveOperatorSeparator(const std::string& _input);
 
 		// resolve the site
-		int resolveSite(const std::string& _site);
+		double resolveSite(const std::string& _site);
 
-		std::vector<int> resolveSites(const strVec& _sites);
+		// std::string resolveSite(double _site);
+
+		std::vector<double> resolveSites(const strVec& _sites);
 
 		strVec resolveSitesMultiple(const std::string& _sites);
 
 		// resolve the correlation recursively
 		void resolveCorrelation(const std::vector<strVec>& _list, strVec& _currentCombination, size_t _depth, strVec& _out);
+
+		// --------------------------------------------------------------------------------------------
+	public:
+
+		template <typename _T>
+		Operator<_T> createGlobalOperator(const std::string& _input)
+		{
+			// resolve the operator and the sites
+			auto [op, sites] 		= this->resolveOperatorSeparator(_input);
+			
+			std::vector<double> _sites;
+			std::vector<uint> _sitesInt;
+			
+			// check if the sites contain the correlation
+			if (sites.find(OPERATOR_SEP_CORR) != std::string::npos)
+				for (auto& _site : splitStr(sites, OPERATOR_SEP_CORR))
+					_sites.push_back(std::stod(_site));
+			else
+				_sites = { std::stod(sites) };
+
+			// convert to integer
+			for(auto& _site : _sites)
+				_sitesInt.push_back(static_cast<uint>(_site));
+
+			// create the operator
+			switch (operator_map_[_input])
+			{
+			case OperatorTypes::OperatorsAvailable::Sx: 
+				return Operators::SpinOperators::sig_x(this->L_, _sitesInt);
+			case OperatorTypes::OperatorsAvailable::Sy:
+				break;
+				// return Operators::SpinOperators::sig_y(this->L_, _sites);
+			case OperatorTypes::OperatorsAvailable::Sz:
+				return Operators::SpinOperators::sig_z(this->L_, _sitesInt);
+			case OperatorTypes::OperatorsAvailable::ni:
+				return Operators::QuadraticOperators::site_occupation(this->L_, _sitesInt[0]);	
+			case OperatorTypes::OperatorsAvailable::nq:
+				return Operators::QuadraticOperators::site_nq(this->L_, _sites[0]);
+			case OperatorTypes::OperatorsAvailable::nn:
+				if(_sites.size() == 1)
+					return Operators::QuadraticOperators::nn_correlation(this->L_, _sitesInt[0], _sitesInt[0]);
+				else if (_sites.size() > 1)
+					return Operators::QuadraticOperators::nn_correlation(this->L_, _sitesInt[0], _sitesInt[1]);
+				break;
+			case OperatorTypes::OperatorsAvailable::nk:
+				if (_sites[0] == 0)
+					return Operators::QuadraticOperators::quasimomentum_occupation(this->L_);
+					// return Operators::QuadraticOperators::quasimomentum_occupation(this->L_, _sites[0]);
+			// case OperatorsAvailable::nr:
+				// return Operators::QuadraticOperators::site_occupation_r(this->L_);
+			default:
+				break;
+			};
+
+			return Operator<_T>();
+		}
+
+		template <typename _T>
+		std::vector<Operator<_T>> createGlobalOperators(const strVec& _inputs)
+		{
+			std::vector<Operator<_T>> ops;
+
+			// parse the input strings
+			strVec _outStr = this->parse(_inputs);
+
+			// create the operators
+			LOGINFO("Using operators: ", LOG_TYPES::INFO, 4);
+			for (int i = 0; i < _outStr.size(); i++)
+				std::cout << i << ")" << _outStr[i] << std::endl;
+			
+			// try to parse the operators
+			for (auto& op : _outStr)
+			{
+				Operator<_T> _opin = this->createGlobalOperator<_T>(op);
+
+				// check if the operator is valid
+				if (_opin.getNameS() != "" && _opin.getName())
+					ops.push_back(_opin);
+			}
+
+			return ops;
+		}
+
 
 	};
 

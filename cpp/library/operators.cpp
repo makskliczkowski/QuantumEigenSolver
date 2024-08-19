@@ -971,7 +971,7 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 * The format is {site} or {site}/{div} where div is the divisor of the site.
 * @param _input the input string
 */
-int Operators::OperatorNameParser::resolveSite(const std::string &_site)
+double Operators::OperatorNameParser::resolveSite(const std::string &_site)
 {
 	if(_site.length() == 0)
 		throw std::invalid_argument("The site: " + _site + " is not valid.");
@@ -984,14 +984,14 @@ int Operators::OperatorNameParser::resolveSite(const std::string &_site)
 	}
 	else if (_site.find(OPERATOR_SEP_DIFF) != std::string::npos) {
 		auto _diff = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIFF)[1]);
-		return std::max(0, (int)this->L_ - _diff);
+		return std::max(0.0, (int)this->L_ - _diff);
 	}
 
 	// simply return the site
-	auto _siteInt = std::stoi(_site);
+	auto _siteInt = std::stod(_site);
 	if (_siteInt < 0 || _siteInt > this->L_)
 		throw std::invalid_argument("The site: " + _site + " is out of range.");
-	return std::stoi(_site);
+	return std::stod(_site);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
@@ -1006,7 +1006,7 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 
 	if (_sites.find(OPERATOR_SEP_MULT) != std::string::npos) {
 		for (const auto& _str : splitStr(_sites, OPERATOR_SEP_MULT))
-			_out.push_back(std::to_string(this->resolveSite(_str)));
+			_out.push_back(STRP(this->resolveSite(_str), 3));
 	} else if (_sites.find(OPERATOR_SEP_RANGE) != std::string::npos) {
 		auto _str = splitStr(_sites, OPERATOR_SEP_RANGE);	
 		if (_str.size() == 3)
@@ -1017,10 +1017,10 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 			auto _step 	= this->resolveSite(_str[2]);
 
 			for (auto i = _start; i <= _end; i += _step)
-				_out.push_back(std::to_string(i));
+				_out.push_back(STRP(i, 3));
 		}
 	} else {
-		_out.push_back(std::to_string(this->resolveSite(_sites)));
+		_out.push_back(STRP(this->resolveSite(_sites), 3));
 	}
 	return _out;
 }
@@ -1031,9 +1031,9 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 * @brief Parse the list of string sites and change them to the integer sites.
 * @param _sites the sites to resolve
 */
-std::vector<int> Operators::OperatorNameParser::resolveSites(const strVec &_sites)
+std::vector<double> Operators::OperatorNameParser::resolveSites(const strVec &_sites)
 {
-	std::vector<int> _out = {};
+	std::vector<double> _out = {};
 
 	for (const auto& _site : _sites)
 		_out.push_back(this->resolveSite(_site));
@@ -1112,7 +1112,7 @@ std::string Operators::OperatorNameParser::parseSingleOperator(const std::string
 	auto _index = this->resolveSite(_indexStr);
 
 	// return the operator name
-	return _opName + OPERATOR_SEP + std::to_string(_index);
+	return _opName + OPERATOR_SEP + STRP(_index, 3);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
