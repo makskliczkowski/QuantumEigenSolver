@@ -924,6 +924,14 @@ strVec Operators::OperatorNameParser::parse(const strVec& _inputs)
 		}
 	}
 
+	// sort the output
+	std::sort(_out.begin(), _out.end());
+
+	// remove duplicates
+	auto _last = std::unique(_out.begin(), _out.end());
+
+	_out.erase(_last, _out.end());
+
 	return _out;
 }
 
@@ -937,7 +945,7 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 	strVec _out = {};
 
 	// go through all the strings
-	if(_input.find(OPERATOR_SEP) != std::string::npos) {
+	if(_input.find(OPERATOR_SEP) == std::string::npos) {
 		// Assume default format {operator}/1.L.1
 		_out = this->parseDefault(_input); 
 	} else if(_input.find(OPERATOR_SEP_CORR) != std::string::npos) {
@@ -965,12 +973,24 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 */
 int Operators::OperatorNameParser::resolveSite(const std::string &_site)
 {
+	if(_site.length() == 0)
+		throw std::invalid_argument("The site: " + _site + " is not valid.");
+
 	if(_site == "L") {
 		return this->L_;
 	} else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
-		auto _div = std::stoi(splitStr(_site, OPERATOR_SEP_DIV)[1]);
+		auto _div = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIV)[1]);
 		return this->L_ / _div;
 	}
+	else if (_site.find(OPERATOR_SEP_DIFF) != std::string::npos) {
+		auto _diff = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIFF)[1]);
+		return std::max(0, (int)this->L_ - _diff);
+	}
+
+	// simply return the site
+	auto _siteInt = std::stoi(_site);
+	if (_siteInt < 0 || _siteInt > this->L_)
+		throw std::invalid_argument("The site: " + _site + " is out of range.");
 	return std::stoi(_site);
 }
 
@@ -1000,7 +1020,7 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 				_out.push_back(std::to_string(i));
 		}
 	} else {
-		_out.push_back(_sites);
+		_out.push_back(std::to_string(this->resolveSite(_sites)));
 	}
 	return _out;
 }

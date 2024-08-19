@@ -17,6 +17,7 @@
 constexpr auto OPERATOR_SEP			= "/";
 constexpr auto OPERATOR_SEP_CORR	= "-";
 constexpr auto OPERATOR_SEP_MULT 	= ",";
+constexpr auto OPERATOR_SEP_DIFF	= "m";
 constexpr auto OPERATOR_SEP_RANGE	= ".";
 constexpr auto OPERATOR_SEP_DIV		= "_";
 
@@ -234,8 +235,9 @@ namespace Operators
 	{
 	private:
 		size_t L_;
+		std::string Lstr_;
 	public:
-		OperatorNameParser(size_t L) : L_(L) {};
+		OperatorNameParser(size_t L) : L_(L), Lstr_(std::to_string(L)) {};
 		
 		// parse input 
 		strVec parse(const strVec& _inputs);
