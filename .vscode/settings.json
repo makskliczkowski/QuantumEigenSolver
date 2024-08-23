@@ -83,7 +83,9 @@
         "**/CVS": true,
         "**/.DS_Store": true,
         "**/Thumbs.db": true,
-        "**/.vscode": true
+        "**/.vscode": true,
+        "**/.cache": true,
+        "**/.cmake": true
     },
     "explorerExclude.backup": {},
     "cmake.sourceDirectory": "/home/klimak/Codes/QuantumEigenSolver/cpp/library",

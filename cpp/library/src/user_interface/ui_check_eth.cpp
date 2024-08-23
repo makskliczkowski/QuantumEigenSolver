@@ -155,8 +155,8 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 		{
 			auto _type				= "mb";
 			// add z spins 
-			//v_1d<size_t> _toTake	= v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
-			v_1d<size_t> _toTake = v_1d<size_t>({ _Ns - 1 });
+			v_1d<size_t> _toTake	= v_1d<size_t>({ 0, (size_t)(_Ns / 2), _Ns - 1});
+			// v_1d<size_t> _toTake = v_1d<size_t>({ _Ns - 1 });
 
 			for (uint i : _toTake)
 			//for (uint i = 0; i < _Ns; ++i)
@@ -169,12 +169,12 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 			}
 
 			// add other operators
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
-			//_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(_Ns - 2), STR(_Ns - 1)));
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(0), (uint)(1) })));
-			//_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(0), STR(1)));
-			//_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
-			//_opsN.push_back(Operators::createOperatorName(_type, "sxc", STR(0), STR(_Ns - 1)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(_Ns - 2), (uint)(_Ns - 1) })));
+			_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(_Ns - 2), STR(_Ns - 1)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_z(this->latP.Ntot_, { (uint)(0), (uint)(1) })));
+			_opsN.push_back(Operators::createOperatorName(_type, "szc", STR(0), STR(1)));
+			_ops.push_back(std::make_shared<Operators::Operator<double>>(Operators::SpinOperators::sig_x(this->latP.Ntot_, { 0, (uint)_Ns - 1 })));
+			_opsN.push_back(Operators::createOperatorName(_type, "sxc", STR(0), STR(_Ns - 1)));
 		}
 
 		// add quadratic operators if applicable

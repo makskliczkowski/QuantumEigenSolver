@@ -42,8 +42,8 @@
 # 	q_man	- shall I use degenerate manifold? It currently applies to FF
 # 	q_mb 	- shall I also calculate the many body state (currently Slater determinant only)
 ### CHOOSE MODEL AND RANDOMNESS
--mod 4
--modRanN 5
+-mod 104
+-modRanN 20
 -modRanSeed 0
 # number of midspectrum states for the diagonal elements
 -modMidStates 0.7
@@ -55,14 +55,14 @@
 #	1 - RBM+PP
 -nqst 1
 #################################### LATTICE CHOICE ####################################
--th 1
+-th 12
 -bc 0
 -Lx 5 -Ly 20 -Lz 1
 # -Lx 40 -Ly 40 -Lz 1
 -l 0
 -d 1
 # for the models that are not defined on a lattice
--Ntot 8
+-Ntot 11
 -Ntots 7, 8, 9, 10
 #-Ntots 64;128;256;512;1024
 #-Ntots 11;2000
@@ -75,7 +75,7 @@
 
 #### QSM
 # vectors
--qsm_alpha 0.92
+-qsm_alpha 0.86
 -qsm_xi 0.2 
 -qsm_h r;1.0;0.5
 # other
@@ -90,7 +90,7 @@
 -rp_g_sweep_n 1
 #### ULTRAMETRIC
 -um_g 1.0
--um_alpha 0.96
+-um_alpha 0.6
 -um_N 3
 #### POWER LAW RANDOM BANDWIDTH
 -plrb_a 0.55
@@ -134,7 +134,10 @@
 ### load weights :)
 # -lNQS C:\University\PHD\CODES\VQMC\QSolver\cpp\library\DATA\nqs\HEX,PBC,d=2,Ns=16,Lx=4,Ly=2,Lz=1\,heikit,Ns=16,J=1.000,Kx=-0.500,Ky=1.000,Kz=1.000,delta=1.000,hz=0.000,hx=0.000,BC=0\RBM,mod=HEI_KIT_M,nv=16,nh=32,nS=2,lr=1.00e-02\WEIGHTS\
 ####################################### DIRECTORY ######################################
--dir ./RANDOM_MODELS_STRUCTURE
+#-dir ./RANDOM_MODELS_STRUCTURE
+-dir /media/klimak/ObiTwo/DATA
+
+########################################################################################
 # rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./
 # rsync --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:
 
