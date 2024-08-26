@@ -353,9 +353,39 @@ namespace Hilbert
 	inline void Hilbert::HilbertSpace<_T, _spinModes>::hi()
 	{
 		if (this->Nh == this->NhFull)
+		{
 			LOGINFO("Produced the full Hilbert space - no symmetries are used. Spin modes = " + STR(Nhl), LOG_TYPES::WARNING, 2);
+			LOGINFO("Number of lattice sites (Ns) = " + STR(Ns), LOG_TYPES::INFO, 3);
+			LOGINFO("Hilbert space size (Nh) = " + STR(Nh), LOG_TYPES::INFO, 3);
+		}
 		else if (this->Nh <= 0)
 			LOGINFO("No states in the Hilbert space", LOG_TYPES::WARNING, 2);
+		else
+		{
+			LOGINFO("Reduced Hilbert space produced using symmetries.", LOG_TYPES::INFO, 2);
+			LOGINFO("Spin modes = " + STR(Nhl), LOG_TYPES::INFO, 3);
+			LOGINFO("Number of lattice sites (Ns) = " + STR(Ns), LOG_TYPES::INFO, 3);
+			LOGINFO("Number of fermionic modes (Nint) = " + STR(Nint), LOG_TYPES::INFO, 3);
+			LOGINFO("Full Hilbert space size (NhFull) = " + STR(NhFull), LOG_TYPES::INFO, 3);
+			LOGINFO("Reduced Hilbert space size (Nh) = " + STR(Nh), LOG_TYPES::INFO, 3);
+			LOGINFO("Number of symmetry sectors = " + STR(symGroupSec_.size()), LOG_TYPES::INFO, 3);
+
+			if (!symGroupGlobal_.empty())
+			{
+				LOGINFO("Global symmetries used:", LOG_TYPES::INFO, 3);
+				for (const auto& sym : symGroupGlobal_)
+				{
+					LOGINFO(" - " + sym.getNameS() + " with value " + STR(sym.getVal()), LOG_TYPES::INFO, 4);
+				}
+			}
+			else
+				LOGINFO("No global symmetries applied.", LOG_TYPES::INFO, 3);
+
+			if (!symGroup_.empty())
+				LOGINFO("Local symmetry group operators applied:", LOG_TYPES::INFO, 2);
+			else
+				LOGINFO("No local symmetry group operators applied.", LOG_TYPES::INFO, 3);
+		}
 	}
 
 	/*

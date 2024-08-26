@@ -116,6 +116,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(modP, modRanSeed);
 		SETOPTION(modP, modMidStates);
 		SETOPTION(modP, modEnDiff);
+		// set operators vector
+		this->setOption<std::string>(modP.operators, argv, "op", "sz/L", true);
 
 		// ---- quadratic ----
 		{

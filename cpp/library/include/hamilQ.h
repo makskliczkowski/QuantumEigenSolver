@@ -31,25 +31,34 @@ inline bool isQuadraticRandom(uint _type)								// #
 			_type == (uint)MY_MODELS::SYK2_M	 ||						// #
 			_type == (uint)MY_MODELS::POWER_LAW_RANDOM_BANDED_M;		// #
 }																		// #
-inline bool isLatticeModel(MY_MODELS _m)
-{
-	switch (_m)
-	{
-	// quadratic
-	case MY_MODELS::RP_M:
-		return false;
-	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		return false;
-	default:
-		return true;
-	}
-}
+////////////////////////////////////////////////////////////////////////////
+inline bool isLatticeModel(MY_MODELS _m)								// #
+{																		// #		
+	switch (_m)															// #
+	{																	// #
+	// quadratic														// #
+	case MY_MODELS::RP_M:												// #
+		return false;													// #
+	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:							// #	
+		return false;													// #
+	// many body														// #
+	case MY_MODELS::SYK2_M:												// #
+		return false;													// #
+	case MY_MODELS::QSM_M:												// #
+		return false;													// #	
+	case MY_MODELS::ULTRAMETRIC_M:										// #
+		return false;													// #
+	default:															// #
+		return true;													// #
+	}																	// #
+}																		// #
+////////////////////////////////////////////////////////////////////////////
 inline std::string filenameQuadraticRandom(std::string _f,				// #
 	uint _type,															// #
 	randomGen& ran)														// #
 {																		// #
 	if (isQuadraticRandom(_type))										// #
-		return _f + "_R=" + STR(ran.randomInt<int>(0, 1000));			// #
+		return _f + "_R=" + STR(ran.randomInt<int>(0, 10000));			// #
 	return _f;															// #
 }																		// #
 // #########################################################################

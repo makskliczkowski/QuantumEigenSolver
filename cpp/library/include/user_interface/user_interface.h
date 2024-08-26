@@ -7,6 +7,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 #include "../../source/src/UserInterface/ui.h"
+#include <vector>
 
 #ifdef _DEBUG
 //	#define DEBUG_BINARY
@@ -152,6 +153,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(modRanSeed, u64, 0);		// seed for the random number generator
 		UI_PARAM_CREATE_DEFAULTD(modMidStates, double, 1.0);// states in the middle of the spectrum
 		UI_PARAM_CREATE_DEFAULTD(modEnDiff, double, 1.0);	// tolerance for the energy difference of the states in offdiagonal
+		std::vector<std::string> operators;					// operators to be calculated for the model
 
 		// ##########################################################################
 		
@@ -304,6 +306,11 @@ namespace UI_PARAMS
 		{
 			UI_PARAM_SET_DEFAULT(modTyp);
 
+			// -------------------------------------
+			// default operators
+			this->operators = {"sz/L", "sz/1"};
+
+			// -------------------------------------
 			// SPIN
 			{
 				// ising
@@ -496,6 +503,14 @@ namespace UI_PARAMS
 // ##########################################################################################################################################
 
 // ############################################################# U I N T E R F ##############################################################
+
+// ##########################################################################################################################################
+
+// for running the complex Hamiltonian or the real one
+#define RUN_CPX_REAL(TAKE_COMPLEX, _F, _MREAL, _MCPX) if (TAKE_COMPLEX) _F(_MCPX); else _F(_MREAL);
+// default containers
+#define UI_DEF_MAT_D(sizex, sizey) -1e5 * arma::ones<arma::Mat<double>>(sizex, sizey)
+#define UI_DEF_COL_D(size) -1e5 * arma::ones<arma::Col<double>>(size)
 
 // ##########################################################################################################################################
 

@@ -36,20 +36,21 @@ namespace GlobalSyms
 			: name_(_name), val_(_val), lat_(_lat)								{};
 
 		// ---------- SETTERS -----------
-		auto setFun(const repType& _fun)				-> void					{ this->check_ = _fun;							};
-		auto setFun(repType&& _fun)						-> void					{ this->check_ = std::move(_fun);				};
-		auto setName(GlobalSymGenerators _name)			-> void					{ this->name_ = _name;							};
+		auto setFun(const repType& _fun)				-> void					{ this->check_ = _fun;								};
+		auto setFun(repType&& _fun)						-> void					{ this->check_ = std::move(_fun);					};
+		auto setName(GlobalSymGenerators _name)			-> void					{ this->name_ = _name;								};
 
 		// ---------- GETTERS -----------
-		auto getName()							const -> GlobalSymGenerators	{ return this->name_;							};
-		auto getVal()									const -> double			{ return this->val_;							};
+		auto getNameS()									const -> std::string	{ return getSTR_GlobalSymGenerators(this->name_);	};
+		auto getName()							const -> GlobalSymGenerators	{ return this->name_;								};
+		auto getVal()									const -> double			{ return this->val_;								};
 		// ---------- CHECKER -----------
 
-		virtual auto operator()(u64 state) const		-> bool					{ return this->check_(state, val_);				};
-		virtual auto operator()(u64 state)				-> bool					{ return this->check_(state, val_);				};
+		virtual auto operator()(u64 state) const		-> bool					{ return this->check_(state, val_);					};
+		virtual auto operator()(u64 state)				-> bool					{ return this->check_(state, val_);					};
 
 		// --------- EXISTING ----------
-		auto check(u64 state, bool outCond) const		-> bool					{ return this->check_(state, val_) && outCond;	};
+		auto check(u64 state, bool outCond) const		-> bool					{ return this->check_(state, val_) && outCond;		};
 	};
 
 	// ###################################
@@ -57,7 +58,7 @@ namespace GlobalSyms
 	/*
 	* @brief describes the global check of U(1) symmetry
 	*/
-	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val;			};
+	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val;				};
 	inline GlobalSym getU1Sym(std::shared_ptr<Lattice> _lat, double _val)		
 	{ 
 		auto g = GlobalSym(_val, _lat, GlobalSymGenerators::U1); 

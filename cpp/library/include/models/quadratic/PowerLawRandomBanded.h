@@ -31,6 +31,8 @@ public:
 		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
+		// check if the model is quadratic
+		this->checkQuadratic();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
 	PowerLawRandomBanded(std::shared_ptr<Lattice> _lat, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
@@ -43,6 +45,8 @@ public:
 		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
+		// check if the model is quadratic
+		this->checkQuadratic();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
 	// Hilbert space constructor
@@ -56,6 +60,8 @@ public:
 		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
+		// check if the model is quadratic
+		this->checkQuadratic();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
 	// Hilbert space constructor move
@@ -69,41 +75,15 @@ public:
 		this->Nh	= this->Nh_;
 		this->type_ = MY_MODELS::POWER_LAW_RANDOM_BANDED_M;
 		this->info_ = this->info();
+		// check if the model is quadratic
+		this->checkQuadratic();
 		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
 	};
 
 
 	// ### H A M I L T O N I A N ###
 
-	void hamiltonian() override										
-	{ 
-		if (this->Nh == 0)
-		{
-			LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
-			return;
-		}
-		this->init();
-
-		// go through the Hamiltonian and set the elements
-		for (size_t i = 0; i < this->Nh_; i++)
-		{
-			for (size_t j = i; j < this->Nh_; j++)
-			{
-				double _ranval		= this->ran_.random(-1.0, 1.0);
-				double _distance	= 0.0;
-				if (i != j)
-				{
-					_distance = std::abs(int(i - j)) / this->b_;
-					_distance = std::pow(_distance, 2 * this->a_);
-				}
-
-				// set Hamiltonian element
-				auto _val = _ranval / std::sqrt(1.0 + _distance);
-				this->H_.set(i, j, _val);
-				this->H_.set(j, i, _val);
-			}
-		}
-	}
+	void hamiltonian() override;
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -132,6 +112,55 @@ inline void PowerLawRandomBanded<_T>::checkQuadratic()
 	{
 		this->isManyBody_	= true;
 		this->isQuadratic_	= true;
+	}
+}
+
+// ### H A M I L T O N I A N ###
+
+/*
+* @brief: This function builds the Hamiltonian for the Power Law Random Banded model.
+* @note: The Hamiltonian is built in the following way:
+*		- The Hamiltonian is a banded matrix with the bandwidth of 1.
+*		- The elements of the Hamiltonian are random numbers between -1 and 1.
+*		- The elements are divided by the square root of the distance between the particles.
+*		- The distance is calculated as the difference between the indices of the particles in the Hilbert space (either single or many body).
+*/
+template<typename _T>
+inline void PowerLawRandomBanded<_T>::hamiltonian()
+{
+	if (this->Nh == 0)
+	{
+		LOGINFOG("Empty Hilbert, not building anything.", LOG_TYPES::INFO, 1);
+		return;
+	}
+	this->init();
+
+	const double _power = 2.0 * this->a_; 
+	const double _binv  = 1.0 / this->b_;
+	// go through the Hamiltonian and set the elements
+	// notice that the Hamiltonian is symmetric and it is systematically
+	// shrinked to the offdiagonal. Additionally, the elements are going through 
+	// a power law decay (in single particle) but this changes to many body (exponential)
+	// when the distance between the particles is calculated in many body Hilbert space.
+	// (according to this, the Ns = log2(Nh) and the distance is calculated as the difference
+	// between the indices of the particles in this big Hilbert space)
+	for (size_t i = 0; i < this->Nh_; i++)
+	{
+		for (size_t j = i; j < this->Nh_; j++)
+		{
+			double _distance	= 0.0;
+			if (i != j)
+			{
+				_distance = (long double)std::abs(int(i - j)) * _binv;
+				_distance = std::pow(_distance, _power);
+			}
+
+			// set Hamiltonian element
+			auto _val = this->ran_.random(-1.0, 1.0) / std::sqrt(1.0 + _distance);
+			this->H_.set(i, j, _val);
+			// do I need to set the other side of the matrix?
+			this->H_.set(j, i, _val);
+		}
 	}
 }
 

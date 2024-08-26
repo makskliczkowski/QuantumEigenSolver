@@ -20,7 +20,7 @@
 # 	45 - run the QSM ETH simulation - statistics - sweep time evolution - Ljubljana 2024
 # 	46 - run the QSM ETH simulation - statistics - time evolution - Ljubljana 2024
 
--fun 46
+-fun 42
 ##################################### MODEL CHOICE #####################################
 #+++ Interacting models +++:
 # 	1  - Transverse Ising
@@ -45,6 +45,8 @@
 -mod 104
 -modRanN 20
 -modRanSeed 0
+-op Sz/L;Sz/L_2;Sz/0;Sz/Lm1;Sz/Lm1-L;Sz/0-1;Sx/0-L;ni/L
+
 # number of midspectrum states for the diagonal elements
 -modMidStates 0.7
 # difference between energies for the offdiagonal elements (this is the maximal difference divided by average energy)
@@ -95,7 +97,7 @@
 #### POWER LAW RANDOM BANDWIDTH
 -plrb_a 0.55
 -plrb_b 1
--plrb_mb 0
+-plrb_mb 1
 
 ################################## SYMMETRY PARAMETERS #################################
 -S 1 -U1 5

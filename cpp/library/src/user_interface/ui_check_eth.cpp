@@ -4,64 +4,44 @@
 
 void UI::makeSimETH()
 {
-	bool _isquadratic [[maybe_unused]] = check_noninteracting(this->modP.modTyp_);
-
-	// define the models
+	// define the models - we don't need complex numbers (only for the RP model)
 	if (this->modP.modTyp_ == MY_MODELS::RP_M)
-		this->useComplex_ = !this->modP.rosenzweig_porter.rp_be_real_;
+		this->useComplex_ 	= !this->modP.rosenzweig_porter.rp_be_real_;
 	else
-		this->useComplex_ = false;
+		this->useComplex_ 	= false;
 
 	// go complex if needed
-	bool _takeComplex = (this->isComplex_ || this->useComplex_);	
+	const bool _takeComplex = (this->isComplex_ || this->useComplex_);	
 
 	// define the models depending on which to choose
-	bool _isok = false;
-	if (check_noninteracting(this->modP.modTyp_))
-		_isok = this->defineModelsQ(false);
-	else
-		_isok = this->defineModels(false, false, false);
+	bool _isok 				= this->defineModels(false, false, false);
+
+	if (!_isok)
+		return;
 	
 	// go through the function choice
-	if (_isok)
+	switch (this->chosenFun)
 	{
-		if (this->chosenFun == 40)
-		{
-			//this->checkETH(this->hamDouble);
-		}
-		else if (this->chosenFun == 42 || this->chosenFun == 43)
-		{
-			if (_takeComplex)
-			{
-				this->checkETH_statistics(this->hamComplex);
-			}
-			else
-			{
-				this->checkETH_statistics(this->hamDouble);
-			}
-		}
-		else if (this->chosenFun == 44)
-		{
-			if (_takeComplex)
-			{
-				this->checkETH_scaling_offdiag(this->hamComplex);
-			}
-			else
-			{
-				this->checkETH_scaling_offdiag(this->hamDouble);
-			}
-		}
-		else if (this->chosenFun == 46 || this->chosenFun == 45)
-		{
-			if (_takeComplex)
-			{
-				this->checkETH_time_evo(this->hamComplex);
-			}
-			else
-			{
-				this->checkETH_time_evo(this->hamDouble);
-			}
-		}
+		case 40:
+			// this->checkETH(this->hamDouble);
+			break;
+
+		case 42:
+		case 43:
+			RUN_CPX_REAL(_takeComplex, this->checkETH_statistics, this->hamDouble, this->hamComplex);
+			break;
+
+		case 44:
+			RUN_CPX_REAL(_takeComplex, this->checkETH_scaling_offdiag, this->hamDouble, this->hamComplex);
+			break;
+		case 45:
+		case 46:
+			RUN_CPX_REAL(_takeComplex, this->checkETH_time_evo, this->hamDouble, this->hamComplex);
+			break;
+
+		default:
+			// Handle unexpected values of chosenFun, if necessary
+			break;
 	}
 }
 
@@ -145,6 +125,11 @@ constexpr static bool check_multithread_operator(u64 _Nh)
 std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth_getoperators(const size_t _Nh, bool _isquadratic, bool _ismanybody)
 {
 	const size_t _Ns = this->latP.Ntot_;
+
+	// create operator parser
+	Operators::OperatorNameParser _parser(_Ns, _Nh);
+	auto _parsedOps = _parser.createGlobalOperators<double>(this->modP.operators);
+
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
 	strVec _opsN;
 
@@ -273,6 +258,9 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 	_H->buildHamiltonian();
 	_H->diagH(false);
 }
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -737,8 +725,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		 isManyBody			= _H->getIsManyBody();
 
 	// do both!, cause why the hell not
-	isQuadratic				= false;
-	isManyBody				= true;
+	// isQuadratic				= false;
+	// isManyBody				= true;
 
 	// get the operators
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
@@ -750,19 +738,19 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
-	arma::Mat<double> _en			= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _entroHalf	= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _entroFirst	= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _entroLast	= -1e5 * arma::Mat<double>(_Nh, this->modP.modRanN_, arma::fill::ones);
+	arma::Mat<double> _en			= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _entroHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _entroFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _entroLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
 
 	// gap ratios
 	v_1d<double> _gapsin(_Nh - 2, 0.0);
-	arma::Col<double> _gaps			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Mat<double> _gapsall		= -1e5 * arma::Mat<double>(_Nh - 2, this->modP.modRanN_, arma::fill::ones);
+	arma::Col<double> _gaps			= UI_DEF_COL_D(this->modP.modRanN_);
+	arma::Mat<double> _gapsall		= UI_DEF_MAT_D(_Nh - 2, this->modP.modRanN_);
 	// mean lvl
-	arma::Col<double> _meanlvl		= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Col<double> _bandwidth	= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
-	arma::Col<double> _H2			= -1e5 * arma::Col<double>(this->modP.modRanN_, arma::fill::ones);
+	arma::Col<double> _meanlvl		= UI_DEF_COL_D(this->modP.modRanN_);
+	arma::Col<double> _bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);
+	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);
 
 	// create the measurement class
 	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
@@ -876,6 +864,13 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			_timer.checkpoint(STR(_r));
 			this->ui_eth_randomize(_H);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
+
+			// check the image of the Hamiltonian
+			if (_r == 0 && _Nh < ULLPOW(10))
+			{
+				auto _hamilmatrix = _H->getHamiltonian();
+				saveAlgebraic(dir, "hamil" + randomStr + extension, _hamilmatrix.toDense(), "hamiltonian", _r == 0);
+			}
 		}
 
 		// -----------------------------------------------------------------------------

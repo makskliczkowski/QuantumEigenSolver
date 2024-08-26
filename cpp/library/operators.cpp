@@ -935,6 +935,8 @@ strVec Operators::OperatorNameParser::parse(const strVec& _inputs)
 	return _out;
 }
 
+// ------------------------------------------------------------------------------------------------------------------------------
+
 /*
 * @brief Parse the operator name and return the corresponding operator.
 * @param _input the input string
@@ -957,6 +959,8 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 		_out = this->parseMultipleOperators(_input);
 	} else if (_input.find(OPERATOR_SEP_RANGE) != std::string::npos) {
 		_out = this->parseRangeOperators(_input);
+	} else if (_input.find(OPERATOR_SEP_RANDOM) != std::string::npos) {
+		// _out = this->parseRandomOperators(_input);
 	} else {
 		_out.push_back(this->parseSingleOperator(_input));
 	}
@@ -971,56 +975,65 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 * The format is {site} or {site}/{div} where div is the divisor of the site.
 * @param _input the input string
 */
-double Operators::OperatorNameParser::resolveSite(const std::string &_site)
+long double Operators::OperatorNameParser::resolveSite(const std::string &_site, bool _usesHilbert)
 {
-	if(_site.length() == 0)
-		throw std::invalid_argument("The site: " + _site + " is not valid.");
+	if(_site.length() == 0) throw std::invalid_argument("The site: " + _site + " is not valid.");
 
-	if(_site == "L") {
-		return this->L_;
+	// get the dimension
+	const size_t _dimension = _usesHilbert ? this->Nh_ : this->L_;
+
+	if(_site == "L" || _site == "l") {
+		return _dimension - (OPERATOR_SITE_M_1 ? 1 : 0);
 	} else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
 		auto _div = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIV)[1]);
-		return this->L_ / _div;
+		return _dimension / _div;
 	}
 	else if (_site.find(OPERATOR_SEP_DIFF) != std::string::npos) {
 		auto _diff = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIFF)[1]);
-		return std::max(0.0, (int)this->L_ - _diff);
+		return std::max((long double)0.0, _dimension - _diff - (OPERATOR_SITE_M_1 ? 1 : 0));
 	}
 
 	// simply return the site
-	auto _siteInt = std::stod(_site);
-	if (_siteInt < 0 || _siteInt > this->L_)
-		throw std::invalid_argument("The site: " + _site + " is out of range.");
-	return std::stod(_site);
+	auto _siteInt = std::stold(_site);
+	if (_siteInt < 0 || _siteInt >= _dimension)
+		throw std::invalid_argument("The site: " + _site + " is out of range. The dimension is: " + std::to_string(_dimension));
+	return std::stold(_site);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
 /*
 * @brief Given single site ranges (something that occurs after /) resolve the sites.
+* @note The format is {site1}_{site2}_{site3}..._{siteN}
 * @param _sites the sites to resolve
 */
-strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_sites)
+strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_sites, bool _needsIntIdx, bool _usesHilbert)
 {
     strVec _out = {};
 
-	if (_sites.find(OPERATOR_SEP_MULT) != std::string::npos) {
+	if (_sites.find(OPERATOR_SEP_MULT) != std::string::npos) 
+	{
 		for (const auto& _str : splitStr(_sites, OPERATOR_SEP_MULT))
-			_out.push_back(STRP(this->resolveSite(_str), 3));
-	} else if (_sites.find(OPERATOR_SEP_RANGE) != std::string::npos) {
+		{
+			long double _site = _needsIntIdx ? size_t(this->resolveSite(_str, _usesHilbert)) : this->resolveSite(_str, _usesHilbert);
+			_out.push_back(STRP(_site, 3));
+		}	
+	} else if (_sites.find(OPERATOR_SEP_RANGE) != std::string::npos) 
+	{
 		auto _str = splitStr(_sites, OPERATOR_SEP_RANGE);	
 		if (_str.size() == 3)
 		{
 			// throw std::invalid_argument("The range: " + _sites + " is not valid.");		
-			auto _start = this->resolveSite(_str[0]);
-			auto _end 	= this->resolveSite(_str[1]);
-			auto _step 	= this->resolveSite(_str[2]);
-
+			auto _start = this->resolveSite(_str[0], _usesHilbert);
+			auto _end 	= this->resolveSite(_str[1], _usesHilbert);
+			auto _step 	= this->resolveSite(_str[2], _usesHilbert);
+			
+			// based on the index type, resolve the sites
 			for (auto i = _start; i <= _end; i += _step)
-				_out.push_back(STRP(i, 3));
+				_out.push_back(OPERATOR_INT_CAST_S(_needsIntIdx, i, OperatorNameParser::precision_));
 		}
 	} else {
-		_out.push_back(STRP(this->resolveSite(_sites), 3));
+		_out.push_back(OPERATOR_INT_CAST_S(_needsIntIdx, this->resolveSite(_sites, _usesHilbert), OperatorNameParser::precision_));
 	}
 	return _out;
 }
@@ -1031,14 +1044,16 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 * @brief Parse the list of string sites and change them to the integer sites.
 * @param _sites the sites to resolve
 */
-std::vector<double> Operators::OperatorNameParser::resolveSites(const strVec &_sites)
+std::vector<long double> Operators::OperatorNameParser::resolveSites(const strVec &_sites, bool _usesHilbert)
 {
-	std::vector<double> _out = {};
+	std::vector<long double> _out = {};
 
 	for (const auto& _site : _sites)
-		_out.push_back(this->resolveSite(_site));
+		_out.push_back(this->resolveSite(_site, _usesHilbert));
 	return _out;
 }
+
+// ------------------------------------------------------------------------------------------------------------------------------
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
@@ -1098,6 +1113,8 @@ std::pair<std::string, std::string> Operators::OperatorNameParser::resolveOperat
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
+// ------------------------------------------------------------------------------------------------------------------------------
+
 /*
 * @brief Parse the operator name and return the corresponding operator for a single operator.
 * The format is {operator}/{index} where the index is the index of the operator (site).
@@ -1108,11 +1125,21 @@ std::string Operators::OperatorNameParser::parseSingleOperator(const std::string
 	// get the operator name
 	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
 
+	// check if the operator needs Hilbert space or lattice space
+	bool _usesHilbert 				= false;
+	bool _needsIntIdx 				= true;
+	if (this->operator_map_.contains(_opName))
+	{
+		_needsIntIdx 				= OperatorTypes::needsIntegerIdx(this->operator_map_.at(_opName));
+		_usesHilbert 				= OperatorTypes::needsHilbertSpaceDim(this->operator_map_.at(_opName));
+	}
+
 	// site index
-	auto _index = this->resolveSite(_indexStr);
+	long double _index 				= this->resolveSite(_indexStr, _usesHilbert);
+
 
 	// return the operator name
-	return _opName + OPERATOR_SEP + STRP(_index, 3);
+	return _opName + OPERATOR_SEP + OPERATOR_INT_CAST_S(_needsIntIdx, _index, OperatorNameParser::precision_);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------
@@ -1137,6 +1164,14 @@ strVec Operators::OperatorNameParser::parseCorrelationOperator(const std::string
 	// get the operator name
 	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
 
+	bool _usesHilbert 				= false;
+	bool _needsIntIdx 				= true;
+	if (this->operator_map_.contains(_opName))
+	{
+		_needsIntIdx 				= OperatorTypes::needsIntegerIdx(this->operator_map_.at(_opName));
+		_usesHilbert 				= OperatorTypes::needsHilbertSpaceDim(this->operator_map_.at(_opName));
+	}
+
 	// split for the potential indices (for each element there might be multiple sites)
 	strVec _potentialIndicies 		= splitStr(_indexStr, OPERATOR_SEP_CORR);
 
@@ -1144,7 +1179,7 @@ strVec Operators::OperatorNameParser::parseCorrelationOperator(const std::string
 
 	// go through all the potential indices and resolve them
 	for (int i = 0; i < _potentialIndicies.size(); ++i)
-		_out.push_back(resolveSitesMultiple(_potentialIndicies[i]));
+		_out.push_back(resolveSitesMultiple(_potentialIndicies[i], _needsIntIdx, _usesHilbert));
 
 	if (_out.size() == 0)
 		return {};
@@ -1172,8 +1207,16 @@ strVec Operators::OperatorNameParser::parseMultipleOperators(const std::string &
 	// get the operator name
 	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
 
+	bool _usesHilbert 				= false;
+	bool _needsIntIdx 				= true;
+	if (this->operator_map_.contains(_opName))
+	{
+		_needsIntIdx 				= OperatorTypes::needsIntegerIdx(this->operator_map_.at(_opName));
+		_usesHilbert 				= OperatorTypes::needsHilbertSpaceDim(this->operator_map_.at(_opName));
+	}
+
 	// split for the potential indices
-	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr);
+	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr, _needsIntIdx, _usesHilbert);
 
 	for (int i = 0; i < _potentialIndicies.size(); ++i)
 		_potentialIndicies[i] = _opName + OPERATOR_SEP + _potentialIndicies[i];
@@ -1192,8 +1235,16 @@ strVec Operators::OperatorNameParser::parseRangeOperators(const std::string &_in
 	// get the operator name
 	const auto [_opName, _indexStr] = this->resolveOperatorSeparator(_input);
 
+	bool _usesHilbert 				= false;
+	bool _needsIntIdx 				= true;
+	if (this->operator_map_.contains(_opName))
+	{
+		_needsIntIdx 				= OperatorTypes::needsIntegerIdx(this->operator_map_.at(_opName));
+		_usesHilbert 				= OperatorTypes::needsHilbertSpaceDim(this->operator_map_.at(_opName));
+	}
+
 	// split for the potential indices
-	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr);
+	strVec _potentialIndicies 		= resolveSitesMultiple(_indexStr, _needsIntIdx, _usesHilbert);
 
 	for (int i = 0; i < _potentialIndicies.size(); ++i)
 		_potentialIndicies[i] = _opName + OPERATOR_SEP + _potentialIndicies[i];

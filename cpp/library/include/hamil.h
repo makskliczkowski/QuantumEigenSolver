@@ -14,8 +14,8 @@
 #include "quantities/statistics.h"
 
 // --- ED
-constexpr u64 UI_LIMITS_MAXFULLED								= ULLPOW(18);
-constexpr u64 UI_LIMITS_MAXPRINT								= ULLPOW(3);
+constexpr u64 UI_LIMITS_MAXFULLED								= 0x40000;
+constexpr u64 UI_LIMITS_MAXPRINT								= 0x8;
 constexpr u64 UI_LIMITS_SI_STATENUM								= 100;
 constexpr u64 UI_LIMITS_MIDDLE_SPEC_STATENUM					= 200;
 

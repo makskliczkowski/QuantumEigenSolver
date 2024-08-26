@@ -7,6 +7,7 @@
 * DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***********************************/
+#include <memory>
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
@@ -19,7 +20,11 @@ constexpr auto OPERATOR_SEP_CORR	= "-";
 constexpr auto OPERATOR_SEP_MULT 	= ",";
 constexpr auto OPERATOR_SEP_DIFF	= "m";
 constexpr auto OPERATOR_SEP_RANGE	= ".";
+constexpr auto OPERATOR_SEP_RANDOM	= "r";
 constexpr auto OPERATOR_SEP_DIV		= "_";
+constexpr auto OPERATOR_SITE_M_1    = true;
+#define OPERATOR_INT_CAST(x) static_cast<long double>((size_t)x)
+#define OPERATOR_INT_CAST_S(v, x, p) (v ? STRP(OPERATOR_INT_CAST(x), p) : STRP(x, p))
 
 namespace Operators 
 {
@@ -261,22 +266,65 @@ namespace Operators
 			DECL_ENUM_ELEMENT(E2)
 		}
 		END_ENUM(OperatorsAvailable)
+
+		/*
+		* @brief Checks if the operator needs integer indices
+		* @param _op the operator
+		* @returns true if the operator needs integer indices	
+		*/
+		inline bool needsIntegerIdx(OperatorsAvailable _op)
+		{
+			switch (_op)
+			{
+			case OperatorsAvailable::nq:
+			case OperatorsAvailable::nk:
+			case OperatorsAvailable::nr:
+				return false;
+			default:
+				return true;
+			}
+		}
+		// --------------------------------------------------------------------------------------------
+
+		/*
+		* @brief Check if the operator uses Hilbert space dimension rather than the integer indices
+		* @param _op the operator
+		* @returns true if the operator uses Hilbert space dimension
+		*/
+		inline bool needsHilbertSpaceDim(OperatorsAvailable _op)
+		{
+			switch (_op)
+			{
+			case OperatorsAvailable::E:
+			case OperatorsAvailable::E2:
+				return false;
+			// quadratic operators do use Nh!
+			case OperatorsAvailable::ni:
+			case OperatorsAvailable::nq:
+			case OperatorsAvailable::nn:
+			case OperatorsAvailable::nk:
+			case OperatorsAvailable::nr:
+				return true;
+			default:
+				return false;
+			}
+			return false;
+		}
 	}
 
 	// ##########################################################################################################################################
 
+
 	class OperatorNameParser
 	{
 	private:
+		static inline int precision_ = 3;
 		size_t L_;
+		size_t Nh_; 
 		std::string Lstr_;
-	public:
-		// create a map of operators
-		std::map<std::string, Operators::OperatorTypes::OperatorsAvailable> operator_map_;
+		std::string Nhstr_;
 
-		// --------------------------------------------------------------------------------------------
-
-		OperatorNameParser(size_t L) : L_(L), Lstr_(std::to_string(L)) 
+		void initMap()
 		{
 			for(int fooInt = static_cast<int>(OperatorTypes::OperatorsAvailable::E); fooInt != static_cast<int>(OperatorTypes::OperatorsAvailable::E2); fooInt++ )
 			{
@@ -287,7 +335,26 @@ namespace Operators
 				std::string fooStr 		= OperatorTypes::getSTR_OperatorsAvailable(static_cast<OperatorTypes::OperatorsAvailable>(fooInt));
 				operator_map_[fooStr] 	= static_cast<OperatorTypes::OperatorsAvailable>(fooInt);
 			}
+		}
+
+	public:
+		// create a map of operators
+		std::map<std::string, Operators::OperatorTypes::OperatorsAvailable> operator_map_;
+
+		// --------------------------------------------------------------------------------------------
+
+		OperatorNameParser(size_t L) : L_(L), Nh_(L), Lstr_(std::to_string(L)), Nhstr_(Lstr_) 
+		{
+			this->initMap();
 		};
+
+		OperatorNameParser(size_t L, size_t Nh) : L_(L), Nh_(Nh), Lstr_(std::to_string(L)), Nhstr_(std::to_string(Nh)) 
+		{
+			this->initMap();
+		};
+
+		// --------------------------------------------------------------------------------------------
+
 		
 		// parse input 
 		strVec parse(const strVec& _inputs);
@@ -316,14 +383,14 @@ namespace Operators
 		// resolve the operator name from the input sites
 		std::pair<std::string, std::string> resolveOperatorSeparator(const std::string& _input);
 
-		// resolve the site
-		double resolveSite(const std::string& _site);
+		// resolve the site and return a long double (for the indices parsing)
+		long double resolveSite(const std::string& _site, bool _usesHilbert = false);
 
 		// std::string resolveSite(double _site);
 
-		std::vector<double> resolveSites(const strVec& _sites);
+		std::vector<long double> resolveSites(const strVec& _sites, bool _usesHilbert);
 
-		strVec resolveSitesMultiple(const std::string& _sites);
+		strVec resolveSitesMultiple(const std::string& _sites, bool _needsIntIdx = true, bool _usesHilbert = false);
 
 		// resolve the correlation recursively
 		void resolveCorrelation(const std::vector<strVec>& _list, strVec& _currentCombination, size_t _depth, strVec& _out);
@@ -332,62 +399,72 @@ namespace Operators
 	public:
 
 		template <typename _T>
-		Operator<_T> createGlobalOperator(const std::string& _input)
+		bool createGlobalOperator(const std::string& _input, std::shared_ptr<Operator<_T>>& _operator)
 		{
 			// resolve the operator and the sites
 			auto [op, sites] 		= this->resolveOperatorSeparator(_input);
 			
-			std::vector<double> _sites;
-			std::vector<uint> _sitesInt;
+			bool _usesHilbert 		= false;
+			if (this->operator_map_.contains(op))
+				_usesHilbert 		= true;
+			else 
+				return false;
 			
-			// check if the sites contain the correlation
-			if (sites.find(OPERATOR_SEP_CORR) != std::string::npos)
-				for (auto& _site : splitStr(sites, OPERATOR_SEP_CORR))
-					_sites.push_back(std::stod(_site));
-			else
-				_sites = { std::stod(sites) };
+			size_t _dimension 		= _usesHilbert ? this->Nh_ : this->L_;
 
-			// convert to integer
-			for(auto& _site : _sites)
-				_sitesInt.push_back(static_cast<uint>(_site));
+			// check if the sites contain the correlation or random operator
+			v_1d<long double> _sites 	= { 0 };
+			bool _containsRandom 		= false;
+			if (_containsRandom = sites.find(OPERATOR_SEP_RANDOM) != std::string::npos; !_containsRandom)
+				_sites = this->resolveSites(splitStr(sites, OPERATOR_SEP_CORR), _usesHilbert);
 
 			// create the operator
-			switch (operator_map_[_input])
+			switch (operator_map_[op])
 			{
+			// !!!!! SPIN OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::Sx: 
-				return Operators::SpinOperators::sig_x(this->L_, _sitesInt);
+				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_x(_dimension, Vectors::convert<uint>(_sites)));
 			case OperatorTypes::OperatorsAvailable::Sy:
 				break;
 				// return Operators::SpinOperators::sig_y(this->L_, _sites);
 			case OperatorTypes::OperatorsAvailable::Sz:
-				return Operators::SpinOperators::sig_z(this->L_, _sitesInt);
+				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_z(_dimension, Vectors::convert<uint>(_sites)));
+			// !!!!! QUADRATIC OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::ni:
-				return Operators::QuadraticOperators::site_occupation(this->L_, _sitesInt[0]);	
+				_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::site_occupation(_dimension, _sites[0]));	
 			case OperatorTypes::OperatorsAvailable::nq:
-				return Operators::QuadraticOperators::site_nq(this->L_, _sites[0]);
+				_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::site_nq(_dimension, _sites[0]));
 			case OperatorTypes::OperatorsAvailable::nn:
 				if(_sites.size() == 1)
-					return Operators::QuadraticOperators::nn_correlation(this->L_, _sitesInt[0], _sitesInt[0]);
+					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::nn_correlation(_dimension, _sites[0], _sites[0]));
 				else if (_sites.size() > 1)
-					return Operators::QuadraticOperators::nn_correlation(this->L_, _sitesInt[0], _sitesInt[1]);
+					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::nn_correlation(_dimension, _sites[0], _sites[1]));
 				break;
 			case OperatorTypes::OperatorsAvailable::nk:
 				if (_sites[0] == 0)
-					return Operators::QuadraticOperators::quasimomentum_occupation(this->L_);
+					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::quasimomentum_occupation(_dimension));
+				// else 
 					// return Operators::QuadraticOperators::quasimomentum_occupation(this->L_, _sites[0]);
-			// case OperatorsAvailable::nr:
+			// !!!!!! RANDOM OPERATOR !!!!!!
+			case OperatorTypes::OperatorsAvailable::nr:
+			{
+				v_1d<double> _rcoefs; 
+				// _rcoefs = v_1d<double>(_Nh, 1.0);
 				// return Operators::QuadraticOperators::site_occupation_r(this->L_);
+
+
+			}
 			default:
-				break;
+				return false;
 			};
 
-			return Operator<_T>();
+			return true;
 		}
 
 		template <typename _T>
-		std::vector<Operator<_T>> createGlobalOperators(const strVec& _inputs)
+		std::pair<std::vector<std::shared_ptr<Operator<_T>>>, strVec> createGlobalOperators(const strVec& _inputs)
 		{
-			std::vector<Operator<_T>> ops;
+			std::vector<std::shared_ptr<Operator<_T>>> ops;
 
 			// parse the input strings
 			strVec _outStr = this->parse(_inputs);
@@ -400,14 +477,17 @@ namespace Operators
 			// try to parse the operators
 			for (auto& op : _outStr)
 			{
-				Operator<_T> _opin = this->createGlobalOperator<_T>(op);
+				std::shared_ptr<Operator<_T>> _opin;
 
 				// check if the operator is valid
-				if (_opin.getNameS() != "" && _opin.getName())
+				if (this->createGlobalOperator<_T>(op, _opin))
+				{
+					LOGINFO("Correctly parsed operator: " + op, LOG_TYPES::INFO, 4);
 					ops.push_back(_opin);
+				}
 			}
 
-			return ops;
+			return std::make_pair(ops, _outStr);
 		}
 
 
