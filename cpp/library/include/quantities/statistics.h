@@ -19,7 +19,7 @@
 
 constexpr auto SYSTEM_PROPERTIES_MIN_SPACING = 1e-15;
 constexpr auto SYSTEM_PROPERTIES_THROW_DEGENERATE = 1;
-constexpr auto SYSTEM_PROPERTIES_COEFF_THRESHOLD = 1e-9;
+constexpr auto SYSTEM_PROPERTIES_COEFF_THRESHOLD = 1e-11;
 constexpr auto SYSTEM_PROPERTIES_USE_OPENMP = 0;
 
 // -------------------------------------------------------------------------------
@@ -255,7 +255,7 @@ namespace SystemProperties
 		if(!_degenerate)
 			return arma::square(arma::abs(_ovelaps));
 		else 
-			{
+		{
 			arma::Col<double> _ret(_energies.size(), arma::fill::zeros);
 			for (u64 i = 0; i < _energies.size(); ++i)
 			{
@@ -579,8 +579,9 @@ namespace SystemProperties
 #endif
 		for (auto& _coeff : _state)
 		{
-			if(!EQP(_coeff, 0.0, SYSTEM_PROPERTIES_COEFF_THRESHOLD))
-				pr += std::pow(std::abs(algebra::conjugate(_coeff) * _coeff), 2 * q);
+			const auto abs_coeff = std::abs(algebra::conjugate(_coeff) * _coeff);
+			if (abs_coeff > SYSTEM_PROPERTIES_COEFF_THRESHOLD)
+				pr += std::pow(abs_coeff, q);
 		}
 		return pr;
 	}
@@ -604,7 +605,7 @@ namespace SystemProperties
 		for (auto& _coeff : _state)
 		{
 			auto _v = std::abs(algebra::conjugate(_coeff) * _coeff);
-			ipr		+= _v * _v;
+			ipr		+= _v;
 		}
 		return ipr;
 	}

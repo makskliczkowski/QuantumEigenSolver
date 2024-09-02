@@ -19,12 +19,15 @@ constexpr auto OPERATOR_SEP			= "/";
 constexpr auto OPERATOR_SEP_CORR	= "-";
 constexpr auto OPERATOR_SEP_MULT 	= ",";
 constexpr auto OPERATOR_SEP_DIFF	= "m";
-constexpr auto OPERATOR_SEP_RANGE	= ".";
+constexpr auto OPERATOR_SEP_RANGE	= ":";
 constexpr auto OPERATOR_SEP_RANDOM	= "r";
 constexpr auto OPERATOR_SEP_DIV		= "_";
+constexpr auto OPERATOR_PI			= "pi";
+constexpr auto OPERATOR_SITE		= "l";
+constexpr auto OPERATOR_SITEU    	= "L";
 constexpr auto OPERATOR_SITE_M_1    = true;
-#define OPERATOR_INT_CAST(x) static_cast<long double>((size_t)x)
-#define OPERATOR_INT_CAST_S(v, x, p) (v ? STRP(OPERATOR_INT_CAST(x), p) : STRP(x, p))
+#define OPERATOR_INT_CAST(x) static_cast<size_t>(x)
+#define OPERATOR_INT_CAST_S(v, x, p) (v ? STR(OPERATOR_INT_CAST(x)) : STRP(x, p))
 
 namespace Operators 
 {
@@ -276,7 +279,7 @@ namespace Operators
 		{
 			switch (_op)
 			{
-			case OperatorsAvailable::nq:
+			// case OperatorsAvailable::nq:
 			case OperatorsAvailable::nk:
 			case OperatorsAvailable::nr:
 				return false;
@@ -398,18 +401,30 @@ namespace Operators
 		// --------------------------------------------------------------------------------------------
 	public:
 
+		/*
+		* @brief Creates a global operator from the input string - this allows for its further usage in the calculations.
+		* (creating matrices, acting on states, etc.)
+		* @param _input the input string
+		* @param _operator the operator to create
+		* @returns true if the operator was created successfully
+		*/
 		template <typename _T>
-		bool createGlobalOperator(const std::string& _input, std::shared_ptr<Operator<_T>>& _operator)
+		bool createGlobalOperator(const std::string& _input, std::shared_ptr<Operator<_T>>& _operator,
+				bool _usesRealAllowed 		= true,
+				bool _useHilbertAllowed 	= false,
+				randomGen* _rgen 			= nullptr)
 		{
-			// resolve the operator and the sites
+			// resolve the operator and the sites based on the input
 			auto [op, sites] 		= this->resolveOperatorSeparator(_input);
 			
-			bool _usesHilbert 		= false;
-			if (this->operator_map_.contains(op))
-				_usesHilbert 		= true;
-			else 
+			// check if the operator is known
+			if (!this->operator_map_.contains(op))
 				return false;
+
+			// check if the operator uses the Hilbert space or the lattice size
+			bool _usesHilbert 		= OperatorTypes::needsHilbertSpaceDim(this->operator_map_[op]);
 			
+			// get the dimension - either the Hilbert space or the lattice size (depending on the character of the operator)
 			size_t _dimension 		= _usesHilbert ? this->Nh_ : this->L_;
 
 			// check if the sites contain the correlation or random operator
@@ -418,22 +433,32 @@ namespace Operators
 			if (_containsRandom = sites.find(OPERATOR_SEP_RANDOM) != std::string::npos; !_containsRandom)
 				_sites = this->resolveSites(splitStr(sites, OPERATOR_SEP_CORR), _usesHilbert);
 
+			// filter the operators
+			if (!_useHilbertAllowed && (_usesHilbert || _containsRandom))
+				return false;
+			else if (!_usesRealAllowed && !_usesHilbert)
+				return false;
+
 			// create the operator
 			switch (operator_map_[op])
 			{
 			// !!!!! SPIN OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::Sx: 
 				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_x(_dimension, Vectors::convert<uint>(_sites)));
-			case OperatorTypes::OperatorsAvailable::Sy:
 				break;
+			case OperatorTypes::OperatorsAvailable::Sy:
 				// return Operators::SpinOperators::sig_y(this->L_, _sites);
+				break;
 			case OperatorTypes::OperatorsAvailable::Sz:
 				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_z(_dimension, Vectors::convert<uint>(_sites)));
+				break;
 			// !!!!! QUADRATIC OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::ni:
 				_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::site_occupation(_dimension, _sites[0]));	
+				break;
 			case OperatorTypes::OperatorsAvailable::nq:
 				_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::site_nq(_dimension, _sites[0]));
+				break;
 			case OperatorTypes::OperatorsAvailable::nn:
 				if(_sites.size() == 1)
 					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::nn_correlation(_dimension, _sites[0], _sites[0]));
@@ -445,14 +470,19 @@ namespace Operators
 					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::quasimomentum_occupation(_dimension));
 				// else 
 					// return Operators::QuadraticOperators::quasimomentum_occupation(this->L_, _sites[0]);
+				break;
 			// !!!!!! RANDOM OPERATOR !!!!!!
 			case OperatorTypes::OperatorsAvailable::nr:
 			{
-				v_1d<double> _rcoefs; 
-				// _rcoefs = v_1d<double>(_Nh, 1.0);
-				// return Operators::QuadraticOperators::site_occupation_r(this->L_);
-
-
+				if (_rgen)
+				{
+					// create the random operator
+					v_1d<double> _rcoefs = _rgen->random<double>(-1.0, 1.0, _dimension);
+					_operator = std::make_shared<Operator<_T>>(Operators::QuadraticOperators::site_occupation_r(_dimension, _rcoefs));
+				}
+				else 
+					return false;
+				break;	
 			}
 			default:
 				return false;
@@ -461,8 +491,21 @@ namespace Operators
 			return true;
 		}
 
+		/*
+		* @brief Creates a global operator from the input string - this allows for its further usage in the calculations.
+		* (creating matrices, acting on states, etc.)
+		* allows for filtering the operators on being quadratic or many-body operators
+		* @param _input the input string
+		* @param _operator the operator to create
+		* @param _uses real if the operator uses real space indices (can be also momentum)
+		* @param _usesHilbert if the operator uses the Hilbert space dimension (quadraic operators)
+		* @returns a pair of the operator and the names of the operators
+		*/
 		template <typename _T>
-		std::pair<std::vector<std::shared_ptr<Operator<_T>>>, strVec> createGlobalOperators(const strVec& _inputs)
+		std::pair<std::vector<std::shared_ptr<Operator<_T>>>, strVec> createGlobalOperators(const strVec& _inputs,
+																							bool _usesReal 		= true,
+																							bool _usesHilbert 	= false,
+																							randomGen* _rgen 	= nullptr)
 		{
 			std::vector<std::shared_ptr<Operator<_T>>> ops;
 
@@ -471,26 +514,30 @@ namespace Operators
 
 			// create the operators
 			LOGINFO("Using operators: ", LOG_TYPES::INFO, 4);
+			strVec _msgs = {};
 			for (int i = 0; i < _outStr.size(); i++)
-				std::cout << i << ")" << _outStr[i] << std::endl;
+				_msgs.push_back(STR(i) + ")" + _outStr[i]);
+			LOGINFO(_msgs, LOG_TYPES::INFO, 4);
 			
 			// try to parse the operators
+			strVec _outOperators = {};
 			for (auto& op : _outStr)
 			{
 				std::shared_ptr<Operator<_T>> _opin;
 
 				// check if the operator is valid
-				if (this->createGlobalOperator<_T>(op, _opin))
+				if (this->createGlobalOperator<_T>(op, _opin, _usesReal, _usesHilbert, _rgen))
 				{
 					LOGINFO("Correctly parsed operator: " + op, LOG_TYPES::INFO, 4);
 					ops.push_back(_opin);
+					_outOperators.push_back(op);
 				}
 			}
 
-			return std::make_pair(ops, _outStr);
+			return std::make_pair(ops, _outOperators);
 		}
 
-
+		// --------------------------------------------------------------------------------------------
 	};
 
 };

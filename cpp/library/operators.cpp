@@ -1,5 +1,7 @@
 #include "./include/algebra/operators.h"
+#include "source/src/Include/str.h"
 #include <complex>
+#include <string>
 
 namespace Operators
 {
@@ -436,7 +438,6 @@ namespace Operators
 					// set the values
 					for (auto i = 0; i < _Ns; i++)
 						_out.set(i, i, std::cos(_k * i));	
-
 					return _out;
 				};
 
@@ -959,8 +960,8 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 		_out = this->parseMultipleOperators(_input);
 	} else if (_input.find(OPERATOR_SEP_RANGE) != std::string::npos) {
 		_out = this->parseRangeOperators(_input);
-	} else if (_input.find(OPERATOR_SEP_RANDOM) != std::string::npos) {
-		// _out = this->parseRandomOperators(_input);
+	} else if (_input.find(std::string(OPERATOR_SEP) + OPERATOR_SEP_RANDOM) != std::string::npos) {
+		_out.push_back(_input);
 	} else {
 		_out.push_back(this->parseSingleOperator(_input));
 	}
@@ -982,18 +983,33 @@ long double Operators::OperatorNameParser::resolveSite(const std::string &_site,
 	// get the dimension
 	const size_t _dimension = _usesHilbert ? this->Nh_ : this->L_;
 
-	if(_site == "L" || _site == "l") {
+	// check if site is L or l already - then return the dimension (L-1)
+	if(_site == OPERATOR_SITE || _site == OPERATOR_SITEU) {
 		return _dimension - (OPERATOR_SITE_M_1 ? 1 : 0);
-	} else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
-		auto _div = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIV)[1]);
-		return _dimension / _div;
+	} 
+	// check if the site is PI
+	else if (_site == OPERATOR_PI) {
+		return M_PI;
 	}
+	// check if the site can be divided - then divide it
+	else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
+		// contains L or l
+		auto _div = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIV)[1]);
+		if (_site.find(OPERATOR_SITEU) != std::string::npos || _site.find(OPERATOR_SITE) != std::string::npos) {
+			return _dimension / _div;
+		}
+		// contains PI
+		else if (_site.find(OPERATOR_PI) != std::string::npos) {
+			return M_PI / _div;
+		}
+	}
+	// check if the site is a difference
 	else if (_site.find(OPERATOR_SEP_DIFF) != std::string::npos) {
 		auto _diff = this->resolveSite(splitStr(_site, OPERATOR_SEP_DIFF)[1]);
 		return std::max((long double)0.0, _dimension - _diff - (OPERATOR_SITE_M_1 ? 1 : 0));
 	}
 
-	// simply return the site
+	// simply return the site as a number
 	auto _siteInt = std::stold(_site);
 	if (_siteInt < 0 || _siteInt >= _dimension)
 		throw std::invalid_argument("The site: " + _site + " is out of range. The dimension is: " + std::to_string(_dimension));
@@ -1173,7 +1189,7 @@ strVec Operators::OperatorNameParser::parseCorrelationOperator(const std::string
 	}
 
 	// split for the potential indices (for each element there might be multiple sites)
-	strVec _potentialIndicies 		= splitStr(_indexStr, OPERATOR_SEP_CORR);
+	strVec _potentialIndicies 		= StrParser::split(_indexStr, OPERATOR_SEP_CORR);
 
 	std::vector<strVec> _out 		= {};
 

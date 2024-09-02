@@ -2,6 +2,10 @@
 //#define LOG_FILE					//
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+#if defined DEBUG and not defined _DEBUG
+#	define _DEBUG
+#endif 
+
 //#ifdef _DEBUG
  //#	include "vld.h"
 //#endif
@@ -26,31 +30,6 @@ int main(const int argc, char* argv[])
 
 	auto ui = std::make_unique<UI>(argc, argv);
 	ui->funChoice();
-
-	int L = 12;
-	strVec testCases =
-	{
-		"sz/1.L.1-2",
-		"sz/1",
-		"ni/1",
-		// "sz/2",
-		// "sz/L",
-		// "sz/L_2",
-		// "sz/L_3",
-		// "sz/1-2",
-		// "sz/1-2-3",
-		// "sz/1-2-3-4",
-		// "sz/L_2-1",
-		// "sz/L_3-L_2",
-		// "sz/1.L.2",
-		// "sz/1,2,3",
-		// "sz/1,2,3,L _2",
-		// "sz/1,3,Lm2"
-	};
-
-	auto _parser = Operators::OperatorNameParser(L);
-	auto _ops = _parser.createGlobalOperators<double>(testCases);
-
 
 	// create GOE matrix and test Lanczos on it
 	//randomGen* r			= new randomGen(169);
