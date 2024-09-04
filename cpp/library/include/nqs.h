@@ -15,6 +15,11 @@
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
+#define NQS_USE_MULTITHREADING
+#define NQS_USE_VEC_ONLY
+#define NQS_ANGLES_UPD
+#define NQS_USESR
+
 // ######### NQS TYPES #############
 enum NQSTYPES					// #
 {								// #
@@ -30,17 +35,17 @@ BEGIN_ENUM(NQSTYPES)			// #
 END_ENUM(NQSTYPES)				// #
 // #################################
 
-#include <future>
-#include <functional>
-#include <any>
-
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	using NQSB = arma::Col<_type>; using NQSW = arma::Mat<_type>;			
+// all the types that are to be used in each NQS implementation
+#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
+											using NQSB = arma::Col<_type>; 				\
+											using NQSW = arma::Mat<_type>;			
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Kernel for multithreading
-#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#include <future>
+#include <functional>
 /*
 * @brief structure with condition variables for the NQS to perfom multithread operations
 */
@@ -54,8 +59,7 @@ struct CondVarKernel
 	bool flagThreadRun_		= false;
 	_T kernelValue_			= 0.0;
 };
-
-#	endif 
+#endif 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +73,7 @@ struct CondVarKernel
 
 /*
 * @brief General Neural Network Quantum States eigensolver class - base
-* Contains all the necessary methods to override
+* Contains all the necessary methods to override for the specific NQS model.
 */
 template <uint _spinModes, 
 		  typename _Ht,
@@ -78,15 +82,16 @@ template <uint _spinModes,
 class NQS 
 {
 public:
-	using NQSS							=		arma::Col<_stateType>;	// Quantum state -> for occupation representation purpose
-	using NQSB							=		arma::Col<_T>;			// for parameter representation purpose
-	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose
+	// type definitions 
+	using NQSS							=		arma::Col<_stateType>;	// Quantum state -> e.g. for occupation representation purpose 
+	using NQSB							=		arma::Col<_T>;			// for free parameter representation purpose (e.g. angles)
+	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose (e.g. weights - single layer only)
 
 protected:
-	// for the Hamiltonian information
-	const uint spinModes_				=		_spinModes;				// number of spin modes - 2 for hardcore bosons, 4 for fermions
-	const double discVal_				=		Operators::_SPIN_RBM;
-	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> H_;					// pointer to the Hamiltonian
+	// for the Hamiltonian information, types and the Hilbert space
+	const uint spinModes_				=		_spinModes;				// number of spin modes -> e.g. 2 for hardcore bosons, 4 for fermions
+	const double discVal_				=		Operators::_SPIN_RBM;   // discrete value for the numbers in vector representation
+	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> H_;					// pointer to the Hamiltonian instance (for the energy calculation)
 
 protected:
 	// information about the NQS method
@@ -94,17 +99,17 @@ protected:
 	pBar pBar_;															// for printing out the progress
 
 	// simulation specific
-	double lr_							=		0.0;					// specific learning rate
+	double lr_							=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
 	
 	// architecture specific
 	uint nVis_							=		1;						// number of visible neurons (input variables)
-	uint nSites_						=		1;						// number of lattice sites
+	uint nSites_						=		1;						// number of lattice sites or fermionic modes
 	uint fullSize_						=		1;						// full number of the parameters (for memory purpose)
 
 	// Hilbert space info
-	u64 Nh_								=		1;
-	uint nParticles_					=		1;
-	bool conservesParticles_			=		true;
+	u64 Nh_								=		1;						// Hilbert space size (number of basis states)
+	uint nParticles_					=		1;						// number of particles in the system (if applicable)
+	bool conservesParticles_			=		true;					// whether the system conserves the number of particles
 
 	// Random number generator
 	randomGen ran_;														// consistent quick random number generator
@@ -116,19 +121,19 @@ protected:
 	uint threadNum_						=		1;						// number of threads that works on this
 	// create thread pool
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-	uint threadsNumLeft_				=		0;
+	uint threadsNumLeft_				=		0;						// other threads that are left to be processed
 	v_1d<std::thread> threads_;
-	v_1d<CondVarKernel<_T>> kernels_;
-	std::mutex mutex;
+	v_1d<CondVarKernel<_T>> kernels_;									// condition variables for the threads
+	std::mutex mutex;													// global mutex for the threads
 #endif
 
 	/* ----------------------------------------------------------- */
 
 	// ----------------------- T R A I N I N G ----------------------
 	// for flipping
-	uint nFlip_							=		1;
+	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
 	v_1d<uint> flipPlaces_;												// stores flip spots to be flipped during one sampling step
-	v_1d<_stateType> flipVals_;											// stores values before the flip to be used for the gradients
+	v_1d<_stateType> flipVals_;											// stores values before (!!!) the flip to be used for the gradients
 	
 	// current state
 	NQSS curVec_;														// currently processed state vector for convenience
@@ -136,20 +141,20 @@ protected:
 	u64 curState_						=		0;						// currently processed state
 #endif
 	
-	// temporary placeholders
-	v_1d<NQSS> tmpVecs_;
-	u64 tmpState_						=		0;
-	NQSS tmpVec_;
+	// temporary placeholders for the vectors
+	v_1d<NQSS> tmpVecs_;												// temporary vectors for the flips
+	u64 tmpState_						=		0;						// temporary state for the flips
+	NQSS tmpVec_;														// temporary vector for the flips (for the current state)
 	
 	// ------------------------ W E I G H T S -----------------------
 
-	// derivatives storage
+	// derivatives storage for the weights and the biases (F_k) and the covariance matrix (S)
 	NQSW derivatives_;													// store the variational derivatives F_k
-	NQSW derivativesC_;													// derivatives conjugated
+	NQSW derivativesC_;													// derivatives conjugated (F_k^*)
 #ifdef NQS_USESR
-	NQSW S_;															// positive semi-definite covariance matrix
+	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
 #endif
-	NQSB F_;															// forces
+	NQSB F_;															// forces acting on the weights (F_k)
 
 protected:
 	// ----------------------- S T A R T E R S ----------------------
@@ -167,15 +172,21 @@ protected:
 	virtual void setState(u64 _st);
 	
 	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips()					=			0;
+	virtual void chooseRandomFlips()					=			0;	// important for the flipPlaces_ and flipVals_ to be set!
 
 	// apply flips to the temporary vector or the current vector according the template
-	virtual void applyFlipsT()							=			0;
-	virtual void applyFlipsC()							=			0;			
-	virtual void setRandomFlipNum(uint _nFlips)			=			0;
+	virtual void applyFlipsT()							=			0;	// apply flips to the temporary vector
+	virtual void applyFlipsC()							=			0;	// apply flips to the current vector
+	// unapply flips of the temporary vector or the current vector according the template
+	virtual void unapplyFlipsT()										{ this->applyFlipsT();																};
+	virtual void unapplyFlipsC()										{ this->applyFlipsC();																};
+	
+	virtual void setRandomFlipNum(uint _nFlips)			=			0;	// set the number of flips to be done
 
 	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
+	// mucho importante for the flips to be done - most of those functions need to be implemented
+	// in the derived class as they are model specific and depend on the architecture of the NQS.
 	
 	// The probability of accepting new state s' from state s
 	// comming from the Metropolis - Hastings algorithm is of the 
@@ -192,20 +203,20 @@ protected:
 	// $ P(flip) = || <\psi|s'> / <\psi|s> ||^2. $
 	// The value of <\psi | s> can be stored effectively 
 	// as it's updates are easy. Effectively, one needs to calculate
-	// only the new <\psi|s'> given from the new state s'.
+	// only the new <\psi|s'> given from the new state s'. This is exactly what the NQS does.
 
-	// ratio when 1 flip is used and flips are stored inside (flipPlaces_ & flipVals_)
+	// ratio when only 1 (single) flip is used and flips are stored inside (flipPlaces_ & flipVals_)
 	virtual auto pRatio()								-> _T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
-	// ratio when 1 flip is used and flips are provided to the function (fP, fV)
+	// ratio when only 1 (single) flip is used and flips are provided to the function (fP, fV)
 	virtual auto pRatio(uint fP, float fV)				->_T			= 0;
 	// ratio when multiple flips are used, provided the number of flips taken
 	virtual auto pRatio(uint nFlips)					->_T			= 0;
 	// ratio when a new vector is provided (after flip) - (uses current vector as well)
 	virtual auto pRatio(const NQSS& _v)					->_T			{ return this->pRatio(this->curVec_, _v);							};			
-	// ratio when a new vector is provided (after flip) - (uses two different vectors)
+	// ratio when a new vector is provided (after flip) - (uses two different vectors - one for the current state and one for the new state)
 	virtual auto pRatio(const NQSS& _v1,
 						const NQSS& _v2)				->_T			= 0;
-	// ratio when exact points are provided (used for the Hamiltonian)
+	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto pRatio(std::initializer_list<int> fP, 
 						std::initializer_list<double> fV)->_T			= 0;
 	/* ------------------------------------------------------------ */
@@ -226,8 +237,8 @@ public:
 	// --------------------- T R A I N   E T C -----------------------
 	virtual void grad(const NQSS& _v, uint _plc)		=				0;
 	virtual void gradFinal(const NQSB& _energies);
-	// stochastic reconfiguration
 #ifdef NQS_USESR
+	// stochastic reconfiguration
 	virtual void gradSR(uint step = 0);
 #endif
 	 // regularization
@@ -258,10 +269,6 @@ public:
 	virtual void init()									=				0; 
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->Nh_), _upd);	};
 	
-	// unapply flips of the temporary vector or the current vector according the template
-	virtual void unapplyFlipsT()										{ this->applyFlipsT();																};
-	virtual void unapplyFlipsC()										{ this->applyFlipsC();																};
-	
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -278,15 +285,14 @@ public:
 	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
 
 	// ----------------------- S A M P L I N G -----------------------
-#ifndef NQS_USE_VEC_ONLY
 	virtual void blockSample(	uint _bSize,
-								u64 _start, 
-								bool _therm = false);
-#else
-	virtual void blockSample(	uint _bSize,
+							#ifndef NQS_USE_VEC_ONLY 
+								u64 _start,
+							#else 
 								const NQSS& _start,
+							#endif
 								bool _therm = false);
-#endif
+
 	virtual arma::Col<_T> train(uint mcSteps,							// number of Monte Carlo Steps
 								uint nThrm,								// number of mcSteps to thermalize
 								uint nBlck,								// number of such blocks for one average step
@@ -314,8 +320,8 @@ public:
 
 public:
 	virtual ~NQS();
+	NQS() = default;
 	NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr = 1e-2, uint _threadNum = 1, int _nParticles = -1);
-	NQS()										=						default;
 };
 
 // ##########################################################################################################################################
@@ -429,7 +435,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _
 inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const NQSS& _start, bool _therm)
 #endif
 {
-	// check whether we should set a state again or thermalize the whole process
+	// check whether we should set a state again or thermalize the whole process (applies on integer state)
 #ifndef NQS_USE_VEC_ONLY
 	if (_start != this->curState_ || _therm)
 		this->setState(_start, _therm);
@@ -444,13 +450,13 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const
 	// go through each block step
 	for (uint bStep = 0; bStep < _bSize; ++bStep)
 	{
-		// set the random flip sites
+		// set the random flip sites - it depends on a given implementation of the NQS
 		this->chooseRandomFlips();
 
-		// flip the vector - use temporary vector tmpVec
+		// flip the vector - use temporary vector tmpVec to store the flipped vector
 		this->applyFlipsT();
 
-		// check the probability (choose to use the iterative update of presaved weights or calculate ratio from scratch)
+		// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
 #ifndef NQS_ANGLES_UPD
 		double proba = std::abs(this->pRatio(this->curVec_, this->tmpVec_));
 #else
@@ -765,32 +771,35 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 																clk::time_point _t,
 																uint progPrc)
 {
-	std::string outstr	= "";
-	// set the info about training
-	strSeparatedP(outstr, '\t', 2,
-				  VEQV(Monte Carlo Steps, mcSteps),
-				  VEQV(Thermalization Steps, nThrm),
-				  VEQV(Block Number, nBlck),
-				  VEQV(Size of the single block, bSize),
-				  VEQV(Number of flips taken at each step, nFlip));
-	LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
+	{
+		std::string outstr	= "";
+		// set the info about training
+		strSeparatedP(outstr, '\t', 2,
+					VEQV(Monte Carlo Steps, mcSteps),
+					VEQV(Thermalization Steps, nThrm),
+					VEQV(Block Number, nBlck),
+					VEQV(Size of the single block, bSize),
+					VEQV(Number of flips taken at each step, nFlip));
+		LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
+	}
 
 	// make the pbar!
-	this->pBar_			= pBar(progPrc, mcSteps);
+	this->pBar_ = pBar(progPrc, mcSteps);
 	this->derivatives_.resize(nBlck, this->fullSize_);
 	this->derivativesC_.resize(nBlck, this->fullSize_);
 
 	// save all average weights for covariance matrix
 	arma::Col<_T> meanEn(mcSteps, arma::fill::zeros);
-	// history of energies
+	// history of energies - here we save the local energies at each block
 	arma::Col<_T> En(nBlck, arma::fill::zeros);
-	// set the random state at the begining
+	// set the random state at the begining and the number of flips
 	this->setRandomState();
 	this->setRandomFlipNum(nFlip);
 
 	// go through the Monte Carlo steps
 	for (uint i = 1; i <= mcSteps; ++i)
 	{
+		// set the random state at the begining
 		this->setRandomState();
 		// thermalize
 #ifndef NQS_USE_VEC_ONLY
@@ -849,14 +858,16 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 																	clk::time_point _t,
 																	NQSAv::MeasurementNQS<_T>& _meas)
 {																							
-	std::string outstr= "";
-	// set the info about training
-	strSeparatedP(outstr, '\t', 2,
-				  VEQV(Thermalization Steps, nThrm),
-				  VEQV(Block Number, nBlck),
-				  VEQV(Size of the single block, bSize),
-				  VEQV(Number of flips taken at each step, nFlip));
-	LOGINFOG("Collect: " + outstr, LOG_TYPES::TRACE, 1);
+	{
+		std::string outstr= "";
+		// set the info about training
+		strSeparatedP(outstr, '\t', 2,
+					VEQV(Thermalization Steps, nThrm),
+					VEQV(Block Number, nBlck),
+					VEQV(Size of the single block, bSize),
+					VEQV(Number of flips taken at each step, nFlip));
+		LOGINFOG("Collect: " + outstr, LOG_TYPES::TRACE, 1);
+	}
 
 	// make the pbar!
 	this->pBar_	= pBar(20, nSam);
@@ -986,8 +997,7 @@ public:
 	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
 		: NQS<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nParticles)
 														 { NQS_LOG_ERROR_SPIN_MODES; };
-
-	protected:
+protected:
 	// -------------------------- F L I P S --------------------------
 	virtual void chooseRandomFlips()			override { NQS_LOG_ERROR_SPIN_MODES; };
 

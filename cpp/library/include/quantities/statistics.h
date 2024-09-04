@@ -626,10 +626,7 @@ namespace SystemProperties
 	inline long double information_entropy(const _C& _state) 
 	{
 		long double ent = 0;
-#ifdef _DEBUG
-		if (_state.size() < 1000)
-			_state.print("State");
-#endif
+
 #if SYSTEM_PROPERTIES_USE_OPENMP
 #	pragma omp parallel for reduction(+: ent)
 #endif
@@ -654,26 +651,66 @@ namespace SystemProperties
 	* @param _max - the maximum index inside new basis
 	* @returns the information entropy
 	*/
-	template <typename _T> 
+	template <typename _T, typename _T2> 
 	[[nodiscard]]
 	inline long double information_entropy(	const arma::Col<_T>& _state, 
-											const arma::Mat<_T>& _newBasis,
+											const arma::Mat<_T2>& _newBasis,
 											u64 _min = 0,                           
 											u64 _max = -1) 
 	{
-		long double ent = 0;
+		using _typename 		= typename std::common_type<_T, _T2>::type;
+		long double ent 		= 0;
+		const u64 actual_max 	= std::min(_max, static_cast<u64>(_state.size()));
+
+		// quicker, oy?
+		if (_state.size() == actual_max)
+		{
+			const arma::Col<_typename> _c = _newBasis.t() * _state;
+			return information_entropy(_c);
+		}
+
 #if SYSTEM_PROPERTIES_USE_OPENMP
 #	pragma omp parallel for reduction(+: ent)
 #endif
-		for (long long _k = _min; _k < std::min(_max, _state.size()); ++_k)
+		for (long long _k = _min; _k < actual_max; ++_k)
 		{
-			auto _c		= arma::cdot(_newBasis.col(_k), _state);
+			_typename _c= 0.0;
+			for (long long _j = 0; _j < _newBasis.n_cols; ++_j)
+				_c += algebra::conjugate(_newBasis(_j, _k)) * _state(_j);			
+			
 			auto _v		= std::abs(algebra::conjugate(_c) * _c);
-			ent			+= _v * std::log(_v);
+			if (_v > SYSTEM_PROPERTIES_COEFF_THRESHOLD)
+				ent		+= _v * std::log(_v);
 		}
 		return -ent / std::log(0.48 * _state.size());
 	}
 
+	template <typename _T> 
+	[[nodiscard]]
+	inline long double information_entropy(const arma::Col<_T>& _state, const arma::Mat<_T>& _newBasis, const arma::Col<_T>& _energies, u64 _min = 0, u64 _max = -1)
+	{
+		long double ent 		= 0;
+		const u64 actual_max 	= std::min(_max, static_cast<u64>(_state.size()));
+
+		// quicker, oy?
+		if (_state.size() == actual_max)
+		{
+			const arma::Col<_T> _c = _newBasis.t() * _state;
+			return information_entropy(_c);
+		}
+
+#if SYSTEM_PROPERTIES_USE_OPENMP
+#	pragma omp parallel for reduction(+: ent)
+#endif
+		for (long long _k = _min; _k < actual_max; ++_k)
+		{
+			auto _c		= arma::cdot(_newBasis.col(_k), _state);
+			auto _v		= std::abs(algebra::conjugate(_c) * _c);
+			if (_v > SYSTEM_PROPERTIES_COEFF_THRESHOLD)
+				ent		+= _v * std::log(_v);
+		}
+		return -ent / std::log(0.48 * _state.size());
+	}
 
 	/*
 	* @brief Calculates the participation ratio of the state

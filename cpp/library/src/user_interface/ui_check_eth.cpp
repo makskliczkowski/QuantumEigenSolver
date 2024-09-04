@@ -58,7 +58,7 @@ void UI::makeSimETHSweep()
 		_params = this->modP.rosenzweig_porter.rp_g_;
 		break;
 	case MY_MODELS::ULTRAMETRIC_M:
-		_params = this->modP.ultrametric.um_alpha_;
+		_params = { this->modP.ultrametric.um_alpha_[0] };
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
 		_params = { this->modP.power_law_random_bandwidth.plrb_a_ };
@@ -352,8 +352,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		 isManyBody			= _H->getIsManyBody();
 
 	// do both!, cause why the hell not
-	// isQuadratic				= false;
-	// isManyBody				= true;
+	isQuadratic				= true;
+	isManyBody				= true;
 
 	// get the operators
 	v_1d<std::shared_ptr<Operators::Operator<double>>> _ops;
@@ -830,7 +830,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 		isManyBody			= _H->getIsManyBody();
 
 	// do both!, cause why the hell not
-	isQuadratic				= false;
+	isQuadratic				= true;
 	isManyBody				= true;
 
 	// get the operators
@@ -865,6 +865,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	VMAT<_T> _diagonals					= UI_DEF_VMAT(_T, _ops.size(), _Nh, this->modP.modRanN_);
 	// save the time evolution here
 	VMAT<_T> _timeEvolutionME			= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.modRanN_);
+	arma::Mat<double> _timePEntro		= UI_DEF_MAT_D(_timespace.size(), this->modP.modRanN_);
 	// entropies to take
 	v_1d<int> _entropiesSites			= {1, int(_Ns / 2), (int)(_Ns - 1), (int)_Ns};
 	VMAT<double> _timeEntropyME			= UI_DEF_VMAT(double, 4, _timespace.size(), this->modP.modRanN_);
@@ -1014,6 +1015,10 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 					if(_Nh <= UI_LIMITS_MAXFULLED / 4)
 						_timeEntropyBipartiteME(_ti, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<cpx>(_st, int(_Ns / 2), _Ns, (ULLPOW((int(_Ns / 2)))) - 1);
 				}
+				// calculate the participation entropy
+				{
+					_timePEntro(_ti, _r)					= SystemProperties::information_entropy(_st);
+				}
 			}
 
 		};
@@ -1045,7 +1050,8 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			for(int i = 0; i < _entropiesSites.size(); ++i)
 				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyME[i], "entanglement_entropy/ME/" + STR((_entropiesSites[i])), true);
 			saveAlgebraic(dir, "evo" + randomStr + extension, _timeEntropyBipartiteME, "entanglement_entropy/ME/bipartite", true);
-			
+			saveAlgebraic(dir, "evo" + randomStr + extension, _timePEntro, "participation_entropy/ME", true);
+
 			// save the averages epsilon
 			saveAlgebraic(dir, "avs" + randomStr + extension, arma::vec(_toCheckEps), "eps", false);
 			

@@ -1,4 +1,52 @@
 #include "../../include/user_interface/user_interface.h"
+#include <stdexcept>
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief A placeholder for making the simulation with NQS. It uses the complex Hamiltonian.
+*/
+void UI::makeSimNQS()
+{
+	this->useComplex_ = true;
+	this->defineModels(true);
+	this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
+	this->nqsSingle(this->nqsCpx);
+
+}
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/*
+* @brief Based on a given type, it creates a NQS. Uses the model provided by the user to get the Hamiltonian.
+* @param _H Specific Hamiltonian
+* @param _NQS Neural Network Quantum State frameweork
+*/
+template<typename _T, uint _spinModes>
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS)
+{
+	// check what type of NQS to use and create it
+	switch (this->nqsP.type_)
+	{
+	case NQSTYPES::RBM_T:
+		_NQS = std::make_shared<RBM_S<_spinModes, _T>>(	_H,
+														this->nqsP.nHidden_,
+														this->nqsP.lr_,
+														this->threadNum);
+		break;
+	case NQSTYPES::RBMPP_T:
+		_NQS = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H,
+														this->nqsP.nHidden_,
+														this->nqsP.lr_,
+														this->threadNum);
+		break;
+	default:
+		throw std::invalid_argument("I don't know any other NQS types :<");
+		break;
+	}
+}
 
 // ##########################################################################################################################################
 
@@ -6,6 +54,10 @@
 // 
 // ##########################################################################################################################################
 
+/*
+* @brief Based on a given type, it creates a NQS. Uses the model provided by the user to get the Hamiltonian.
+* @param _NQS Neural Network Quantum State frameweork
+*/
 template<typename _T, uint _spinModes>
 void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 {
@@ -13,13 +65,14 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
 	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
+	
 	// get info
 	std::string nqsInfo		= _NQS->getInfo();
 	std::string modelInfo	= _NQS->getHamiltonianInfo();
-	std::string dir			=	makeDirsC(this->mainDir, this->latP.lat->get_info(), modelInfo, nqsInfo);
+	std::string dir			= makeDirsC(this->mainDir, this->latP.lat->get_info(), modelInfo, nqsInfo);
 
 	// calculate ED to compare with Lanczos or Full
-	u64 Nh						= _NQS->getHilbertSize();
+	u64 Nh					= _NQS->getHilbertSize();
 	arma::Col<_T> _mbs;
 	if (Nh <= UI_LIMITS_NQS_ED)
 	{
@@ -29,8 +82,8 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 		{
 			_H->diagH(false);
 			_mbs = _H->getEigVec(0);
-			if(latP.lat->get_Ns() < 6)
-				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-2);
+			if(Nh < ULLPOW(7))
+				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
 			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
 		else
@@ -39,6 +92,8 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 			LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_NQS->getHamiltonianEigVal(0), 7), LOG_TYPES::TRACE, 2);
 		}
 	}
+
+	// load the weights
 	if (!this->nqsP.loadNQS_.empty())
 		_NQS->setWeights(this->nqsP.loadNQS_, "weights.h5");
 	
@@ -54,21 +109,22 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 		_opsC.push_back(_SzC);
 	}
 	// create measurement operator
-	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  _opsG, 
-																			_opsL, 
-																			_opsC, this->threadNum);
+	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  
+									_opsG, 
+									_opsL, 
+									_opsC, this->threadNum);
 
 	// start the simulation
 	arma::Col<_T> _EN(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
-	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(this->nqsP.nMcSteps_,
-																			this->nqsP.nTherm_,
-																			this->nqsP.nBlocks_,
-																			this->nqsP.blockSize_,
-																			dir,												
-																			this->nqsP.nFlips_,
-																			this->quiet,
-																			_timer.start(),
-																			10);
+	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(	this->nqsP.nMcSteps_,
+															this->nqsP.nTherm_,
+															this->nqsP.nBlocks_,
+															this->nqsP.blockSize_,
+															dir,												
+															this->nqsP.nFlips_,
+															this->quiet,
+															_timer.start(),
+															10);
 	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(this->nqsP.nMcSamples_,
 																	0,
 																	this->nqsP.nSBlocks_,
@@ -96,6 +152,9 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS<2, double>>& _NQS);
+template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, std::shared_ptr<NQS<2, cpx>>& _NQS);
 
 // %%%%%%%%%%%%%%%%%%%%% DEFINE THE TEMPLATES %%%%%%%%%%%%%%%%%%%%%
 template void UI::nqsSingle<double, 2>(std::shared_ptr<NQS<2, double>> _NQS);

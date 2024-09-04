@@ -91,7 +91,7 @@
     "cmake.sourceDirectory": "/home/klimak/Codes/QuantumEigenSolver/cpp/library",
     "C_Cpp.intelliSenseEngineFallback": "enabled",
     "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
-    "autoHide.autoHideSideBar": false,
-    "autoHide.autoHidePanel": false,
-    "autoHide.autoHideAuxiliaryBar": false
+    "autoHide.autoHideSideBar": true,
+    "autoHide.autoHidePanel": true,
+    "autoHide.autoHideAuxiliaryBar": true
 }

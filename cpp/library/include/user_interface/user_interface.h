@@ -1031,36 +1031,6 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
-* @brief Based on a given type, it creates a NQS. Uses the model provided by the user to get the Hamiltonian.
-* @param _H Specific Hamiltonian
-* @param _NQS Neural Network Quantum State frameweork
-*/
-template<typename _T, uint _spinModes>
-inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS)
-{
-	switch (this->nqsP.type_)
-	{
-	case NQSTYPES::RBM_T:
-		_NQS = std::make_shared<RBM_S<_spinModes, _T>>(	_H,
-														this->nqsP.nHidden_,
-														this->nqsP.lr_,
-														this->threadNum);
-		break;
-	case NQSTYPES::RBMPP_T:
-		_NQS = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H,
-														this->nqsP.nHidden_,
-														this->nqsP.lr_,
-														this->threadNum);
-		break;
-	default:
-		LOGINFO("I don't know any other NQS types :<", LOG_TYPES::INFO, 1);
-		break;
-	}
-}
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 // ############################################################### I N F O S ################################################################
 
 // ##########################################################################################################################################
