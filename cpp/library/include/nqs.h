@@ -15,10 +15,52 @@
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
-#define NQS_USE_MULTITHREADING
+// ######################### NQS ############################
+
+// saving the weights and the directory
+#define NQS_SAVE_WEIGHTS					
+#ifdef NQS_SAVE_WEIGHTS						
+#	define NQS_SAVE_DIR ( "WEIGHTS" + kPS )		
+#endif										
+
+// ----------------------------------------------------------					
+//#define NQS_USE_GPU						
+#define NQS_USE_CPU							
+											
+#ifdef NQS_USE_CPU							
+#	define NQS_USE_MULTITHREADING			
+
+//#	define NQS_USE_OMP						
+# 	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#		define NQS_NOT_OMP_MT 
+#	endif
+
+#elif defined NSQ_USE_GPU					
+// something !TODO								
+#endif										
+// ----------------------------------------------------------					
+											
+// shall one update the angles or calculate them from scratch						
+#define NQS_ANGLES_UPD						
+											
+// use vector only?							
 #define NQS_USE_VEC_ONLY
-#define NQS_ANGLES_UPD
-#define NQS_USESR
+
+// optimize the gradient descent with Stochastic Reconfiguration (SR)
+#define NQS_USESR							
+#ifdef NQS_USESR							
+
+// skip the matrix construction for the SR
+	#define NQS_USESR_NOMAT
+
+// how to handle the inverse of the matrix (if needed)
+//#	define NQS_PINV 1e-3					
+// regularization for the covariance matrix	
+//#	define NQS_SREG													
+// shall one use the iterative solver without constructing the full matrix explicitly?						  
+#endif										
+// ##########################################################
+
 
 // ######### NQS TYPES #############
 enum NQSTYPES					// #
@@ -42,10 +84,13 @@ END_ENUM(NQSTYPES)				// #
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
 
 //////////////////////////////////////////////////////////////////////////////////////////
+
 // Kernel for multithreading
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-#include <future>
-#include <functional>
+#ifdef NQS_NOT_OMP_MT
+
+	#include <functional>
+	#include <condition_variable>
+	#include <future>
 /*
 * @brief structure with condition variables for the NQS to perfom multithread operations
 */
@@ -62,12 +107,7 @@ struct CondVarKernel
 #endif 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////////////////////////
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,8 +159,9 @@ protected:
 	// ---------------------- T H R E A D I N G ---------------------
 							
 	uint threadNum_						=		1;						// number of threads that works on this
+	bool initThreads(uint _threadNum = 0);
 	// create thread pool
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#ifdef NQS_NOT_OMP_MT
 	uint threadsNumLeft_				=		0;						// other threads that are left to be processed
 	v_1d<std::thread> threads_;
 	v_1d<CondVarKernel<_T>> kernels_;									// condition variables for the threads
@@ -130,12 +171,10 @@ protected:
 	/* ----------------------------------------------------------- */
 
 	// ----------------------- T R A I N I N G ----------------------
-	// for flipping
 	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
 	v_1d<uint> flipPlaces_;												// stores flip spots to be flipped during one sampling step
 	v_1d<_stateType> flipVals_;											// stores values before (!!!) the flip to be used for the gradients
 	
-	// current state
 	NQSS curVec_;														// currently processed state vector for convenience
 #ifndef NQS_USE_VEC_ONLY
 	u64 curState_						=		0;						// currently processed state
@@ -147,12 +186,13 @@ protected:
 	NQSS tmpVec_;														// temporary vector for the flips (for the current state)
 	
 	// ------------------------ W E I G H T S -----------------------
-
-	// derivatives storage for the weights and the biases (F_k) and the covariance matrix (S)
-	NQSW derivatives_;													// store the variational derivatives F_k
-	NQSW derivativesC_;													// derivatives conjugated (F_k^*)
+	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
+	NQSW derivativesC_;													// derivatives conjugated (F_k^*) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
+	NQSB derivativesM_;													// store the mean of the derivatives (F_k) (fullSize)
 #ifdef NQS_USESR
+#	ifndef NQS_USESR_NOMAT
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
+#	endif
 #endif
 	NQSB F_;															// forces acting on the weights (F_k)
 
@@ -183,7 +223,6 @@ protected:
 	
 	virtual void setRandomFlipNum(uint _nFlips)			=			0;	// set the number of flips to be done
 
-	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
 	// mucho importante for the flips to be done - most of those functions need to be implemented
 	// in the derived class as they are model specific and depend on the architecture of the NQS.
@@ -219,7 +258,6 @@ protected:
 	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto pRatio(std::initializer_list<int> fP, 
 						std::initializer_list<double> fV)->_T			= 0;
-	/* ------------------------------------------------------------ */
 
 	// ----------------------- W E I G H T S -------------------------
 #ifdef NQS_ANGLES_UPD
@@ -232,16 +270,21 @@ public:
 	virtual bool saveWeights(std::string _path, std::string _file);
 	virtual bool setWeights(std::string _path, std::string _file);
 
-	/* ------------------------------------------------------------ */
- protected:
+protected:
 	// --------------------- T R A I N   E T C -----------------------
 	virtual void grad(const NQSS& _v, uint _plc)		=				0;
 	virtual void gradFinal(const NQSB& _energies);
 #ifdef NQS_USESR
 	// stochastic reconfiguration
 	virtual void gradSR(uint step = 0);
+
+	#ifdef NQS_USESR_NOMAT
+	
+	_T getSRMatrixElement(size_t i, size_t j);							// stochastic reconfiguration without the matrix construction
+	void getSRMatVec(const arma::Col<_T>& x, arma::Col<_T>& y, size_t);
+	#endif
 #endif
-	 // regularization
+	// ---------------------------------------------------------------
 #ifdef NQS_SREG 
 	double covMatrixRegMult		= 0.95;									// multiplier for the regularization
 	double covMatrixRegStart	= 0.02;									// starting parameter for regularisation (epsilon1)
@@ -258,7 +301,7 @@ public:
 	/* ------------------------------------------------------------ */
 protected:
 	_T locEnKernel();
-#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
+#ifdef NQS_NOT_OMP_MT
 	virtual void locEnKernel(uint _start, uint _end, uint _threadNum);
 #endif
 
@@ -293,14 +336,14 @@ public:
 							#endif
 								bool _therm = false);
 
-	virtual arma::Col<_T> train(uint mcSteps,							// number of Monte Carlo Steps
-								uint nThrm,								// number of mcSteps to thermalize
-								uint nBlck,								// number of such blocks for one average step
-								uint bSize,								// for killing correlations
-								std::string dir,						// saving directory
-								uint nFlip			= 1,				// number of flips to set
-								bool quiet			= false,			// shall talk?
-								clk::time_point _t	= NOW,				// time!
+	virtual arma::Col<_T> train(uint mcSteps,							// number of Monte Carlo Steps (outer loops for the training)
+								uint nThrm,								// number of mcSteps to thermalize (burn-in)
+								uint nBlck,								// number of such blocks for one average step (single iteration step after which the gradient is calculated)
+								uint bSize,								// for killing correlations - (single block size)
+								std::string dir,						// saving directory (for the weights)
+								uint nFlip			= 1,				// number of flips to set (default is 1)
+								bool quiet			= false,			// shall talk? (default is false)
+								clk::time_point _t	= NOW,				// time! (default is NOW)
 								uint progPrc		= 25);
 
 	virtual arma::Col<_T> collect(uint nSam, 
@@ -321,8 +364,108 @@ public:
 public:
 	virtual ~NQS();
 	NQS() = default;
-	NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr = 1e-2, uint _threadNum = 1, int _nParticles = -1);
+	NQS(const NQS& _n)
+		: spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
+		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
+		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
+		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+	{
+		this->init();
+	}
+	NQS(NQS&& _n)
+		: spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
+		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
+		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
+		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+	{
+		this->init();
+	}
+	NQS &operator=(const NQS & _n)
+	{	
+		this->spinModes_			= _n.spinModes_;
+		this->discVal_				= _n.discVal_;
+		this->H_					= _n.H_;
+		this->info_					= _n.info_;
+		this->pBar_					= _n.pBar_;
+		this->lr_					= _n.lr_;
+		this->nVis_					= _n.nVis_;
+		this->nSites_				= _n.nSites_;
+		this->fullSize_				= _n.fullSize_;
+		this->Nh_					= _n.Nh_;
+		this->nParticles_			= _n.nParticles_;
+		this->conservesParticles_	= _n.conservesParticles_;
+		this->ran_					= _n.ran_;
+		this->threadNum_			= _n.threadNum_;
+		this->nFlip_				= _n.nFlip_;
+		this->flipPlaces_			= _n.flipPlaces_;
+		this->flipVals_				= _n.flipVals_;
+		this->init();
+		return *this;
+	}
+	NQS &operator=(NQS &&_n)
+	{
+		this->spinModes_			= _n.spinModes_;
+		this->discVal_				= _n.discVal_;
+		this->H_					= _n.H_;
+		this->info_					= _n.info_;
+		this->pBar_					= _n.pBar_;
+		this->lr_					= _n.lr_;
+		this->nVis_					= _n.nVis_;
+		this->nSites_				= _n.nSites_;
+		this->fullSize_				= _n.fullSize_;
+		this->Nh_					= _n.Nh_;
+		this->nParticles_			= _n.nParticles_;
+		this->conservesParticles_	= _n.conservesParticles_;
+		this->ran_					= _n.ran_;
+		this->threadNum_			= _n.threadNum_;
+		this->nFlip_				= _n.nFlip_;
+		this->flipPlaces_			= _n.flipPlaces_;
+		this->flipVals_				= _n.flipVals_;
+		this->init();
+		return *this;
+	}
+	NQS(std::shared_ptr<Hamiltonian<_Ht>> &_H, double _lr = 1e-2,
+		uint _threadNum = 1, int _nParticles = -1);
 };
+
+// ##########################################################################################################################################
+
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
+{
+#ifndef NQS_USE_MULTITHREADING
+		this->threadNum_		=			1;
+#else
+		this->threadNum_		=			std::min(_threadNum, this->nSites_);
+		this->threadsNumLeft_	=			std::max(_threadNum - this->threadNum_, (uint)1);
+#endif
+	// Use threads for all consecutive parallel regions
+#if defined NQS_USE_MULTITHREADING
+#	ifdef NQS_USE_OMP
+		omp_set_num_threads(this->threadNum_);   
+#	else
+		// initialize the threads
+		this->threads_.reserve(this->threadNum_);
+		this->kernels_			=			v_1d<CondVarKernel<_T>>(this->threadNum_);
+		
+		// calculate how many sites goes to one thread
+		uint _siteStep			=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
+
+		// start the threads that calculate the energy with the local energy kernel function
+		// this function waits for the specific energy calculation to be ready on each thread
+		// this is handled through "flagThreadRun_" member
+		for (uint i = 0; i < this->threadNum_; i++)
+		{
+			std::function<void()> lambda = [this, i, _siteStep]() 
+				{ 
+					this->locEnKernel(i * _siteStep, std::min((i + 1) * _siteStep, this->nSites_), i); 
+				};
+			this->threads_.emplace_back(std::thread(lambda));
+		}
+#	endif
+#endif
+	return true;
+}
 
 // ##########################################################################################################################################
 
@@ -377,6 +520,7 @@ inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, 
 
 /*
 * @brief Allocates the main gradient parameters and the temporary and current vectors.
+* The vectors are set to ones for the start.  
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
@@ -384,7 +528,9 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	// allocate gradients
 	this->F_.resize(this->fullSize_);
 #ifdef NQS_USESR
+#	ifndef NQS_USESR_NOMAT
 	this->S_.resize(this->fullSize_, this->fullSize_);
+#	endif
 #endif
 	this->curVec_ = arma::ones(this->nVis_);
 	this->tmpVec_ = arma::ones(this->nVis_);
@@ -400,7 +546,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 {
 	DESTRUCTOR_CALL;
-#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
+#if defined NQS_NOT_OMP_MT
 	for (int _thread = 0; _thread < this->threadNum_; _thread++)
 	{
 		std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
@@ -429,32 +575,29 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 * @param _nFlip number of flips in a single step
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, 
 #ifndef NQS_USE_VEC_ONLY
-inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, u64 _start, bool _therm)
+															u64 _start,
 #else
-inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const NQSS& _start, bool _therm)
+															const NQSS& _start, 
 #endif
+															bool _therm)
 {
 	// check whether we should set a state again or thermalize the whole process (applies on integer state)
+	// Set state based on whether thermalization is required or _start differs from current state
+	if (_therm 
 #ifndef NQS_USE_VEC_ONLY
-	if (_start != this->curState_ || _therm)
-		this->setState(_start, _therm);
-#else
-	if (_therm)
-		this->setState(_start, _therm);
+		|| _start != this->curState_
 #endif
+		) this->setState(_start, _therm);
 
 	// set the temporary state - the vectors are usefull so set them accordingly
 	this->tmpVec_ = this->curVec_;
 
-	// go through each block step
-	for (uint bStep = 0; bStep < _bSize; ++bStep)
+	for (uint bStep = 0; bStep < _bSize; ++bStep) // go through each block step
 	{
-		// set the random flip sites - it depends on a given implementation of the NQS
-		this->chooseRandomFlips();
-
-		// flip the vector - use temporary vector tmpVec to store the flipped vector
-		this->applyFlipsT();
+		this->chooseRandomFlips(); 	// set the random flip sites - it depends on a given implementation of the NQS
+		this->applyFlipsT();		// flip the vector - use temporary vector tmpVec to store the flipped vector
 
 		// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
 #ifndef NQS_ANGLES_UPD
@@ -465,28 +608,33 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, const
 		// we need to take into account the probability comming from the ratio of states (after and before the flip)
 		if (this->ran_.template random<float>() <= proba * proba)
 		{
-			// update current state and vector when the flip has been accepted
+			// update current state and vector when the flip has been accepted (the probability is higher than the random number)
 			this->applyFlipsC();
 			// update angles if needed
 			this->update(this->nFlip_);
 		}
-		// set the vector back to normal
+		// set the vector back to normal (unflip)
 		else
 		{
 			this->unupdate();
 			this->unapplyFlipsT();
 		}
 	}
+
 	// set the current integer state
 #ifndef NQS_USE_VEC_ONLY
 	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_);
 #endif
+
+	// Set the state again if angles update is disabled
 #ifndef NQS_ANGLES_UPD
-#	ifndef NQS_USE_VEC_ONLY
-	this->setState(this->curState_, true);
-#	else
-	this->setState(this->curVec_, true);
-#	endif
+	this->setState(
+		#ifndef NQS_USE_VEC_ONLY
+			this->curState_, 
+		#else
+			this->curVec_,
+		#endif
+		true);
 #endif
 }
 
@@ -534,8 +682,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 	return toType<_T>(energyR, energyI);
 #else
 	_T energy = 0.0;
-	// run all threads
-	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+	for (int _thread = 0; _thread < this->threadNum_; _thread++) // run all threads
 	{
 		std::lock_guard<std::mutex> lock(this->kernels_[_thread].mutex);
 		this->kernels_[_thread].flagThreadRun_	= true;
@@ -543,8 +690,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 		this->kernels_[_thread].cv.notify_one();
 	}
 
-	// wait for all threads
-	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+	for (int _thread = 0; _thread < this->threadNum_; _thread++) // wait for all threads
 	{
 		{
 			std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
@@ -558,9 +704,10 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 
 ///////////////////////////////////////////////////////////////////////
 
-#if not defined NQS_USE_OMP && defined NQS_USE_MULTITHREADING
+#ifdef NQS_NOT_OMP_MT
 /*
-* @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program
+* @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program.
+* The threads are killed when the program is finished. The function calculates the local energy for a given thread.
 * @param _start starting site for a given thread
 * @param _end ending site for a given thread
 * @param _threadNum number of the thread currently run
@@ -568,8 +715,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)
 {
-	// does not go in if the simulation is finished
-	while (!this->kernels_[_threadNum].flagThreadKill_)
+	while (!this->kernels_[_threadNum].flagThreadKill_)	// does not go in if the simulation is finished
 	{
 		// wait for the lock to end
 		{
@@ -578,7 +724,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 			// thread will suspend here and release the lock if the expression does not return true
 			this->kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->kernels_[_threadNum].flagThreadRun_; });	
 
-			// if kill then kill
 			if (this->kernels_[_threadNum].flagThreadKill_)
 			{
 				this->kernels_[_threadNum].end_ = true;
@@ -590,30 +735,29 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		this->kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
-#ifndef NQS_USE_VEC_ONLY
+	#ifndef NQS_USE_VEC_ONLY
 			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(this->curState_,
 																							 site, 
 																							 std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
 																							 this,
 																							 std::placeholders::_1,
 																							 std::placeholders::_2)));
-#else
+	#else
 			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(this->curVec_,
 																							site, 
 																							std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
 																							this,
 																							std::placeholders::_1,
 																							std::placeholders::_2)));
-#endif
+	#endif
 		}
 		// lock again
 		{
 			std::lock_guard<std::mutex> lock(this->kernels_[_threadNum].mutex);
 			this->kernels_[_threadNum].flagThreadRun_	= false;
-			this->kernels_[_threadNum].end_				= true;
-			// Notify waiting threads if needed
+			this->kernels_[_threadNum].end_				= true; 
 		}
-		this->kernels_[_threadNum].cv.notify_one();
+		this->kernels_[_threadNum].cv.notify_one(); // Notify waiting threads if needed
 	}
 }
 #endif
@@ -660,35 +804,134 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 
 // ##########################################################################################################################################
 
-///////////////////////////////////////////////////////////////////////
+// -----------------------------------------------------------------------------------------------------------------------------------
 #ifdef NQS_USESR
+
+	#ifdef NQS_USESR_NOMAT
+
+/*
+* @brief Calculates the matrix element of the geometric tensor S_ij = <\Delta _i* \Delta _j> - <\Delta _i*><\Delta _j> 
+* without constructing the matrix explicitly. This is done by calculating the matrix element directly. 
+* @param i row index - the matrix is symmetric
+* @param j column index - the matrix is symmetric
+* @returns the matrix element of the geometric tensor S_ij
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline _T NQS<_spinModes, _Ht, _T, _stateType>::getSRMatrixElement(size_t i, size_t j)
+{
+	// get the subviews of the columns (each column has multiple observations now)
+	auto _colO_i 		= this->derivativesC_.col(i);
+	auto _colO_j 		= this->derivatives_.col(j);
+
+	// compute <\Delta _i* \Delta _j>
+	_T avg_Oi_Oj 		= arma::dot(_colO_i, _colO_j) / static_cast<double>(_colO_i.n_elem);
+
+	// compute <\Delta _i*><\Delta _j>
+	_T avg_Oi_avg_Oj 	= algebra::conjugate(this->derivativesM_(i)) * this->derivativesM_(j);
+
+		#ifdef NQS_SREG
+		{
+		// regularize the covariance matrix before inverting it (if needed and set) by adding the regularization term
+		if (i == j)
+			avg_Oi_Oj += this->covMatrixRegStart * avg_Oi_avg_Oj;
+		}
+		#endif
+	return avg_Oi_Oj - avg_Oi_avg_Oj;
+}
+
+// -----------------------------------------------------------------------------------------------------------------------------------
+
+/*
+* @brief Calculates the matrix-vector multiplication using the elements obtained from the getSRMatrixElement. 
+* This is done without constructing the matrix explicitly. Once the matrix is known, the multiplication is done
+* by calculating the matrix-vector multiplication directly.
+* @param x vector to be multiplied with the matrix
+* @param y resulting vector from the multiplication
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec(const arma::Col<_T>& x, arma::Col<_T>& y, size_t n)
+{	
+	// implement the matrix-vector multiplication using the elements obtained from the getSRMatrixElement
+	#pragma omp parallel for num_threads(this->threadNum_)
+	for (size_t i = 0; i < n; ++i)
+	{
+		// initialize the y vector
+		y(i) = 0.0;
+
+		// y_i = \sum _j S_ij x_j
+		// Compute the matrix-vector multiplication using only upper triangular matrix and reflection
+		// as the matrix is square and symmetric
+		// for (size_t j = 0; j < n; j++)
+			// y(i) += this->getSRMatrixElement(i, j) * x(j);
+		for (size_t j = i; j < n; j++) {
+            const _T S_ij = this->getSRMatrixElement(i, j);
+            y(i) += S_ij * x(j);
+
+            // Since S is symmetric, reflect the result to y(j)
+            if (i != j) {
+// #pragma omp atomic
+                y(j) += S_ij * x(i);
+            }
+        }
+	}
+
+}
+	#endif 
 
 /*
 * @brief Calculates the update parameters for weights to be updated in a form:
-* weights[new] <- weights[old] - lr * S^{-1} * F --> second order optimization method
+* weights[new] <- weights[old] - lr * S^{-1} * F --> second order optimization method (stochastic reconfiguration)
+* It uses the matrix S = <\Delta _k* \Delta _k> - <\Delta _k*><\Delta _k> to calculate the update. This matrix is 
+* called the geometric tensor. It is used as a regularizer for the gradient descent method.
+* This method can be either calculated with the pseudoinverse or with the direct inversion of the matrix.
+* Otherwise, one can skip the stochastic reconfiguration and use the standard gradient descent.
+* @note The method can be run without calculating the geometric tensor S explicitly.
 * @param step current step of updating - for the regularization purpose
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 {
-	// update the flattened vector for the gradients
-#	ifdef NQS_SREG 
-	// regularize the covariance matrix before inverting it
-	this->covMatrixReg();
-#	endif
-#	ifdef NQS_PINV
-	// calculate the pseudoinverse
-	if (NQS_PINV > 0)
-		this->F_ = this->lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
-	else
-		this->F_ = this->lr_ * (arma::pinv(this->S_) * this->F_);
-	return;
-#	else 
-	// solve normally
-	//this->F_ = this->lr_ * (arma::inv(this->S_) * this->F_);
-	this->F_ = this->lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
-#	endif 
+	#ifndef NQS_USESR_NOMAT
+	{
+		// regularize the covariance matrix before inverting it (if needed and set)
+		{
+		#ifdef NQS_SREG
+		this->covMatrixReg();
+		#endif
+		}
+		
+		#ifdef NQS_PINV
+		{
+			// calculate the pseudoinverse
+			if (NQS_PINV > 0)
+				this->F_ = this->lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
+			else
+				this->F_ = this->lr_ * (arma::pinv(this->S_) * this->F_);
+			return;
+		}
+		#else 
+		// solve normally
+		//this->F_ = this->lr_ * (arma::inv(this->S_) * this->F_);
+		this->F_ = this->lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+		#endif 
+	}
+	#else
+	{
+		// copy the forces
+		arma::Col<_T> _F = this->F_;
+
+		std::function<void(const arma::Col<_T>&, arma::Col<_T>&, size_t)> _Fun = std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
+		// solve the system manually
+		algebra::Solvers::solve(this->F_, _Fun, _F, algebra::Solvers::SolverType::MY_CONJ_GRAD, 1e-6);
+
+		_F *= this->lr_;
+		// exchange the vectors
+		this->F_ = std::move(_F);
+	}
+	#endif
 }
+// -----------------------------------------------------------------------------------------------------------------------------------
 #endif
 
 ///////////////////////////////////////////////////////////////////////
@@ -703,18 +946,27 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies)
 {
-	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}>
-	this->derivativesC_ = arma::conj(this->derivatives_);
-	this->F_			= arma::cov(this->derivativesC_, _energies, 1);
+	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>]
+	this->derivativesC_ = arma::conj(this->derivatives_);				// precalculate the conjugate of the derivatives
+	this->F_			= arma::cov(this->derivativesC_, _energies, 1);	// calculate the covariance vector for the gradient !TODO modify this for excited states! 
 #ifdef NQS_USESR
-	this->S_			= arma::cov(this->derivativesC_, this->derivatives_, 1);
-	
-	// update model
-	this->gradSR(0);
-
+	{
+	#ifndef NQS_USESR_NOMAT
+		// form the covariance matrix explicitly
+		this->S_			= arma::cov(this->derivativesC_, this->derivatives_, 1);
+	#else 
+		// calculate the matrix without forming it explicitly and use the mean of the derivatives
+		this->derivativesM_ = arma::mean(this->derivatives_, 0).as_col();
+		// skip the matrix calculation
+	#endif
+		// update model by recalculating the gradient (applying the stochastic reconfiguration)
+		this->gradSR(0);
+	}
 #else
-	// standard updater with the gradient only!
-	this->F_ *= this->lr_;
+	{
+		// standard updater with the gradient only!
+		this->F_ *= this->lr_;
+	}
 #endif
 }
 
@@ -751,14 +1003,14 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg()
 
 /*
 * @brief Perform single training of the NQS.
-* @param mcSteps Monte Carlo steps to be used in the training
-* @param nThrm Monte Carlo steps spent for thermalizing the system
-* @param nBlck	number of blocks to be used for calculating the covariance matrix
-* @param bSize number of update steps within a single block
-* @param nFlip number of flips for a single update of a state
-* @param quiet wanna talk?
-* @param _t timepoint for timestamping
-* @param progPrc progress percentage to be displayed
+* @param mcSteps Monte Carlo steps to be used in the training - this is an outer loop for the training (number of iterations)
+* @param nThrm Monte Carlo steps spent for thermalizing the system - burn-in
+* @param nBlck	number of blocks to be used for calculating the covariance matrix - number of iterations for the gradient calculation (single iteration step)
+* @param bSize number of update steps within a single block - size of the block (number of flip trials (global))
+* @param nFlip number of flips for a single update of a state (default is 1)
+* @param quiet wanna talk? (default is false)
+* @param _t timepoint for timestamping the training
+* @param progPrc progress percentage to be displayed in the progress bar
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
@@ -772,8 +1024,11 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 																uint progPrc)
 {
 	{
-		std::string outstr	= "";
+		// make the pbar!
+		this->pBar_ = pBar(progPrc, mcSteps);
+
 		// set the info about training
+		std::string outstr	= "";
 		strSeparatedP(outstr, '\t', 2,
 					VEQV(Monte Carlo Steps, mcSteps),
 					VEQV(Thermalization Steps, nThrm),
@@ -782,9 +1037,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 					VEQV(Number of flips taken at each step, nFlip));
 		LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
 	}
-
-	// make the pbar!
-	this->pBar_ = pBar(progPrc, mcSteps);
+	TIMER_CREATE(_timer);
 	this->derivatives_.resize(nBlck, this->fullSize_);
 	this->derivativesC_.resize(nBlck, this->fullSize_);
 
@@ -793,8 +1046,10 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 	// history of energies - here we save the local energies at each block
 	arma::Col<_T> En(nBlck, arma::fill::zeros);
 	// set the random state at the begining and the number of flips
-	this->setRandomState();
-	this->setRandomFlipNum(nFlip);
+	{
+		this->setRandomState();
+		this->setRandomFlipNum(nFlip);
+	}
 
 	// go through the Monte Carlo steps
 	for (uint i = 1; i <= mcSteps; ++i)
@@ -802,40 +1057,51 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 		// set the random state at the begining
 		this->setRandomState();
 		// thermalize
-#ifndef NQS_USE_VEC_ONLY
-		this->blockSample(nThrm, this->curState_, false);
+		this->blockSample(nThrm, 
+#ifdef NQS_USE_VEC_ONLY
+						this->curVec_,
 #else
-		this->blockSample(nThrm, this->curVec_, false);
+						this->curState_,
 #endif
+						false);
 
-		// iterate blocks
+		// iterate blocks - this ensures the calculation of a stochastic gradient 
 		for (uint _taken = 0; _taken < nBlck; ++_taken) {
 
 			// sample them!
-#ifndef NQS_USE_VEC_ONLY
-			this->blockSample(bSize, this->curState_, false);
+			this->blockSample(bSize, 
+#ifdef NQS_USE_VEC_ONLY
+			this->curVec_,
 #else
-			this->blockSample(bSize, this->curVec_, false);
+			this->curState_,
 #endif
-			// calculate the gradient!
+							false);
+
+			// calculate the gradient at each point of the iteration! - this is implementation specific!!!
 			this->grad(this->curVec_, _taken);
 
-			// energy
+			// local energy - stored at each point within the estimation of the gradient (stochastic)
 			En(_taken) = this->locEnKernel();
 		}
-		// calculate the final update vector
-		this->gradFinal(En);
-		// finally, update the weights
+		
+		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
+		TIMER_START_MEASURE((i % this->pBar_.percentageSteps == 0), _timer, STR(i), this->gradFinal(En));
+
+		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
 		this->updateWeights();
+		
 		// save the mean energy
 		meanEn(i - 1) = arma::mean(En);
 		LOGINFO(VEQ(meanEn(i - 1)), LOG_TYPES::TRACE, 1);
 
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
+		
 #ifdef NQS_SAVE_WEIGHTS
-		if (i % this->pBar_.percentageSteps == 0) 
+		{
+		if (i % this->pBar_.percentageSteps == 0)  
 			this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
+		}
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);
@@ -859,6 +1125,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 																	NQSAv::MeasurementNQS<_T>& _meas)
 {																							
 	{
+		this->pBar_	= pBar(20, nSam);
 		std::string outstr= "";
 		// set the info about training
 		strSeparatedP(outstr, '\t', 2,
@@ -868,51 +1135,47 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 					VEQV(Number of flips taken at each step, nFlip));
 		LOGINFOG("Collect: " + outstr, LOG_TYPES::TRACE, 1);
 	}
-
-	// make the pbar!
-	this->pBar_	= pBar(20, nSam);
+	TIMER_CREATE(_timer);
 	arma::Col<_T> meanEn(nSam, arma::fill::zeros);
-	// history of energies
 	arma::Col<_T> En(nBlck, arma::fill::zeros);
 
 	// set the random state at the begining
 	this->setRandomFlipNum(nFlip);
+
+	// allows to calculate the probability of the operator (for operator measurements)
 	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= nSam; ++i)
 	{
-		//this->setRandomState();
-		// thermalize!
-#ifndef NQS_USE_VEC_ONLY
-		this->blockSample(nThrm, this->curState_, false);
+		this->blockSample(nThrm, 
+#ifdef NQS_USE_VEC_ONLY
+						this->curVec_,
 #else
-		this->blockSample(nThrm, this->curVec_, false);
+						this->curState_,
 #endif
-		// iterate blocks
+						false);
+
+		// iterate blocks - this ensures the calculation of a stochastic gradient
 		for (uint _taken = 0; _taken < nBlck; ++_taken) 
 		{
 			// sample them!
-#ifndef NQS_USE_VEC_ONLY
-			this->blockSample(bSize, this->curState_, false);
+			this->blockSample(bSize, 
+#ifdef NQS_USE_VEC_ONLY
+			this->curVec_, 
 #else
-			this->blockSample(bSize, this->curVec_, false);
+			this->curState_,
 #endif 
-			// energy
-			En(_taken) = this->locEnKernel();
+			false);
 
-			// local operators
-			_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun);
+			En(_taken) = this->locEnKernel();										// one can calculate the local energy here
+			TIMER_START_MEASURE((i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i), _meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun)); 	
 		}
 
-		// normalize operators to be saved 
-		_meas.normalize(nBlck);
+		_meas.normalize(nBlck);														// normalize the measurements
+		meanEn(i - 1) = arma::mean(En); 											// save the mean energy
+		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
-		// save the mean energy
-		meanEn(i - 1) = arma::mean(En);
-
-		// update the progress bar
-		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
 	}
 	LOGINFO(_t, "NQS_COLLECTION", 1);
 	return meanEn;
@@ -946,38 +1209,8 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	this->ran_					=			_H->ran_;
 
 	// set threads
-	{
-#ifndef NQS_USE_MULTITHREADING
-		this->threadNum_		=			1;
-#else
-		this->threadNum_		=			std::min(_threadNum, this->nSites_);
-		this->threadsNumLeft_	=			std::max(_threadNum - this->threadNum_, (uint)1);
-#endif
-	// Use threads for all consecutive parallel regions
-#if defined NQS_USE_MULTITHREADING
-#	ifdef NQS_USE_OMP
-		omp_set_num_threads(this->threadNum_);   
-#	else
-		this->threads_.reserve(this->threadNum_);
-		this->kernels_			=			v_1d<CondVarKernel<_T>>(this->threadNum_);
-		
-		// calculate how many sites goes to one thread
-		uint _siteStep			=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
+	this->initThreads(_threadNum);
 
-		// start the threads that calculate the energy with the local energy kernel function
-		// this function waits for the specific energy calculation to be ready on each thread
-		// this is handled through "flagThreadRun_" member
-		for (uint i = 0; i < this->threadNum_; i++)
-		{
-			std::function<void()> lambda = [this, i, _siteStep]() 
-				{ 
-					this->locEnKernel(i * _siteStep, std::min((i + 1) * _siteStep, this->nSites_), i); 
-				};
-			this->threads_.emplace_back(std::thread(lambda));
-		}
-#	endif
-#endif
-	}
 	LOGINFO("Constructed the general NQS class", LOG_TYPES::TRACE, 2);
 };
 

@@ -18,41 +18,12 @@
 #endif
 
 // ######################### NQS ############################
-#if 1													 // #
-#define NQS_SAVE_WEIGHTS								 // #
-#ifdef NQS_SAVE_WEIGHTS									 // #
-#	define NQS_SAVE_DIR "WEIGHTS" + kPS					 // #
-#endif													 // #
-														 // #
-//#define NQS_USE_GPU									// #
-#define NQS_USE_CPU										 // #
-														// #
-#ifdef NQS_USE_CPU										 // #
-#	define NQS_USE_MULTITHREADING						 // #
-//#	define NQS_USE_OMP									 // #
-#elif defined NSQ_USE_GPU								 // #
-// something											 // #
-#endif													 // #
-														 // #
-// definitions											 // #
-#define NQS_ANGLES_UPD									 // #
-														 // #
-// use vector only?										 // #
-#define NQS_USE_VEC_ONLY								 // #
-#define NQS_USESR										 // #
-#ifdef NQS_USESR										 // #
-// how to handle the inverse of the matrix				// #
-//#	define NQS_PINV 1e-3								// #
-// regularization for the covariance matrix				// #
-//#	define NQS_SREG										// #												  
-#endif													 // #
 #ifndef RBMPP_H											 // #
 #	include "../NQS/rbm_pp.h"							 // #
 #endif													 // #
 #ifndef RBM_H											 // #
 #	include "../NQS/rbm.h"								 // #
 #endif													 // #
-#endif 													 // #
 // ##########################################################
 
 
