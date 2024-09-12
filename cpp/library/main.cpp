@@ -1,11 +1,6 @@
 // %%%%%%%%%%%%% L O G %%%%%%%%%%%%%%%
 //#define LOG_FILE					//
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#if defined DEBUG and not defined _DEBUG
-#	define _DEBUG
-#endif 
-
 //#ifdef _DEBUG
  //#	include "vld.h"
 //#endif

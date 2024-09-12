@@ -7,6 +7,7 @@
 * DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***********************************/
+#include "operator_algebra.h"
 #include <memory>
 #ifndef OPERATORS_H
 #define OPERATORS_H
@@ -134,11 +135,13 @@ namespace Operators
 	namespace SpinOperators
 	{
 		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		std::pair<_OP_V_T, double> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
 		Operators::Operator<double> sig_x(size_t _Ns, size_t _part);
 		Operators::Operator<double> sig_x(size_t _Ns, const v_1d<uint>& sites);
 		Operators::Operator<double> sig_x(size_t _Ns);
 
 		std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		std::pair<_OP_V_T, double> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
 		Operators::Operator<double> sig_z(size_t _Ns, size_t _part);
 		Operators::Operator<double> sig_z(size_t _Ns, const v_1d<uint>& sites);
 		Operators::Operator<double> sig_z(size_t _Ns);

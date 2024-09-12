@@ -1,4 +1,5 @@
 #pragma once
+#include "armadillo"
 #ifndef OPALG_H
 #define OPALG_H
 
@@ -270,5 +271,201 @@ namespace Operators {
 		return fun;
 	}
 };
+
+// ------------------------------------------------------------------------------------------------------------------
+
+// Do the same for the functions of the operators to handle vectors, not integers - this may be useful for 
+
+// ------------------------------------------------------------------------------------------------------------------
+
+namespace Operators {
+
+	using _OP_V_T 	= arma::Col<double>;
+	using _OP_V_T_CR= const arma::Col<double>&;
+	template <typename _T>
+	using _OPx_V 		= std::pair<_OP_V_T, _T>;
+	template <typename _T>
+	using _OPxEXT_V		= std::vector<std::pair<_OP_V_T, _T>>;
+	// standard operators
+	typedef _OPx_V<cpx> _OPCx_V;
+	typedef _OPx_V<double> _OPRe_V;
+
+	/*
+	* @brief All possible correlators
+	*/
+	template <typename _RET>
+	struct _OP_V {
+		// standard operators
+		using RET		=		_RET;
+		using R			=		std::pair<_OP_V_T, _RET>;
+		// functions
+		using GLB		=		std::function<R(_OP_V_T_CR)>;
+		using LOC		=		std::function<R(_OP_V_T_CR, int)>;
+		using COR		=		std::function<R(_OP_V_T_CR, int, int)>;
+
+		/*
+		* @brief contains all possible functions in a template
+		*/
+		template <typename... _T>
+		using INP		=		std::function<R(_OP_V_T_CR, _T...)>;
+
+		// ---------------------------------------------------------
+	};
+
+	// ######### S T A N D A R D #########
+	using _GLBC_V		=		typename _OP_V<cpx>::GLB;		//<! global function acting on whole product state
+	using _LOCC_V		=		typename _OP_V<cpx>::LOC;		//<! local function acting on single site
+	using _CORC_V		=		typename _OP_V<cpx>::COR;		//<! correlation function acting on pair of sites	
+
+#define _INPC_V _OP_V<cpx>::template INP
+#define _INPR_V _OP_V<double>::template INP
+
+	using _GLBR_V		=		typename _OP_V<double>::GLB;	//<! global function acting on whole product state
+	using _LOCR_V		=		typename _OP_V<double>::LOC;	//<! local function acting on single site
+	using _CORR_V		=		typename _OP_V<double>::COR;	//<! correlation function acting on pair of sites
+
+	template<typename _T>
+	using _GLB_V		=		typename _OP_V<_T>::GLB;				
+	template<typename _T>
+	using _LOC_V		=		typename _OP_V<_T>::LOC;
+	template<typename _T>
+	using _COR_V		=		typename _OP_V<_T>::COR;
+	template<typename _T, typename ..._Ts>
+	using _INP_V		=		typename _OP_V<_T>::template INP<_Ts...>;
+
+
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of arguments)
+	* Fixes both the inputs to be complex - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPC_V<_T1...> f, _INPC_V<_T2...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _T1... a1, _T2... a2) -> _OPCx_V
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of arguments)
+	* Fixes both inputs to be real - thus returning real
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPR_V<_T1...> f, _INPR_V<_T2...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _T1... a1, _T2... a2) -> _OPRe_V
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...)
+	* Leaves more types to handle thereafter (the function takes combined number of arguments)
+	* Fixes first input to be real and the second input to be complex - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPR_V<_T1...> f, _INPC_V<_T2...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _T1... a1, _T2... a2) -> _OPCx_V
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	/*
+	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
+	* Leaves more types to handle thereafter (the function takes combined number of arguments)
+	* Fixes first input to be complex and the second input to be real - thus returning complex
+	* @param f first function to apply
+	* @param g second function to apply
+	*/
+	template <typename... _T1, typename... _T2>
+	inline auto operator*(_INPC_V<_T1...> f, _INPR_V<_T2...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _T1... a1, _T2... a2) -> _OPCx_V
+		{
+			auto [s1, v1] = g(s, a2...);
+			auto [s2, v2] = f(s1, a1...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+	template <typename... _Ts>
+	inline auto operator%(_OP_V<double>::INP<_Ts...> f, _OP_V<double>::INP<_Ts...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, static_cast<double>(v1 * v2));
+		};
+	};
+
+	template <typename... _Ts>
+	inline auto operator%(_OP_V<cpx>::INP<_Ts...> f, _OP_V<double>::INP<_Ts...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _Ts>
+	inline auto operator%(_OP_V<cpx>::INP<_Ts...> f, _OP_V<cpx>::INP<_Ts...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	template <typename... _Ts>
+	inline auto operator%(_OP_V<double>::INP<_Ts...> f, _OP_V<cpx>::INP<_Ts...> g)
+	{
+		return [f, g](_OP_V_T_CR s, _Ts... a)
+		{
+			auto [s1, v1] = g(s, a...);
+			auto [s2, v2] = f(s1, a...);
+			return std::make_pair(s2, v1 * v2);
+		};
+	};
+
+	// vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+	template <typename... _T>
+	inline _OP_V<cpx>::INP<_T...> castINP(_OP_V<double>::INP<_T...> _in) {
+		auto fun = [&](_OP_V_T_CR s, _T... a) {
+			auto [sn, v] = std::apply(_in, a...);
+			return std::make_pair(sn, cpx(v, 0.0));
+		};
+		return fun;
+	}
+
+
+};
+
+// ------------------------------------------------------------------------------------------------------------------
 
 #endif
