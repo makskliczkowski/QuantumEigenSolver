@@ -1158,7 +1158,8 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 			this->blockSample(bSize, NQS_STATE, false);
 
 			En(_taken) = this->locEnKernel();										// one can calculate the local energy here (either of the ground state or the excited state)
-			TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
+			TIMER_START_MEASURE(_meas.measure(this->curVec_, opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
+			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
 		_meas.normalize(nBlck);														// normalize the measurements

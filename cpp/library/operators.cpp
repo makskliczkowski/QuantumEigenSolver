@@ -1018,7 +1018,7 @@ long double Operators::OperatorNameParser::resolveSite(const std::string &_site,
 	} 
 	// check if the site is PI
 	else if (_site == OPERATOR_PI) {
-		return M_PI;
+		return PI;
 	}
 	// check if the site can be divided - then divide it
 	else if(_site.find(OPERATOR_SEP_DIV) != std::string::npos) {
@@ -1029,7 +1029,7 @@ long double Operators::OperatorNameParser::resolveSite(const std::string &_site,
 		}
 		// contains PI
 		else if (_site.find(OPERATOR_PI) != std::string::npos) {
-			return M_PI / _div;
+			return PI / _div;
 		}
 	}
 	// check if the site is a difference
@@ -1296,3 +1296,5 @@ strVec Operators::OperatorNameParser::parseRangeOperators(const std::string &_in
 
 	return _potentialIndicies;
 }
+
+// #############################################################################################################################

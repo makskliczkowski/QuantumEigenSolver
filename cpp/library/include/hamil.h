@@ -191,7 +191,7 @@ public:
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
 	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
 	// energy
-	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_)) / (long double)this->Nh_;		};
+	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_));									};
 	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
 	virtual auto getEnergyWidth()						const -> double								{ return algebra::cast<double>(this->H_.getEnergyWidth());						};
 	// hamiltonian

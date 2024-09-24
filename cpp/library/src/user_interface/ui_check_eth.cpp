@@ -261,7 +261,8 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 			// calculate the frequency
 			const double w			= std::abs(_en_l - _en_r);
-			const double w_ov_bw	= w * _bandwidth;
+			//const double w_ov_bw	= w * _bandwidth;
+			const double w_ov_bw	= w / _bandwidth;
 
 			// calculate the values
 			const auto& _measured	= algebra::cast<double>(_overlaps(i, j));
@@ -487,10 +488,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		};
 
 	// ---------------------------------------------------------------
-	// bandwidth limits
-	double oMaxBW			=	0.5;
-	double oMinBW			=	1.0 / _Nh;
-
 	// go through realizations
 	for (int _r = 0; _r < this->modP.modRanN_; ++_r)
 	{
@@ -545,13 +542,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 				const arma::Col<double> _energies_cut = _energies.subvec(_minIdxDiag_cut, _maxIdxDiag_cut - 1).as_col();
 				// calculate the eigenlevel statistics
-				auto _gapratio		=	SystemProperties::eigenlevel_statistics(_energies_cut);
-				_gaps(_r)			=	_gapratio;
+				_gaps(_r)			=	SystemProperties::eigenlevel_statistics(_energies_cut);
 					
 				SystemProperties::eigenlevel_statistics(_energies.begin(), _energies.end(), _gapsin);
 				_gapsall.col(_r)	=	arma::Col<double>(_gapsin);
 
-				LOGINFO(StrParser::colorize(VEQ(_gapratio), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQ(_gaps(_r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
 				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
 
 				// -----------------------------------------------------------------------------
@@ -604,8 +600,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		if (_r == 0)
 		{
 			// values that are the limits when the 
-			double oMax			= oMaxBW * _bandwidth(0);
-			double oMin			= oMinBW * _bandwidth(0);
+			double oMax			= 0.5 * _bandwidth(0);
+			double oMin			= _meanlvl(0)/*oMinBW * _bandwidth(0)*/;
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 

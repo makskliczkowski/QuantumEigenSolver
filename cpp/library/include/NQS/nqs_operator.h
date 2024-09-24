@@ -89,8 +89,14 @@ namespace Operators
 		OperatorNQS(Operators::OperatorNQS<_T, _Ts...>&& _other);
 
 		// ###### APPLICATION ######
+
+		// for the integer type of the state
 		auto operator()(u64 s, _Ts... a)						const -> v_1d<typename _OP<_T>::R>;
 		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		-> _T;
+		// for the column vector type of the state
+		auto operator()(_OP_V_T_CR s, _Ts... a)					const -> v_1d<typename _OP<_T>::R>;
+		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) -> _T;
+		// for the colected samples
 		auto operator[](uint i)									const -> arma::Mat<_T> { return this->samples_[i]; };
 
 		// updates current value
@@ -122,10 +128,10 @@ namespace Operators
 		auto mbmat()					const -> const GeneralizedMatrix<_T>&			{ return this->manyBodyMatrix_;			};
 		auto mbval_c()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
 		auto mbval()					const -> const arma::Mat<_T>&					{ return this->manyBodyVal_;			};
-		auto var()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::var(samples_));		};
-		auto mean()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::mean(samples_));		};
-		auto value()					const -> arma::Mat<cpx>							{ return currentValue_;					};
-		auto value(uint i)				const -> arma::Mat<cpx>							{ return samples_[i];					};
+		auto var()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::var(samples_));	};
+		auto mean()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::mean(samples_));	};
+		auto value()					const -> arma::Mat<cpx>							{ return this->currentValue_;			};
+		auto value(uint i)				const -> arma::Mat<cpx>							{ return this->samples_[i];				};
 		auto samples_c()				const -> v_1d<arma::Mat<cpx>>					{ return this->samples_;				};
 		auto samples()					const -> const v_1d<arma::Mat<cpx>>&			{ return this->samples_;				};
 		auto getOperator(uint i)		const -> Operators::Operator<_T, _Ts...>		{ return this->op_[i];					};
@@ -384,6 +390,26 @@ namespace Operators
 
 	////////////////////////////////////////////////////////////////////////////
 
+	template<typename _T, typename ..._Ts>
+	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a)
+	{
+		// starting value
+		this->currentIdx_	= 0;
+		_T _valTotal		= 0.0;
+		// go through operators
+		for (auto& _op : op_)
+		{
+			// take value and new vector
+			auto [s2, _val] = _op(s, a...);
+			// calculate the probability ratio
+			_valTotal += _val * algebra::cast<_T>(_fun(s2));
+		}
+		this->updCurrent(_valTotal, a...);
+		return algebra::cast<_T>(_valTotal);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
 	/*
 	* @brief Apply the operators without a value change with pRatio.
 	* @param s base state to apply the operators to
@@ -392,6 +418,19 @@ namespace Operators
 	*/
 	template<typename _T, typename ..._Ts>
 	inline v_1d<typename _OP<_T>::R> Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, _Ts ...a) const
+	{
+		v_1d<typename _OP<_T>::R> _out;
+		// go through operators
+		for (auto& _op : op_)
+			// take value and new vector (written as an integer) 
+			_out.push_back(_op(s, a...));
+		return _out;
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	template<typename _T, typename ..._Ts>
+	inline v_1d<typename _OP<_T>::R> OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, _Ts ...a) const
 	{
 		v_1d<typename _OP<_T>::R> _out;
 		// go through operators
@@ -484,29 +523,61 @@ namespace NQSAv
 			for (auto& x : opL_) x.reset();
 			for (auto& x : opC_) x.reset();
 		}
+		MeasurementNQS()						= default;
+		MeasurementNQS(const MeasurementNQS&)	= default;
+		MeasurementNQS(MeasurementNQS&&)		= default;
+
+		// ---- CONSTRUCTORS ----
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators);
+		MeasurementNQS(size_t _Ns, const strVec& _operators);
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const std::string& _dir,
 													  const OPG& _opG,
-													  const OPL& _opL,
-													  const OPC& _opC,
+													  const OPL& _opL = {},
+													  const OPC& _opC = {},
 													  uint _threadNum = 1);
+		MeasurementNQS(size_t _Ns, const std::string& _dir,
+									const OPG& _opG,
+									const OPL& _opL = {},
+									const OPC& _opC = {},
+									uint _threadNum = 1);
+
+
+
+		// ---- MEASUREMENT ----
 
 		void measure(u64 s, NQSFunCol _fun);
+		void measure(Operators::_OP_V_T_CR, NQSFunCol _fun);
 		void measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>&);
 		void normalize(uint _nBlck);
 		void save(const strVec& _ext = { ".h5" });
+
+		// ---- GETTERS ----
+		auto getOpG()				const		->		const OPG& { return this->opG_; };
+		auto getOpL()				const		->		const OPL& { return this->opL_; };
+		auto getOpC()				const		->		const OPC& { return this->opC_; };
+		auto getDir()				const		->		const std::string& { return this->dir_; };
+
 	};
 
 	// ##########################################################################################################################################
-	// ##########################################################################################################################################
+
 	// ###################################################### C L A S S   C O N S T U C T #######################################################
-	// ##########################################################################################################################################
+
 	// ##########################################################################################################################################
 	
 	template <typename _T>
 	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators)
 		: Ns_(_lat->get_Ns()), lat_(_lat)
-	{}
+	{
+		CONSTRUCTOR_CALL;
+	}
+
+	template<typename _T>
+	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const strVec & _operators)
+		: Ns_(_Ns), lat_(nullptr)
+	{
+		CONSTRUCTOR_CALL;
+	}
 
 	////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////////
@@ -527,14 +598,71 @@ namespace NQSAv
 		CONSTRUCTOR_CALL;
 	}
 
+	template<typename _T>
+	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const std::string& _dir, const OPG& _opG, const OPL& _opL, const OPC& _opC, uint _threadNum)
+		: dir_(_dir), threads_(_threadNum), Ns_(_Ns), lat_(nullptr)
+	{
+		// create directory
+		makeDir(_dir);
+
+		this->opG_ = _opG;
+		this->opL_ = _opL;
+		this->opC_ = _opC;
+		CONSTRUCTOR_CALL;
+	}
+
 	// ##########################################################################################################################################
-	// ##########################################################################################################################################
+	
 	// ####################################################### C L A S S   M E A S U R E ########################################################
-	// ##########################################################################################################################################
+	
 	// ##########################################################################################################################################
 	
 	template <typename _T>
 	inline void NQSAv::MeasurementNQS<_T>::measure(u64 s, NQSFunCol _fun)
+	{
+		BEGIN_CATCH_HANDLER
+		{
+			// measure global
+			for (auto& _op : this->opG_)
+				auto val [[maybe_unused]] = _op->operator()(s, _fun);
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure local
+			for (auto& _op : this->opL_)
+			{
+				// go through the local operators
+				for (auto i = 0; i < this->Ns_; ++i)
+				{
+					auto val [[maybe_unused]] = _op->operator()(s, _fun, i);
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure correlation
+			for (auto& _op : this->opC_)
+			{
+				for (auto i = 0; i < this->Ns_; ++i)
+				{
+					for (auto j = 0; j < this->Ns_; ++j)
+					{
+						auto val [[maybe_unused]] = _op->operator()(s, _fun, i, j);
+					}
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+
+	template<typename _T>
+	inline void MeasurementNQS<_T>::measure(Operators::_OP_V_T_CR s, NQSFunCol _fun)
 	{
 		BEGIN_CATCH_HANDLER
 		{
