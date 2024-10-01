@@ -5,6 +5,7 @@
 * entanglement entropy. Acts as an
 *********************************/
 
+#include "armadillo"
 #ifndef ENTROPY_H
 #define ENTROPY_H
 
@@ -26,6 +27,38 @@ namespace Entropy
 		namespace Bipartite 
 		{
 			using namespace DensityMatrix;
+			// ##########################################################################################################################################
+			
+			[[nodiscard]]
+			inline double vonNeuman(const arma::vec& vals)
+			{
+				// calculate entropy
+				double entropy = 0.0;
+				
+				// go through the values
+				for (const auto& val: vals)
+					if (val > 0.0)
+						entropy += -val * std::log(val);
+				return entropy;
+			};
+			
+			// ##########################################################################################################################################
+
+			/*
+			* @brief Calculates the von Neuman entropy from the density matrix of the system
+			* @param rho density matrix
+			* @param _ch method choice
+			* @returns the bipartite entanglement entropy (von Neuman entropy)
+			*/
+			template <typename _T>
+			[[nodiscard]]
+			double vonNeuman(const arma::Mat<_T>& rho,
+							 DensityMatrix::RHO_METHODS _ch)
+			{
+				auto vals = DensityMatrix::Values::redDensMat_v(rho, _ch);
+				return vonNeuman(vals);
+			};
+			
 			// ##########################################################################################################################################
 
 			/*
@@ -65,6 +98,8 @@ namespace Entropy
 				return entropy;
 			};
 
+			// ##########################################################################################################################################
+
 			/*
 			* @brief Calculates the von Neuman entropy
 			* @param _s			state to construct the density matrix from
@@ -83,25 +118,7 @@ namespace Entropy
 			{
 				// get the reduced density matrix
 				auto rho = redDensMat<_T>(_s, _sizeA, _Ns, _ch, _localHilbert);
-
-				// get the values
-				arma::vec vals;
-				if (_ch == RHO_METHODS::SCHMIDT)
-				{
-					vals = arma::svd(rho);
-					vals = arma::square(vals);
-				}
-				else
-					arma::eig_sym(vals, rho);
-
-				// calculate entropy
-				double entropy = 0.0;
-
-				// go through the values
-				for (const auto& val: vals)
-					if (val > 0.0)
-						entropy += -val * std::log(val);
-				return entropy;
+				return vonNeuman(rho, _ch);
 			};
 
 			// ##########################################################################################################################################
@@ -118,24 +135,57 @@ namespace Entropy
 			{
 				// get the reduced density matrix
 				auto rho = redDensMat<_T>(_s, _sizeA, _Ns, _maskA, _ch, _locHilbert);
-				// get the values
-				arma::vec vals;
-				if (_ch == RHO_METHODS::SCHMIDT)
-				{
-					vals = arma::svd(rho);
-					vals = arma::square(vals);
-				}
-				else
-					arma::eig_sym(vals, rho);
+				return vonNeuman(rho, _ch);
+			};
 
-				// calculate entropy
-				double entropy = 0.0;
-				
-				// go through the values
-				for (const auto& val: vals)
-					if (val > 0.0)
-						entropy += -val * std::log(val);
-				return entropy;
+			// ##########################################################################################################################################
+
+			namespace Renyi
+			{
+
+				/*
+				* @brief Calculates the Renyi entropy defined by the values of the density matrix
+				* @param vals values of the density matrix (eigenvalues) obtained from the reduced density matrix
+				* either by the Schmidt decomposition or the standard method
+				* @param q exponent of the Renyi entropy S_q = 1/(1-q) * log(Tr(rho^q)) / log(D_A), 
+				* where D_B is the dimension of the subsystem B or equivalently the number of eigenvalues
+				* @returns the Renyi entropy
+				*/
+				inline double renyi(const arma::vec& vals, double q = 2.0)
+				{
+					if (q == 1.0)
+						return vonNeuman(vals);
+					
+					// calculate entropy
+					double entropy = 0.0;
+					
+					// go through the values
+					for (const auto& val: vals)
+						if (val > 0.0)
+							entropy += std::pow(val, q);
+					return std::log(entropy) / (1.0 - q) / std::log(vals.size()); 
+				};
+
+				// ##########################################################################################################################################
+
+				/*
+				* @brief Calculates the Renyi entropy defined by the values of the density matrix
+				* @param rho density matrix
+				* @param q exponent of the Renyi entropy S_q = 1/(1-q) * log(Tr(rho^q)) / log(D_A),
+				* where D_B is the dimension of the subsystem B or equivalently the number of eigenvalues
+				* @param _ch method choice
+				* @returns the Renyi entropy
+				*/
+				template <typename _T>
+				inline double renyi(const arma::Mat<_T>& rho, 
+									DensityMatrix::RHO_METHODS _ch = DensityMatrix::RHO_METHODS::SCHMIDT,
+									double q = 2.0)
+				{
+					auto vals = DensityMatrix::Values::redDensMat_v(rho, _ch);
+					return renyi(vals, q);
+				};
+
+				// ##########################################################################################################################################
 			};
 
 			// ##########################################################################################################################################

@@ -564,31 +564,6 @@ namespace SystemProperties
 	// ---------------------------------------------------------------------------
 
 	/*
-	* @brief Calculates the participation ratio of the state
-	* @param _state - the state
-	* @param q - the exponent
-	* @returns the participation ratio
-	*/
-	template <typename _C> 
-	[[nodiscard]]
-	inline long double participation_ratio(const _C& _state, double q = 1.0)
-	{
-		long double pr	= 0;
-#if SYSTEM_PROPERTIES_USE_OPENMP
-#	pragma omp parallel for reduction(+: pr)
-#endif
-		for (auto& _coeff : _state)
-		{
-			const auto abs_coeff = std::abs(algebra::conjugate(_coeff) * _coeff);
-			if (abs_coeff > SYSTEM_PROPERTIES_COEFF_THRESHOLD)
-				pr += std::pow(abs_coeff, q);
-		}
-		return pr;
-	}
-
-	// ---------------------------------------------------------------------------
-
-	/*
 	* @brief Calculates the inverse participation ratio of the state
 	* @param _state - the state
 	* @param q - the exponent
@@ -606,6 +581,34 @@ namespace SystemProperties
 		{
 			auto _v = std::abs(algebra::conjugate(_coeff) * _coeff);
 			ipr		+= _v;
+		}
+		return ipr;
+	}
+
+	// ---------------------------------------------------------------------------
+
+	/*
+	* @brief Calculates the inverse participation ratio of the state
+	* @param _state the state
+	* @param q the exponent
+	* @returns the participation ratio
+	*/
+	template <typename _C> 
+	[[nodiscard]]
+	inline long double inverse_participation_ratio(const _C& _state, double q)
+	{
+		long double ipr	= 0;
+		if (q == 1.0)
+			return inverse_participation_ratio(_state);
+
+#if SYSTEM_PROPERTIES_USE_OPENMP
+#	pragma omp parallel for reduction(+: pr)
+#endif
+		for (auto& _coeff : _state)
+		{
+			const auto abs_coeff = std::abs(algebra::conjugate(_coeff) * _coeff);
+			if (abs_coeff > SYSTEM_PROPERTIES_COEFF_THRESHOLD)
+				ipr += std::pow(abs_coeff, q);
 		}
 		return ipr;
 	}
@@ -724,7 +727,7 @@ namespace SystemProperties
 	{
 		if (q == 1.0)
 			return information_entropy(_state);
-		return 1.0 / (1.0 - q) * std::log(participation_ratio(_state, q));
+		return 1.0 / (1.0 - q) * std::log(inverse_participation_ratio(_state, q));
 	}
 
 	// ---------------------------------------------------------------------------

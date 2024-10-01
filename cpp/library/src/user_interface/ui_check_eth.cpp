@@ -134,7 +134,8 @@ std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec> UI::ui_eth
 // ###############################################################################################
 
 /*
-* @brief Randomize the Hamiltonian to get another realization of the system. 
+* @brief Randomize the Hamiltonian to get another realization of the system. It allows for creating 
+* different realizations of the same system. 
 * @param _H: Hamiltonian to randomize
 * @param _r: realization number
 * @param _spinchanged: which spin to change (if applicable)
@@ -145,8 +146,10 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 	bool isQuadratic [[maybe_unused]]	= _H->getIsQuadratic(),
 		 isManyBody	 [[maybe_unused]]	= _H->getIsManyBody();
 
+	// clear the Hamiltonian
 	_H->clearH();
 
+	// randomize the Hamiltonian
 	if (isManyBody)
 	{
 		if (this->modP.modTyp_ == MY_MODELS::QSM_M)
@@ -157,6 +160,7 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 			{
 				auto _Ns	= this->latP.Ntot_;
 				auto _N		= this->modP.qsm.qsm_N_;
+
 				if (_r % 2 == 0 || (_spinchanged > _Ns - _N))
 					_H->randomize(this->modP.qsm.qsm_h_ra_, this->modP.qsm.qsm_h_r_, { "h" });
 				else
@@ -164,8 +168,7 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 					// set only the _spinchanged magnetic field to a different spin, which is the same as the one before but with a different sign
 					// this is to check the ETH properties when one perturbs the system just slightly. Other magnetic fields are the same.
 					std::shared_ptr<QSM<double>> _Hp = std::reinterpret_pointer_cast<QSM<double>>(_H);
-					auto _h = _Hp->getMagnetic(_Ns - _N - _spinchanged);
-					_Hp->setMagnetic(_Ns - 3 - _spinchanged, -_h);
+					_Hp->setMagnetic(_Ns - 3 - _spinchanged, -_Hp->getMagnetic(_Ns - _N - _spinchanged));
 				}
 			}
 		}
@@ -173,6 +176,7 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 			_H->randomize(0, 1.0, { "g" });
 		else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
 			_H->randomize(0, 1.0, {});
+		// else if (this->modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
 	}
 
 	// -----------------------------------------------------------------------------
@@ -249,11 +253,11 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 	for (u64 i = _start; i < _stop; i += _iter)
 	{
-		const auto _en_l = _H->getEigVal(i);
+		const double _en_l = _H->getEigVal(i);
 
 		for (u64 j = i + 1; j < _Nh; ++j)
 		{
-			const auto _en_r = _H->getEigVal(j);
+			const double _en_r = _H->getEigVal(j);
 
 			// check the energy difference
 			if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_ * _bandwidth))
@@ -261,7 +265,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 			// calculate the frequency
 			const double w			= std::abs(_en_l - _en_r);
-			//const double w_ov_bw	= w * _bandwidth;
+			// const double w_ov_bw	= w * _bandwidth;
 			const double w_ov_bw	= w / _bandwidth;
 
 			// calculate the values
@@ -304,7 +308,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 					_offdiagElems.set(_opi, _ii, _r, _elemreal);
 					_totalIterator_off++;
 				}
-				if (_totalIterator_off_low < _elemThreadedLowSize && w_ov_bw < omega_lower_cut)
+				if (_totalIterator_off_low < _elemThreadedLowSize && w * _bandwidth < omega_lower_cut)
 				{
 					const auto _ii				= _startElem + _totalIterator_off_low;
 					_offdiagElemsOmegaLow(_ii, _r)	= std::abs(w);
@@ -334,6 +338,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 	return _offdiagElemesStat_local;
 }
 
+// -----------------------------------------------------------------------------------------------
 
 /*
 * @brief Check the properties of the models complying to ETH based on the Hamiltonian provided.
@@ -366,25 +371,35 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
-	arma::Mat<double> _en			= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _entroHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _entroFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _entroLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _en			= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// energies
+	arma::Mat<double> _entroHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
+	arma::Mat<double> _entroRHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
+	arma::Mat<double> _entroFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
+	arma::Mat<double> _entroRFirst  = UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
+	arma::Mat<double> _entroLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
+	arma::Mat<double> _entroRLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
+	arma::Mat<double> _schmidFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// schmid gap
+	arma::Mat<double> _schmidLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// schmid gap
 
 	// information entropy and ipr
-	arma::Mat<double> _ipr05		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _ipr1 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Col<double> _ipr1mean 	= UI_DEF_COL_D(this->modP.modRanN_);
-	arma::Mat<double> _ipr2 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	v_1d<double> _qs = { 0.1, 0.5, 1.0, 1.5, 2.0, 3.0 };
+	arma::Mat<double> _e_ipr01		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr05		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr1 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr15 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr2 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr3 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
 
 	// gap ratios
 	v_1d<double> _gapsin(_Nh - 2, 0.0);
 	arma::Col<double> _gaps			= UI_DEF_COL_D(this->modP.modRanN_);
 	arma::Mat<double> _gapsall		= UI_DEF_MAT_D(_Nh - 2, this->modP.modRanN_);
 	// mean lvl
-	arma::Col<double> _meanlvl		= UI_DEF_COL_D(this->modP.modRanN_);
-	arma::Col<double> _bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);
-	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);
+	arma::Col<double> _meanEn		= UI_DEF_COL_D(this->modP.modRanN_);		// mean energy
+	arma::Col<double> _meanEnIdx 	= UI_DEF_COL_D(this->modP.modRanN_);		// mean energy index
+	arma::Col<double> _meanlvl		= UI_DEF_COL_D(this->modP.modRanN_);		// mean level spacing
+	arma::Col<double> _bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);		// bandwidth
+	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);		// Hamiltonian squared average
 
 	// create the measurement class
 	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
@@ -420,18 +435,38 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	std::function<void(uint)> _saver = [&](uint _r)
 		{
 			saveAlgebraic(dir, "stat" + randomStr + extension, _gaps, "gap_ratio", false);
-			saveAlgebraic(dir, "stat" + randomStr + extension, _meanlvl, "mean_level_spacing", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _gapsall, "gap_ratios", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _meanEn, "mean_energy", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _meanEnIdx, "mean_energy_index", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _meanlvl, "mean_level_spacing", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _bandwidth, "bandwidth", true);
+			saveAlgebraic(dir, "stat" + randomStr + extension, _H2, "H2", true);
 			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
-			saveAlgebraic(dir, "entro" + randomStr + extension, _entroHalf, "half", false);
-			saveAlgebraic(dir, "entro" + randomStr + extension, _entroFirst, "first", true);
-			saveAlgebraic(dir, "entro" + randomStr + extension, _entroLast, "last", true);
+
+			// entanglement entropies
+			{	
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroHalf, "vN/half", false);
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroFirst, "vN/first", true);
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroLast, "vN/last", true);
+				// save the Renyi entropies
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroRFirst, "renyi/2.0/first", true);
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroRHalf, "renyi/2.0/half", true);
+				saveAlgebraic(dir, "entro" + randomStr + extension, _entroRLast, "renyi/2.0/last", true);
+
+				// schmid gaps
+				saveAlgebraic(dir, "entro" + randomStr + extension, _schmidFirst, "schmid/first", true);
+				saveAlgebraic(dir, "entro" + randomStr + extension, _schmidLast, "schmid/last", true);
+			}
 
 			// iprs
-			saveAlgebraic(dir, "ipr" + randomStr + extension, _ipr05, "ipr05", false);
-			saveAlgebraic(dir, "ipr" + randomStr + extension, _ipr1, "ipr1", true);
-			saveAlgebraic(dir, "ipr" + randomStr + extension, _ipr1mean, "mean/ipr1", true);
-			saveAlgebraic(dir, "ipr" + randomStr + extension, _ipr2, "ipr2", true);
+			{
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr01, "info/0.1", false);
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr05, "info/0.5", true);
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr1,  "info/1.0", true);
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr15, "info/1.5", true);
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr2,  "info/2.0", true);
+				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr3,  "info/3.0", true);
+			}
 
 			// diagonal operators saved (only append when _opi > 0)
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
@@ -495,9 +530,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		
 		// checkpoints etc
 		{
-			LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-			LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
-			_timer.checkpoint(STR(_r));
+			{
+				LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+				LOGINFO("Doing: " + STR(_r), LOG_TYPES::TRACE, 0);
+				_timer.checkpoint(STR(_r));
+			}
+
 			this->ui_eth_randomize(_H);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 
@@ -552,7 +590,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 				// -----------------------------------------------------------------------------
 
-				_en.col(_r) = _energies;
+				_en.col(_r) 	= _energies;
+				_meanEn(_r) 	= _H->getEnAv();
+				_meanEnIdx(_r) 	= _H->getEnAvIdx();
 
 				// -----------------------------------------------------------------------------
 				
@@ -563,11 +603,15 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					{
 						// get the entanglement
 						const arma::Col<_T> _st = _H->getEigVec(_idx);
-						_ipr1(_idx, _r)			= SystemProperties::information_entropy(_st);
-						_ipr05(_idx, _r)		= SystemProperties::participation_entropy(_st, 0.5);
-						_ipr2(_idx, _r)			= SystemProperties::participation_entropy(_st, 2.0);
+
+						// get the entropies
+						_e_ipr01(_idx, _r)	= SystemProperties::participation_entropy(_st, 0.1);
+						_e_ipr05(_idx, _r)	= SystemProperties::participation_entropy(_st, 0.5);
+						_e_ipr1(_idx, _r)	= SystemProperties::information_entropy(_st);
+						_e_ipr15(_idx, _r)	= SystemProperties::participation_entropy(_st, 1.5);
+						_e_ipr2(_idx, _r)	= SystemProperties::participation_entropy(_st, 2.0);
+						_e_ipr3(_idx, _r)	= SystemProperties::participation_entropy(_st, 3.0);
 					}
-					_ipr1mean(_r) = arma::mean(_ipr1.col(_r).subvec(_minIdxDiag_cut, _maxIdxDiag_cut - 1));
 				}
 
 				// -----------------------------------------------------------------------------
@@ -600,8 +644,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		if (_r == 0)
 		{
 			// values that are the limits when the 
-			double oMax			= 0.5 * _bandwidth(0);
-			double oMin			= _meanlvl(0)/*oMinBW * _bandwidth(0)*/;
+			double oMax			= 2.0 * _bandwidth(0);
+			double oMin			= _meanlvl(0) * 0.5/*oMinBW * _bandwidth(0)*/;
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 
@@ -624,9 +668,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			// other measures
 			{
 
-				// entanglement
-				if (_Ns <= std::log2(UI_LIMITS_MAXFULLED))
+				// entanglement entropies
+				if (_Ns < 20)
 				{
+					v_1d<int> _sites   = { 0 };
+					uint _lastSiteMask = Binary::prepareMask<int, v_1d<int>, false>(_sites, _Ns - 1);
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif				
@@ -634,10 +680,41 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					{
 						// get the entanglement
 						const auto _state		= _H->getEigVecCol(_idx);
-						_entroHalf(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, uint(_Ns / 2), uint(_Ns));
-						_entroFirst(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, 1, uint(_Ns));
-						_entroLast(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, 1, uint(_Ns), 1, Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT, 2);
-						//_entroLast(_idx, _r)	= Entropy::Entanglement::Bipartite::vonNeuman<_T>(_state, _Ns - 1, uint(_Ns), uint(_Nh - 2), Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT, 2);
+
+						// half of the system
+						{
+							auto _rho_v = DensityMatrix::Values::redDensMat_v(_state, uint(_Ns / 2), uint(_Ns));
+							// calculate the von Neumann entropy
+							_entroHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+							_entroRHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
+						}
+
+						// first site
+						{
+							auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 1, uint(_Ns));
+							// calculate the von Neumann entropy
+							_entroLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+							_entroRLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
+
+							// schmid gap
+							_schmidLast(_idx, _r)	= _rho_v(0) - _rho_v(1);
+						}
+
+						// last site 
+						{
+							auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 
+																						1, 
+																						uint(_Ns),
+																						_lastSiteMask,
+																						Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT,
+																						2);
+							// calculate the von Neumann entropy
+							_entroFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+							_entroRFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
+
+							// schmid gap
+							_schmidFirst(_idx, _r)	= _rho_v(0) - _rho_v(1);
+						}
 					}
 				}
 

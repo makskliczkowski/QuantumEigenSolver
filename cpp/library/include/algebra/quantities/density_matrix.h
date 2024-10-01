@@ -176,7 +176,11 @@ namespace DensityMatrix
 	*/
 	template<typename _TV, typename _T>
 	inline typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
-	schmidt(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, size_t _locHilbert = 2)
+	schmidt(const arma::Col<_TV>& _s, 
+			size_t _sizeA, 
+			size_t _size, 
+			const _T& _maskA, 
+			size_t _locHilbert = 2)
 	{
 		uint bitNum		= (uint)std::log2(_locHilbert);
 		const u64 dA	= ULLPOW(bitNum * _sizeA);
@@ -191,7 +195,6 @@ namespace DensityMatrix
 		// loop over the state
 		for(u64 _st = 0; _st < _s.size(); ++_st)
 		{
-			// get the index of the state
 			// get the index of the state in the reduced basis
 			u64 _idxA	= Binary::extract(_st, _maskA);
 			u64 _idxB	= Binary::extract(_st, _maskB);
@@ -238,7 +241,10 @@ namespace DensityMatrix
 	// ###############################################################
 
 	template <typename _T>
-	inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, uint _sizeA, size_t _Ns, RHO_METHODS _ch = RHO_METHODS::SCHMIDT, uint _locHilbert = 2)
+	inline arma::Mat<_T> redDensMat(const arma::Col<_T>& _s, 
+									uint _sizeA, size_t _Ns, 
+									RHO_METHODS _ch = RHO_METHODS::SCHMIDT, 
+									uint _locHilbert = 2)
 	{
 		switch (_ch) 
 		{
@@ -261,7 +267,12 @@ namespace DensityMatrix
 
 	template<typename _TV, typename _T>
 	inline typename std::enable_if<std::is_arithmetic<_T>::value, arma::Mat<_TV>>::type
-	redDensMat(const arma::Col<_TV>& _s, size_t _sizeA, size_t _size, const _T& _maskA, RHO_METHODS _ch = RHO_METHODS::SCHMIDT, size_t _locHilbert = 2)
+	redDensMat(const arma::Col<_TV>& _s, 
+				size_t _sizeA, 
+				size_t _size, 
+				const _T& _maskA, 
+				RHO_METHODS _ch = RHO_METHODS::SCHMIDT, 
+				size_t _locHilbert = 2)
 	{
 		switch (_ch) 
 		{
@@ -281,6 +292,66 @@ namespace DensityMatrix
 	}
 	
 	// ##############################################################################################################################
+
+	namespace Values
+	{	
+		template <typename _T>
+		inline arma::vec redDensMat_v(const arma::Mat<_T>& _rho, 
+									  RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
+		{
+			if (_ch == RHO_METHODS::SCHMIDT)
+				return arma::square(arma::svd(_rho));
+			else
+				return arma::eig_sym(_rho);
+		}
+
+
+		template <typename _T>
+		inline arma::vec redDensMat_v(const arma::Col<_T>& _s, 
+										uint _sizeA, size_t _Ns, 
+										RHO_METHODS _ch = RHO_METHODS::SCHMIDT, 
+										uint _locHilbert = 2)
+		{
+			auto _rho = redDensMat<_T>(_s, _sizeA, _Ns, _ch, _locHilbert);
+			return redDensMat_v(_rho, _ch);
+		}
+
+		// ##############################################################################################################################
+
+		template <typename _T>
+		inline arma::vec redDensMat_v(const arma::Col<_T>& _s, 
+									uint _sizeA,
+									Hilbert::HilbertSpace<_T>& _hilb,
+									RHO_METHODS _ch = RHO_METHODS::SCHMIDT)
+		{
+			auto _rho = redDensMat<_T>(_s, _sizeA, _hilb, _ch);
+			return redDensMat_v(_rho, _ch);
+		}
+
+		// ##############################################################################################################################
+
+		/*
+		* @brief Calculates the reduced density matrix with one of the methods and returns the eigenvalues
+		* @param _s state to construct the density matrix from
+		* @param _sizeA subsystem size
+		* @param _Ns number of lattice sites
+		* @param _ch method choice
+		* @param _locHilbert local Hilbert space size
+		* @returns the eigenvalues of the reduced density matrix
+		*/
+		template<typename _TV, typename _T>
+		inline typename std::enable_if<std::is_arithmetic<_T>::value, arma::vec>::type
+		redDensMat_v(const arma::Col<_TV>& _s, 
+				size_t _sizeA, 
+				size_t _size, 
+				const _T& _maskA, 
+				RHO_METHODS _ch = RHO_METHODS::SCHMIDT, 
+				size_t _locHilbert = 2)
+		{
+			auto _rho = redDensMat<_TV, _T>(_s, _sizeA, _size, _maskA, _ch, _locHilbert);
+			return redDensMat_v(_rho, _ch);
+		}
+	};
 };
 
 #endif
