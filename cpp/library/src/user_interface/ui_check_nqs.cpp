@@ -115,24 +115,14 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 									_opsC, this->threadNum);
 
 	// start the simulation
+	NQS_train_t _par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
 	arma::Col<_T> _EN(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
-	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(	this->nqsP.nMcSteps_,
-															this->nqsP.nTherm_,
-															this->nqsP.nBlocks_,
-															this->nqsP.blockSize_,
-															dir,												
-															this->nqsP.nFlips_,
-															this->quiet,
-															_timer.start(),
-															10);
-	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(this->nqsP.nMcSamples_,
-																	0,
-																	this->nqsP.nSBlocks_,
-																	this->nqsP.blockSizeS_,
-																	this->nqsP.nFlips_,
-																	this->quiet,
-																	_timer.start(),
-																	_meas);
+	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(_par, this->quiet, _timer.start(), 10);
+
+	_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
+	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(_par, this->quiet, _timer.start(), _meas);
+
+	// save the energies
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
 	_ENSM.col(0)	= arma::real(_EN);
 	_ENSM.col(1)	= arma::imag(_EN);

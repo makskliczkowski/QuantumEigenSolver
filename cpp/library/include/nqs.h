@@ -1,4 +1,3 @@
-#pragma once
 /***************************************
 * Defines the generic NQS Solver class. 
 * Allows for later inhertiance
@@ -7,6 +6,8 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 #include "armadillo"
+#include <memory>
+#include <stdexcept>
 #ifndef NQS_H
 #	define NQS_H
 
@@ -91,7 +92,8 @@ END_ENUM(NQSTYPES)				// #
 // all the types that are to be used in each NQS implementation
 #define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
 											using NQSB = arma::Col<_type>; 				\
-											using NQSW = arma::Mat<_type>;			
+											using NQSW = arma::Mat<_type>;			 	;
+
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -122,6 +124,28 @@ struct CondVarKernel
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+struct NQS_train_t
+{
+	uint mcSteps	=	10;					// number of Monte Carlo Steps (outer loops for the training)
+	uint nThrm		=	0;					// number of mcSteps to thermalize (burn-in)
+	uint nBlck		= 	32;					// number of such blocks for one average step (single iteration step after which the gradient is calculated)
+	uint bSize		= 	10;					// for killing correlations - (single block size)
+	std::string dir	=	"";					// saving directory (for the weights)
+	uint nFlip		= 	1;					// number of flips to set (default is 1)
+
+	void hi(const std::string& _in = "Train: ") const
+	{
+		std::string outstr	= "";
+		strSeparatedP(outstr, '\t', 2,
+					VEQV(Monte Carlo Steps, this->mcSteps),
+					VEQV(Thermalization Steps, this->nThrm),
+					VEQV(Block Number, this->nBlck),
+					VEQV(Size of the single block, this->bSize),
+					VEQV(Number of flips taken at each step, this->nFlip));
+		LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
+	}
+};
+
 /*
 * @brief General Neural Network Quantum States eigensolver class - base
 * Contains all the necessary methods to override for the specific NQS model.
@@ -137,6 +161,39 @@ public:
 	using NQSS							=		arma::Col<_stateType>;	// Quantum state -> e.g. for occupation representation purpose 
 	using NQSB							=		arma::Col<_T>;			// for free parameter representation purpose (e.g. angles)
 	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose (e.g. weights - single layer only)
+	using NQSLS_p						= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+
+	// ##################################
+
+	struct NQS_info_t
+	{
+		// simulation specific
+		double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
+	
+		// architecture specific
+		uint nVis_						=		1;						// number of visible neurons (input variables)
+		uint nSites_					=		1;						// number of lattice sites or fermionic modes
+		uint fullSize_					=		1;						// full number of the parameters (for memory purpose)
+
+		// Hilbert space info
+		u64 Nh_							=		1;						// Hilbert space size (number of basis states)
+		uint nParticles_				=		1;						// number of particles in the system (if applicable)
+		bool conservesParticles_		=		true;					// whether the system conserves the number of particles
+
+		// normalization
+		double norm_					=		0.0;					// normalization factor for the state vector
+	} info_p_;
+
+	// ##################################
+	struct NQS_lower_t
+	{
+		// for the excited states 
+		bool isSet_						= 		false;
+		NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
+		v_1d<double> f_lower_b			=		{};						// pentalties for the excited states
+	} lower_states_;
+
+	// ##################################
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
@@ -331,7 +388,8 @@ public:
 	// ------------------------ S E T T E R S ------------------------
 	virtual void init()									=				0; 
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->Nh_), _upd);	};
-	
+	virtual double setNormalization();
+
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -346,32 +404,23 @@ public:
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
 	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;						};
 	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
+	auto getNorm()								const -> double			{ return this->info_p_.norm_ <= 0 ? this->setNormalization() : this->info_p_.norm_;	};
 
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
-	virtual arma::Col<_T> train(uint mcSteps,							// number of Monte Carlo Steps (outer loops for the training)
-								uint nThrm,								// number of mcSteps to thermalize (burn-in)
-								uint nBlck,								// number of such blocks for one average step (single iteration step after which the gradient is calculated)
-								uint bSize,								// for killing correlations - (single block size)
-								std::string dir,						// saving directory (for the weights)
-								uint nFlip			= 1,				// number of flips to set (default is 1)
+	virtual arma::Col<_T> train(const NQS_train_t& _par,
 								bool quiet			= false,			// shall talk? (default is false)
 								clk::time_point _t	= NOW,				// time! (default is NOW)
 								uint progPrc		= 25);
 
-	virtual arma::Col<_T> collect(uint nSam, 
-								  uint nThrm, 
-								  uint nBlck, 
-								  uint bSize, 
-								  uint nFlip		= 1,
-								  bool quiet		= false,
-								  clk::time_point _t	= NOW,			// time!
-								  NQSAv::MeasurementNQS<_T>& _mes = {});
+	virtual arma::Col<_T> collect(const NQS_train_t& _par,
+								  bool quiet						= false,
+								  clk::time_point _t				= NOW,
+								  NQSAv::MeasurementNQS<_T>& _mes 	= {});
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
-
 
 	// -------------------- C O N S T R U C T --------------------
 
@@ -379,7 +428,7 @@ public:
 	virtual ~NQS();
 	NQS() = default;
 	NQS(const NQS& _n)
-		: spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
+		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
 		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
 		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
 		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
@@ -387,7 +436,7 @@ public:
 		this->init();
 	}
 	NQS(NQS&& _n)
-		: spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
+		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
 		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
 		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
 		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
@@ -396,6 +445,7 @@ public:
 	}
 	NQS &operator=(const NQS & _n)
 	{	
+		this->info_p_				= _n.info_p_;
 		this->spinModes_			= _n.spinModes_;
 		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
@@ -418,6 +468,7 @@ public:
 	}
 	NQS &operator=(NQS &&_n)
 	{
+		this->info_p_				= _n.info_p_;
 		this->spinModes_			= _n.spinModes_;
 		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
@@ -439,8 +490,27 @@ public:
 		return *this;
 	}
 	NQS(std::shared_ptr<Hamiltonian<_Ht>> &_H, double _lr = 1e-2,
-		uint _threadNum = 1, int _nParticles = -1);
+		uint _threadNum = 1, int _nParticles = -1, 
+		const NQSLS_p& _lower = {}, std::vector<double> _beta = {});
 };
+
+// ##########################################################################################################################################
+
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization()
+{
+	// calculate the normalization factor
+	double _norm = 0.0;
+	for (u64 i = 0; i < this->Nh_; i++)
+	{
+		Binary::int2base(i, this->curVec_, this->discVal_);
+		auto _val 	= 	this->ansatz(this->curVec_);
+		_norm 		+= 	algebra::real(_val * arma::conj(_val));
+	}
+
+	this->info_p_.norm_ = _norm;
+	return _norm;
+}
 
 // ##########################################################################################################################################
 
@@ -746,6 +816,21 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 																							std::placeholders::_1,
 																							std::placeholders::_2)));
 		}
+
+		// lower energy states
+		{
+			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
+			{
+				// go through the other overlapping states
+				for (int _Nh = 0; _Nh < this->Nh_; _Nh++)
+				{
+					// get psi_wj (s) = <s_{wj}|\psi>^+
+
+				}	
+			}
+		}
+
+
 		// lock again
 		{
 			std::lock_guard<std::mutex> lock(this->kernels_[_threadNum].mutex);
@@ -1027,56 +1112,45 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg()
 * @param progPrc progress percentage to be displayed in the progress bar
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
-																uint nThrm,
-																uint nBlck,
-																uint bSize,
-																std::string dir,
-																uint nFlip,
+inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train_t& _par,
 																bool quiet,
 																clk::time_point _t,
 																uint progPrc)
 {
 	{
 		// make the pbar!
-		this->pBar_ = pBar(progPrc, mcSteps);
+		this->pBar_ = pBar(progPrc, _par.mcSteps);
 
 		// set the info about training
-		std::string outstr	= "";
-		strSeparatedP(outstr, '\t', 2,
-					VEQV(Monte Carlo Steps, mcSteps),
-					VEQV(Thermalization Steps, nThrm),
-					VEQV(Block Number, nBlck),
-					VEQV(Size of the single block, bSize),
-					VEQV(Number of flips taken at each step, nFlip));
-		LOGINFOG("Train: " + outstr, LOG_TYPES::TRACE, 1);
-		this->derivativesReset(nBlck);
+		_par.hi();
+
+		this->derivativesReset(_par.nBlck);
 	}
 	TIMER_CREATE(_timer);
 
 	// save all average weights for covariance matrix
-	arma::Col<_T> meanEn(mcSteps, arma::fill::zeros);
+	arma::Col<_T> meanEn(_par.mcSteps, arma::fill::zeros);
 	// history of energies - here we save the local energies at each block
-	arma::Col<_T> En(nBlck, arma::fill::zeros);
+	arma::Col<_T> En(_par.nBlck, arma::fill::zeros);
 	// set the random state at the begining and the number of flips
 	{
 		this->setRandomState();
-		this->setRandomFlipNum(nFlip);
+		this->setRandomFlipNum(_par.nFlip);
 	}
 
 	// go through the Monte Carlo steps
-	for (uint i = 1; i <= mcSteps; ++i)
+	for (uint i = 1; i <= _par.mcSteps; ++i)
 	{
 		// set the random state at the begining
 		this->setRandomState();
 		// thermalize
-		this->blockSample(nThrm, NQS_STATE, false);
+		this->blockSample(_par.nThrm, NQS_STATE, false);
 
 		// iterate blocks - this ensures the calculation of a stochastic gradient 
-		for (uint _taken = 0; _taken < nBlck; ++_taken) {
+		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) {
 
 			// sample them!
-			this->blockSample(bSize, NQS_STATE, false);
+			this->blockSample(_par.bSize, NQS_STATE, false);
 
 			// calculate the gradient at each point of the iteration! - this is implementation specific!!!
 			this->grad(this->curVec_, _taken);
@@ -1101,7 +1175,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 #ifdef NQS_SAVE_WEIGHTS
 		{
 		if (i % this->pBar_.percentageSteps == 0)  
-			this->saveWeights(dir + NQS_SAVE_DIR, "weights.h5");
+			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights.h5");
 		}
 #endif
 	}
@@ -1116,53 +1190,42 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(uint mcSteps,
 // ##########################################################################################################################################
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
-																	uint nThrm, 
-																	uint nBlck,
-																	uint bSize,
-																	uint nFlip,
+inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_train_t& _par,
 																	bool quiet,
 																	clk::time_point _t,
 																	NQSAv::MeasurementNQS<_T>& _meas)
 {																							
 	{
-		this->pBar_	= pBar(20, nSam);
-		std::string outstr= "";
-		// set the info about training
-		strSeparatedP(outstr, '\t', 2,
-					VEQV(Thermalization Steps, nThrm),
-					VEQV(Block Number, nBlck),
-					VEQV(Size of the single block, bSize),
-					VEQV(Number of flips taken at each step, nFlip));
-		LOGINFOG("Collect: " + outstr, LOG_TYPES::TRACE, 1);
+		this->pBar_	= pBar(20, _par.mcSteps);
+		_par.hi("Collect: ");
 	}
 	TIMER_CREATE(_timer);
-	arma::Col<_T> meanEn(nSam, arma::fill::zeros);
-	arma::Col<_T> En(nBlck, arma::fill::zeros);
+	arma::Col<_T> meanEn(_par.mcSteps, arma::fill::zeros);
+	arma::Col<_T> En(_par.nBlck, arma::fill::zeros);
 
 	// set the random state at the begining
-	this->setRandomFlipNum(nFlip);
+	this->setRandomFlipNum(_par.nFlip);
 
 	// allows to calculate the probability of the operator (for operator measurements)
 	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
-	for (uint i = 1; i <= nSam; ++i)
+	for (uint i = 1; i <= _par.mcSteps; ++i)
 	{
-		this->blockSample(nThrm, NQS_STATE, false);
+		this->blockSample(_par.nThrm, NQS_STATE, false);
 
 		// iterate blocks - this ensures the calculation of a stochastic gradient
-		for (uint _taken = 0; _taken < nBlck; ++_taken) 
+		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(bSize, NQS_STATE, false);
+			this->blockSample(_par.bSize, NQS_STATE, false);
 
 			En(_taken) = this->locEnKernel();										// one can calculate the local energy here (either of the ground state or the excited state)
 			TIMER_START_MEASURE(_meas.measure(this->curVec_, opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
-		_meas.normalize(nBlck);														// normalize the measurements
+		_meas.normalize(_par.nBlck);														// normalize the measurements
 		meanEn(i - 1) = arma::mean(En); 											// save the mean energy
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
@@ -1182,21 +1245,42 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	uint nSam,
 * @param _H Hamiltonian to be used for correct data sampling
 * @param _lr learning rate to be used for the training
 * @param _threadNum thread number to be used for the solver - available on setting corresponding thread pragma
+* @param _lower 
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
+inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+													double _lr, 
+													uint _threadNum, 
+													int _nParticles,
+													const NQSLS_p& _lower, 
+													std::vector<double> _beta)
 	: H_(_H), lr_(_lr)
 {
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
 	this->nVis_					=			_H->getNs() * (this->spinModes_ / 2);
+	this->info_p_.nVis_ 		= 			_H->getNs() * (this->spinModes_ / 2);
 	this->nSites_				=			_H->getNs();
+	this->info_p_.nVis_			=			_H->getNs();
+
 	// make it half filling if necessary
 	this->nParticles_			=			(_nParticles < 0 || this->spinModes_ == 2) ? this->nSites_ : (uint)_nParticles;
+	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->nSites_ : (uint)_nParticles;
 	// check the Hilbert space
 	this->Nh_					=			_H->getHilbertSize();
+	this->info_p_.Nh_			=			_H->getHilbertSize();
 	// set the random number generator
 	this->ran_					=			_H->ran_;
+
+	// setup the lower lying states, whenever they were previously set
+	{
+		if (_lower.size() == _beta.size() && _lower.size() != 0)
+		{
+			this->lower_states_.isSet_		=	true;
+			this->lower_states_.f_lower 	= _lower;
+			this->lower_states_.f_lower_b 	= _beta;
+		}
+	}
 
 	// set threads
 	this->initThreads(_threadNum);

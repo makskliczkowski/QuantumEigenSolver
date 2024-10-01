@@ -1,4 +1,12 @@
-//#pragma once
+#ifndef ML_H
+#define ML_H
+    struct ML_PARAMS
+    {
+        double lr_          = 1e-2;         // learning rate
+    };
+
+#endif
+
 //#ifndef COMMON_H
 //#include "../src/common.h"
 //#endif
