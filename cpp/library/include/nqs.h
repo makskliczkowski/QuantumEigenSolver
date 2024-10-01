@@ -505,7 +505,7 @@ double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization()
 	{
 		Binary::int2base(i, this->curVec_, this->discVal_);
 		auto _val 	= 	this->ansatz(this->curVec_);
-		_norm 		+= 	algebra::real(_val * arma::conj(_val));
+		_norm 		+= 	algebra::real(_val * algebra::conjugate(_val));
 	}
 
 	this->info_p_.norm_ = _norm;
