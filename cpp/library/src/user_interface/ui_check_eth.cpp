@@ -297,8 +297,10 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 
 				// add to the histograms
-				_histAvLocal.append(w, _elem2);
-				_histAvTypicalLocal.append(w, _logElem2);
+				_histAvLocal.append(w_ov_bw, _elem2);
+				// _histAvLocal.append(w, _elem2);
+				_histAvTypicalLocal.append(w_ov_bw, _logElem2);
+				// _histAvTypicalLocal.append(w, _logElem2);
 
 				// save the values
 				if (_totalIterator_off < _elemThreadedSize && w_ov_bw <= omega_upper_cut && w_ov_bw >= omega_lower_cut)
@@ -401,7 +403,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	arma::Col<double> _bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);		// bandwidth
 	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);		// Hamiltonian squared average
 
-	// create the measurement class
+	// create the measurem_bandwidthent class
 	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
 
 	// to save the operators (those elements will be stored for each operator separately)
@@ -427,7 +429,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	v_1d<HistogramAverage<double>> _histAvTypical(_ops.size(), HistogramAverage<double>(1));
 	
 	// ----------------------- nbins operators -----------------------
-	uint _nbinOperators = std::min((size_t)(12 * _Ns), (size_t)300);
+	const size_t _nbinOperators = (size_t)(20 * std::log2(_Nh));
 	v_1d<Histogram> _histOperatorsDiag(_ops.size(), Histogram(_nbinOperators));
 	v_1d<Histogram> _histOperatorsOffdiag(_ops.size(), Histogram(_nbinOperators));
 
@@ -644,8 +646,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		if (_r == 0)
 		{
 			// values that are the limits when the 
-			double oMax			= 2.0 * _bandwidth(0);
-			double oMin			= _meanlvl(0) * 0.5/*oMinBW * _bandwidth(0)*/;
+			// double oMax			= 2.0 * _bandwidth(0);
+			double oMax			= 1.0;
+			double oMin			= 0.1 /_Nh / _bandwidth(0);
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 
