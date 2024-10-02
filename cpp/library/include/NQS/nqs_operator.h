@@ -37,7 +37,35 @@ namespace Operators
 	template <typename _T>
 	class NQSContainer
 	{
-		
+	public:
+		uint sizeX_							= 1;					// size of the operator (in X direction)
+		uint sizeY_							= 1;					// size of the operator (in Y direction)
+		uint Ns_							= 1;					// number of states in the quantum state
+
+		// ##########################################################################################################################################
+
+		arma::Mat<_T> currentValue_;								// current value of the operator (at each point in X and Y) - for a single state
+		v_1d<arma::Mat<_T>> samples_;								// store the samples for the operator - samples taken from the quantum state
+
+		// ##########################################################################################################################################
+	
+		// ####### MANY BODY #######
+		// store the matrix for the matrices obtained directly from the many body matrix (for the many body operators) 
+		GeneralizedMatrix<_T> manyBodyMatrix_;
+		arma::Mat<_T> manyBodyVal_;
+
+		// ##########################################################################################################################################
+
+		// ######## INDICES ########
+		v_1d<uint> indices_;										// for finding out the index in the variadic variable 
+		uint currentIdx_					= 0;					// current index in the variadic variable (currently processed)
+
+	public:
+		NQSContainer(size_t _Ns)
+			:	Ns_(_Ns)
+		{
+			this->samples_ 					= {};
+		}
 	};
 
 	// ##########################################################################################################################################
@@ -64,24 +92,11 @@ namespace Operators
 	public:
 		// ##### OPERATOR NAME #####
 		std::string name_					= "";					// name of the operator
-		uint sizeX_							= 1;					// size of the operator (in X direction)
-		uint sizeY_							= 1;					// size of the operator (in Y direction)
-		uint Ns_							= 1;					// number of states in the quantum state
-
-		arma::Mat<_T> currentValue_;								// current value of the operator
-		v_1d<arma::Mat<_T>> samples_;								// store the samples for the operator (for the average)
-
-		// ####### MANY BODY #######
-		// store the matrix for the many body average basded on a given quantum state
-		GeneralizedMatrix<_T> manyBodyMatrix_;
-		arma::Mat<_T> manyBodyVal_;
-
-		// ######## INDICES ########
-		v_1d<uint> indices_;										// for finding out the index in the variadic variable
-		uint currentIdx_					= 0;
 
 		// ######## HELPER #########
 		NQSS state_;												// store the column state vector						
+
+		NQSContainer<_T> container_;								// container for the operator
 
 		// operators to apply step by step that add up in the average \sum _ s' <s|O|s'> * \Psi(s') / \Psi(s)
 		// !we apply the operator to the left and look for all the states that can be reached from the base state (= <s|)
@@ -110,7 +125,7 @@ namespace Operators
 		auto operator()(_OP_V_T_CR s, _Ts... a)					const -> v_1d<typename _OP<_T>::R>;
 		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) -> _T;
 		// for the colected samples
-		auto operator[](uint i)									const -> arma::Mat<_T> { return this->samples_[i]; };
+		auto operator[](uint i)									const -> arma::Mat<_T> { return this->container_.samples_[i]; };
 
 		// updates current value
 		template <class _Tt = uint>
@@ -126,9 +141,9 @@ namespace Operators
 		
 	public:
 		// ######## SETTERS ########
-		auto resetSamples()				-> void { this->samples_ = {};															};
-		auto resetValue()				-> void { currentValue_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);				};
-		auto resetMB()					-> void { manyBodyVal_ = arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);				};
+		auto resetSamples()				-> void { this->container_.samples_ = {};															};
+		auto resetValue()				-> void { container_.currentValue_ = arma::Mat<_T>(container_.sizeX_, container_.sizeY_, arma::fill::zeros);				};
+		auto resetMB()					-> void { container_.manyBodyVal_ = arma::Mat<_T>(container_.sizeX_, container_.sizeY_, arma::fill::zeros);				};
 		auto reset()					-> void;
 		auto normalize(uint N)			-> void; 
 		template <typename _T2>
@@ -137,16 +152,16 @@ namespace Operators
 
 		// ######## GETTERS ########
 		auto name()						const -> std::string							{ return this->name_;					};
-		auto mbmat_c()					const -> GeneralizedMatrix<_T>					{ return this->manyBodyMatrix_;			};
-		auto mbmat()					const -> const GeneralizedMatrix<_T>&			{ return this->manyBodyMatrix_;			};
-		auto mbval_c()					const -> arma::Mat<_T>							{ return this->manyBodyVal_;			};
-		auto mbval()					const -> const arma::Mat<_T>&					{ return this->manyBodyVal_;			};
-		auto var()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::var(samples_));	};
-		auto mean()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::mean(samples_));	};
+		auto mbmat_c()					const -> GeneralizedMatrix<_T>					{ return this->container_.manyBodyMatrix_;			};
+		auto mbmat()					const -> const GeneralizedMatrix<_T>&			{ return this->container_.manyBodyMatrix_;			};
+		auto mbval_c()					const -> arma::Mat<_T>							{ return this->container_.manyBodyVal_;			};
+		auto mbval()					const -> const arma::Mat<_T>&					{ return this->container_.manyBodyVal_;			};
+		auto var()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::var(container_.samples_));	};
+		auto mean()						const -> arma::Mat<cpx>							{ return algebra::cast<cpx>(Vectors::mean(container_.samples_));	};
 		auto value()					const -> arma::Mat<cpx>							{ return this->currentValue_;			};
-		auto value(uint i)				const -> arma::Mat<cpx>							{ return this->samples_[i];				};
-		auto samples_c()				const -> v_1d<arma::Mat<cpx>>					{ return this->samples_;				};
-		auto samples()					const -> const v_1d<arma::Mat<cpx>>&			{ return this->samples_;				};
+		auto value(uint i)				const -> arma::Mat<cpx>							{ return this->container_.samples_[i];				};
+		auto samples_c()				const -> v_1d<arma::Mat<cpx>>					{ return this->container_.samples_;				};
+		auto samples()					const -> const v_1d<arma::Mat<cpx>>&			{ return this->container_.samples_;				};
 		auto getOperator(uint i)		const -> Operators::Operator<_T, _Ts...>		{ return this->op_[i];					};
 	};
 
@@ -189,67 +204,68 @@ namespace Operators
 
 		if (numArgs == 0)
 		{
-			this->sizeX_				= 1;
-			this->sizeY_				= 1;
-			this->indices_				= {};
+			this->container_.sizeX_				= 1;
+			this->container_.sizeY_				= 1;
+			this->container_.indices_			= {};
 		}
 		else if (numArgs == 1)
 		{
-			this->sizeX_				= this->Ns_;
-			this->sizeY_				= 1;
-			this->indices_				= { 0 };
+			this->container_.sizeX_				= this->container_.Ns_;
+			this->container_.sizeY_				= 1;
+			this->container_.indices_				= { 0 };
 		}
 		else if (numArgs == 2)
 		{
-			this->sizeX_				= this->Ns_;
-			this->sizeY_				= this->Ns_;
-			this->indices_				= { 0, 0 };
+			this->container_.sizeX_				= this->container_.Ns_;
+			this->container_.sizeY_				= this->container_.Ns_;
+			this->container_.indices_				= { 0, 0 };
 		}
 		else
 			throw std::runtime_error("Not implemented for more than two arguments!");
 
 		// store the matrix for the many body average basded on a given quantum state
-		this->manyBodyVal_	=  arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
+		this->container_.manyBodyVal_	=  arma::Mat<_T>(container_.sizeX_, container_.sizeY_, arma::fill::zeros);
 	};
 
 	// ##########################################################################################################################################
 
 	template <typename _T, typename ..._Ts>
 	OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name)
-		: name_(_name), Ns_(_op.getNs()), samples_({}), op_({ _op })
+		: name_(_name), container_(_op.getNs()), op_({ _op })
 	{
 		// decide about the size of the operator
 		this->decideSize();
 		// create the state (basis state)
-		this->state_.resize(Ns_);
+		this->state_.resize(container_.Ns_);
 		this->reset();
 	};
 
 	template <typename _T, typename ..._Ts>
 	OperatorNQS<_T, _Ts...>::OperatorNQS(const v_1d<Operators::Operator<_T, _Ts...>>& _opV, const std::string& _name)
-		: name_(_name), Ns_(_opV[0].getNs()), samples_({}), op_(_opV)
+		: name_(_name), container_(Ns_(_opV[0].getNs())), op_(_opV)
 	{
 		// decide about the size of the operator
 		this->decideSize();
 		// create the state (basis state)
-		this->state_.resize(Ns_);
+		this->state_.resize(container_.Ns_);
 		this->reset();
 	};
 
 	template<typename _T, typename ..._Ts>
 	inline Operators::OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::OperatorNQS<_T, _Ts...>& _other)
-		: name_(_other.name_), Ns_(_other.Ns_), currentValue_(_other.currentValue_), samples_(_other.samples_), op_(_other.op_)
+		: name_(_other.name_), container_(_other.container_), op_(_other.op_)
 	{
+
 		// decide about the size of the operator
 		this->decideSize();
 		// create the state (basis state)
-		this->state_.resize(Ns_);
+		this->state_.resize(container_.Ns_);
 		this->reset();
 	}
 
 	template<typename _T, typename ..._Ts>
 	inline Operators::OperatorNQS<_T, _Ts...>::OperatorNQS(Operators::OperatorNQS<_T, _Ts...>&& _other)
-		: name_(std::move(_other.name_)), Ns_(std::move(_other.Ns_)), currentValue_(std::move(_other.currentValue_)), samples_(std::move(_other.samples_)), op_(std::move(_other.op_))
+		: name_(std::move(_other.name_)), container_(std::move(_other.container_)), op_(std::move(_other.op_))
 	{
 		// decide about the size of the operator
 		this->decideSize();
@@ -262,9 +278,9 @@ namespace Operators
 	inline Operators::OperatorNQS<_T, _Ts...>::~OperatorNQS()
 	{
 		// reset the samples
-		for (auto& x : this->samples_) 
+		for (auto& x : this->container_.samples_) 
 			x.reset();
-		this->samples_.clear();
+		this->container_.samples_.clear();
 		op_.clear();
 	}
 
@@ -279,16 +295,16 @@ namespace Operators
 	inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
 	Operators::OperatorNQS<_T, _Ts...>::updCurrent(_T _val, _Tt i)
 	{
-		this->indices_[this->currentIdx_] = i;
-		this->currentIdx_++;
+		this->container_.indices_[this->container_.currentIdx_] = i;
+		this->container_.currentIdx_++;
 
 		// check the size of the indices
-		if (indices_.size() == 0)
-			this->currentValue_(0, 0) += _val;
-		else if (indices_.size() == 1)
-			this->currentValue_(this->indices_[0], 0) += _val;
-		else if (indices_.size() == 2)
-			this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
+		if (container_.indices_.size() == 0)
+			this->container_.currentValue_(0, 0) += _val;
+		else if (container_.indices_.size() == 1)
+			this->container_.currentValue_(this->container_.indices_[0], 0) += _val;
+		else if (container_.indices_.size() == 2)
+			this->container_.currentValue_(this->container_.indices_[0], this->container_.indices_[1]) += _val;
 		else
 			throw std::runtime_error("Not implemented such exotic operators");
 	}
@@ -305,8 +321,8 @@ namespace Operators
 	inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
 	Operators::OperatorNQS<_T, _Ts...>::updCurrent(_T _val, _Tt i, _Tss...a)
 	{
-		indices_[currentIdx_] = i;
-		currentIdx_++;
+		this->container_.indices_[container_.currentIdx_] = i;
+		this->container_.currentIdx_++;
 		updCurrent(_val, a...);
 	};
 
@@ -326,7 +342,7 @@ namespace Operators
 		using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
 		// store all the measured values
-		this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_H.getHilbertSize(), true);
+		this->container_.manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_H.getHilbertSize(), true);
 		const bool _isFull 		= _H.getHilbertSize() == _H.getFullHilbertSize();
 		const size_t _dim		= _H.getHilbertSize();
 
@@ -342,13 +358,13 @@ namespace Operators
 				else
 					_Min = _op.template generateMat<false, res_typ, GeneralizedMatrix>(_dim, a...);
 
-				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
+				this->container_.manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 			else
 			{	
 				GeneralizedMatrix<_T> _Min;
 				_Min.setSparse(_op.template generateMat<false, res_typ, typename arma::SpMat>(_H, a...));
-				this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
+				this->container_.manyBodyMatrix_ += algebra::cast<_T>(_Min);
 			}
 		}
 	}
@@ -366,8 +382,8 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	inline arma::Col<_T> Operators::OperatorNQS<_T, _Ts...>::applyManyBody(const arma::Col<_T>& _C, uint i, uint j)
 	{
-		auto _Cout 			= Operators::apply(_C, this->manyBodyMatrix_);
-		manyBodyVal_(i, j) 	= arma::cdot(_C, _Cout);
+		auto _Cout 			= Operators::apply(_C, this->container_.manyBodyMatrix_);
+		container_.manyBodyVal_(i, j) 	= arma::cdot(_C, _Cout);
 		return _Cout;
 	}
 
@@ -385,7 +401,7 @@ namespace Operators
 	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
 	{
 		// starting value
-		this->currentIdx_	= 0;
+		this->container_.currentIdx_	= 0;
 		_T _valTotal		= 0.0;
 		// go through operators
 		for (auto& _op : op_)
@@ -407,7 +423,7 @@ namespace Operators
 	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a)
 	{
 		// starting value
-		this->currentIdx_	= 0;
+		this->container_.currentIdx_	= 0;
 		_T _valTotal		= 0.0;
 		// go through operators
 		for (auto& _op : op_)
@@ -462,7 +478,7 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	inline void Operators::OperatorNQS<_T, _Ts...>::normalize(uint N)
 	{
-		samples_.push_back(currentValue_ / (long double)(N)); 
+		container_.samples_.push_back(container_.currentValue_ / (long double)(N)); 
 		this->resetValue();
 	}
 };

@@ -1024,6 +1024,53 @@ inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::O
 
 // ##########################################################################################################################################
 
+// ####################################### O P E R A T O R   R E T U R N S   C O M B I N A T I O N ##########################################
+
+// ##########################################################################################################################################
+
+namespace Operators 
+{
+	template <typename _T, typename ..._Ts>
+	class OperatorComb : public GeneralOperator<_T, 
+												typename OperatorsCombination::_OP<_T>::template INP<_Ts...>,
+												typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>,
+												_Ts...>
+	{
+	public:
+		using baseType 	= 	GeneralOperator<_T, 
+								typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, 
+								typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, 
+								_Ts...>;												// type of the operator - base type
+		// ----------------------------------------------------------------------------------------------------
+
+		// Inherit constructors from GeneralOperator
+   	 	using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
+		
+		// ----------------------------------------------------------------------------------------------------
+		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
+		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference
+
+	protected:
+		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
+		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
+		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
+		using ReturnTypeV 	= typename baseType::ReturnTypeV;							// return type of the operator - for vectors
+
+	public:
+		// ----------------------------------------------------------------------------------------------------
+
+		// Default constructor
+		OperatorComb() : baseType() {};													// default constructor
+		
+		// ----------------------------------------------------------------------------------------------------
+
+	
+
+	};
+};
+
+// ##########################################################################################################################################
+
 // ############################################### E X T E N S I V E   O P E R A T O R S ####################################################
 
 // ##########################################################################################################################################
