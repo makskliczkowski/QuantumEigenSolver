@@ -8,7 +8,10 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
+#include <memory>
 #ifndef GENERAL_OPERATOR_H
+#define GENERAL_OPERATOR_H
+
 #ifndef LATTICE_H
 #include "../../source/src/lattices.h"
 #endif
@@ -140,202 +143,423 @@ namespace Operators {
 
 namespace Operators
 {
+
 	/*
-	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
-	* Can take several template arguments
+	* @brief A class describing the general operator. It can be later expanded for some more complicated operators acting on Hiblert space or other spaces.
+	* Can take several template arguments - the first one is the type of the operator, the rest are the potential non-local variables (like the index of the state (site) etc.)
+	* The operator can be acting on the states or can be a matrix operator.
 	*/
-	template<typename _T, typename ..._Ts>
-	class Operator 
+	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
+	class GeneralOperator
 	{
 	protected:
 		/*
 		* @brief Function for creating the matrix (overriden). If this is set, the matrix will be created using this function. Otherwise it is created 
 		* via standard procedure of acting on the states. This is useful for the operators that are not acting on the states directly or are random operators.
 		*/
-		GeneralizedMatrixFunction<_T> overridenMatFun_;										// function for creating the matrix (overriden)
+		GeneralizedMatrixFunction<_T> overridenMatFun_;		
 
-		typedef typename _OP<_T>::template INP<_Ts...> repType;								// type returned for representing, what it does with state and value it returns
-		typedef typename _OP_V<_T>::template INP<_Ts...> repTypeV;							// type returned for representing, what it does with state and value it returns - for vectors - this may not be used
+		// ====================================================================================================
+
+	protected:
+		// -------- LATTICE OR GRAPH RELATED --------
 		size_t Ns_											=			1;					// number of elements in the vector (for one to know how to act on it)
 		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, !! the lattice can be empty if not needed !!
+
+		// -------------- EIGENVALUE ----------------
 		_T eigVal_											=			1.0;				// eigenvalue for symmetry generator (if there is an inner value)
-		repType fun_										=			E;					// function allowing to use the symmetry operation
 
-		// using vector functions
+		// --------------- VECTORS ------------------
 		using _VT 											=			Operators::_OP_V_T;	// type of the vector to be used for the operator
-		using _VT_CR 										=			const _VT&;			// type of the vector to be used for the operator
-		bool hasVectorFun_									=			false;				// if the operator has a vector function
-		repTypeV funV_										=			E_V;				// function allowing to use the symmetry operation - for vectors
+		using _VT_CR 										=			const _VT&;			// type of the vector to be used for the operator - const reference
+		bool hasVectorFun_									=			false;				// if the operator has a vector function - this is then set to true
 
-		// quadratic
+		// -------------- QUADRATIC -----------------
 		bool isQuadratic_									=			false;				// based on this, we will create the operator differently (we want act on a many body state per se)
 
+		// -------------- SYMMETRY ------------------
 		// used for checking on which states the operator acts when forgetting and using the matrix only
 		u64 acton_											=			0;					// check on states the operator acts, this is stored as a number and the bitmask is applied! For many body
 		SymGenerators name_									=			SymGenerators::E;   // name of the operator
-		std::string nameS_									=			"E";				// name of the operator in string
-		
+		std::string nameS_									=			"E";				// name of the operator in the string
+
+		// ====================================================================================================
+
+	protected:
+				
+		using repType_ 										= 			repType;
+		using repTypeV_ 									= 			repTypeV;
+		repType_ fun_;																		// function allowing to use the symmetry operation
+		repTypeV_ funV_;																	// function allowing to use the symmetry operation - for vectors
+
+		// ====================================================================================================
+	
 	public:
+		
+		// return type of the operator
+	    using ReturnType 									= 			decltype(std::declval<repType>()(std::declval<u64>(), std::declval<_Ts>()...));
+		using ReturnTypeV 									= 			decltype(std::declval<repTypeV>()(std::declval<_VT_CR>(), std::declval<_Ts>()...));
+
+		// ====================================================================================================
+
+	public:
+		virtual ~GeneralOperator()							=			default;			// default destructor
+
 		// ----------------------------------------------------------------------------------------------------
 
-		virtual ~Operator()									=			default;			// default destructor
-
-		// standard constructor
-		Operator() 
-		{ 
-			init(); 
-		};
-		
-		// with the usage of the elements in the state vector
-		Operator(size_t Ns, const std::string& _nameS = "")
-			: Ns_(Ns), nameS_(_nameS)
-		{ 
-			init(); 
-		};
-
-		// with the eigenvalue and the name of the operator
-		Operator(size_t Ns, _T _eigVal, const std::string& _nameS = "") 
-			: Ns_(Ns), eigVal_(_eigVal), nameS_(_nameS)
-		{ 
-			init(); 
-		};
-
-		// with the eigenvalue, the function and the name of the operator
-		Operator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "") 
-			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
-		{ 
-			init(); 
-		};
-
-		// with the eigenvalue, the function and the name of the operator + vector function
-		Operator(size_t Ns, _T _eigVal, repType _fun, repTypeV _funV, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
-			: Ns_(Ns), eigVal_(_eigVal), fun_(_fun), funV_(_funV), name_(_name), nameS_(_nameS)
+		// Default constructor
+		GeneralOperator() 
 		{
+			this->init();
+		}
+
+		// Constructor with state size and optional name
+		GeneralOperator(size_t Ns, const std::string& _nameS = "")
+			: GeneralOperator()
+		{
+			this->Ns_ = Ns;
+			this->nameS_ = _nameS;
+		}
+
+		// Constructor with eigenvalue and optional name
+		GeneralOperator(size_t Ns, _T _eigVal, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _nameS) 
+		{
+			this->eigVal_ = _eigVal;
+		}
+
+		// Constructor with eigenvalue, name, and optional string
+		GeneralOperator(size_t Ns, _T _eigVal, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _eigVal, _nameS) 
+		{
+			this->name_ = _name;
+		}
+
+		// Constructor with lattice (shared_ptr) and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS) 
+		{
+			this->lat_ = _lat;
+		}
+
+		// Constructor with lattice (raw pointer) and optional name
+		GeneralOperator(Lattice* _lat, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ = std::make_shared<Lattice>(_lat);
+		}
+
+		// Constructor with lattice, eigenvalue, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _eigVal, _nameS) 
+		{
+			this->lat_ = _lat;
+		}
+
+		// Same as above, but with a raw pointer lattice
+		GeneralOperator(Lattice* _lat, _T _eigVal, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _eigVal, _nameS) 
+		{
+			this->lat_ = std::make_shared<Lattice>(_lat);
+		}
+
+		// Constructor with lattice, eigenvalue, name, and optional string
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _eigVal, _name, _nameS) 
+		{
+			this->lat_ = _lat;
+		}
+
+		// Same as above, but with a raw pointer lattice
+		GeneralOperator(Lattice* _lat, _T _eigVal, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _eigVal, _name, _nameS) 
+		{
+			this->lat_ = std::make_shared<Lattice>(_lat);
+		}
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, function, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ = _lat;
+			this->fun_ = _fun;
+			this->init();
+		}
+
+		GeneralOperator(Lattice* _lat, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ = std::make_shared<Lattice>(_lat);
+			this->fun_ = _fun;
+			this->init();
+		}
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, function, vector function, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_			= _lat;
+			this->fun_			= _fun;
+			this->funV_			= _funV;
 			this->hasVectorFun_ = true;
-			init();
-		};
+			this->init();
+		}
 
-		// for the usage with the lattice (mostly for spin models, spinless fermions and hardcore bosons)
-		Operator(std::shared_ptr<Lattice> _lat, const std::string& _nameS = "")
-			: Ns_(_lat->get_Ns()), lat_(_lat), nameS_(_nameS)
+		GeneralOperator(Lattice* _lat, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
 		{
-			init();
-		};
-
-		// for the usage with the lattice and the eigenvalue
-		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, const std::string& _nameS = "")
-			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), nameS_(_nameS)
-		{
-			init();
-		};
-
-		// for the usage with the lattice, the eigenvalue, the function and the name of the operator
-		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
-			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), name_(_name), nameS_(_nameS)
-		{
-			init();
-		};
-
-		// for the usage with the lattice, the eigenvalue, the function and the name of the operator + vector function
-		Operator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, repTypeV _funV, SymGenerators _name = SymGenerators::E, const std::string& _nameS = "")
-			: Ns_(_lat->get_Ns()), lat_(_lat), eigVal_(_eigVal), fun_(_fun), funV_(_funV), name_(_name), nameS_(_nameS)
-		{
+			this->lat_			= std::make_shared<Lattice>(_lat);
+			this->fun_			= _fun;
+			this->funV_			= _funV;
 			this->hasVectorFun_ = true;
-			init();
-		};
+			this->init();
+		}
 
-		// copy constructor
-		Operator(const Operator<_T, _Ts...>& o)
-			: overridenMatFun_(o.overridenMatFun_),
-			Ns_(o.Ns_), 
-			lat_(o.lat_), 
-			eigVal_(o.eigVal_), 
-			fun_(o.fun_),
-			funV_(o.funV_),
-			isQuadratic_(o.isQuadratic_), 
-			acton_(o.acton_),
-			name_(o.name_), 
-			nameS_(o.nameS_)
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, eigenvalue, function, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
 		{
-			init();
-		};
+			this->lat_ 		= _lat;
+			this->eigVal_ 	= _eigVal;
+			this->fun_ 		= _fun;
+			this->init();
+		}
 
-		// move constructor
-		Operator(Operator<_T, _Ts...>&& o)
-			: overridenMatFun_(std::move(o.overridenMatFun_)), 
-			Ns_(std::move(o.Ns_)), 
+		// Constructor with lattice, eigenvalue, function, and optional name
+		GeneralOperator(Lattice* _lat, _T _eigVal, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 		= std::make_shared<Lattice>(_lat);
+			this->eigVal_ 	= _eigVal;
+			this->fun_ 		= _fun;
+			this->init();
+		}
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, eigenvalue, function, vector function, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= _lat;
+			this->eigVal_ 		= _eigVal;
+			this->fun_ 			= _fun;
+			this->funV_ 		= _funV;
+			this->hasVectorFun_ = true;
+			this->init();
+		}
+
+		// Constructor with lattice, eigenvalue, function, vector function, and optional name
+		GeneralOperator(Lattice* _lat, _T _eigVal, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= std::make_shared<Lattice>(_lat);
+			this->eigVal_ 		= _eigVal;
+			this->fun_ 			= _fun;
+			this->funV_ 		= _funV;
+			this->hasVectorFun_ = true;
+			this->init();
+		}
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, eigenvalue, function, name, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= _lat;
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_ 			= _fun;
+			this->init();
+		}
+
+		// Constructor with lattice, eigenvalue, function, name, and optional name
+		GeneralOperator(Lattice* _lat, _T _eigVal, repType _fun, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= std::make_shared<Lattice>(_lat);
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_ 			= _fun;
+			this->init();
+		}
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with lattice, eigenvalue, function, vector function, name, and optional name
+		GeneralOperator(std::shared_ptr<Lattice> _lat, _T _eigVal, repType _fun, repTypeV _funV, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= _lat;
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_ 			= _fun;
+			this->funV_ 		= _funV;
+			this->hasVectorFun_ = true;
+			this->init();
+		}
+
+		// Constructor with lattice, eigenvalue, function, vector function, name, and optional name
+		GeneralOperator(Lattice* _lat, _T _eigVal, repType _fun, repTypeV _funV, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(_lat->get_Ns(), _nameS)
+		{
+			this->lat_ 			= std::make_shared<Lattice>(_lat);
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_ 			= _fun;
+			this->funV_ 		= _funV;			
+			this->hasVectorFun_ = true;
+			this->init();
+		}		
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// Constructor with function
+		GeneralOperator(size_t Ns, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _nameS) 
+		{
+			fun_ = _fun;
+		}
+
+		// Constructor with function and vector function
+		GeneralOperator(size_t Ns, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _fun, _nameS) 
+		{
+			funV_ = _funV;
+			hasVectorFun_ = true;
+		}
+
+		// Constructor with function, eigenvalue, and optional name
+		GeneralOperator(size_t Ns, _T _eigVal, repType _fun, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _eigVal, _nameS) 
+		{
+			fun_ = _fun;
+		}
+
+		// Constructor with function, eigenvalue, and vector function
+		GeneralOperator(size_t Ns, _T _eigVal, repType _fun, repTypeV _funV, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _eigVal, _fun, _nameS) 
+		{
+			funV_ = _funV;
+			hasVectorFun_ = true;
+		}
+
+		// Constructor with eigenvalue, function, name, and optional name
+		GeneralOperator(size_t Ns, _T _eigVal, repType _fun, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _nameS)
+		{
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_		 	= _fun;
+			this->init();
+		}
+
+		// Constructor with eigenvalue, function, vector function, name, and optional name
+		GeneralOperator(size_t Ns, _T _eigVal, repType _fun, repTypeV _funV, SymGenerators _name, const std::string& _nameS = "")
+			: GeneralOperator(Ns, _nameS)
+		{
+			this->eigVal_ 		= _eigVal;
+			this->name_ 		= _name;
+			this->fun_		 	= _fun;
+			this->funV_ 		= _funV;
+			this->hasVectorFun_ = true;
+			this->init();
+		}
+
+		// Move constructor
+		GeneralOperator(GeneralOperator<_T, repType, repTypeV, _Ts...>&& o)
+			: overridenMatFun_(std::move(o.overridenMatFun_)),
+			Ns_(std::move(o.Ns_)),
 			lat_(std::move(o.lat_)),
 			eigVal_(std::move(o.eigVal_)),
-			fun_(std::move(o.fun_)), 
-			funV_(std::move(o.funV_)),
-			isQuadratic_(std::move(o.isQuadratic_)), 
-			acton_(std::move(o.acton_)), 
-			name_(std::move(o.name_)), 
-			nameS_(std::move(o.nameS_))
+			hasVectorFun_(std::move(o.hasVectorFun_)),
+			isQuadratic_(std::move(o.isQuadratic_)),
+			acton_(std::move(o.acton_)),
+			name_(std::move(o.name_)),
+			nameS_(std::move(o.nameS_)) 
 		{
-			init();
-		};
+			this->init();
+		}
+
+		// Copy constructor
+		GeneralOperator(const GeneralOperator<_T, repType, repTypeV, _Ts...>& o)
+			: overridenMatFun_(o.overridenMatFun_),
+			Ns_(o.Ns_),
+			lat_(o.lat_),
+			eigVal_(o.eigVal_),
+			hasVectorFun_(o.hasVectorFun_),
+			isQuadratic_(o.isQuadratic_),
+			acton_(o.acton_),
+			name_(o.name_),
+			nameS_(o.nameS_) 
+		{
+			this->init();
+		}
 
 		// ----------------------------------------------------------------------------------------------------
+	public:
+		// operators = and move operators
 
-		Operator<_T, _Ts...>& operator=(const Operator<_T, _Ts...>& _other)
+		GeneralOperator<_T, repType, repTypeV, _Ts...>& operator=(const GeneralOperator<_T, repType, repTypeV, _Ts...>& _other)
 		{
 			if (this != &_other)
 			{
-				this->Ns_		=		_other.Ns_;
-				this->lat_		=		_other.lat_;
-				this->fun_		=		_other.fun_;
-				this->funV_		=		_other.funV_;
-				this->eigVal_	=		_other.eigVal_;
-				this->name_		=		_other.name_;
+				this->Ns_			=		_other.Ns_;
+				this->lat_			=		_other.lat_;
+				this->eigVal_		=		_other.eigVal_;
+				this->hasVectorFun_ =		_other.hasVectorFun_;
+				this->isQuadratic_	=		_other.isQuadratic_;
+				this->acton_		=		_other.acton_;
+				this->name_			=		_other.name_;
+				this->nameS_		=		_other.nameS_;
+				this->overridenMatFun_ =	_other.overridenMatFun_;
+				// copy the functions
+				this->fun_			=		_other.fun_;
+				this->funV_			=		_other.funV_;
 			}
 			return *this;
 		}
 
-		Operator<_T, _Ts...>& operator=(const Operator<_T, _Ts...>&& _other)
+		// ----------------------------------------------------------------------------------------------------
+
+		GeneralOperator<_T, repType, repTypeV, _Ts...>& operator=(const GeneralOperator<_T, repType, repTypeV, _Ts...>&& _other)
 		{
 			if (this != &_other)
 			{
-				this->Ns_		=		std::move(_other.Ns_);
-				this->lat_		=		std::move(_other.lat_);
-				this->fun_		=		std::move(_other.fun_);
-				this->funV_		=		std::move(_other.funV_);
-				this->eigVal_	=		std::move(_other.eigVal_);
-				this->name_		=		std::move(_other.name_);
+				this->Ns_			=		std::move(_other.Ns_);
+				this->lat_			=		std::move(_other.lat_);
+				this->eigVal_		=		std::move(_other.eigVal_);
+				this->hasVectorFun_ =		std::move(_other.hasVectorFun_);
+				this->isQuadratic_	=		std::move(_other.isQuadratic_);
+				this->acton_		=		std::move(_other.acton_);
+				this->name_			=		std::move(_other.name_);
+				this->nameS_		=		std::move(_other.nameS_);
+				this->overridenMatFun_ =	std::move(_other.overridenMatFun_);
+
+				// copy the functions
+				this->fun_			=		std::move(_other.fun_);
+				this->funV_			=		std::move(_other.funV_);
 			}
 			return *this;
 		}
 
-		// -------------- O P E R A T O R ( ) -------------
-		
-		virtual auto operator()(u64 s, _Ts... a)		const -> typename _OP<_T>::R	{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val);  };
-		virtual auto operator()(u64 s, _Ts... a)		-> typename _OP<_T>::R			{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, eigVal_ * _val);  };
-		virtual auto operator()(_VT_CR s, _Ts... a)		const -> typename _OP_V<_T>::R	{ auto [s2, _val] = this->funV_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
-		virtual auto operator()(_VT_CR s, _Ts... a)		-> typename _OP_V<_T>::R		{ auto [s2, _val] = this->funV_(s, a...); return std::make_pair(s2, eigVal_ * _val); };
-		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)	const	{ return std::bind(this->fun_, s, std::placeholders::_1); };
-		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)			{ return std::bind(this->fun_, s, std::placeholders::_1); };
-
 		// ----------------------------------------------------------------------------------------------------
 
-		// -------------------- STATIC --------------------
-		static auto E(u64 s, _Ts...)					-> typename _OP<_T>::R			{ return std::make_pair(s, _T(1.0));					};
-		static auto E_V(_VT_CR s, _Ts...)				-> typename _OP_V<_T>::R		{ return std::make_pair(s, _T(1.0));					};
-
+	public:
 		// ----------------- V I R T U A L ----------------
 		virtual void init() {};
-		
-		// -------------------- SETTERS -------------------
-		
+
+		// ----------------- S E T T E R S ----------------
+				
 		auto setIsQuadratic(bool _is)					-> void							{ this->isQuadratic_ = _is;								};	// set if the operator is quadratic
 		auto setActOn(u64 _acton)						-> void							{ this->acton_ = _acton;								};	// which states the operator acts on, saved in a number form (binary bitmask)
-
-		// functions (using integers)
-		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;									}; // set the function
-		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);							}; // set the function (move)
-		// functions (using vectors)
-		auto setFun(const repTypeV& _fun)				-> void							{ this->funV_ = _fun;									}; // set the function
-		auto setFun(repTypeV&& _fun)					-> void							{ this->funV_ = std::move(_fun);						}; // set the function (move)
-
+		
 		// names
 		auto setName(SymGenerators _name)				-> void							{ this->name_ = _name;									}; 
 		auto setNameS(const std::string& _name)			-> void							{ this->nameS_ = _name;									};
@@ -345,19 +569,112 @@ namespace Operators
 
 		// quadratic matrices and overriden functions creating the matrix
 		auto setFun(GeneralizedMatrixFunction<_T>& _fun) -> void						{ this->overridenMatFun_ = _fun;						};
-		auto setFun(GeneralizedMatrixFunction<_T>&& _fun)-> void						{ this->overridenMatFun_ = std::move(_fun);				};
+		auto setFun(GeneralizedMatrixFunction<_T>&& _fun) -> void						{ this->overridenMatFun_ = std::move(_fun);				};
+		auto setFun(const GeneralizedMatrixFunction<_T>&& _fun) -> void					{ this->overridenMatFun_ = std::move(_fun);				};
 
-		// -------------------- GETTERS --------------------
+		// functions (using integers)
+		auto setFun(const repType& _fun)				-> void							{ this->fun_ = _fun;									}; // set the function
+		auto setFun(repType&& _fun)						-> void							{ this->fun_ = std::move(_fun);							}; // set the function (move)
+		
+		// functions (using vectors)
+		auto setFun(const repTypeV& _fun)				-> void							{ this->funV_ = _fun;									}; // set the function
+		auto setFun(repTypeV&& _fun)					-> void							{ this->funV_ = std::move(_fun);						}; // set the function (move)
+
+		// ----------------- G E T T E R S ----------------
 		auto getIsQuadratic()							const -> bool					{ return this->isQuadratic_;							};
 		auto getActOn()									const -> u64					{ return this->acton_;									};
 		auto getNs()									const -> size_t					{ return this->Ns_;										};
 		auto getVal()									const -> _T						{ return this->eigVal_;									};
-		auto getFun()									const -> repType				{ return this->fun_;									};
-		auto getFunV()									const -> repTypeV				{ return this->funV_;									};
+		// names
 		auto getName()									const -> SymGenerators			{ return this->name_;									};
 		auto getNameG()									const -> std::string			{ return SSTR(getSTR_SymGenerators(this->name_));		};
 		auto getNameS()									const -> std::string			{ return this->nameS_;									};
+		// functions
+		auto getFun()									const -> repType				{ return this->fun_;									};
+		auto getFunV()									const -> repTypeV				{ return this->funV_;									};
+		
+		// ----------------------------------------------------------------------------------------------------
 
+		public:
+
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+		/*
+		* @brief representative eigenvalue calculator for the operator 
+		* @param _op operator to calculate the eigenvalue for
+		* @returns the eigenvalue of the operator
+		*/
+		friend _T chi(const GeneralOperator<_T, repType, repTypeV, _Ts...>& _op)		{ return _op.eigVal_;};
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// -------------- O P E R A T O R ( ) -------------
+		
+		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType				= 0;		// operator acting on the states
+		virtual auto operator()(u64 s, _Ts... a)		-> ReturnType					= 0;		// operator acting on the states			
+		virtual auto operator()(_VT_CR s, _Ts... a)		const -> ReturnTypeV			= 0;		// operator acting on the vectors
+		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV					= 0;		// operator acting on the vectors
+
+		// ----------------------------------------------------------------------------------------------------		
+	};
+};
+
+// ################################################################ N O N - M I X I N G #########################################################################
+
+namespace Operators 
+{
+
+	/*
+	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
+	* Can take several template arguments
+	*/
+	template<typename _T, typename ..._Ts>
+	class Operator : public GeneralOperator<_T, 
+											typename _OP<_T>::template INP<_Ts...>,
+											typename _OP_V<_T>::template INP<_Ts...>,
+											_Ts...>
+	{
+	public:
+		using baseType 	= 	GeneralOperator<_T, 
+								typename _OP<_T>::template INP<_Ts...>, 
+								typename _OP_V<_T>::template INP<_Ts...>, 
+								_Ts...>;												// type of the operator - base type
+		// ----------------------------------------------------------------------------------------------------
+
+		// Inherit constructors from GeneralOperator
+   	 	using GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
+		
+		// ----------------------------------------------------------------------------------------------------
+		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
+		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference		
+	protected:
+		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
+		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
+		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
+		using ReturnTypeV 	= typename baseType::ReturnTypeV;							// return type of the operator - for vectors
+	public:
+		// ----------------------------------------------------------------------------------------------------
+
+		// Default constructor
+		Operator() : baseType() {};														// default constructor
+		
+		// ----------------------------------------------------------------------------------------------------
+	public:
+		// -------------- O P E R A T O R ( ) -------------
+		
+		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType override	{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, this->eigVal_ * _val);  };
+		virtual auto operator()(u64 s, _Ts... a)		-> ReturnType override			{ auto [s2, _val] = this->fun_(s, a...); return std::make_pair(s2, this->eigVal_ * _val);  };
+		virtual auto operator()(_VT_CR s, _Ts... a)		const -> ReturnTypeV override	{ auto [s2, _val] = this->funV_(s, a...); return std::make_pair(s2, this->eigVal_ * _val); };
+		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV override			{ auto [s2, _val] = this->funV_(s, a...); return std::make_pair(s2, this->eigVal_ * _val); };
+		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)	const	{ return std::bind(this->fun_, s, std::placeholders::_1); };
+		//virtual std::function<std::pair<u64, _T>(_Ts...)> operator*(u64 s)			{ return std::bind(this->fun_, s, std::placeholders::_1); };
+
+		// ----------------------------------------------------------------------------------------------------
+
+		// -------------------- STATIC --------------------
+		static auto E(u64 s, _Ts...)					-> ReturnType					{ return std::make_pair(s, _T(1.0));					};
+		static auto E_V(_VT_CR s, _Ts...)				-> ReturnTypeV					{ return std::make_pair(s, _T(1.0));					};
+	
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
@@ -431,11 +748,6 @@ namespace Operators
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
-		* @brief representative eigenvalue calculator
-		*/
-		friend _T chi(const Operator<_T, _Ts...>& _op)									{ return _op.eigVal_;};
-
-		/*
 		* @brief calculate operator acting on state num eigenvalue
 		*/
 		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)				{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
@@ -481,7 +793,7 @@ namespace Operators
 
 };
 
-// ##########################################################################################################################################
+// ##############################################################################################################################################################
 
 /*
 * @brief Raising the operator to the power of n (n is an integer) 

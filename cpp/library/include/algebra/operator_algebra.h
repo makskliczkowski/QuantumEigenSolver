@@ -280,8 +280,8 @@ namespace Operators {
 
 namespace Operators {
 
-	using _OP_V_T 	= arma::Col<double>;
-	using _OP_V_T_CR= const arma::Col<double>&;
+	using _OP_V_T 		= arma::Col<double>;
+	using _OP_V_T_CR	= const arma::Col<double>&;
 	template <typename _T>
 	using _OPx_V 		= std::pair<_OP_V_T, _T>;
 	template <typename _T>
