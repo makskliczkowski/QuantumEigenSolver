@@ -17,70 +17,8 @@
 #endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// ######################### NQS ############################
-
-// saving the weights and the directory
-#define NQS_SAVE_WEIGHTS					
-#ifdef NQS_SAVE_WEIGHTS						
-#	define NQS_SAVE_DIR ( "WEIGHTS" + kPS )		
-#endif										
-
-// ----------------------------------------------------------		
-
-//#define NQS_USE_GPU						
-#define NQS_USE_CPU							
-											
-#ifdef NQS_USE_CPU							
-#	define NQS_USE_MULTITHREADING			
-
-//#	define NQS_USE_OMP						
-# 	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-#		define NQS_NOT_OMP_MT 
-#	endif
-
-#elif defined NSQ_USE_GPU					
-// something !TODO								
-#endif		
-
-// ----------------------------------------------------------					
-											
-// shall one update the angles or calculate them from scratch						
-#define NQS_ANGLES_UPD						
-											
-// use vector only?							
-#define NQS_USE_VEC_ONLY
-
-#if defined NQS_USE_VEC_ONLY
-	#define NQS_STATE this->curVec_
-	#define NQS_STATE_T const NQSS&
-#else 
-	#define NQS_STATE this->curState_
-	#define NQS_STATE_T u64 
-#endif
-
-// optimize the gradient descent with Stochastic Reconfiguration (SR)
-#define NQS_USESR							
-#ifdef NQS_USESR							
-
-// skip the matrix construction for the SR
-	// #define NQS_USESR_NOMAT
-
-// how to handle the inverse of the matrix (if needed)
-	// #define NQS_PINV 1e-6					
-// regularization for the covariance matrix	
-//#	define NQS_SREG													
-// shall one use the iterative solver without constructing the full matrix explicitly?						  
-#endif										
-// ##########################################################
-
-
+#include "NQS/nqs_definitions.h"
 // ######### NQS TYPES #############
-enum NQSTYPES					// #
-{								// #
-	RBM_T,						// #
-	RBMPP_T						// #
-};								// #
-								// #
 BEGIN_ENUM(NQSTYPES)			// #
 {								// #
 	DECL_ENUM_ELEMENT(RBM),		// #
@@ -89,62 +27,33 @@ BEGIN_ENUM(NQSTYPES)			// #
 END_ENUM(NQSTYPES)				// #
 // #################################
 
-// all the types that are to be used in each NQS implementation
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
-											using NQSB = arma::Col<_type>; 				\
-											using NQSW = arma::Mat<_type>;			 	;
+// forward declarations
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+class NQS;
 
-#define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// Kernel for multithreading
-#ifdef NQS_NOT_OMP_MT
-
-	#include <functional>
-	#include <condition_variable>
-	#include <future>
-/*
-* @brief structure with condition variables for the NQS to perfom multithread operations
-*/
-template <typename _T>
-struct CondVarKernel
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+struct NQS_lower_t
 {
-	std::mutex mutex;
-	std::condition_variable cv;
-	std::atomic<bool> end_	= false;
-	bool flagThreadKill_	= false;
-	bool flagThreadRun_		= false;
-	_T kernelValue_			= 0.0;
+    using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+    // for the excited states 
+    bool isSet_						= 		false;
+    NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
+    std::vector<double> f_lower_b	=		{};						// pentalties for the excited states
 };
-#endif 
-//////////////////////////////////////////////////////////////////////////////////////////
+
+inline void NQS_train_t::hi(const std::string& _in) const
+{
+    std::string outstr	= "";
+    strSeparatedP(outstr, '\t', 2,
+                VEQV(Monte Carlo Steps, this->mcSteps),
+                VEQV(Thermalization Steps, this->nThrm),
+                VEQV(Block Number, this->nBlck),
+                VEQV(Size of the single block, this->bSize),
+                VEQV(Number of flips taken at each step, this->nFlip));
+    LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-struct NQS_train_t
-{
-	uint mcSteps	=	10;					// number of Monte Carlo Steps (outer loops for the training)
-	uint nThrm		=	0;					// number of mcSteps to thermalize (burn-in)
-	uint nBlck		= 	32;					// number of such blocks for one average step (single iteration step after which the gradient is calculated)
-	uint bSize		= 	10;					// for killing correlations - (single block size)
-	std::string dir	=	"";					// saving directory (for the weights)
-	uint nFlip		= 	1;					// number of flips to set (default is 1)
-
-	void hi(const std::string& _in = "Train: ") const
-	{
-		std::string outstr	= "";
-		strSeparatedP(outstr, '\t', 2,
-					VEQV(Monte Carlo Steps, this->mcSteps),
-					VEQV(Thermalization Steps, this->nThrm),
-					VEQV(Block Number, this->nBlck),
-					VEQV(Size of the single block, this->bSize),
-					VEQV(Number of flips taken at each step, this->nFlip));
-		LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
-	}
-};
 
 /*
 * @brief General Neural Network Quantum States eigensolver class - base
@@ -160,40 +69,12 @@ public:
 	// type definitions 
 	using NQSS							=		arma::Col<_stateType>;	// Quantum state -> e.g. for occupation representation purpose 
 	using NQSB							=		arma::Col<_T>;			// for free parameter representation purpose (e.g. angles)
-	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose (e.g. weights - single layer only)
-	using NQSLS_p						= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose (e.g. weights - single layer only)	
+	using NQSLS_p						=		NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;	// for the lower states information
 
-	// ##################################
+	NQS_info_t info_p_;													// information about the NQS
+	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
 
-	struct NQS_info_t
-	{
-		// simulation specific
-		double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
-	
-		// architecture specific
-		uint nVis_						=		1;						// number of visible neurons (input variables)
-		uint nSites_					=		1;						// number of lattice sites or fermionic modes
-		uint fullSize_					=		1;						// full number of the parameters (for memory purpose)
-
-		// Hilbert space info
-		u64 Nh_							=		1;						// Hilbert space size (number of basis states)
-		uint nParticles_				=		1;						// number of particles in the system (if applicable)
-		bool conservesParticles_		=		true;					// whether the system conserves the number of particles
-
-		// normalization
-		double norm_					=		0.0;					// normalization factor for the state vector
-	} info_p_;
-
-	// ##################################
-	struct NQS_lower_t
-	{
-		// for the excited states 
-		bool isSet_						= 		false;
-		NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
-		v_1d<double> f_lower_b			=		{};						// pentalties for the excited states
-	} lower_states_;
-
-	// ##################################
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
