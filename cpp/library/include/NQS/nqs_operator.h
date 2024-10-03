@@ -8,6 +8,7 @@
 ***************************************/
 
 // #################################
+#include "nqs_definitions.h"
 #include <initializer_list>
 #ifndef HAMIL_H
 #	include "../hamil.h"
@@ -30,49 +31,48 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	// ####################################################### N Q S   C O N T A I N E R ########################################################
-
-	// ##########################################################################################################################################
-
-	template <typename _T>
-	class NQSContainer
-	{
-	public:
-		uint sizeX_							= 1;					// size of the operator (in X direction)
-		uint sizeY_							= 1;					// size of the operator (in Y direction)
-		uint Ns_							= 1;					// number of states in the quantum state
-
-		// ##########################################################################################################################################
-
-		arma::Mat<_T> currentValue_;								// current value of the operator (at each point in X and Y) - for a single state
-		v_1d<arma::Mat<_T>> samples_;								// store the samples for the operator - samples taken from the quantum state
-
-		// ##########################################################################################################################################
-	
-		// ####### MANY BODY #######
-		// store the matrix for the matrices obtained directly from the many body matrix (for the many body operators) 
-		GeneralizedMatrix<_T> manyBodyMatrix_;
-		arma::Mat<_T> manyBodyVal_;
-
-		// ##########################################################################################################################################
-
-		// ######## INDICES ########
-		v_1d<uint> indices_;										// for finding out the index in the variadic variable 
-		uint currentIdx_					= 0;					// current index in the variadic variable (currently processed)
-
-	public:
-		NQSContainer(size_t _Ns)
-			:	Ns_(_Ns)
-		{
-			this->samples_ 					= {};
-		}
-	};
-
-	// ##########################################################################################################################################
-
 	// ######################################################## N Q S   O P E R A T O R #########################################################
 
 	// ##########################################################################################################################################
+
+	template <typename _T, typename ..._Ts>
+	class OperatorNQS_t : public OperatorComb<_T, _Ts...>
+	{
+		NQS_PUBLIC_TYPES(_T, double);
+	public:
+		using baseType 		= OperatorComb<_T, _Ts...>;									// type of the operator - base type
+		// ----------------------------------------------------------------------------------------------------
+
+		// Inherit constructors from GeneralOperator
+   	 	using OperatorComb<_T, _Ts...>::OperatorComb;  									
+		
+		// ----------------------------------------------------------------------------------------------------
+		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
+		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference		
+	public:
+		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
+		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
+		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
+		using ReturnTypeV 	= typename baseType::ReturnTypeV;							// return type of the operator - for vectors
+		// ----------------------------------------------------------------------------------------------------
+	protected:
+		using fP_t			= std::initializer_list<int>;								// like a vector of integers and values but separated with a fixed number of elements
+		using fV_t			= std::initializer_list<double>;						
+		// ----------------------------------------------------------------------------------------------------
+		using NQSFunCol		= std::function<cpx(const NQSS& _v)>;						// for initializing the pRatio function with a single column vector (state)
+		using NQSFun		= std::function<cpx(fP_t, fV_t)>; 							// for initializing the pRatio function with initializer list - for the Hamiltonian probability ratio (or other operators)
+
+		// ----------------------------------------------------------------------------------------------------
+
+	public:
+		~OperatorNQS_t()																{};
+		OperatorNQS_t() : baseType() 													{};
+
+	
+
+	};
+
+	using namespace Containers;
 
 	/*
 	* @brief Class for storing the operators that act on the quantum state taking into account the probability 
@@ -96,7 +96,7 @@ namespace Operators
 		// ######## HELPER #########
 		NQSS state_;												// store the column state vector						
 
-		NQSContainer<_T> container_;								// container for the operator
+		Containers::OperatorContainer<_T> container_;				// container for the operator
 
 		// operators to apply step by step that add up in the average \sum _ s' <s|O|s'> * \Psi(s') / \Psi(s)
 		// !we apply the operator to the left and look for all the states that can be reached from the base state (= <s|)
@@ -125,7 +125,7 @@ namespace Operators
 		auto operator()(_OP_V_T_CR s, _Ts... a)					const -> v_1d<typename _OP<_T>::R>;
 		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) -> _T;
 		// for the colected samples
-		auto operator[](uint i)									const -> arma::Mat<_T> { return this->container_.samples_[i]; };
+		auto operator[](uint i)									const -> arma::Mat<_T> { return this->container_[i]; };
 
 		// updates current value
 		template <class _Tt = uint>
@@ -185,56 +185,13 @@ namespace Operators
 
 	// ##########################################################################################################################################
 	
-	/*
-	* @brief Resize the current value so one can store only the necessary values in the matrix (sizeX, sizeY)
-	* Global		has sizeX = sizeY = 1 		-	stores only one value (scalar)
-	* Local			has sizeX = Ns, sizeY = 1,	- 	stores Ns values (vector)
-	* Correlation	has sizeX = Ns, sizeY = Ns. - 	stores Ns x Ns values (matrix)
-	* @template _T type of the operator			
-	* @template _Ts types of the additional parameters
-	* @throws runtime_error if the number of arguments is not 0, 1 or 2
-	*/
-	template<typename _T, typename ..._Ts>
-	inline void Operators::OperatorNQS<_T, _Ts...>::decideSize()
-	{
-		// get the size of template operators to decide on the opeartor type
-		constexpr size_t numArgs		= sizeof...(_Ts);
-		if (numArgs > 2) 
-			throw std::runtime_error("Not implemented for more than two arguments!");
-
-		if (numArgs == 0)
-		{
-			this->container_.sizeX_				= 1;
-			this->container_.sizeY_				= 1;
-			this->container_.indices_			= {};
-		}
-		else if (numArgs == 1)
-		{
-			this->container_.sizeX_				= this->container_.Ns_;
-			this->container_.sizeY_				= 1;
-			this->container_.indices_				= { 0 };
-		}
-		else if (numArgs == 2)
-		{
-			this->container_.sizeX_				= this->container_.Ns_;
-			this->container_.sizeY_				= this->container_.Ns_;
-			this->container_.indices_				= { 0, 0 };
-		}
-		else
-			throw std::runtime_error("Not implemented for more than two arguments!");
-
-		// store the matrix for the many body average basded on a given quantum state
-		this->container_.manyBodyVal_	=  arma::Mat<_T>(container_.sizeX_, container_.sizeY_, arma::fill::zeros);
-	};
-
-	// ##########################################################################################################################################
 
 	template <typename _T, typename ..._Ts>
 	OperatorNQS<_T, _Ts...>::OperatorNQS(const Operators::Operator<_T, _Ts...>& _op, const std::string& _name)
 		: name_(_name), container_(_op.getNs()), op_({ _op })
 	{
 		// decide about the size of the operator
-		this->decideSize();
+		this->container_.template decideSize<_Ts...>();
 		// create the state (basis state)
 		this->state_.resize(container_.Ns_);
 		this->reset();
@@ -245,7 +202,7 @@ namespace Operators
 		: name_(_name), container_(Ns_(_opV[0].getNs())), op_(_opV)
 	{
 		// decide about the size of the operator
-		this->decideSize();
+		this->container_.template decideSize<_Ts...>();
 		// create the state (basis state)
 		this->state_.resize(container_.Ns_);
 		this->reset();
@@ -257,7 +214,7 @@ namespace Operators
 	{
 
 		// decide about the size of the operator
-		this->decideSize();
+		this->container_.template decideSize<_Ts...>();
 		// create the state (basis state)
 		this->state_.resize(container_.Ns_);
 		this->reset();
@@ -268,7 +225,7 @@ namespace Operators
 		: name_(std::move(_other.name_)), container_(std::move(_other.container_)), op_(std::move(_other.op_))
 	{
 		// decide about the size of the operator
-		this->decideSize();
+		this->container_.template decideSize<_Ts...>();
 		// create the state (basis state)
 		this->state_ = std::move(_other.state_);
 		this->reset();

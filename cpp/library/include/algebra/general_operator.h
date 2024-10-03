@@ -1,4 +1,3 @@
-#pragma once
 /***************************************
 * Defines a class for a general operator.
 * It can be later expanded for some more
@@ -7,10 +6,12 @@
 * APRIL 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
+#pragma once
 
-#include <memory>
+// =====================================
 #ifndef GENERAL_OPERATOR_H
 #define GENERAL_OPERATOR_H
+#include <memory>
 
 #ifndef LATTICE_H
 #include "../../source/src/lattices.h"
@@ -108,19 +109,18 @@ namespace Operators {
 
 	BEGIN_ENUM(SymGenerators)
 	{
-			DECL_ENUM_ELEMENT(E),
-			DECL_ENUM_ELEMENT(T),
-			DECL_ENUM_ELEMENT(Tr),
-			DECL_ENUM_ELEMENT(R),
-			DECL_ENUM_ELEMENT(PX),
-			DECL_ENUM_ELEMENT(PY),
-			DECL_ENUM_ELEMENT(PZ),
-			// other
-			DECL_ENUM_ELEMENT(OTHER),
-			DECL_ENUM_ELEMENT(SX),
-			DECL_ENUM_ELEMENT(SY),
-			DECL_ENUM_ELEMENT(SZ)
-
+		DECL_ENUM_ELEMENT(E),
+		DECL_ENUM_ELEMENT(T),
+		DECL_ENUM_ELEMENT(Tr),
+		DECL_ENUM_ELEMENT(R),
+		DECL_ENUM_ELEMENT(PX),
+		DECL_ENUM_ELEMENT(PY),
+		DECL_ENUM_ELEMENT(PZ),
+		// other
+		DECL_ENUM_ELEMENT(OTHER),
+		DECL_ENUM_ELEMENT(SX),
+		DECL_ENUM_ELEMENT(SY),
+		DECL_ENUM_ELEMENT(SZ)
 	}
 	END_ENUM(SymGenerators);
 
@@ -141,8 +141,7 @@ namespace Operators {
 
 // ################################################################### G E N E R A L ############################################################################
 
-namespace Operators
-{
+namespace Operators {
 
 	/*
 	* @brief A class describing the general operator. It can be later expanded for some more complicated operators acting on Hiblert space or other spaces.
@@ -604,7 +603,7 @@ namespace Operators
 		* @param _op operator to calculate the eigenvalue for
 		* @returns the eigenvalue of the operator
 		*/
-		friend _T chi(const GeneralOperator<_T, repType, repTypeV, _Ts...>& _op)		{ return _op.eigVal_;};
+		friend _T chi(const GeneralOperator<_T, repType, repTypeV, _Ts...>& _op)		{ return _op.eigVal_; 									};
 
 		// ----------------------------------------------------------------------------------------------------
 
@@ -616,13 +615,122 @@ namespace Operators
 		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV					= 0;		// operator acting on the vectors
 
 		// ----------------------------------------------------------------------------------------------------		
+
+		template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _InT = u64>
+		typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
+			generateMat(_InT _dim, _Ts... _arg) const;
+
+		template<bool _standarize = false, typename _TinMat = _T,  template <class _TM = _TinMat> class _MatType, typename _InT = u64>
+		typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
+			generateMat(_InT _dim, _Ts... _arg) const;
+		
+		// ----------------------------------------------------------------------------------------------------
+
+		template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType>
+		typename std::enable_if<HasMatrixType<_MatType<_TinMat>>, _MatType<_TinMat>>::type
+			standaridizeMatrix(_MatType<_TinMat>& _mat) const;
+
+		template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType>
+		typename std::enable_if<!HasMatrixType<_MatType<_TinMat>>, GeneralizedMatrix<_TinMat>>::type
+			standaridizeMatrix(GeneralizedMatrix<_TinMat>& _mat) const;
+
 	};
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Returns the matrix representation of the operator. This is a default implementation for the operators that are acting on the states.
+	* The matrix here is created ad-hoc by an overriden matrix function. If the function is not overriden, the function throws an error.
+	* @param _dim dimension of the matrix
+	* @param _arg additional arguments
+	* @returns the matrix representation of the operator
+	*/
+	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
+	typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
+		Operators::GeneralOperator<_T, repType, repTypeV, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
+	{
+		_MatType<_TinMat> op(_dim, _dim);
+#ifdef _DEBUG
+		LOGINFO("Operator has a special, overriden matrix function!", LOG_TYPES::CHOICE, 1);
+#endif
+		if constexpr (std::is_same_v<_MatType<_TinMat>, arma::Mat<_TinMat>>)
+			op = this->overridenMatFun_(_dim).getDense();
+		else if constexpr (std::is_same_v<_MatType<_TinMat>, arma::SpMat<_TinMat>>)
+			op = this->overridenMatFun_(_dim).getSparse();
+		else
+		{
+			LOGINFO("Type is neither arma::Mat nor arma::SpMat", LOG_TYPES::ERROR, 0);
+			throw std::logic_error("Unsupported matrix type in GeneralOperator class");
+		}
+		return op;
+	}
+
+	// ##########################################################################################################################################
+
+	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
+	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
+		Operators::GeneralOperator<_T, repType, repTypeV, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
+	{
+		GeneralizedMatrix<_TinMat> op(_dim);
+		if (this->overridenMatFun_)
+		{
+#ifdef _DEBUG
+			LOGINFO("Operator has a special, overriden matrix function!", LOG_TYPES::CHOICE, 1);
+#endif
+			op = this->overridenMatFun_(_dim);
+		}
+		else
+		{
+			LOGINFO("Operator does not have a special, overriden matrix function!", LOG_TYPES::CHOICE, 1);
+			throw std::logic_error("Operator does not have a special, overriden matrix function!");
+		}
+		return op;
+	}
+
+	// ##########################################################################################################################################
+	
+	/*
+	* @brief Standarizes the matrix representation of the operator. This is a default implementation for the operators that are acting on the states.
+	* The matrix here is standarized by the standarizeOperator function. If the function is not overriden, the function throws an error.
+	* @param _mat matrix to be standarized
+	* @returns the standarized matrix representation of the operator
+	*/
+	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType>
+	typename std::enable_if<HasMatrixType<_MatType<_TinMat>>, _MatType<_TinMat>>::type
+		Operators::GeneralOperator<_T, repType, repTypeV, _Ts...>::standaridizeMatrix(_MatType<_TinMat>& _mat) const
+	{
+		// standarize the operator
+		if (_standarize)
+		{
+			Operators::standarizeOperator(_mat);
+			Operators::operatorInfo(_mat);
+		}
+		return _mat;
+	}
+
+	// ##########################################################################################################################################
+
+	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType>
+	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>>, GeneralizedMatrix<_TinMat>>::type
+		Operators::GeneralOperator<_T, repType, repTypeV, _Ts...>::standaridizeMatrix(GeneralizedMatrix<_TinMat>& _mat) const
+	{
+		// standarize the operator
+		if (_standarize)
+		{
+			_mat.standarize();
+			Operators::operatorInfo(_mat);
+		}
+		return _mat;
+	}
 };
 
 // ################################################################ N O N - M I X I N G #########################################################################
 
-namespace Operators 
-{
+namespace Operators {
 
 	/*
 	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
@@ -647,13 +755,13 @@ namespace Operators
 		// ----------------------------------------------------------------------------------------------------
 		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
 		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference		
-	protected:
+	public:
 		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
 		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
 		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
 		using ReturnTypeV 	= typename baseType::ReturnTypeV;							// return type of the operator - for vectors
+
 	public:
-		// ----------------------------------------------------------------------------------------------------
 
 		// Default constructor
 		Operator() : baseType() {};														// default constructor
@@ -791,245 +899,215 @@ namespace Operators
 	//using OpVec_loc_t = v_1d<std::variant<Operators::Operator<cpx, uint>, Operators::Operator<double, uint>>>;
 	//using OpVec_cor_t = v_1d<std::variant<Operators::Operator<cpx, uint, uint>, Operators::Operator<double, uint, uint>>>;
 
+	// ##############################################################################################################################################################
+
+	/*
+	* @brief Raising the operator to the power of n (n is an integer) 
+	* @param _n the power to which the operator is raised
+	* @returns the operator raised to the power of n
+	*/
+	template<typename _T, typename ..._Ts>
+	template<typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type*>
+	inline Operators::Operator<_T,_Ts...> Operators::Operator<_T, _Ts...>::operator ^(_T1 _n)
+	{
+		if (_n == 0)
+			return Operator<_T, _Ts...>(this->lat_, 1.0, Operators::Operator<_T, _Ts...>::E);
+		else if (_n == 1)
+			return *this;
+
+		auto _f = [_n, this](u64 _s, _Ts... _args) {
+			_T val = 1.0;
+			do {
+				auto [newS, newV]	= this->operator()(_s, _args...);
+				_s					= newS;
+				val					*= newV;
+				--_n;
+				} while (_n);
+			return std::make_tuple(_s, val);
+		};
+		return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
+	}
+
+	// ##########################################################################################################################################
+
+	//!TODO
+	template<typename _T, typename ..._Ts>
+	template<typename _T1, typename _T2>
+	inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
+	{
+		return _T();
+	}
+
+	//!TODO
+	template<typename _T, typename ..._Ts>
+	template<typename _T1>
+	inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
+	{
+		return _T();
+	}
+
+	// #################################################### M A T R I X   G E N E R A T I O N ####################################################
+
+	/*
+	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
+	* The operator is acting on the same Hilbert space as the one it is acting on.
+	* For the total Hilbert space known to be without symmetries - not looking for representatives
+	* @brief _dim A dimension of the Hilbert space
+	* @returns A matrix representing the operator
+	*/
+	template<typename _T, typename ..._Ts> 
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
+	typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
+		Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
+	{
+	#ifdef _DEBUG
+		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+	#endif
+
+		_MatType<_TinMat> op(_dim, _dim);
+
+		// check whether the operator has an overriden matrix function
+		if (this->overridenMatFun_)
+			op = GeneralOperator<_T, repType, repTypeV, _Ts...>::template generateMat<_standarize, _TinMat, _MatType>(_dim, _arg...);
+		else
+		{
+			// otherwise create the operator matrix
+		#pragma omp parallel for
+			for (u64 _base = 0; _base < _dim; ++_base) 
+			{
+				auto [_idx, _val]	=	this->operator()(_base, _arg...);
+				op(_idx, _base)		+=	_val;
+			}
+
+		}
+		return GeneralOperator<_T, repType, repTypeV, _Ts...>::template standaridizeMatrix<_standarize, _TinMat, _MatType>(op);
+	}
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
+	* The operator is acting on the same Hilbert space as the one it is acting on.
+	* For the total Hilbert space known to be without symmetries - not looking for representatives
+	* @brief _dim A dimension of the Hilbert space
+	* @returns A matrix representing the operator
+	*/
+	template<typename _T, typename ..._Ts> 
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
+	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
+	Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
+	{
+	#ifdef _DEBUG
+		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+	#endif
+
+		GeneralizedMatrix<_TinMat> op(_dim);
+
+		// check whether the operator has an overriden matrix function
+		if (this->overridenMatFun_ && this->isQuadratic_)
+			op = GeneralOperator<_T, repType, repTypeV, _Ts...>::template generateMat<_standarize, _TinMat, _MatType>(_dim, _arg...);
+		else
+		{
+			// otherwise create the operator matrix
+	#pragma omp parallel for
+			for (u64 _base = 0; _base < _dim; ++_base) 
+			{
+				auto [_idx, _val]	=	this->operator()(_base, _arg...);
+				op.add(_idx, _base, _val);
+			}
+
+		}
+
+		return GeneralOperator<_T, repType, repTypeV, _Ts...>::template standaridizeMatrix<_standarize, _TinMat, _MatType>(op);
+	}
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Creates an operator matrix whenever the operator is not transforming the state from a different symmetry sector.
+	* Uses the Hilbert space that stores the state transformations from the representative base.
+	* @param _Hil the Hilbert space in which we operate
+	* @param _arg arguments for the operator
+	* @returns A matrix representing the operator
+	*/
+	template<typename _T, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _T1, uint _spinModes>
+	inline _MatType<typename std::common_type<_TinMat, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts ..._arg) const
+	{
+		using res_typ	=	typename std::common_type<_T1, _TinMat>::type;
+		u64 Nh			=	_Hil.getHilbertSize();
+		_MatType<res_typ> op(Nh, Nh);
+
+		for (u64 _idx = 0; _idx < Nh; _idx++)
+		{
+			auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
+
+			// why even bother?
+			[[unlikely]] if (EQP(std::abs(_val), 0.0, 1e-14))
+				continue;
+
+			// looking for the representative
+			auto [_newIdx, _eigval]		=	_Hil.findRep(_newState, _Hil.getNorm(_idx));
+
+			// go to it manually
+			[[likely]]
+			if(_newIdx < Nh)
+				op(_newIdx, _idx)		+=	_val * _eigval;
+		}
+		// standarize the operator
+		//if(_standarize)
+		//	Operators::standarizeOperator(op);
+		return op;
+	}
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
+	* @param _Hil the Hilbert space in which we operate
+	* @warning (takes into account that we are going to a different symmetry sector so matrix is not square)
+	* @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
+	*/
+	template<typename _T, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _T1, typename _T2, uint _spinModes>
+	inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts ..._arg)
+	{
+		// using res_typ		=	typename std::common_type<_T1, _T, _T2>::type;
+		u64 NhA				=	_Hil1.getHilbertSize();
+		u64 NhB				=	_Hil2.getHilbertSize();
+		arma::SpMat<_TinMat> op(NhA, NhB);
+
+		for (u64 _idxB = 0; _idxB < NhB; _idxB++) 
+		{
+			// act with an operator on beta sector (right)
+			auto [_newStateB, _valB]				=	this->operator()(_Hil2.getMapping(_idxB), _arg...);
+
+			// why even bother?
+			[[unlikely]] if (EQP(std::abs(_valB), 0.0, 1e-14))
+				continue;
+
+			// find the corresponding index and value in the A sector (left)
+			auto [newIdxA, symValA]					=	_Hil1.findRep(_newStateB, _Hil2.getNorm(_idxB));
+
+			// check if the state is there
+			if (newIdxA < NhA)
+				op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
+		}
+		// standarize the operator
+		if(_standarize)
+			return standarizeOperator(op);
+		return op;
+	}
 };
+
 
 // ##############################################################################################################################################################
 
-/*
-* @brief Raising the operator to the power of n (n is an integer) 
-* @param _n the power to which the operator is raised
-* @returns the operator raised to the power of n
-*/
-template<typename _T, typename ..._Ts>
-template<typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type*>
-inline Operators::Operator<_T,_Ts...> Operators::Operator<_T, _Ts...>::operator ^(_T1 _n)
-{
-	if (_n == 0)
-		return Operator<_T, _Ts...>(this->lat_, 1.0, Operators::Operator<_T, _Ts...>::E);
-	else if (_n == 1)
-		return *this;
+// ################################################## O P E R A T O R   R E T U R N S   C O M B I N A T I O N ###################################################
 
-	auto _f = [_n, this](u64 _s, _Ts... _args) {
-		_T val = 1.0;
-		do {
-			auto [newS, newV]	= this->operator()(_s, _args...);
-			_s					= newS;
-			val					*= newV;
-			--_n;
-			} while (_n);
-		return std::make_tuple(_s, val);
-	};
-	return Operator<_T, _Ts...>(this->lat_, std::pow(this->eigVal_, _n), _f);
-}
+// ##############################################################################################################################################################
 
-// ##########################################################################################################################################
-
-//!TODO
-template<typename _T, typename ..._Ts>
-template<typename _T1, typename _T2>
-inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const arma::Col<_T2>& _beta, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
-{
-	return _T();
-}
-
-//!TODO
-template<typename _T, typename ..._Ts>
-template<typename _T1>
-inline _T Operators::Operator<_T, _Ts...>::avOp(const arma::Col<_T1>& _alfa, const Operators::Operator<_T, _Ts...>& _op, const Hilbert::HilbertSpace<_T>& _hSpace)
-{
-	return _T();
-}
-
-// #################################################### M A T R I X   G E N E R A T I O N ####################################################
-
-/*
-* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
-* The operator is acting on the same Hilbert space as the one it is acting on.
-* For the total Hilbert space known to be without symmetries - not looking for representatives
-* @brief _dim A dimension of the Hilbert space
-* @returns A matrix representing the operator
-*/
-template<typename _T, typename ..._Ts> 
-template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
-typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
-	Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
-{
-#ifdef _DEBUG
-	LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-#endif
-
-	_MatType<_TinMat> op(_dim, _dim);
-
-	// check whether the operator is quadratic
-	if (this->overridenMatFun_ && this->isQuadratic_)
-	{
-#ifdef _DEBUG
-		LOGINFO("Operator is quadratic, going into!", LOG_TYPES::INFO, 1);
-#endif
-		if constexpr (std::is_same_v<_MatType<_TinMat>, arma::Mat<_TinMat>>)
-			op = this->overridenMatFun_(_dim).getDense();
-		else if constexpr (std::is_same_v<_MatType<_TinMat>, arma::SpMat<_TinMat>>)
-			op = this->overridenMatFun_(_dim).getSparse();
-		else
-		{
-			LOGINFO("Type is neither arma::Mat nor arma::SpMat", LOG_TYPES::ERROR, 0);
-			throw std::logic_error("Unsupported matrix type in operator class");
-		}
-	}
-	else
-	{
-		// otherwise create the operator matrix
-	#pragma omp parallel for
-		for (u64 _base = 0; _base < _dim; ++_base) 
-		{
-			auto [_idx, _val]	=	this->operator()(_base, _arg...);
-			op(_idx, _base)		+=	_val;
-		}
-
-	}
-
-
-	// standarize the operator
-	if (_standarize)
-	{
-		Operators::standarizeOperator(op);
-		Operators::operatorInfo(op);
-	}
-	return op;
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
-* The operator is acting on the same Hilbert space as the one it is acting on.
-* For the total Hilbert space known to be without symmetries - not looking for representatives
-* @brief _dim A dimension of the Hilbert space
-* @returns A matrix representing the operator
-*/
-template<typename _T, typename ..._Ts> 
-template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
-typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
-Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
-{
-#ifdef _DEBUG
-	LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-#endif
-
-	GeneralizedMatrix<_TinMat> op(_dim);
-
-	// check whether the operator is quadratic
-	if (this->overridenMatFun_ && this->isQuadratic_)
-	{
-		op = this->overridenMatFun_(_dim);
-	}
-	else
-	{
-		// otherwise create the operator matrix
-#pragma omp parallel for
-		for (u64 _base = 0; _base < _dim; ++_base) 
-		{
-			auto [_idx, _val]	=	this->operator()(_base, _arg...);
-			op.add(_idx, _base, _val);
-		}
-
-	}
-
-	// standarize the operator
-	if (_standarize)
-	{
-		op.standarize();
-		Operators::operatorInfo(op);
-	}
-	return op;
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Creates an operator matrix whenever the operator is not transforming the state from a different symmetry sector.
-* Uses the Hilbert space that stores the state transformations from the representative base.
-* @param _Hil the Hilbert space in which we operate
-* @param _arg arguments for the operator
-* @returns A matrix representing the operator
-*/
-template<typename _T, typename ..._Ts>
-template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _T1, uint _spinModes>
-inline _MatType<typename std::common_type<_TinMat, _T1>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts ..._arg) const
-{
-	using res_typ	=	typename std::common_type<_T1, _TinMat>::type;
-	u64 Nh			=	_Hil.getHilbertSize();
-	_MatType<res_typ> op(Nh, Nh);
-
-	for (u64 _idx = 0; _idx < Nh; _idx++)
-	{
-		auto [_newState, _val]		=	this->operator()(_Hil.getMapping(_idx), _arg...);
-
-		// why even bother?
-		[[unlikely]] if (EQP(std::abs(_val), 0.0, 1e-14))
-			continue;
-
-		// looking for the representative
-		auto [_newIdx, _eigval]		=	_Hil.findRep(_newState, _Hil.getNorm(_idx));
-
-		// go to it manually
-		[[likely]]
-		if(_newIdx < Nh)
-			op(_newIdx, _idx)		+=	_val * _eigval;
-	}
-	// standarize the operator
-	//if(_standarize)
-	//	Operators::standarizeOperator(op);
-	return op;
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
-* @param _Hil the Hilbert space in which we operate
-* @warning (takes into account that we are going to a different symmetry sector so matrix is not square)
-* @trace O = \sum _{i \in A} \sum _{j \in _B} |i>_A <j|_B O_{ij}
-*/
-template<typename _T, typename ..._Ts>
-template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _T1, typename _T2, uint _spinModes>
-inline _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> Operators::Operator<_T, _Ts...>::generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts ..._arg)
-{
-	// using res_typ		=	typename std::common_type<_T1, _T, _T2>::type;
-	u64 NhA				=	_Hil1.getHilbertSize();
-	u64 NhB				=	_Hil2.getHilbertSize();
-	arma::SpMat<_TinMat> op(NhA, NhB);
-
-	for (u64 _idxB = 0; _idxB < NhB; _idxB++) 
-	{
-		// act with an operator on beta sector (right)
-		auto [_newStateB, _valB]				=	this->operator()(_Hil2.getMapping(_idxB), _arg...);
-
-		// why even bother?
-		[[unlikely]] if (EQP(std::abs(_valB), 0.0, 1e-14))
-			continue;
-
-		// find the corresponding index and value in the A sector (left)
-		auto [newIdxA, symValA]					=	_Hil1.findRep(_newStateB, _Hil2.getNorm(_idxB));
-
-		// check if the state is there
-		if (newIdxA < NhA)
-			op(newIdxA, _idxB)					+=	_valB * algebra::conjugate(symValA);
-	}
-	// standarize the operator
-	if(_standarize)
-		return standarizeOperator(op);
-	return op;
-}
-
-// ##########################################################################################################################################
-
-// ####################################### O P E R A T O R   R E T U R N S   C O M B I N A T I O N ##########################################
-
-// ##########################################################################################################################################
-
-namespace Operators 
-{
+namespace Operators {
 	template <typename _T, typename ..._Ts>
 	class OperatorComb : public GeneralOperator<_T, 
 												typename OperatorsCombination::_OP<_T>::template INP<_Ts...>,
@@ -1037,10 +1115,10 @@ namespace Operators
 												_Ts...>
 	{
 	public:
-		using baseType 	= 	GeneralOperator<_T, 
-								typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, 
-								typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, 
-								_Ts...>;												// type of the operator - base type
+		
+		// type of the operator - base type
+		using baseType 	= 	GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, 
+								typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>;	
 		// ----------------------------------------------------------------------------------------------------
 
 		// Inherit constructors from GeneralOperator
@@ -1050,7 +1128,7 @@ namespace Operators
 		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
 		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference
 
-	protected:
+	public:
 		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
 		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
 		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
@@ -1064,10 +1142,307 @@ namespace Operators
 		
 		// ----------------------------------------------------------------------------------------------------
 
+	public:
+		// ---------------------------------------- O P E R A T O R ( ) ---------------------------------------
+		
+		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType override;
+		virtual auto operator()(u64 s, _Ts... a)		-> ReturnType override;
+		virtual auto operator()(_VT_CR s, _Ts... a)		const -> ReturnTypeV override;
+		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV override;		
+			
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+		friend std::vector<_T> chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)\
+		{
+			std::vector<_T> _res;
+			for (const auto [s2, _val] : _op(_s, std::forward<_Ts>(_a)...))
+				_res.push_back(_val);
+			return _res;
+		}
+
+		friend std::vector<_T> chi(const Operator<_T, _Ts...>& _op, const _VT& _s, _Ts... _a)
+		{
+			std::vector<_T> _res;
+			for (const auto [s2, _val] : _op(_s, std::forward<_Ts>(_a)...))
+				_res.push_back(_val);
+			return _res;
+		}
 	
+		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% H I L B E R T   S P A C E %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		
+		template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _InT = u64>
+		typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
+			generateMat(_InT _dim, _Ts... _arg) const;
+
+		template<bool _standarize = false, typename _TinMat = _T,  template <class _TM = _TinMat> class _MatType, typename _InT = u64>
+		typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
+			generateMat(_InT _dim, _Ts... _arg) const;
+
+		// template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, uint _spinModes = 2>
+		// _MatType<typename std::common_type<_TinMat, _T1>::type>
+		// generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil, _Ts... _arg) const;
+
+		// template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _T1, typename _T2, uint _spinModes = 2>
+		// _MatType<typename std::common_type<_TinMat, _T1, _T2>::type> 
+		// generateMat(const Hilbert::HilbertSpace<_T1, _spinModes>& _Hil1, const Hilbert::HilbertSpace<_T2, _spinModes>& _Hil2, _Ts... _arg);
+	};
+
+	// ##########################################################################################################################################
+
+	/*
+	* @brief Calculating the application of the operator on the state and the values it returns
+	* @param s the state on which the operator is acting
+	* @param a the values of the operator
+	* @returns the states and the values of the operator
+	*/
+	template <typename _T, typename ..._Ts>
+	OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a) const
+	{
+		// return value
+		std::vector<std::pair<u64, _T>> _res;
+
+		// calculate the operator
+		for (const auto [s2, _val] : this->fun_(s, a...))
+			_res.push_back(std::make_pair(s2, this->eigVal_ * _val));
+		return _res;
+	}
+
+	template <typename _T, typename ..._Ts>
+	OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a)
+	{
+		// return value
+		std::vector<std::pair<u64, _T>> _res;
+
+		// calculate the operator
+		for (const auto [s2, _val] : this->fun_(s, a...))
+			_res.push_back(std::make_pair(s2, this->eigVal_ * _val));
+		return _res;
+	}
+	
+	// ------------------------------------------------------------------------------------------------------------------------------------------
+
+	/*
+	* @brief Calculating the application of the operator on the state and the values it returns (vector version)
+	* @param s the state on which the operator is acting
+	* @param a the values of the operator
+	* @returns the states and the values of the operator
+	* @note the operator is acting on the vector state and returns the vector of states and values
+	*/
+	template <typename _T, typename ..._Ts>
+	OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a) const
+	{
+		// return value
+		std::vector<std::pair<_VT, _T>> _res;
+
+		// calculate the operator
+		for (const auto [s2, _val] : this->funV_(s, a...))
+			_res.push_back(std::make_pair(s2, this->eigVal_ * _val));
+		return _res;
+	}
+	
+	template <typename _T, typename ..._Ts>
+	OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a)
+	{
+		// return value
+		std::vector<std::pair<_VT, _T>> _res;
+
+		// calculate the operator
+		for (const auto [s2, _val] : this->funV_(s, a...))
+			_res.push_back(std::make_pair(s2, this->eigVal_ * _val));
+		return _res;
+	}
+
+	// ##########################################################################################################################################
+
+	template <typename _T, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class _TM> class _MatType, typename _InT>
+	typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
+	OperatorComb<_T, _Ts...>::generateMat(_InT _dim, _Ts... _arg) const
+	{
+	#ifdef _DEBUG
+		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+	#endif
+	
+		_MatType<_TinMat> op(_dim, _dim);
+
+		// check whether the operator has an overriden matrix function
+		if (this->overridenMatFun_)
+			op = GeneralOperator<_T, repType, repTypeV, _Ts...>::template generateMat<_standarize, _TinMat, _MatType>(_dim, _arg...);
+		else
+		{
+			for (u64 _base = 0; _base < _dim; ++_base) 
+			{
+				for (const auto [_idx, _val] : this->operator()(_base, _arg...))
+					op(_idx, _base)		+=	_val;
+			}
+		}
+
+		return GeneralOperator<_T, repType, repTypeV, _Ts...>::template standaridizeMatrix<_standarize, _TinMat, _MatType>(op);
+	}
+
+	// ##########################################################################################################################################
+
+	template <typename _T, typename ..._Ts>
+	template<bool _standarize, typename _TinMat, template <class _TM> class _MatType, typename _InT>
+	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
+	OperatorComb<_T, _Ts...>::generateMat(_InT _dim, _Ts... _arg) const
+	{
+	#ifdef _DEBUG
+		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
+	#endif
+		
+		GeneralizedMatrix<_TinMat> op(_dim);
+
+		// check whether the operator has an overriden matrix function
+		if (this->overridenMatFun_ && this->isQuadratic_)
+			op = GeneralOperator<_T, repType, repTypeV, _Ts...>::template generateMat<_standarize, _TinMat, _MatType>(_dim, _arg...);
+		else
+		{
+			for (u64 _base = 0; _base < _dim; ++_base) 
+			{
+				for (const auto [_idx, _val] : this->operator()(_base, _arg...))
+					op.add(_idx, _base, _val);
+			}
+		}
+
+		return GeneralOperator<_T, repType, repTypeV, _Ts...>::template standaridizeMatrix<_standarize, _TinMat, _MatType>(op);
+	}
+	
+	// ##########################################################################################################################################
+
+};
+
+// ##############################################################################################################################################################
+
+// ############################################################ O P E R A T O R   C O N T A I N E R #############################################################
+
+// ##############################################################################################################################################################
+
+namespace Operators {
+	namespace Containers
+	{
+		// stores elements in a matrix form
+		template <typename _T>
+		using OperatorContainer_t = arma::Mat<_T>;
+
+		#define OperatorContainerS this->sizeX_, this->sizeY_
+
+		// ##############################################################################################################################################
+		template <typename _T>
+		class OperatorContainer
+		{
+		public:
+			using OperatorContainer_typ 		= OperatorContainer_t<_T>;
+			size_t sizeX_						= 1;					// size of the operator (in X direction)
+			size_t sizeY_						= 1;					// size of the operator (in Y direction)
+			size_t Ns_							= 1;					// number of states in the quantum state
+
+			// ##########################################################################################################################################
+
+			OperatorContainer_typ currentValue_;						// current value of the operator (at each point in X and Y) - for a single state
+			v_1d<OperatorContainer_typ> samples_;						// store the samples for the operator - samples taken from the quantum state
+
+			// ##########################################################################################################################################
+		
+			// ####### MANY BODY #######
+			// store the matrix for the matrices obtained directly from the many body matrix (for the many body operators) 
+			GeneralizedMatrix<_T> manyBodyMatrix_;
+			OperatorContainer_typ manyBodyVal_;
+
+			// ##########################################################################################################################################
+
+			// ######## INDICES ########
+			v_1d<uint> indices_;										// for finding out the index in the variadic variable - for multiple locality operators
+			uint currentIdx_					= 0;					// current index in the variadic variable (currently processed) - for multiple locality operators
+
+		public:
+			OperatorContainer(size_t _Ns)
+				: Ns_(_Ns)
+			{
+				this->samples_ = {};
+			}
+
+			// ##########################################################################################################################################
+			
+			template <typename ..._Ts>
+			auto decideSize()					-> void;				// decide about the size of the container
+
+			// ----------------------------------------------------------------------------------------------------
+			
+			// for the colected samples
+			auto operator[](uint i) const -> OperatorContainer_typ 		{ return this->samples_[i]; 								};			
+			auto operator[](uint i)	-> const OperatorContainer_typ&		{ return this->samples_[i]; 								};
+
+			// ######## S E T T E R S ########
+			auto resetSamples()		-> void { this->samples_ = {};																	};
+			auto resetValue()		-> void { this->currentValue_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
+			auto resetMB()			-> void { this->manyBodyVal_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
+
+			// ######## G E T T E R S ########
+			auto mbmat_c()			   const -> GeneralizedMatrix<_T>				{ return this->manyBodyMatrix_;					};
+			auto mbmat()			   const -> const GeneralizedMatrix<_T>&		{ return this->manyBodyMatrix_;					};
+			auto mbval_c()			   const -> arma::Mat<_T>						{ return this->manyBodyVal_;					};
+			auto mbval()			   const -> const arma::Mat<_T>&				{ return this->manyBodyVal_;					};
+			auto var()				   const -> arma::Mat<cpx>						{ return CAST<cpx>(Vectors::var(this->samples_));	};
+			auto mean()				   const -> arma::Mat<cpx>						{ return CAST<cpx>(Vectors::mean(this->samples_));	};
+			auto value()			   const -> arma::Mat<cpx>						{ return this->currentValue_;					};
+			auto value(uint i)		   const -> arma::Mat<cpx>						{ return this->samples_[i];						};
+			auto samples_c()		   const -> v_1d<OperatorContainer_typ>			{ return this->samples_;						};
+			auto samples()			   const -> const v_1d<OperatorContainer_typ>&	{ return this->samples_;						};
+		};
+
+		// ##########################################################################################################################################
+
+		/*
+		* @brief Resize the current value so one can store only the necessary values in the matrix (sizeX, sizeY)
+		* Global		has sizeX = sizeY = 1 		-	stores only one value (scalar)
+		* Local			has sizeX = Ns, sizeY = 1,	- 	stores Ns values (vector)
+		* Correlation	has sizeX = Ns, sizeY = Ns. - 	stores Ns x Ns values (matrix)
+		* @template _T type of the operator			
+		* @template _Ts types of the additional parameters
+		* @throws runtime_error if the number of arguments is not 0, 1 or 2
+		*/
+		template <typename _T>
+		template <typename ..._Ts>
+		void OperatorContainer<_T>::decideSize()
+		{
+			// get the size of template operators to decide on the opeartor type
+			constexpr size_t numArgs 		= sizeof...(_Ts);
+			
+			if (numArgs > 2) 
+				throw std::runtime_error("Not implemented for more than two arguments!");
+
+			if (numArgs == 0)
+			{
+				this->sizeX_				= 1;
+				this->sizeY_				= 1;
+				this->indices_				= {};
+			}
+			else if (numArgs == 1)
+			{
+				this->sizeX_				= this->Ns_;
+				this->sizeY_				= 1;
+				this->indices_				= { 0 };
+			}
+			else if (numArgs == 2)
+			{
+				this->sizeX_				= this->Ns_;
+				this->sizeY_				= this->Ns_;
+				this->indices_				= { 0, 0 };
+			}
+			else
+				throw std::runtime_error("Not implemented for more than two arguments!");
+
+			// store the matrix for the many body average basded on a given quantum state
+			this->manyBodyVal_	=  arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
+		}
+
+		// ##########################################################################################################################################
 
 	};
+
 };
+
 
 // ##########################################################################################################################################
 
@@ -1075,8 +1450,7 @@ namespace Operators
 
 // ##########################################################################################################################################
 
- namespace Operators
- {
+namespace Operators {
  	template <typename _T, typename ..._Ts>
  	class OperatorExt : std::vector<Operator<_T, _Ts...>>
  	{
@@ -1345,6 +1719,6 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-}
+};
 
 #endif // !GENERAL_OPERATOR_H

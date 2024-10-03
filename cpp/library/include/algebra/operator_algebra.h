@@ -473,7 +473,7 @@ namespace Operators {
 namespace OperatorsCombination {
 	using _OP_T      	= u64;
 	template <typename _T>
-	using _OPx = std::pair<_OP_T, _T>;
+	using _OPx 			= std::vector<std::pair<_OP_T, _T>>;
 
 	// Standard operators
 	using _OPCx 		= _OPx<cpx>;
