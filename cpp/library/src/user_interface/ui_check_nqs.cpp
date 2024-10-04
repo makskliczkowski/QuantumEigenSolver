@@ -103,10 +103,10 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};
 	// go through the lattice sites
 	{
-		auto _SzL = std::make_shared<Operators::OperatorNQS<_T, uint>>(Operators::sigmaZ_L<_T>(latP.lat), "sz_l");
-		auto _SzC = std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(Operators::sigmaZ_C<_T>(latP.lat), "sz_c");
-		_opsL.push_back(_SzL);
-		_opsC.push_back(_SzC);
+		// auto _SzL = std::make_shared<Operators::OperatorNQS<_T, uint>>(Operators::sigmaZ_L<_T>(latP.lat), "sz_l");
+		// auto _SzC = std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(Operators::sigmaZ_C<_T>(latP.lat), "sz_c");
+		// _opsL.push_back(_SzL);
+		// _opsC.push_back(_SzC);
 	}
 	// create measurement operator
 	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  

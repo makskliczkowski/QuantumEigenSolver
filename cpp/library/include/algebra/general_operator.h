@@ -731,6 +731,10 @@ namespace Operators {
 // ################################################################ N O N - M I X I N G #########################################################################
 
 namespace Operators {
+	
+	// forward declaration
+	template <typename _T, typename ..._Ts>
+	class OperatorComb;
 
 	/*
 	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
@@ -766,6 +770,10 @@ namespace Operators {
 		// Default constructor
 		Operator() : baseType() {};														// default constructor
 		
+		explicit operator OperatorComb<_T, _Ts...>() const {
+			return OperatorComb<_T, _Ts...>(*this);
+		}
+
 		// ----------------------------------------------------------------------------------------------------
 	public:
 		// -------------- O P E R A T O R ( ) -------------
@@ -1115,7 +1123,6 @@ namespace Operators {
 												_Ts...>
 	{
 	public:
-		
 		// type of the operator - base type
 		using baseType 	= 	GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, 
 								typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>;	
@@ -1140,9 +1147,36 @@ namespace Operators {
 		// Default constructor
 		OperatorComb() : baseType() {};													// default constructor
 		
-		// ----------------------------------------------------------------------------------------------------
+		OperatorComb(const Operator<_T, _Ts...>& other)
+		{
+			// Copy or convert relevant data members from "other" to "this"
+			this->name_				= other.name_;
+			this->nameS_ 			= other.nameS_;
+			this->overridenMatFun_ 	= other.overridenMatFun_;
+			this->isQuadratic_ 		= other.isQuadratic_; 
+			this->lat_ 				= other.lat_;
+			this->Ns_ 				= other.Ns_;
+			this->eigVal_ 			= other.eigVal_;
+			this->hasVectorFun_ 	= other.hasVectorFun_;
 
-	public:
+			// make new function
+			auto _f = [this, other](u64 _s, _Ts... _args) {
+				auto [_s2, _v] = other.operator()(_s, _args...);
+				return std::vector(std::make_tuple(_s, _v));
+			};
+			this->fun_ 				= _f;
+
+			// vector function
+			if (this->hasVectorFun_)
+			{
+				auto _fV = [this, other](const _VT& _s, _Ts... _args) {
+					auto [_s2, _v] = other.operator()(_s, _args...);
+					return std::vector(std::make_tuple(_s, _v));
+				};
+				this->funV_ 		= _fV;
+			}
+		};
+
 		// ---------------------------------------- O P E R A T O R ( ) ---------------------------------------
 		
 		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType override;
@@ -1152,7 +1186,7 @@ namespace Operators {
 			
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		friend std::vector<_T> chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)\
+		friend std::vector<_T> chi(const OperatorComb<_T, _Ts...>& _op, u64 _s, _Ts... _a)\
 		{
 			std::vector<_T> _res;
 			for (const auto [s2, _val] : _op(_s, std::forward<_Ts>(_a)...))
@@ -1160,7 +1194,7 @@ namespace Operators {
 			return _res;
 		}
 
-		friend std::vector<_T> chi(const Operator<_T, _Ts...>& _op, const _VT& _s, _Ts... _a)
+		friend std::vector<_T> chi(const OperatorComb<_T, _Ts...>& _op, const _VT& _s, _Ts... _a)
 		{
 			std::vector<_T> _res;
 			for (const auto [s2, _val] : _op(_s, std::forward<_Ts>(_a)...))
@@ -1321,75 +1355,176 @@ namespace Operators {
 namespace Operators {
 	namespace Containers
 	{
+		#define OperatorContainerS this->sizeX_, this->sizeY_
 		// stores elements in a matrix form
 		template <typename _T>
 		using OperatorContainer_t = arma::Mat<_T>;
 
-		#define OperatorContainerS this->sizeX_, this->sizeY_
 
 		// ##############################################################################################################################################
 		template <typename _T>
 		class OperatorContainer
 		{
+		protected:
+			_OP_V_T state_;															// store the column state vector						
+
 		public:
-			using OperatorContainer_typ 		= OperatorContainer_t<_T>;
-			size_t sizeX_						= 1;					// size of the operator (in X direction)
-			size_t sizeY_						= 1;					// size of the operator (in Y direction)
-			size_t Ns_							= 1;					// number of states in the quantum state
+			using OperatorContainer_typ = OperatorContainer_t<_T>;
+			size_t sizeX_				= 1;										// size of the operator (in X direction)
+			size_t sizeY_				= 1;										// size of the operator (in Y direction)
+			size_t Ns_					= 1;										// number of states in the quantum state
 
 			// ##########################################################################################################################################
 
-			OperatorContainer_typ currentValue_;						// current value of the operator (at each point in X and Y) - for a single state
-			v_1d<OperatorContainer_typ> samples_;						// store the samples for the operator - samples taken from the quantum state
+			size_t sample_num_			= 0;										// number of samples taken - for a single addition of the operator (Monte Carlo etc.)
+			OperatorContainer_typ currentValue_;									// current value of the operator (at each point in X and Y) - for a single state
+			v_1d<OperatorContainer_typ> samples_;									// store the samples for the operator - samples taken from the quantum state
 
 			// ##########################################################################################################################################
 		
 			// ####### MANY BODY #######
 			// store the matrix for the matrices obtained directly from the many body matrix (for the many body operators) 
+			size_t sample_num_mb_		= 0;										// number of samples taken for the matrix representation of the operator (Monte Carlo etc.)
 			GeneralizedMatrix<_T> manyBodyMatrix_;
 			OperatorContainer_typ manyBodyVal_;
 
-			// ##########################################################################################################################################
+			// ##########################################################################################################################
 
 			// ######## INDICES ########
-			v_1d<uint> indices_;										// for finding out the index in the variadic variable - for multiple locality operators
-			uint currentIdx_					= 0;					// current index in the variadic variable (currently processed) - for multiple locality operators
+			v_1d<uint> indices_;													// for finding out the index in the variadic variable - for multiple locality operators
+			uint currentIdx_			= 0;										// current index in the variadic variable (currently processed) - for multiple locality operators
 
 		public:
+
+			// ##########################################################################################################################
+
+			~OperatorContainer() 		= default;
+
 			OperatorContainer(size_t _Ns)
 				: Ns_(_Ns)
 			{
-				this->samples_ = {};
+				this->samples_ 	= {};
+				this->state_ 	= _OP_V_T(_Ns);
 			}
 
-			// ##########################################################################################################################################
+			// ##########################################################################################################################
+
+			template <class _Tt = uint>
+			typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+			updCurrent(_T _val, _Tt i);
+
+			template <class _Tt, typename ..._Tss>
+			typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+			updCurrent(_T _val, _Tt i, _Tss...a);
+
+			template <typename ..._Tss>
+			void updCurrent(_T _val, _Tss...a)										{ currentIdx_ = 0; this->updCurrent(_val, a...);	};
+
+			// sample number - for a single realization
+			void updSampleNum()														{ this->sample_num_++;								};
+			void updSampleNumMB()													{ this->sample_num_mb_++;							};
+			void resetSampleNum()													{ this->sample_num_ = 0;							};
+			void resetSampleNumMB()													{ this->sample_num_mb_ = 0;							};
+
+			// ##########################################################################################################################
 			
 			template <typename ..._Ts>
-			auto decideSize()					-> void;				// decide about the size of the container
+			auto decideSize()			-> void;									// decide about the size of the container
 
-			// ----------------------------------------------------------------------------------------------------
+			// --------------------------------------------------------------------------------------------------------------------------
 			
 			// for the colected samples
-			auto operator[](uint i) const -> OperatorContainer_typ 		{ return this->samples_[i]; 								};			
-			auto operator[](uint i)	-> const OperatorContainer_typ&		{ return this->samples_[i]; 								};
+			auto operator[](uint i) 	const -> OperatorContainer_typ 				{ return this->samples_[i]; 						};			
+			auto operator[](uint i)		-> const OperatorContainer_typ&				{ return this->samples_[i]; 						};
+			auto operator()() 			const	-> OperatorContainer_typ			{ return this->currentValue_;						};
+			auto operator()()			-> const OperatorContainer_typ&				{ return this->currentValue_;						};
 
+		public:
+			auto reset()				-> void { this->resetSamples(); this->resetValue(); this->resetMB();							};
+		protected:
 			// ######## S E T T E R S ########
-			auto resetSamples()		-> void { this->samples_ = {};																	};
-			auto resetValue()		-> void { this->currentValue_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
-			auto resetMB()			-> void { this->manyBodyVal_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
+			auto resetSamples()			-> void { this->samples_ = {};																	};
+			auto resetValue()			-> void { this->currentValue_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
+			auto resetMB()				-> void { this->manyBodyVal_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
 
 			// ######## G E T T E R S ########
-			auto mbmat_c()			   const -> GeneralizedMatrix<_T>				{ return this->manyBodyMatrix_;					};
-			auto mbmat()			   const -> const GeneralizedMatrix<_T>&		{ return this->manyBodyMatrix_;					};
-			auto mbval_c()			   const -> arma::Mat<_T>						{ return this->manyBodyVal_;					};
-			auto mbval()			   const -> const arma::Mat<_T>&				{ return this->manyBodyVal_;					};
-			auto var()				   const -> arma::Mat<cpx>						{ return CAST<cpx>(Vectors::var(this->samples_));	};
-			auto mean()				   const -> arma::Mat<cpx>						{ return CAST<cpx>(Vectors::mean(this->samples_));	};
-			auto value()			   const -> arma::Mat<cpx>						{ return this->currentValue_;					};
-			auto value(uint i)		   const -> arma::Mat<cpx>						{ return this->samples_[i];						};
-			auto samples_c()		   const -> v_1d<OperatorContainer_typ>			{ return this->samples_;						};
-			auto samples()			   const -> const v_1d<OperatorContainer_typ>&	{ return this->samples_;						};
+			auto mbmat()			   	const -> GeneralizedMatrix<_T>				{ return this->manyBodyMatrix_;						};
+			auto mbmat()			   	-> const GeneralizedMatrix<_T>&				{ return this->manyBodyMatrix_;						};
+			auto mbval()			   	const -> arma::Mat<_T>						{ return this->manyBodyVal_;						};
+			auto mbval()			   	-> const arma::Mat<_T>&						{ return this->manyBodyVal_;						};
+			template<typename _T1>
+			auto var()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::var(this->samples_));	};
+			template<typename _T1>
+			auto mean()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::mean(this->samples_));	};
+			auto value()			   	const -> OperatorContainer_t<_T>			{ return this->currentValue_;						};
+			auto value(uint i)		   	const -> OperatorContainer_t<_T>			{ return this->samples_[i];							};
+			auto samples()		   		const -> v_1d<OperatorContainer_typ>		{ return this->samples_;							};
+			auto samples()			  	-> const v_1d<OperatorContainer_typ>&		{ return this->samples_;							};
+
+			// ##########################################################################################################################
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, Operator<_T, _Ts...>* _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(size_t _Nh, Operator<_T, _Ts...>* _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<Operator<_T, _Ts...>*>& _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _op, _Ts... a) -> void;
+
+			// ##########################################################################################################################
+
+			// ######## S A M P L I N G ########
+
+			inline void normalize(bool reset = true);
+			
+			template <typename _T1>
+			arma::Col<_T1> sample(const arma::Col<_T1>& _state, size_t i = 0, size_t j = 0);
+
 		};
+
+		// ##########################################################################################################################################
+
+		template<typename _T>
+		template<class _Tt>
+		inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+		Operators::Containers::OperatorContainer<_T>::updCurrent(_T _val, _Tt i)
+		{
+			// store the index
+			this->indices_[this->currentIdx_] = i;
+			this->currentIdx_++;
+
+			// check the size of the indices
+			if (this->indices_.size() == 0)
+				this->currentValue_(0, 0) += _val;
+			else if (this->indices_.size() == 1)
+				this->currentValue_(this->container_.indices_[0], 0) += _val;
+			else if (this->indices_.size() == 2)
+				this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
+			else
+				throw std::runtime_error("Not implemented such exotic operators...");
+		}
+
+		/*
+		* @brief Updates the current value of the operator with the given value and indices
+		* @param _val value to add
+		* @param i index to add to the current value of the index
+		* @param a additional indices - in case of the many body operator or the operator that needs correlation saving
+		* @note The function is recursive and goes through all the indices to update the value. See above for the implementation.
+		*/
+		template<typename _T>
+		template<class _Tt, typename ..._Tss>
+		inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
+		Operators::Containers::OperatorContainer<_T>::updCurrent(_T _val, _Tt i, _Tss...a)
+		{
+			this->indices_[this->currentIdx_] = i;
+			this->currentIdx_++;
+			updCurrent(_val, a...);
+		};
+
 
 		// ##########################################################################################################################################
 
@@ -1404,13 +1539,14 @@ namespace Operators {
 		*/
 		template <typename _T>
 		template <typename ..._Ts>
-		void OperatorContainer<_T>::decideSize()
+		void Operators::Containers::OperatorContainer<_T>::decideSize()
 		{
+			
 			// get the size of template operators to decide on the opeartor type
 			constexpr size_t numArgs 		= sizeof...(_Ts);
 			
-			if (numArgs > 2) 
-				throw std::runtime_error("Not implemented for more than two arguments!");
+			LOGINFO("Deciding the size of the operator container...", LOG_TYPES::DEBUG, 3);
+			LOGINFO("Number of arguments: " + VEQ(numArgs), LOG_TYPES::DEBUG, 4);
 
 			if (numArgs == 0)
 			{
@@ -1433,14 +1569,167 @@ namespace Operators {
 			else
 				throw std::runtime_error("Not implemented for more than two arguments!");
 
-			// store the matrix for the many body average basded on a given quantum state
-			this->manyBodyVal_	=  arma::Mat<_T>(sizeX_, sizeY_, arma::fill::zeros);
+			this->reset();
+		}
+
+		// ##########################################################################################################################################
+		
+		/*
+		* @brief Sets the many body matrix (Operator Matrix) to apply it later for the states in a many body representation. It can be used as a combination 
+		* of the operators acting on the Hilbert space. This means that one uses the Hilbert space to generate the matrix for the operator.
+		* @param _H Hilbert space - the Hilbert space in which the operator is acting
+		* @param _op operator to be used for the many body matrix creation 
+		* @param ...a additional parameters to the operators - if needed - from the general operator definition
+		*/
+		template<typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, Operator<_T, _Ts...>* _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			const size_t _Nh 		= _hilb.getHilbertSize();
+			const size_t _Nhfull	= _hilb.getFullHilbertSize();
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_hilb.getHilbertSize(), true);
+			const bool _isFull 		= _Nh == _Nhfull;
+
+			// setup the matrix
+			const bool _isQuadratic	= _op->getIsQuadratic();				// check if the operator is quadratic
+			if (_isFull) {
+				if (_isQuadratic)
+					this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+				else
+					this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+			}
+			else {
+				this->manyBodyMatrix_.setSparse(_op->template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+			}
+		}
+
+		template <typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, Operator<_T, _Ts...>* _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
+
+			// setup the matrix
+			const bool _isQuadratic	= _op->getIsQuadratic();				// check if the operator is quadratic
+			if (_isQuadratic)
+				this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+			else
+				this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));	
+		}
+
+		// ------------------------------------------------------------------------------------------------------------------------------------------
+
+		/*
+		* @brief Sets the many body matrix (Operator Matrix) to apply it later for the states in a many body representation. It can be used as a combination
+		* of the operators acting on the Hilbert space. This means that one uses the Hilbert space to generate the matrix for the operator.
+		* @param _H Hilbert space - the Hilbert space in which the operator is acting
+		* @param _op operator to be used for the many body matrix creation - multiple operators in the vector - must act in the same Hilbert space
+		* @param ...a additional parameters to the operators - if needed - from the general operator definition
+		*/
+		template<typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<Operator<_T, _Ts...>*>& _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			const size_t _Nh 		= _hilb.getHilbertSize();
+			const size_t _Nhfull	= _hilb.getFullHilbertSize();
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_hilb.getHilbertSize(), true);
+			const bool _isFull 		= _Nh == _Nhfull;
+
+			// setup the matrix
+			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			{		
+				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
+				// if we don't need to apply the symmetries
+				if (_isFull) {	
+					GeneralizedMatrix<_T> _Min;
+					if (_isquadratic)
+						_Min = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+					else
+						_Min = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+
+					this->manyBodyMatrix_ += _Min;
+				}
+				else {	
+					GeneralizedMatrix<_T> _Min;
+					_Min.setSparse(_op.template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+					this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
+				}
+			}
+		}
+
+		template <typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
+
+			// setup the matrix
+			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			{		
+				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
+				// if we don't need to apply the symmetries
+				GeneralizedMatrix<_T> _Min;
+				if (_isquadratic)
+					_Min = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+				else
+					_Min = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+
+				this->manyBodyMatrix_ += _Min;
+			}
 		}
 
 		// ##########################################################################################################################################
 
-	};
+		/*
+		* @brief Samples the operator for the given state and stores the value in the samples
+		* @param _state state on which the operator is acting
+		* @param i index of the sample
+		* @param j index of the sample
+		* @returns the value of the operator for the given state
+		*/
+		template<typename _T>
+		template<typename _T1>
+		inline arma::Col<_T1> Operators::Containers::OperatorContainer<_T>::sample(const arma::Col<_T1>& _state, size_t i, size_t j)
+		{
+			if (this->manyBodyMatrix_.isSparse())
+			{
+				arma::Col<_T1> _Cout = this->manyBodyMatrix_.getSparse() * _state;
+				this->manyBodyVal_(i, j) = arma::cdot(_state, _Cout);
+				return _Cout;
+			}
+			auto _Cout 					= this->manyBodyMatrix_.getDense() * _state;
+			this->manyBodyVal_(i, j) 	= arma::cdot(_state, _Cout);
+			return _Cout;
+		}
 
+		// ##########################################################################################################################################
+
+		template <typename _T>
+		inline void Operators::Containers::OperatorContainer<_T>::normalize(bool reset)
+		{
+			this->samples_.push_back(this->currentValue_ / (long double)this->sample_num_);
+			if (reset)
+			{
+				this->resetValue();
+				this->resetSampleNum();
+			}
+		}
+
+	};
 };
 
 

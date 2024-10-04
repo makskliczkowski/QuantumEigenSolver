@@ -1,4 +1,3 @@
-#pragma once
 /***********************************
 * Contains the most common operators.
 * Is used for more general opeartors.
@@ -7,8 +6,11 @@
 * DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***********************************/
+#pragma once
+
 #include "operator_algebra.h"
 #include <memory>
+#include <string>
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
