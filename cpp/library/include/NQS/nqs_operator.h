@@ -430,20 +430,28 @@ namespace NQSAv
 		BEGIN_CATCH_HANDLER
 		{
 			// measure global
-			for (auto& _op : this->opG_)
-				auto val [[maybe_unused]] = _op->operator()(s, _fun);
+			for (int i = 0; i < this->opG_.size(); ++i)
+			{
+				auto& _op 	= this->opG_[i];
+				auto val 	= _op->operator()(s, _fun);
+				// update the container
+			 	this->containersG_[i].updCurrent(val);
+			}
 		}
 		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
 
 		BEGIN_CATCH_HANDLER
 		{
 			// measure local
-			for (auto& _op : this->opL_)
+			for (int i = 0; i < this->opL_.size(); ++i)
 			{
+				auto& _op 	= this->opL_[i];
 				// go through the local operators
-				for (auto i = 0; i < this->Ns_; ++i)
+				for (auto j = 0; j < this->Ns_; ++j)
 				{
-					auto val [[maybe_unused]] = _op->operator()(s, _fun, i);
+					auto val = _op->operator()(s, _fun, j);
+					// update the container
+					this->containersL_[i].updCurrent(val, j);
 				}
 			}
 		}
@@ -452,13 +460,16 @@ namespace NQSAv
 		BEGIN_CATCH_HANDLER
 		{
 			// measure correlation
-			for (auto& _op : this->opC_)
+			for (int k = 0; k < this->opC_.size(); ++k)
 			{
+				auto& _op = this->opC_[k];
 				for (auto i = 0; i < this->Ns_; ++i)
 				{
 					for (auto j = 0; j < this->Ns_; ++j)
 					{
-						auto val [[maybe_unused]] = _op->operator()(s, _fun, i, j);
+						auto val = _op->operator()(s, _fun, i, j);
+						// update the container
+						this->containersC_[k].updCurrent(val, i, j);
 					}
 				}
 			}
@@ -468,85 +479,119 @@ namespace NQSAv
 
 	////////////////////////////////////////////////////////////////////////////
 
+	/*
+	* @brief Measure the operators for the given state - uses the operator representation acting on 
+	* the state in a full Hilbert space. Therefore, one needs to provide the Hilbert space and the state.
+	* @param _state state to measure the operators for
+	* @param _H Hilbert space to measure the operators in
+	*/
 	template<typename _T>
 	inline void NQSAv::MeasurementNQS<_T>::measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>& _H)
 	{
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure global
-		// 	for (auto& _op : this->opG_)
-		// 	{
-		// 		_op->resetMB();
-		// 		_op->setManyBodyMat(_H);
-		// 		_op->applyManyBody(_state, 0, 0);
-		// 	}
-				
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// measure global
+			for (int i = 0; i < this->opG_.size(); ++i)
+			{
+				auto& _op 	= this->opG_[i];
+				auto& _cont = this->containersG_[i];
+				// set the many body matrix
+				_cont.resetMB();
+				_cont.setManyBodyMat(_H, _op.get());
+				auto _val 	= Operators::applyOverlap(_state, _cont.mbmat());
+				// update the container
+				_cont.setManyBodyVal(_val);
+				// reset the many body matrix
+				_cont.resetMB();
+			}	
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure local
-		// 	for (auto& _op : this->opL_)
-		// 	{
-		// 		_op->resetMB();
-		// 		// go through the local operators
-		// 		for (auto i = 0; i < this->Ns_; ++i)
-		// 		{
-		// 			_op->setManyBodyMat(_H, i);
-		// 			_op->applyManyBody(_state, i, 0);
-		// 		}
-		// 	}
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// measure local
+			for (int i = 0; i < this->opL_.size(); ++i)
+			{
+				auto& _op 	= this->opL_[i];
+				auto& _cont = this->containersL_[i];
+				// reset
+				_cont.resetMB();
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure correlation
-		// 	for (auto& _op : this->opC_)
-		// 	{
-		// 		_op->resetMB();
-		// 		for (auto i = 0; i < this->Ns_; ++i)
-		// 		{
-		// 			for (auto j = 0; j < this->Ns_; ++j)
-		// 			{
-		// 				_op->setManyBodyMat(_H, i, j);
-		// 				_op->applyManyBody(_state, i, j);
-		// 			}
-		// 		}
-		// 	}
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+				// go through the local operators
+				for (auto i = 0; i < _op->getNs(); ++i)
+				{
+					// set the many body matrix
+					// _cont.setManyBodyMat(_H, _op.get(), i);
+					// auto _val = Operators::applyOverlap(_state, _cont.mbmat());
+					// update the container
+					// _cont.setManyBodyVal(_val, i);					
+				}
+				// reset the many body matrix
+				_cont.resetMB();
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
+
+		BEGIN_CATCH_HANDLER
+		{
+			// measure correlation
+			for (int k = 0; k < this->opC_.size(); ++k)
+			{
+				auto& _op = this->opC_[k];
+				auto& _cont = this->containersC_[k];
+				// reset
+				_cont.resetMB();
+
+				for (auto i = 0; i < _op->getNs(); ++i)
+				{
+					for (auto j = 0; j < _op->getNs(); ++j)
+					{
+						// set the many body matrix
+						// _cont.setManyBodyMat(_H, _op.get(), i, j);
+						// auto _val = Operators::applyOverlap(_state, _cont.mbmat());
+						// update the container
+						// _cont.setManyBodyVal(_val, i, j);
+					}
+				}
+				// reset the many body matrix
+				_cont.resetMB();
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
 	}
 
 	////////////////////////////////////////////////////////////////////////////
 
+	/*
+	* @brief Normalize the operators - divide by the number of samples
+	* @param _nsamples number of samples
+	*/
 	template <typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::normalize(uint _nBlck)
+	inline void NQSAv::MeasurementNQS<_T>::normalize(uint _nsamples)
 	{
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure global
-		// 	for (auto& _op : this->opG_)
-		// 		_op->normalize(_nBlck);
-		// }
-		// END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// measure global
+			for (auto& _cont : this->containersG_)
+				_cont.normalize(_nsamples);
+		}
+		END_CATCH_HANDLER("Problem in the normalization of global operators.", ;);
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure local
-		// 	for (auto& _op : this->opL_)
-		// 		_op->normalize(_nBlck);
-		// }
-		// END_CATCH_HANDLER("Problem in the normalization of local operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// measure local
+			for (auto& _cont : this->containersL_)
+				_cont.normalize(_nsamples);
+		}
+		END_CATCH_HANDLER("Problem in the normalization of local operators.", ;);
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure correlation
-		// 	for (auto& _op : this->opC_)
-		// 		_op->normalize(_nBlck);
-		// }
-		// END_CATCH_HANDLER("Problem in the normalization of correlation operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// measure correlation
+			for (auto& _cont : this->containersC_)
+				_cont.normalize(_nsamples);
+		}
+		END_CATCH_HANDLER("Problem in the normalization of correlation operators.", ;);
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -554,72 +599,80 @@ namespace NQSAv
 	template<typename _T>
 	inline void NQSAv::MeasurementNQS<_T>::save(const strVec& _ext)
 	{
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// save global
-		// 	for (auto& _op : this->opG_)
-		// 	{
-		// 		// nqs
-		// 		{
-		// 			arma::Mat<cpx> M = _op->mean();
-		// 			// save!
-		// 			for (const auto& ext : _ext)
-		// 				saveAlgebraic(dir_, _op->name() + ext, M, "values");
-		// 		}
-		// 		// many body
-		// 		{
-		// 			arma::Mat<_T> M = _op->mbval();
-		// 			if(M.size() != 0)
-		// 				for (const auto& ext : _ext)
-		// 					saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-		// 		}
-		// 	}
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// save global
+			for (int i = 0; i < this->opG_.size(); ++i)
+			{
+				auto& _cont = this->containersG_[i];
+				auto& _op 	= this->opG_[i];
+				// nqs
+				{
+					auto M = _cont.template mean<cpx>();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+				}
+				// many body 
+				{
+					const arma::Mat<_T>& M = _cont.mbval();
+					if (M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure local
-		// 	for (auto& _op : this->opL_)
-		// 	{
-		// 		{
-		// 			arma::Mat<cpx> M = _op->mean();
-		// 			// save!
-		// 			for (const auto& ext : _ext)
-		// 				saveAlgebraic(dir_, _op->name() + ext, M, "values");
-		// 		}
-		// 		// many body
-		// 		{
-		// 			arma::Mat<_T> M = _op->mbval();
-		// 			if (M.size() != 0)
-		// 				for (const auto& ext : _ext)
-		// 					saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-		// 		}
-		// 	}
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// save local
+			for (int i = 0; i < this->opL_.size(); ++i)
+			{
+				auto& _cont = this->containersL_[i];
+				auto& _op 	= this->opL_[i];
+				// nqs
+				{
+					auto M = _cont.template mean<cpx>();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+				}
+				// many body
+				{
+					const arma::Mat<_T>& M = _cont.mbval();
+					if (M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
 
-		// BEGIN_CATCH_HANDLER
-		// {
-		// 	// measure correlation
-		// 	for (auto& _op : this->opC_)
-		// 	{
-		// 		{
-		// 			arma::Mat<cpx> M = _op->mean();
-		// 			// save!
-		// 			for (const auto& ext : _ext)
-		// 				saveAlgebraic(dir_, _op->name() + ext, M, "values");
-		// 		}
-		// 		// many body
-		// 		{
-		// 			arma::Mat<_T> M = _op->mbval();
-		// 			if (M.size() != 0)
-		// 				for (const auto& ext : _ext)
-		// 					saveAlgebraic(dir_, "mb_" + _op->name() + ext, M, "values");
-		// 		}
-		// 	}
-		// }
-		// END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
+		BEGIN_CATCH_HANDLER
+		{
+			// save correlation
+			for (int i = 0; i < this->opC_.size(); ++i)
+			{
+				auto& _cont = this->containersC_[i];
+				auto& _op 	= this->opC_[i];
+				// nqs
+				{
+					auto M = _cont.template mean<cpx>();
+					// save!
+					for (const auto& ext : _ext)
+						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+				}
+				// many body
+				{
+					const arma::Mat<_T>& M = _cont.mbval();
+					if (M.size() != 0)
+						for (const auto& ext : _ext)
+							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+				}
+			}
+		}
+		END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
 	}
 
 	////////////////////////////////////////////////////////////////////////////

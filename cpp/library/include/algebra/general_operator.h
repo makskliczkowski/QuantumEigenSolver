@@ -1440,12 +1440,15 @@ namespace Operators {
 			auto operator()()			-> const OperatorContainer_typ&				{ return this->currentValue_;						};
 
 		public:
-			auto reset()				-> void { this->resetSamples(); this->resetValue(); this->resetMB();							};
-		protected:
 			// ######## S E T T E R S ########
+			auto reset()				-> void { this->resetSamples(); this->resetValue(); this->resetMB();							};
 			auto resetSamples()			-> void { this->samples_ = {};																	};
 			auto resetValue()			-> void { this->currentValue_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
 			auto resetMB()				-> void { this->manyBodyVal_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
+
+			// many body value storage
+			auto setManyBodyVal(_T _val, size_t i = 0, size_t j = 0) -> void 		{ this->manyBodyVal_(i, j) = _val;					};
+			auto updManyBodyVal(_T _val, size_t i = 0, size_t j = 0) -> void 		{ this->manyBodyVal_(i, j) += _val;					};
 
 			// ######## G E T T E R S ########
 			auto mbmat()			   	const -> GeneralizedMatrix<_T>				{ return this->manyBodyMatrix_;						};
@@ -1474,6 +1477,20 @@ namespace Operators {
 
 			template <typename _T2, typename ..._Ts>
 			auto setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _op, _Ts... a) -> void;
+			
+			// combination
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, OperatorComb<_T, _Ts...>* _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(size_t _Nh, OperatorComb<_T, _Ts...>* _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts... a) -> void;
+
+			template <typename _T2, typename ..._Ts>
+			auto setManyBodyMat(size_t _Nh, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts... a) -> void;
 
 			// ##########################################################################################################################
 
@@ -1501,7 +1518,7 @@ namespace Operators {
 			if (this->indices_.size() == 0)
 				this->currentValue_(0, 0) += _val;
 			else if (this->indices_.size() == 1)
-				this->currentValue_(this->container_.indices_[0], 0) += _val;
+				this->currentValue_(this->indices_[0], 0) += _val;
 			else if (this->indices_.size() == 2)
 				this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
 			else
@@ -1603,13 +1620,57 @@ namespace Operators {
 					this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
 			}
 			else {
-				this->manyBodyMatrix_.setSparse(_op->template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+				this->manyBodyMatrix_.setSparse(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_hilb, a...));
 			}
 		}
 
 		template <typename _T>
 		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, OperatorComb<_T, _Ts...>* _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			const size_t _Nh 		= _hilb.getHilbertSize();
+			const size_t _Nhfull	= _hilb.getFullHilbertSize();
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_hilb.getHilbertSize(), true);
+			const bool _isFull 		= _Nh == _Nhfull;
+
+			// setup the matrix
+			const bool _isQuadratic	= _op->getIsQuadratic();				// check if the operator is quadratic
+			if (_isFull) {
+				if (_isQuadratic)
+					this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+				else
+					this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+			}
+			// else {
+			// 	this->manyBodyMatrix_.setSparse(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_hilb, a...));
+			// }
+		}
+		// ------------------------------------------------------------------------------------------------------------------------------------------
+
+		template <typename _T>
+		template <typename _T2, typename ..._Ts>
 		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, Operator<_T, _Ts...>* _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
+
+			// setup the matrix
+			const bool _isQuadratic	= _op->getIsQuadratic();				// check if the operator is quadratic
+			if (_isQuadratic)
+				this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+			else
+				this->manyBodyMatrix_ = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));	
+		}
+
+		template <typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, OperatorComb<_T, _Ts...>* _op, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
@@ -1668,9 +1729,70 @@ namespace Operators {
 			}
 		}
 
+		template<typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			const size_t _Nh 		= _hilb.getHilbertSize();
+			const size_t _Nhfull	= _hilb.getFullHilbertSize();
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_hilb.getHilbertSize(), true);
+			const bool _isFull 		= _Nh == _Nhfull;
+
+			// setup the matrix
+			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			{		
+				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
+				// if we don't need to apply the symmetries
+				if (_isFull) {	
+					GeneralizedMatrix<_T> _Min;
+					if (_isquadratic)
+						_Min = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+					else
+						_Min = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+
+					this->manyBodyMatrix_ += _Min;
+				}
+				else {	
+					GeneralizedMatrix<_T> _Min;
+					_Min.setSparse(_op.template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+					this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
+				}
+			}
+		}
+
+		// ------------------------------------------------------------------------------------------------------------------------------------------
+
 		template <typename _T>
 		template <typename _T2, typename ..._Ts>
 		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _op, _Ts ...a)
+		{
+			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
+
+			// store all the measured values
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
+
+			// setup the matrix
+			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			{		
+				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
+				// if we don't need to apply the symmetries
+				GeneralizedMatrix<_T> _Min;
+				if (_isquadratic)
+					_Min = algebra::cast<_T>(_op->template generateMat<true, res_typ, GeneralizedMatrix>(_Nh, a...));
+				else
+					_Min = algebra::cast<_T>(_op->template generateMat<false, res_typ, GeneralizedMatrix>(_Nh, a...));
+
+				this->manyBodyMatrix_ += _Min;
+			}
+		}
+
+		template <typename _T>
+		template <typename _T2, typename ..._Ts>
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
