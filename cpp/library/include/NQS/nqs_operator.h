@@ -521,10 +521,10 @@ namespace NQSAv
 				for (auto i = 0; i < _op->getNs(); ++i)
 				{
 					// set the many body matrix
-					// _cont.setManyBodyMat(_H, _op.get(), i);
-					// auto _val = Operators::applyOverlap(_state, _cont.mbmat());
+					_cont.setManyBodyMat(_H, _op.get(), (uint)i);
+					auto _val = Operators::applyOverlap(_state, _cont.mbmat());
 					// update the container
-					// _cont.setManyBodyVal(_val, i);					
+					_cont.setManyBodyVal(_val, (uint)i);					
 				}
 				// reset the many body matrix
 				_cont.resetMB();
@@ -547,10 +547,10 @@ namespace NQSAv
 					for (auto j = 0; j < _op->getNs(); ++j)
 					{
 						// set the many body matrix
-						// _cont.setManyBodyMat(_H, _op.get(), i, j);
-						// auto _val = Operators::applyOverlap(_state, _cont.mbmat());
+						_cont.setManyBodyMat(_H, _op.get(), (uint)i, (uint)j);
+						auto _val = Operators::applyOverlap(_state, _cont.mbmat());
 						// update the container
-						// _cont.setManyBodyVal(_val, i, j);
+						_cont.setManyBodyVal(_val, (uint)i, (uint)j);
 					}
 				}
 				// reset the many body matrix

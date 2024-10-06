@@ -82,6 +82,24 @@ namespace Operators
 	}
 
 	/*
+	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
+	* @param _Cleft many body state
+	* @param _Cright many body state
+	* @param _M many body matrix
+	* @returns the overlap <\Psi|O|\Psi>
+	*/
+	template<typename _Ct, typename _T2>
+	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const GeneralizedMatrix<_T2>& _mat)
+	{	
+		if (_mat.isSparse())
+			return CAST<inner_type_t<_Ct>>(arma::cdot(_C, _mat.getSparse() * _C));
+		else
+			return CAST<inner_type_t<_Ct>>(arma::cdot(_C, _mat.getDense() * _C));
+	}
+
+	// ##########################################################################################################################################
+
+	/*
 	* @brief Applies the overlap between all the states in the matrix.
 	* @param _eigvecs the eigenvectors matrix
 	* @param _mat the many body matrix
