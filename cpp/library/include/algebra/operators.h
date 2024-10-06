@@ -225,6 +225,50 @@ namespace Operators
 
 		// ##########################################################################################################################################
 
+		template <typename _T>
+		std::pair<u64, _T> projectorSum(u64 _projectTo, std::function<_T(u64)> _application)
+		{
+			return std::make_pair(_projectTo, _application(_projectTo));
+		}
+
+		template <typename _T>
+		std::pair<_OP_V_T, _T> projectorSum(_OP_V_T_CR _projectTo, std::function<_T(_OP_V_T_CR)> _application)
+		{
+			return std::make_pair(_projectTo, _application(_projectTo));
+		}
+
+		template <typename _T> 
+		Operators::Operator<_T> projectorSum(size_t _Ns, const u64 _projectTo, std::function<_T(u64)> _application)
+		{
+			_OP_V_T _projv(_Ns);
+			Binary::int2base<inner_type_t<_OP_V_T>, arma::Col<inner_type_t<_OP_V_T>>, false>(_projectTo, _projv);
+
+			typename _OP<_T>::GLB fun_ 		= [_projectTo, _application](u64 _state) 		{ return projectorSum<_T>(_projectTo, _application); };
+			typename _OP_V<_T>::GLB funV_ 	= [_projv, _application](_OP_V_T_CR _state) 	{ return projectorSum<_T>(_projv, _application); };
+			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+		}
+
+		template <typename _T>
+		Operators::Operator<_T> projectorSum(size_t _Ns, _OP_V_T_CR _projectTo, std::function<_T(_OP_V_T_CR)> _application, bool _projectInt = false)
+		{
+			const u64 _proj = _projectInt ? Binary::base2int<inner_type_t<_OP_V_T>, _OP_V_T, false>(_projectTo) : 0;
+
+			typename _OP<_T>::GLB fun_ 		= [_proj, _application](u64 _state) 			{ return projectorSum<_T>(0, _application); };
+			typename _OP_V<_T>::GLB funV_ 	= [_projectTo, _application](_OP_V_T_CR _state) { return projectorSum<_T>(_projectTo, _application); };
+			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+		}
+
+		template <typename _T>
+		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, const u64 _projectTo, std::function<_T(u64)> _application)
+		{
+			return OperatorComb<_T>(projectorSum<_T>(_Ns, _projectTo, _application));
+		}
+
+		template <typename _T>
+		Operators::OperatorComb<_T> projectorSumComb(_OP_V_T_CR _projectTo, std::function<_T(_OP_V_T_CR)> _application, bool _projectInt = false)
+		{
+			return OperatorComb<_T>(projectorSum<_T>(_projectTo, _application, _projectInt));
+		}
 	};
 
 

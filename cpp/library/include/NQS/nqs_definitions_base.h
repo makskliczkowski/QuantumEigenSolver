@@ -1,5 +1,9 @@
-#pragma once
+/*
+* NQS Definitions - all the definitions for the NQS class
+* @file nqs_definitions.h
+*/
 
+#pragma once
 // ######################### NQS ############################
 
 // saving the weights and the directory
@@ -152,5 +156,3 @@ struct NQS_thread_t
 		std::mutex mutex;										// global mutex for the threads	
 	#endif
 };
-
-// #######################################################################################

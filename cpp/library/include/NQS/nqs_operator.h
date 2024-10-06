@@ -8,7 +8,7 @@
 ***************************************/
 
 // #################################
-#include "nqs_definitions.h"
+#include "nqs_definitions_base.h"
 #include <initializer_list>
 #ifndef HAMIL_H
 #	include "../hamil.h"
@@ -148,35 +148,6 @@ namespace Operators
 #	define NQS_AV_H
 namespace NQSAv
 {
-//	// CREATE A MAPPING TO DECIDE WHICH OPERATORS TO USE
-//#define MEASUREMENT_OPERATORS_CREATE(WHICH) WHICH, WHICH##TOT, WHICH##COR,
-//#define MEASUREMENT_OPERATORS_DECLARE(WHICH) DECL_ENUM_ELEMENT(WHICH), DECL_ENUM_ELEMENT(WHICH##TOT), DECL_ENUM_ELEMENT(WHICH##COR),
-//	/*
-//	* @brief Operators that are available for the measurement
-//	* !TODO Generalize me!
-//	*/
-//	enum class MeasurementNQSOperators
-//	{
-//		MEASUREMENT_OPERATORS_CREATE(SZ)
-//		MEASUREMENT_OPERATORS_CREATE(SX)
-//	};
-//
-//	BEGIN_ENUMC(MeasurementNQSOperators)
-//	{
-//		MEASUREMENT_OPERATORS_DECLARE(SZ)
-//		MEASUREMENT_OPERATORS_DECLARE(SX)
-//	}
-//	END_ENUMC(MeasurementNQSOperators);
-//
-//#define MEASUREMENT_OPERATORS_MAP(WHICH, ENUM_NAME)	{getSTR_##ENUM_NAME(WHICH), ENUM_NAME::##WHICH},				\
-//																		{getSTR_##ENUM_NAME(WHICH##TOT), ENUM_NAME::##WHICH##TOT},	\
-//																		{getSTR_##ENUM_NAME(WHICH##COR), ENUM_NAME::##WHICH##COR},
-//	// create a map
-//	std::map<std::string, MeasurementNQSOperators> MeasurementNQSOperatorsMap = {
-//		MEASUREMENT_OPERATORS_MAP(SZ, MeasurementNQSOperators)
-//		MEASUREMENT_OPERATORS_MAP(SX, MeasurementNQSOperators)
-//	};
-
 	/*
 	* @brief Class that stores the measurements from the NQS and is able to save them.
 	*/

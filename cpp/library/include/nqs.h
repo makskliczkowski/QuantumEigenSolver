@@ -9,66 +9,12 @@
 #include <memory>
 #include <stdexcept>
 #ifndef NQS_H
-#	define NQS_H
+#define NQS_H
 
-//////////////////////////////////////////////////////////////////////////////////////////
-#ifndef NQS_OPERATOR_H
-#	include "NQS/nqs_operator.h"
-#endif
-//////////////////////////////////////////////////////////////////////////////////////////
+// include all the definions
+#include "NQS/nqs_definitions_base.h"
+#include "NQS/nqs_definitions_lower.h"
 
-#include "NQS/nqs_definitions.h"
-// ######### NQS TYPES #############
-BEGIN_ENUM(NQSTYPES)			// #
-{								// #
-	DECL_ENUM_ELEMENT(RBM),		// #
-	DECL_ENUM_ELEMENT(RBMPP)	// #
-}								// #
-END_ENUM(NQSTYPES)				// #
-// #################################
-
-// forward declarations
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-class NQS;
-
-// ##########################################################################################################################################
-
-/*
-* @brief Structure for storing the lower states information - for the training and the overlaps 
-* when one is looking for the excited states - the lower states are needed for the energy estimation and gradients
-* @see 
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-struct NQS_lower_t
-{
-    using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
-
-    // for the excited states 
-    bool isSet_						= 		false;
-    NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
-    std::vector<double> f_lower_b	=		{};						// pentalties for the excited states
-	NQSAv::MeasurementNQS<_T> measureProjectors_;					// measurement projectors for the lower states energy estimation (see )
-};
-
-// ##########################################################################################################################################
-
-inline void NQS_train_t::hi(const std::string& _in) const
-{
-    std::string outstr	= "";
-    strSeparatedP(outstr, '\t', 2,
-                VEQV(Monte Carlo Steps, this->mcSteps),
-                VEQV(Thermalization Steps, this->nThrm),
-                VEQV(Block Number, this->nBlck),
-                VEQV(Size of the single block, this->bSize),
-                VEQV(Number of flips taken at each step, this->nFlip));
-    LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
-}
-
-// ##########################################################################################################################################
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-// ########################################################################################################################################## 
 
 /*
 * @brief General Neural Network Quantum States eigensolver class - base
@@ -642,6 +588,16 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 			}
 			energy += this->threads_.kernels_[_thread].kernelValue_;
 		}
+
+		// for the lower states - only if the lower states are used
+		{
+			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
+			{
+				// go through the other overlapping states 
+				
+			}
+		}
+
 		return energy;
 	}
 #endif
@@ -687,16 +643,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 																							std::placeholders::_1,
 																							std::placeholders::_2)));
 		}
-
-		// lower energy states
-		{
-			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
-			{
-				// go through the other overlapping states 
-				
-			}
-		}
-
 
 		// lock again
 		{
@@ -1089,8 +1035,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _p
 			// measure 
 			_meas.measure(this->curVec_, opFun);
 		}
-
-		_meas.normalize(_par.nBlck);												// normalize the measurements
+		// normalize the measurements - this also creates a new block of measurements
+		_meas.normalize(_par.nBlck);												
 	}
 }
 
@@ -1214,152 +1160,9 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 
 // ##########################################################################################################################################
 
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GENERAL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
-class NQS_S : public NQS<_spinModes, _Ht, _T, _stateType>
-{
-	NQS_PUBLIC_TYPES(_T, _stateType);
-public:
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
-		: NQS<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nParticles)
-														 { NQS_LOG_ERROR_SPIN_MODES; };
-protected:
-	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips()			override { NQS_LOG_ERROR_SPIN_MODES; };
-
-	// apply flips to the temporary vector or the current vector according the template
-	virtual void applyFlipsT()					override { NQS_LOG_ERROR_SPIN_MODES; };
-	virtual void applyFlipsC()					override { NQS_LOG_ERROR_SPIN_MODES; };
-	virtual void setRandomFlipNum(uint _nFlips)	override { NQS_LOG_ERROR_SPIN_MODES; };
-};
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SPINS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-#	ifndef NQS_2_H
-#		define NQS_2_H
-
-/*
-* @brief Template NQS for Spins (hardcore bosons)
-*/
-template <typename _Ht, typename _T, class _stateType>
-class NQS_S<2, _Ht, _T, _stateType> : public NQS<2, _Ht, _T, _stateType>
-{
-	NQS_PUBLIC_TYPES(_T, _stateType);
-
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
-		: NQS<2, _Ht, _T, _stateType>(_H, _lr, _threadNum, _H->getNs()) 
-	{	};
-
-protected:
-	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips()			override;
-
-	// apply flips to the temporary vector or the current vector according the template
-	virtual void applyFlipsT()					override { for (auto& i : this->flipPlaces_) flip(this->tmpVec_, i, 0, this->discVal_);	};
-	virtual void applyFlipsC()					override { for (auto& i : this->flipPlaces_) flip(this->curVec_, i, 0, this->discVal_);	};
-	virtual void setRandomFlipNum(uint _nFlips) override;
-};
-
-// !!!!!!!!!!!!!!!!!! F L I P S !!!!!!!!!!!!!!!!!!
-
-/*
-* @brief Randomly flip the discrete variables at chosen flip places. Sets the random flips to the vector already saved.
-*/
-template<typename _Ht, typename _T, class _stateType>
-inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
-{
-	// go through the vector elements
-	for (auto i = 0; i < this->flipPlaces_.size(); ++i)
-	{
-		auto fP					= this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
-		// choose the flip place of the vector
-		this->flipPlaces_[i]	= fP;
-		// save the element of a vector before the flip
-		this->flipVals_[i]		= this->tmpVec_(fP);
-	}
-}
-
-//////////////////////////////////////////////////
-
-/*
-* @brief Set the number of random flips.
-* @param _nFlips number of flips to be used
-*/
-template<typename _Ht, typename _T, class _stateType>
-inline void NQS_S<2, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
-{
-	this->nFlip_ = _nFlips;
-	this->flipPlaces_.resize(this->nFlip_);
-	this->flipVals_.resize(this->nFlip_);
-}
-
-#	endif
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FERMIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-#	ifndef NQS_4_H
-#		define NQS_4_H
-
-/*
-* @brief Template NQS for Fermions
-*/
-template <  typename _Ht, typename _T, class _stateType>
-class NQS_S<4, _Ht, _T, _stateType> : public NQS<4, _Ht, _T, _stateType>
-{
-	NQS_PUBLIC_TYPES(_T, _stateType);
-
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles)
-		: NQS<4, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nParticles) {};
-	
-protected:
-	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips();
-
-	// apply flips to the temporary vector or the current vector according the template
-	virtual void applyFlipsT() override								{ LOG_ERROR("NOT IMPLEMENTED FOR FERMIONS YET"); };
-	virtual void applyFlipsC() override								{ LOG_ERROR("NOT IMPLEMENTED FOR FERMIONS YET"); };			
-	virtual void setRandomFlipNum(uint _nFlips) override;
-};
-
-// !!!!!!!!!!!!!!!!!! F L I P S !!!!!!!!!!!!!!!!!!
-
-/*
-* @brief Randomly flip the discrete variables at chosen flip places. Sets the random flips to the vector already saved.
-*/
-template<typename _Ht, typename _T, class _stateType>
-inline void NQS_S<4, _Ht, _T, _stateType>::chooseRandomFlips()
-{
-	LOG_ERROR("NOT IMPLEMENTED FOR FERMIONS YET");
-}
-
-/*
-* @brief Set the number of random flips.
-* @param _nFlips number of flips to be used
-*/
-template<typename _Ht, typename _T, class _stateType>
-inline void NQS_S<4, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
-{
-	// check if the NQS shall conserve particles
-	this->nFlip_ = this->conservesParticles_ ? 2 * _nFlips : _nFlips;
-	this->flipPlaces_.resize(this->nFlip_);
-	this->flipVals_.resize(this->nFlip_);
-}
-
-#	endif
-//////////////////////////////////////////////////////////////////////////////////////////
+#include "./NQS/NQS_base/nqs_general.h"
+#include "./NQS/NQS_base/nqs_spins.h"
+#include "./NQS/NQS_base/nqs_fermions.h"
 
 // ##########################################################################################################################################
 

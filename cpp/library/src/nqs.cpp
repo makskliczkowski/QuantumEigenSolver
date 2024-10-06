@@ -2,7 +2,20 @@
 
 // ##########################################################################################################################################
 
-
+/*
+* @brief Say hello to the NQS solver.
+*/
+void NQS_train_t::hi(const std::string& _in) const
+{
+    std::string outstr	= "";
+    strSeparatedP(outstr, '\t', 2,
+                VEQV(Monte Carlo Steps, this->mcSteps),
+                VEQV(Thermalization Steps, this->nThrm),
+                VEQV(Block Number, this->nBlck),
+                VEQV(Size of the single block, this->bSize),
+                VEQV(Number of flips taken at each step, this->nFlip));
+    LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
+}
 
 // // ##########################################################################################################################################
 
