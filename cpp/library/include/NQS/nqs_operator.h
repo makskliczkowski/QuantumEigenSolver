@@ -563,7 +563,8 @@ namespace NQSAv
 	////////////////////////////////////////////////////////////////////////////
 
 	/*
-	* @brief Normalize the operators - divide by the number of samples
+	* @brief Normalize the operators - divide by the number of samples for each operator and 
+	* for each container (block). The normalization is done for the global, local, and correlation operators.
 	* @param _nsamples number of samples
 	*/
 	template <typename _T>

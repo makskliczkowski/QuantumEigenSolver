@@ -116,9 +116,9 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum, int _nPart)
 	: NQS_S<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nPart)
 {
-	this->nHid_ = _nHid;
-	this->rbmSize_  = this->nHid_ + this->nVis_ + this->nHid_ * this->nVis_;
-	this->fullSize_ = this->rbmSize_;
+	this->nHid_ 			= _nHid;
+	this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
+	this->info_p_.fullSize_ = this->rbmSize_;
 	this->allocate();
 	this->setInfo();
 }
@@ -137,7 +137,7 @@ RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H,
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 {
-	return (std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in))) / std::sqrt(this->nVis_);
+	return (std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in))) / std::sqrt(this->info_p_.nVis_);
 };
 
 // ##########################################################################################################################################
@@ -155,16 +155,16 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 {
 	// allocate weights
-	this->bV_.resize(this->nVis_);
+	this->bV_.resize(this->info_p_.nVis_);
 	this->bH_.resize(this->nHid_);
 	this->theta_.resize(this->nHid_);
 	this->thetaCOSH_.resize(this->nHid_);
-	this->W_.resize(this->nHid_, this->nVis_);
+	this->W_.resize(this->nHid_, this->info_p_.nVis_);
 	// create thread map
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	// allocate the vector for using it in the RBM
-	for (int _thread = 0; _thread < this->threadNum_; _thread++)
-		this->thetaTmp_[this->threads_[_thread].get_id()] = NQSB(this->nHid_);
+	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
+		this->thetaTmp_[this->threads_.threads_[_thread].get_id()] = NQSB(this->nHid_);
 #else
 	this->thetaTmp_ = NQSB(this->nHid_);
 #endif
@@ -182,19 +182,19 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
 {
 	// initialize biases visible
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum_)
+#pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
-	for (int i = 0; i < this->nVis_; i++)
+	for (int i = 0; i < this->info_p_.nVis_; i++)
 		this->bV_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
 	// initialize biases hidden
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum_)
+#pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
 	for (int i = 0; i < this->nHid_; i++)
 		this->bH_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
 	// weights matrix
 #ifndef _DEBUG
-#pragma omp parallel for num_threads(this->threadNum_)
+#pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
 	for (int i = 0; i < this->W_.n_rows; i++)
 		for (uint j = 0; j < this->W_.n_cols; j++)
@@ -214,10 +214,10 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setInfo()
 	this->info_ = "";
 	strSeparatedS(this->info_, ',', "RBM", 
 		VEQV(mod, this->H_->getType()), 
-		VEQV(nv, this->nVis_), 
+		VEQV(nv, this->info_p_.nVis_), 
 		VEQV(nh, this->nHid_), 
 		VEQV(nS, this->spinModes_),
-		VEQVS(lr, this->lr_));
+		VEQVS(lr, this->info_p_.nVis_));
 }
 
 // ##########################################################################################################################################
@@ -293,9 +293,9 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, 
 		// set the forces vector for the weights
 		if(!NQS_S<_spinModes, _Ht, _T, _stateType>::setWeights(_path, _file))
 			return false;
-		this->bV_	= this->F_.subvec(0, this->nVis_ - 1);
-		this->bH_	= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
-		this->W_	= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->nVis_ + this->nHid_ + this->W_.n_rows * this->W_.n_cols - 1),
+		this->bV_	= this->F_.subvec(0, this->info_p_.nVis_ - 1);
+		this->bH_	= this->F_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
+		this->W_	= arma::reshape(this->F_.subvec(this->info_p_.nVis_ + this->nHid_, this->info_p_.nVis_ + this->nHid_ + this->W_.n_rows * this->W_.n_cols - 1),
 									this->W_.n_rows, this->W_.n_cols);
 	}
 	END_CATCH_HANDLER("Couldn't set the weights for the RBM NQS...", return false);
@@ -315,9 +315,9 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 {
 	BEGIN_CATCH_HANDLER
 	{
-		this->F_.subvec(0, this->nVis_ - 1) = this->bV_;
-		this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1) = this->bH_;
-		this->F_.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1) = this->W_.as_col();
+		this->F_.subvec(0, this->info_p_.nVis_ - 1) = this->bV_;
+		this->F_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1) = this->bH_;
+		this->F_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1) = this->W_.as_col();
 		
 		// set the forces vector for the weights
 		if(!NQS_S<_spinModes, _Ht, _T, _stateType>::saveWeights(_path, _file))
@@ -336,9 +336,9 @@ inline bool RBM<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path,
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
-	this->bV_	-= this->F_.subvec(0, this->nVis_ - 1);
-	this->bH_	-= this->F_.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
-	this->W_	-= arma::reshape(this->F_.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1),
+	this->bV_	-= this->F_.subvec(0, this->info_p_.nVis_ - 1);
+	this->bH_	-= this->F_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
+	this->W_	-= arma::reshape(this->F_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1),
 								this->W_.n_rows, this->W_.n_cols);
 }
 
@@ -365,17 +365,17 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 #endif
 
 	// calculate the flattened part
-	_currDerivative.subvec(0, this->nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
+	_currDerivative.subvec(0, this->info_p_.nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
 
-	auto _hiddDerivative	= _currDerivative.subvec(this->nVis_, this->nVis_ + this->nHid_ - 1);
+	auto _hiddDerivative	= _currDerivative.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
 	_hiddDerivative			= arma::tanh(this->theta_).as_row();
 
-	auto _weightsDerivative	= _currDerivative.subvec(this->nVis_ + this->nHid_, this->rbmSize_ - 1);
+	auto _weightsDerivative	= _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
 
 //#ifndef _DEBUG
 //#	pragma omp parallel for num_threads(this->threadsNumLeft_)
 //#endif
-	for (int j = 0; j < this->nVis_; ++j)
+	for (int j = 0; j < this->info_p_.nVis_; ++j)
 		_weightsDerivative.subvec(j * this->nHid_, (j + 1) * this->nHid_ - 1) = _v(j) * _hiddDerivative;
 }
 

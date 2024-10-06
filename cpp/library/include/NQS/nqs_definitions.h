@@ -78,7 +78,6 @@ enum NQSTYPES					// #
 
 // Kernel for multithreading
 #ifdef NQS_NOT_OMP_MT
-
 	#include <functional>
 	#include <condition_variable>
 	#include <future>
@@ -103,7 +102,7 @@ struct CondVarKernel
 #include <vector>
 #include <string>
 
-// ##################################
+// #######################################################################################
 
 struct NQS_train_t
 {
@@ -140,4 +139,18 @@ struct NQS_info_t
     double norm_					=		0.0;					// normalization factor for the state vector
 };
 
-// ##################################
+//////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename _T>
+struct NQS_thread_t
+{
+	int threadNum_					=	1;						// number of threads to be used for the NQS
+	#ifdef NQS_NOT_OMP_MT
+		uint threadsNumLeft_		=	0;						// other threads that are left to be processed
+		std::vector<std::thread> threads_;
+		std::vector<CondVarKernel<_T>> kernels_;				// condition variables for the threads
+		std::mutex mutex;										// global mutex for the threads	
+	#endif
+};
+
+// #######################################################################################

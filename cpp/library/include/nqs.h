@@ -31,15 +31,26 @@ END_ENUM(NQSTYPES)				// #
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 class NQS;
 
+// ##########################################################################################################################################
+
+/*
+* @brief Structure for storing the lower states information - for the training and the overlaps 
+* when one is looking for the excited states - the lower states are needed for the energy estimation and gradients
+* @see 
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+
     // for the excited states 
     bool isSet_						= 		false;
     NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
     std::vector<double> f_lower_b	=		{};						// pentalties for the excited states
+	NQSAv::MeasurementNQS<_T> measureProjectors_;					// measurement projectors for the lower states energy estimation (see )
 };
+
+// ##########################################################################################################################################
 
 inline void NQS_train_t::hi(const std::string& _in) const
 {
@@ -53,7 +64,11 @@ inline void NQS_train_t::hi(const std::string& _in) const
     LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
 }
 
+// ##########################################################################################################################################
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+// ########################################################################################################################################## 
 
 /*
 * @brief General Neural Network Quantum States eigensolver class - base
@@ -65,16 +80,12 @@ template <uint _spinModes,
 		  class _stateType				= double>
 class NQS 
 {
-public:
 	// type definitions 
-	using NQSS							=		arma::Col<_stateType>;	// Quantum state -> e.g. for occupation representation purpose 
-	using NQSB							=		arma::Col<_T>;			// for free parameter representation purpose (e.g. angles)
-	using NQSW							=		arma::Mat<_T>;			// for weights representation purpose (e.g. weights - single layer only)	
+	NQS_PUBLIC_TYPES(_T, double);
 	using NQSLS_p						=		NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;	// for the lower states information
-
+public:
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
-
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
@@ -83,22 +94,8 @@ protected:
 	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> H_;					// pointer to the Hamiltonian instance (for the energy calculation)
 
 protected:
-	// information about the NQS method
 	std::string info_					=		"General NQS";
 	pBar pBar_;															// for printing out the progress
-
-	// simulation specific
-	double lr_							=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
-	
-	// architecture specific
-	uint nVis_							=		1;						// number of visible neurons (input variables)
-	uint nSites_						=		1;						// number of lattice sites or fermionic modes
-	uint fullSize_						=		1;						// full number of the parameters (for memory purpose)
-
-	// Hilbert space info
-	u64 Nh_								=		1;						// Hilbert space size (number of basis states)
-	uint nParticles_					=		1;						// number of particles in the system (if applicable)
-	bool conservesParticles_			=		true;					// whether the system conserves the number of particles
 
 	// Random number generator
 	randomGen ran_;														// consistent quick random number generator
@@ -107,15 +104,8 @@ protected:
 
 	// ---------------------- T H R E A D I N G ---------------------
 							
-	uint threadNum_						=		1;						// number of threads that works on this
 	bool initThreads(uint _threadNum = 0);
-	// create thread pool
-#ifdef NQS_NOT_OMP_MT
-	uint threadsNumLeft_				=		0;						// other threads that are left to be processed
-	v_1d<std::thread> threads_;
-	v_1d<CondVarKernel<_T>> kernels_;									// condition variables for the threads
-	std::mutex mutex;													// global mutex for the threads
-#endif
+	NQS_thread_t<_T> threads_;												// thread information
 
 	/* ----------------------------------------------------------- */
 
@@ -125,9 +115,7 @@ protected:
 	v_1d<_stateType> flipVals_;											// stores values before (!!!) the flip to be used for the gradients
 	
 	NQSS curVec_;														// currently processed state vector for convenience
-#ifndef NQS_USE_VEC_ONLY
-	u64 curState_						=		0;						// currently processed state
-#endif
+	u64 curState_						=		0;						// currently processed state - may or may not be used
 	
 	// temporary placeholders for the vectors
 	v_1d<NQSS> tmpVecs_;												// temporary vectors for the flips
@@ -137,7 +125,7 @@ protected:
 	// ------------------------ W E I G H T S -----------------------
 	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
 	NQSW derivativesC_;													// derivatives conjugated (F_k^*) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->fullSize_, arma::fill::zeros); this->derivativesC_ = this->derivatives_; };
+	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesC_ = this->derivatives_; };
 #ifdef NQS_USESR
 #	ifndef NQS_USESR_NOMAT
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
@@ -268,18 +256,18 @@ protected:
 public:
 	// ------------------------ S E T T E R S ------------------------
 	virtual void init()									=				0; 
-	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->Nh_), _upd);	};
+	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
 	virtual double setNormalization();
 
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
 	auto getInfo()								const -> std::string	{ return this->info_;					};
-	auto getNvis()								const -> uint			{ return this->nVis_;					};
+	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;					};
 	auto getF()									const -> NQSB			{ return this->F_;						};
 	auto getCovarianceMat()						const -> NQSW			{ return this->S_;						};	
 	// Hilbert
-	auto getHilbertSize()						const -> u64			{ return this->Nh_;						};
+	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;						};
 	// Hamiltonian
 	auto getHamiltonianInfo()					const -> std::string	{ return this->H_->getInfo();			};
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
@@ -298,7 +286,10 @@ public:
 	virtual arma::Col<_T> collect(const NQS_train_t& _par,
 								  bool quiet						= false,
 								  clk::time_point _t				= NOW,
-								  NQSAv::MeasurementNQS<_T>& _mes 	= {});
+								  NQSAv::MeasurementNQS<_T>& _mes 	= {},
+								  bool _collectEn					= true);
+	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
+
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
@@ -309,19 +300,23 @@ public:
 	virtual ~NQS();
 	NQS() = default;
 	NQS(const NQS& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
-		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
-		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
-		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
+		this->threads_ 		= _n.threads_;
+		// initialize the information 
+		this->info_p_  		= _n.info_p_;
+		this->lower_states_ = _n.lower_states_;
 		this->init();
 	}
 	NQS(NQS&& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), lr_(_n.lr_),
-		nVis_(_n.nVis_), nSites_(_n.nSites_), fullSize_(_n.fullSize_), Nh_(_n.Nh_), nParticles_(_n.nParticles_),
-		conservesParticles_(_n.conservesParticles_), ran_(_n.ran_), threadNum_(_n.threadNum_), nFlip_(_n.nFlip_),
-		flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
+		this->threads_ 		= std::move(_n.threads_);
+		// initialize the information
+		this->info_p_  		= std::move(_n.info_p_);
+		this->lower_states_ = std::move(_n.lower_states_);
 		this->init();
 	}
 	NQS &operator=(const NQS & _n)
@@ -332,18 +327,16 @@ public:
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
-		this->lr_					= _n.lr_;
-		this->nVis_					= _n.nVis_;
-		this->nSites_				= _n.nSites_;
-		this->fullSize_				= _n.fullSize_;
-		this->Nh_					= _n.Nh_;
-		this->nParticles_			= _n.nParticles_;
-		this->conservesParticles_	= _n.conservesParticles_;
 		this->ran_					= _n.ran_;
 		this->threadNum_			= _n.threadNum_;
 		this->nFlip_				= _n.nFlip_;
 		this->flipPlaces_			= _n.flipPlaces_;
 		this->flipVals_				= _n.flipVals_;
+		// initialize the information
+		this->info_p_				= _n.info_p_;
+		this->lower_states_			= _n.lower_states_;
+		this->threads_				= _n.threads_;		
+
 		this->init();
 		return *this;
 	}
@@ -355,18 +348,15 @@ public:
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
-		this->lr_					= _n.lr_;
-		this->nVis_					= _n.nVis_;
-		this->nSites_				= _n.nSites_;
-		this->fullSize_				= _n.fullSize_;
-		this->Nh_					= _n.Nh_;
-		this->nParticles_			= _n.nParticles_;
-		this->conservesParticles_	= _n.conservesParticles_;
 		this->ran_					= _n.ran_;
-		this->threadNum_			= _n.threadNum_;
 		this->nFlip_				= _n.nFlip_;
 		this->flipPlaces_			= _n.flipPlaces_;
 		this->flipVals_				= _n.flipVals_;
+		// initialize the information
+		this->info_p_				= std::move(_n.info_p_);
+		this->lower_states_			= std::move(_n.lower_states_);
+		this->threads_				= std::move(_n.threads_);
+
 		this->init();
 		return *this;
 	}
@@ -378,11 +368,11 @@ public:
 // ##########################################################################################################################################
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization()
+double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization [[deprecated]] () 
 {
 	// calculate the normalization factor
 	double _norm = 0.0;
-	for (u64 i = 0; i < this->Nh_; i++)
+	for (u64 i = 0; i < this->info_p_.Nh_; i++)
 	{
 		Binary::int2base(i, this->curVec_, this->discVal_);
 		auto _val 	= 	this->ansatz(this->curVec_);
@@ -399,10 +389,10 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
 {
 #ifndef NQS_USE_MULTITHREADING
-		this->threadNum_		=			1;
+		this->threads_.threadNum_		=	1;
 #else
-		this->threadNum_		=			std::min(_threadNum, this->nSites_);
-		this->threadsNumLeft_	=			std::max(_threadNum - this->threadNum_, (uint)1);
+		this->threads_.threadNum_		=	std::min(_threadNum, this->info_p_.nSites_);
+		this->threads_.threadsNumLeft_	=	std::max(_threadNum - this->threads_.threadNum_, (uint)1);
 #endif
 	// Use threads for all consecutive parallel regions
 #if defined NQS_USE_MULTITHREADING
@@ -410,22 +400,22 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
 		omp_set_num_threads(this->threadNum_);   
 #	else
 		// initialize the threads
-		this->threads_.reserve(this->threadNum_);
-		this->kernels_			=			v_1d<CondVarKernel<_T>>(this->threadNum_);
+		this->threads_.threads_.reserve(this->threads_.threadNum_);
+		this->threads_.kernels_	=			v_1d<CondVarKernel<_T>>(this->threads_.threadNum_);
 		
 		// calculate how many sites goes to one thread
-		uint _siteStep			=			std::ceil(this->nSites_ / 1.0 / this->threadNum_);
+		uint _siteStep			=			std::ceil(this->info_p_.nSites_ / 1.0 / this->threads_.threadNum_);
 
 		// start the threads that calculate the energy with the local energy kernel function
 		// this function waits for the specific energy calculation to be ready on each thread
 		// this is handled through "flagThreadRun_" member
-		for (uint i = 0; i < this->threadNum_; i++)
+		for (uint i = 0; i < this->threads_.threadNum_; i++)
 		{
 			std::function<void()> lambda = [this, i, _siteStep]() 
 				{ 
-					this->locEnKernel(i * _siteStep, std::min((i + 1) * _siteStep, this->nSites_), i); 
+					this->locEnKernel(i * _siteStep, std::min((i + 1) * _siteStep, this->info_p_.nSites_), i); 
 				};
-			this->threads_.emplace_back(std::thread(lambda));
+			this->threads_.threads_.emplace_back(std::thread(lambda));
 		}
 #	endif
 #endif
@@ -491,21 +481,21 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 {
 	// allocate gradients
-	this->F_.resize(this->fullSize_);
+	this->F_.resize(this->info_p_.fullSize_);
 #ifdef NQS_USESR
 	#ifndef NQS_USESR_NOMAT
-	this->S_.resize(this->fullSize_, this->fullSize_);
+	this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
 	#else
 	{
-		this->r_ 	= NQSB(this->fullSize_, arma::fill::zeros);
-		this->p_ 	= NQSB(this->fullSize_, arma::fill::zeros);
-		this->Ap_ 	= NQSB(this->fullSize_, arma::fill::zeros);
-		this->x_ 	= NQSB(this->fullSize_, arma::fill::zeros);
+		this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
 	}
 	#endif
 #endif
-	this->curVec_ = arma::ones(this->nVis_);
-	this->tmpVec_ = arma::ones(this->nVis_);
+	this->curVec_ = arma::ones(this->info_p_.nVis_);
+	this->tmpVec_ = arma::ones(this->info_p_.nVis_);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -519,17 +509,17 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 {
 	DESTRUCTOR_CALL;
 #if defined NQS_NOT_OMP_MT
-	for (int _thread = 0; _thread < this->threadNum_; _thread++)
+	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
 	{
-		std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
-		this->kernels_[_thread].flagThreadKill_		= true;
-		this->kernels_[_thread].end_				= true;
-		this->kernels_[_thread].flagThreadRun_		= 1;
-		this->kernels_[_thread].cv.notify_all();
+		std::unique_lock<std::mutex> lock(this->threads_.kernels_[_thread].mutex);
+		this->threads_.kernels_[_thread].flagThreadKill_	= true;
+		this->threads_.kernels_[_thread].end_				= true;
+		this->threads_.kernels_[_thread].flagThreadRun_		= 1;
+		this->threads_.kernels_[_thread].cv.notify_all();
 	}
-	for (int _thread = 0; _thread < this->threadNum_; _thread++)
-		if (threads_[_thread].joinable())
-			threads_[_thread].join();
+	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
+		if (this->threads_.threads_[_thread].joinable())
+			this->threads_.threads_[_thread].join();
 #endif
 }
 
@@ -620,7 +610,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 #ifndef _DEBUG
 		#pragma omp parallel for reduction(+ : energyR, energyI) num_threads(this->threadNum_)
 #endif
-		for (int site = 0; site < this->nSites_; site++) 
+		for (int site = 0; site < this->info_p_.nSites_; site++) 
 		{
 			auto energy	=	this->H_->locEnergy(NQS_STATE, 
 												site, 
@@ -636,21 +626,21 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 #else
 	{
 		_T energy = 0.0;
-		for (int _thread = 0; _thread < this->threadNum_; _thread++) // run all threads
+		for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++) // run all threads
 		{
-			std::lock_guard<std::mutex> lock(this->kernels_[_thread].mutex);
-			this->kernels_[_thread].flagThreadRun_	= true;
-			this->kernels_[_thread].end_			= false;
-			this->kernels_[_thread].cv.notify_one();
+			std::lock_guard<std::mutex> lock(this->threads_.kernels_[_thread].mutex);
+			this->threads_.kernels_[_thread].flagThreadRun_	= true;
+			this->threads_.kernels_[_thread].end_			= false;
+			this->threads_.kernels_[_thread].cv.notify_one();
 		}
 
-		for (int _thread = 0; _thread < this->threadNum_; _thread++) // wait for all threads
+		for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++) // wait for all threads
 		{
 			{
-				std::unique_lock<std::mutex> lock(this->kernels_[_thread].mutex);
-				this->kernels_[_thread].cv.wait(lock, [this, _thread] { return !this->kernels_[_thread].flagThreadRun_; });
+				std::unique_lock<std::mutex> lock(this->threads_.kernels_[_thread].mutex);
+				this->threads_.kernels_[_thread].cv.wait(lock, [this, _thread] { return !this->threads_.kernels_[_thread].flagThreadRun_; });
 			}
-			energy += this->kernels_[_thread].kernelValue_;
+			energy += this->threads_.kernels_[_thread].kernelValue_;
 		}
 		return energy;
 	}
@@ -670,27 +660,27 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)
 {
-	while (!this->kernels_[_threadNum].flagThreadKill_)	// does not go in if the simulation is finished
+	while (!this->threads_.kernels_[_threadNum].flagThreadKill_)	// does not go in if the simulation is finished
 	{
 		// wait for the lock to end
 		{
 			// aquire mutex lock as required by condition variable
-			std::unique_lock<std::mutex> lock(this->kernels_[_threadNum].mutex);	
+			std::unique_lock<std::mutex> lock(this->threads_.kernels_[_threadNum].mutex);	
 			// thread will suspend here and release the lock if the expression does not return true
-			this->kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->kernels_[_threadNum].flagThreadRun_; });	
+			this->threads_.kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->threads_.kernels_[_threadNum].flagThreadRun_; });	
 
-			if (this->kernels_[_threadNum].flagThreadKill_)
+			if (this->threads_.kernels_[_threadNum].flagThreadKill_)
 			{
-				this->kernels_[_threadNum].end_ = true;
+				this->threads_.kernels_[_threadNum].end_ = true;
 				break;
 			}
 		}
 
 		// Process the work
-		this->kernels_[_threadNum].kernelValue_ = 0.0;
+		this->threads_.kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
-			this->kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE,
+			this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE,
 																							site, 
 																							std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
 																							this,
@@ -702,28 +692,22 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		{
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
 			{
-				// go through the other overlapping states
-				for (int _Nh = 0; _Nh < this->Nh_; _Nh++)
-				{
-					// get psi_wj (s) = <s_{wj}|\psi>^+
-
-				}	
+				// go through the other overlapping states 
+				
 			}
 		}
 
 
 		// lock again
 		{
-			std::lock_guard<std::mutex> lock(this->kernels_[_threadNum].mutex);
-			this->kernels_[_threadNum].flagThreadRun_	= false;
-			this->kernels_[_threadNum].end_				= true; 
+			std::lock_guard<std::mutex> lock(this->threads_.kernels_[_threadNum].mutex);
+			this->threads_.kernels_[_threadNum].flagThreadRun_	= false;
+			this->threads_.kernels_[_threadNum].end_				= true; 
 		}
-		this->kernels_[_threadNum].cv.notify_one(); // Notify waiting threads if needed
+		this->threads_.kernels_[_threadNum].cv.notify_one(); // Notify waiting threads if needed
 	}
 }
 #endif
-
-///////////////////////////////////////////////////////////////////////
 
 // ##########################################################################################################################################
 
@@ -867,15 +851,15 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 		{
 			// calculate the pseudoinverse
 			if (NQS_PINV > 0)
-				this->F_ = this->lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
+				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
 			else
-				this->F_ = this->lr_ * (arma::pinv(this->S_) * this->F_);
+				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
 			return;
 		}
 		#else 
 		// solve normally
-		//this->F_ = this->lr_ * (arma::inv(this->S_) * this->F_);
-		this->F_ = this->lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+		//this->F_ = this->info_p_.lr_ * (arma::inv(this->S_) * this->F_);
+		this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
 		#endif 
 	}
 	#else
@@ -888,10 +872,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 		algebra::Solvers::solve(this->F_, _Fun, _F, algebra::Solvers::SolverType::MY_CONJ_GRAD, 1.0e-5);
 		// algebra::Solvers::ConjugateGradient::solve_my_conj_grad<_T>(this->F_, _Fun, this->x_, this->r_, this->p_, this->Ap_, 1e-6);
 
-		_F *= this->lr_;
+		_F *= this->info_p_.lr_;
 		// exchange the vectors
 		this->F_ = std::move(_F);
-		// this->F_ = this->lr_ * this->x_;
+		// this->F_ = this->info_p_.lr_ * this->x_;
 	}
 	#endif
 }
@@ -901,8 +885,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 ///////////////////////////////////////////////////////////////////////
 
 /*
-* @brief	Calculate the final step for the weights to be updated.
-* First of all, it calculates the generalized forces
+* @brief Calculate the final step for the weights to be updated.
+* First of all, it calculates the generalized forces for the weights.
+* The forces are calculated as the covariance of the derivatives and the local energies.
+* The forces are then used to update the weights.
 * 
 * @warning Uses the forces vector (member F_) to store the forces that update the weights
 * 
@@ -945,7 +931,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 #else
 	{
 		// standard updater with the gradient only!
-		this->F_ *= this->lr_;
+		this->F_ *= this->info_p_.lr_;
 	}
 #endif
 }
@@ -1070,19 +1056,73 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 
 // ##########################################################################################################################################
 
+/*
+* @brief Collects the samples for the given number of Monte Carlo steps. The samples are collected in the form of the measurements
+* of the operator. The operator is given as a function that calculates the probability of the operator.
+* @param _par parameters for the training
+* @param _meas measurement object to store the measurements
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _meas)
+{
+	// set the random state at the begining
+	this->setRandomFlipNum(_par.nFlip);
+
+	// allows to calculate the probability of the operator (for operator measurements)
+	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
+	
+	// go through the number of samples to be collected
+	for (uint i = 1; i <= _par.mcSteps; ++i)
+	{	
+		// random flip
+		this->setRandomState();
+
+		// remove autocorrelations
+		this->blockSample(_par.nThrm, NQS_STATE, false);
+
+		// iterate blocks - allows to collect samples outside of the block
+		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		{
+			// sample them!
+			this->blockSample(_par.bSize, NQS_STATE, false);
+			
+			// measure 
+			_meas.measure(this->curVec_, opFun);
+		}
+
+		_meas.normalize(_par.nBlck);												// normalize the measurements
+	}
+}
+
+/*
+* @brief Collects the samples for the given number of Monte Carlo steps. The samples are collected in the form of the measurements
+* of the operator. The operator is given as a function that calculates the probability of the operator.
+* @param _par parameters for the training
+* @param _meas measurement object to store the measurements
+* @param _collectEn collect the energy as well
+* @param _t timepoint for timestamping the training
+* @param quiet wanna talk? (default is false)
+* @returns the mean energy of the system
+*/
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_train_t& _par,
 																	bool quiet,
 																	clk::time_point _t,
-																	NQSAv::MeasurementNQS<_T>& _meas)
+																	NQSAv::MeasurementNQS<_T>& _meas,
+																	bool _collectEn)
 {																							
 	{
 		this->pBar_	= pBar(20, _par.mcSteps);
 		_par.hi("Collect: ");
 	}
 	TIMER_CREATE(_timer);
-	arma::Col<_T> meanEn(_par.mcSteps, arma::fill::zeros);
-	arma::Col<_T> En(_par.nBlck, arma::fill::zeros);
+
+	arma::Col<_T> meanEn, En;
+	if (_collectEn)
+	{
+		meanEn 	= arma::Col<_T>(_par.mcSteps, arma::fill::zeros);
+		En 		= arma::Col<_T>(_par.nBlck, arma::fill::zeros);
+	}
 
 	// set the random state at the begining
 	this->setRandomFlipNum(_par.nFlip);
@@ -1093,20 +1133,26 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= _par.mcSteps; ++i)
 	{
+		// random flip
+		this->setRandomState();
+
+		// remove autocorrelations
 		this->blockSample(_par.nThrm, NQS_STATE, false);
 
-		// iterate blocks - this ensures the calculation of a stochastic gradient
+		// iterate blocks - allows to collect samples outside of the block
 		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
 		{
 			// sample them!
 			this->blockSample(_par.bSize, NQS_STATE, false);
 
-			En(_taken) = this->locEnKernel();										// one can calculate the local energy here (either of the ground state or the excited state)
+			if (_collectEn) En(_taken) = this->locEnKernel();
+			
+			// collect other										// one can calculate the local energy here (either of the ground state or the excited state)
 			TIMER_START_MEASURE(_meas.measure(this->curVec_, opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
-		_meas.normalize(_par.nBlck);														// normalize the measurements
+		_meas.normalize(_par.nBlck);												// normalize the measurements
 		meanEn(i - 1) = arma::mean(En); 											// save the mean energy
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
@@ -1135,20 +1181,17 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 													int _nParticles,
 													const NQSLS_p& _lower, 
 													std::vector<double> _beta)
-	: H_(_H), lr_(_lr)
+	: H_(_H)
 {
+	this->info_p_.lr_			= _lr;
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
-	this->nVis_					=			_H->getNs() * (this->spinModes_ / 2);
 	this->info_p_.nVis_ 		= 			_H->getNs() * (this->spinModes_ / 2);
-	this->nSites_				=			_H->getNs();
-	this->info_p_.nVis_			=			_H->getNs();
+	this->info_p_.nSites_		=			_H->getNs();
 
 	// make it half filling if necessary
-	this->nParticles_			=			(_nParticles < 0 || this->spinModes_ == 2) ? this->nSites_ : (uint)_nParticles;
-	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->nSites_ : (uint)_nParticles;
+	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_nParticles;
 	// check the Hilbert space
-	this->Nh_					=			_H->getHilbertSize();
 	this->info_p_.Nh_			=			_H->getHilbertSize();
 	// set the random number generator
 	this->ran_					=			_H->ran_;
@@ -1237,7 +1280,7 @@ inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 	// go through the vector elements
 	for (auto i = 0; i < this->flipPlaces_.size(); ++i)
 	{
-		auto fP					= this->ran_.template randomInt<uint>(0, this->nVis_);
+		auto fP					= this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
 		// choose the flip place of the vector
 		this->flipPlaces_[i]	= fP;
 		// save the element of a vector before the flip

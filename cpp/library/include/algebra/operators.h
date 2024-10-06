@@ -8,6 +8,7 @@
 ***********************************/
 #pragma once
 
+#include "general_operator.h"
 #include "operator_algebra.h"
 #include <memory>
 #include <string>
@@ -148,6 +149,84 @@ namespace Operators
 	}
 
 	// ##########################################################################################################################################
+	
+	namespace GeneralOperators
+	{
+		// ##########################################################################################################################################
+
+		/*
+		* @brief For the states in state occupation representation, check if they
+		* correspond to the given state, if yes, return 1.0, otherwise 0.0.
+		* @note The function is used not in the full Hilbert space representation, but in the state occupation representation.
+		* Therefore, although the states are not diagonal in terms of the dot product, they are in the full Hilbert space
+		* Those are represented by the integer numbers - and 1 in the state in full Hilbert space corresponds to using exactly this state.
+		* @param base_vec the base vector
+		* @param _proj the projected vector
+		* @returns the pair of the base vector and the value of the projector
+		*/
+		template<typename _T>
+		std::pair<u64, _T> projector(u64 base_vec, u64 _proj)
+		{
+			return std::make_pair(base_vec, (base_vec == _proj) ? 1.0 : 0.0);
+		}
+		
+		/*
+		* @brief For the states in state occupation representation, check if they
+		* correspond to the given state, if yes, return 1.0, otherwise 0.0. 
+		* @note The function is used not in the full Hilbert space representation, but in the state occupation representation.
+		* Therefore, although the states are not diagonal in terms of the dot product, they are in the full Hilbert space 
+		* Those are represented by the integer numbers - and 1 in the state in full Hilbert space corresponds to using exactly this state.
+		* @example Let's say we have hardcore bosons on the lattice. State in full Hilbert space |0, 1, 0, 0> corresponds to the state 1 = |01> in the state occupation representation.
+		* but state |0, 0, 1, 0> corresponds to the state 2 = |10> in the state occupation representation and |0, 0, 0, 1> corresponds to the state 4 = |11> in the state occupation representation.
+		* @param base_vec the base vector
+		* @param _proj the projected vector
+		* @returns the pair of the base vector and the value of the projector
+		* @note Uses vector representation!
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> projector(_OP_V_T_CR base_vec, _OP_V_T_CR _proj)
+		{
+			if (base_vec.n_elem != _proj.n_elem) throw std::invalid_argument("The states have different dimensions.");
+			return std::make_pair(base_vec, arma::approx_equal(base_vec, _proj, "absdiff", 0.0) ? 1.0 : 0.0);
+		}
+
+		template <typename _T>
+		Operators::Operator<_T> projector(size_t _Ns, u64 _proj)
+		{
+			_OP_V_T _projv(_Ns);
+			Binary::int2base<inner_type_t<_OP_V_T>, arma::Col<inner_type_t<_OP_V_T>>, false>(_proj, _projv);
+
+			typename _OP<_T>::GLB fun_ 		= [_proj](u64 _state) 			{ return projector<_T>(_state, _proj); };
+			typename _OP_V<_T>::GLB funV_ 	= [_projv](_OP_V_T_CR _state) 	{ return projector<_T>(_state, _projv); };
+			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+		}
+
+		template <typename _T>
+		Operators::Operator<_T> projector(size_t _Ns, _OP_V_T_CR _projv)
+		{
+			u64 _proj = Binary::base2int<inner_type_t<_OP_V_T>, _OP_V_T, false>(_projv);
+
+			typename _OP<_T>::GLB fun_ 		= [_proj](u64 _state) 			{ return projector<_T>(_state, _proj); };
+			typename _OP_V<_T>::GLB funV_ 	= [_projv](_OP_V_T_CR _state) 	{ return projector<_T>(_state, _projv); };
+			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+		}
+
+		template <typename _T>
+		Operators::OperatorComb<_T> projectorComb(size_t _Ns, u64 _proj)
+		{
+			return OperatorComb<_T>(projector<_T>(_Ns, _proj));
+		}
+
+		template <typename _T>
+		Operators::OperatorComb<_T> projectorComb(size_t _Ns, _OP_V_T_CR _projv)
+		{
+			return OperatorComb<_T>(projector<_T>(_Ns, _projv));
+		}
+
+		// ##########################################################################################################################################
+
+	};
+
 
 	/*
 	* @brief The spin operator namespace. Contains the most common spin operators.

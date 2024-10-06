@@ -1840,6 +1840,12 @@ namespace Operators {
 
 		// ##########################################################################################################################################
 
+		/*
+		* @brief Normalizes the operator value and stores it in the samples - for the Monte Carlo sampling etc. - this allows 
+		* to store the value of the operator for the given state and then normalize it to the number of samples taken and obtain
+		* all averages for multiple blocks of the samples. [nBlocks x nSamples (average)]
+		* @param reset if true, the current value of the operator is reset to zero and the number of samples is reset to zero 
+		*/
 		template <typename _T>
 		inline void Operators::Containers::OperatorContainer<_T>::normalize(bool reset)
 		{
