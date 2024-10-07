@@ -10,8 +10,11 @@
 #endif
 
 #ifndef ULTRAMETRIC_H
-#	define ULTRAMETRIC_H
-#	define ULTRAMETRIC_USE_DIFFERENT_BLOCKS
+#define ULTRAMETRIC_H
+#define ULTRAMETRIC_USE_DIFFERENT_BLOCKS
+
+// defining the bandwidth
+#include "defines/ultrametic_def.hpp"
 
 template<typename _T>
 class Ultrametric : public Hamiltonian<_T, 2>

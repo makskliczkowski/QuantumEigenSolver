@@ -10,7 +10,10 @@
 #endif
 
 #ifndef ROSENZWEIG_PORTER_H
-#	define ROSENZWEIG_PORTER_H
+#define ROSENZWEIG_PORTER_H
+
+#include "defines/rp_def.hpp"
+
 template<typename _T>
 class RosenzweigPorter : public QuadraticHamiltonian<_T>
 {
@@ -62,7 +65,7 @@ public:
 	void updateInfo()							override final		{ this->info_ = this->info({}, ",", 3); };
 
 	// ###############################################################################################
-
+	double get_gamma()							const				{ return this->gamma_;	};
 };
 
 // ##########################################################################################################################################

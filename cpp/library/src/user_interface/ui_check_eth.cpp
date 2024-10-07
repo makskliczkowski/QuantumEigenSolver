@@ -1,5 +1,6 @@
 #include "../../include/user_interface/user_interface.h"
 #include "armadillo"
+#include <memory>
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -645,10 +646,18 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// set the uniform distribution of frequencies in logspace for the f-functions!!!
 		if (_r == 0)
 		{
+			double _bwIn 		= _bandwidth(0);
+			if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+				_bwIn			= Ultrametric_types::UM_default::getBandwidth(modP.ultrametric.um_alpha_[0], (int)std::log2(_Nh));
+			else if (modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
+				_bwIn			= PRLB_types::PRLB_default::getBandwidth(modP.power_law_random_bandwidth.plrb_a_, (int)std::log2(_Nh));
+			else if (modP.modTyp_ == MY_MODELS::RP_M)
+				_bwIn			= RP_types::RP_default::getBandwidth(std::reinterpret_pointer_cast<RosenzweigPorter<_T>>(_H)->get_gamma(), (int)std::log2(_Nh));
+
 			// values that are the limits when the 
 			// double oMax			= 2.0 * _bandwidth(0);
-			double oMax			= 1.0;
-			double oMin			= 0.1 /_Nh / _bandwidth(0);
+			double oMax			= _bwIn;
+			double oMin			= 0.1 /_Nh;
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 

@@ -7,6 +7,8 @@
 #ifndef POWER_LAW_RANDOM_BANDED_H
 #define POWER_LAW_RANDOM_BANDED_H
 
+#include "../defines/prlb_def.hpp"
+
 /*
 * @brief: This class is an instance of the Power Law Random Banded model.
 */
