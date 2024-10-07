@@ -7,7 +7,6 @@
 ***************************************/
 #include "armadillo"
 #include <memory>
-#include <stdexcept>
 #ifndef NQS_H
 #define NQS_H
 
