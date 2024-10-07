@@ -298,9 +298,9 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 
 				// add to the histograms
-				_histAvLocal.append(w_ov_bw, _elem2);
+				_histAvLocal.append(w, _elem2);
 				// _histAvLocal.append(w, _elem2);
-				_histAvTypicalLocal.append(w_ov_bw, _logElem2);
+				_histAvTypicalLocal.append(w, _logElem2);
 				// _histAvTypicalLocal.append(w, _logElem2);
 
 				// save the values
