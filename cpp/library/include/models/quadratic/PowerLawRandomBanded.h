@@ -83,6 +83,16 @@ public:
 	};
 
 
+	// ------------------------------------------- 				 Setters				  -------------------------------------------
+
+	void set_a(double _a) { this->a_ = _a; this->updateInfo(); };
+	void set_b(double _b) { this->b_ = _b; this->updateInfo(); };
+
+	// ------------------------------------------- 				 Getters				  -------------------------------------------
+
+	double get_a() const { return this->a_; };
+	double get_b() const { return this->b_; };
+
 	// ### H A M I L T O N I A N ###
 
 	void hamiltonian() override;
@@ -98,6 +108,8 @@ public:
 	}
 	void updateInfo()									override final { this->info_ = this->info(); };
 };
+
+// ##########################################################################################################################################
 
 template<typename _T>
 inline void PowerLawRandomBanded<_T>::checkQuadratic()

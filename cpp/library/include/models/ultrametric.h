@@ -331,7 +331,7 @@ inline void Ultrametric<_T>::hamiltonian()
 		// set the dimensions
 		auto _dimrest	=	ULLPOW((this->Nout_ - k));	// L - k -> number of diagonal blocks of size 2^{N+k}
 		auto _dim		=	ULLPOW((this->Nin_ + k));	// N + k -> size of the diagonal blocks
-		auto _mult		=	k == 0 ? 1.0 : (this->g0_ * this->au_[k - 1]  / std::sqrt(_dim + 1));
+		auto _mult		=	k == 0 ? 1.0 / std::sqrt(_dim + 1) : (this->g0_ * this->au_[k - 1]  / std::sqrt(_dim + 1));
 
 #ifdef ULTRAMETRIC_USE_DIFFERENT_BLOCKS
 		arma::Mat<_T> Hk(this->Nh, this->Nh, arma::fill::zeros);

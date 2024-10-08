@@ -195,7 +195,8 @@ public:
 	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
 	virtual auto getEnergyWidth()						const -> double								{ return algebra::cast<double>(this->H_.getEnergyWidth());						};
 	// hamiltonian
-	auto getHamiltonian()								const -> const GeneralizedMatrix<_T>&		{ return this->H_;																};
+	auto getHamiltonian()								-> const GeneralizedMatrix<_T>&				{ return this->H_;																};
+	auto getHamiltonian()								const -> GeneralizedMatrix<_T>				{ return this->H_;																};
 	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
 	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_.get(0, 0));							};								

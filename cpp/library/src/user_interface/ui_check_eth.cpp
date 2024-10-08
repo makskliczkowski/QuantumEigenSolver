@@ -543,11 +543,20 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
 
 			// check the image of the Hamiltonian
-			if (_r == 0 && _Nh < ULLPOW(10))
-			{
-				auto _hamilmatrix = _H->getHamiltonian();
-				saveAlgebraic(dir, "hamil" + randomStr + extension, _hamilmatrix.toDense(), "hamiltonian", _r == 0);
-			}
+			// if (_r == 0 && _Nh < ULLPOW(8))
+			// {
+			// 	GeneralizedMatrix<_T> _hamilmatrix = _H->getHamiltonian();
+			// 	arma::Mat<_T> _hamilMatrixCast;
+
+			// 	if (_hamilmatrix.isSparse())
+			// 		_hamilMatrixCast = _hamilmatrix.getSparse();
+			// 	else
+			// 		_hamilMatrixCast = _hamilmatrix.getDense();
+
+			// 	LOGINFO("Saving the Hamiltonian matrix", LOG_TYPES::TRACE, 1);
+			// 	LOGINFO("Shape: " + STR(_hamilMatrixCast.n_rows) + "x" + STR(_hamilMatrixCast.n_cols), LOG_TYPES::TRACE, 2);
+			// 	saveAlgebraic(dir, "hamil" + randomStr + extension, _hamilMatrixCast, "hamiltonian", _r != 0);
+			// }
 		}
 
 		// -----------------------------------------------------------------------------
@@ -648,16 +657,20 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		{
 			double _bwIn 		= _bandwidth(0);
 			if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
-				_bwIn			= Ultrametric_types::UM_default::getBandwidth(modP.ultrametric.um_alpha_[0], (int)std::log2(_Nh));
+				_bwIn			= Ultrametric_types::UM_default::getBandwidth(std::reinterpret_pointer_cast<Ultrametric<_T>>(_H)->get_alpha(), (int)std::log2(_Nh));
 			else if (modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
-				_bwIn			= PRLB_types::PRLB_default::getBandwidth(modP.power_law_random_bandwidth.plrb_a_, (int)std::log2(_Nh));
+				_bwIn			= PRLB_types::PRLB_default::getBandwidth(std::reinterpret_pointer_cast<PowerLawRandomBanded<_T>>(_H)->get_a(), (int)std::log2(_Nh));
 			else if (modP.modTyp_ == MY_MODELS::RP_M)
 				_bwIn			= RP_types::RP_default::getBandwidth(std::reinterpret_pointer_cast<RosenzweigPorter<_T>>(_H)->get_gamma(), (int)std::log2(_Nh));
+			
+			LOGINFO("Setting bandwidth to: ", LOG_TYPES::TRACE, 2);
+			LOGINFO(StrParser::colorize(VEQ(_bwIn), StrParser::StrColors::green), LOG_TYPES::TRACE, 3);
+			LOGINFO(StrParser::colorize(VEQ((int)std::log2(_Nh)), StrParser::StrColors::green), LOG_TYPES::TRACE, 3);
 
 			// values that are the limits when the 
 			// double oMax			= 2.0 * _bandwidth(0);
 			double oMax			= _bwIn;
-			double oMin			= 0.1 /_Nh;
+			double oMin			= 0.1 / (long double)_Nh;
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
 
