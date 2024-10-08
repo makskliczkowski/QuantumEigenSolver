@@ -5,7 +5,11 @@
 * DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
+#include "NQS/nqs_operator.h"
+#include "algebra/general_operator.h"
+#include "algebra/operators.h"
 #include "armadillo"
+#include <functional>
 #include <memory>
 #ifndef NQS_H
 #define NQS_H
@@ -234,6 +238,9 @@ public:
 								  NQSAv::MeasurementNQS<_T>& _mes 	= {},
 								  bool _collectEn					= true);
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
+	virtual void collect(const NQS_train_t& _par, 
+						 const Operators::OperatorNQS<_T>& _opG,
+						 Operators::Containers::OperatorContainer<_T>& _cont);
 
 
 	// ----------------------- F I N A L E -----------------------
@@ -590,11 +597,12 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 
 		// for the lower states - only if the lower states are used
 		{
+			// set new projector (\sum _{s'} <s|psi_wl><psi_wl|s'>) = \sum _{s'} \frac{\psi _w(s')}{\psi _w(s)} \times \frac{\psi _wl(s)}{\psi _wl(s')} \times proba_wl(s', s)
+			std::function<_T(const NQSS&)> _pratio 	= [&](const NQSS& _v) { return this->pRatio(_v); };
+			this->lower_states_.setProjector(this->info_p_.nVis_, NQS_STATE, _pratio);
+
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
-			{
-				// go through the other overlapping states 
-				
-			}
+				energy += this->lower_states_.f_lower_b[_low] * this->lower_states_.collectLowerEnergy(_low);
 		}
 
 		return energy;
@@ -1039,6 +1047,40 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _p
 	}
 }
 
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _par, 
+														const Operators::OperatorNQS<_T>& _opG,
+														Operators::Containers::OperatorContainer<_T>& _cont)
+{
+	// set the random state at the begining
+	this->setRandomFlipNum(_par.nFlip);
+
+	// allows to calculate the probability of the operator (for operator measurements)
+	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
+	
+	// go through the number of samples to be collected
+	for (uint i = 1; i <= _par.mcSteps; ++i)
+	{	
+		// random flip
+		this->setRandomState();
+
+		// remove autocorrelations
+		this->blockSample(_par.nThrm, NQS_STATE, false);
+
+		// iterate blocks - allows to collect samples outside of the block
+		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		{
+			// sample them!
+			this->blockSample(_par.bSize, NQS_STATE, false);
+			
+			// measure 
+			NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, opFun, _cont);
+		}
+		// normalize the measurements - this also creates a new block of measurements
+		NQSAv::MeasurementNQS<_T>::normalize(_par.nBlck, _cont);												
+	}
+}
+
 /*
 * @brief Collects the samples for the given number of Monte Carlo steps. The samples are collected in the form of the measurements
 * of the operator. The operator is given as a function that calculates the probability of the operator.
@@ -1126,7 +1168,7 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 													int _nParticles,
 													const NQSLS_p& _lower, 
 													std::vector<double> _beta)
-	: H_(_H)
+	: lower_states_(NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_H->getNs())), H_(_H)
 {
 	this->info_p_.lr_			= _lr;
 	// set the number of particles

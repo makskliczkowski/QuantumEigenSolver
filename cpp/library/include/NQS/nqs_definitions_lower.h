@@ -7,6 +7,8 @@
 #pragma once
 
 /////////////////////////////////////////////////////////////
+#include "nqs_definitions_base.h"
+#include <memory>
 #ifndef NQS_OPERATOR_H
 #	include "nqs_operator.h"
 #endif
@@ -37,36 +39,66 @@ class NQS;
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
+    NQS_train_t train_lower_;                                       // training information for the lower states                       
+    // NQS<_spinModes, _Ht, _T, _stateType>* nqs_;			    	// pointer to the excited state NQS instance
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+
+    // constant functions
+    std::function<_T(Operators::_OP_V_T_CR)> const_funV_;
+    std::function<_T(u64)> const_fun_;
 
     // for the excited states 
     bool isSet_						= 		false;
     NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
-    std::vector<double> f_lower_b	=		{};						// pentalties for the excited states
-	NQSAv::MeasurementNQS<_T> measureProjectors_;					// measurement projectors for the lower states energy estimation (see )
+    std::vector<double> f_lower_b	=		{};						// pentalties for the lower states - for the excited states calculation
+
+    // ##########################################################################################################################################
+
+    NQS_lower_t()
+        : containerP_(Operators::Containers::OperatorContainer<_T>(1)) {};
+    NQS_lower_t(size_t _Ns)
+        : containerP_(Operators::Containers::OperatorContainer<_T>(_Ns))
+    {
+        this->containerP_.template decideSize<_T>();
+
+        // set constant functions
+        this->const_fun_    = [](u64 _s)                    -> _T { return _T(1.0); };
+        this->const_funV_   = [](Operators::_OP_V_T_CR _v)  -> _T { return _T(1.0); };
+    }
+    
+    // ##########################################################################################################################################
+    
+    // for the energy estimation
+    Operators::Containers::OperatorContainer<_T> containerP_;       // container for the projectors  
+    Operators::OperatorNQS<_T> enP_;                                // operator for the energy estimation - it is a combination of the projectors to the basis state currently used in the excited state estimation
 
     // ##########################################################################################################################################
 
     /*
-    * @brief Resets the projectors for the lower states estimation. 
+    * @brief Sets the projector for the lower states - for the energy estimation of the excited state. 
+    * The measurement class is reset and new projector operator is being set. 
+    * @param _Ns number of states in the basis vector
+    * @param _current_exc_state current excited state vector
+    * @param _exc_state_pratio function for calculating the probability ratio for the excited state
     */
-    void resetProjector()
+    void setProjector(size_t _Ns, Operators::_OP_V_T_CR _current_exc_state, 
+                                    std::function<_T(Operators::_OP_V_T_CR _v)> _exc_state_pratio_v)
     {
-        for (auto& _projector : this->measureProjectors_)
-        {
-            _projector->reset();
-        }
+        // create the projection operator
+        this->enP_ = Operators::GeneralOperators::projectorSumComb(_Ns, 
+                                                                    _current_exc_state,     // project to current state
+                                                                    this->const_fun_,       // calculate the probability ratio (for the excited state)
+                                                                    _exc_state_pratio_v);   // calculate the probability ratio (for the excited state) using the vector representation
     }
 
     // ##########################################################################################################################################
 
-    /*
-    * 
-    */
-    void setProjector(size_t _Ns, Operators::_OP_V_T_CR _current_exc_state, 
-                std::function<_T(Operators::_OP_V_T_CR _v)> _exc_state_pratio)
+    _T collectLowerEnergy(uint i)
     {
-    
+        this->containerP_.reset();
+        this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_);
+        // get the mean value
+        return this->f_lower_b[i] * this->containerP_.template mean<_T>()(0, 0);
     }
 
 };

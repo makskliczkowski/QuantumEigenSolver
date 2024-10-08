@@ -151,7 +151,7 @@ namespace Operators {
 	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
 	class GeneralOperator
 	{
-	protected:
+	public:
 		/*
 		* @brief Function for creating the matrix (overriden). If this is set, the matrix will be created using this function. Otherwise it is created 
 		* via standard procedure of acting on the states. This is useful for the operators that are not acting on the states directly or are random operators.
@@ -160,7 +160,7 @@ namespace Operators {
 
 		// ====================================================================================================
 
-	protected:
+	public:
 		// -------- LATTICE OR GRAPH RELATED --------
 		size_t Ns_											=			1;					// number of elements in the vector (for one to know how to act on it)
 		std::shared_ptr<Lattice> lat_;														// lattice type to be used later on, !! the lattice can be empty if not needed !!
@@ -184,7 +184,7 @@ namespace Operators {
 
 		// ====================================================================================================
 
-	protected:
+	public:
 				
 		using repType_ 										= 			repType;
 		using repTypeV_ 									= 			repTypeV;
@@ -1160,18 +1160,18 @@ namespace Operators {
 			this->hasVectorFun_ 	= other.hasVectorFun_;
 
 			// make new function
-			auto _f = [this, other](u64 _s, _Ts... _args) {
-				auto [_s2, _v] = other.operator()(_s, _args...);
-				return std::vector(std::make_tuple(_s, _v));
+			auto _f = [other](u64 _s, _Ts... _args) {
+				std::pair<u64, _T> _out = other.operator()(_s, _args...);
+				return std::vector<std::pair<u64, _T>>( { _out } );
 			};
 			this->fun_ 				= _f;
 
 			// vector function
 			if (this->hasVectorFun_)
 			{
-				auto _fV = [this, other](const _VT& _s, _Ts... _args) {
-					auto [_s2, _v] = other.operator()(_s, _args...);
-					return std::vector(std::make_tuple(_s, _v));
+				auto _fV = [other](const _VT& _s, _Ts... _args) {
+					std::pair<_VT, _T> _out = other.operator()(_s, _args...);
+					return std::vector<std::pair<_VT, _T>>( { _out } );
 				};
 				this->funV_ 		= _fV;
 			}
@@ -1456,9 +1456,9 @@ namespace Operators {
 			auto mbval()			   	const -> arma::Mat<_T>						{ return this->manyBodyVal_;						};
 			auto mbval()			   	-> const arma::Mat<_T>&						{ return this->manyBodyVal_;						};
 			template<typename _T1>
-			auto var()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::var(this->samples_));	};
+			auto var()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::var<_T>(this->samples_));	};
 			template<typename _T1>
-			auto mean()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::mean(this->samples_));	};
+			auto mean()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::mean<_T>(this->samples_));};
 			auto value()			   	const -> OperatorContainer_t<_T>			{ return this->currentValue_;						};
 			auto value(uint i)		   	const -> OperatorContainer_t<_T>			{ return this->samples_[i];							};
 			auto samples()		   		const -> v_1d<OperatorContainer_typ>		{ return this->samples_;							};

@@ -62,6 +62,26 @@ namespace Operators
 	public:
 		~OperatorNQS()																{};
 		OperatorNQS() : baseType() 													{};
+		OperatorNQS(const OperatorComb<_T, _Ts...>& comb) : OperatorComb<_T, _Ts...>(comb) {
+			// Additional initialization for OperatorNQS, if necessary
+		}
+		OperatorNQS(OperatorComb<_T, _Ts...>&& comb) : OperatorComb<_T, _Ts...>(std::move(comb)) {
+			// Additional initialization for OperatorNQS, if necessary
+		}
+
+		// -----------------------------------------------------------------------------
+
+		// equality operator to the OperatorComb class
+		OperatorNQS& operator=(const OperatorComb<_T, _Ts...>& comb) {
+			OperatorComb<_T, _Ts...>::operator=(comb);
+			return *this;
+		}
+
+		// equality operator to the OperatorComb class
+		OperatorNQS& operator=(OperatorComb<_T, _Ts...>&& comb) {
+			OperatorComb<_T, _Ts...>::operator=(std::move(comb));
+			return *this;
+		}
 
 		// -----------------------------------------------------------------------------
 
@@ -160,6 +180,8 @@ namespace NQSAv
 		using OPG			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>>;
 		using OPL			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>>;
 		using OPC			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>>;
+		// -----------------------------------------------------------------------------
+
 	protected:
 		std::string dir_	= "";
 		uint threads_		= 1;
@@ -195,8 +217,63 @@ namespace NQSAv
 			for (auto& x : opC_) x.reset();
 		}
 		MeasurementNQS()						= default;
-		MeasurementNQS(const MeasurementNQS&)	= default;
-		MeasurementNQS(MeasurementNQS&&)		= default;
+		MeasurementNQS(const MeasurementNQS& _m)
+		{
+			this->containersC_ = _m.containersC_;
+			this->containersG_ = _m.containersG_;
+			this->containersL_ = _m.containersL_;
+			this->dir_ = _m.dir_;
+			this->lat_ = _m.lat_;
+			this->Ns_ = _m.Ns_;
+			this->opC_ = _m.opC_;
+			this->opG_ = _m.opG_;
+			this->opL_ = _m.opL_;
+			this->threads_ = _m.threads_;
+		}
+		MeasurementNQS(MeasurementNQS&& _m)
+		{
+			this->containersC_ = std::move(_m.containersC_);
+			this->containersG_ = std::move(_m.containersG_);
+			this->containersL_ = std::move(_m.containersL_);
+			this->dir_ = std::move(_m.dir_);
+			this->lat_ = std::move(_m.lat_);
+			this->Ns_ = std::move(_m.Ns_);
+			this->opC_ = std::move(_m.opC_);
+			this->opG_ = std::move(_m.opG_);
+			this->opL_ = std::move(_m.opL_);
+			this->threads_ = std::move(_m.threads_);
+		}
+
+		// copy and move operators
+		MeasurementNQS& operator=(const MeasurementNQS& _m)
+		{
+			this->containersC_ = _m.containersC_;
+			this->containersG_ = _m.containersG_;
+			this->containersL_ = _m.containersL_;
+			this->dir_ = _m.dir_;
+			this->lat_ = _m.lat_;
+			this->Ns_ = _m.Ns_;
+			this->opC_ = _m.opC_;
+			this->opG_ = _m.opG_;
+			this->opL_ = _m.opL_;
+			this->threads_ = _m.threads_;
+			return *this;
+		}
+
+		MeasurementNQS& operator=(MeasurementNQS&& _m)
+		{
+			this->containersC_ = std::move(_m.containersC_);
+			this->containersG_ = std::move(_m.containersG_);
+			this->containersL_ = std::move(_m.containersL_);
+			this->dir_ = std::move(_m.dir_);
+			this->lat_ = std::move(_m.lat_);
+			this->Ns_ = std::move(_m.Ns_);
+			this->opC_ = std::move(_m.opC_);
+			this->opG_ = std::move(_m.opG_);
+			this->opL_ = std::move(_m.opL_);
+			this->threads_ = std::move(_m.threads_);
+			return *this;
+		}
 
 		// ---- CONSTRUCTORS ----
 		MeasurementNQS(std::shared_ptr<Lattice> _lat, const strVec& _operators);
@@ -213,6 +290,10 @@ namespace NQSAv
 									const OPL& _opL = {},
 									const OPC& _opC = {},
 									uint _threadNum = 1);
+		MeasurementNQS(size_t _Ns,	const OPG& _opG,
+									const OPL& _opL = {},
+									const OPC& _opC = {},
+									uint _threadNum = 1);
 
 
 
@@ -224,12 +305,41 @@ namespace NQSAv
 		void normalize(uint _nBlck);
 		void save(const strVec& _ext = { ".h5" });
 
+		// ---- MEASUREMENT ---- (STATIC)
+
+		static void measure(Operators::_OP_V_T_CR _state, Operators::OperatorNQS<_T> _gO, 
+							NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont)
+		{
+			auto val = _gO(_state, _fun);
+			// update the container
+			_cont.updCurrent(val);
+		};
+
+		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont)
+		{
+			_cont.normalize(_nBlck);
+		};
+
 		// ---- GETTERS ----
 		auto getOpG()				const		->		const OPG& { return this->opG_; };
 		auto getOpL()				const		->		const OPL& { return this->opL_; };
 		auto getOpC()				const		->		const OPC& { return this->opC_; };
 		auto getDir()				const		->		const std::string& { return this->dir_; };
 
+		// values from the containers
+		auto getContMean_G(uint i) 	const		-> 		_T { return this->containersG_[i].template mean<_T>()(0,0); };
+
+		// ---- SETTERS ----
+		void setDir(const std::string& _dir)			{ this->dir_ = _dir; };
+		void setThreads(uint _threads)					{ this->threads_ = _threads; };
+		void setLat(std::shared_ptr<Lattice> _lat) 		{ this->lat_ = _lat; this->Ns_ = _lat->get_Ns(); };
+		void setLat(size_t _Ns) 						{ this->Ns_ = _Ns; this->lat_ = nullptr; };
+		void setOP_G(const OPG& _opG)					{ this->opG_ = _opG; };
+		void setOP_L(const OPL& _opL)					{ this->opL_ = _opL; };
+		void setOP_C(const OPC& _opC)					{ this->opC_ = _opC; };
+
+		void resetContainers();
+		void reset();
 	};
 
 	// ##########################################################################################################################################
@@ -246,12 +356,29 @@ namespace NQSAv
 	}
 
 	template<typename _T>
-	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const strVec & _operators)
+	inline  NQSAv::MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const strVec & _operators)
 		: Ns_(_Ns), lat_(nullptr)
 	{
 		CONSTRUCTOR_CALL;
 	}
 
+	////////////////////////////////////////////////////////////////////////////
+
+	template <typename _T>
+	inline void NQSAv::MeasurementNQS<_T>::resetContainers()
+	{
+		this->createContainers();
+	}
+
+	template <typename _T>
+	inline void NQSAv::MeasurementNQS<_T>::reset()
+	{
+		this->opG_.clear();
+		this->opL_.clear();
+		this->opC_.clear();
+		this->resetContainers();
+	}
+	
 	////////////////////////////////////////////////////////////////////////////
 
 	/*
@@ -293,8 +420,8 @@ namespace NQSAv
 		}
 	}
 
-
 	////////////////////////////////////////////////////////////////////////////
+	
 	template <typename _T>
 	inline NQSAv::MeasurementNQS<_T>::MeasurementNQS(std::shared_ptr<Lattice> _lat,  
 													const std::string& _dir,
@@ -316,21 +443,25 @@ namespace NQSAv
 
 		CONSTRUCTOR_CALL;
 	}
-
+	
 	template<typename _T>
-	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const std::string& _dir, const OPG& _opG, const OPL& _opL, const OPC& _opC, uint _threadNum)
-		: dir_(_dir), threads_(_threadNum), lat_(nullptr), Ns_(_Ns)
+	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const OPG& _opG, const OPL& _opL, const OPC& _opC, uint _threadNum)
+		: threads_(_threadNum), lat_(nullptr), Ns_(_Ns)
 	{
-		// create directory
-		makeDir(_dir);
-
 		this->opG_ = _opG;
 		this->opL_ = _opL;
 		this->opC_ = _opC;
 
 		// create containers
 		this->createContainers();
-		
+	}
+
+	template<typename _T>
+	inline MeasurementNQS<_T>::MeasurementNQS(size_t _Ns, const std::string& _dir, const OPG& _opG, const OPL& _opL, const OPC& _opC, uint _threadNum)
+		: MeasurementNQS<_T>::MeasurementNQS(_Ns, _opG, _opL, _opC, _threadNum)
+	{
+		// create directory
+		makeDir(_dir);
 		CONSTRUCTOR_CALL;
 	}
 
@@ -648,6 +779,15 @@ namespace NQSAv
 	}
 
 	////////////////////////////////////////////////////////////////////////////
+	
+	/*
+	* @brief Measure the given operator for the given basis state and the probability ratio function. 
+	* The function is used to measure the operator for the given state and the probability ratio function.
+	* @param _state basis state to measure the operator for
+	* @param _gO operator to measure - global
+	* @param _fun probability ratio function
+	*/
+
 };
 #endif 
 //////////////////////////////////////////////////////////////////////////////////////////
