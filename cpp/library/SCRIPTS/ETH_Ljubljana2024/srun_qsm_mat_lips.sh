@@ -14,7 +14,7 @@ FUN=$6
 RUN_DIR=/home/kliczkowski/CODES/QuantumEigenSolver/cpp/library/
 cd ${RUN_DIR}
 
-savedir=/scratch/kliczkowski/RANDOM_MODELS_ETH/
+savedir=/scratch/kliczkowski/FADING_RAN_MODELS/FINAL/
 mkdir -p ${savedir}
 
 # create log directory
@@ -47,7 +47,7 @@ echo "module load HDF5" >> ${a}
 echo >> ${a}
 echo "cd ${RUN_DIR}" >> ${a}
 echo >> ${a}
-echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -fun ${FUN} ${PARS} -th ${CPU} -dir ${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
+echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -fun ${FUN} ${PARS} -op 'Sz/L;Sz/L_2;Sz/0;Sz/Lm1;Sz/Lm1-L;Sz/0-1;Sx/0-L' -th ${CPU} -dir ${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
 echo >> ${a}
 # echo "tar -cvzf ${SAVDIR}/${arhname} ${SAVDIR}" >> ${a}
 # echo "mv ${SAVDIR}/${arhname} ${lustredir} && rm -rf ${SAVDIR}" >> ${a} 
