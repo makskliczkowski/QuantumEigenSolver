@@ -329,6 +329,47 @@ namespace Operators
 			return sig_p(_out, _Ns, _right);
 		}
 
+		namespace RandomSuperposition 
+		{
+			/*
+			* @brief multiplication of \sum _i c^r_i S_z^i |state> 
+			*/
+			std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns)
+			{
+				auto _val = 0.0;
+				for (size_t i = 0; i < _Ns; i++)
+					_val += superpositions[i] * (Binary::check(base_vec, i) ? Operators::_SPIN : -Operators::_SPIN);
+				return std::make_pair(base_vec, _val / std::sqrt(_Ns));
+			}
+
+			std::pair<_OP_V_T_CR, double> sig_z(_OP_V_T_CR base_vec, size_t _Ns)
+			{
+				auto _val = 0.0;
+				for (size_t i = 0; i < _Ns; i++)
+					_val += superpositions[i] * (Binary::check(base_vec, i) ? Operators::_SPIN : -Operators::_SPIN);
+				return std::make_pair(base_vec, _val / std::sqrt(_Ns));
+			}
+
+			Operators::Operator<double> sig_z(size_t _Ns)
+			{
+				// create the function
+				_OP<double>::GLB fun_ 		= [_Ns](u64 state) 			{ return RandomSuperposition::sig_z(state, _Ns); };
+				_OP_V<double>::GLB funV_ 	= [_Ns](_OP_V_T_CR state) 	{ return RandomSuperposition::sig_z(state, _Ns); };
+
+				// save on which elements the operator acts (for the sake of the correctness)
+				u64 _acts = 0;
+				// |set the bitmask on the state, remember that this is counted from the left|
+				// the first position is leftwise 0, the last is leftwise Ns - 1
+				for (size_t i = 0; i < _Ns; i++)
+					_acts |= 1 << (_Ns - 1 - i);
+
+				// set the operator
+				Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+				_op.setActOn(_acts);
+				return _op;
+			}
+
+		};
 	}
 
 
