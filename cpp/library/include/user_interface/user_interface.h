@@ -492,22 +492,12 @@ namespace UI_PARAMS
 class UI : public UserInterface 
 {
 protected:
-
-	// LATTICE params
-	UI_PARAMS::LatP latP;
-
-	// SYMMETRY params
-	UI_PARAMS::SymP symP;
-
-	// NQS params
-	UI_PARAMS::NqsP nqsP;
-
-	// MODEL params
-	UI_PARAMS::ModP modP;
+	UI_PARAMS::LatP latP;								// LATTICE params
+	UI_PARAMS::SymP symP;								// SYMMETRY params
+	UI_PARAMS::NqsP nqsP;								// NQS params
+	UI_PARAMS::ModP modP;								// MODEL params
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	
-	// define basic models
 	bool isComplex_		= false;						// checks the complex sector
 	bool useComplex_	= false;						// forces complex sector choice
 
@@ -556,6 +546,9 @@ private:
 
 	template<typename _T, uint _spinModes>
 	void nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS);
+
+	template<typename _T, uint _spinModes>
+	void nqsExcited();
 
 	// ##################### QUADRATIC #####################
 
@@ -652,6 +645,7 @@ public:
 	// ############################################### N Q S 
 
 	void makeSimNQS();
+	void makeSimNQSExcited();
 
 	// ############################################### S Y M M E T R I E S 
 

@@ -40,6 +40,8 @@ namespace Operators
 
 		// Inherit constructors from GeneralOperator
    	 	using OperatorComb<_T, _Ts...>::OperatorComb;  									
+		using OperatorComb<_T, _Ts...>::operator=;
+		using OperatorComb<_T, _Ts...>::operator();
 		
 		// -----------------------------------------------------------------------------
 		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
@@ -92,9 +94,9 @@ namespace Operators
 		// @note The class uses general implementation of the operator, so it can be used for any operator in the future
 
 		// for the integer type of the state
-		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		-> _T;
+		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		const -> _T;
 		// for the column vector type of the state
-		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) -> _T;
+		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) const -> _T;
 
 		// ------------------------------------------------------------------------------
 	};
@@ -110,14 +112,14 @@ namespace Operators
 	* @returns value of the operator acting on the state with the probability ratio applied
 	*/
 	template<typename _T, typename ..._Ts>
-	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
+	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a) const
 	{
 		// starting value
 		// this->container_.currentIdx_	= 0;
 		_T _valTotal = 0.0;
 
 		// go through operator acting on the state
-		for (auto& [s2, _val] : OperatorComb<_T, _Ts...>::operator()(s, a...))
+		for (auto& [s2, _val] : this->operator()(s, a...))
 		{
 			// transform to state
 			INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
@@ -140,17 +142,18 @@ namespace Operators
 	* @returns value of the operator acting on the state with the probability ratio applied
 	*/
 	template<typename _T, typename ..._Ts>
-	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a)
+	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a) const
 	{
 		// starting value
 		// this->container_.currentIdx_	= 0;
 		_T _valTotal = 0.0;
 
 		// go through operator acting on the state
-		for (auto& [s2, _val] : OperatorComb<_T, _Ts...>::operator()(s, a...))
+		for (auto& [s2, _val] : this->operator()(s, a...))
 		{
 			// calculate the probability ratio
-			_valTotal += _val * algebra::cast<_T>(_fun(s2));
+			_T _functionVal = CAST<_T>(_fun(s2));
+			_valTotal 		= _valTotal + _functionVal * _val;
 		}
 		// this->updCurrent(_valTotal, a...);
 		return algebra::cast<_T>(_valTotal);
@@ -307,7 +310,7 @@ namespace NQSAv
 
 		// ---- MEASUREMENT ---- (STATIC)
 
-		static void measure(Operators::_OP_V_T_CR _state, Operators::OperatorNQS<_T> _gO, 
+		static void measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, 
 							NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
 			auto val = _gO(_state, _fun);
@@ -317,7 +320,7 @@ namespace NQSAv
 
 		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
-			_cont.normalize(_nBlck);
+			_cont.normalize(true);
 		};
 
 		// ---- GETTERS ----

@@ -270,14 +270,16 @@ namespace Operators
 		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, const u64 _projectTo, 
 				std::function<_T(u64)> _application, std::function<_T(_OP_V_T_CR)> _applicationV)
 		{
-			return OperatorComb<_T>(projectorSum<_T>(_Ns, _projectTo, _application, _applicationV));
+			auto _proj = projectorSum<_T>(_Ns, _projectTo, _application, _applicationV);
+			return OperatorComb<_T>(std::move(_proj));
 		}
 
 		template <typename _T>
 		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, _OP_V_T_CR _projectTo, 
 				std::function<_T(u64)> _application, std::function<_T(_OP_V_T_CR)> _applicationV, bool _projectInt = false)
 		{
-			return OperatorComb<_T>(projectorSum<_T>(_Ns, _projectTo, _application, _applicationV, _projectInt));
+			auto _proj = projectorSum<_T>(_Ns, _projectTo, _application, _applicationV, _projectInt);
+			return OperatorComb<_T>(std::move(_proj));
 		}
 	};
 
@@ -352,6 +354,7 @@ namespace Operators
 			val *= checkBit(base_vec, L - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
 		return std::make_pair(base_vec, val);
 	}
+	
 	template <typename _T>
 	Operators::Operator<_T> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site)
 	{

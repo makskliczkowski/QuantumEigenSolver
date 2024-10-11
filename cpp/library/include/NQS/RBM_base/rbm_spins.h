@@ -14,16 +14,18 @@ template <typename _Ht, typename _T, class _stateType>
 class RBM_S<2, _Ht, _T, _stateType> : public RBM<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
-
-	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nParticles = -1)
-		: RBM<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles) 
+	using NQSLS_p =	RBM<2, _Ht, _T, _stateType>::NQSLS_p;
+public:
+	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr,
+	 uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
+		: RBM<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles, _lower, _beta) 
 	{ 
 		this->init();
 		this->setRandomState(true);
 	};
 
 	/* ----------------------------------------------------------- */
-	protected:
+protected:
 	// -------------------- P R O B A B I L I T Y -------------------
 	virtual auto pRatio(uint fP, float fV)			-> _T	override;
 	virtual auto pRatio(uint nFlips)				-> _T	override;

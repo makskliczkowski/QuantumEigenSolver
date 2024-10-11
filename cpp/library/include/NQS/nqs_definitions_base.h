@@ -74,7 +74,9 @@ enum NQSTYPES					// #
 // all the types that are to be used in each NQS implementation
 #define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
 											using NQSB = arma::Col<_type>; 				\
-											using NQSW = arma::Mat<_type>;			 	;
+											using NQSW = arma::Mat<_type>;			 	
+											
+
 
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
 

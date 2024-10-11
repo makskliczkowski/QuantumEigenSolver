@@ -755,6 +755,8 @@ namespace Operators {
 
 		// Inherit constructors from GeneralOperator
    	 	using GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
+		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator=;
+		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();		
 		
 		// ----------------------------------------------------------------------------------------------------
 		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
@@ -1129,7 +1131,9 @@ namespace Operators {
 		// ----------------------------------------------------------------------------------------------------
 
 		// Inherit constructors from GeneralOperator
-   	 	using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
+   	 	using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  
+		using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator=;
+		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();				
 		
 		// ----------------------------------------------------------------------------------------------------
 		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
@@ -1141,6 +1145,10 @@ namespace Operators {
 		using ReturnType 	= typename baseType::ReturnType;							// return type of the operator
 		using ReturnTypeV 	= typename baseType::ReturnTypeV;							// return type of the operator - for vectors
 
+		// ----------------------------------------------------------------------------------------------------
+		typename _OP<_T>::template INP<_Ts...> s_fun_;									// function for the operator
+		typename _OP_V<_T>::template INP<_Ts...> s_funV_;								// function for the operator - for vectors
+
 	public:
 		// ----------------------------------------------------------------------------------------------------
 
@@ -1149,33 +1157,102 @@ namespace Operators {
 		
 		OperatorComb(const Operator<_T, _Ts...>& other)
 		{
-			// Copy or convert relevant data members from "other" to "this"
-			this->name_				= other.name_;
-			this->nameS_ 			= other.nameS_;
-			this->overridenMatFun_ 	= other.overridenMatFun_;
-			this->isQuadratic_ 		= other.isQuadratic_; 
-			this->lat_ 				= other.lat_;
-			this->Ns_ 				= other.Ns_;
-			this->eigVal_ 			= other.eigVal_;
-			this->hasVectorFun_ 	= other.hasVectorFun_;
+			this->name_             = other.name_;
+			this->nameS_            = other.nameS_;
+			this->overridenMatFun_  = other.overridenMatFun_;
+			this->isQuadratic_      = other.isQuadratic_;
+			this->lat_              = other.lat_;
+			this->Ns_               = other.Ns_;
+			this->eigVal_           = other.eigVal_;
+			this->hasVectorFun_     = other.hasVectorFun_;
 
-			// make new function
-			auto _f = [other](u64 _s, _Ts... _args) {
-				std::pair<u64, _T> _out = other.operator()(_s, _args...);
-				return std::vector<std::pair<u64, _T>>( { _out } );
-			};
-			this->fun_ 				= _f;
-
-			// vector function
-			if (this->hasVectorFun_)
+			// Move scalar function
+			this->s_fun_ 			= other.fun_;
+			
+			// Create a new lambda that captures a copy of `this->s_fun_`
 			{
-				auto _fV = [other](const _VT& _s, _Ts... _args) {
-					std::pair<_VT, _T> _out = other.operator()(_s, _args...);
-					return std::vector<std::pair<_VT, _T>>( { _out } );
-				};
-				this->funV_ 		= _fV;
+				if (this->s_fun_) 
+				{
+					this->fun_ = [s_fun_copy = this->s_fun_](u64 _s, _Ts... _args) {
+						std::pair<u64, _T> _out = s_fun_copy(_s, _args...);
+						return std::vector<std::pair<u64, _T>>({ _out });
+					};
+				} else {
+					this->fun_ = nullptr;
+				}
+			}
+
+			// Handle vector function if present
+			if (this->hasVectorFun_) 
+			{
+				{
+					this->s_funV_ = other.s_funV_;
+					
+					// Create a new lambda that captures a copy of `this->s_funV_`
+					if (this->s_funV_) 
+					{
+						this->funV_ = [s_funV_copy = this->s_funV_](const _VT& _s, _Ts... _args) {
+							std::pair<_VT, _T> _out = s_funV_copy(_s, _args...);
+							return std::vector<std::pair<_VT, _T>>({ _out });
+						};
+					} else {
+						this->funV_ = nullptr;
+					}
+				}
 			}
 		};
+
+		OperatorComb(Operator<_T, _Ts...>&& other)
+		{
+			this->name_             = std::move(other.name_);
+			this->nameS_            = std::move(other.nameS_);
+			this->overridenMatFun_  = std::move(other.overridenMatFun_);
+			this->isQuadratic_      = std::move(other.isQuadratic_);
+			this->lat_              = std::move(other.lat_);
+			this->Ns_               = std::move(other.Ns_);
+			this->eigVal_           = std::move(other.eigVal_);
+			this->hasVectorFun_     = other.hasVectorFun_;
+
+			// Move scalar function
+			this->s_fun_ 			= std::move(other.fun_);
+			
+			// Create a new lambda that captures a copy of `this->s_fun_`
+			{
+				if (this->s_fun_) 
+				{
+					this->fun_ = [s_fun_copy = this->s_fun_](u64 _s, _Ts... _args) {
+						std::pair<u64, _T> _out = s_fun_copy(_s, _args...);
+						return std::vector<std::pair<u64, _T>>({ _out });
+					};
+				} else {
+					this->fun_ = nullptr;
+				}
+			}
+
+			// Handle vector function if present
+			if (this->hasVectorFun_) 
+			{
+				{
+					this->s_funV_ = std::move(other.funV_);
+					
+					// Create a new lambda that captures a copy of `this->s_funV_`
+					if (this->s_funV_) 
+					{
+						this->funV_ = [s_funV_copy = this->s_funV_](const _VT& _s, _Ts... _args) {
+							std::pair<_VT, _T> _out = s_funV_copy(_s, _args...);
+							return std::vector<std::pair<_VT, _T>>({ _out });
+						};
+					} else {
+						this->funV_ = nullptr;
+					}
+				}
+			}
+
+			// Optional: Clear the moved-from `other` to prevent accidental use
+			other.fun_ 		= nullptr;
+			other.funV_ 	= nullptr;
+
+		}
 
 		// ---------------------------------------- O P E R A T O R ( ) ---------------------------------------
 		
@@ -1400,6 +1477,13 @@ namespace Operators {
 
 			~OperatorContainer() 		= default;
 
+			OperatorContainer()
+				: Ns_(1)
+			{
+				this->samples_ 	= {};
+				this->state_ 	= _OP_V_T(1);
+			}
+
 			OperatorContainer(size_t _Ns)
 				: Ns_(_Ns)
 			{
@@ -1411,7 +1495,7 @@ namespace Operators {
 
 			template <class _Tt = uint>
 			typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
-			updCurrent(_T _val, _Tt i);
+			updCurrent(_T _val);
 
 			template <class _Tt, typename ..._Tss>
 			typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
@@ -1508,12 +1592,8 @@ namespace Operators {
 		template<typename _T>
 		template<class _Tt>
 		inline typename std::enable_if<std::is_arithmetic<_Tt>::value, void>::type
-		Operators::Containers::OperatorContainer<_T>::updCurrent(_T _val, _Tt i)
+		Operators::Containers::OperatorContainer<_T>::updCurrent(_T _val)
 		{
-			// store the index
-			this->indices_[this->currentIdx_] = i;
-			this->currentIdx_++;
-
 			// check the size of the indices
 			if (this->indices_.size() == 0)
 				this->currentValue_(0, 0) += _val;
@@ -1523,6 +1603,7 @@ namespace Operators {
 				this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
 			else
 				throw std::runtime_error("Not implemented such exotic operators...");
+			this->sample_num_++;
 		}
 
 		/*

@@ -34,6 +34,7 @@ template < 	uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType =
 class RBM_PP : public RBM_S<_spinModes, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	using NQSLS_p = RBM_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 protected:
 	// architecture parameters
 	uint nPP_					= 1;
@@ -113,7 +114,10 @@ protected:
 						arma::Mat<_T>& _Xtmp)					= 0;
 public: 				  
 	~RBM_PP() override											{ DESTRUCTOR_CALL;												};
-	RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1);
+	RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum = 1, 
+													int _nPart = -1, 
+													const NQSLS_p& _lower = {}, 
+													std::vector<double> _beta = {});
 
 	// --------------------- S E T T E R S ---------------------
 	void init()													override final;
@@ -181,8 +185,9 @@ public:
 // ##########################################################################################################################################
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart)
-	: RBM_S<_spinModes, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nPart)
+RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, 
+							double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta)
+	: RBM_S<_spinModes, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nPart, _lower, _beta)
 {
 	// create the spin sectors
 	spinSectors_.push_back({ 1, 1 });

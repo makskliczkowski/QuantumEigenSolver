@@ -259,6 +259,11 @@ void UI::funChoice()
 			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
 			this->makeSimNQS();
 			break;
+		case 11:
+			// this option utilizes the Hamiltonian with NQS ansatz calculation - excited states
+			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS - EXCITED STATES", LOG_TYPES::CHOICE, 1);
+			this->makeSimNQSExcited();
+			break;
 			// ------------------------------- SYMMETRIES -------------------------------
 		case 20:
 			// this option utilizes the Hamiltonian with symmetries calculation

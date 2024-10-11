@@ -13,10 +13,12 @@ template <typename _Ht, typename _T, class _stateType>
 class RBM_PP_S<2, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	using NQSLS_p = RBM_PP<2, _Ht, _T, _stateType>::NQSLS_p;
 	/* ------------------------------------------------------- */
 public:
-	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nParticles = -1)
-		: RBM_PP<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles) 
+	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, 
+				int _nParticles = -1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
+		: RBM_PP<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles, _lower, _beta) 
 	{
 		this->init();
 		// sets the thetas and Pfaffian as well

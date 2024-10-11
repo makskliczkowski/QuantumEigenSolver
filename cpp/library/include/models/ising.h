@@ -43,7 +43,7 @@ public:
 	cpx locEnergy(u64 _id, uint site, NQSFun f1)		override final;
 	cpx locEnergy(const arma::Col<double>& v,
 				  uint site,
-				  NQSFun f1)							override final { return 0; };
+				  NQSFun f1)							override final;
 
 	// ------------------------------------------- 				 Info				  -------------------------------------------
 
@@ -195,6 +195,40 @@ inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, NQSFun f1)
 	_changedVal			+=	f1(std::initializer_list<int>({ (int)site }),
 							   std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, site) * Operators::_SPIN_RBM;
 
+	// -----------------------------------------------------------
+	return _changedVal + _locVal;
+}
+
+template<typename _T>
+inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQSFun f1)
+{
+	double _locVal		=	0.0;			// unchanged state value
+	cpx _changedVal		=	0.0;			// changed state value			
+
+	// get number of forward nn
+	uint NUM_OF_NN		=	(uint)this->lat_->get_nn_ForwardNum(_site);
+
+	// check spin at a given site
+	double _Si			=	Binary::check(v, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+
+	// add to a local value
+	_locVal				+=	PARAM_W_DISORDER(h, _site) * _Si;
+
+	// check the S_i^z * S_{i+1}^z
+	for (uint nn = 0; nn < NUM_OF_NN; nn++) 
+	{
+		auto N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		if (auto nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
+		{
+			double _Sj	=	Binary::check(v, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			_locVal		+=	PARAM_W_DISORDER(J, _site) * _Si * _Sj;
+		}
+	}
+	// -----------------------------------------------------------
+	if (!EQP(this->g, 0.0, 1e-9)) {
+		_changedVal			+=	f1(std::initializer_list<int>({ (int)_site }),
+								std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, _site) * Operators::_SPIN_RBM;
+	}
 	// -----------------------------------------------------------
 	return _changedVal + _locVal;
 }

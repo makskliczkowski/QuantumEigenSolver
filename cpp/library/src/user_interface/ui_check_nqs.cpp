@@ -1,4 +1,5 @@
 #include "../../include/user_interface/user_interface.h"
+#include <memory>
 #include <stdexcept>
 
 
@@ -14,6 +15,15 @@ void UI::makeSimNQS()
 	this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
 	this->nqsSingle(this->nqsCpx);
 
+}
+
+void UI::makeSimNQSExcited()
+{
+	this->useComplex_ = true;
+	// this->defineModels(true);
+	// this->defineNQS<cpx>(this->hamComplex, this->nqsCpx);
+	this->defineLattice();
+	this->nqsExcited<cpx, 2>();
 }
 
 
@@ -73,6 +83,7 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 
 	// calculate ED to compare with Lanczos or Full
 	u64 Nh					= _NQS->getHilbertSize();
+
 	arma::Col<_T> _mbs;
 	if (Nh <= UI_LIMITS_NQS_ED)
 	{
@@ -141,6 +152,107 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 	_meas.save();
 }
 
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T, uint _spinModes>
+void UI::nqsExcited()
+{
+	Hilbert::HilbertSpace<_T> _hilbert 				= Hilbert::HilbertSpace<_T, _spinModes>(this->latP.lat);
+	std::shared_ptr<Hamiltonian<_T, _spinModes>> _H = std::make_shared<IsingModel<_T>>(std::move(_hilbert), 
+													this->modP.J1_, this->modP.hx_, this->modP.hz_);
+	std::shared_ptr<NQS<_spinModes, _T>> _NQS_0;
+	std::shared_ptr<NQS<_spinModes, _T>> _NQS_1;
+	
+	if (this->nqsP.type_ == NQSTYPES::RBM_T)
+	{
+		_NQS_0 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum);
+	} else {
+		_NQS_0 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum);
+	}
+
+	_timer.reset();
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
+	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
+	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
+	
+	// get info
+	std::string nqsInfo		= _NQS_0->getInfo();
+	std::string modelInfo	= _NQS_0->getHamiltonianInfo();
+	std::string dir			= makeDirsC(this->mainDir, this->latP.lat->get_info(), modelInfo, nqsInfo);
+
+	// calculate ED to compare with Lanczos or Full
+	u64 Nh					= _NQS_0->getHilbertSize();
+
+	arma::Col<_T> _mbs;
+	if (Nh <= UI_LIMITS_NQS_ED)
+	{
+		_H->buildHamiltonian();
+		if (Nh <= UI_LIMITS_NQS_FULLED)
+		{
+			_H->diagH(false);
+			_mbs = _H->getEigVec(0);
+			if(Nh < ULLPOW(7))
+				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
+		}
+		else
+		{
+			_H->diagH(false, 50, 0, 1000, 0, "lanczos");
+		}
+		LOGINFO("Found the ED groundstate to be EED_0 = " + STRP(_H->getEigVal(0), 7), LOG_TYPES::TRACE, 2);
+		LOGINFO("Found the ED groundstate to be EED_1 = " + STRP(_H->getEigVal(1), 7), LOG_TYPES::TRACE, 2);
+		LOGINFO("Found the ED groundstate to be EED_2 = " + STRP(_H->getEigVal(2), 7), LOG_TYPES::TRACE, 2);
+	}
+
+	arma::Col<_T> _EN0(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
+	arma::Col<_T> _EN1(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
+
+
+	// set the operators to save
+	v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>> _opsG = {};
+	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>> _opsL = {};
+	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};
+	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  
+									_opsG, 
+									_opsL, 
+									_opsC, this->threadNum);
+	// train the ground state
+	NQS_train_t _par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
+	_EN0.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS_0->train(_par, this->quiet, _timer.start(), 25);
+	_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
+	_EN0.subvec(this->nqsP.nMcSteps_, _EN0.size() - 1) = _NQS_0->collect(_par, this->quiet, _timer.start(), _meas, true);
+
+	auto perc		= int(this->nqsP.nMcSamples_ / 20);
+	perc			= perc == 0 ? 1 : perc;
+	auto ENQS_0		= arma::mean(_EN0.col(0).tail(perc));
+	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
+	
+	// create the excited state
+	{
+		v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_0_p 	= { _NQS_0 };
+		v_1d<double> _betas 									= { 5e-1 };
+		if (this->nqsP.type_ == NQSTYPES::RBM_T)
+		{
+			_NQS_1 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
+			// std::reinterpret_pointer_cast<RBM_S<_spinModes, _T>>(_NQS_1)->setWeights(std::reinterpret_pointer_cast<RBM_S<_spinModes, _T>>(_NQS_0));
+		} else {
+			_NQS_1 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
+		}
+
+		// train the excited state
+		_par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
+		_EN1.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS_1->train(_par, this->quiet, _timer.start(), 25);
+		_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
+		_EN1.subvec(this->nqsP.nMcSteps_, _EN1.size() - 1) = _NQS_1->collect(_par, this->quiet, _timer.start(), _meas, true);
+	}
+	auto ENQS_1		= arma::mean(_EN1.col(0).tail(perc));
+	LOGINFOG("Found the NQS excited state to be ENQS_1 = " + STRP(ENQS_1, 7), LOG_TYPES::TRACE, 2);
+
+	// sumup true energies and those from NQS
+	LOGINFO("True energies: EED_0 = " + STRP(_H->getEigVal(0), 7) + " EED_1 = " + STRP(_H->getEigVal(1), 7), LOG_TYPES::TRACE, 2);
+	LOGINFO("NQS energies: ENQS_0 = " + STRP(ENQS_0, 7) + " ENQS_1 = " + STRP(ENQS_1, 7), LOG_TYPES::TRACE, 2);	
+}
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS<2, double>>& _NQS);
@@ -149,3 +261,6 @@ template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, st
 // %%%%%%%%%%%%%%%%%%%%% DEFINE THE TEMPLATES %%%%%%%%%%%%%%%%%%%%%
 template void UI::nqsSingle<double, 2>(std::shared_ptr<NQS<2, double>> _NQS);
 template void UI::nqsSingle<cpx, 2>(std::shared_ptr<NQS<2, cpx>> _NQS);
+
+template void UI::nqsExcited<double, 2>();
+template void UI::nqsExcited<cpx, 2>();
