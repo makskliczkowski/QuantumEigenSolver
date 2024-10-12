@@ -230,7 +230,7 @@ void UI::nqsExcited()
 	// create the excited state
 	{
 		v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_0_p 	= { _NQS_0 };
-		v_1d<double> _betas 									= { 5e-1 };
+		v_1d<double> _betas 									= { 3e-1 };
 		if (this->nqsP.type_ == NQSTYPES::RBM_T)
 		{
 			_NQS_1 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);

@@ -176,6 +176,8 @@ public:
 	auto getNPP()							const -> uint		{ return this->nPP_;														};
 	// --------------------- F I N A L E -----------------------
 	auto ansatz(const NQSS& _in)			const -> _T			override final;
+	auto ansatz_ratio(const NQSS& _in, 
+		NQS<_spinModes, _Ht, _T, _stateType>* _other) 			const -> _T override final;
 };
 
 // ##########################################################################################################################################
@@ -221,6 +223,21 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 	// set the Jacobian before!
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz(_in) * this->getPfaffian(_in); //* std::pow(2.0, this->n_hidden)
 };
+
+/*
+* @brief calculates the ratio of the two RBM-PP states - used for calculating the excited states (_other->ansatz / this->ansatz)
+* @param _in vector to calculate the ratio for
+* @param _other pointer to the other NQS to calculate the ratio with
+* @return ratio of the two states (other / this) for a given state _in (vector)
+* @note the ratio is calculated as: _other->ansatz / this->ansatz * _other->getPfaffian(_in) / this->getPfaffian(_in)
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
+{
+	auto _rbm_pp_other = dynamic_cast<RBM_PP<_spinModes, _Ht, _T, _stateType>*>(_other);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(_in, _other) * _rbm_pp_other->getPfaffian(_in) / this->getPfaffian(_in);
+}
+
 
 // ##########################################################################################################################################
 

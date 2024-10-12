@@ -13,7 +13,7 @@
 #include <memory>
 #include <vector>
 #ifndef NQS_OPERATOR_H
-#	include "nqs_operator.h"
+#	include "../nqs_operator.h"
 #endif
 /////////////////////////////////////////////////////////////
 

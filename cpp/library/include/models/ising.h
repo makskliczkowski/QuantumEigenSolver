@@ -205,9 +205,6 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	double _locVal		=	0.0;			// unchanged state value
 	cpx _changedVal		=	0.0;			// changed state value			
 
-	// get number of forward nn
-	uint NUM_OF_NN		=	(uint)this->lat_->get_nn_ForwardNum(_site);
-
 	// check spin at a given site
 	double _Si			=	Binary::check(v, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 
@@ -215,7 +212,7 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	_locVal				+=	PARAM_W_DISORDER(h, _site) * _Si;
 
 	// check the S_i^z * S_{i+1}^z
-	for (uint nn = 0; nn < NUM_OF_NN; nn++) 
+	for (uint nn = 0; nn < (uint)this->lat_->get_nn_ForwardNum(_site); ++nn) 
 	{
 		auto N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
 		if (auto nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 

@@ -8,7 +8,7 @@
 ***************************************/
 
 // #################################
-#include "nqs_definitions_base.h"
+#include "./NQS_base/nqs_definitions_base.h"
 #include <initializer_list>
 #ifndef HAMIL_H
 #	include "../hamil.h"

@@ -5,9 +5,9 @@
 * DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
-#include "NQS/nqs_operator.h"
-#include "algebra/general_operator.h"
-#include "algebra/operators.h"
+#include "../nqs_operator.h"
+#include "../../algebra/general_operator.h"
+#include "../../algebra/operators.h"
 #include "armadillo"
 #include <functional>
 #include <memory>
@@ -15,13 +15,21 @@
 #define NQS_H
 
 // include all the definions
-#include "NQS/nqs_definitions_base.h"
-#include "NQS/nqs_definitions_lower.h"
-
+#include "nqs_definitions_base.h"
+#include "nqs_definitions_lower.tpp"
 
 /*
-* @brief General Neural Network Quantum States eigensolver class - base
-* Contains all the necessary methods to override for the specific NQS model.
+* @class NQS
+* @brief General template class for Neural Quantum States (NQS) solver.
+* 
+* This class defines a flexible framework for building Neural Quantum State solvers, supporting multiple spin modes and Hamiltonians.
+* It is designed for efficient sampling and optimization of neural network weights using Monte Carlo-based methods. The class can be 
+* specialized by inheriting and overriding key methods.
+* 
+* @tparam _spinModes Number of spin modes (e.g., 2 for hardcore bosons, 4 for fermions).
+* @tparam _Ht Type of Hamiltonian used for energy calculations.
+* @tparam _T General type for numerical precision (default: same as _Ht).
+* @tparam _stateType Type of quantum state (default: double).
 */
 template <uint _spinModes, 
 		  typename _Ht,
@@ -248,6 +256,7 @@ public:
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
+	virtual auto ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const -> _T = 0;
 
 	// -------------------- C O N S T R U C T --------------------
 
@@ -512,12 +521,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include "./NQS/NQS_base/nqs_sampling.hpp"
-#include "./NQS/NQS_base/nqs_optimize.hpp"
-#include "./NQS/NQS_base/nqs_training.hpp"
-
 // ##########################################################################################################################################
 
 // ########################################################### C O N S T R U C T ############################################################
@@ -559,13 +562,5 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 
 	LOGINFO("Constructed the general NQS class", LOG_TYPES::TRACE, 2);
 };
-
-// ##########################################################################################################################################
-
-#include "./NQS/NQS_base/nqs_general.h"
-#include "./NQS/NQS_base/nqs_spins.h"
-#include "./NQS/NQS_base/nqs_fermions.h"
-
-// ##########################################################################################################################################
 
 #endif

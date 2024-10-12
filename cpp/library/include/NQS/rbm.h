@@ -3,7 +3,7 @@
 #define RBM_H
 
 #ifndef NQS_H
-	#include "../nqs.h"
+	#include "nqs_final.hpp"
 #endif // !NQS_H
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -111,8 +111,10 @@ public:
 	auto getHiddenBias()			const -> NQSB			{ return this->bH_; 		};
 	
 	// --------------------- F I N A L E -----------------------
-	virtual auto ansatz(const NQSS& _in) const->_T			override;
-};
+	virtual auto ansatz(const NQSS& _in) 					const -> _T override;
+	virtual auto ansatz_ratio(const NQSS& _in, 
+		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
+};	
 
 // ##########################################################################################################################################
 
@@ -130,8 +132,25 @@ public:
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 {
-	return std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in)) / std::sqrt(this->info_p_.nVis_);
+	return std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in));
+	// / std::sqrt(this->info_p_.nVis_);
 };
+
+////////////////////////////////////////////////////////////////////////////
+
+/*
+* @brief calculates the ratio of the two RBM states - used for calculating the excited states (_other->ansatz / this->ansatz)
+* @param _in vector to calculate the ratio for
+* @param _other pointer to the other NQS to calculate the ratio with
+* @return ratio of the two states (other / this) for a given state _in (vector)
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
+{
+	auto _rbm_other = dynamic_cast<RBM<_spinModes, _Ht, _T, _stateType>*>(_other);
+	return std::exp(arma::dot(_rbm_other->bV_ - this->bV_, _in)) * arma::prod(_rbm_other->coshF(_in) / this->coshF(_in));
+}
+
 
 ////////////////////////////////////////////////////////////////////////////
 
