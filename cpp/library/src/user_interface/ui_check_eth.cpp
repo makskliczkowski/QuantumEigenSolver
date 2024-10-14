@@ -433,9 +433,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
 	arma::Mat<double> _en, _entroHalf, _entroRHalf, _entroFirst, _entroRFirst, _entroLast, _entroRLast, _schmidFirst, _schmidLast;
-	if (this->modP.eth_entro_)
-	{
-		_en				= 	UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// energies
+	if (this->modP.eth_entro_) {
+		_en				= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);								// energies
 		_entroHalf		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=1
 		_entroRHalf		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=2
 		_entroFirst		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=1
@@ -447,10 +446,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	}
 
 	// information entropy and ipr
-	v_1d<double> _qs = { 0.1, 0.5, 1.0, 1.5, 2.0, 3.0 };
+	v_1d<double> _qs 	= { 0.1, 0.5, 1.0, 1.5, 2.0, 3.0 };
 	arma::Mat<double> _e_ipr01, _e_ipr05, _e_ipr1, _e_ipr15, _e_ipr2, _e_ipr3;
-	if (this->modP.eth_entro_)
-	{
+	if (this->modP.eth_entro_) {
 		_e_ipr01		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
 		_e_ipr05		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
 		_e_ipr1 		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
@@ -461,14 +459,17 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// gap ratios
 	v_1d<double> _gapsin(_Nh - 2, 0.0);
-	arma::Col<double> _gaps			= UI_DEF_COL_D(this->modP.modRanN_);
-	arma::Mat<double> _gapsall		= UI_DEF_MAT_D(_Nh - 2, this->modP.modRanN_);
-	// mean lvl
-	arma::Col<double> _meanEn		= UI_DEF_COL_D(this->modP.modRanN_);		// mean energy
-	arma::Col<double> _meanEnIdx 	= UI_DEF_COL_D(this->modP.modRanN_);		// mean energy index
-	arma::Col<double> _meanlvl		= UI_DEF_COL_D(this->modP.modRanN_);		// mean level spacing
-	arma::Col<double> _bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);		// bandwidth
-	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);		// Hamiltonian squared average
+	arma::Col<double> _gaps, _meanEn, _meanEnIdx, _meanlvl, _bandwidth, _H2;
+	arma::Mat<double> _gapsall;
+	{
+		_gaps		= UI_DEF_COL_D(_Nh - 2);
+		_gapsall	= UI_DEF_MAT_D(_Nh - 2, this->modP.modRanN_);
+		meanEn		= UI_DEF_COL_D(this->modP.modRanN_);
+		meanEnIdx	= UI_DEF_COL_D(this->modP.modRanN_);
+		meanlvl		= UI_DEF_COL_D(this->modP.modRanN_);
+		bandwidth	= UI_DEF_COL_D(this->modP.modRanN_);
+		H2			= UI_DEF_COL_D(this->modP.modRanN_);
+	}
 
 	// create the measurem_bandwidthent class
 	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);	
@@ -544,8 +545,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				saveAlgebraic(dir, "stat" + randomStr + extension, _fidelitySusceptibility, "fidelity_susceptibility", true);
 
 			// iprs
-			if (this->modP.eth_ipr_)
-			{
+			if (this->modP.eth_ipr_) {
 				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr01, "info/0.1", false);
 				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr05, "info/0.5", true);
 				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr1,  "info/1.0", true);
@@ -555,15 +555,13 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			}
 
 			// diagonal operators saved (only append when _opi > 0)
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi) {
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "diag" + randomStr + extension, algebra::cast<double>(_diagElems[_opi]), _name, _opi > 0);
 			}
 
 			// offdiagonal operators saved (only append when _opi > 0)
-			if (this->modP.eth_offd_)
-			{
+			if (this->modP.eth_offd_) {
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
 					auto _name = _measure.getOpGN(_opi);
@@ -575,8 +573,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			}
 
 			// save the statistics
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi) {
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi].row(0), "operators/" + _measure.getOpGN(_opi) + "/mean", true);
 				saveAlgebraic(dir, "stat" + randomStr + extension, _offdiagElemesStat[_opi].row(1), "operators/" + _measure.getOpGN(_opi) + "/typical", true);
@@ -590,8 +587,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// save the histograms of the operators for the f functions
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].edgesCol(), "omegas", false);
-			if (this->modP.eth_susc_)
-			{
+			if (this->modP.eth_susc_) {
 				for (uint _epi = 0; _epi < _histAvEps.size(); ++_epi)
 				{
 					auto e = this->modP.eth_end_[_epi];
@@ -599,8 +595,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				}
 			}
 
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi) {
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[_opi].averages_av(), _name + "_mean", true);
 				saveAlgebraic(dir, "hist" + randomStr + extension, _histAvTypical[_opi].averages_av(true), _name + "_typical", true);
@@ -615,8 +610,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					}
 				}
 			}
-			if (_histAvEps.size() > 0)
-			{
+			
+			if (_histAvEps.size() > 0) {
 				for (uint _epi = 0; _epi < _histAvEps.size(); ++_epi)
 				{
 					auto e = this->modP.eth_end_[_epi];
@@ -626,9 +621,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].countsCol(), "_counts", true);
 
 			// save the distributions of the operators - histograms for the values
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-			{
-				auto _name = _measure.getOpGN(_opi);
+			for (uint _opi = 0; _opi < _ops.size(); ++_opi) {
+				const auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].edgesCol(), _name + "_diag_edges", _opi > 0);
 				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsOffdiag[_opi].edgesCol(), _name + "_offdiag_edges", true);
 				saveAlgebraic(dir, "dist" + randomStr + extension, _histOperatorsDiag[_opi].countsCol(), _name + "_diag_counts", true);
@@ -814,15 +808,13 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// -----------------------------------------------------------------------------
 	
 		// entanglement entropies
-		if (this->modP.eth_entro_ && _Ns < 20)
-		{
+		if (this->modP.eth_entro_ && _Ns < 20) {
 			v_1d<int> _sites   = { 0 };
 			uint _lastSiteMask = Binary::prepareMask<int, v_1d<int>, false>(_sites, _Ns - 1);
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif				
-			for(size_t _idx = 0; _idx < _Nh; ++_idx)
-			{
+			for(size_t _idx = 0; _idx < _Nh; ++_idx) {
 				// get the entanglement
 				const auto _state		= _H->getEigVecCol(_idx);
 
