@@ -949,7 +949,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// time evolution saved here
 	long double _heisenberg_time_est	= _Nh;
-	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 10), 5000);
+	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), 5000);
 	// create initial states for the quench
 	arma::Col<_T> _initial_state_me		= arma::Col<_T>(_Nh, arma::fill::zeros);
 
