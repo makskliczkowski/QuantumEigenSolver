@@ -1,6 +1,7 @@
 #include "../../include/user_interface/user_interface.h"
 #include "armadillo"
 #include <memory>
+#include <vector>
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -62,7 +63,7 @@ void UI::makeSimETHSweep()
 		_params = { this->modP.ultrametric.um_alpha_[0] };
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_params = { this->modP.power_law_random_bandwidth.plrb_a_ };
+		_params = this->modP.power_law_random_bandwidth.plrb_a_;
 		break;
 	default:
 		_params = { 1.0 };
@@ -86,7 +87,7 @@ void UI::makeSimETHSweep()
 			else if (this->modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
 				this->modP.ultrametric.um_alpha_ = v_1d<double>(this->latP.Ntot_ - this->modP.ultrametric.um_N_, _param);
 			else if (this->modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
-				this->modP.power_law_random_bandwidth.plrb_a_ = _param;
+				this->modP.power_law_random_bandwidth.plrb_a_[0] = _param;
 
 			// define the models
 			this->resetEd();
@@ -212,24 +213,17 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 */
 template<typename _T>
 std::array<double, 6> UI::checkETH_statistics_mat_elems(
-	u64 _startElem, 
-	u64 _stopElem, 
+	u64 _startElem, u64 _stopElem, std::atomic<size_t>& _statiter,  int _th,
 	u64 _Nh,
-	std::atomic<size_t>& _statiter, 
-	std::shared_ptr<Hamiltonian<_T>> _H,
+	Hamiltonian<_T>* _H,
 	const arma::Mat<_T>& _overlaps, 
-	HistogramAverage<double>& _histAv,
-	HistogramAverage<double>& _histAvTypical,
-	arma::Mat<double>& _offdiagElemsOmega,
-	arma::Mat<double>& _offdiagElemsOmegaLow,
-	VMAT<_T>& _offdiagElems,
-	VMAT<_T>& _offdiagElemsLow,
-	VMAT<double>& _offdiagElemesStat,
+	HistogramAverage<double>& _histAv, HistogramAverage<double>& _histAvTypical,
+	arma::Mat<double>* _offdiagElemsOmega, arma::Mat<double>* _offdiagElemsOmegaLow,
+	VMAT<_T>* _offdiagElems, VMAT<_T>* _offdiagElemsLow,
+	VMAT<double>* _offdiagElemesStat,
 	const double _bandwidth,
-	const double _avEn,
-	int _opi,
-	int _r,
-	int _th)
+	const double _energyAt,
+	int _opi, int _r)
 {
 	// diagonal
 	std::array<double, 6> _offdiagElemesStat_local = {0.0};
@@ -261,7 +255,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 			const double _en_r = _H->getEigVal(j);
 
 			// check the energy difference
-			if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _avEn, this->modP.modEnDiff_ * _bandwidth))
+			if (!SystemProperties::hs_fraction_close_mean(_en_l, _en_r, _energyAt, this->modP.modEnDiff_ * _bandwidth))
 				continue;
 
 			// calculate the frequency
@@ -273,7 +267,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 			const auto& _measured	= algebra::cast<double>(_overlaps(i, j));
 
 			// save the off-diagonal elements
-
+			
 			{
 				auto _elem			= _measured;
 				auto _elemabs		= std::abs(_elem);
@@ -282,20 +276,22 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 				auto _logElem		= std::log(_elemabs);
 				auto _logElem2		= std::log(_elemabs * _elemabs);
 
-				// Accumulate statistics in thread-local storage
-				// mean
-				_offdiagElemesStat_local[0] += _elemreal;
-				// typical
-				_offdiagElemesStat_local[1] += _logElem;
-				// mean2
-				_offdiagElemesStat_local[2] += _elem2;
-				// typical2
-				_offdiagElemesStat_local[3] += _logElem2;
-				// mean4
-				_offdiagElemesStat_local[4] += _elem2 * _elem2;
-				// meanabs
-				_offdiagElemesStat_local[5] += _elemabs;
-
+				if (_offdiagElemesStat)
+				{
+					// Accumulate statistics in thread-local storage
+					// mean
+					_offdiagElemesStat_local[0] += _elemreal;
+					// typical
+					_offdiagElemesStat_local[1] += _logElem;
+					// mean2
+					_offdiagElemesStat_local[2] += _elem2;
+					// typical2
+					_offdiagElemesStat_local[3] += _logElem2;
+					// mean4
+					_offdiagElemesStat_local[4] += _elem2 * _elem2;
+					// meanabs
+					_offdiagElemesStat_local[5] += _elemabs;
+				}
 
 				// add to the histograms
 				_histAvLocal.append(w, _elem2);
@@ -303,20 +299,27 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 				_histAvTypicalLocal.append(w, _logElem2);
 				// _histAvTypicalLocal.append(w, _logElem2);
 
-				// save the values
-				if (_totalIterator_off < _elemThreadedSize && w_ov_bw <= omega_upper_cut && w_ov_bw >= omega_lower_cut)
+				if (_offdiagElems)
 				{
-					const auto _ii				= _startElem + _totalIterator_off;
-					_offdiagElemsOmega(_ii, _r)	= std::abs(w);
-					_offdiagElems.set(_opi, _ii, _r, _elemreal);
-					_totalIterator_off++;
+					// save the values
+					if (_totalIterator_off < _elemThreadedSize && w_ov_bw <= omega_upper_cut && w_ov_bw >= omega_lower_cut)
+					{
+						const auto _ii					= _startElem + _totalIterator_off;
+						(*_offdiagElemsOmega)(_ii, _r)	= std::abs(w);
+						(*_offdiagElems).set(_opi, _ii, _r, _elemreal);
+						_totalIterator_off++;
+					}
 				}
-				if (_totalIterator_off_low < _elemThreadedLowSize && w * _bandwidth < omega_lower_cut)
+				
+				if (_offdiagElemsLow)
 				{
-					const auto _ii				= _startElem + _totalIterator_off_low;
-					_offdiagElemsOmegaLow(_ii, _r)	= std::abs(w);
-					_offdiagElemsLow.set(_opi, _ii, _r, _elemreal);
-					_totalIterator_off_low++;
+					if (_totalIterator_off_low < _elemThreadedLowSize && w * _bandwidth < omega_lower_cut)
+					{
+						const auto _ii						= _startElem + _totalIterator_off_low;
+						(*_offdiagElemsOmegaLow)(_ii, _r)	= std::abs(w);
+						(*_offdiagElemsLow).set(_opi, _ii, _r, _elemreal);
+						_totalIterator_off_low++;
+					}
 				}
 
 				_statiter_local++;
@@ -343,6 +346,61 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 // -----------------------------------------------------------------------------------------------
 
+template <typename ClassType, typename _R, typename _F, typename ..._Args>
+static std::vector<_R> createFutures(ClassType* _instance,
+				std::atomic<size_t>& _totalIterator,
+                size_t _thNum,
+                bool _isParallel,
+				size_t _iterSize,				
+                _F &&f, _Args &&...args) 
+                
+{
+	if (!_isParallel)
+		_thNum = 1;
+	
+     // reserve the threads
+	std::vector<std::future<_R>> _futures;
+	_futures.reserve(_thNum);
+
+	for(auto _ithread = 0; _ithread < _thNum; ++_ithread)
+	{
+		// get the subvectors
+		u64 _startElem	= _ithread * _iterSize / _thNum;
+		u64 _stopElem	= (_ithread + 1) * _iterSize / _thNum;
+
+		// Validate indices
+		if (_startElem >= _iterSize || _stopElem > _iterSize)
+			throw std::out_of_range("Thread indices out of range");
+
+        _futures.push_back(
+            std::async(
+                [=, &_totalIterator, &_instance]() mutable { 
+					// Use mutable lambda to avoid const issues
+                    // Call the member function with all arguments
+                    return (_instance->*f)(_startElem, 
+											_stopElem, 
+											std::ref(_totalIterator), 
+											_ithread,
+											std::forward<_Args>(args)...);
+                }
+            )
+        );
+	}
+
+	std::vector<_R> _out;
+	for (auto& future : _futures) {
+		try {
+			auto _res = future.get();
+			_out.push_back(_res);
+		} catch (const std::exception& e) {
+			LOGINFO("Exception while getting future result: " + std::string(e.what()), LOG_TYPES::ERROR, 2);
+		}
+	}
+	return _out;
+}
+
+// -----------------------------------------------------------------------------------------------
+
 /*
 * @brief Check the properties of the models complying to ETH based on the Hamiltonian provided.
 * It saves the gap ratios, level statistcs, energies, and the operators.
@@ -351,8 +409,8 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 template<typename _T>
 void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 {
-	_timer.reset();
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 0);
+	_timer.reset();
 
 	// check the random field
 	size_t _Ns				= this->latP.Ntot_;
@@ -370,28 +428,36 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	std::tie(_ops, _opsN)			= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
 	// get info about the model
-	std::string modelInfo, dir = "ETH_MAT_STAT", randomStr, extension;
+	std::string modelInfo, dir 		= "ETH_MAT_STAT", randomStr, extension;
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
-	arma::Mat<double> _en			= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// energies
-	arma::Mat<double> _entroHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
-	arma::Mat<double> _entroRHalf	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
-	arma::Mat<double> _entroFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
-	arma::Mat<double> _entroRFirst  = UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
-	arma::Mat<double> _entroLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=1
-	arma::Mat<double> _entroRLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// Renyi entropy q=2
-	arma::Mat<double> _schmidFirst	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// schmid gap
-	arma::Mat<double> _schmidLast	= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// schmid gap
+	arma::Mat<double> _en, _entroHalf, _entroRHalf, _entroFirst, _entroRFirst, _entroLast, _entroRLast, _schmidFirst, _schmidLast;
+	if (this->modP.eth_entro_)
+	{
+		_en				= 	UI_DEF_MAT_D(_Nh, this->modP.modRanN_);	// energies
+		_entroHalf		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=1
+		_entroRHalf		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=2
+		_entroFirst		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=1
+		_entroRFirst 	= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=2
+		_entroLast		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=1
+		_entroRLast		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// Renyi entropy q=2
+		_schmidFirst	= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// schmid gap
+		_schmidLast		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);	// schmid gap
+	}
 
 	// information entropy and ipr
 	v_1d<double> _qs = { 0.1, 0.5, 1.0, 1.5, 2.0, 3.0 };
-	arma::Mat<double> _e_ipr01		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _e_ipr05		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _e_ipr1 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _e_ipr15 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _e_ipr2 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
-	arma::Mat<double> _e_ipr3 		= UI_DEF_MAT_D(_Nh, this->modP.modRanN_);
+	arma::Mat<double> _e_ipr01, _e_ipr05, _e_ipr1, _e_ipr15, _e_ipr2, _e_ipr3;
+	if (this->modP.eth_entro_)
+	{
+		_e_ipr01		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+		_e_ipr05		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+		_e_ipr1 		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+		_e_ipr15 		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+		_e_ipr2 		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+		_e_ipr3 		= UI_DEF_MAT_D_COND(_Nh, this->modP.modRanN_, this->modP.eth_entro_);
+	}
 
 	// gap ratios
 	v_1d<double> _gapsin(_Nh - 2, 0.0);
@@ -405,19 +471,25 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	arma::Col<double> _H2			= UI_DEF_COL_D(this->modP.modRanN_);		// Hamiltonian squared average
 
 	// create the measurem_bandwidthent class
-	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);
+	Measurement<double> _measure(this->latP.Ntot_, dir, _ops, _opsN, 1, _Nh);	
 
 	// to save the operators (those elements will be stored for each operator separately)
 	// a given matrix element <n|O|n> will be stored in i'th column of the i'th operator
 	// the n'th row in the column will be the state index
 	// the columns corresponds to realizations of disorder
 	VMAT<_T> _diagElems 			= UI_DEF_VMAT(_T, _ops.size(), _Nh, this->modP.modRanN_);
+	
 	// constraint the offdiagonals also to _Nh elements only
 	size_t _offdiagElemsSize 		= this->threadNum * _Nh;
-	VMAT<_T> _offdiagElems			= UI_DEF_VMAT(_T, _ops.size(), _offdiagElemsSize, this->modP.modRanN_);
-	VMAT<_T> _offdiagElemsLow		= UI_DEF_VMAT(_T, _ops.size(), _offdiagElemsSize, this->modP.modRanN_);
-	arma::Mat<double> _offdiagElemsOmega 	= UI_DEF_MAT_D(_offdiagElems.n_rows(0), this->modP.modRanN_); 
-	arma::Mat<double> _offdiagElemsOmegaLow = UI_DEF_MAT_D(_offdiagElems.n_rows(0), this->modP.modRanN_); 
+	VMAT<_T> _offdiagElems, _offdiagElemsLow;
+	arma::Mat<double> _offdiagElemsOmega, _offdiagElemsOmegaLow;
+	if (this->modP.eth_offd_)
+	{
+		_offdiagElems			= UI_DEF_VMAT(_T, _ops.size(), _offdiagElemsSize, this->modP.modRanN_);
+		_offdiagElemsLow		= UI_DEF_VMAT(_T, _ops.size(), _offdiagElemsSize, this->modP.modRanN_);
+		_offdiagElemsOmega 		= UI_DEF_MAT_D(_offdiagElems.n_rows(0), this->modP.modRanN_); 
+		_offdiagElemsOmegaLow 	= UI_DEF_MAT_D(_offdiagElems.n_rows(0), this->modP.modRanN_); 
+	}
 
 	// due to mobility edges, for the statistics we'll save two sets of data
 	u64 _hs_fractions_diag_stat 	= SystemProperties::hs_fraction_diagonal_cut(0.1, _Nh);
@@ -428,6 +500,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// saves the histograms of the second moments for the offdiagonal elements -- those are the f-functions for the omega dependence
 	v_1d<HistogramAverage<double>> _histAv(_ops.size(), HistogramAverage<double>(1));
 	v_1d<HistogramAverage<double>> _histAvTypical(_ops.size(), HistogramAverage<double>(1));
+
+	// histograms for other epsilons
+	v_2d<HistogramAverage<double>> _histAvEps(this->modP.eth_end_.size(), v_1d<HistogramAverage<double>>(_ops.size(), HistogramAverage<double>(1)));
+	v_2d<HistogramAverage<double>> _histAvTypicalEps(this->modP.eth_end_.size(), v_1d<HistogramAverage<double>>(_ops.size(), HistogramAverage<double>(1)));
+	auto _fidelitySusceptibility 	= UI_DEF_MAT_D_CONDT(_Nh, this->modP.modRanN_, this->modP.eth_susc_, _T);
 	
 	// ----------------------- nbins operators -----------------------
 	const size_t _nbinOperators = (size_t)(20 * std::log2(_Nh));
@@ -447,6 +524,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			saveAlgebraic(dir, "stat" + randomStr + extension, _en, "energy", true);
 
 			// entanglement entropies
+			if (this->modP.eth_entro_)
 			{	
 				saveAlgebraic(dir, "entro" + randomStr + extension, _entroHalf, "vN/half", false);
 				saveAlgebraic(dir, "entro" + randomStr + extension, _entroFirst, "vN/first", true);
@@ -461,7 +539,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				saveAlgebraic(dir, "entro" + randomStr + extension, _schmidLast, "schmid/last", true);
 			}
 
+			// fidelity susceptibility
+			if (this->modP.eth_susc_)
+				saveAlgebraic(dir, "stat" + randomStr + extension, _fidelitySusceptibility, "fidelity_susceptibility", true);
+
 			// iprs
+			if (this->modP.eth_ipr_)
 			{
 				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr01, "info/0.1", false);
 				saveAlgebraic(dir, "ipr" + randomStr + extension, _e_ipr05, "info/0.5", true);
@@ -479,14 +562,17 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			}
 
 			// offdiagonal operators saved (only append when _opi > 0)
-			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+			if (this->modP.eth_offd_)
 			{
-				auto _name = _measure.getOpGN(_opi);
-				saveAlgebraic(dir, "offdiag" + randomStr + extension, algebra::cast<double>(_offdiagElems[_opi]), _name, _opi > 0);
-				saveAlgebraic(dir, "offdiag_low" + randomStr + extension, algebra::cast<double>(_offdiagElemsLow[_opi]), _name, _opi > 0);
+				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+				{
+					auto _name = _measure.getOpGN(_opi);
+					saveAlgebraic(dir, "offdiag" + randomStr + extension, algebra::cast<double>(_offdiagElems[_opi]), _name, _opi > 0);
+					saveAlgebraic(dir, "offdiag_low" + randomStr + extension, algebra::cast<double>(_offdiagElemsLow[_opi]), _name, _opi > 0);
+				}
+				saveAlgebraic(dir, "offdiag" + randomStr + extension, _offdiagElemsOmega, "omega", true);
+				saveAlgebraic(dir, "offdiag_low" + randomStr + extension, _offdiagElemsOmegaLow, "omega", true);
 			}
-			saveAlgebraic(dir, "offdiag" + randomStr + extension, _offdiagElemsOmega, "omega", true);
-			saveAlgebraic(dir, "offdiag_low" + randomStr + extension, _offdiagElemsOmegaLow, "omega", true);
 
 			// save the statistics
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
@@ -504,11 +590,38 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// save the histograms of the operators for the f functions
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].edgesCol(), "omegas", false);
+			if (this->modP.eth_susc_)
+			{
+				for (uint _epi = 0; _epi < _histAvEps.size(); ++_epi)
+				{
+					auto e = this->modP.eth_end_[_epi];
+					saveAlgebraic(dir, "hist" + randomStr + extension, _histAvEps[_epi][0].edgesCol(), VEQP(e, 3) + "/omegas", true);
+				}
+			}
+
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 			{
 				auto _name = _measure.getOpGN(_opi);
 				saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[_opi].averages_av(), _name + "_mean", true);
 				saveAlgebraic(dir, "hist" + randomStr + extension, _histAvTypical[_opi].averages_av(true), _name + "_typical", true);
+
+				if (_histAvEps.size() > 0)
+				{
+					for (uint _epi = 0; _epi < _histAvEps.size(); ++_epi)
+					{
+						auto e = this->modP.eth_end_[_epi];
+						saveAlgebraic(dir, "hist" + randomStr + extension, _histAvEps[_epi][_opi].averages_av(), VEQP(e, 3) + "/" + _name + "_mean", true);
+						saveAlgebraic(dir, "hist" + randomStr + extension, _histAvTypicalEps[_epi][_opi].averages_av(true), VEQP(e, 3) + "/" + _name + "_typ", true);
+					}
+				}
+			}
+			if (_histAvEps.size() > 0)
+			{
+				for (uint _epi = 0; _epi < _histAvEps.size(); ++_epi)
+				{
+					auto e = this->modP.eth_end_[_epi];
+					saveAlgebraic(dir, "hist" + randomStr + extension, _histAvEps[_epi][0].edgesCol(), VEQP(e, 3) + "/_counts", true);
+				}
 			}
 			saveAlgebraic(dir, "hist" + randomStr + extension, _histAv[0].countsCol(), "_counts", true);
 
@@ -656,7 +769,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		if (_r == 0)
 		{
 			double _bwIn 		= _bandwidth(0);
-			if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+			if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M || modP.modTyp_ == MY_MODELS::QSM_M)
 				_bwIn			= Ultrametric_types::UM_default::getBandwidth(std::reinterpret_pointer_cast<Ultrametric<_T>>(_H)->get_alpha(), (int)std::log2(_Nh));
 			else if (modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
 				_bwIn			= PRLB_types::PRLB_default::getBandwidth(std::reinterpret_pointer_cast<PowerLawRandomBanded<_T>>(_H)->get_a(), (int)std::log2(_Nh));
@@ -669,7 +782,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			// values that are the limits when the 
 			// double oMax			= 2.0 * _bandwidth(0);
-			double oMax			= _bwIn;
+			double oMax			= _bwIn * 3.0;
 			double oMin			= 0.1 / (long double)_Nh;
 			//double oMax			= std::abs(_H->getEigVal(_maxIdxDiag) - _H->getEigVal(_minIdxDiag)) * 2;
 			//double oMin			= _Nh <= UI_LIMITS_MAXFULLED ? 1.0 / _Nh : 1e-3;
@@ -682,219 +795,179 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 				_histAvTypical[iHist].reset(_nbinOperators);
 				_histAvTypical[iHist].uniformLog(oMax, oMin);
+
+				// set other
+				if (!this->modP.eth_susc_)
+					continue;
+
+				for (auto iEps = 0; iEps < this->modP.eth_end_.size(); ++iEps)
+				{
+					_histAvEps[iEps][iHist].reset(_nbinOperators);
+					_histAvEps[iEps][iHist].uniformLog(oMax, oMin);
+
+					_histAvTypicalEps[iEps][iHist].reset(_nbinOperators);
+					_histAvTypicalEps[iEps][iHist].uniformLog(oMax, oMin);
+				}
 			}
 		}
 
 		// -----------------------------------------------------------------------------
-		
-		// calculator of the properties
+	
+		// entanglement entropies
+		if (this->modP.eth_entro_ && _Ns < 20)
 		{
-
-			// other measures
-			{
-
-				// entanglement entropies
-				if (_Ns < 20)
-				{
-					v_1d<int> _sites   = { 0 };
-					uint _lastSiteMask = Binary::prepareMask<int, v_1d<int>, false>(_sites, _Ns - 1);
+			v_1d<int> _sites   = { 0 };
+			uint _lastSiteMask = Binary::prepareMask<int, v_1d<int>, false>(_sites, _Ns - 1);
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threadNum)
 #endif				
-					for(size_t _idx = 0; _idx < _Nh; ++_idx)
-					{
-						// get the entanglement
-						const auto _state		= _H->getEigVecCol(_idx);
+			for(size_t _idx = 0; _idx < _Nh; ++_idx)
+			{
+				// get the entanglement
+				const auto _state		= _H->getEigVecCol(_idx);
 
-						// half of the system
-						{
-							auto _rho_v = DensityMatrix::Values::redDensMat_v(_state, uint(_Ns / 2), uint(_Ns));
-							// calculate the von Neumann entropy
-							_entroHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
-							_entroRHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
-						}
-
-						// first site
-						{
-							auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 1, uint(_Ns));
-							// calculate the von Neumann entropy
-							_entroLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
-							_entroRLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
-
-							// schmid gap
-							_schmidLast(_idx, _r)	= _rho_v(0) - _rho_v(1);
-						}
-
-						// last site 
-						{
-							auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 
-																						1, 
-																						uint(_Ns),
-																						_lastSiteMask,
-																						Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT,
-																						2);
-							// calculate the von Neumann entropy
-							_entroFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
-							_entroRFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
-
-							// schmid gap
-							_schmidFirst(_idx, _r)	= _rho_v(0) - _rho_v(1);
-						}
-					}
+				// half of the system
+				{
+					auto _rho_v = DensityMatrix::Values::redDensMat_v(_state, uint(_Ns / 2), uint(_Ns));
+					// calculate the von Neumann entropy
+					_entroHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+					_entroRHalf(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
 				}
 
-				// -----------------------------------------------------------------------------
-
-				// all elements together
-				BEGIN_CATCH_HANDLER
+				// first site
 				{
-					// get matrices
-					const auto& _matrices	= _measure.getOpG_mat();
-					const auto& _eigVec		= _H->getEigVec();
-					const double _avEn		= _H->getEnAv();
-					double _bw				= _bandwidth(_r);
+					auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 1, uint(_Ns));
+					// calculate the von Neumann entropy
+					_entroLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+					_entroRLast(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
 
-					// go through the operators
+					// schmid gap
+					_schmidLast(_idx, _r)	= _rho_v(0) - _rho_v(1);
+				}
+
+				// last site 
+				{
+					auto _rho_v 			= DensityMatrix::Values::redDensMat_v(_state, 
+																				1, 
+																				uint(_Ns),
+																				_lastSiteMask,
+																				Entropy::Entanglement::Bipartite::RHO_METHODS::SCHMIDT,
+																				2);
+					// calculate the von Neumann entropy
+					_entroFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::vonNeuman(_rho_v);
+					_entroRFirst(_idx, _r) 	= Entropy::Entanglement::Bipartite::Renyi::renyi(_rho_v, 2.0);
+
+					// schmid gap
+					_schmidFirst(_idx, _r)	= _rho_v(0) - _rho_v(1);
+				}
+			}
+		}
+
+		// -----------------------------------------------------------------------------
+
+		// calculator of the properties
+		{
+			// all elements together
+			BEGIN_CATCH_HANDLER
+			{
+				// get matrices
+				const auto& _matrices	= _measure.getOpG_mat();
+				const auto& _eigVec		= _H->getEigVec();
+				const auto& _eigVal 	= _H->getEigVal();
+				const double _avEn		= _H->getEnAv();
+				const double _bw		= _bandwidth(_r);
+
+				// go through the operators
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(check_multithread_operator(_Nh) ? this->threadNum : 1)
 #endif
-					for (int _opi = 0; _opi < _matrices.size(); _opi++)
+				for (int _opi = 0; _opi < _matrices.size(); _opi++)
+				{
+					LOGINFO("Doing operator: " + _opsN[_opi], LOG_TYPES::TRACE, 2);
+					arma::Mat<_T> _overlaps = Operators::applyOverlapMat(_eigVec, _matrices[_opi]);
+					std::atomic<size_t> _totalIteratorIn(0);
+
+					// get histograms
 					{
-						std::atomic<size_t> _totalIteratorIn(0);
-
-						LOGINFO("Doing operator: " + _opsN[_opi], LOG_TYPES::TRACE, 2);
-						arma::Mat<_T> _overlaps = Operators::applyOverlapMat(_eigVec, _matrices[_opi]);
-
-						// multi-threaded or not
-						if (!check_multithread_operator(_Nh) && this->threadNum != 1)
-						{
-
-							// reserve the threads
-							std::vector<std::future<std::array<double, 6>>> _futures;
-							_futures.reserve(this->threadNum);
-
-							for(auto _ithread = 0; _ithread < this->threadNum; ++_ithread)
-							{
-								// get the subvectors
-								u64 _startElem	= _ithread * _offdiagElemsSize / this->threadNum;
-								u64 _stopElem	= (_ithread + 1) * _offdiagElemsSize / this->threadNum;
-
-								// Validate indices
-								if (_startElem >= _offdiagElemsSize || _stopElem > _offdiagElemsSize)
-									throw std::out_of_range("Thread indices out of range");
-
-								_futures.push_back(
-									std::async(
-										std::launch::async,
-										&UI::checkETH_statistics_mat_elems<_T>, this,
-										_startElem, _stopElem, _Nh,
-										std::ref(_totalIteratorIn),
-										_H,
-										std::ref(_overlaps),
-										std::ref(_histAv[_opi]),
-										std::ref(_histAvTypical[_opi]),
-										std::ref(_offdiagElemsOmega),
-										std::ref(_offdiagElemsOmegaLow),
-										std::ref(_offdiagElems),
-										std::ref(_offdiagElemsLow),
-										std::ref(_offdiagElemesStat),
-										_bw, // Assuming _bw is a value, not a function call
-										_avEn,
-										_opi,
-										_r,
-										_ithread
-									)
-								);
-							}
-
-							for (auto& future : _futures) {
-								try {
-									auto _res = future.get();
-									for (int i = 0; i < 6; ++i) {
-										_offdiagElemesStat.add(_opi, i, _r, _res[i]);
-									}
-								} catch (const std::exception& e) {
-									LOGINFO("Exception while getting future result: " + std::string(e.what()), LOG_TYPES::ERROR, 2);
-								}
-							}
-
-							//for (auto& th : threads)
-							//	th.join();
-
-						}
-						else
-						{
-							u64 _startElem								= 0;
-							u64 _stopElem								= _offdiagElemsSize;
-
-							// calculate the statistics
-							auto _statLoc = this->checkETH_statistics_mat_elems(
-								_startElem,
-								_stopElem,
-								_Nh,
-								_totalIteratorIn,
-								_H,
-								_overlaps,
-								_histAv[_opi],
-								_histAvTypical[_opi],
-								_offdiagElemsOmega,
-								_offdiagElemsOmegaLow,
-								_offdiagElems,
-								_offdiagElemsLow,
-								_offdiagElemesStat,
-								_bw,
-								_avEn,
-								_opi,
-								_r,
-								-1);
-
+						v_1d<std::array<double, 6>> _out = createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn, this->threadNum, 
+																	!check_multithread_operator(_Nh) && this->threadNum != 1, 
+																	_offdiagElemsSize, &UI::checkETH_statistics_mat_elems<_T>, 
+																	_Nh, _H.get(),
+																	std::ref(_overlaps), std::ref(_histAv[_opi]), std::ref(_histAvTypical[_opi]),
+																	&_offdiagElemsOmega, &_offdiagElemsOmegaLow,
+																	&_offdiagElems, &_offdiagElemsLow,
+																	&_offdiagElemesStat,
+																	_bw, _avEn, _opi, _r);
+						for (auto& _o : _out)
 							for (int i = 0; i < 6; ++i)
-								_offdiagElemesStat.add(_opi, i, _r, _statLoc[i]);
-
-						}
-
-						// -----------------------------------------------------------------
-
-	
-
-
-						// ############## finalize statistics ##############
-
-						LOGINFO("Finalizing statistics for operator: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
-
-						// offdiagonal
-						{
-
-							{
-								for (uint ii = 0; ii < 6; ii++)
-									_offdiagElemesStat.divide(_opi, ii, _r, (long double)_totalIteratorIn);
-
-								// statistics
-								_offdiagElemesStat.set(_opi, 6, _r, StatisticalMeasures::gaussianity(_offdiagElemesStat.get(_opi, 5, _r), _offdiagElemesStat.get(_opi, 2, _r)));
-								_offdiagElemesStat.set(_opi, 7, _r, StatisticalMeasures::binder_cumulant(_offdiagElemesStat.get(_opi, 2, _r), _offdiagElemesStat.get(_opi, 4, _r)));
-							}
-
-							// additionally, for typical values, calculate the exponential of the mean
-							{
-								for (auto ii : { 1, 3 })
-									_offdiagElemesStat.set(_opi, ii, _r, std::exp(_offdiagElemesStat.get(_opi, ii, _r)));
-							}
-						}
-
-						//LOGINFO("Finished the offdiagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
-
-						// save the diagonal part
-						_diagElems[_opi].col(_r) = _overlaps.diag().as_col();
-
-						// save the histograms of the diagonals and offdiagonals!
-						_histOperatorsDiag[_opi].setHistogramCounts(_diagElems[_opi].col(_r), _r == 0);
-						_histOperatorsOffdiag[_opi].setHistogramCounts(_offdiagElems[_opi].col(_r), _r == 0);
-
+								_offdiagElemesStat.add(_opi, i, _r, _o[i]);
 					}
 
+					// get histograms for the epsilons
+					if (this->modP.eth_susc_)
+					{	
+						for (uint _epi = 0; _epi < this->modP.eth_end_.size(); ++_epi)
+						{
+							std::atomic<size_t> _totalIteratorIn2(0);
+							auto _energyIn = _eigVal(0) + this->modP.eth_end_[_epi] * _bw;
+							LOGINFO("Doing epsilon = " + STR(this->modP.eth_end_[_epi]) + " at " + VEQP(_energyIn, 3), LOG_TYPES::TRACE, 3);
+
+							v_1d<std::array<double, 6>> _out = createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn2, this->threadNum, 
+																	(!check_multithread_operator(_Nh) && this->threadNum != 1), 
+																	_offdiagElemsSize, &UI::checkETH_statistics_mat_elems<_T>, 
+																	_Nh, _H.get(),
+																	std::ref(_overlaps), std::ref(_histAvEps[_epi][_opi]), std::ref(_histAvTypicalEps[_epi][_opi]),
+																	nullptr, nullptr,
+																	nullptr, nullptr,
+																	nullptr,
+																	_bw, _energyIn, _opi, _r);
+						}
+					}
+
+
+					// -----------------------------------------------------------------
+
+					// fidelity susceptability
+					if (this->modP.eth_susc_)
+					{
+						auto _fidelitySusceptibilityIn = _fidelitySusceptibility.col(_r);
+						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, double(std::log2(_Nh) / _Nh), _fidelitySusceptibilityIn);
+					}
+
+					// ############## finalize statistics ##############
+
+					LOGINFO("Finalizing statistics for operator: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
+					// offdiagonal
+					{
+
+						{
+							for (uint ii = 0; ii < 6; ii++)
+								_offdiagElemesStat.divide(_opi, ii, _r, (long double)_totalIteratorIn);
+
+							// statistics
+							_offdiagElemesStat.set(_opi, 6, _r, StatisticalMeasures::gaussianity(_offdiagElemesStat.get(_opi, 5, _r), _offdiagElemesStat.get(_opi, 2, _r)));
+							_offdiagElemesStat.set(_opi, 7, _r, StatisticalMeasures::binder_cumulant(_offdiagElemesStat.get(_opi, 2, _r), _offdiagElemesStat.get(_opi, 4, _r)));
+						}
+
+						// additionally, for typical values, calculate the exponential of the mean
+						{
+							for (auto ii : { 1, 3 })
+								_offdiagElemesStat.set(_opi, ii, _r, std::exp(_offdiagElemesStat.get(_opi, ii, _r)));
+						}
+					}
+
+					//LOGINFO("Finished the offdiagonal statistics for: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
+
+					// save the diagonal part
+					_diagElems[_opi].col(_r) = _overlaps.diag().as_col();
+
+					// save the histograms of the diagonals and offdiagonals!
+					_histOperatorsDiag[_opi].setHistogramCounts(_diagElems[_opi].col(_r), _r == 0);
+					_histOperatorsOffdiag[_opi].setHistogramCounts(_offdiagElems[_opi].col(_r), _r == 0);
+
 				}
-				END_CATCH_HANDLER("Operators failed:", break;)
 			}
+			END_CATCH_HANDLER("Operators failed:", break;)
 		}
 
 		// save the checkpoints
@@ -1276,44 +1349,35 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 template void UI::checkETH_statistics<double>(std::shared_ptr<Hamiltonian<double>> _H);
 template void UI::checkETH_statistics<cpx>(std::shared_ptr<Hamiltonian<cpx>> _H);
 
-template std::array<double, 6> UI::checkETH_statistics_mat_elems<double>(
-	u64 _start,
-	u64 _end,
-	u64 _Nh,
-	std::atomic<size_t>& _statiter,
-	std::shared_ptr<Hamiltonian<double>> _H,
+template std::array<double, 6> UI::checkETH_statistics_mat_elems<double>(u64 _start, u64 _end,	std::atomic<size_t>& _statiter, int _th, u64 _Nh,
+	Hamiltonian<double>* _H,
 	const arma::Mat<double>& _overlaps,
 	HistogramAverage<double>& _histAv,
 	HistogramAverage<double>& _histAvTypical,
-	arma::Mat<double>& _offdiagElemsOmega,
-	arma::Mat<double>& _offdiagElemsOmegaLow,
-	VMAT<double>& _offdiagElems,
-	VMAT<double>& _offdiagElemsLow,
-	VMAT<double>& _offdiagElemesStat,
+	arma::Mat<double>* _offdiagElemsOmega,
+	arma::Mat<double>* _offdiagElemsOmegaLow,
+	VMAT<double>* _offdiagElems,
+	VMAT<double>* _offdiagElemsLow,
+	VMAT<double>* _offdiagElemesStat,
 	const double _bandwidth,
 	const double _avEn,
 	int _opi,
-	int _r,
-	int _th
+	int _r
 	);
-template std::array<double, 6> UI::checkETH_statistics_mat_elems<cpx>(u64 _start,
-	u64 _end,
-	u64 _Nh,
-	std::atomic<size_t>& _statiter,
-	std::shared_ptr<Hamiltonian<cpx>> _H,
+template std::array<double, 6> UI::checkETH_statistics_mat_elems<cpx>(u64 _start, u64 _end, std::atomic<size_t>& _statiter, int _th, u64 _Nh,
+	Hamiltonian<cpx>* _H,
 	const arma::Mat<cpx>& _overlaps,
 	HistogramAverage<double>& _histAv,
 	HistogramAverage<double>& _histAvTypical,
-	arma::Mat<double>& _offdiagElemsOmega,
-	arma::Mat<double>& _offdiagElemsOmegaLow,
-	VMAT<cpx>& _offdiagElems,
-	VMAT<cpx>& _offdiagElemsLow,
-	VMAT<double>& _offdiagElemesStat,
+	arma::Mat<double>* _offdiagElemsOmega,
+	arma::Mat<double>* _offdiagElemsOmegaLow,
+	VMAT<cpx>* _offdiagElems,
+	VMAT<cpx>* _offdiagElemsLow,
+	VMAT<double>* _offdiagElemesStat,
 	const double _bandwidth,
 	const double _avEn,
 	int _opi,
-	int _r,
-	int _th
+	int _r
 	);
 
 template void UI::checkETH_time_evo<double>(std::shared_ptr<Hamiltonian<double>> _H);

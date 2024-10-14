@@ -122,6 +122,14 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
 		UI_PARAM_CREATE_DEFAULT(modRanN, uint, 1);			// number of random states
 		UI_PARAM_CREATE_DEFAULT(modRanSeed, u64, 0);		// seed for the random number generator
+		
+		// eth related
+		UI_PARAM_CREATE_DEFAULT(eth_entro, bool, false);
+		UI_PARAM_CREATE_DEFAULT(eth_susc, bool, true);
+		UI_PARAM_CREATE_DEFAULT(eth_ipr, bool, true);
+		UI_PARAM_CREATE_DEFAULT(eth_offd, bool, false);
+		UI_PARAM_CREATE_DEFAULTV(eth_end, double);
+
 		UI_PARAM_CREATE_DEFAULTD(modMidStates, double, 1.0);// states in the middle of the spectrum
 		UI_PARAM_CREATE_DEFAULTD(modEnDiff, double, 1.0);	// tolerance for the energy difference of the states in offdiagonal
 		std::vector<std::string> operators;					// operators to be calculated for the model
@@ -261,7 +269,8 @@ namespace UI_PARAMS
 
 		struct power_law_random_bandwidth_t
 		{
-			UI_PARAM_CREATE_DEFAULTD(plrb_a, double, 1.0);
+			UI_PARAM_CREATE_DEFAULTV(plrb_a, double);
+			// UI_PARAM_CREATE_DEFAULTD(plrb_a, double, 1.0);
 			UI_PARAM_CREATE_DEFAULTD(plrb_b, double, 1.0);
 			UI_PARAM_CREATE_DEFAULTD(plrb_mb, bool, false);
 
@@ -482,6 +491,8 @@ namespace UI_PARAMS
 // default containers
 #define UI_DEF_VMAT(Type, _sizex, _sizey, _sizez) VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5)
 #define UI_DEF_MAT_D(sizex, sizey) -1e5 * arma::ones<arma::Mat<double>>(sizex, sizey)
+#define UI_DEF_MAT_D_COND(sizex, sizey, cond) cond ? arma::Mat<double>(sizex, sizey, arma::fill::ones) : arma::Mat<double>()
+#define UI_DEF_MAT_D_CONDT(sizex, sizey, cond, T) cond ? arma::Mat<T>(sizex, sizey, arma::fill::ones) : arma::Mat<T>()
 #define UI_DEF_COL_D(size) -1e5 * arma::ones<arma::Col<double>>(size)
 
 // ##########################################################################################################################################
@@ -579,24 +590,23 @@ private:
 
 	template<typename _T>
 	std::array<double, 6> checkETH_statistics_mat_elems(
-		u64 _start,
-		u64 _end,
-		u64 _Nh,
+		u64 _start, u64 _end,
 		std::atomic<size_t>& _statiter,
-		std::shared_ptr<Hamiltonian<_T>> _H,
+		int _th,
+		u64 _Nh,
+		Hamiltonian<_T>* _H,
 		const arma::Mat<_T>& _overlaps,
 		HistogramAverage<double>& _histAv,
 		HistogramAverage<double>& _histAvTypical,
-		arma::Mat<double>& _offdiagElemsOmega,
-		arma::Mat<double>& _offdiagElemsOmegaLow,
-		VMAT<_T>& _offdiagElems,
-		VMAT<_T>& _offdiagElemsLow,
-		VMAT<double>& _offdiagElemesStat,
+		arma::Mat<double>* _offdiagElemsOmega,
+		arma::Mat<double>* _offdiagElemsOmegaLow,
+		VMAT<_T>* _offdiagElems,
+		VMAT<_T>* _offdiagElemsLow,
+		VMAT<double>* _offdiagElemesStat,
 		const double _bandwidth = 2.0,
-		const double _avEn = 0.0,
-		int _opi = 0,
-		int _r = 0,
-		int _th	= -1
+		const double _energyAt	= 0.0,
+		int _opi 				= 0,
+		int _r 					= 0
 	);
 
 	template<typename _T>
@@ -842,7 +852,7 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 		_H = std::make_shared<SYK2<_T>>(std::move(_Hil));
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(std::move(_Hil), this->modP.power_law_random_bandwidth.plrb_a_,
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(std::move(_Hil), this->modP.power_law_random_bandwidth.plrb_a_[0],
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
@@ -913,7 +923,7 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 		_H = std::make_shared<SYK2<_T>>(_lat, 0.0);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(_lat, this->modP.power_law_random_bandwidth.plrb_a_,
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(_lat, this->modP.power_law_random_bandwidth.plrb_a_[0],
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
@@ -983,7 +993,7 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 		_H = std::make_shared<SYK2<_T>>(_Ns, 0.0);
 		break;
 	case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
-		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_,
+		_H = std::make_shared<PowerLawRandomBanded<_T>>(_Ns, this->modP.power_law_random_bandwidth.plrb_a_[0],
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:

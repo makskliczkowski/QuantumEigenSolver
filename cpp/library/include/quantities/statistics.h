@@ -6,6 +6,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 
+#include "armadillo"
 #ifndef SYSTEM_PROPERTIES_H
 #define SYSTEM_PROPERTIES_H
 
@@ -232,6 +233,97 @@ namespace SystemProperties
 		}
 
 	}
+
+	// ---------------------------------------------------------------------------
+
+	// --------------------------- S P E C T R A L S -----------------------------
+
+	// ---------------------------------------------------------------------------
+
+	namespace AGP
+	{
+		/*
+		* @brief Calculate the fidelity susceptability of the perturbation. The fidelity susceptability
+		* is calculated based on the energies and overlaps of the system. The perturbation is given by the
+		* matrix V (the perturbation matrix) and the cutoff mu.
+		* @param _idx - the index of the energy
+		* @param _energies - the energies of the system
+		* @param _V - the perturbation matrix
+		* @param _mu - the cutoff
+		* @returns the fidelity susceptability for a given index (state)
+		*/
+		template <typename _T, typename _ET>
+		[[nodiscard]] 
+		inline _T fidelity_susceptability(const size_t _idx, const _ET& _energies, const GeneralizedMatrix<_T>& _V, double _mu)
+		{
+			// energy at _idx
+			double _E 			= _energies(_idx);
+
+			// go through other elements
+			auto _Velems 					= 	_V.row(_idx);
+			const arma::Col<double> _omm  	= 	arma::square(_energies - _E);
+			const double _mu2				= 	_mu * _mu;
+
+			// calculate the sum
+			_T _sum 		= 	0.0;
+			for (size_t i = 0; i < _energies.size(); ++i)
+			{
+				if (i == _idx)
+					continue;
+
+				auto _nom = 	_Velems(i) * algebra::conjugate(_Velems(i)) * _omm(i);
+				auto _den = 	(_omm(i) + _mu2);
+				_sum 	  += 	_nom / _den;
+			}
+			return _sum;
+		}
+
+		template <typename _T, typename _ET>
+		[[nodiscard]]
+		inline _T fidelity_susceptability(const size_t _idx, const _ET& _energies, const arma::Mat<_T>& _V, double _mu)
+		{
+			// energy at _idx
+			double _E 						= _energies(_idx);
+
+			// go through other elements
+			auto _Velems 					= 	_V.row(_idx);
+			const arma::Col<double> _omm 	= 	arma::square(_energies - _E);
+			const double _mu2				= 	_mu * _mu;
+
+			// calculate the sum
+			_T _sum 		= 	0.0;
+			for (size_t i = 0; i < _energies.size(); ++i)
+			{
+				if (i == _idx)
+					continue;
+
+				auto _nom = 	_Velems(i) * algebra::conjugate(_Velems(i)) * _omm(i);
+				auto _den = 	(_omm(i) + _mu2);
+				_sum 	  += 	_nom / _den;
+			}
+			return _sum;
+		}
+
+		template <typename _T, typename _ET >
+		inline void fidelity_susceptability_tot(const _ET& _energies, const GeneralizedMatrix<_T>& _V, double _mu, arma::subview_col<_T>& _out)
+		{
+			// _out.set_size(_energies.size());
+#pragma omp parallel for 
+			for (size_t i = 0; i < _energies.size(); ++i)
+				_out(i) = fidelity_susceptability<_T, _ET>(i, _energies, _V, _mu);
+		}
+
+		template <typename _T, typename _ET>
+		inline void fidelity_susceptability_tot(const _ET& _energies, const arma::Mat<_T>& _V, double _mu, arma::subview_col<_T>& _out)
+		{
+			// _out.set_size(_energies.size());
+#pragma omp parallel for
+			for (size_t i = 0; i < _energies.size(); ++i)
+				_out(i) = fidelity_susceptability<_T, _ET>(i, _energies, _V, _mu);
+		}
+		// ---------------------------------------------------------------------------
+	};
+
 
 	// ---------------------------------------------------------------------------
 

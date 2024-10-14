@@ -116,6 +116,14 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(modP, modRanSeed);
 		SETOPTION(modP, modMidStates);
 		SETOPTION(modP, modEnDiff);
+
+		// eth
+		SETOPTION(modP, eth_entro);
+		SETOPTION(modP, eth_susc);
+		SETOPTION(modP, eth_ipr);
+		SETOPTION(modP, eth_offd);
+		SETOPTIONVECTORRESIZET(modP, eth_end, 10, double);
+
 		// set operators vector
 		this->setOption<std::string>(modP.operators, argv, "op", "sz/L", true);
 
@@ -139,7 +147,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 			// --- power-law ---
 			{
-				SETOPTION(modP.power_law_random_bandwidth, plrb_a);
+				SETOPTIONVECTORRESIZET(modP.power_law_random_bandwidth, plrb_a, 10, double);
+				// SETOPTION(modP.power_law_random_bandwidth, plrb_a);
 				SETOPTION(modP.power_law_random_bandwidth, plrb_b);
 				SETOPTION(modP.power_law_random_bandwidth, plrb_mb);
 			}
