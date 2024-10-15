@@ -283,24 +283,29 @@ namespace SystemProperties
 		inline _T fidelity_susceptability(const size_t _idx, const _ET& _energies, const arma::Mat<_T>& _V, double _mu)
 		{
 			// energy at _idx
-			double _E 						= _energies(_idx);
+			double _E 						= 	_energies(_idx);
 
-			// go through other elements
-			auto _Velems 					= 	_V.row(_idx);
-			const arma::Col<double> _omm 	= 	arma::square(_energies - _E);
-			const double _mu2				= 	_mu * _mu;
+			// Precompute constants
+			const arma::Row<_T> _Velems 	= _V.row(_idx);
+			const arma::Col<double> _omm 	= arma::square(_energies - _E);
+			const double _mu2 				= _mu * _mu;
 
-			// calculate the sum
-			_T _sum 		= 	0.0;
+			// Accumulate the sum
+			_T _sum = 0.0;
 			for (size_t i = 0; i < _energies.size(); ++i)
 			{
-				if (i == _idx)
-					continue;
+				if (i == _idx) continue;
 
-				auto _nom = 	_Velems(i) * algebra::conjugate(_Velems(i)) * _omm(i);
-				auto _den = 	(_omm(i) + _mu2);
-				_sum 	  += 	_nom / _den;
+				// Use std::norm to compute |V_nm|^2 efficiently
+				double _V_sq = std::norm(_Velems(i));
+
+				// Precompute the denominator once
+				double _den = _omm(i) + _mu2;
+
+				// Accumulate the result
+				_sum += (_V_sq * _omm(i)) / (_den * _den);
 			}
+
 			return _sum;
 		}
 

@@ -112,7 +112,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 	{
 		// model type
 		SETOPTIONV(modP, modTyp, "mod");
-		SETOPTION(modP, modRanN);
+		this->modP.modRanN_ = { 1 };
+		SETOPTIONVECTORRESIZET(modP, modRanN, 10, uint);
 		SETOPTION(modP, modRanSeed);
 		SETOPTION(modP, modMidStates);
 		SETOPTION(modP, modEnDiff);
@@ -201,7 +202,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 				this->modP.qsm.resizeQSM();
 				
 				// set
-				SETOPTIONVECTOR(modP.qsm, qsm_alpha);
+				SETOPTIONVECTORRESIZET(modP.qsm, qsm_alpha, 10, double);
 				SETOPTIONVECTOR(modP.qsm, qsm_xi);
 				SETOPTIONVECTOR(modP.qsm, qsm_h);
 			}

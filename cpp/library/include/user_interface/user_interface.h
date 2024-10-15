@@ -120,8 +120,9 @@ namespace UI_PARAMS
 		// ################################## TYPE ##################################
 		
 		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
-		UI_PARAM_CREATE_DEFAULT(modRanN, uint, 1);			// number of random states
+		UI_PARAM_CREATE_DEFAULTV(modRanN, uint);			// number of random states
 		UI_PARAM_CREATE_DEFAULT(modRanSeed, u64, 0);		// seed for the random number generator
+		UI_PARAM_CREATE_DEFAULT(modRanNIdx, uint, 0);		// index of the random state
 		
 		// eth related
 		UI_PARAM_CREATE_DEFAULT(eth_entro, bool, false);
@@ -281,6 +282,8 @@ namespace UI_PARAMS
 		// #####################################
 
 		// -------------------------------------
+		uint getRanReal(uint i) const { return i < this->modRanN_.size() ? this->modRanN_[i] : this->modRanN_[this->modRanN_.size()-1]; 	};
+		uint getRanReal() 		const { return this->modRanNIdx_ < this->modRanN_.size() ? this->modRanN_[this->modRanNIdx_] : this->modRanN_[this->modRanN_.size()-1]; };
 
 		void setDefault() 
 		{
@@ -289,6 +292,7 @@ namespace UI_PARAMS
 			// -------------------------------------
 			// default operators
 			this->operators = {"sz/L", "sz/1"};
+			this->modRanN_ = { 1 };
 
 			// -------------------------------------
 			// SPIN
@@ -826,9 +830,13 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.heiJ_, this->modP.heiDlt_, this->modP.heiHz_, this->modP.heiHx_);
 		break;
 	case MY_MODELS::QSM_M:
-		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
-			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
-			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		{
+			v_1d<double> _ain(_Hil.getNs() - this->modP.qsm.qsm_N_);
+			std::fill(_ain.begin(), _ain.end(), this->modP.qsm.qsm_alpha_[0]);
+			_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+				this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+				_ain, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		}
 		break;
 	case MY_MODELS::RP_M:
 		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
@@ -898,9 +906,13 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 		break;
 		// --------------------------- RANDOM MODELS ---------------------------
 	case MY_MODELS::QSM_M:
-		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
-			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
-			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		{
+			v_1d<double> _ain(_lat->get_Ns() - this->modP.qsm.qsm_N_);
+			std::fill(_ain.begin(), _ain.end(), this->modP.qsm.qsm_alpha_[0]);
+			_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+				this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+				_ain, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		}
 		break;
 	case MY_MODELS::RP_M:
 		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
@@ -968,9 +980,11 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 		break;
 		// --------------------------- RANDOM MODELS ---------------------------
 	case MY_MODELS::QSM_M:
-		_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
-			this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
-			this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		{
+			_H = std::make_shared<QSM<_T>>(std::move(_Hil), 
+				this->modP.qsm.qsm_N_, this->modP.qsm.qsm_gamma_, this->modP.qsm.qsm_g0_,
+				this->modP.qsm.qsm_alpha_, this->modP.qsm.qsm_h_, this->modP.qsm.qsm_xi_);
+		}
 		break;
 	case MY_MODELS::RP_M:
 		_H = std::make_shared<RosenzweigPorter<_T>>(std::move(_Hil), 
