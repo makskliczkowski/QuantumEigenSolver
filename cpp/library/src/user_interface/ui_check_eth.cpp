@@ -469,7 +469,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	arma::Col<double> _gaps, _meanEn, _meanEnIdx, _meanlvl, _bandwidth, _H2;
 	arma::Mat<double> _gapsall;
 	{
-		_gaps		= UI_DEF_COL_D(_Nh - 2);
+		_gaps		= UI_DEF_COL_D(this->modP.getRanReal());
 		_gapsall	= UI_DEF_MAT_D(_Nh - 2, this->modP.getRanReal());
 		_meanEn		= UI_DEF_COL_D(this->modP.getRanReal());
 		_meanEnIdx	= UI_DEF_COL_D(this->modP.getRanReal());
@@ -694,29 +694,29 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				// -----------------------------------------------------------------------------
 
 				// get the average energy index and the points around it on the diagonal
-				// u64 _minIdxDiag_cut			= 0;
-				// u64 _maxIdxDiag_cut			= _Nh;
+				u64 _minIdxDiag_cut			= 0;
+				u64 _maxIdxDiag_cut			= _Nh;
 
-				// // set
-				// std::tie(_minIdxDiag_cut, _maxIdxDiag_cut) = _H->getEnArndAvIdx(_hs_fractions_diag_stat / 2, _hs_fractions_diag_stat / 2);
-				// if(_minIdxDiag_cut == 0 || _maxIdxDiag_cut == 0)
-				// 	throw std::runtime_error("Energy indices are zero!");
-				// else if(_minIdxDiag_cut == _maxIdxDiag_cut)
-				// 	throw std::runtime_error("Energy indices are the same!");
-				// else if (_minIdxDiag_cut >= _maxIdxDiag_cut)
-				// 	throw std::runtime_error("Energy indices are wrong!");
+				// set
+				std::tie(_minIdxDiag_cut, _maxIdxDiag_cut) = _H->getEnArndAvIdx(_hs_fractions_diag_stat / 2, _hs_fractions_diag_stat / 2);
+				if(_minIdxDiag_cut == 0 || _maxIdxDiag_cut == 0)
+					throw std::runtime_error("Energy indices are zero!");
+				else if(_minIdxDiag_cut == _maxIdxDiag_cut)
+					throw std::runtime_error("Energy indices are the same!");
+				else if (_minIdxDiag_cut >= _maxIdxDiag_cut)
+					throw std::runtime_error("Energy indices are wrong!");
 
-				// // -----------------------------------------------------------------------------
+				// -----------------------------------------------------------------------------
 
-				// const arma::Col<double> _energies_cut = _energies.subvec(_minIdxDiag_cut, _maxIdxDiag_cut - 1).as_col();
-				// // calculate the eigenlevel statistics
-				// _gaps(_r)			=	SystemProperties::eigenlevel_statistics(_energies_cut);
+				const arma::Col<double> _energies_cut = _energies.subvec(_minIdxDiag_cut, _maxIdxDiag_cut - 1).as_col();
+				// calculate the eigenlevel statistics
+				_gaps(_r)			=	SystemProperties::eigenlevel_statistics(_energies_cut);
 					
-				// SystemProperties::eigenlevel_statistics(_energies.begin(), _energies.end(), _gapsin);
-				// _gapsall.col(_r)	=	arma::Col<double>(_gapsin);
+				SystemProperties::eigenlevel_statistics(_energies.begin(), _energies.end(), _gapsin);
+				_gapsall.col(_r)	=	arma::Col<double>(_gapsin);
 
-				// LOGINFO(StrParser::colorize(VEQ(_gaps(_r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
-				// LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
+				LOGINFO(StrParser::colorize(VEQ(_gaps(_r)), StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
+				LOGINFO(_timer.point(STR(_r)), "Gap ratios", 1);
 
 				// -----------------------------------------------------------------------------
 
@@ -727,22 +727,22 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				// -----------------------------------------------------------------------------
 				
 				// ipr etc.
-				// {
-				// 	#pragma omp parallel for num_threads(this->threadNum)
-				// 	for(size_t _idx = 0; _idx < _Nh; ++_idx)
-				// 	{
-				// 		// get the entanglement
-				// 		const arma::Col<_T> _st = _H->getEigVec(_idx);
+				{
+					#pragma omp parallel for num_threads(this->threadNum)
+					for(size_t _idx = 0; _idx < _Nh; ++_idx)
+					{
+						// get the entanglement
+						const arma::Col<_T> _st = _H->getEigVec(_idx);
 
-				// 		// get the entropies
-				// 		_e_ipr01(_r, _idx)	= SystemProperties::participation_entropy(_st, 0.1);
-				// 		_e_ipr05(_r, _idx)	= SystemProperties::participation_entropy(_st, 0.5);
-				// 		_e_ipr1(_r, _idx)	= SystemProperties::information_entropy(_st);
-				// 		_e_ipr15(_r, _idx)	= SystemProperties::participation_entropy(_st, 1.5);
-				// 		_e_ipr2(_r, _idx)	= SystemProperties::participation_entropy(_st, 2.0);
-				// 		_e_ipr3(_r, _idx)	= SystemProperties::participation_entropy(_st, 3.0);
-				// 	}
-				// }
+						// get the entropies
+						_e_ipr01(_idx, _r)	= SystemProperties::participation_entropy(_st, 0.1);
+						_e_ipr05(_idx, _r)	= SystemProperties::participation_entropy(_st, 0.5);
+						_e_ipr1(_idx, _r)	= SystemProperties::information_entropy(_st);
+						_e_ipr15(_idx, _r)	= SystemProperties::participation_entropy(_st, 1.5);
+						_e_ipr2(_idx, _r)	= SystemProperties::participation_entropy(_st, 2.0);
+						_e_ipr3(_idx, _r)	= SystemProperties::participation_entropy(_st, 3.0);
+					}
+				}
 
 				// -----------------------------------------------------------------------------
 			}
