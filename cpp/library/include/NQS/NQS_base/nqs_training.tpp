@@ -26,23 +26,23 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 {
 	{
 		// make the pbar!
-		this->pBar_ = pBar(progPrc, _par.mcSteps);
+		this->pBar_ = pBar(progPrc, _par.MC_sam_);
 
 		// set the info about training
 		_par.hi();
 
 		// set the derivatives to fullsize
-		this->derivativesReset(_par.nBlck);
+		this->derivativesReset(_par.nblck_);
 
 		// set the size of the containers for the lower states
-		this->lower_states_.setDerivContSize(_par.nBlck, _par.nBlck);
+		this->lower_states_.setDerivContSize(_par.nblck_, _par.nblck_);
 	}
 	TIMER_CREATE(_timer);
 
 	// save all average weights for covariance matrix
-	arma::Col<_T> meanEn(_par.mcSteps, arma::fill::zeros);
-	// history of energies - here we save the local energies at each block
-	arma::Col<_T> En(_par.nBlck, arma::fill::zeros);
+	arma::Col<_T> meanEn(_par.MC_sam_, arma::fill::zeros);
+	// history of energies (for given weights) - here we save the local energies at each block
+	arma::Col<_T> En(_par.nblck_, arma::fill::zeros);
 	// set the random state at the begining and the number of flips
 	{
 		this->setRandomState();
@@ -50,19 +50,20 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 	}
 
 	// go through the Monte Carlo steps
-	for (uint i = 1; i <= _par.mcSteps; ++i)
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{
 		// set the random state at the begining
-		this->setRandomState();
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
 
 		// thermalize
-		this->blockSample(_par.nThrm, NQS_STATE, false);
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
-		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) {
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) {
 
 			// sample them!
-			this->blockSample(_par.bSize, NQS_STATE, false);
+			this->blockSample(_par.bsize_, NQS_STATE, false);
 
 			// calculate the gradient at each point of the iteration! - this is implementation specific!!!
 			this->grad(this->curVec_, _taken);
@@ -72,15 +73,12 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 
 			// calculate the excited states overlaps for the gradient - if used
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-				this->lower_states_.ratios_excited_[_low](_taken) = this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_);
+				this->lower_states_.ratios_excited_[_low](_taken) = std::exp(this->lower_states_.ansatzlog(this->curVec_, _low) - this->ansatzlog(this->curVec_));
 		}
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-		{
-			std::function<_T(Operators::_OP_V_T_CR)> _f = [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); };
-			this->lower_states_.collectRatiosLower(_low, _f);
-		}
+			this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatzlog(_v); });
 		
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
 		TIMER_START_MEASURE(this->gradFinal(En), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
@@ -129,25 +127,26 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _p
 	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
-	for (uint i = 1; i <= _par.mcSteps; ++i)
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{	
 		// random flip
-		this->setRandomState();
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
 
 		// remove autocorrelations and thermalize
-		this->blockSample(_par.nThrm, NQS_STATE, false);
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(_par.bSize, NQS_STATE, false);
+			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
 			_meas.measure(this->curVec_, opFun);
 		}
 		// normalize the measurements - this also creates a new block of measurements
-		_meas.normalize(_par.nBlck);												
+		_meas.normalize(_par.nblck_);												
 	}
 }
 
@@ -167,25 +166,26 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
-	for (uint i = 1; i <= _par.mcSteps; ++i)
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{	
 		// random flip
-		this->setRandomState();
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
 
 		// remove autocorrelations and thermalizes
-		this->blockSample(_par.nThrm, NQS_STATE, false);
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(_par.bSize, NQS_STATE, false);
+			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
 			NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, opFun, _cont);
 		}
 		// normalize the measurements - this also creates a new block of measurements
-		NQSAv::MeasurementNQS<_T>::normalize(_par.nBlck, _cont);												
+		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);												
 	}
 }
 
@@ -207,16 +207,15 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 																	bool _collectEn)
 {																							
 	{
-		this->pBar_	= pBar(20, _par.mcSteps);
+		this->pBar_	= pBar(20, _par.MC_sam_);
 		_par.hi("Collect: ");
 	}
 	TIMER_CREATE(_timer);
 
 	arma::Col<_T> meanEn, En;
-	if (_collectEn)
-	{
-		meanEn 	= arma::Col<_T>(_par.mcSteps, arma::fill::zeros);
-		En 		= arma::Col<_T>(_par.nBlck, arma::fill::zeros);
+	if (_collectEn) {
+		meanEn 	= arma::Col<_T>(_par.MC_sam_, arma::fill::zeros);
+		En 		= arma::Col<_T>(_par.nblck_, arma::fill::zeros);
 	}
 
 	// set the random state at the begining
@@ -226,19 +225,19 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
-	for (uint i = 1; i <= _par.mcSteps; ++i)
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{
 		// random flip
 		this->setRandomState();
 
 		// remove autocorrelations
-		this->blockSample(_par.nThrm, NQS_STATE, false);
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(_par.bSize, NQS_STATE, false);
+			this->blockSample(_par.bsize_, NQS_STATE, false);
 
 			if (_collectEn) En(_taken) = this->locEnKernel();
 			
@@ -248,7 +247,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
-		_meas.normalize(_par.nBlck);												// normalize the measurements
+		_meas.normalize(_par.nblck_);												// normalize the measurements
 		meanEn(i - 1) = arma::mean(En); 											// save the mean energy
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
@@ -268,23 +267,24 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 
 	// go through the number of samples to be collected
 	_T _values = 0.0;
-	for (uint i = 1; i <= _par.mcSteps; ++i)
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{	
 		// random flip
-		this->setRandomState();
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
 
 		// remove autocorrelations and thermalizes
-		this->blockSample(_par.nThrm, NQS_STATE, false);
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) 
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(_par.bSize, NQS_STATE, false);
+			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// calculate f(s) / \psi(s)
-			_values += _f(this->curVec_) / this->ansatz(this->curVec_);
+			_values += std::exp(_f(this->curVec_) - this->ansatz(this->curVec_));
 		}
-		_container(i - 1) = _values / (double)_par.nBlck;												
+		_container(i - 1) = _values / (double)_par.nblck_;												
 	}
 }

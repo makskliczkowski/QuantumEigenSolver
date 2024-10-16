@@ -165,16 +165,20 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 	{
 		// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
-		auto& ratios_excited 	= this->lower_states_.ratios_excited_[_low];
-		auto& ratios_lower 		= this->lower_states_.ratios_lower_[_low];
-		auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];
-		auto _meanExcited 		= arma::mean(ratios_excited);
-		auto _meanLower 		= arma::mean(ratios_lower);
-		auto _diff 				= ratios_excited - _meanExcited;
+		auto& ratios_excited= this->lower_states_.ratios_excited_[_low];	// <Psi_W / Psi_W_j> evaluated at W_j - column vector
+		auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];		// <Psi_W_j / Psi_W> evaluated at W - column vector
+		auto& f_lower_b 	= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states
+		auto _meanLower 	= arma::mean(ratios_lower);						// mean of the ratios in the lower state
+		this->F_ 			+= _meanLower * f_lower_b * arma::cov(this->derivativesC_, ratios_excited, 1);
+
+		// manually
+		
+		// auto _meanExcited 		= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+		// auto _diff 				= ratios_excited - _meanExcited;				// 
 
 		// multiply each row of \Delta _k* with the difference at each realization (each element of the row)
 		// and then multiply with the mean of the lower states
-		this->F_ += (f_lower_b * _meanLower) * arma::mean(this->derivativesC_.each_col() % _diff, 0).t();
+		// this->F_ += (f_lower_b * _meanLower) * arma::mean(this->derivativesC_.each_col() % _diff, 0).t();
 	}
 	
 #ifdef NQS_USESR

@@ -80,6 +80,7 @@ struct NQS_lower_t
 
     _T collectLowerEnergy(uint i);
     _T ansatz(Operators::_OP_V_T_CR _v, int _low = 0) const         { return this->f_lower[_low]->ansatz(_v); };
+    _T ansatzlog(Operators::_OP_V_T_CR _v, int _low = 0) const      { return this->f_lower[_low]->ansatzlog(_v); };
    
     // ##########################################################################################################################################
 
@@ -97,11 +98,6 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, NQS
 {
     this->containerP_ = Operators::Containers::OperatorContainer<_T>(_Ns);
     this->containerP_.decideSize();
-
-    this->train_lower_.nBlck    = 64;
-    this->train_lower_.nThrm    = 64;
-    this->train_lower_.mcSteps  = 1;
-    this->train_lower_.bSize    = 1;
 
     // set constant functions
     this->const_fun_    = [](u64 _s)                    -> _T { return _T(1.0); };
@@ -157,8 +153,7 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint 
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectRatiosLower(uint i, 
-                                                std::function<_T(Operators::_OP_V_T_CR)> _f)
+inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectRatiosLower(uint i, std::function<_T(Operators::_OP_V_T_CR)> _f)
 {
     if (this->f_lower_size_ == 0)
         return;

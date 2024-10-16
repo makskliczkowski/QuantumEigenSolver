@@ -112,6 +112,7 @@ public:
 	
 	// --------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in) 					const -> _T override;
+	virtual auto ansatzlog(const NQSS& _in) 				const -> _T override;
 	virtual auto ansatz_ratio(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
 };	
@@ -135,6 +136,12 @@ _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 	return std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in));
 	// / std::sqrt(this->info_p_.nVis_);
 };
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T RBM<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) const
+{
+	return arma::dot(this->bV_, _in) + arma::sum(arma::log(this->coshF(_in)));
+}
 
 ////////////////////////////////////////////////////////////////////////////
 

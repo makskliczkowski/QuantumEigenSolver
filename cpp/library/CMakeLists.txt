@@ -261,8 +261,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 # Additional flags for specific OS platforms
+message(STATUS "Using Compiler: ${CMAKE_CXX_COMPILER}")
 if (OS_PLATFORM STREQUAL "linux")
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+    if (CMAKE_CXX_COMPILER STREQUAL "icpx")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -qopenmp -D_DEBUG")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -qopenmp")
     else()
@@ -284,6 +285,16 @@ add_custom_target(redirect_output ALL DEPENDS ${OUTPUT_FILE})
 add_custom_target(build_all
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
     COMMAND ${CMAKE_COMMAND} --build .
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_deb
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_rel
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
     COMMAND ${CMAKE_COMMAND} --build .
 )

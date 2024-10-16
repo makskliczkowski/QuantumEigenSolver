@@ -176,6 +176,7 @@ public:
 	auto getNPP()							const -> uint		{ return this->nPP_;														};
 	// --------------------- F I N A L E -----------------------
 	auto ansatz(const NQSS& _in)			const -> _T			override final;
+	auto ansatzlog(const NQSS& _in)			const -> _T			override final;
 	auto ansatz_ratio(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 			const -> _T override final;
 };
@@ -223,6 +224,12 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
 	// set the Jacobian before!
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz(_in) * this->getPfaffian(_in); //* std::pow(2.0, this->n_hidden)
 };
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) const
+{
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatzlog(_in) + std::log(this->getPfaffian(_in));
+}
 
 /*
 * @brief calculates the ratio of the two RBM-PP states - used for calculating the excited states (_other->ansatz / this->ansatz)

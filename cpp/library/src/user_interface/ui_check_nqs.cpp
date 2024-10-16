@@ -126,12 +126,16 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 									_opsC, this->threadNum);
 
 	// start the simulation
-	NQS_train_t _par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
-	arma::Col<_T> _EN(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
-	_EN.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS->train(_par, this->quiet, _timer.start(), 10);
-
-	_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
-	_EN.subvec(this->nqsP.nMcSteps_, _EN.size() - 1) = _NQS->collect(_par, this->quiet, _timer.start(), _meas);
+	NQS_train_t _parT(this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_th_, 
+					 this->nqsP.nqs_tr_mc_, this->nqsP.nqs_tr_bs_, 
+					 this->nqsP.nFlips_, dir);
+	NQS_train_t _parC(this->nqsP.nqs_col_mc_, this->nqsP.nqs_col_th_, 
+					 this->nqsP.nqs_col_bn_, this->nqsP.nqs_col_bs_, 
+					 this->nqsP.nFlips_, dir);
+					 
+	arma::Col<_T> _EN(_parT.MC_sam_ + _parC.MC_sam_, arma::fill::zeros);
+	_EN.subvec(0, _parT.MC_sam_ - 1) = _NQS->train(_parT, this->quiet, _timer.start(), 10);
+	_EN.subvec(_parT.MC_sam_, _EN.size() - 1) = _NQS->collect(_parC, this->quiet, _timer.start(), _meas);
 
 	// save the energies
 	arma::Mat<double> _ENSM(_EN.size(), 2, arma::fill::zeros);
@@ -139,7 +143,7 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 	_ENSM.col(1)	= arma::imag(_EN);
 
 	// save energy
-	auto perc		= int(this->nqsP.nMcSamples_ / 20);
+	auto perc		= int(_parT.MC_sam_ / 20);
 	perc			= perc == 0 ? 1 : perc;
 	auto ENQS_0		= arma::mean(_ENSM.col(0).tail(perc));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
@@ -204,9 +208,18 @@ void UI::nqsExcited()
 		LOGINFO("Found the ED groundstate to be EED_2 = " + STRP(_H->getEigVal(2), 7), LOG_TYPES::TRACE, 2);
 	}
 
-	arma::Col<_T> _EN0(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
-	arma::Col<_T> _EN1(this->nqsP.nMcSteps_ + this->nqsP.nMcSamples_, arma::fill::zeros);
+	NQS_train_t _parT(this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_th_, 
+					this->nqsP.nqs_tr_mc_, this->nqsP.nqs_tr_bs_, 
+					this->nqsP.nFlips_, dir);
+	NQS_train_t _parC(this->nqsP.nqs_col_mc_, this->nqsP.nqs_col_th_, 
+					this->nqsP.nqs_col_bn_, this->nqsP.nqs_col_bs_, 
+					this->nqsP.nFlips_, dir);
+	NQS_train_t _parE(this->nqsP.nqs_col_mc_, this->nqsP.nqs_col_th_, 
+					this->nqsP.nqs_col_bn_, this->nqsP.nqs_col_bs_, 
+					this->nqsP.nFlips_, dir);
 
+	arma::Col<_T> _EN0(_parT.MC_sam_ + _parC.MC_sam_, arma::fill::zeros);
+	arma::Col<_T> _EN1(_parT.MC_sam_ + _parC.MC_sam_, arma::fill::zeros);
 
 	// set the operators to save
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>> _opsG = {};
@@ -217,20 +230,17 @@ void UI::nqsExcited()
 									_opsL, 
 									_opsC, this->threadNum);
 	// train the ground state
-	NQS_train_t _par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
-	_EN0.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS_0->train(_par, this->quiet, _timer.start(), 25);
-	_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
-	_EN0.subvec(this->nqsP.nMcSteps_, _EN0.size() - 1) = _NQS_0->collect(_par, this->quiet, _timer.start(), _meas, true);
+	_EN0.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_0->train(_parT, this->quiet, _timer.start(), 25);
+	_EN0.subvec(_parT.MC_sam_, _EN0.size() - 1) = _NQS_0->collect(_parC, this->quiet, _timer.start(), _meas, true);
 
-	auto perc		= int(this->nqsP.nMcSamples_ / 20);
-	perc			= perc == 0 ? 1 : perc;
+	auto perc		= int(_parT.MC_sam_ / 20) == 0 ? 1 : int(_parT.MC_sam_ / 20);
 	auto ENQS_0		= arma::mean(_EN0.col(0).tail(perc));
 	LOGINFOG("Found the NQS groundstate to be ENQS_0 = " + STRP(ENQS_0, 7), LOG_TYPES::TRACE, 2);
 	
 	// create the excited state
 	{
 		v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_0_p 	= { _NQS_0 };
-		v_1d<double> _betas 									= { 3e-1 };
+		v_1d<double> _betas 									= { 1e-2 };
 		if (this->nqsP.type_ == NQSTYPES::RBM_T)
 		{
 			_NQS_1 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
@@ -239,11 +249,10 @@ void UI::nqsExcited()
 			_NQS_1 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
 		}
 
+		_NQS_1->setTrainParExc(_parE);
 		// train the excited state
-		_par = { this->nqsP.nMcSteps_, this->nqsP.nTherm_, this->nqsP.nBlocks_, this->nqsP.blockSize_, dir, this->nqsP.nFlips_ };
-		_EN1.subvec(0, this->nqsP.nMcSteps_ - 1) = _NQS_1->train(_par, this->quiet, _timer.start(), 25);
-		_par = { this->nqsP.nMcSamples_, this->nqsP.nTherm_, this->nqsP.nSBlocks_, this->nqsP.blockSizeS_, dir, this->nqsP.nFlips_ };
-		_EN1.subvec(this->nqsP.nMcSteps_, _EN1.size() - 1) = _NQS_1->collect(_par, this->quiet, _timer.start(), _meas, true);
+		_EN1.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_1->train(_parT, this->quiet, _timer.start(), 25);
+		_EN1.subvec(_parT.MC_sam_, _EN1.size() - 1) = _NQS_1->collect(_parC, this->quiet, _timer.start(), _meas, true);
 	}
 	auto ENQS_1		= arma::mean(_EN1.col(0).tail(perc));
 	LOGINFOG("Found the NQS excited state to be ENQS_1 = " + STRP(ENQS_1, 7), LOG_TYPES::TRACE, 2);

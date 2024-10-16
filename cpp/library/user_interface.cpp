@@ -79,20 +79,27 @@ void UI::parseModel(int argc, cmdArg& argv)
 	std::string choosen_option = "";
 	// ---------- SIMULATION PARAMETERS ----------
 	{
-		SETOPTIONV(nqsP,	nMcSteps,	"m"		);
-		SETOPTIONV(nqsP,	blockSize,	"bs"	);
-		SETOPTIONV(nqsP,	nBlocks,	"nb"	);
-		SETOPTIONV(nqsP,	nHidden,	"nh"	);
-		SETOPTIONV(nqsP,	nFlips,		"nf"	);
-		SETOPTIONV(nqsP,	type,		"nqst"	);
-		SETOPTIONV(nqsP,	nTherm,		"nt"	);
+		// training parameters
+		SETOPTION(nqsP,	nqs_tr_epo);
+		SETOPTION(nqsP,	nqs_tr_mc);
+		SETOPTION(nqsP,	nqs_tr_bs);
+		SETOPTION(nqsP,	nqs_tr_th);
+		// collecting - excited
+		SETOPTION(nqsP,	nqs_ex_mc);
+		SETOPTION(nqsP,	nqs_ex_bn);
+		SETOPTION(nqsP,	nqs_ex_th);
+		SETOPTION(nqsP,	nqc_ex_bs);
+
+		// collecting - all
+		SETOPTION(nqsP,	nqs_col_mc);
+		SETOPTION(nqsP,	nqs_col_bn);
+		SETOPTION(nqsP,	nqs_col_th);	
+		SETOPTION(nqsP,	nqs_col_bs);	
+
+		SETOPTION(nqsP,	nFlips);
+		SETOPTIONV(nqsP,	type, 		"nqst");
 		SETOPTION(nqsP,		lr					);
 		SETOPTIONV(nqsP,	loadNQS,	"lNQS"	);
-		// samples
-		SETOPTIONV(nqsP,	nMcSamples,	"mcS"	);
-		SETOPTIONV(nqsP,	blockSizeS,	"bsS"	);
-		SETOPTIONV(nqsP,	nSBlocks,	"nbS"	);
-		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
 	// ----------------- LATTICE -----------------
 	{

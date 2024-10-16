@@ -112,11 +112,15 @@ struct CondVarKernel
 
 struct NQS_train_t
 {
-	uint mcSteps	=	10;					// number of Monte Carlo Steps (outer loops for the training)
-	uint nThrm		=	0;					// number of mcSteps to thermalize (burn-in)
-	uint nBlck		= 	32;					// number of such blocks for one average step (single iteration step after which the gradient is calculated)
-	uint bSize		= 	10;					// for killing correlations - (single block size)
-	std::string dir	=	"";					// saving directory (for the weights)
+	NQS_train_t() 	= default;
+	NQS_train_t(uint _mcs, uint _mcth, uint _nblck, uint _bsize, uint _nFlip, const std::string& _dir = "") 
+		: MC_sam_(_mcs), MC_th_(_mcth), nblck_(_nblck), bsize_(_bsize), dir(_dir), nFlip(_nFlip) {};
+
+	uint MC_sam_	=	10;					// number of Monte Carlo Steps (outer loops for the training or collecting)
+	uint MC_th_		=	0;					// number of mcSteps to thermalize (burn-in)
+	uint nblck_		= 	32;					// number of such blocks for one average step (single iteration step after which the gradient is calculated)
+	uint bsize_		= 	4;					// for killing correlations - (single block size)
+	std::string dir	=	"";					// saving directory (for the weights) - try to flip this many times (many flips)
 	uint nFlip		= 	1;					// number of flips to set (default is 1)
 
 	void hi(const std::string& _in = "Train: ") const;

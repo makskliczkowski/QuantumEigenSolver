@@ -462,7 +462,7 @@ void UI::symmetriesDeg()
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	u64 Nh					= this->hamComplex->getHilbertSize();
-	const auto _realizations= this->nqsP.nBlocks_;
+	const auto _realizations= this->nqsP.nqs_col_bn_;
 
 	// create the directories
 	std::string dir			= makeDirsC(this->mainDir, 
@@ -628,7 +628,7 @@ void UI::symmetriesCreateDeg()
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	_timer.reset();
 	u64 Nh					=			this->hamComplex->getHilbertSize();
-	const auto _realizations=			this->nqsP.nBlocks_;
+	const auto _realizations=			this->nqsP.nqs_col_bn_;
 
 	// create the directories
 	std::string dir			=			makeDirsC(this->mainDir, 

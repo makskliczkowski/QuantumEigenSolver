@@ -215,7 +215,7 @@ public:
 	virtual void init()									=				0; 
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
 	virtual double setNormalization();
-
+	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -256,6 +256,7 @@ public:
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
+	virtual auto ansatzlog(const NQSS& _in)		const ->_T				= 0;
 	virtual auto ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const -> _T = 0;
 
 	// -------------------- C O N S T R U C T --------------------
