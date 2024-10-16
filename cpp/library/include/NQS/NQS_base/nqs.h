@@ -32,9 +32,9 @@
 * @tparam _stateType Type of quantum state (default: double).
 */
 template <uint _spinModes, 
-		  typename _Ht,
-		  typename _T					= _Ht, 
-		  class _stateType				= double>
+		typename _Ht,
+		typename _T			= _Ht, 
+		class _stateType	= double>
 class NQS 
 {
 	// type definitions 

@@ -31,7 +31,9 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 		// set the info about training
 		_par.hi();
 
+		// set the derivatives to fullsize
 		this->derivativesReset(_par.nBlck);
+
 		// set the size of the containers for the lower states
 		this->lower_states_.setDerivContSize(_par.nBlck, _par.nBlck);
 	}
@@ -52,10 +54,11 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 	{
 		// set the random state at the begining
 		this->setRandomState();
+
 		// thermalize
 		this->blockSample(_par.nThrm, NQS_STATE, false);
 
-		// iterate blocks - this ensures the calculation of a stochastic gradient 
+		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
 		for (uint _taken = 0; _taken < _par.nBlck; ++_taken) {
 
 			// sample them!
