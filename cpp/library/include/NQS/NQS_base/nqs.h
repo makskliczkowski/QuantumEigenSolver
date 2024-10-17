@@ -216,6 +216,8 @@ public:
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
 	virtual double setNormalization();
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
+	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv;				};
+
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------

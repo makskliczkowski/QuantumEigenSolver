@@ -1,4 +1,5 @@
 #include "include/user_interface/user_interface.h"
+#include "source/src/UserInterface/ui.h"
 int LASTLVL = 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -84,11 +85,13 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_tr_mc);
 		SETOPTION(nqsP,	nqs_tr_bs);
 		SETOPTION(nqsP,	nqs_tr_th);
+		SETOPTION(nqsP,	nqs_tr_pinv);
 		// collecting - excited
 		SETOPTION(nqsP,	nqs_ex_mc);
 		SETOPTION(nqsP,	nqs_ex_bn);
 		SETOPTION(nqsP,	nqs_ex_th);
 		SETOPTION(nqsP,	nqc_ex_bs);
+		SETOPTIONVECTORRESIZET(nqsP, nqs_ex_beta, 1, double);
 
 		// collecting - all
 		SETOPTION(nqsP,	nqs_col_mc);

@@ -438,6 +438,8 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
 		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
 		UI_PARAM_CREATE_DEFAULT(nFlips, uint, 1);
+		
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pinv, double, 1e-5);// pseudoinverse for the NQS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_bs, uint, 8);		// block size for training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
@@ -447,6 +449,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_th, uint, 0);		// thermalize when collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_bn, uint, 100);		// number of inner blocks for collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqc_ex_bs, uint, 4);		// block size for collecting - excited states
+		UI_PARAM_CREATE_DEFAULTV(nqs_ex_beta, double);		// beta for the excited states - if not set, then only the ground state is calculated
 		// for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_mc, uint, 1);		// number of samples - outer loop for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_th, uint, 0);		// thermalize when collecting

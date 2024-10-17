@@ -174,6 +174,7 @@ void UI::nqsExcited()
 	} else {
 		_NQS_0 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum);
 	}
+	_NQS_0->setPinv(this->nqsP.nqs_tr_pinv_);
 
 	_timer.reset();
 	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
@@ -230,7 +231,7 @@ void UI::nqsExcited()
 									_opsL, 
 									_opsC, this->threadNum);
 	// train the ground state
-	_EN0.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_0->train(_parT, this->quiet, _timer.start(), 25);
+	_EN0.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_0->train(_parT, this->quiet, _timer.start(), 5);
 	_EN0.subvec(_parT.MC_sam_, _EN0.size() - 1) = _NQS_0->collect(_parC, this->quiet, _timer.start(), _meas, true);
 
 	auto perc		= int(_parT.MC_sam_ / 20) == 0 ? 1 : int(_parT.MC_sam_ / 20);
@@ -240,22 +241,26 @@ void UI::nqsExcited()
 	// create the excited state
 	{
 		v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_0_p 	= { _NQS_0 };
-		v_1d<double> _betas 									= { 1e-2 };
 		if (this->nqsP.type_ == NQSTYPES::RBM_T)
 		{
-			_NQS_1 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
+			_NQS_1 = std::make_shared<RBM_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, 
+									this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, this->nqsP.nqs_ex_beta_);
 			// std::reinterpret_pointer_cast<RBM_S<_spinModes, _T>>(_NQS_1)->setWeights(std::reinterpret_pointer_cast<RBM_S<_spinModes, _T>>(_NQS_0));
 		} else {
-			_NQS_1 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, _betas);
+			_NQS_1 = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H, this->nqsP.nHidden_, 
+									this->nqsP.lr_, this->threadNum, 1, _NQS_0_p, this->nqsP.nqs_ex_beta_);
 		}
-
+		_NQS_1->setPinv(this->nqsP.nqs_tr_pinv_);
 		_NQS_1->setTrainParExc(_parE);
+
 		// train the excited state
-		_EN1.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_1->train(_parT, this->quiet, _timer.start(), 25);
+		_EN1.subvec(0, _parT.MC_sam_ - 1) 			= _NQS_1->train(_parT, this->quiet, _timer.start(), 5);
 		_EN1.subvec(_parT.MC_sam_, _EN1.size() - 1) = _NQS_1->collect(_parC, this->quiet, _timer.start(), _meas, true);
 	}
 	auto ENQS_1		= arma::mean(_EN1.col(0).tail(perc));
 	LOGINFOG("Found the NQS excited state to be ENQS_1 = " + STRP(ENQS_1, 7), LOG_TYPES::TRACE, 2);
+	_EN0.save(dir + "history_0.dat", arma::raw_ascii);
+	_EN1.save(dir + "history_1.dat", arma::raw_ascii);
 
 	// sumup true energies and those from NQS
 	LOGINFO("True energies: EED_0 = " + STRP(_H->getEigVal(0), 7) + " EED_1 = " + STRP(_H->getEigVal(1), 7), LOG_TYPES::TRACE, 2);

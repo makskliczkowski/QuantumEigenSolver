@@ -80,16 +80,16 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 			this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatzlog(_v); });
 		
+		// save the mean energy
+		meanEn(i - 1) = arma::mean(En);
+		
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
 		TIMER_START_MEASURE(this->gradFinal(En), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
+		if (i % this->pBar_.percentageSteps == 0)
+			LOGINFO(_t, VEQP(meanEn(i-1), 4), 3);
 
 		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
 		this->updateWeights();
-		
-		// save the mean energy
-		meanEn(i - 1) = arma::mean(En);
-		LOGINFO(VEQ(meanEn(i - 1)), LOG_TYPES::TRACE, 1);
-
 
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);

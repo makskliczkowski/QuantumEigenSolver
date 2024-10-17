@@ -53,7 +53,7 @@
 	// #define NQS_USESR_NOMAT
 
 // how to handle the inverse of the matrix (if needed)
-	// #define NQS_PINV 1e-6					
+#	define NQS_PINV					
 // regularization for the covariance matrix	
 //#	define NQS_SREG													
 // shall one use the iterative solver without constructing the full matrix explicitly?						  
@@ -134,7 +134,8 @@ struct NQS_info_t
 
     // simulation specific
     double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
-
+	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
+	
     // architecture specific
     uint nVis_						=		1;						// number of visible neurons (input variables)
     uint nSites_					=		1;						// number of lattice sites or fermionic modes

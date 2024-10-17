@@ -106,10 +106,12 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 		#ifdef NQS_PINV
 		{
 			// calculate the pseudoinverse
-			if (NQS_PINV > 0)
-				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, NQS_PINV) * this->F_);
-			else
+			if (this->info_p_.pinv_ > 0.0)
+				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
+			else if (this->info_p_.pinv_ == 0.0)
 				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
+			else 
+				this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
 			return;
 		}
 		#else 
@@ -169,16 +171,16 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 		auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];		// <Psi_W_j / Psi_W> evaluated at W - column vector
 		auto& f_lower_b 	= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states
 		auto _meanLower 	= arma::mean(ratios_lower);						// mean of the ratios in the lower state
-		this->F_ 			+= _meanLower * f_lower_b * arma::cov(this->derivativesC_, ratios_excited, 1);
+		// this->F_ 			+= _meanLower * f_lower_b * arma::cov(this->derivativesC_, ratios_excited, 1);
 
 		// manually
 		
-		// auto _meanExcited 		= arma::mean(ratios_excited);					// mean of the ratios in the excited state
-		// auto _diff 				= ratios_excited - _meanExcited;				// 
+		auto _meanExcited 	= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+		auto _diff 			= ratios_excited - _meanExcited;				// 
 
 		// multiply each row of \Delta _k* with the difference at each realization (each element of the row)
 		// and then multiply with the mean of the lower states
-		// this->F_ += (f_lower_b * _meanLower) * arma::mean(this->derivativesC_.each_col() % _diff, 0).t();
+		this->F_ += (f_lower_b * _meanLower) * arma::mean(this->derivativesC_.each_col() % _diff, 0).t();
 	}
 	
 #ifdef NQS_USESR
