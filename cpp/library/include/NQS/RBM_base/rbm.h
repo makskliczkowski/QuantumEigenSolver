@@ -3,7 +3,7 @@
 #define RBM_H
 
 #ifndef NQS_H
-	#include "nqs_final.hpp"
+	#include "../nqs_final.hpp"
 #endif // !NQS_H
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -116,10 +116,6 @@ public:
 	virtual auto ansatz_ratio(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
 };	
-
-// ##########################################################################################################################################
-
-#include "RBM_base/rbm_setup.hpp"
 
 // ##########################################################################################################################################
 
@@ -273,12 +269,5 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFl
 
 }
 #endif
-//////////////////////////////////////////////////////////////////////////////////////////
-
-#include "./RBM_base/rbm_general.h"
-#include "./RBM_base/rbm_spins.h"
-#include "./RBM_base/rbm_fermions.h"
-
-//////////////////////////////////////////////////////////////////////////////////////////
 
 #endif

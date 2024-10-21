@@ -790,9 +790,11 @@ namespace Operators {
 		// ----------------------------------------------------------------------------------------------------
 
 		// -------------------- STATIC --------------------
-		static auto E(u64 s, _Ts...)					-> ReturnType					{ return std::make_pair(s, _T(1.0));					};
-		static auto E_V(_VT_CR s, _Ts...)				-> ReturnTypeV					{ return std::make_pair(s, _T(1.0));					};
-	
+		static auto E(u64 s, _Ts...)					-> ReturnType					{ return std::make_pair(s, _T(1.0));				};
+		static inline std::function <_T(u64, _Ts...)> E_F								= [](u64 s, _Ts...) { return _T(1.0); };
+		static auto E_V(_VT_CR s, _Ts...)				-> ReturnTypeV					{ return std::make_pair(s, _T(1.0));				};
+		static inline std::function <_T(_VT_CR, _Ts...)> E_V_F							= [](_VT_CR s, _Ts...) { return _T(1.0); };
+
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% O P E R A T O R S   J O I N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*

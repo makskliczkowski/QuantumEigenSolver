@@ -440,6 +440,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nFlips, uint, 1);
 		
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pinv, double, 1e-5);// pseudoinverse for the NQS
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pc, double, 5.0);	// percentage of the samples to be used for display
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_bs, uint, 8);		// block size for training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps

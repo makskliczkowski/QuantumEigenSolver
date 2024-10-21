@@ -13,6 +13,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
@@ -229,13 +230,15 @@ namespace Operators
 		template <typename _T>
 		std::pair<u64, _T> projectorSum(u64 _projectTo, u64 _state, std::function<_T(u64)> _application)
 		{
-			return std::make_pair(_projectTo, _application(_state));
+			auto _val = _application(_state);
+			return std::make_pair(_projectTo, _val);
 		}
 
 		template <typename _T>
 		std::pair<_OP_V_T, _T> projectorSum(_OP_V_T_CR _projectTo, _OP_V_T_CR _state, std::function<_T(_OP_V_T_CR)> _application)
 		{
-			return std::make_pair(_projectTo, _application(_state));
+			auto _val = _application(_state);
+			return std::make_pair(_projectTo, _val);	
 		}
 
 		template <typename _T> 
@@ -251,34 +254,51 @@ namespace Operators
 
 		/*
 		* @brief Creates the operator that projects the state to the given state and sums the values of the operator.
-		* This is: \sum _{s'} |s><s'| * _applicationV(s') 
+		* This is: \sum _{s'} |s><s'| * pRatio[excited state](s' -> s)) 
+		* @param _Ns number of sites
+		* @param _projectTo the state to project to - in a vector representation
+		* @param _application the function that calculates the value of the operator for a given state (in the integer representation)
+		* @param _applicationV the function that calculates the value of the operator for a given state (in the vector representation)
+		* @param _projectInt if the projection is in the integer representation and shall be converted to the vector representation
 		* @note For NQS, the function _applicationV is the probability ratio of changing the state 
 		*/
-		template <typename _T>
-		Operators::Operator<_T> projectorSum(size_t _Ns, _OP_V_T_CR _projectTo, 
-			std::function<_T(u64)> _application, std::function<_T(_OP_V_T_CR)> _applicationV, bool _projectInt = false)
-		{
-			const u64 _proj = _projectInt ? Binary::base2int<inner_type_t<_OP_V_T>, _OP_V_T, false>(_projectTo) : 0;
-			
+		template <typename _T, bool _projectInt = false>
+		typename std::enable_if<!_projectInt, typename Operators::Operator<_T>>::type 
+		projectorSum(size_t _Ns, _OP_V_T_CR _projectTo, std::function<_T(u64)> _application, 
+			std::function<_T(_OP_V_T_CR)> _applicationV)
+		{			
+			// not really used in the function, but we need to have it
+			typename _OP_V<_T>::GLB funV_ 	= [_projectTo, _applicationV](_OP_V_T_CR _state) 	{ return projectorSum<_T>(_projectTo, _state, _applicationV); };
+			return Operator<_T>(_Ns, 1.0, Operator<_T>::E, funV_, SymGenerators::OTHER);
+		}
+
+		template <typename _T, bool _projectInt>
+		typename std::enable_if<_projectInt, typename Operators::Operator<_T>>::type
+		projectorSum(size_t _Ns, _OP_V_T_CR _projectTo, std::function<_T(u64)> _application, 
+			std::function<_T(_OP_V_T_CR)> _applicationV)
+		{			
+			const u64 _proj = Binary::base2int<inner_type_t<_OP_V_T>, _OP_V_T, false>(_projectTo);
+
 			// not really used in the function, but we need to have it
 			typename _OP<_T>::GLB fun_ 		= [_proj, _application](u64 _state) 				{ return projectorSum<_T>(_proj, _state, _application); };
 			typename _OP_V<_T>::GLB funV_ 	= [_projectTo, _applicationV](_OP_V_T_CR _state) 	{ return projectorSum<_T>(_projectTo, _state, _applicationV); };
 			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
 		}
 
+		// ##########################################################################################################################################
+
 		template <typename _T>
 		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, const u64 _projectTo, 
-				std::function<_T(u64)> _application, std::function<_T(_OP_V_T_CR)> _applicationV)
+				std::function<_T(u64)> _application)
 		{
-			auto _proj = projectorSum<_T>(_Ns, _projectTo, _application, _applicationV);
+			auto _proj = projectorSum<_T>(_Ns, _projectTo, _application, Operators::Operator<_T>::E_V_F);
 			return OperatorComb<_T>(std::move(_proj));
 		}
 
 		template <typename _T>
-		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, _OP_V_T_CR _projectTo, 
-				std::function<_T(u64)> _application, std::function<_T(_OP_V_T_CR)> _applicationV, bool _projectInt = false)
+		Operators::OperatorComb<_T> projectorSumComb(size_t _Ns, _OP_V_T_CR _projectTo, std::function<_T(_OP_V_T_CR)> _applicationV)
 		{
-			auto _proj = projectorSum<_T>(_Ns, _projectTo, _application, _applicationV, _projectInt);
+			auto _proj = projectorSum<_T, false>(_Ns, _projectTo, Operators::Operator<_T>::E_F, _applicationV);
 			return OperatorComb<_T>(std::move(_proj));
 		}
 	};

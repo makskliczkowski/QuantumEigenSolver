@@ -36,19 +36,19 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_S
 #ifndef NQS_ANGLES_UPD
 		double proba = std::abs(this->pRatio(this->curVec_, this->tmpVec_));
 #else
-		double proba = std::abs(this->pRatio(this->nFlip_));
+		double proba = std::norm(this->pRatio(this->nFlip_));
 #endif
 		// we need to take into account the probability comming from the ratio of states (after and before the flip)
-		if (this->ran_.template random<float>() <= proba * proba)
+		if (this->ran_.template random<float>() < proba)
 		{
 			// update current state and vector when the flip has been accepted (the probability is higher than the random number)
 			this->applyFlipsC();
 			// update angles if needed
 			this->update(this->nFlip_);
 		}
-		// set the vector back to normal (unflip)
 		else
 		{
+			// set the vector back to normal (unflip)
 			this->unupdate();
 			this->unapplyFlipsT();
 		}
@@ -127,8 +127,12 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 			std::function<_T(const NQSS&)> _pratio 	= [&](const NQSS& _v) { return this->pRatio(_v); };
 			this->lower_states_.setProjector(this->info_p_.nVis_, NQS_STATE, _pratio);
 
+			_T _elower = 0.0;
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
-				energy += this->lower_states_.collectLowerEnergy(_low);
+				_elower += this->lower_states_.collectLowerEnergy(_low);
+			// std::cout << "Lower energy: " << algebra::real(_elower) << ", " << algebra::imag(_elower) << std::endl;
+			// std::cout << "Energy: " << algebra::real(energy) << ", " << algebra::imag(energy) << std::endl;
+			energy += _elower;
 		}
 
 		return energy;

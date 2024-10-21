@@ -106,6 +106,11 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, NQS
 
 // ##########################################################################################################################################
 
+/*
+* @brief Sets the size of the containers for the derivatives of the lower states - for the gradient estimation of the excited state.
+* @param _mcslower size of the Monte Carlo steps for the lower states - ratios sampled in the lower states
+* @param _mcsexcited size of the Monte Carlo steps for the excited state - ratios sampled in the excited state
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_t _mcslower, size_t _mcsexcited)
 {
@@ -126,14 +131,14 @@ inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_
 * @param _exc_state_pratio function for calculating the probability ratio for the excited state
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(size_t _Ns, Operators::_OP_V_T_CR _current_exc_state, 
+inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(size_t _Ns, 
+                                Operators::_OP_V_T_CR _current_exc_state, 
                                 std::function<_T(Operators::_OP_V_T_CR _v)> _exc_state_pratio_v)
 {
     // create the projection operator
     this->enP_ = Operators::GeneralOperators::projectorSumComb(_Ns, 
-                                                                _current_exc_state,     // project to current state
-                                                                this->const_fun_,       // calculate the probability ratio (for the excited state)
-                                                                _exc_state_pratio_v);   // calculate the probability ratio (for the excited state) using the vector representation
+                    _current_exc_state,     // project to current state <s|psi_w>
+                    _exc_state_pratio_v);   // calculate the probability ratio (for the excited state) using the vector representation \psi _w(s') / \psi _w(s)
 }
 
 // ##########################################################################################################################################

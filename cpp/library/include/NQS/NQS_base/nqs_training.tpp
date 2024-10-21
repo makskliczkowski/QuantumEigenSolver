@@ -41,6 +41,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 
 	// save all average weights for covariance matrix
 	arma::Col<_T> meanEn(_par.MC_sam_, arma::fill::zeros);
+	arma::Col<_T> stdEn(_par.MC_sam_, arma::fill::zeros);
 	// history of energies (for given weights) - here we save the local energies at each block
 	arma::Col<_T> En(_par.nblck_, arma::fill::zeros);
 	// set the random state at the begining and the number of flips
@@ -73,20 +74,21 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 
 			// calculate the excited states overlaps for the gradient - if used
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-				this->lower_states_.ratios_excited_[_low](_taken) = std::exp(this->lower_states_.ansatzlog(this->curVec_, _low) - this->ansatzlog(this->curVec_));
+				// this->lower_states_.ratios_excited_[_low](_taken) = std::exp(this->lower_states_.ansatzlog(this->curVec_, _low) - this->ansatzlog(this->curVec_));
+				this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_));
 		}
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-			this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatzlog(_v); });
+			this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
 		
 		// save the mean energy
-		meanEn(i - 1) = arma::mean(En);
+		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));
 		
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
 		TIMER_START_MEASURE(this->gradFinal(En), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
-		if (i % this->pBar_.percentageSteps == 0)
-			LOGINFO(_t, VEQP(meanEn(i-1), 4), 3);
+		// if (i % this->pBar_.percentageSteps == 0)
+		LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
 
 		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
 		this->updateWeights();
@@ -95,10 +97,8 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
 		
 #ifdef NQS_SAVE_WEIGHTS
-		{
 		if (i % this->pBar_.percentageSteps == 0)  
 			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights.h5");
-		}
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);
@@ -182,10 +182,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
-			NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, opFun, _cont);
+			auto _val [[maybe_unused]] = NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, opFun, _cont);
 		}
 		// normalize the measurements - this also creates a new block of measurements
-		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);												
+		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);		
 	}
 }
 
@@ -228,7 +228,8 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{
 		// random flip
-		this->setRandomState();
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
 
 		// remove autocorrelations
 		this->blockSample(_par.MC_th_, NQS_STATE, false);
@@ -283,7 +284,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// calculate f(s) / \psi(s)
-			_values += std::exp(_f(this->curVec_) - this->ansatz(this->curVec_));
+			// _values += std::exp(_f(this->curVec_) - this->ansatzlog(this->curVec_));
+			_values += _f(this->curVec_) / this->ansatz(this->curVec_);
 		}
 		_container(i - 1) = _values / (double)_par.nblck_;												
 	}

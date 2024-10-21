@@ -86,6 +86,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_tr_bs);
 		SETOPTION(nqsP,	nqs_tr_th);
 		SETOPTION(nqsP,	nqs_tr_pinv);
+		SETOPTION(nqsP,	nqs_tr_pc);
 		// collecting - excited
 		SETOPTION(nqsP,	nqs_ex_mc);
 		SETOPTION(nqsP,	nqs_ex_bn);
@@ -99,6 +100,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_col_th);	
 		SETOPTION(nqsP,	nqs_col_bs);	
 
+		SETOPTIONV(nqsP, nHidden, "nh");
 		SETOPTION(nqsP,	nFlips);
 		SETOPTIONV(nqsP,	type, 		"nqst");
 		SETOPTION(nqsP,		lr					);

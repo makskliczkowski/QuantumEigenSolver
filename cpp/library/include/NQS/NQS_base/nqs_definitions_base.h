@@ -55,7 +55,7 @@
 // how to handle the inverse of the matrix (if needed)
 #	define NQS_PINV					
 // regularization for the covariance matrix	
-//#	define NQS_SREG													
+// #	define NQS_SREG													
 // shall one use the iterative solver without constructing the full matrix explicitly?						  
 #endif										
 // ##########################################################

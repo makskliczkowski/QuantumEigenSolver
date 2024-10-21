@@ -180,6 +180,7 @@ namespace NQSAv
 		NQS_PUBLIC_TYPES(_T, double);
 		// for initializing the pRatio function with a single column vector
 		using NQSFunCol		= std::function<cpx(const NQSS& _v)>;
+		using NQSFunColP	= cpx(*)(const NQSS& _v);
 		using OPG			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>>;
 		using OPL			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>>;
 		using OPC			= v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>>;
@@ -310,12 +311,13 @@ namespace NQSAv
 
 		// ---- MEASUREMENT ---- (STATIC)
 
-		static void measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, 
+		static _T measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, 
 							NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
 			auto val = _gO(_state, _fun);
 			// update the container
 			_cont.updCurrent(val);
+			return val;
 		};
 
 		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont)

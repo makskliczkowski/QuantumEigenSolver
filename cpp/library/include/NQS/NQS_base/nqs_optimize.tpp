@@ -94,48 +94,53 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec(const arma::Col<_T
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 {
-	#ifndef NQS_USESR_NOMAT
+#ifndef NQS_USESR_NOMAT
 	{
 		// regularize the covariance matrix before inverting it (if needed and set)
-		{
-		#ifdef NQS_SREG
+#	ifdef NQS_SREG
 		this->covMatrixReg();
-		#endif
-		}
+#	endif
 		
-		#ifdef NQS_PINV
-		{
-			// calculate the pseudoinverse
-			if (this->info_p_.pinv_ > 0.0)
-				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
-			else if (this->info_p_.pinv_ == 0.0)
-				this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
-			else 
+#	ifdef NQS_PINV
+		// calculate the pseudoinverse
+		if (this->info_p_.pinv_ > 0.0)
+			this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
+		else if (this->info_p_.pinv_ == 0.0)
+			this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
+		else {
+			try {
 				this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
-			return;
+			} catch(std::exception& e) {
+				// this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
+				this->updateWeights_ = false;
+				std::cerr << "Error in the pseudoinverse calculation: " << e.what() << std::endl;
+			}
 		}
-		#else 
+#	else 
 		// solve normally
 		//this->F_ = this->info_p_.lr_ * (arma::inv(this->S_) * this->F_);
-		this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
-		#endif 
+		try {
+			this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+		} catch(std::exception& e) {
+			this->updateWeights_ = false;
+		}
+#	endif 
 	}
-	#else
-	{
-		std::function<void(const arma::Col<_T>&, arma::Col<_T>&, size_t)> _Fun = std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+#else
+	std::function<void(const arma::Col<_T>&, arma::Col<_T>&, size_t)> _Fun = std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 
-		arma::Col<_T> _F = this->F_;
+	arma::Col<_T> _F = this->F_;
 
-		// solve the system manually
-		algebra::Solvers::solve(this->F_, _Fun, _F, algebra::Solvers::SolverType::MY_CONJ_GRAD, 1.0e-5);
-		// algebra::Solvers::ConjugateGradient::solve_my_conj_grad<_T>(this->F_, _Fun, this->x_, this->r_, this->p_, this->Ap_, 1e-6);
+	// solve the system manually
+	algebra::Solvers::solve(this->F_, _Fun, _F, algebra::Solvers::SolverType::MY_CONJ_GRAD, 1.0e-5);
+	// algebra::Solvers::ConjugateGradient::solve_my_conj_grad<_T>(this->F_, _Fun, this->x_, this->r_, this->p_, this->Ap_, 1e-6);
 
-		_F *= this->info_p_.lr_;
-		// exchange the vectors
-		this->F_ = std::move(_F);
-		// this->F_ = this->info_p_.lr_ * this->x_;
-	}
-	#endif
+	_F *= this->info_p_.lr_;
+	// exchange the vectors
+	this->F_ = std::move(_F);
+	// this->F_ = this->info_p_.lr_ * this->x_;
+#endif
+	this->updateWeights_ = true;
 }
 // -----------------------------------------------------------------------------------------------------------------------------------
 #endif
@@ -184,13 +189,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	}
 	
 #ifdef NQS_USESR
-	{
-	#ifndef NQS_USESR_NOMAT
+#	ifndef NQS_USESR_NOMAT
 		// form the covariance matrix explicitly
-		{
-			this->S_ = arma::cov(this->derivativesC_, this->derivatives_, 1);
-		}
-	#else 
+	this->S_ = arma::cov(this->derivativesC_, this->derivatives_, 1);
+#	else 
 		{
 		arma::Mat<_T> S1 	= arma::cov(this->derivativesC_, this->derivatives_, 0);
 		std::cout << "Covariance matrix: " << S1.n_rows << ", " << S1.n_cols << std::endl;
@@ -210,16 +212,14 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 		arma::Mat<double> diff = arma::abs(S1 - S2);
 		diff.print("Difference: ");
 		}
-	#endif
+#	endif
 		// update model by recalculating the gradient (applying the stochastic reconfiguration)
-		this->gradSR(0);
-	}
+	return this->gradSR(0);
 #else
-	{
-		// standard updater with the gradient only!
-		this->F_ *= this->info_p_.lr_;
-	}
+	// standard updater with the gradient only!
+	this->F_ *= this->info_p_.lr_;
 #endif
+	this->updateWeights_ = true;
 }
 
 // ##########################################################################################################################################
@@ -234,14 +234,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg()
 {
-	if (this->covMatrixRegStart != 0)
-	{
-		this->S_.diag() *= (1.0 + this->covMatrixRegStart);
-	}
-	if (this->covMatrixRegStart2 != 0)
-	{
-		auto maximal_re	=	arma::max(arma::real(this->S_.diag()));
-		this->S_.diag()	+= this->covMatrixRegStart2 * maximal_re;
-	}
+	this->S_.diag() += 0.01 * arma::max(this->S_.diag());
 }
 #endif

@@ -16,7 +16,7 @@
 */
 
 #ifndef RBM_H
-	#include "rbm.h"
+	#include "rbm_final.hpp"
 #endif // !NQS_H
 
 #define NQS_RBM_PP_USE_PFAFFIAN_UPDATE

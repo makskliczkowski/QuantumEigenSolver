@@ -294,8 +294,20 @@ add_custom_target(build_deb
     COMMAND ${CMAKE_COMMAND} --build .
 )
 
+add_custom_target(build_deb_reg
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
+    COMMAND ${CMAKE_COMMAND} -DNQS_SREG
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
 add_custom_target(build_rel
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_rel_reg
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} -DNQS_SREG
     COMMAND ${CMAKE_COMMAND} --build .
 )
 

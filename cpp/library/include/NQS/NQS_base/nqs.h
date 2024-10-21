@@ -168,6 +168,7 @@ public:
 
 protected:
 	// --------------------- T R A I N   E T C -----------------------
+	bool updateWeights_ = true;											// shall update the weights in current step?
 	virtual void grad(const NQSS& _v, uint _plc)		=				0;
 	virtual void gradFinal(const NQSB& _energies);
 #ifdef NQS_USESR
