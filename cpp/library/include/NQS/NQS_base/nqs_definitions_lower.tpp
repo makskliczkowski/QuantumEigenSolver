@@ -43,12 +43,8 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
     NQS_train_t train_lower_;                                       // training information for the lower states                       
-    // NQS<_spinModes, _Ht, _T, _stateType>* nqs_;			    	// pointer to the excited state NQS instance
+    NQS<_spinModes, _Ht, _T, _stateType>* nqs_exc_;			    	// pointer to the excited state NQS instance
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
-
-    // constant functions
-    std::function<_T(Operators::_OP_V_T_CR)> const_funV_;
-    std::function<_T(u64)> const_fun_;
 
     // for the excited states 
     bool isSet_						= 		false;
@@ -59,7 +55,7 @@ struct NQS_lower_t
     // ##########################################################################################################################################
 
     NQS_lower_t() : containerP_(Operators::Containers::OperatorContainer<_T>(1)) {};
-    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b);
+    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc);
     
     // ##########################################################################################################################################
     
@@ -73,35 +69,43 @@ struct NQS_lower_t
 
     // ##########################################################################################################################################
     
+    std::function<_T(Operators::_OP_V_T_CR)> exc_ratio_;            // set later
     void setDerivContSize(size_t _mcslower, size_t _mcsexcited);
-    void setProjector(size_t _Ns, Operators::_OP_V_T_CR _current_exc_state, std::function<_T(Operators::_OP_V_T_CR _v)> _exc_state_pratio_v);
+    void setProjector(Operators::_OP_V_T_CR _current_exc_state);
     
     // ##########################################################################################################################################
 
     _T collectLowerEnergy(uint i);
     _T ansatz(Operators::_OP_V_T_CR _v, int _low = 0) const         { return this->f_lower[_low]->ansatz(_v); };
     _T ansatzlog(Operators::_OP_V_T_CR _v, int _low = 0) const      { return this->f_lower[_low]->ansatzlog(_v); };
-   
+
     // ##########################################################################################################################################
 
-    void collectRatiosLower(uint i, std::function<_T(Operators::_OP_V_T_CR)> _f);
+    std::function<_T(Operators::_OP_V_T_CR)> exc_ansatz_;
+    void collectLowerRatios(uint i);
+    _T collectExcitedRatios(uint i, Operators::_OP_V_T_CR _current_exc_state);
 };
 
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b)
-    : isSet_(!_f_lower.empty()),
+inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, 
+                        NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc)
+    : nqs_exc_(_nqs_exc), 
+    isSet_(!_f_lower.empty()),
     f_lower_size_(_f_lower.size()),
     f_lower(_f_lower),
     f_lower_b_(_f_lower_b)    
 {
+    // keep empty
+    if (!_nqs_exc)
+    {
+        LOGINFO("NQS_lower_t: No excited state NQS instance has been set...", LOG_TYPES::WARNING, 3);
+        return;
+    }
+
     this->containerP_ = Operators::Containers::OperatorContainer<_T>(_Ns);
     this->containerP_.decideSize();
-
-    // set constant functions
-    this->const_fun_    = [](u64 _s)                    -> _T { return _T(1.0); };
-    this->const_funV_   = [](Operators::_OP_V_T_CR _v)  -> _T { return _T(1.0); };
 }
 
 // ##########################################################################################################################################
@@ -131,18 +135,21 @@ inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_
 * @param _exc_state_pratio function for calculating the probability ratio for the excited state
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(size_t _Ns, 
-                                Operators::_OP_V_T_CR _current_exc_state, 
-                                std::function<_T(Operators::_OP_V_T_CR _v)> _exc_state_pratio_v)
+inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(Operators::_OP_V_T_CR _current_exc_state)
 {
     // create the projection operator
-    this->enP_ = Operators::GeneralOperators::projectorSumComb(_Ns, 
+    this->enP_ = Operators::GeneralOperators::projectorSumComb(nqs_exc_->getNvis(), 
                     _current_exc_state,     // project to current state <s|psi_w>
-                    _exc_state_pratio_v);   // calculate the probability ratio (for the excited state) using the vector representation \psi _w(s') / \psi _w(s)
+                    this->exc_ratio_);      // calculate the probability ratio (for the excited state) using the vector representation \psi _w(s') / \psi _w(s)
 }
 
 // ##########################################################################################################################################
 
+/*
+* @brief Collect the addition to the energy coming from the overlap with the lower states - for the excited state energy estimation
+* @param i index of the lower state
+* @returns the mean value of the energy estimation coming from the lower states overlap
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint i)
 {
@@ -157,13 +164,26 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint 
 
 // ##########################################################################################################################################
 
+/*
+* @brief Collect the ratios for the lower states - for the gradient estimation of the excited state. This ratio is given by the
+* \psi _w(s') / \psi _w_j(s) at each MC step (average in the lower states)
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectRatiosLower(uint i, std::function<_T(Operators::_OP_V_T_CR)> _f)
+inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerRatios(uint i)
 {
     if (this->f_lower_size_ == 0)
         return;
+    this->f_lower[i]->collect_ratio(this->train_lower_, this->exc_ansatz_, this->ratios_lower_[i]);
+}
 
-    this->f_lower[i]->collect_ratio(this->train_lower_, _f, this->ratios_lower_[i]);
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uint i, Operators::_OP_V_T_CR _current_exc_state)
+{
+    if (this->f_lower_size_ == 0)
+        return _T(0.0);
+    return std::exp(this->ansatzlog(_current_exc_state, i) - this->exc_ansatz_(_current_exc_state));
 }
 
 // ##########################################################################################################################################

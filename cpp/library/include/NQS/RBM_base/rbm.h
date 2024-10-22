@@ -209,11 +209,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 	auto _hiddDerivative	= _currDerivative.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
 	_hiddDerivative			= arma::tanh(this->theta_).as_row();
 
-	auto _weightsDerivative	= _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
+	auto _weightsDerivative= _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
 
-//#ifndef _DEBUG
-//#	pragma omp parallel for num_threads(this->threadsNumLeft_)
-//#endif
+// #ifndef _DEBUG
+// #pragma omp parallel for
+// #endif
 	for (int j = 0; j < this->info_p_.nVis_; ++j)
 		_weightsDerivative.subvec(j * this->nHid_, (j + 1) * this->nHid_ - 1) = _v(j) * _hiddDerivative;
 }

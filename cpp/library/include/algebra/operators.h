@@ -308,18 +308,32 @@ namespace Operators
 	* @brief The spin operator namespace. Contains the most common spin operators.
 	*/
 	namespace SpinOperators
-	{
-		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		std::pair<_OP_V_T, double> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		Operators::Operator<double> sig_x(size_t _Ns, size_t _part);
-		Operators::Operator<double> sig_x(size_t _Ns, const v_1d<uint>& sites);
-		Operators::Operator<double> sig_x(size_t _Ns);
+	{	
+		template <typename _T = double>
+		std::pair<u64, _T> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_x(size_t _Ns, size_t _part);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_x(size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_x(size_t _Ns);
+		template <typename _T = double>
+		Operators::Operator<_T, uint> sig_x_l(size_t _Ns);
 
-		std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		std::pair<_OP_V_T, double> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		Operators::Operator<double> sig_z(size_t _Ns, size_t _part);
-		Operators::Operator<double> sig_z(size_t _Ns, const v_1d<uint>& sites);
-		Operators::Operator<double> sig_z(size_t _Ns);
+		template <typename _T = double>
+		std::pair<u64, _T> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_z(size_t _Ns, size_t _part);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_z(size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_z(size_t _Ns);
+		template <typename _T = double>
+		Operators::Operator<_T, uint> sig_z_l(size_t _Ns);
 	}
 
 	// ##########################################################################################################################################
@@ -374,9 +388,20 @@ namespace Operators
 			val *= checkBit(base_vec, L - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
 		return std::make_pair(base_vec, val);
 	}
+
+	template <typename _T>
+	std::pair <_OP_V_T, _T> sigma_z(_OP_V_T_CR base_vec, int L, const v_1d<uint>& sites)
+	{
+		_T val = 1.0;
+		for (auto const& site : sites)
+			val *= Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+		return std::make_pair(base_vec, val);
+	}
+
+	// ##########################################################################################################################################
 	
 	template <typename _T>
-	Operators::Operator<_T> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site)
+	inline Operators::Operator<_T> makeSigmaZ(std::shared_ptr<Lattice> lat, uint site)
 	{
 		typename _OP<_T>::GLB fun_ = [&](u64 state) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { site }); };
 		return Operator<_T>(lat, 1.0, fun_, SymGenerators::SZ);
@@ -386,9 +411,10 @@ namespace Operators
 	* @brief Creates local sigma z
 	*/
 	template <typename _T>
-	Operators::Operator<_T, uint> sigmaZ_L(std::shared_ptr<Lattice> lat)
+	inline Operators::Operator<_T, uint> makeSigZ_l(std::shared_ptr<Lattice> lat)
 	{
-		typename _OP<_T>::LOC fun_ = [&](u64 state, uint i) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i }); };
+		typename _OP<_T>::LOC fun_ 		= [&](u64 state, uint i) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i }); };
+		typename _OP_V<_T>::LOC funV_ 	= [&](_OP_V_T_CR state, uint i) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i }); };
 		return Operator<_T, uint>(lat, 1.0, fun_, SymGenerators::SZ);
 	}
 
@@ -396,7 +422,7 @@ namespace Operators
 	* @brief Creates correlation sigma z
 	*/
 	template <typename _T>
-	Operators::Operator<_T, uint, uint> sigmaZ_C(std::shared_ptr<Lattice> lat)
+	inline Operators::Operator<_T, uint, uint> sigmaZ_C(std::shared_ptr<Lattice> lat)
 	{
 		typename _OP<_T>::COR fun_ = [&](u64 state, uint i, uint j) { return Operators::sigma_z<_T>(state, lat->get_Ns(), { i, j }); };
 		return Operator<_T, uint, uint>(lat, 1.0, fun_, SymGenerators::SZ);
@@ -720,6 +746,8 @@ namespace Operators
 	};
 
 };
+
+
 
 #endif
 

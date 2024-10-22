@@ -1,4 +1,5 @@
 #include "./nqs_optimize.tpp"
+#include "nqs_definitions_base.h"
 
 // ##########################################################################################################################################
 
@@ -18,8 +19,9 @@
 * @param progPrc progress percentage to be displayed in the progress bar
 */
 #include <functional>
+#include <utility>
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train_t& _par,
+inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train_t& _par,
 																bool quiet,
 																clk::time_point _t,
 																uint progPrc)
@@ -73,14 +75,17 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 			En(_taken) = this->locEnKernel();
 
 			// calculate the excited states overlaps for the gradient - if used
+#pragma omp parallel for
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-				// this->lower_states_.ratios_excited_[_low](_taken) = std::exp(this->lower_states_.ansatzlog(this->curVec_, _low) - this->ansatzlog(this->curVec_));
-				this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_));
+				this->lower_states_.ratios_excited_[_low](_taken) = this->lower_states_.collectExcitedRatios(_low, NQS_STATE);
+				// this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_));
 		}
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
+#pragma omp parallel for
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-			this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
+			// this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
+			this->lower_states_.collectLowerRatios(_low);
 		
 		// save the mean energy
 		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));
@@ -88,7 +93,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
 		TIMER_START_MEASURE(this->gradFinal(En), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
 		// if (i % this->pBar_.percentageSteps == 0)
-		LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
+		// LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
 
 		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
 		this->updateWeights();
@@ -98,11 +103,11 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train
 		
 #ifdef NQS_SAVE_WEIGHTS
 		if (i % this->pBar_.percentageSteps == 0)  
-			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights.h5");
+			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
 #endif
 	}
 	LOGINFO(_t, "NQS_EQ", 1);
-	return meanEn;
+	return std::make_pair(meanEn, stdEn);
 }
 
 // ##########################################################################################################################################
@@ -160,10 +165,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 														Operators::Containers::OperatorContainer<_T>& _cont)
 {
 	// set the random state at the begining
-	this->setRandomFlipNum(_par.nFlip);
+	// this->setRandomFlipNum(_par.nFlip);
 
 	// allows to calculate the probability of the operator (for operator measurements)
-	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
+	// std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= _par.MC_sam_; ++i)
@@ -182,7 +187,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
-			auto _val [[maybe_unused]] = NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, opFun, _cont);
+			auto _val [[maybe_unused]] = NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
 		}
 		// normalize the measurements - this also creates a new block of measurements
 		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);		
@@ -221,9 +226,6 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 	// set the random state at the begining
 	this->setRandomFlipNum(_par.nFlip);
 
-	// allows to calculate the probability of the operator (for operator measurements)
-	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
-	
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{
@@ -244,7 +246,7 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 			
 			// one can calculate the local energy here (either of the ground state or the excited state)
 			// collect other										
-			TIMER_START_MEASURE(_meas.measure(this->curVec_, opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
+			_meas.measure(NQS_STATE, this->pRatioFunc_);
 			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
@@ -253,18 +255,17 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
 	}
-	LOGINFO(_t, "NQS_COLLECTION", 1);
+	// LOGINFO(_t, "NQS_COLLECTION", 1);
 	return meanEn;
 }
 
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f,
-								arma::Col<_T>& _container)
+inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container)
 {
 	// set the random state at the begining
-	this->setRandomFlipNum(_par.nFlip);
+	// this->setRandomFlipNum(_par.nFlip);
 
 	// go through the number of samples to be collected
 	_T _values = 0.0;
@@ -284,8 +285,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// calculate f(s) / \psi(s)
-			// _values += std::exp(_f(this->curVec_) - this->ansatzlog(this->curVec_));
-			_values += _f(this->curVec_) / this->ansatz(this->curVec_);
+			_values += std::exp(_f(NQS_STATE) - this->ansatzlog(NQS_STATE));
+			// _values += _f(this->curVec_) / this->ansatz(this->curVec_);
 		}
 		_container(i - 1) = _values / (double)_par.nblck_;												
 	}

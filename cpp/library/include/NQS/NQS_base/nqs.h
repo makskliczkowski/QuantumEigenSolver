@@ -119,6 +119,8 @@ protected:
 	
 	virtual void setRandomFlipNum(uint _nFlips)			=			0;	// set the number of flips to be done
 
+public:
+
 	// -------------------- P R O B A B I L I T Y --------------------
 	// mucho importante for the flips to be done - most of those functions need to be implemented
 	// in the derived class as they are model specific and depend on the architecture of the NQS.
@@ -154,6 +156,7 @@ protected:
 	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto pRatio(std::initializer_list<int> fP, 
 						std::initializer_list<double> fV)->_T			= 0;
+	std::function<_T(const NQSS&)> pRatioFunc_;							// function for the probability ratio
 
 	// ----------------------- W E I G H T S -------------------------
 #ifdef NQS_ANGLES_UPD
@@ -201,6 +204,7 @@ protected:
 	// ------------------------ E N E R G Y --------------------------
 	auto pKernel(std::initializer_list<int>  fP,
 				 std::initializer_list<double> fV)		-> _T			{ return this->pRatio(fP, fV); };
+	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> pKernelFunc_;	// function for the probability ratio
 
 	/* ------------------------------------------------------------ */
 protected:
@@ -238,7 +242,7 @@ public:
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
-	virtual arma::Col<_T> train(const NQS_train_t& _par,
+	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
 								bool quiet			= false,			// shall talk? (default is false)
 								clk::time_point _t	= NOW,				// time! (default is NOW)
 								uint progPrc		= 25);
@@ -253,8 +257,7 @@ public:
 						 const Operators::OperatorNQS<_T>& _opG,
 						 Operators::Containers::OperatorContainer<_T>& _cont);
 	// for collecting the \sum _s f(s) / \psi(s) - used for the gradient calculation
-	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f,
-								arma::Col<_T>& _container);
+	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
 
 
 	// ----------------------- F I N A L E -----------------------
@@ -548,7 +551,12 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	: H_(_H)
 {	
 	const size_t _Ns			= 			_H->getNs();	
-	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta);
+	this->pRatioFunc_			= 			[&](const NQSS& _v) { return this->pRatio(_v); };
+	this->pKernelFunc_			= 			[&](std::initializer_list<int> fP, std::initializer_list<double> fV) { return this->pRatio(fP, fV); };
+
+	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta, this);
+	this->lower_states_.exc_ratio_ = 		[&](const NQSS& _v) { return this->pRatio(_v); };
+	this->lower_states_.exc_ansatz_ = 		[&](const NQSS& _v) { return this->ansatzlog(_v); };
 	this->info_p_.lr_			= 			_lr;
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)

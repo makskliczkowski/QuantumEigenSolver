@@ -1531,7 +1531,7 @@ namespace Operators {
 			auto resetSamples()			-> void { this->samples_ = {};																	};
 			auto resetValue()			-> void { this->currentValue_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
 			auto resetMB()				-> void { this->manyBodyVal_ = OperatorContainer_typ(OperatorContainerS, arma::fill::zeros);	};
-
+			auto resetMBMat()			-> void { this->manyBodyMatrix_ = GeneralizedMatrix<_T>();										};
 			// many body value storage
 			auto setManyBodyVal(_T _val, size_t i = 0, size_t j = 0) -> void 		{ this->manyBodyVal_(i, j) = _val;					};
 			auto updManyBodyVal(_T _val, size_t i = 0, size_t j = 0) -> void 		{ this->manyBodyVal_(i, j) += _val;					};
@@ -1582,7 +1582,7 @@ namespace Operators {
 
 			// ######## S A M P L I N G ########
 
-			inline void normalize(bool reset = true);
+			inline void normalize(size_t _samples, bool reset = true);
 			
 			template <typename _T1>
 			arma::Col<_T1> sample(const arma::Col<_T1>& _state, size_t i = 0, size_t j = 0);
@@ -1605,7 +1605,9 @@ namespace Operators {
 				this->currentValue_(this->indices_[0], this->indices_[1]) += _val;
 			else
 				throw std::runtime_error("Not implemented such exotic operators...");
-			this->sample_num_++;
+			// this->sample_num_++;
+			// reset the indices
+			this->currentIdx_ = 0;
 		}
 
 		/*
@@ -1717,7 +1719,7 @@ namespace Operators {
 			const size_t _Nhfull	= _hilb.getFullHilbertSize();
 
 			// store all the measured values
-			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_hilb.getHilbertSize(), true);
+			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
 			const bool _isFull 		= _Nh == _Nhfull;
 
 			// setup the matrix
@@ -1930,9 +1932,9 @@ namespace Operators {
 		* @param reset if true, the current value of the operator is reset to zero and the number of samples is reset to zero 
 		*/
 		template <typename _T>
-		inline void Operators::Containers::OperatorContainer<_T>::normalize(bool reset)
+		inline void Operators::Containers::OperatorContainer<_T>::normalize(size_t _samples, bool reset)
 		{
-			this->samples_.push_back(this->currentValue_ / (long double)this->sample_num_);
+			this->samples_.push_back(this->currentValue_ / (long double)_samples);
 			if (reset)
 			{
 				this->resetValue();

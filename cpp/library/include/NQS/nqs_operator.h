@@ -305,7 +305,7 @@ namespace NQSAv
 
 		void measure(u64 s, NQSFunCol _fun);
 		void measure(Operators::_OP_V_T_CR, NQSFunCol _fun);
-		void measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>&);
+		void measure(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&);
 		void normalize(uint _nBlck);
 		void save(const strVec& _ext = { ".h5" });
 
@@ -593,7 +593,7 @@ namespace NQSAv
 	* @param _H Hilbert space to measure the operators in
 	*/
 	template<typename _T>
-	inline void NQSAv::MeasurementNQS<_T>::measure(arma::Col<_T> _state, const Hilbert::HilbertSpace<_T>& _H)
+	inline void NQSAv::MeasurementNQS<_T>::measure(const arma::Col<_T>& _state, const Hilbert::HilbertSpace<_T>& _H)
 	{
 		BEGIN_CATCH_HANDLER
 		{
@@ -609,7 +609,7 @@ namespace NQSAv
 				// update the container
 				_cont.setManyBodyVal(_val);
 				// reset the many body matrix
-				_cont.resetMB();
+				_cont.resetMBMat();
 			}	
 		}
 		END_CATCH_HANDLER("Problem in the measurement of global operators.", ;);
@@ -625,16 +625,16 @@ namespace NQSAv
 				_cont.resetMB();
 
 				// go through the local operators
-				for (auto i = 0; i < _op->getNs(); ++i)
+				for (auto j = 0; j < _op->getNs(); ++j)
 				{
 					// set the many body matrix
-					_cont.setManyBodyMat(_H, _op.get(), (uint)i);
+					_cont.setManyBodyMat(_H, _op.get(), (uint)j);
 					auto _val = Operators::applyOverlap(_state, _cont.mbmat());
 					// update the container
-					_cont.setManyBodyVal(_val, (uint)i);					
+					_cont.setManyBodyVal(_val, (uint)j);					
 				}
 				// reset the many body matrix
-				_cont.resetMB();
+				_cont.resetMBMat();
 			}
 		}
 		END_CATCH_HANDLER("Problem in the measurement of local operators.", ;);
@@ -661,7 +661,7 @@ namespace NQSAv
 					}
 				}
 				// reset the many body matrix
-				_cont.resetMB();
+				_cont.resetMBMat();
 			}
 		}
 		END_CATCH_HANDLER("Problem in the measurement of correlation operators.", ;);
@@ -714,19 +714,21 @@ namespace NQSAv
 			{
 				auto& _cont = this->containersG_[i];
 				auto& _op 	= this->opG_[i];
+				auto _name  = _op->getNameS();
+				_name 		= _name.size() == 0 ? "OP" + std::to_string(i) : _name;
 				// nqs
 				{
 					auto M = _cont.template mean<cpx>();
 					// save!
 					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+						saveAlgebraic(dir_, "NQS_OP" + ext, M, _name);
 				}
 				// many body 
 				{
 					const arma::Mat<_T>& M = _cont.mbval();
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+							saveAlgebraic(dir_, "ED_OP" + ext, M, _name);
 				}
 			}
 		}
@@ -739,19 +741,21 @@ namespace NQSAv
 			{
 				auto& _cont = this->containersL_[i];
 				auto& _op 	= this->opL_[i];
+				auto _name  = _op->getNameS();
+				_name 		= _name.size() == 0 ? "OP" + std::to_string(i) : _name;
 				// nqs
 				{
 					auto M = _cont.template mean<cpx>();
 					// save!
 					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+						saveAlgebraic(dir_, "NQS_OP_L" + ext, M, _name);
 				}
 				// many body
 				{
 					const arma::Mat<_T>& M = _cont.mbval();
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+							saveAlgebraic(dir_, "ED_OP_L" + ext, M, _name);
 				}
 			}
 		}
@@ -764,19 +768,21 @@ namespace NQSAv
 			{
 				auto& _cont = this->containersC_[i];
 				auto& _op 	= this->opC_[i];
+				auto _name  = _op->getNameS();
+				_name 		= _name.size() == 0 ? "OP" + std::to_string(i) : _name;
 				// nqs
 				{
 					auto M = _cont.template mean<cpx>();
 					// save!
 					for (const auto& ext : _ext)
-						saveAlgebraic(dir_, _op->getNameS() + ext, M, "values");
+						saveAlgebraic(dir_, "NQS_OP_C" + ext, M, _name);
 				}
 				// many body
 				{
 					const arma::Mat<_T>& M = _cont.mbval();
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, "mb_" + _op->getNameS() + ext, M, "values");
+							saveAlgebraic(dir_, "ED_OP_C" + ext, M, _name);
 				}
 			}
 		}

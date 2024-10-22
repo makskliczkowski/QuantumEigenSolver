@@ -7,6 +7,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 #include "../../source/src/UserInterface/ui.h"
+#include <memory>
 #include <vector>
 
 #ifdef _DEBUG
@@ -89,7 +90,7 @@
 
 #define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
 // --- NQS
-constexpr int UI_LIMITS_NQS_ED									= ULLPOW(18);
+constexpr int UI_LIMITS_NQS_ED									= ULLPOW(26);
 constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
@@ -629,7 +630,8 @@ private:
 
 	// NQS
 	template<typename _T, uint _spinModes = 2>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS);
+	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
+		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl = {}, const v_1d<double>& _beta = {});
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	

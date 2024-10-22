@@ -124,14 +124,11 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 		if (this->lower_states_.f_lower_size_ != 0) 
 		{
 			// set new projector (\sum _{s'} <s|psi_wl><psi_wl|s'>) = \sum _{s'} \frac{\psi _w(s')}{\psi _w(s)} \times \frac{\psi _wl(s)}{\psi _wl(s')} \times proba_wl(s', s)
-			std::function<_T(const NQSS&)> _pratio 	= [&](const NQSS& _v) { return this->pRatio(_v); };
-			this->lower_states_.setProjector(this->info_p_.nVis_, NQS_STATE, _pratio);
+			this->lower_states_.setProjector(NQS_STATE);
 
 			_T _elower = 0.0;
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
 				_elower += this->lower_states_.collectLowerEnergy(_low);
-			// std::cout << "Lower energy: " << algebra::real(_elower) << ", " << algebra::imag(_elower) << std::endl;
-			// std::cout << "Energy: " << algebra::real(energy) << ", " << algebra::imag(energy) << std::endl;
 			energy += _elower;
 		}
 
@@ -173,12 +170,13 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		this->threads_.kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
 		{
-			this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE,
-																							site, 
-																							std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
-																							this,
-																							std::placeholders::_1,
-																							std::placeholders::_2)));
+			// this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE,
+			// 																				site, 
+			// 																				std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
+			// 																				this,
+			// 																				std::placeholders::_1,
+			// 																				std::placeholders::_2)));
+			this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE, site, this->pKernelFunc_));
 		}
 
 		// lock again
