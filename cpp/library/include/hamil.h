@@ -270,6 +270,7 @@ public:
 	// --------------------------------------------- CLEAR -----------------------------------------------------
 	void clearEigVec()									{ this->eigVec_.reset();					}; // resets the eigenvectors memory to 0
 	void clearEigVal()									{ this->eigVal_.reset();					}; // resets the energy memory to 0
+	void clearKrylov()									{ this->K_.reset();							}; // resets the Krylov memory to 0
 	virtual void clearH()								{ this->H_.reset();							}; // resets the hamiltonian memory to 0
 	void clear();
 

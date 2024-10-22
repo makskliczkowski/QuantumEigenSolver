@@ -239,6 +239,10 @@ void UI::nqsExcited()
 			_meansED(i) = _H->getEigVal(i);
 			LOGINFO("Found the ED state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
 		}
+		_H->clearEigVal();
+		_H->clearEigVec();
+		_H->clearH();
+		_H->clearKrylov();
 	}
 
 
