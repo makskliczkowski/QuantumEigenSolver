@@ -78,14 +78,15 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 #pragma omp parallel for
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 				this->lower_states_.ratios_excited_[_low](_taken) = this->lower_states_.collectExcitedRatios(_low, NQS_STATE);
+				// this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(NQS_STATE, _low) / this->ansatz(NQS_STATE));
 				// this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_));
 		}
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
 #pragma omp parallel for
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
-			// this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
 			this->lower_states_.collectLowerRatios(_low);
+			// this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
 		
 		// save the mean energy
 		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));
@@ -96,7 +97,7 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 		// LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
 
 		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
-		this->updateWeights();
+		if (this->updateWeights_) this->updateWeights();
 
 		// update the progress bar
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
@@ -126,10 +127,10 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _meas)
 {
 	// set the random state at the begining
-	this->setRandomFlipNum(_par.nFlip);
+	// this->setRandomFlipNum(_par.nFlip);
 
 	// allows to calculate the probability of the operator (for operator measurements)
-	std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
+	// std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
 	
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= _par.MC_sam_; ++i)
@@ -148,7 +149,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _p
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
-			_meas.measure(this->curVec_, opFun);
+			_meas.measure(this->curVec_, this->pRatioFunc_);
 		}
 		// normalize the measurements - this also creates a new block of measurements
 		_meas.normalize(_par.nblck_);												
@@ -247,15 +248,16 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 			// one can calculate the local energy here (either of the ground state or the excited state)
 			// collect other										
 			_meas.measure(NQS_STATE, this->pRatioFunc_);
+			// TIMER_START_MEASURE(_meas.measure(NQS_STATE, this->pRatioFunc_), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i));
 			//TIMER_START_MEASURE(_meas.measure(BASE_TO_INT<u64>(this->curVec_, this->discVal_), opFun), (i % this->pBar_.percentageSteps == 0 && _taken == 0), _timer, STR(i)); 	
 		}
 
 		_meas.normalize(_par.nblck_);												// normalize the measurements
-		meanEn(i - 1) = arma::mean(En); 											// save the mean energy
+		MonteCarlo::blockmean(En, _par.nblck_, &meanEn(i-1)); 						// save the mean energy
 		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet); 					// update the progress bar
 
 	}
-	// LOGINFO(_t, "NQS_COLLECTION", 1);
+	LOGINFO(_t, "NQS_COLLECTION", 1);
 	return meanEn;
 }
 
@@ -285,8 +287,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// calculate f(s) / \psi(s)
+#ifdef NQS_LOWER_RATIO_LOGDIFF
 			_values += std::exp(_f(NQS_STATE) - this->ansatzlog(NQS_STATE));
-			// _values += _f(this->curVec_) / this->ansatz(this->curVec_);
+#else 
+			_values += _f(NQS_STATE) / this->ansatz(NQS_STATE);
+#endif
 		}
 		_container(i - 1) = _values / (double)_par.nblck_;												
 	}

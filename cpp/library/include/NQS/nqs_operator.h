@@ -322,7 +322,7 @@ namespace NQSAv
 
 		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
-			_cont.normalize(true);
+			_cont.normalize(_nBlck, true);
 		};
 
 		// ---- GETTERS ----

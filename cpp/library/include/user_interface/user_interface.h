@@ -450,7 +450,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_mc, uint, 1);		// number of samples - outer loop for collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_th, uint, 0);		// thermalize when collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_bn, uint, 100);		// number of inner blocks for collecting - excited states
-		UI_PARAM_CREATE_DEFAULT(nqc_ex_bs, uint, 4);		// block size for collecting - excited states
+		UI_PARAM_CREATE_DEFAULT(nqs_ex_bs, uint, 4);		// block size for collecting - excited states
 		UI_PARAM_CREATE_DEFAULTV(nqs_ex_beta, double);		// beta for the excited states - if not set, then only the ground state is calculated
 		// for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_mc, uint, 1);		// number of samples - outer loop for collecting

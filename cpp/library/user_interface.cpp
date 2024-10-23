@@ -91,7 +91,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_ex_mc);
 		SETOPTION(nqsP,	nqs_ex_bn);
 		SETOPTION(nqsP,	nqs_ex_th);
-		SETOPTION(nqsP,	nqc_ex_bs);
+		SETOPTION(nqsP,	nqs_ex_bs);
 		SETOPTIONVECTORRESIZET(nqsP, nqs_ex_beta, 1, double);
 
 		// collecting - all

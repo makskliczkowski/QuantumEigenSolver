@@ -556,7 +556,11 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 
 	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta, this);
 	this->lower_states_.exc_ratio_ = 		[&](const NQSS& _v) { return this->pRatio(_v); };
+#ifdef NQS_LOWER_RATIO_LOGDIFF
 	this->lower_states_.exc_ansatz_ = 		[&](const NQSS& _v) { return this->ansatzlog(_v); };
+#else
+	this->lower_states_.exc_ansatz_ = 		[&](const NQSS& _v) { return this->ansatz(_v); };
+#endif
 	this->info_p_.lr_			= 			_lr;
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)

@@ -21,6 +21,8 @@
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 class NQS;
 
+#define NQS_LOWER_RATIO_LOGDIFF 
+
 // ##########################################################################################################################################
 
 /*
@@ -47,6 +49,7 @@ struct NQS_lower_t
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
 
     // for the excited states 
+    size_t Ns_                      =       0;                      // number of the states in the basis
     bool isSet_						= 		false;
     uint f_lower_size_				=		0;						// number of the lower states
     NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
@@ -92,6 +95,7 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, 
                         NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc)
     : nqs_exc_(_nqs_exc), 
+    Ns_(_Ns),
     isSet_(!_f_lower.empty()),
     f_lower_size_(_f_lower.size()),
     f_lower(_f_lower),
@@ -138,7 +142,7 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(Operators::_OP_V_T_CR _current_exc_state)
 {
     // create the projection operator
-    this->enP_ = Operators::GeneralOperators::projectorSumComb(nqs_exc_->getNvis(), 
+    this->enP_ = Operators::GeneralOperators::projectorSumComb(Ns_, 
                     _current_exc_state,     // project to current state <s|psi_w>
                     this->exc_ratio_);      // calculate the probability ratio (for the excited state) using the vector representation \psi _w(s') / \psi _w(s)
 }
@@ -183,7 +187,11 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uin
 {
     if (this->f_lower_size_ == 0)
         return _T(0.0);
+#ifdef NQS_LOWER_RATIO_LOGDIFF
     return std::exp(this->ansatzlog(_current_exc_state, i) - this->exc_ansatz_(_current_exc_state));
+#else
+    return this->ansatz(_current_exc_state, i) / this->exc_ansatz_(_current_exc_state);
+#endif
 }
 
 // ##########################################################################################################################################

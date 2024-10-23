@@ -194,8 +194,8 @@ void UI::nqsExcited()
 					this->nqsP.nqs_tr_mc_, this->nqsP.nqs_tr_bs_, this->nqsP.nFlips_, dir);
 	NQS_train_t _parC(this->nqsP.nqs_col_mc_, this->nqsP.nqs_col_th_, 
 					this->nqsP.nqs_col_bn_, this->nqsP.nqs_col_bs_, this->nqsP.nFlips_, dir);
-	NQS_train_t _parE(this->nqsP.nqs_col_mc_, this->nqsP.nqs_col_th_, 
-					this->nqsP.nqs_col_bn_, this->nqsP.nqs_col_bs_, this->nqsP.nFlips_, dir);
+	NQS_train_t _parE(this->nqsP.nqs_ex_mc_, this->nqsP.nqs_ex_th_, 
+					this->nqsP.nqs_ex_bn_, this->nqsP.nqs_ex_bs_, this->nqsP.nFlips_, dir);
 
 	// calculate ED to compare with Lanczos or Full
 	const auto mean_perc 	= int(_parT.MC_sam_ / 20) == 0 ? 1 : int(_parT.MC_sam_ / 20);
@@ -244,7 +244,6 @@ void UI::nqsExcited()
 		_H->clearH();
 		_H->clearKrylov();
 	}
-
 
 	// setup the energies container
 	arma::Mat<_T> _EN(_parT.MC_sam_ + _parC.MC_sam_, this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);

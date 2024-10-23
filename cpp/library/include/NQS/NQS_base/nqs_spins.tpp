@@ -61,8 +61,10 @@ template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<2, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
 {
 	this->nFlip_ = _nFlips;
-	this->flipPlaces_.resize(this->nFlip_);
-	this->flipVals_.resize(this->nFlip_);
+	if (this->flipPlaces_.size() != this->nFlip_)
+		this->flipPlaces_.resize(this->nFlip_);
+	if (this->flipVals_.size() != this->nFlip_)
+		this->flipVals_.resize(this->nFlip_);
 }
 
 #endif
