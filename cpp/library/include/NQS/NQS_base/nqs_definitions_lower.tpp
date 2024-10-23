@@ -57,13 +57,13 @@ struct NQS_lower_t
 
     // ##########################################################################################################################################
 
-    NQS_lower_t() : containerP_(Operators::Containers::OperatorContainer<_T>(1)) {};
+    NQS_lower_t() : containerP_({}) {};
     NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc);
     
     // ##########################################################################################################################################
     
     // for the energy estimation
-    Operators::Containers::OperatorContainer<_T> containerP_;       // container for the projectors  
+    v_1d<Operators::Containers::OperatorContainer<_T>> containerP_; // containers for the projectors  
     Operators::OperatorNQS<_T> enP_;                                // operator for the energy estimation - it is a combination of the projectors to the basis state currently used in the excited state estimation
 
     // for the gradient ratio estimation
@@ -108,8 +108,9 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns,
         return;
     }
 
-    this->containerP_ = Operators::Containers::OperatorContainer<_T>(_Ns);
-    this->containerP_.decideSize();
+    this->containerP_ = v_1d<Operators::Containers::OperatorContainer<_T>>(this->f_lower_size_, Operators::Containers::OperatorContainer<_T>(_Ns));
+    for (auto& i : this->containerP_)
+        i.decideSize();
 }
 
 // ##########################################################################################################################################
@@ -160,10 +161,10 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint 
     if (this->f_lower_size_ == 0)
         return _T(0.0);
 
-    this->containerP_.reset();
-    this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_);
+    this->containerP_[i].reset();
+    this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_[i]);
     // get the mean value
-    return this->f_lower_b_[i] * this->containerP_.template mean<_T>()(0, 0);
+    return this->f_lower_b_[i] * this->containerP_[i].template mean<_T>()(0, 0);
 }
 
 // ##########################################################################################################################################

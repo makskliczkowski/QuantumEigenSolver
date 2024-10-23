@@ -264,6 +264,7 @@ void UI::nqsExcited()
 			_EN.col(i).subvec(0, _parT.MC_sam_ - 1) 			= std::get<0>(_out);
 			_EN_std.col(i).subvec(0, _parT.MC_sam_ - 1) 		= std::get<1>(_out);
 			// _timer.checkpoint(VEQ(i) + "collect");
+			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
 			_EN.col(i).subvec(_parT.MC_sam_, _EN.n_rows - 1) 	= _NQS[i]->collect(_parC, this->quiet, 
 																					_timer.point(VEQ(i)), (i == 0) ? _measGS : _meas, true);
 
