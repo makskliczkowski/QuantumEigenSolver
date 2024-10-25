@@ -7,6 +7,7 @@
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
 #include "../../source/src/UserInterface/ui.h"
+#include <memory>
 #include <vector>
 
 #ifdef _DEBUG
@@ -89,7 +90,7 @@
 
 #define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
 // --- NQS
-constexpr int UI_LIMITS_NQS_ED									= ULLPOW(18);
+constexpr int UI_LIMITS_NQS_ED									= ULLPOW(26);
 constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
 
@@ -451,14 +452,25 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
 		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
 		UI_PARAM_CREATE_DEFAULT(nFlips, uint, 1);
-		UI_PARAM_CREATE_DEFAULT(blockSize, uint, 8);
-		UI_PARAM_CREATE_DEFAULT(nTherm, uint, 50);
-		UI_PARAM_CREATE_DEFAULT(nBlocks, uint, 500);
-		UI_PARAM_CREATE_DEFAULT(nMcSteps, uint, 1000);
+		
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pinv, double, 1e-5);// pseudoinverse for the NQS
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pc, double, 5.0);	// percentage of the samples to be used for display
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_bs, uint, 8);		// block size for training
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
+		// for collecting - excited states
+		UI_PARAM_CREATE_DEFAULT(nqs_ex_mc, uint, 1);		// number of samples - outer loop for collecting - excited states
+		UI_PARAM_CREATE_DEFAULT(nqs_ex_th, uint, 0);		// thermalize when collecting - excited states
+		UI_PARAM_CREATE_DEFAULT(nqs_ex_bn, uint, 100);		// number of inner blocks for collecting - excited states
+		UI_PARAM_CREATE_DEFAULT(nqs_ex_bs, uint, 4);		// block size for collecting - excited states
+		UI_PARAM_CREATE_DEFAULTV(nqs_ex_beta, double);		// beta for the excited states - if not set, then only the ground state is calculated
 		// for collecting
-		UI_PARAM_CREATE_DEFAULT(nMcSamples, uint, 100);
-		UI_PARAM_CREATE_DEFAULT(nSBlocks, uint, 100);
-		UI_PARAM_CREATE_DEFAULT(blockSizeS, uint, 8);
+		UI_PARAM_CREATE_DEFAULT(nqs_col_mc, uint, 1);		// number of samples - outer loop for collecting
+		UI_PARAM_CREATE_DEFAULT(nqs_col_th, uint, 0);		// thermalize when collecting
+		UI_PARAM_CREATE_DEFAULT(nqs_col_bn, uint, 100);		// number of inner blocks for collecting
+		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
+		// learning rate
 		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
 		// weight load directory
 		inline static const std::string _loadNQS	= ""; 
@@ -470,16 +482,18 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nVisible);
 			UI_PARAM_SET_DEFAULT(nLayers);
 			UI_PARAM_SET_DEFAULT(nFlips);
-			UI_PARAM_SET_DEFAULT(blockSize);
-			UI_PARAM_SET_DEFAULT(nTherm);
-			UI_PARAM_SET_DEFAULT(nBlocks);
-			UI_PARAM_SET_DEFAULT(nMcSteps);
+			// training
+			UI_PARAM_SET_DEFAULT(nqs_tr_epo);
+			UI_PARAM_SET_DEFAULT(nqs_tr_mc);
+			UI_PARAM_SET_DEFAULT(nqs_tr_bs);
+			UI_PARAM_SET_DEFAULT(nqs_tr_th);
 			UI_PARAM_SET_DEFAULT(lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
 			// collection
-			UI_PARAM_SET_DEFAULT(nMcSamples);
-			UI_PARAM_SET_DEFAULT(nSBlocks);
-			UI_PARAM_SET_DEFAULT(blockSizeS);
+			UI_PARAM_SET_DEFAULT(nqs_col_mc);
+			UI_PARAM_SET_DEFAULT(nqs_col_th);
+			UI_PARAM_SET_DEFAULT(nqs_col_bn);
+			UI_PARAM_SET_DEFAULT(nqs_col_bs);
 		}
 	};
 };
@@ -507,22 +521,12 @@ namespace UI_PARAMS
 class UI : public UserInterface 
 {
 protected:
-
-	// LATTICE params
-	UI_PARAMS::LatP latP;
-
-	// SYMMETRY params
-	UI_PARAMS::SymP symP;
-
-	// NQS params
-	UI_PARAMS::NqsP nqsP;
-
-	// MODEL params
-	UI_PARAMS::ModP modP;
+	UI_PARAMS::LatP latP;								// LATTICE params
+	UI_PARAMS::SymP symP;								// SYMMETRY params
+	UI_PARAMS::NqsP nqsP;								// NQS params
+	UI_PARAMS::ModP modP;								// MODEL params
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	
-	// define basic models
 	bool isComplex_		= false;						// checks the complex sector
 	bool useComplex_	= false;						// forces complex sector choice
 
@@ -571,6 +575,9 @@ private:
 
 	template<typename _T, uint _spinModes>
 	void nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS);
+
+	template<typename _T, uint _spinModes>
+	void nqsExcited();
 
 	// ##################### QUADRATIC #####################
 
@@ -637,7 +644,8 @@ private:
 
 	// NQS
 	template<typename _T, uint _spinModes = 2>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS);
+	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
+		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl = {}, const v_1d<double>& _beta = {});
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
@@ -666,6 +674,7 @@ public:
 	// ############################################### N Q S 
 
 	void makeSimNQS();
+	void makeSimNQSExcited();
 
 	// ############################################### S Y M M E T R I E S 
 
@@ -710,15 +719,15 @@ inline void UI::setDefaultMap()
 {
 	this->defaultParams = {
 		UI_OTHER_MAP(nqs	, this->nqsP.type_			, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
-		UI_OTHER_MAP(m		, this->nqsP.nMcSteps_		, FHANDLE_PARAM_HIGHER0),			// mcsteps	
-		UI_OTHER_MAP(nb		, this->nqsP.nBlocks_		, FHANDLE_PARAM_HIGHER0),			// number of blocks
-		UI_OTHER_MAP(bs		, this->nqsP.blockSize_		, FHANDLE_PARAM_HIGHER0),			// block size
+		// UI_OTHER_MAP(m		, this->nqsP.nMcSteps_		, FHANDLE_PARAM_HIGHER0),			// mcsteps	
+		// UI_OTHER_MAP(nb		, this->nqsP.nBlocks_		, FHANDLE_PARAM_HIGHER0),			// number of blocks
+		// UI_OTHER_MAP(bs		, this->nqsP.blockSize_		, FHANDLE_PARAM_HIGHER0),			// block size
 		UI_OTHER_MAP(nh		, this->nqsP.nHidden_		, FHANDLE_PARAM_HIGHER0),			// hidden params
 		UI_OTHER_MAP(nf		, this->nqsP.nFlips_		, FHANDLE_PARAM_HIGHER0),			// flip number
 		// for collecting in nqs
-		UI_OTHER_MAP(bsS	, this->nqsP.blockSizeS_	, FHANDLE_PARAM_HIGHER0),			// block size samples
-		UI_OTHER_MAP(mcS	, this->nqsP.nMcSamples_	, FHANDLE_PARAM_HIGHER0),			// mcsteps samples
-		UI_OTHER_MAP(nbS	, this->nqsP.nSBlocks_		, FHANDLE_PARAM_HIGHER0),			// number of blocks - samples
+		// UI_OTHER_MAP(bsS	, this->nqsP.blockSizeS_	, FHANDLE_PARAM_HIGHER0),			// block size samples
+		// UI_OTHER_MAP(mcS	, this->nqsP.nMcSamples_	, FHANDLE_PARAM_HIGHER0),			// mcsteps samples
+		// UI_OTHER_MAP(nbS	, this->nqsP.nSBlocks_		, FHANDLE_PARAM_HIGHER0),			// number of blocks - samples
 		UI_OTHER_MAP(dirNQS	, this->nqsP.loadNQS_		, FHANDLE_PARAM_DEFAULT),			// directory to load the weights from
 
 		// --------------- directory parameters ---------------

@@ -1,0 +1,1 @@
+#include "RBM_base/rbm_fermions.tpp"

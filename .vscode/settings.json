@@ -93,5 +93,6 @@
     "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
     "autoHide.autoHideSideBar": true,
     "autoHide.autoHidePanel": true,
-    "autoHide.autoHideAuxiliaryBar": true
+    "autoHide.autoHideAuxiliaryBar": true,
+    "notebook.stickyScroll.enabled": true
 }

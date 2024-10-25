@@ -280,12 +280,10 @@ namespace Operators {
 
 namespace Operators {
 
-	using _OP_V_T 	= arma::Col<double>;
-	using _OP_V_T_CR= const arma::Col<double>&;
+	using _OP_V_T 		= arma::Col<double>;
+	using _OP_V_T_CR	= const arma::Col<double>&;
 	template <typename _T>
 	using _OPx_V 		= std::pair<_OP_V_T, _T>;
-	template <typename _T>
-	using _OPxEXT_V		= std::vector<std::pair<_OP_V_T, _T>>;
 	// standard operators
 	typedef _OPx_V<cpx> _OPCx_V;
 	typedef _OPx_V<double> _OPRe_V;
@@ -467,5 +465,127 @@ namespace Operators {
 };
 
 // ------------------------------------------------------------------------------------------------------------------
+
+// Do the same for the functions of the operators that return combination of pairs and values - this may be useful for
+// the operators acting on the product states and returning the vectors of new states and values in different basis or 
+// as and extensive operator
+
+namespace OperatorsCombination {
+	using _OP_T      	= u64;
+	template <typename _T>
+	using _OPx 			= std::vector<std::pair<_OP_T, _T>>;
+
+	// Standard operators
+	using _OPCx 		= _OPx<cpx>;
+	using _OPRe 		= _OPx<double>;
+
+	/*
+	* @brief All possible correlators that this operator can return
+	* The operator acts on the product state and returns a vector of new states and values
+	* The operator can be global, local or correlation operator
+	*/
+	template <typename _RET>
+	struct _OP {
+		// Standard operators
+		using RET      = _RET;
+		using R        = _OPx<RET>;
+		
+		// Functions
+		using GLB      = std::function<R(_OP_T)>;
+		using LOC      = std::function<R(_OP_T, int)>;
+		using COR      = std::function<R(_OP_T, int, int)>;
+
+		/*
+		* @brief Contains all possible functions in a template
+		*/
+		template <typename... _T>
+		using INP      = std::function<R(_OP_T, _T...)>;
+
+		// ---------------------------------------------------------
+	};
+
+	// ######### S T A N D A R D #########
+	using _GLBC   = typename _OP<cpx>::GLB;   // Global function acting on whole product state
+	using _LOCC   = typename _OP<cpx>::LOC;   // Local function acting on single site
+	using _CORC   = typename _OP<cpx>::COR;   // Correlation function acting on pair of sites
+
+	#define _INPC _OP<cpx>::template INP
+	#define _INPR _OP<double>::template INP
+
+	using _GLBR   = typename _OP<double>::GLB; // Global function acting on whole product state
+	using _LOCR   = typename _OP<double>::LOC; // Local function acting on single site
+	using _CORR   = typename _OP<double>::COR; // Correlation function acting on pair of sites
+
+	template<typename _T>
+	using _GLB    = typename _OP<_T>::GLB;                
+	template<typename _T>
+	using _LOC    = typename _OP<_T>::LOC;
+	template<typename _T>
+	using _COR    = typename _OP<_T>::COR;
+	template<typename _T, typename ..._Ts>
+	using _INP    = typename _OP<_T>::template INP<_Ts...>;
+
+};
+
+// for vectors
+
+namespace OperatorsCombination {
+	using _OP_V_T      = arma::Col<double>;
+	using _OP_V_T_CR   = const arma::Col<double>&;
+	
+	template <typename _T>
+	using _OPx_V      = std::vector<Operators::_OPx_V<_T>>;
+
+	// Standard operators
+	using _OPCx_V 		= _OPx_V<cpx>;
+	using _OPRe_V 		= _OPx_V<double>;
+
+	/*
+	* @brief All possible correlators that this operator can return
+	* The operator acts on the product state and returns a vector of new states and values
+	* The operator can be global, local or correlation operator
+	*/
+	template <typename _RET>
+	struct _OP_V {
+		// Standard operators
+		using RET      = _RET;
+		using R        = _OPx_V<RET>;
+		
+		// Functions
+		using GLB      = std::function<R(_OP_V_T_CR)>;
+		using LOC      = std::function<R(_OP_V_T_CR, int)>;
+		using COR      = std::function<R(_OP_V_T_CR, int, int)>;
+
+		/*
+		* @brief Contains all possible functions in a template
+		*/
+		template <typename... _T>
+		using INP      = std::function<R(_OP_V_T_CR, _T...)>;
+
+		// ---------------------------------------------------------
+	};
+
+	// ######### S T A N D A R D #########
+	using _GLBC_V   = typename _OP_V<cpx>::GLB;   // Global function acting on whole product state
+	using _LOCC_V   = typename _OP_V<cpx>::LOC;   // Local function acting on single site
+	using _CORC_V   = typename _OP_V<cpx>::COR;   // Correlation function acting on pair of sites
+
+	#define _INPC_V _OP_V<cpx>::template INP
+	#define _INPR_V _OP_V<double>::template INP
+
+	using _GLBR_V   = typename _OP_V<double>::GLB; // Global function acting on whole product state
+	using _LOCR_V   = typename _OP_V<double>::LOC; // Local function acting on single site
+	using _CORR_V   = typename _OP_V<double>::COR; // Correlation function acting on pair of sites
+
+	template<typename _T>
+	using _GLB_V    = typename _OP_V<_T>::GLB;                
+	template<typename _T>
+	using _LOC_V    = typename _OP_V<_T>::LOC;
+	template<typename _T>
+	using _COR_V    = typename _OP_V<_T>::COR;
+	template<typename _T, typename ..._Ts>
+	using _INP_V    = typename _OP_V<_T>::template INP<_Ts...>;
+
+};
 
 #endif

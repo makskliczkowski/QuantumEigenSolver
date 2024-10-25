@@ -1,4 +1,5 @@
 #include "include/user_interface/user_interface.h"
+#include "source/src/UserInterface/ui.h"
 int LASTLVL = 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -79,20 +80,31 @@ void UI::parseModel(int argc, cmdArg& argv)
 	std::string choosen_option = "";
 	// ---------- SIMULATION PARAMETERS ----------
 	{
-		SETOPTIONV(nqsP,	nMcSteps,	"m"		);
-		SETOPTIONV(nqsP,	blockSize,	"bs"	);
-		SETOPTIONV(nqsP,	nBlocks,	"nb"	);
-		SETOPTIONV(nqsP,	nHidden,	"nh"	);
-		SETOPTIONV(nqsP,	nFlips,		"nf"	);
-		SETOPTIONV(nqsP,	type,		"nqst"	);
-		SETOPTIONV(nqsP,	nTherm,		"nt"	);
+		// training parameters
+		SETOPTION(nqsP,	nqs_tr_epo);
+		SETOPTION(nqsP,	nqs_tr_mc);
+		SETOPTION(nqsP,	nqs_tr_bs);
+		SETOPTION(nqsP,	nqs_tr_th);
+		SETOPTION(nqsP,	nqs_tr_pinv);
+		SETOPTION(nqsP,	nqs_tr_pc);
+		// collecting - excited
+		SETOPTION(nqsP,	nqs_ex_mc);
+		SETOPTION(nqsP,	nqs_ex_bn);
+		SETOPTION(nqsP,	nqs_ex_th);
+		SETOPTION(nqsP,	nqs_ex_bs);
+		SETOPTIONVECTORRESIZET(nqsP, nqs_ex_beta, 1, double);
+
+		// collecting - all
+		SETOPTION(nqsP,	nqs_col_mc);
+		SETOPTION(nqsP,	nqs_col_bn);
+		SETOPTION(nqsP,	nqs_col_th);	
+		SETOPTION(nqsP,	nqs_col_bs);	
+
+		SETOPTIONV(nqsP, nHidden, "nh");
+		SETOPTION(nqsP,	nFlips);
+		SETOPTIONV(nqsP,	type, 		"nqst");
 		SETOPTION(nqsP,		lr					);
 		SETOPTIONV(nqsP,	loadNQS,	"lNQS"	);
-		// samples
-		SETOPTIONV(nqsP,	nMcSamples,	"mcS"	);
-		SETOPTIONV(nqsP,	blockSizeS,	"bsS"	);
-		SETOPTIONV(nqsP,	nSBlocks,	"nbS"	);
-		//this->nqsP.nTherm_ = uint(0.1 * nqsP.nBlocks_);
 	}
 	// ----------------- LATTICE -----------------
 	{
@@ -268,6 +280,11 @@ void UI::funChoice()
 			// this option utilizes the Hamiltonian with NQS ansatz calculation
 			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS", LOG_TYPES::CHOICE, 1);
 			this->makeSimNQS();
+			break;
+		case 11:
+			// this option utilizes the Hamiltonian with NQS ansatz calculation - excited states
+			LOGINFO("SIMULATION: HAMILTONIAN WITH NQS - EXCITED STATES", LOG_TYPES::CHOICE, 1);
+			this->makeSimNQSExcited();
 			break;
 			// ------------------------------- SYMMETRIES -------------------------------
 		case 20:

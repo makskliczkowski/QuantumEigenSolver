@@ -117,6 +117,7 @@ set(SOURCES
     src/user_interface/ui_check_nqs.cpp
     src/user_interface/ui_check_quadratic.cpp
     src/user_interface/ui_check_symmetries.cpp
+    src/nqs.cpp
     ${CPPSOURCE}/common.cpp 
     ${CPPSOURCE}/directories.cpp 
     ${CPPSOURCE}/exceptions.cpp 
@@ -260,9 +261,15 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 # Additional flags for specific OS platforms
+message(STATUS "Using Compiler: ${CMAKE_CXX_COMPILER}")
 if (OS_PLATFORM STREQUAL "linux")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -qopenmp -D_DEBUG")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -qopenmp")
+    if (CMAKE_CXX_COMPILER STREQUAL "icpx")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -qopenmp -D_DEBUG")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -qopenmp")
+    else()
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp -D_DEBUG")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp")
+    endif()
 elseif (OS_PLATFORM STREQUAL "windows")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /FS /bigobj /DMKL_ILP64 /Qiopenmp /D_DEBUG")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /FS /bigobj /DMKL_ILP64 /Qiopenmp")
@@ -279,6 +286,28 @@ add_custom_target(build_all
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
     COMMAND ${CMAKE_COMMAND} --build .
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_deb
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_deb_reg
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
+    COMMAND ${CMAKE_COMMAND} -DNQS_SREG
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_rel
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} --build .
+)
+
+add_custom_target(build_rel_reg
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND ${CMAKE_COMMAND} -DNQS_SREG
     COMMAND ${CMAKE_COMMAND} --build .
 )
 

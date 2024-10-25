@@ -1,4 +1,5 @@
 #include "./include/algebra/operators.h"
+#include "include/algebra/general_operator.h"
 #include "source/src/Include/str.h"
 #include <complex>
 #include <string>
@@ -27,9 +28,10 @@ namespace Operators
 		* @param sites the sites to meassure correlation at. The order of the sites matters!
 		* @returns the pair of the new state and the value of the operator
 		*/
-		std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<u64, _T> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val = 1.0;
+			_T _val = 1.0;
 			for (auto const& site : sites)
 			{
 				base_vec	=	flip(base_vec, _Ns - 1 - site);
@@ -38,9 +40,10 @@ namespace Operators
 			return std::make_pair(base_vec, _val);
 		}
 
-		std::pair<_OP_V_T, double> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val 			= 1.0;
+			_T _val 			= 1.0;
 			_OP_V_T _base_vec 	= base_vec;
 			for (auto const& site : sites)
 			{
@@ -58,11 +61,12 @@ namespace Operators
 		* @param _part the site to meassure correlation at
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_x(size_t _Ns, size_t _part)
+		template <typename _T>
+		Operators::Operator<_T> sig_x(size_t _Ns, size_t _part)
 		{
 			// create the function
-			_OP<double>::GLB fun_ 		= [_Ns, _part](u64 state) { return sig_x(state, _Ns, { (uint)_part }); };
-			_OP_V<double>::GLB funV_ 	= [_Ns, _part](_OP_V_T_CR state) { return sig_x(state, _Ns, { (uint)_part }); };
+			_GLB<_T> fun_		= [_Ns, _part](u64 state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
+			_GLB_V<_T> funV_	= [_Ns, _part](_OP_V_T_CR state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			u64 _acts = 0;
@@ -71,7 +75,7 @@ namespace Operators
 			_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -82,11 +86,12 @@ namespace Operators
 		* @param sites the sites to meassure correlation at
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_x(size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		Operators::Operator<_T> sig_x(size_t _Ns, const v_1d<uint>& sites)
 		{
 			// create the function
-			_OP<double>::GLB fun_ = [_Ns, sites](u64 state) { return sig_x(state, _Ns, sites); };
-			_OP_V<double>::GLB funV_ = [_Ns, sites](_OP_V_T_CR state) { return sig_x(state, _Ns, sites); };
+			_GLB<_T> fun_		= [_Ns, sites](u64 state) { return sig_x(state, _Ns, sites); };
+			_GLB_V<_T> funV_	= [_Ns, sites](_OP_V_T_CR state) { return sig_x(state, _Ns, sites); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			u64 _acts = 0;
@@ -96,7 +101,7 @@ namespace Operators
 				_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -106,13 +111,14 @@ namespace Operators
 		* @param _Ns lattice dimensionality (base vector length)
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_x(size_t _Ns)
+		template <typename _T>
+		Operators::Operator<_T> sig_x(size_t _Ns)
 		{
 			// set the vector of sites
 			v_1d<uint> _sites		= Vectors::vecAtoB<uint>(_Ns);
 			// create the function
-			_OP<double>::GLB fun_	= [_Ns, _sites](u64 state) { return sig_x(state, _Ns, _sites); };
-			_OP_V<double>::GLB funV_ = [_Ns, _sites](_OP_V_T_CR state) { return sig_x(state, _Ns, _sites); };
+			_GLB<_T> fun_			= [_Ns, _sites](u64 state) { return sig_x(state, _Ns, _sites); };
+			_GLB_V<_T> funV_ 		= [_Ns, _sites](_OP_V_T_CR state) { return sig_x(state, _Ns, _sites); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			// |set the bitmask on the state, remember that this is counted from the left|
@@ -122,10 +128,22 @@ namespace Operators
 			u64 _acts				= (ULLPOW(_Ns)) - 1;
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
 			return _op;
 		}
+
+		template <typename _T>
+		Operators::Operator<_T, uint> sig_x_l(size_t _Ns)
+		{
+			_LOC<_T> fun_ 	= [_Ns](u64 state, uint _part) { return sig_x<_T>(state, _Ns, { _part }); };
+			_LOC_V<_T> funV_ 	= [_Ns](_OP_V_T_CR state, uint _part) { return sig_x<_T>(state, _Ns, { _part }); };
+
+			// set the operator
+			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			return _op;
+		}
+
 
 		// ############################################################################################# 
 
@@ -140,17 +158,19 @@ namespace Operators
 		* @param sites the sites to meassure correlation at. The order of the sites matters!
 		* @returns the pair of the new state and the value of the operator
 		*/
-		std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<u64, _T> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val = 1.0;
+			_T _val = 1.0;
 			for (auto const& site : sites)
 				_val *= Binary::check(base_vec, _Ns - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
 			return std::make_pair(base_vec, _val);
 		}
 
-		std::pair<_OP_V_T, double> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val 			= 1.0;
+			_T _val 			= 1.0;
 			for (auto const& site : sites)
 				_val *= Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
 
@@ -163,11 +183,12 @@ namespace Operators
 		* @param _part the site to meassure correlation at
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_z(size_t _Ns, size_t _part)
+		template <typename _T>
+		Operators::Operator<_T> sig_z(size_t _Ns, size_t _part)
 		{
 			// create the function
-			_OP<double>::GLB fun_ = [_Ns, _part](u64 state) { return sig_z(state, _Ns, { (uint)_part }); };
-			_OP_V<double>::GLB funV_ = [_Ns, _part](_OP_V_T_CR state) { return sig_z(state, _Ns, { (uint)_part }); };
+			_GLB<_T> fun_		= [_Ns, _part](u64 state) { return sig_z(state, _Ns, { (uint)_part }); };
+			_GLB_V<_T> funV_ 	= [_Ns, _part](_OP_V_T_CR state) { return sig_z(state, _Ns, { (uint)_part }); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			u64 _acts = 0;
@@ -176,7 +197,7 @@ namespace Operators
 			_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -187,11 +208,12 @@ namespace Operators
 		* @param sites the sites to meassure correlation at
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_z(size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		Operators::Operator<_T> sig_z(size_t _Ns, const v_1d<uint>& sites)
 		{
 			// create the function
-			_OP<double>::GLB fun_ = [_Ns, sites](u64 state) { return sig_z(state, _Ns, sites); };
-			_OP_V<double>::GLB funV_ = [_Ns, sites](_OP_V_T_CR state) { return sig_z(state, _Ns, sites); };
+			_GLB<_T> fun_		= [_Ns, sites](u64 state) { return sig_z(state, _Ns, sites); };
+			_GLB_V<_T> funV_	= [_Ns, sites](_OP_V_T_CR state) { return sig_z(state, _Ns, sites); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			u64 _acts = 0;
@@ -201,7 +223,7 @@ namespace Operators
 				_acts |= 1 << (_Ns - 1 - _part);
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			return _op;
 		}
@@ -212,13 +234,14 @@ namespace Operators
 		* @param sites the sites to meassure correlation at
 		* @returns the operator acting on the _part site
 		*/
-		Operators::Operator<double> sig_z(size_t _Ns)
+		template <typename _T>
+		Operators::Operator<_T> sig_z(size_t _Ns)
 		{
 			// set the vector of sites
 			v_1d<uint> _sites		= Vectors::vecAtoB<uint>(_Ns);
 			// create the function
-			_OP<double>::GLB fun_	= [_Ns, _sites](u64 state) { return sig_z(state, _Ns, _sites); };
-			_OP_V<double>::GLB funV_ = [_Ns, _sites](_OP_V_T_CR state) { return sig_z(state, _Ns, _sites); };
+			_GLB<_T> fun_		= [_Ns, _sites](u64 state) { return sig_z(state, _Ns, _sites); };
+			_GLB_V<_T> funV_ 	= [_Ns, _sites](_OP_V_T_CR state) { return sig_z(state, _Ns, _sites); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
 			// |set the bitmask on the state, remember that this is counted from the left|
@@ -228,8 +251,19 @@ namespace Operators
 			u64 _acts				= (ULLPOW(_Ns)) - 1;
 
 			// set the operator
-			Operator<double> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
+			return _op;
+		}
+
+		template <typename _T>
+		Operators::Operator<_T, uint> sig_z_l(size_t _Ns)
+		{
+			_LOC<_T> fun_ 		= [_Ns](u64 state, uint _part) { return sig_z<_T>(state, _Ns, { _part }); };
+			_LOC_V<_T> funV_ 	= [_Ns](_OP_V_T_CR state, uint _part) { return sig_z<_T>(state, _Ns, { _part }); };
+
+			// set the operator
+			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			return _op;
 		}
 
@@ -372,6 +406,37 @@ namespace Operators
 		};
 	}
 
+
+	// definitions of the tamplates with given types
+
+	// sigx - double 
+	template std::pair<u64, double> SpinOperators::sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template std::pair<_OP_V_T, double> SpinOperators::sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, size_t _part);
+	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns);
+	template Operators::Operator<double, uint> SpinOperators::sig_x_l(size_t _Ns);
+	// sigz - double
+	template std::pair<u64, double> SpinOperators::sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template std::pair<_OP_V_T, double> SpinOperators::sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, size_t _part);
+	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns);
+	template Operators::Operator<double, uint> SpinOperators::sig_z_l(size_t _Ns);
+	// sigx - complex
+	template std::pair<u64, std::complex<double>> SpinOperators::sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template std::pair<_OP_V_T, std::complex<double>> SpinOperators::sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, size_t _part);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns);
+	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_x_l(size_t _Ns);
+	// sigz - complex
+	template std::pair<u64, std::complex<double>> SpinOperators::sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template std::pair<_OP_V_T, std::complex<double>> SpinOperators::sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, size_t _part);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
+	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns);
+	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_z_l(size_t _Ns);
 
 	// ##############################################################################################################################
 
