@@ -13,7 +13,7 @@ template <typename _Ht, typename _T, class _stateType>
 class RBM_PP_S<2, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	using NQSLS_p = RBM_PP<2, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p = typename RBM_PP<2, _Ht, _T, _stateType>::NQSLS_p;
 	/* ------------------------------------------------------- */
 public:
 	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, 

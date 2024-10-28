@@ -40,7 +40,7 @@ class NQS
 	// type definitions 
 	NQS_PUBLIC_TYPES(_T, double);	
 public:
-	using NQSLS_p 						=		NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p 						=		typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
 

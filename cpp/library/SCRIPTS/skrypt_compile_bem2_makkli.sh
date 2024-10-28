@@ -4,18 +4,17 @@
 #SBATCH --mem=8gb
 #SBATCH --time=1:00:00
 
-# source /usr/local/sbin/modules.sh
+source /usr/local/sbin/modules.sh
 
-module load intel
+module load intel/2022b
 module load HDF5
 
 
-cd ~/CODES/QuantumEigenSolver/cpp/library
-ls
-
 CPPSOURCE=./source/cpp
-ARMADIR=/home/kliczkowski/LIBRARY/armadillo-12.8.0
+ARMADIR=/home/makkli4548/armadillo-14.0.2
 
+cd /home/makkli4548/CODES/QuantumEigenSolver/cpp/library/
+ls
 
 icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ./src/user_interface/ui_check_eth.cpp                   \
@@ -28,8 +27,7 @@ icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp \
         ${CPPSOURCE}/ui.cpp ${CPPSOURCE}/Lattices/hexagonal.cpp \
         ${CPPSOURCE}/Lattices/square.cpp -o ./qsolver.o \
-        -I${ARMADIR}/include/  \
-        -pthread -lhdf5 -Wall \
+        -I${ARMADIR}/include/ -pthread -lhdf5 -Wall \
         -Wformat=0 -lmkl_intel_lp64 -lmkl_core -lmkl_core \
         -liomp5 -lpthread -lm -ldl -lmkl_sequential \
         -lstdc++fs -std=c++17 \

@@ -24,7 +24,7 @@ class RBM : public NQS_S<_spinModes, _Ht, _T, _stateType>
 {
 public:
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	using NQSLS_p =	NQS_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p =	typename NQS_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 protected:
 	// architecture parameters
 	uint nHid_						=						1;

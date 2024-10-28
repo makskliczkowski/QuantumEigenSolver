@@ -44,8 +44,8 @@ namespace Operators
 		using OperatorComb<_T, _Ts...>::operator();
 		
 		// -----------------------------------------------------------------------------
-		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
-		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference		
+		using _VT 			= typename baseType::_VT;									// type of the vector to be used for the operator
+		using _VT_CR 		= typename baseType::_VT_CR;								// type of the vector to be used for the operator - const reference		
 	public:
 		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
 		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors

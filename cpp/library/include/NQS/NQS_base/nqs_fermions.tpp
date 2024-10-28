@@ -16,7 +16,7 @@ template <  typename _Ht, typename _T, class _stateType>
 class NQS_S<4, _Ht, _T, _stateType> : public NQS<4, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	using NQSLS_p =	NQS<4, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p =	typename NQS<4, _Ht, _T, _stateType>::NQSLS_p;
 public:
 	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles, 
 									const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})

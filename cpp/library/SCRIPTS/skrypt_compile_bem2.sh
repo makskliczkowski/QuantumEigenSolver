@@ -16,12 +16,13 @@ ARMADIR=/home/klimak97/LIBRARIES_CPP/armadillo-12.2.0
 cd /home/klimak97/CODES/QuantumEigenSolver/cpp/library/
 ls
 
-icpx ./main.cpp ./operators.cpp ./user_interface.cpp \
-        ./src/user_interface/ui_check_eth.cpp \
-        ./src/user_interface/ui_check_nqs.cpp \
-        ./src/user_interface/ui_check_quadratic.cpp \
-        ./src/user_interface/ui_check_symmetries.cpp \
-        ./src/user_interface/operator_parser.cpp \
+icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
+        ./src/user_interface/ui_check_eth.cpp                   \
+        ./src/user_interface/ui_check_nqs.cpp                   \
+        ./src/user_interface/ui_check_quadratic.cpp             \
+        ./src/user_interface/ui_check_symmetries.cpp            \
+        ./src/nqs.cpp                                           \
+        ./src/operator_parser.cpp                               \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp \
         ${CPPSOURCE}/ui.cpp ${CPPSOURCE}/Lattices/hexagonal.cpp \

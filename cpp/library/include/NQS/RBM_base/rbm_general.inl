@@ -11,7 +11,7 @@ class RBM_S : public RBM<_spinModes, _Ht, _T, _stateType>
 {
 public:
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	using NQSLS_p =	RBM<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p =	typename RBM<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 public:
 	RBM_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr,
 					 uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})

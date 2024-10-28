@@ -34,7 +34,7 @@ template < 	uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType =
 class RBM_PP : public RBM_S<_spinModes, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
-	using NQSLS_p = RBM_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	using NQSLS_p = typename RBM_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 protected:
 	// architecture parameters
 	uint nPP_					= 1;

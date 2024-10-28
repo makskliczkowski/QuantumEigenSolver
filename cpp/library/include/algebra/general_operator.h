@@ -763,8 +763,8 @@ namespace Operators {
 		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();		
 		
 		// ----------------------------------------------------------------------------------------------------
-		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
-		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference		
+		using _VT 			= typename baseType::_VT;									// type of the vector to be used for the operator
+		using _VT_CR 		= typename baseType::_VT_CR;								// type of the vector to be used for the operator - const reference		
 	public:
 		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
 		using repTypeV 		= typename baseType::repTypeV_;								// type of the function to be used for the operator - for vectors
@@ -1146,8 +1146,8 @@ namespace Operators {
 		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();				
 		
 		// ----------------------------------------------------------------------------------------------------
-		using _VT 			= baseType::_VT;											// type of the vector to be used for the operator
-		using _VT_CR 		= baseType::_VT_CR;											// type of the vector to be used for the operator - const reference
+		using _VT 			= typename baseType::_VT;									// type of the vector to be used for the operator
+		using _VT_CR 		= typename baseType::_VT_CR;								// type of the vector to be used for the operator - const reference
 
 	public:
 		using repType 		= typename baseType::repType_;								// type of the function to be used for the operator
@@ -1317,7 +1317,7 @@ namespace Operators {
 	* @returns the states and the values of the operator
 	*/
 	template <typename _T, typename ..._Ts>
-	OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a) const
+	typename OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a) const
 	{
 		// return value
 		std::vector<std::pair<u64, _T>> _res;
@@ -1329,7 +1329,7 @@ namespace Operators {
 	}
 
 	template <typename _T, typename ..._Ts>
-	OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a)
+	typename OperatorComb<_T, _Ts...>::ReturnType OperatorComb<_T, _Ts...>::operator()(u64 s, _Ts... a)
 	{
 		// return value
 		std::vector<std::pair<u64, _T>> _res;
@@ -1350,7 +1350,7 @@ namespace Operators {
 	* @note the operator is acting on the vector state and returns the vector of states and values
 	*/
 	template <typename _T, typename ..._Ts>
-	OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a) const
+	typename OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a) const
 	{
 		// return value
 		std::vector<std::pair<_VT, _T>> _res;
@@ -1362,7 +1362,7 @@ namespace Operators {
 	}
 	
 	template <typename _T, typename ..._Ts>
-	OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a)
+	typename OperatorComb<_T, _Ts...>::ReturnTypeV OperatorComb<_T, _Ts...>::operator()(_VT_CR s, _Ts... a)
 	{
 		// return value
 		std::vector<std::pair<_VT, _T>> _res;
