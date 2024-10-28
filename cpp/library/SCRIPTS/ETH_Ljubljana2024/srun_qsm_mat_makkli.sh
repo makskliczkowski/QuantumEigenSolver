@@ -26,16 +26,22 @@ mkdir -p $LOGDIR
 # parameters
 SSYYMS=$(tr -d ' ' <<< "$PARS")
 
-b="qsm_mat_ns=${Ns}_${SLURM_JOBID}_${SSYYMS}"
-arhname="Ns=${Ns},${b},${SLURM_JOBID}.tar.gz"
+b="qsm_mat_ns=${Ns},${SSYYMS}"
+arhname="Ns=${Ns},${b},\${SLURM_JOBID}.tar.gz"
 a="ns=${Ns}_${SSYYMS}"
 echo "#!/bin/bash" >> ${a}
 echo "#SBATCH -N1" >> ${a}
 echo "#SBATCH -c${CPU}" >> ${a}
 echo "#SBATCH --mem=${MEM}" >> ${a}
 echo "#SBATCH --time=${TIM}" >> ${a}
-echo "#SBATCH -o ./SLURM/out-%j-${b}.out" >> ${a}
+echo "#SBATCH -o ${RUN_DIR}/SLURM/out-%j-${b}.out" >> ${a}
 echo "#SBATCH --job-name=${b}" >> ${a}
+echo >> ${a}
+echo "SAVDIR=/lustre/tmp/slurm/\$SLURM_JOB_ID" >> ${a}
+echo >> ${a}
+echo "mkdir -p \${SAVDIR}" >> ${a}
+# echo "cd \${SAVDIR}" >> ${a}
+echo >> ${a}
 echo "source /usr/local/sbin/modules.sh" >> ${a}
 echo >> ${a}
 echo "module load intel/2022b" >> ${a}
@@ -46,8 +52,8 @@ echo "cd ${RUN_DIR}" >> ${a}
 echo >> ${a}
 echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;Sz/0-1;Sz/0-1-2;Sz/0-1-2-3;Sz/1:Lm3:1;Sz/0-1:Lm3:1' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -fun ${FUN} ${PARS} -th ${CPU} -dir ${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
 echo >> ${a}
-echo "tar -cvzf ${SAVDIR}/${arhname} ${SAVDIR}" >> ${a}
-echo "mv ${SAVDIR}/${arhname} ${lustredir} && rm -rf ${SAVDIR}" >> ${a} 
+echo "rsync -a --remove-source-files \${SAVDIR}/* ${lustredir}" >> ${a}
+echo "rm -rf \${SAVDIR}/*" >> ${a} 
 
 sbatch ${a} 
 # echo ${a}
