@@ -26,9 +26,9 @@ mkdir -p $LOGDIR
 # parameters
 SSYYMS=$(tr -d ' ' <<< "$PARS")
 
-b="qsm_mat_ns=${Ns}_${SLURM_JOBID}_${EPOCHREALTIME}"
+b="qsm_mat_ns=${Ns}_${SLURM_JOBID}_${SSYYMS}"
 arhname="Ns=${Ns},${b},${SLURM_JOBID}.tar.gz"
-a="ns=${Ns}"
+a="ns=${Ns}_${SSYYMS}"
 echo "#!/bin/bash" >> ${a}
 echo "#SBATCH -N1" >> ${a}
 echo "#SBATCH -c${CPU}" >> ${a}
@@ -44,7 +44,7 @@ echo "module load HDF5" >> ${a}
 echo >> ${a}
 echo "cd ${RUN_DIR}" >> ${a}
 echo >> ${a}
-echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;Sz/0-1;Sz/0-1-2;Sz/0-1-2-3;Sz/1:Lm3:1;Sz/0-1:Lm3:1' -qsm_h r\;1.0\;0.5 -fun ${FUN} ${PARS} -th ${CPU} -dir ${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
+echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;Sz/0-1;Sz/0-1-2;Sz/0-1-2-3;Sz/1:Lm3:1;Sz/0-1:Lm3:1' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -fun ${FUN} ${PARS} -th ${CPU} -dir ${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
 echo >> ${a}
 echo "tar -cvzf ${SAVDIR}/${arhname} ${SAVDIR}" >> ${a}
 echo "mv ${SAVDIR}/${arhname} ${lustredir} && rm -rf ${SAVDIR}" >> ${a} 
