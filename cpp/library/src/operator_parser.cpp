@@ -111,10 +111,10 @@ long double Operators::OperatorNameParser::resolveSite(const std::string &_site,
 	}
 
 	// simply return the site as a number
-	auto _siteInt = std::stold(_site);
+	auto _siteInt = std::stod(_site);
 	if (_siteInt < 0 || _siteInt >= _dimension)
 		throw std::invalid_argument("The site: " + _site + " is out of range. The dimension is: " + std::to_string(_dimension));
-	return std::stold(_site);
+	return std::stod(_site);
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------

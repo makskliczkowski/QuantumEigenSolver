@@ -103,6 +103,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 		
 #	ifdef NQS_PINV
 		// calculate the pseudoinverse
+		bool _inversionSuccess 	= false;
+		int _attempts 			= 0;
+		
+
 		if (this->info_p_.pinv_ > 0.0)
 			this->F_ = this->info_p_.lr_ * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
 		else if (this->info_p_.pinv_ == 0.0)
