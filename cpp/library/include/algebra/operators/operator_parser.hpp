@@ -9,6 +9,7 @@ namespace Operators
 			Sy, 
 			Sz,
 			SzR,			// random superposition of Sz
+			SzRV,			// random superposition of Sz (vanishing)
 			// quadratic
 			ni, 			// site occupation
 			nq,				// site modulation 
@@ -208,16 +209,19 @@ namespace Operators
 			{
 			// !!!!! SPIN OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::Sx: 
-				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_x(_dimension, Vectors::convert<uint>(_sites)));
+				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_x<double>(_dimension, Vectors::convert<uint>(_sites)));
 				break;
 			case OperatorTypes::OperatorsAvailable::Sy:
 				// return Operators::SpinOperators::sig_y(this->L_, _sites);
 				break;
 			case OperatorTypes::OperatorsAvailable::Sz:
-				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_z(_dimension, Vectors::convert<uint>(_sites)));
+				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::sig_z<double>(_dimension, Vectors::convert<uint>(_sites)));
 				break;
 			case OperatorTypes::OperatorsAvailable::SzR:
 				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::RandomSuperposition::sig_z(_dimension));
+				break;
+			case OperatorTypes::OperatorsAvailable::SzRV:
+				_operator = std::make_shared<Operator<_T>>(Operators::SpinOperators::RandomSuperposition::sig_z_vanish(_dimension));
 				break;
 			// !!!!! QUADRATIC OPERATORS !!!!!
 			case OperatorTypes::OperatorsAvailable::ni:
@@ -295,6 +299,9 @@ namespace Operators
 				// check if the operator is valid
 				if (this->createGlobalOperator<_T>(op, _opin, _usesReal, _usesHilbert, _rgen))
 				{
+					if (!_opin->getFun())
+						throw std::runtime_error("The operator: " + op + " is not valid.");
+
 					LOGINFO("Correctly parsed operator: " + op, LOG_TYPES::INFO, 4);
 					ops.push_back(_opin);
 					_outOperators.push_back(op);

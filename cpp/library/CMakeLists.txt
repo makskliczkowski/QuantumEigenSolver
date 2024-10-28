@@ -118,6 +118,7 @@ set(SOURCES
     src/user_interface/ui_check_quadratic.cpp
     src/user_interface/ui_check_symmetries.cpp
     src/nqs.cpp
+    src/operator_parser.cpp
     ${CPPSOURCE}/common.cpp 
     ${CPPSOURCE}/directories.cpp 
     ${CPPSOURCE}/exceptions.cpp 

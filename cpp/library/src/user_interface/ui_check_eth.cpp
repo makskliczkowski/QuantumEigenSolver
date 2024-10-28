@@ -352,61 +352,6 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 // -----------------------------------------------------------------------------------------------
 
-template <typename ClassType, typename _R, typename _F, typename ..._Args>
-static std::vector<_R> createFutures(ClassType* _instance,
-				std::atomic<size_t>& _totalIterator,
-                size_t _thNum,
-                bool _isParallel,
-				size_t _iterSize,				
-                _F &&f, _Args &&...args) 
-                
-{
-	if (!_isParallel)
-		_thNum = 1;
-	
-     // reserve the threads
-	std::vector<std::future<_R>> _futures;
-	_futures.reserve(_thNum);
-
-	for(auto _ithread = 0; _ithread < _thNum; ++_ithread)
-	{
-		// get the subvectors
-		u64 _startElem	= _ithread * _iterSize / _thNum;
-		u64 _stopElem	= (_ithread + 1) * _iterSize / _thNum;
-
-		// Validate indices
-		if (_startElem >= _iterSize || _stopElem > _iterSize)
-			throw std::out_of_range("Thread indices out of range");
-
-        _futures.push_back(
-            std::async(
-                [=, &_totalIterator, &_instance]() mutable { 
-					// Use mutable lambda to avoid const issues
-                    // Call the member function with all arguments
-                    return (_instance->*f)(_startElem, 
-											_stopElem, 
-											std::ref(_totalIterator), 
-											_ithread,
-											std::forward<_Args>(args)...);
-                }
-            )
-        );
-	}
-
-	std::vector<_R> _out;
-	for (auto& future : _futures) {
-		try {
-			auto _res = future.get();
-			_out.push_back(_res);
-		} catch (const std::exception& e) {
-			LOGINFO("Exception while getting future result: " + std::string(e.what()), LOG_TYPES::ERROR, 2);
-		}
-	}
-	return _out;
-}
-
-// -----------------------------------------------------------------------------------------------
-
 /*
 * @brief Check the properties of the models complying to ETH based on the Hamiltonian provided.
 * It saves the gap ratios, level statistcs, energies, and the operators.
@@ -773,7 +718,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		// set the uniform distribution of frequencies in logspace for the f-functions!!!
 		if (_r == 0)
 		{
-			double _bwIn 		= _bandwidth(0);5
+			double _bwIn 		= _bandwidth(0);
 			if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
 				_bwIn			= Ultrametric_types::UM_default::getBandwidth(std::reinterpret_pointer_cast<Ultrametric<_T>>(_H)->get_alpha(), (int)std::log2(_Nh));
 			else if (modP.modTyp_ == MY_MODELS::QSM_M)
@@ -894,7 +839,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 					// get histograms
 					{
-						v_1d<std::array<double, 6>> _out = createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn, this->threadNum, 
+						v_1d<std::array<double, 6>> _out = Threading::createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn, this->threadNum, 
 																	!check_multithread_operator(_Nh) && this->threadNum != 1, 
 																	_offdiagElemsSize, &UI::checkETH_statistics_mat_elems<_T>, 
 																	_Nh, _H.get(),
@@ -917,7 +862,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 							auto _energyIn = _eigVal(0) + this->modP.eth_end_[_epi] * _bw;
 							LOGINFO("Doing epsilon = " + STR(this->modP.eth_end_[_epi]) + " at " + VEQP(_energyIn, 3), LOG_TYPES::TRACE, 3);
 
-							v_1d<std::array<double, 6>> _out = createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn2, this->threadNum, 
+							v_1d<std::array<double, 6>> _out = Threading::createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn2, this->threadNum, 
 																	(!check_multithread_operator(_Nh) && this->threadNum != 1), 
 																	_offdiagElemsSize, &UI::checkETH_statistics_mat_elems<_T>, 
 																	_Nh, _H.get(),
@@ -1344,10 +1289,6 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
 
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

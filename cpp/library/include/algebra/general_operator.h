@@ -484,6 +484,8 @@ namespace Operators {
 			nameS_(std::move(o.nameS_)) 
 		{
 			this->init();
+			this->fun_ = std::move(o.fun_);
+			this->funV_ = std::move(o.funV_);
 		}
 
 		// Copy constructor
@@ -499,6 +501,8 @@ namespace Operators {
 			nameS_(o.nameS_) 
 		{
 			this->init();
+			this->fun_ = o.fun_;
+			this->funV_ = o.funV_;
 		}
 
 		// ----------------------------------------------------------------------------------------------------
@@ -984,7 +988,9 @@ namespace Operators {
 		else
 		{
 			// otherwise create the operator matrix
+#ifndef _DEBUG
 		#pragma omp parallel for
+#endif
 			for (u64 _base = 0; _base < _dim; ++_base) 
 			{
 				auto [_idx, _val]	=	this->operator()(_base, _arg...);
@@ -1021,7 +1027,9 @@ namespace Operators {
 		else
 		{
 			// otherwise create the operator matrix
+#ifndef _DEBUG
 	#pragma omp parallel for
+#endif
 			for (u64 _base = 0; _base < _dim; ++_base) 
 			{
 				auto [_idx, _val]	=	this->operator()(_base, _arg...);

@@ -13,7 +13,9 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 #include <type_traits>
+
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
@@ -21,6 +23,18 @@
 #	include "quantities/entropy.h"
 #endif // !ENTROPY_H
 
+/*
+* Separators used for the later parsing of the operators and their names:
+* - OPERATOR_SEP: separator between the operator type and the operator name
+* - OPERATOR_SEP_CORR: separator between the operator name and the correlation site - this means that "-" separates 
+*	different sites in the correlation operator (e.g. "nn-1-2" = nn operator acting on sites 1 and 2 as multiplication)
+* - OPERATOR_SEP_MULT: separator between the operator name and multiple sites - this means that "," separates different sites
+	For instance, "nn,1,2" = nn operator acting on sites 1 and 2 as separate operators
+* - OPERATOR_SEP_DIFF: separator between the operator name and the site. "m" stands for the difference between the sites
+* - OPERATOR_SEP_RANGE: separator between the operator name and the site. ":" stands for the range of the sites
+* - OPERATOR_SEP_RANDOM: separator between the operator name and the site. "r" stands for the random operator
+* - OPERATOR_SEP_DIV: separator between the operator name and the site. "_" stands for the division of the sites
+*/
 constexpr auto OPERATOR_SEP			= "/";
 constexpr auto OPERATOR_SEP_CORR	= "-";
 constexpr auto OPERATOR_SEP_MULT 	= ",";
@@ -309,70 +323,6 @@ namespace Operators
 		}
 	};
 
-
-	/*
-	* @brief The spin operator namespace. Contains the most common spin operators.
-	*/
-	namespace SpinOperators
-	{	
-		template <typename _T = double>
-		std::pair<u64, _T> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_x(size_t _Ns, size_t _part);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_x(size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_x(size_t _Ns);
-		template <typename _T = double>
-		Operators::Operator<_T, uint> sig_x_l(size_t _Ns);
-
-		template <typename _T = double>
-		std::pair<u64, _T> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_z(size_t _Ns, size_t _part);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_z(size_t _Ns, const v_1d<uint>& sites);
-		template <typename _T = double>
-		Operators::Operator<_T> sig_z(size_t _Ns);
-		template <typename _T = double>
-		Operators::Operator<_T, uint> sig_z_l(size_t _Ns);
-	}
-
-	// ##########################################################################################################################################
-
-	/*
-	* @brief For Quadratic Operators, we will treat the operators as acting on the integer index as it was not the configuration!
-	*/
-	namespace QuadraticOperators
-	{
-		// -------- n_i Operators --------
-
-		Operators::Operator<double> site_occupation(size_t _Ns, const size_t _site);
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<double>& _coeffs);
-		Operators::Operator<double> site_occupation_r(size_t _Ns, const v_1d<size_t>& _sites, const v_1d<double>& _coeffs);
-
-		// -------- n_q Operators --------
-		
-		Operators::Operator<double> site_nq(size_t _Ns, const size_t _momentum);
-
-		// ------ n_i n_j Operators ------
-
-		Operators::Operator<double> nn_correlation(size_t _Ns, const size_t _site_plus, const size_t _site_minus);
-
-		// --- quasimomentum Operators ---
-
-		Operators::Operator<std::complex<double>> quasimomentum_occupation(size_t _Ns, const size_t _momentum);
-		Operators::Operator<double> quasimomentum_occupation(size_t _Ns);
-
-		// ----- kinectic Operators ------
-
-		Operators::Operator<double> kinetic_energy(size_t _Nx, size_t _Ny, size_t _Nz);
-	}
-
 	// ##########################################################################################################################################
 
 	std::pair<u64, double> sigma_x(u64 base_vec, int L, const v_1d<uint>& sites);
@@ -451,6 +401,7 @@ namespace Operators
 	// ##########################################################################################################################################
 };
 
+#include "operators/operator_parser.hpp"
 
 #endif
 
