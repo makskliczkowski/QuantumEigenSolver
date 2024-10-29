@@ -192,12 +192,7 @@ protected:
 	#endif
 #endif
 	// ---------------------------------------------------------------
-#ifdef NQS_SREG 
-	double covMatrixRegMult		= 0.95;									// multiplier for the regularization
-	double covMatrixRegStart	= 0.02;									// starting parameter for regularisation (epsilon1)
-	double covMatrixRegStart2	= 0.0;									// starting parameter for regularisation (epsilon2)
 	virtual void covMatrixReg(int _step = 0);
-#endif
 	
 	/* ------------------------------------------------------------ */
 
@@ -222,6 +217,7 @@ public:
 	virtual double setNormalization();
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
 	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv;				};
+	void setSReg(double _sreg)											{ this->info_p_.sreg_ = _sreg;				};
 
 	/* ------------------------------------------------------------ */
 

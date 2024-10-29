@@ -6,13 +6,11 @@
 
 // -----------------------------------------------------------------------------------------------------------------------------------
 #include "./nqs_sampling.tpp"
-
+#include "armadillo"
+#include <iostream>
 
 
 #ifdef NQS_USESR
-
-
-
 #ifdef NQS_USESR_NOMAT
 // -----------------------------------------------------------------------------------------------------------------------------------
 
@@ -99,18 +97,17 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec(const arma::Col<_T
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 {
-	bool _inversionSuccess = false;
+	bool _inversionSuccess 		= false;
 #ifndef NQS_USESR_NOMAT
 	{
 		// regularize the covariance matrix before inverting it (if needed and set)
-#	ifdef NQS_SREG
-		this->covMatrixReg(step);
-#	endif
-		
-#	ifdef NQS_PINV
+		// if (this->info_p_.sreg_ > 0) 
+			// this->covMatrixReg(step);
+
+#ifdef NQS_PINV
 		// calculate the pseudoinverse
 		int _attempts 			= 0;
-		double _regFactor		= NQS_SREG_VALUE;
+		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-7;
 
 		while (!_inversionSuccess && _attempts < NQS_SREG_ATTEMPTS)
 		{
@@ -126,13 +123,18 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 				_inversionSuccess = true;
 			} catch(std::exception& e) {
                 // Increase regularization factor and apply to diagonal
-                std::cerr << "Inverse calculation failed, attempt " << _attempts + 1 << ": " << e.what() << std::endl;
+				LOGINFO("Inverse calculation failed, attempt " + STR(_attempts + 1) + ". E: " + e.what(), LOG_TYPES::ERROR, 1);
+				if (!arma::is_finite(this->S_)) {
+					LOGINFO("Non-finite values in the diagonal of the covariance matrix. Stopping the training.", LOG_TYPES::ERROR, 1);
+					break;
+				}
+
                 this->S_.diag() += _regFactor;  	// Apply regularization to diagonal
                 _regFactor 		*= 10;  			// Increase regularization factor for next attempt
                 ++_attempts;
 			}
 		}
-#	else 
+#else 
 		// solve normally
 		//this->F_ = this->info_p_.lr_ * (arma::inv(this->S_) * this->F_);
 		try {
@@ -141,7 +143,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 			_inversionSuccess = false;
 		}
 		_inversionSuccess = true;
-#	endif 
+#endif 
 	}
 #else
 	std::function<void(const arma::Col<_T>&, arma::Col<_T>&, size_t)> _Fun = std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
@@ -180,30 +182,37 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
 	// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
 	// - for the excited states, the derivatives are appe	
-	this->derivativesC_ = arma::conj(this->derivatives_);				// precalculate the conjugate of the derivatives
-	this->F_			= arma::cov(this->derivativesC_, _energies, 1);	// calculate the covariance vector for the gradient 
+	this->derivativesC_ = arma::conj(this->derivatives_);						// precalculate the conjugate of the derivatives
+	this->F_			= arma::cov(this->derivativesC_, _energies, 1);			// calculate the covariance vector for the gradient 
 
-	// !TODO modify this for excited states! 
 	// append with the lower states derivatives - if the lower states are used
 // #pragma omp parallel for num_threads(this->threads_.threadNum_)
 	for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 	{
 		// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
-		auto& ratios_excited= this->lower_states_.ratios_excited_[_low];	// <Psi_W / Psi_W_j> evaluated at W_j - column vector
-		auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];		// <Psi_W_j / Psi_W> evaluated at W - column vector
-		auto& f_lower_b 	= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states
-		auto _meanLower 	= arma::mean(ratios_lower);						// mean of the ratios in the lower state
-		this->F_ 			+= _meanLower * f_lower_b * arma::cov(this->derivativesC_, ratios_excited, 1);
+		const auto& ratios_excited	= this->lower_states_.ratios_excited_[_low];// <Psi_W_j / Psi_W> evaluated at W - column vector
+		const auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];	// <Psi_W / Psi_W_j> evaluated at W_j - column vector
+		const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];		// penalty for the lower states 
+		const auto _meanLower 		= arma::mean(ratios_lower);					// mean of the ratios in the lower state
+
+		// auto _cov 					= arma::cov(this->derivativesC_, ratios_excited, 1);
+		// this->F_ 					+= _meanLower * f_lower_b * _cov;
+		// continue;
 
 		// manually
-		
-		// auto _meanExcited 	= arma::mean(ratios_excited);					// mean of the ratios in the excited state
-		// auto _diff 			= ratios_excited - _meanExcited;				// 
+		const auto _meanExcited 	= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+		auto _diff 					= ratios_excited - _meanExcited;				// difference between the ratios and the mean Eq. (14) in the paper
 
 		// multiply each row of \Delta _k* with the difference at each realization (each element of the row)
 		// and then multiply with the mean of the lower states
-		// this->F_ += (f_lower_b * _meanLower) * arma::mean(this->derivativesC_.each_col() % _diff, 0).t();
+		this->F_	 				+= (f_lower_b * _meanLower) * arma::mean((this->derivativesC_.each_col() % _diff), 0).t();
 	}
+
+	// fix the NANs
+	// if (!arma::is_finite(this->F_)) {
+	// 	stoutd("Non-finite values in the gradient: ");
+	// 	this->F_.replace(arma::datum::nan, 0.0);	// replace NaNs with zeros
+	// }
 	
 #ifdef NQS_USESR
 #	ifndef NQS_USESR_NOMAT
@@ -231,24 +240,26 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 		}
 #	endif
 		// update model by recalculating the gradient (applying the stochastic reconfiguration)
+	// check the norm of the gradient and normalize it if needed
+	// if (auto gradNorm = arma::norm(this->F_); gradNorm > NQS_SREG_GRAD_NORM_THRESHOLD)
+	// {
+	// 	std::cerr << "Gradient norm is too large: " << gradNorm << std::endl;
+	// 	this->F_ *= NQS_SREG_GRAD_NORM_THRESHOLD / gradNorm;
+	// }
+
 	return this->gradSR(_step);
 #else
 	// standard updater with the gradient only!
 	this->F_ *= this->info_p_.lr_;
 #endif
 
-	// check the norm of the gradient
-#ifdef NQS_SREG
-	if (auto gradNorm = arma::norm(this->F_); gradNorm > NQS_SREG_GRAD_NORM_THRESHOLD)
-		this->F_ *= NQS_SREG_GRAD_NORM_THRESHOLD / gradNorm;
-#endif 
+
 	this->updateWeights_ = true;
 }
 
 // ##########################################################################################################################################
 
 ///////////////////////////////////////////////////////////////////////
-#ifdef NQS_SREG
 /*
 ! TODO 
 * @brief The inverse of the covariance matrix is poorly defined at the begining of training. 
@@ -257,6 +268,5 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg(int step)
 {
-	this->S_.diag() += this->info_p_.Sreg_ / (step + 1);
+	this->S_.diag() += this->info_p_.sreg_ / (step + 1);
 }
-#endif

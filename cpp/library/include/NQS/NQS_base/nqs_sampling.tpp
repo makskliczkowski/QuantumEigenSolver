@@ -127,7 +127,9 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 			this->lower_states_.setProjector(NQS_STATE);
 
 			_T _elower = 0.0;
-// #pragma omp parallel for
+#ifndef _DEBUG 
+// # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
+#endif
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
 				_elower += this->lower_states_.collectLowerEnergy(_low);
 			energy += _elower;

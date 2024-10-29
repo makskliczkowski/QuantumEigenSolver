@@ -46,23 +46,20 @@
 #endif
 
 // optimize the gradient descent with Stochastic Reconfiguration (SR)
-#define NQS_USESR							
-#ifdef NQS_USESR							
+#define NQS_USESR
+#define NQS_LOWER_RATIO_LOGDIFF 
+// #define NQS_CHECK_NAN
+
+// --------------- STOCHASTIC RECONFIGURATION ---------------
+#ifdef NQS_USESR						
 
 // skip the matrix construction for the SR
 	// #define NQS_USESR_NOMAT
 
 // how to handle the inverse of the matrix (if needed)
 #	define NQS_PINV					
-// regularization for the covariance matrix	
-#	define NQS_SREG													
-// shall one use the iterative solver without constructing the full matrix explicitly?					
-# 	ifdef NQS_SREG
-#		define NQS_SREG_VALUE 1e-4
-#		define NQS_SREG_VALUE_STANDARD 1e-4
-#		define NQS_SREG_ATTEMPTS 5
-#    	define NQS_SREG_GRAD_NORM_THRESHOLD 1e3
-#	endif
+#	define NQS_SREG_ATTEMPTS 5
+#   define NQS_SREG_GRAD_NORM_THRESHOLD 1e3
 #endif										
 // ##########################################################
 
@@ -141,8 +138,7 @@ struct NQS_info_t
     // simulation specific
     double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
 	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
-	double Sreg_					= 		NQS_SREG_VALUE;
-
+	double sreg_					=		1e-7;					// regularization for the covariance matrix
     // architecture specific
     uint nVis_						=		1;						// number of visible neurons (input variables)
     uint nSites_					=		1;						// number of lattice sites or fermionic modes

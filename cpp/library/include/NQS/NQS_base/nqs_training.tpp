@@ -38,7 +38,7 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 		this->derivativesReset(_par.nblck_);
 
 		// set the size of the containers for the lower states
-		this->lower_states_.setDerivContSize(_par.nblck_, _par.nblck_);
+		this->lower_states_.setDerivContSize(_par.nblck_);
 	}
 	TIMER_CREATE(_timer);
 
@@ -76,44 +76,42 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 			En(_taken) = this->locEnKernel();
 
 			// calculate the excited states overlaps for the gradient - if used
-// #pragma omp parallel for
+#ifndef _DEBUG 
+// # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
+#endif
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 				this->lower_states_.ratios_excited_[_low](_taken) = this->lower_states_.collectExcitedRatios(_low, NQS_STATE);
-				// this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(NQS_STATE, _low) / this->ansatz(NQS_STATE));
-				// this->lower_states_.ratios_excited_[_low](_taken) = (this->lower_states_.ansatz(this->curVec_, _low) / this->ansatz(this->curVec_));
 		}
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
-// #pragma omp parallel for
+#ifndef _DEBUG 
+// # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
+#endif
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 			this->lower_states_.collectLowerRatios(_low);
-			// this->lower_states_.collectRatiosLower(_low, [&](Operators::_OP_V_T_CR _v) { return this->ansatz(_v); });
 		
-		// save the mean energy
-		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));
+		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));			// save the mean energy
 		
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
 		TIMER_START_MEASURE(this->gradFinal(En, i), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
-		// if (i % this->pBar_.percentageSteps == 0)
-		// LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
+		LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
 
-		// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!=
-		if (this->updateWeights_) {
+		if (this->updateWeights_) 														// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
 			this->updateWeights();
-		} else {
+		else {
 			LOGINFO("The inversion of a matrix failed. Stopping the training.", LOG_TYPES::ERROR, 1);
 			break;
 		}
 
 		// update the progress bar
-		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS", !quiet);
+		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: "+ VEQPS(meanEn(i-1), 4) , !quiet);
 		
 #ifdef NQS_SAVE_WEIGHTS
 		if (i % this->pBar_.percentageSteps == 0)  
 			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
 #endif
 	}
-	LOGINFO(_t, "NQS_EQ", 1);
+	LOGINFO(_t, "NQS_EQ_" + STR(this->lower_states_.f_lower_size_), 1);
 	return std::make_pair(meanEn, stdEn);
 }
 
@@ -188,19 +186,16 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		size_t _normIter = 0;
 		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
-			auto [_ok, _val] 	= NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
-			_normIter 			+= int(_ok);
+			auto [_, _val] 	= NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
 		}
 		// normalize the measurements - this also creates a new block of measurements
-		if (_normIter > 0)
-			NQSAv::MeasurementNQS<_T>::normalize(_normIter, _cont);
+		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);
 	}
 }
 
@@ -277,12 +272,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 {
 	// set the random state at the begining
 	// this->setRandomFlipNum(_par.nFlip);
+	_container.zeros();
 
 	// go through the number of samples to be collected
 	for (uint i = 1; i <= _par.MC_sam_; ++i)
 	{	
-		_T _values = 0.0;
-
 		// random flip
 		if (_par.MC_th_ > 0)
 			this->setRandomState();
@@ -291,28 +285,23 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 		this->blockSample(_par.MC_th_, NQS_STATE, false);
 
 		// iterate blocks - allows to collect samples outside of the block
-		size_t _normIter = 0;
 		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// calculate f(s) / \psi(s)
-			_T _val 			= 0;
 			const _T _top 		= _f(NQS_STATE);
 #ifdef NQS_LOWER_RATIO_LOGDIFF
 			const _T _bottom 	= this->ansatzlog(NQS_STATE);
-			_val 				= std::exp(_top - _bottom);
+			_container(_taken) 	+= std::exp(_top - _bottom);
 #else 
 			const _T _bottom 	= this->ansatz(NQS_STATE);
-			_val 				+= _top / _bottom;
-#endif		
-			_values 			+= _val;
-			_normIter++;
-		}
-		if (_normIter > 0)
-			_container(i - 1) = _values / (double)_normIter;
-		else 
-			_container(i - 1) = 0.0;												
+			_container(_taken) 	+= _top / _bottom;
+#endif
+		}									
 	}
+	// normalize the measurements - this also creates a new block of measurements - divide by the number of samples
+	if (_par.MC_sam_ > 1)
+		_container /= _par.MC_sam_;
 }

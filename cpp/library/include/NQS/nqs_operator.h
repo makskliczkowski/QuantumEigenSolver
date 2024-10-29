@@ -317,6 +317,7 @@ namespace NQSAv
 		{
 			bool ok  = true;
 			auto val = _gO(_state, _fun);
+			_cont.updCurrent(val);
 
 			// Check if val is valid (no NaN or Inf)
 			// if constexpr (std::is_arithmetic_v<_T>) {  // For real numbers (float, double)

@@ -22,8 +22,6 @@
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 class NQS;
 
-#define NQS_LOWER_RATIO_LOGDIFF 
-
 // ##########################################################################################################################################
 
 /*
@@ -74,7 +72,7 @@ struct NQS_lower_t
     // ##########################################################################################################################################
     
     std::function<_T(Operators::_OP_V_T_CR)> exc_ratio_;            // set later
-    void setDerivContSize(size_t _mcslower, size_t _mcsexcited);
+    void setDerivContSize(size_t _mcsexcited);
     void setProjector(Operators::_OP_V_T_CR _current_exc_state);
     
     // ##########################################################################################################################################
@@ -122,12 +120,12 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns,
 * @param _mcsexcited size of the Monte Carlo steps for the excited state - ratios sampled in the excited state
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_t _mcslower, size_t _mcsexcited)
+inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_t _mcsexcited)
 {
     if (this->f_lower_size_ == 0)
         return;
     
-    this->ratios_lower_             = std::vector<arma::Col<_T>>(this->f_lower_size_, arma::Col<_T>(_mcslower, arma::fill::zeros));
+    this->ratios_lower_             = std::vector<arma::Col<_T>>(this->f_lower_size_, arma::Col<_T>(this->train_lower_.nblck_, arma::fill::zeros));
     this->ratios_excited_           = std::vector<arma::Col<_T>>(this->f_lower_size_, arma::Col<_T>(_mcsexcited, arma::fill::zeros));
 }
 
@@ -161,9 +159,13 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint 
 {
     if (this->f_lower_size_ == 0)
         return _T(0.0);
-
+    
+    // reset the container
     this->containerP_[i].reset();
+
+    // collect the energy addition from the lower states
     this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_[i]);
+
     // get the mean value
     return this->f_lower_b_[i] * this->containerP_[i].template mean<_T>()(0, 0);
 }
@@ -179,6 +181,7 @@ inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerRatios(uin
 {
     if (this->f_lower_size_ == 0)
         return;
+
     this->f_lower[i]->collect_ratio(this->train_lower_, this->exc_ansatz_, this->ratios_lower_[i]);
 }
 
@@ -193,15 +196,6 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uin
     // calculate the ansatz at the current state for the excited state
     _T _bottom  = this->exc_ansatz_(_current_exc_state);
     _T _top     = _T(0.0);
-
-    // check if the bottom is not a number
-    // if constexpr (std::is_arithmetic_v<_T>) {
-    //     if (std::isnan(_bottom) || std::isinf(_bottom))
-    //         return _T(0.0);    
-    // } else if constexpr (std::is_same_v<_T, std::complex<typename _T::value_type>>) { 
-    //     if (std::isnan(_bottom.real()) || std::isinf(_bottom.real()) || std::isnan(_bottom.imag()) || std::isinf(_bottom.imag()))
-    //         return _T(0.0);
-    // }
 
     // calculate the ratio
 #ifdef NQS_LOWER_RATIO_LOGDIFF
