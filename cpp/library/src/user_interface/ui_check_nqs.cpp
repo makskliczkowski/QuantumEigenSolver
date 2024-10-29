@@ -67,6 +67,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		break;
 	}
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
+	_NQS->setSReg(this->nqsP.nqs_tr_reg_);
 }
 
 // ##########################################################################################################################################
@@ -174,10 +175,14 @@ void UI::nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS)
 template<typename _T, uint _spinModes>
 void UI::nqsExcited()
 {
-	Hilbert::HilbertSpace<_T> _hilbert 				= Hilbert::HilbertSpace<_T, _spinModes>(this->latP.lat);
-	std::shared_ptr<Hamiltonian<_T, _spinModes>> _H = std::make_shared<IsingModel<_T>>(std::move(_hilbert), this->modP.J1_, this->modP.hx_, this->modP.hz_);
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);
+	Hilbert::HilbertSpace<_T> _hilbert;
+	std::shared_ptr<Hamiltonian<_T, _spinModes>> _H;
+	this->defineModel<_T>(_hilbert, _H);
+	
+	// define the NQS states for the excited states
 	arma::Col<_T> _meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _meansED(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
+	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);
+	// define the first one already here for the ground state
 	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);
 	
 	_timer.reset();
@@ -220,24 +225,34 @@ void UI::nqsExcited()
 									{}, 
 									{}, this->threadNum);
 
-	if (Nh <= UI_LIMITS_NQS_ED && this->nqsP.nqs_ed_) {
+	if (this->nqsP.nqs_ed_) {
 		_H->buildHamiltonian();
+
+		// try with the full diagonalization
 		if (Nh <= UI_LIMITS_NQS_FULLED) {
 			_H->diagH(false);
+
+			// get the ground state and find the measurements
 			arma::Col<_T> _mbs = _H->getEigVec(0);
 			if(Nh < ULLPOW(7))
 				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
 			
 			// save the measured quantities
 			_measGS.measure(_mbs, _hilbert);
-		} else {
-			_H->diagH(false, 100, 0, 1000, 0, "lanczos");
+		
+			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
+				_meansED(i) = _H->getEigVal(i);
+				LOGINFO("Found the ED (full) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
+			}
 		}
-
-		// go through all the eigenvalues
-		for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
-			_meansED(i) = _H->getEigVal(i);
-			LOGINFO("Found the ED state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
+		// get LANCZOS
+		{
+			_H->diagH(false, 100, 0, 1000, 1e-10, "lanczos");
+			
+			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
+				_meansED(i) = _H->getEigVal(i);
+				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
+			}
 		}
 		_H->clearEigVal();
 		_H->clearEigVec();
@@ -272,6 +287,7 @@ void UI::nqsExcited()
 
 			LOGINFOG("Found the NQS state( " + STR(i) + ") to be E=" + STRPS(_meansNQS(i), prec), LOG_TYPES::TRACE, 2);
 			LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
+			LOGINFO(4);
 		}
 
 		// saver

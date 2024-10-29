@@ -813,7 +813,10 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 		else if (form == "lanczos")
 		{
 			LOGINFO("Diagonalizing Hamiltonian. Using: Lanczos", LOG_TYPES::INFO, 3);
-			LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getSparse(), k, &this->ran_);
+			if (this->isSparse_)
+				LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getSparse(), k, &this->ran_, this->K_, tol);
+			else
+				LanczosMethod<_T>::diagS(this->eigVal_, this->eigVec_, this->H_.getDense(), k, &this->ran_, this->K_, tol);				
 			//this->calcAvEn();
 		}
 		else
