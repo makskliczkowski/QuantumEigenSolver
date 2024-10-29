@@ -800,7 +800,7 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 	BEGIN_CATCH_HANDLER
 	{
 		arma::eigs_opts opts;
-		opts.tol					= tol;
+		opts.tol				= tol;
 		opts.maxiter			= maxiter;
 		opts.subdim				= (subdim == 0) ? (2 * int(k) + 1) : subdim;
 		

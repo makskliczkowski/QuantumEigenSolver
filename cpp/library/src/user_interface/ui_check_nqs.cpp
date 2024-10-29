@@ -220,7 +220,7 @@ void UI::nqsExcited()
 									{}, 
 									{}, this->threadNum);
 
-	if (Nh <= UI_LIMITS_NQS_ED) {
+	if (Nh <= UI_LIMITS_NQS_ED && this->nqsP.nqs_ed_) {
 		_H->buildHamiltonian();
 		if (Nh <= UI_LIMITS_NQS_FULLED) {
 			_H->diagH(false);
@@ -231,7 +231,7 @@ void UI::nqsExcited()
 			// save the measured quantities
 			_measGS.measure(_mbs, _hilbert);
 		} else {
-			_H->diagH(false, 50, 0, 1000, 0, "lanczos");
+			_H->diagH(false, 100, 0, 1000, 0, "lanczos");
 		}
 
 		// go through all the eigenvalues

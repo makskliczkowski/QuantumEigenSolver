@@ -105,6 +105,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONV(nqsP,	type, 		"nqst");
 		SETOPTION(nqsP,		lr					);
 		SETOPTIONV(nqsP,	loadNQS,	"lNQS"	);
+		SETOPTION(nqsP, 	nqs_ed				);
 	}
 	// ----------------- LATTICE -----------------
 	{

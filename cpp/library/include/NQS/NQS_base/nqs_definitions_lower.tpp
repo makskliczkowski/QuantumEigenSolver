@@ -9,6 +9,7 @@
 /////////////////////////////////////////////////////////////
 #include "armadillo"
 #include "nqs_definitions_base.h"
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -188,10 +189,27 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uin
 {
     if (this->f_lower_size_ == 0)
         return _T(0.0);
+
+    // calculate the ansatz at the current state for the excited state
+    _T _bottom  = this->exc_ansatz_(_current_exc_state);
+    _T _top     = _T(0.0);
+
+    // check if the bottom is not a number
+    // if constexpr (std::is_arithmetic_v<_T>) {
+    //     if (std::isnan(_bottom) || std::isinf(_bottom))
+    //         return _T(0.0);    
+    // } else if constexpr (std::is_same_v<_T, std::complex<typename _T::value_type>>) { 
+    //     if (std::isnan(_bottom.real()) || std::isinf(_bottom.real()) || std::isnan(_bottom.imag()) || std::isinf(_bottom.imag()))
+    //         return _T(0.0);
+    // }
+
+    // calculate the ratio
 #ifdef NQS_LOWER_RATIO_LOGDIFF
-    return std::exp(this->ansatzlog(_current_exc_state, i) - this->exc_ansatz_(_current_exc_state));
+    _top        = this->ansatzlog(_current_exc_state, i);
+    return std::exp(_top - _bottom);
 #else
-    return this->ansatz(_current_exc_state, i) / this->exc_ansatz_(_current_exc_state);
+    _top        = this->ansatz(_current_exc_state, i);
+    return _top / _bottom;
 #endif
 }
 

@@ -472,6 +472,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
 		// learning rate
 		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
+		UI_PARAM_CREATE_DEFAULT(nqs_ed, bool, false);		// use the exact diagonalization for the NQS
 		// weight load directory
 		inline static const std::string _loadNQS	= ""; 
 		std::string loadNQS_								= "";
