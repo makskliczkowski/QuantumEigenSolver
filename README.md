@@ -22,7 +22,6 @@ This document outlines the configuration parameters used in the quantum state si
 - [Functionality Commands](#functionality-commands)
 - [Interacting Models](#interacting-models)
 - [Quadratic Models](#quadratic-models)
-- [Random Models](#random-models)
 - [Model Parameters](#model-parameters)
 - [Lattice Choice](#lattice-choice)
 - [Symmetry Parameters](#symmetry-parameters)
@@ -82,18 +81,6 @@ Quadratic models represent systems where interactions are captured by quadratic 
 - **103 - Anderson Model**: A model that describes the localization of electrons in a disordered medium. It is crucial for understanding electron transport in materials and the metal-insulator transition.
 
 - **104 - Power Law Random Bandwidth Model**: A model that examines the effects of power-law distributions on quantum states. It is particularly relevant for systems with long-range interactions and critical behavior.
-
-## Random Models
-
-Random models incorporate randomness into their structure, allowing for the exploration of disorder-induced phenomena and the robustness of quantum states.
-
-- **200 - Random Matrix Model**: A model that utilizes random matrices to study eigenvalue distributions and spectral statistics, providing insights into quantum chaos and universal properties of quantum systems.
-
-- **201 - Anderson Localization**: A random model that explores the localization of quantum states in disordered systems, particularly focusing on the interplay between disorder and wavefunction interference.
-
-- **202 - Random Spin Model**: A model where spin interactions are randomly distributed, examining the effects of disorder on phase transitions and quantum entanglement.
-
-- **203 - Quantum Random Walk Model**: A model that studies the quantum analog of classical random walks, investigating how randomness affects propagation and localization in quantum systems.
 
 ## Model Parameters
 
