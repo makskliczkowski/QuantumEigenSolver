@@ -95,9 +95,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::getSRMatVec(const arma::Col<_T
 * @param step current step of updating - for the regularization purpose
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
+inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
 {
 	bool _inversionSuccess 		= false;
+
 #ifndef NQS_USESR_NOMAT
 	{
 		// regularize the covariance matrix before inverting it (if needed and set)
@@ -107,7 +108,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 #ifdef NQS_PINV
 		// calculate the pseudoinverse
 		int _attempts 			= 0;
-		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-7;
+		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-5;
 
 		while (!_inversionSuccess && _attempts < NQS_SREG_ATTEMPTS)
 		{
@@ -139,10 +140,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 		//this->F_ = this->info_p_.lr_ * (arma::inv(this->S_) * this->F_);
 		try {
 			this->F_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+			_inversionSuccess = true;
 		} catch(std::exception& e) {
 			_inversionSuccess = false;
 		}
-		_inversionSuccess = true;
 #endif 
 	}
 #else
@@ -173,41 +174,51 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step)
 * The forces are calculated as the covariance of the derivatives and the local energies.
 * The forces are then used to update the weights.
 * 
+* @param _energies vector of the local energies for the current state
+* @param _step current step of the training
+* @param _currLoss current loss of the system - here is the energy
 * @warning Uses the forces vector (member F_) to store the forces that update the weights
 * 
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies, int _step)
+inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies, int _step, _T _currLoss)
 {
-	// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
-	// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
-	// - for the excited states, the derivatives are appe	
-	this->derivativesC_ = arma::conj(this->derivatives_);						// precalculate the conjugate of the derivatives
-	this->F_			= arma::cov(this->derivativesC_, _energies, 1);			// calculate the covariance vector for the gradient 
+	// calculate current learning rate based on the scheduler
+	this->info_p_.lr_ 		= this->info_p_.lr(_step, algebra::real(_currLoss));
 
-	// append with the lower states derivatives - if the lower states are used
-// #pragma omp parallel for num_threads(this->threads_.threadNum_)
-	for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
+	// calculate the derivatives 
 	{
-		// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
-		const auto& ratios_excited	= this->lower_states_.ratios_excited_[_low];// <Psi_W_j / Psi_W> evaluated at W - column vector
-		const auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];	// <Psi_W / Psi_W_j> evaluated at W_j - column vector
-		const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];		// penalty for the lower states 
-		const auto _meanLower 		= arma::mean(ratios_lower);					// mean of the ratios in the lower state
+		// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
+		// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
+		// - for the excited states, the derivatives are appe	
+		this->derivativesC_ = arma::conj(this->derivatives_);						// precalculate the conjugate of the derivatives
+		this->F_			= arma::cov(this->derivativesC_, _energies, 1);			// calculate the covariance vector for the gradient 
+		// by hand 
+		// this->F_ 			= arma::mean(this->derivativesC_.each_col() % _energies, 0).t() - arma::mean(this->derivativesC_, 0).t() * _currLoss;
+	
+		// append with the lower states derivatives - if the lower states are used
+	// #pragma omp parallel for num_threads(this->threads_.threadNum_)
+		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
+		{
+			// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
+			const auto& ratios_excited	= this->lower_states_.ratios_excited_[_low];// <Psi_W_j / Psi_W> evaluated at W - column vector
+			const auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];	// <Psi_W / Psi_W_j> evaluated at W_j - column vector
+			const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];		// penalty for the lower states 
+			const auto _meanLower 		= arma::mean(ratios_lower);					// mean of the ratios in the lower state
 
-		// auto _cov 					= arma::cov(this->derivativesC_, ratios_excited, 1);
-		// this->F_ 					+= _meanLower * f_lower_b * _cov;
-		// continue;
+			auto _cov 					= arma::cov(this->derivativesC_, ratios_excited, 1);
+			this->F_ 					+= _meanLower * f_lower_b * _cov;
+			// continue;
 
-		// manually
-		const auto _meanExcited 	= arma::mean(ratios_excited);					// mean of the ratios in the excited state
-		auto _diff 					= ratios_excited - _meanExcited;				// difference between the ratios and the mean Eq. (14) in the paper
+			// manually
+			// const auto _meanExcited 	= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+			// auto _diff 					= ratios_excited - _meanExcited;				// difference between the ratios and the mean Eq. (14) in the paper
 
-		// multiply each row of \Delta _k* with the difference at each realization (each element of the row)
-		// and then multiply with the mean of the lower states
-		this->F_	 				+= (f_lower_b * _meanLower) * arma::mean((this->derivativesC_.each_col() % _diff), 0).t();
+			// multiply each row of \Delta _k* with the difference at each realization (each element of the row)
+			// and then multiply with the mean of the lower states
+			// this->F_	 				+= (f_lower_b * _meanLower) * arma::mean((this->derivativesC_.each_col() % _diff), 0).t();
+		}
 	}
-
 	// fix the NANs
 	// if (!arma::is_finite(this->F_)) {
 	// 	stoutd("Non-finite values in the gradient: ");
@@ -215,31 +226,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	// }
 	
 #ifdef NQS_USESR
-#	ifndef NQS_USESR_NOMAT
-		// form the covariance matrix explicitly
+	// update model by recalculating the gradient (applying the stochastic reconfiguration)
 	this->S_ = arma::cov(this->derivativesC_, this->derivatives_, 1);
-#	else 
-		{
-		arma::Mat<_T> S1 	= arma::cov(this->derivativesC_, this->derivatives_, 0);
-		std::cout << "Covariance matrix: " << S1.n_rows << ", " << S1.n_cols << std::endl;
-
-
-		// calculate the matrix without forming it explicitly and use the mean of the derivatives
-		this->derivativesM_ = arma::mean(this->derivatives_, 0).as_col();
-		std::cout << "Mean of the derivatives: " << this->derivativesM_.n_elem << std::endl;
-
-		arma::Mat<_T> S2	= S1;
-		S2.zeros();
-
-		for (size_t i = 0; i < this->derivativesC_.n_cols; ++i)
-			for (size_t j = 0; j < this->derivativesC_.n_cols; ++j)
-				S2(i, j) = this->getSRMatrixElement(i, j);
-		// check the difference
-		arma::Mat<double> diff = arma::abs(S1 - S2);
-		diff.print("Difference: ");
-		}
-#	endif
-		// update model by recalculating the gradient (applying the stochastic reconfiguration)
+	// this->S_ 	= arma::mean(arma::square(arma::abs(this->derivatives_)), 0) - arma::real(arma::mean(this->derivatives_, 0) * arma::mean(this->derivatives_, 1));
+	
 	// check the norm of the gradient and normalize it if needed
 	// if (auto gradNorm = arma::norm(this->F_); gradNorm > NQS_SREG_GRAD_NORM_THRESHOLD)
 	// {
@@ -247,13 +237,11 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	// 	this->F_ *= NQS_SREG_GRAD_NORM_THRESHOLD / gradNorm;
 	// }
 
-	return this->gradSR(_step);
+	return this->gradSR(_step, _currLoss);
 #else
 	// standard updater with the gradient only!
 	this->F_ *= this->info_p_.lr_;
 #endif
-
-
 	this->updateWeights_ = true;
 }
 

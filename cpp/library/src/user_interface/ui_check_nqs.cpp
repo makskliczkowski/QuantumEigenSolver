@@ -46,8 +46,8 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 	{
 	case NQSTYPES::RBM_T:
 		_NQS = std::make_shared<RBM_S<_spinModes, _T>>(	_H,
-														this->nqsP.nHidden_,
-														this->nqsP.lr_,
+														this->nqsP.nqs_nh_,
+														this->nqsP.nqs_lr_,
 														this->threadNum, 
 														1,
 														_NQSl,
@@ -55,8 +55,8 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		break;
 	case NQSTYPES::RBMPP_T:
 		_NQS = std::make_shared<RBM_PP_S<_spinModes, _T>>(_H,
-														this->nqsP.nHidden_,
-														this->nqsP.lr_,
+														this->nqsP.nqs_nh_,
+														this->nqsP.nqs_lr_,
 														this->threadNum,
 														1,
 														_NQSl,
@@ -66,8 +66,12 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		throw std::invalid_argument("I don't know any other NQS types :<");
 		break;
 	}
+
+	// set the hyperparameters
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
 	_NQS->setSReg(this->nqsP.nqs_tr_reg_);
+	_NQS->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
+	_NQS->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
 }
 
 // ##########################################################################################################################################
@@ -258,7 +262,11 @@ void UI::nqsExcited()
 		_H->clearEigVec();
 		_H->clearH();
 		_H->clearKrylov();
+		LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+		LOGINFO(2);
 	}
+	LOGINFO(nqsInfo, LOG_TYPES::TRACE, 2);
+	LOGINFO(1);
 
 	// setup the energies container
 	arma::Mat<_T> _EN(_parT.MC_sam_ + _parC.MC_sam_, this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);

@@ -1789,7 +1789,7 @@ namespace Operators {
 		*/
 		template<typename _T>
 		template <typename _T2, typename ..._Ts>
-		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<Operator<_T, _Ts...>*>& _op, _Ts ...a)
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<Operator<_T, _Ts...>*>& _ops, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
@@ -1801,7 +1801,7 @@ namespace Operators {
 			const bool _isFull 		= _Nh == _Nhfull;
 
 			// setup the matrix
-			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			for (const Operators::Operator<_T, _Ts...>& _op : _ops)
 			{		
 				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
 				// if we don't need to apply the symmetries
@@ -1824,7 +1824,7 @@ namespace Operators {
 
 		template<typename _T>
 		template <typename _T2, typename ..._Ts>
-		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts ...a)
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(const Hilbert::HilbertSpace<_T2>& _hilb, std::vector<OperatorComb<_T, _Ts...>*>& _ops, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
@@ -1836,7 +1836,7 @@ namespace Operators {
 			const bool _isFull 		= _Nh == _Nhfull;
 
 			// setup the matrix
-			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			for (const Operators::Operator<_T, _Ts...>& _op : _ops)
 			{		
 				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
 				// if we don't need to apply the symmetries
@@ -1861,7 +1861,7 @@ namespace Operators {
 
 		template <typename _T>
 		template <typename _T2, typename ..._Ts>
-		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _op, _Ts ...a)
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<Operator<_T, _Ts...>*>& _ops, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
@@ -1869,7 +1869,7 @@ namespace Operators {
 			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
 
 			// setup the matrix
-			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			for (const Operators::Operator<_T, _Ts...>& _op : _ops)
 			{		
 				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
 				// if we don't need to apply the symmetries
@@ -1885,7 +1885,7 @@ namespace Operators {
 
 		template <typename _T>
 		template <typename _T2, typename ..._Ts>
-		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<OperatorComb<_T, _Ts...>*>& _op, _Ts ...a)
+		inline void Operators::Containers::OperatorContainer<_T>::setManyBodyMat(size_t _Nh, std::vector<OperatorComb<_T, _Ts...>*>& _ops, _Ts ...a)
 		{
 			using res_typ = typename std::common_type<_T, _T2>::type; 		// get the common type from the operators and the Hilbert space - the result type
 
@@ -1893,7 +1893,7 @@ namespace Operators {
 			this->manyBodyMatrix_ 	= GeneralizedMatrix<_T>(_Nh, true);
 
 			// setup the matrix
-			for (const Operators::Operator<_T, _Ts...>& _op : this->op_)
+			for (const Operators::Operator<_T, _Ts...>& _op : _ops)
 			{		
 				const bool _isquadratic = _op.getIsQuadratic();			// check if the operator is quadratic
 				// if we don't need to apply the symmetries

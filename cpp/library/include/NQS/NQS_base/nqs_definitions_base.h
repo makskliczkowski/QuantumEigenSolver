@@ -63,7 +63,6 @@
 #endif										
 // ##########################################################
 
-
 // ######### NQS TYPES #############
 enum NQSTYPES					// #
 {								// #
@@ -113,6 +112,14 @@ struct CondVarKernel
 
 // #######################################################################################
 
+// #################################
+#ifndef ML_H					// #
+#	include "../../../source/src/Include/ml.h"
+#endif // !ML_H					// #
+// #################################
+
+// #######################################################################################
+
 struct NQS_train_t
 {
 	NQS_train_t() 	= default;
@@ -131,12 +138,14 @@ struct NQS_train_t
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+
 struct NQS_info_t
 {
     using u64                       =       uint64_t;
 
     // simulation specific
-    double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
+	MachineLearning::Parameters* p_	=		nullptr;
+
 	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
 	double sreg_					=		1e-7;					// regularization for the covariance matrix
     // architecture specific
@@ -151,6 +160,24 @@ struct NQS_info_t
 
     // normalization
     double norm_					=		0.0;					// normalization factor for the state vector
+
+	double lr_						=		1e-3;					// learning rate
+	double lr(size_t epoch, double _metric) const					{ return this->p_ ? (*this->p_)(epoch, _metric) : this->lr_; };
+
+	// ---------------------------------------------------------------
+	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)		{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); };	
+	bool stop(size_t epoch, double _metric = 0.0)					{ if (this->p_) return this->p_->stop(epoch, _metric); else return false; };
+	bool stop(size_t epoch, std::complex<double> _metric)			{ if (this->p_) return this->p_->stop(epoch, std::real(_metric)); else return false; };
+	
+	// ---------------------------------------------------------------
+
+	NQS_info_t() 					= 		default;
+	~NQS_info_t() {
+		if (p_) {
+			delete p_;
+			p_ = nullptr;
+		}
+	}
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////

@@ -9,6 +9,7 @@
 #include "../../algebra/general_operator.h"
 #include "../../algebra/operators.h"
 #include "armadillo"
+#include <cstddef>
 #include <functional>
 #include <memory>
 #ifndef NQS_H
@@ -36,7 +37,7 @@ template <uint _spinModes,
 		typename _T			= _Ht, 
 		class _stateType	= double>
 class NQS 
-{
+{	
 	// type definitions 
 	NQS_PUBLIC_TYPES(_T, double);	
 public:
@@ -60,11 +61,8 @@ protected:
 	/* ----------------------------------------------------------- */
 
 	// ---------------------- T H R E A D I N G ---------------------
-							
 	bool initThreads(uint _threadNum = 0);
-	NQS_thread_t<_T> threads_;												// thread information
-
-	/* ----------------------------------------------------------- */
+	NQS_thread_t<_T> threads_;											// thread information
 
 	// ----------------------- T R A I N I N G ----------------------
 	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
@@ -173,10 +171,10 @@ protected:
 	// --------------------- T R A I N   E T C -----------------------
 	bool updateWeights_ = true;											// shall update the weights in current step?
 	virtual void grad(const NQSS& _v, uint _plc)		=				0;
-	virtual void gradFinal(const NQSB& _energies, int step = 0);
+	virtual void gradFinal(const NQSB& _energies, int step = 0, _T _currLoss = 0.0);
 #ifdef NQS_USESR
 	// stochastic reconfiguration
-	virtual void gradSR(uint step = 0);
+	virtual void gradSR(uint step = 0, _T _currLoss = 0.0);
 
 	#ifdef NQS_USESR_NOMAT
 	
@@ -218,16 +216,20 @@ public:
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
 	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv;				};
 	void setSReg(double _sreg)											{ this->info_p_.sreg_ = _sreg;				};
-
+	void setScheduler(int _sch = 0, double _lr = 1e-3, 
+					double _lrd = 0.96, size_t _epo = 10, 
+					size_t _pat = 5)									{ this->info_p_.p_	  = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd); };	
+	void setEarlyStopping(size_t _pat, double _minDlt)					{ this->info_p_.setEarlyStopping(_pat, _minDlt); };
+	
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
 	auto getInfo()								const -> std::string	{ return this->info_;					};
-	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;					};
+	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;			};
 	auto getF()									const -> NQSB			{ return this->F_;						};
 	auto getCovarianceMat()						const -> NQSW			{ return this->S_;						};	
 	// Hilbert
-	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;						};
+	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;				};
 	// Hamiltonian
 	auto getHamiltonianInfo()					const -> std::string	{ return this->H_->getInfo();			};
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
@@ -267,7 +269,7 @@ public:
 	virtual ~NQS();
 	NQS() = default;
 	NQS(const NQS& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
 		this->threads_ 		= _n.threads_;
@@ -277,7 +279,7 @@ public:
 		this->init();
 	}
 	NQS(NQS&& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
 		this->threads_ 		= std::move(_n.threads_);
@@ -289,13 +291,10 @@ public:
 	NQS &operator=(const NQS & _n)
 	{	
 		this->info_p_				= _n.info_p_;
-		this->spinModes_			= _n.spinModes_;
-		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
 		this->ran_					= _n.ran_;
-		this->threadNum_			= _n.threadNum_;
 		this->nFlip_				= _n.nFlip_;
 		this->flipPlaces_			= _n.flipPlaces_;
 		this->flipVals_				= _n.flipVals_;
@@ -310,8 +309,6 @@ public:
 	NQS &operator=(NQS &&_n)
 	{
 		this->info_p_				= _n.info_p_;
-		this->spinModes_			= _n.spinModes_;
-		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
@@ -339,7 +336,7 @@ double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization [[deprecated]] ()
 {
 	// calculate the normalization factor
 	double _norm = 0.0;
-	for (u64 i = 0; i < this->info_p_.Nh_; i++)
+	for (u64 i = 0; i < this->info_p_.Nh_; i++) 
 	{
 		Binary::int2base(i, this->curVec_, this->discVal_);
 		auto _val 	= 	this->ansatz(this->curVec_);
@@ -558,6 +555,7 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	this->lower_states_.exc_ansatz_ = 		[&](const NQSS& _v) { return this->ansatz(_v); };
 #endif
 	this->info_p_.lr_			= 			_lr;
+
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
 	this->info_p_.nVis_ 		= 			_Ns * (this->spinModes_ / 2);

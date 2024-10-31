@@ -685,7 +685,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _
 	// find the correct indices on the values that can be updated
 	_currDerivative.zeros();
 
-	int _spinIter		= 0;
+	int _spinIter [[maybe_unused]] = 0;
 //#ifndef _DEBUG
 //#pragma omp parallel for num_threads(this->threads_.threadNum_)
 //#endif

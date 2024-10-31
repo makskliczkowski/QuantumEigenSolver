@@ -77,7 +77,7 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 
 			// calculate the excited states overlaps for the gradient - if used
 #ifndef _DEBUG 
-// # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
+# 	pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
 			for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 				this->lower_states_.ratios_excited_[_low](_taken) = this->lower_states_.collectExcitedRatios(_low, NQS_STATE);
@@ -85,31 +85,34 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 
 		// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
 #ifndef _DEBUG 
-// # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
+# 	pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
 			this->lower_states_.collectLowerRatios(_low);
 		
 		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));			// save the mean energy
-		
+
 		// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent !TODO: implement optimizers
-		TIMER_START_MEASURE(this->gradFinal(En, i), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
-		LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
+		TIMER_START_MEASURE(this->gradFinal(En, i, meanEn(i - 1)), (i % this->pBar_.percentageSteps == 0), _timer, STR(i));
+		// LOGINFO(_t, VEQ(i-1) + " --- " + VEQP(meanEn(i-1), 4), 3);
 
-		if (this->updateWeights_) 														// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
-			this->updateWeights();
-		else {
-			LOGINFO("The inversion of a matrix failed. Stopping the training.", LOG_TYPES::ERROR, 1);
-			break;
-		}
+		if (this->updateWeights_)
+			this->updateWeights(); // finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
 
-		// update the progress bar
-		PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: "+ VEQPS(meanEn(i-1), 4) , !quiet);
-		
+		{
+			// update the progress bar
+			PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: " + VEQPS(meanEn(i-1), 4) + ". The lr = " + STRPS(this->info_p_.lr_, 4), !quiet);
+			
+			this->updateWeights_ = !this->info_p_.stop(i, meanEn(i - 1));
 #ifdef NQS_SAVE_WEIGHTS
-		if (i % this->pBar_.percentageSteps == 0)  
-			this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
-#endif
+			if (i % this->pBar_.percentageSteps == 0 || !this->updateWeights_)  
+				this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
+#endif	
+			if (!this->updateWeights_) {
+				LOGINFO("Stopping at " + STR(i) + " iteration with last value: " + STRPS(meanEn(i - 1), 4), LOG_TYPES::WARNING, 1);
+				break;
+			}
+		}
 	}
 	LOGINFO(_t, "NQS_EQ_" + STR(this->lower_states_.f_lower_size_), 1);
 	return std::make_pair(meanEn, stdEn);
@@ -192,7 +195,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _pa
 			this->blockSample(_par.bsize_, NQS_STATE, false);
 			
 			// measure 
-			auto [_, _val] 	= NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
+			// auto [_, _val] = 
+			NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
 		}
 		// normalize the measurements - this also creates a new block of measurements
 		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);
