@@ -84,30 +84,38 @@ Quadratic models represent systems where interactions are captured by quadratic 
 
 ## Model Parameters
 
-This section specifies parameters relevant to each model, such as interaction strengths, randomness, and other model-specific variables.
+This section specifies parameters relevant to each model, such as interaction strengths, randomness, and other model-specific variables. Models can be classified into different categories, including lattice-based and non-lattice models.
 
 ### General Parameters
-- `q_R`: Number of realizations of the mixed (unmixed) states.
-- `q_CN`: Number of combinations to choose random states from (applicable when the number of sites > 22).
-- `q_gamma`: Number of states to combine together.
-- `q_man`: Use degenerate manifold? (Currently applies to FF model).
-- `q_mb`: Calculate many-body states (currently only for Slater determinants).
+
+The following parameters are applicable primarily to quadratic models, where the interaction can be represented in a quadratic form:
+
+- **`q_R`**: Number of realizations of the mixed (unmixed) states. This parameter indicates how many different realizations of the quantum states will be generated for sampling.
+- **`q_CN`**: Number of combinations to choose random states from, applicable when the number of sites is greater than 22. This parameter helps to manage state combinations in larger systems.
+- **`q_gamma`**: Number of states to combine together. It specifies how many different quantum states are combined for analysis or calculations.
+- **`q_man`**: Use of a degenerate manifold? (Currently applies to the Free Fermion (FF) model). This parameter determines whether to consider degenerate states when constructing the model.
+- **`q_mb`**: Calculate many-body states? (Currently applicable only for Slater determinants). This flag indicates whether many-body quantum states will be calculated within the model.
 
 ### Example Model Parameters
-- **Transverse Ising Model**:
-  - `hx`: Transverse field strength.
-  - `hz`: Longitudinal field strength.
-  - `J1`, `J2`: Coupling constants.
 
-- **Heisenberg-Kitaev Model**:
-  - `heiJ`: Coupling strength.
-  - `heiHz`: Longitudinal field strength.
-  - `Kx`, `Ky`, `Kz`: Kitaev interaction parameters.
+#### Transverse Ising Model
+- **`hx`**: Transverse field strength. This parameter represents the strength of the external magnetic field applied in the transverse direction.
+- **`hz`**: Longitudinal field strength. This parameter indicates the strength of the external magnetic field applied in the longitudinal direction.
+- **`J1`, `J2`**: Coupling constants. These values determine the strength of interactions between nearest and next-nearest neighbor spins.
 
-- **QSM Parameters**:
-  - `qsm_alpha`: Parameter controlling the spectral density.
-  - `qsm_xi`: Localization length.
-  - `qsm_h`: External field values.
+#### Heisenberg-Kitaev Model
+- **`heiJ`**: Coupling strength. This parameter quantifies the interaction strength between spins in the Heisenberg part of the model.
+- **`heiHz`**: Longitudinal field strength. Similar to the Transverse Ising Model, this parameter represents the longitudinal magnetic field applied.
+- **`Kx`, `Ky`, `Kz`**: Kitaev interaction parameters. These parameters specify the interaction strengths in the respective x, y, and z directions, defining the Kitaev interaction.
+
+#### Quantum State Model (QSM) Parameters
+- **`qsm_alpha`**: Parameter controlling the spectral density. This parameter affects the distribution of energy levels in the quantum state model.
+- **`qsm_xi`**: Localization length. It indicates the scale over which wave functions remain localized in the presence of disorder.
+- **`qsm_h`**: External field values. This parameter specifies the strengths of external fields applied in various directions in the model.
+
+### Note on Lattice Structures
+
+It's important to note that not all models require a lattice structure. Some models, such as the Quantum State Model (QSM) or the Random Band Model, may operate directly on the total number of sites (`Ntot`) and not rely on lattice configurations. This flexibility allows for the exploration of different physical scenarios and systems without being constrained to regular lattice geometries.
 
 ## Lattice Choice
 
