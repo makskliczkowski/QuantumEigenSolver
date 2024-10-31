@@ -96,22 +96,103 @@ The following parameters are applicable primarily to quadratic models, where the
 - **`q_man`**: Use of a degenerate manifold? (Currently applies to the Free Fermion (FF) model). This parameter determines whether to consider degenerate states when constructing the model.
 - **`q_mb`**: Calculate many-body states? (Currently applicable only for Slater determinants). This flag indicates whether many-body quantum states will be calculated within the model.
 
-### Example Model Parameters
+### Model Choice
 
-#### Transverse Ising Model
-- **`hx`**: Transverse field strength. This parameter represents the strength of the external magnetic field applied in the transverse direction.
-- **`hz`**: Longitudinal field strength. This parameter indicates the strength of the external magnetic field applied in the longitudinal direction.
-- **`J1`, `J2`**: Coupling constants. These values determine the strength of interactions between nearest and next-nearest neighbor spins.
+The interacting models are designed to study complex quantum systems where spins or particles interact with each other. They are relevant in understanding various quantum phases and transitions.
 
-#### Heisenberg-Kitaev Model
-- **`heiJ`**: Coupling strength. This parameter quantifies the interaction strength between spins in the Heisenberg part of the model.
-- **`heiHz`**: Longitudinal field strength. Similar to the Transverse Ising Model, this parameter represents the longitudinal magnetic field applied.
-- **`Kx`, `Ky`, `Kz`**: Kitaev interaction parameters. These parameters specify the interaction strengths in the respective x, y, and z directions, defining the Kitaev interaction.
+#### Interacting models
 
-#### Quantum State Model (QSM) Parameters
-- **`qsm_alpha`**: Parameter controlling the spectral density. This parameter affects the distribution of energy levels in the quantum state model.
-- **`qsm_xi`**: Localization length. It indicates the scale over which wave functions remain localized in the presence of disorder.
-- **`qsm_h`**: External field values. This parameter specifies the strengths of external fields applied in various directions in the model.
+##### 1. Transverse Ising Model
+A fundamental model in quantum magnetism, the Transverse Ising Model describes spins that interact through nearest-neighbor coupling in a transverse magnetic field. It captures the transition from ordered to disordered phases.
+
+- **Parameters**:
+  - **`hx`**: Transverse field strength.
+  - **`hz`**: Longitudinal field strength.
+  - **`J1`, `J2`**: Coupling constants.
+
+##### 2. XYZ Model
+The XYZ model extends the Ising model by including anisotropic interactions in all three spatial dimensions. It is useful for exploring more general magnetic behaviors and quantum phase transitions.
+
+- **Parameters**:
+  - **`Jx`, `Jy`, `Jz`**: Coupling strengths along the x, y, and z directions.
+
+##### 3. Heisenberg-Kitaev Model
+Combining Heisenberg and Kitaev interactions, this model provides insight into spin liquids and topological phases. The unique coupling structure allows for exotic behaviors in magnetic systems.
+
+- **Parameters**:
+  - **`heiJ`**: Coupling strength for the Heisenberg term.
+  - **`heiHz`**: Longitudinal field strength.
+  - **`Kx`, `Ky`, `Kz`**: Kitaev interaction parameters.
+
+##### 4. Quantum State Model (QSM)
+This model studies the quantum states of systems with varying degrees of disorder. It is pivotal in understanding localization phenomena and spectral properties of disordered systems.
+
+- **Parameters**:
+  - **`qsm_alpha`**: Parameter controlling the spectral density.
+  - **`qsm_xi`**: Localization length.
+  - **`qsm_h`**: External field values.
+
+##### 5. Rosenzweig-Porter Model
+A model characterized by random interactions, the Rosenzweig-Porter model is crucial for studying quantum chaos and the emergence of critical phenomena in disordered systems.
+
+- **Parameters**:
+  - **`rp_g`**: Strength of the random interactions.
+  - **`rp_single_particle`**: Indicates whether to treat the system as single-particle or multi-particle.
+  - **`rp_be_real`**: Specifies if the model should have real-valued parameters.
+  - **`rp_g_sweep_n`**: Number of sweeps for the parameter `g`.
+
+##### 6. Ultrametric Model
+This model captures the behavior of systems with ultrametric distance properties, often used in the context of disordered systems and spin glasses. It explores how ultrametricity influences thermodynamic behavior.
+
+- **Parameters**:
+  - **`um_g`**: Interaction strength.
+  - **`um_alpha`**: Exponent controlling the degree of ultrametricity.
+  - **`um_N`**: Number of states in the system.
+
+#### Quadratic models
+
+Quadratic models allow for simplified representations of quantum systems, focusing on bilinear interactions. These models are often analytically tractable and provide insights into more complex behaviors.
+
+#### 100. Free Fermion (FF) Model
+The Free Fermion model describes non-interacting fermions. It serves as a foundational model in quantum mechanics and many-body physics, allowing for analytical solutions in various contexts.
+
+- **Parameters**:
+  - **`q_man`**: Use of a degenerate manifold (relevant for certain analyses).
+
+#### 101. Aubry-André Model
+This model studies the effects of quasiperiodicity on the localization of particles. It is crucial for understanding phenomena such as Anderson localization in disordered systems.
+
+- **Parameters**:
+  - **`Aubry_lambda`**: Strength of the quasiperiodic potential.
+
+#### 102. SYK2 Model
+The SYK2 model is a two-body interaction model that provides insights into quantum chaos and holography. It is significant for studying quantum many-body systems with a strong correlation.
+
+- **Parameters**:
+  - **`SYK_J`**: Strength of the two-body interactions.
+
+#### 103. Anderson Model
+The Anderson model describes the localization of wave functions due to disorder in a lattice. It is fundamental for understanding transport properties in disordered systems.
+
+- **Parameters**:
+  - **`A`**: Strength of the disorder potential.
+
+#### 104. Power Law Random Bandwidth Model
+This model explores the effects of random bandwidths in quantum systems, providing insights into critical phenomena and disorder-induced transitions.
+
+- **Parameters**:
+  - **`plrb_a`**: Parameter controlling the power-law distribution of bandwidths.
+  - **`plrb_b`**: Other model-specific constants.
+
+### General Model Parameters
+
+These parameters specify aspects relevant to quadratic models specifically:
+
+- **`q_R`**: Number of realizations of the mixed (unmixed) states.
+- **`q_CN`**: Number of combinations to choose random states from (applicable when the number of sites > 22).
+- **`q_gamma`**: Number of states to combine together.
+- **`q_man`**: Use of a degenerate manifold? (Currently applies to FF model).
+- **`q_mb`**: Calculate many-body states (currently only for Slater determinants).
 
 ### Note on Lattice Structures
 
