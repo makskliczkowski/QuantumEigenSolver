@@ -282,4 +282,36 @@ Load pre-trained weights for the NQS using the following format:
   - `-dir /media/klimak/ObiTwo/DATA_NQS`: Path for NQS data storage.
   - `-dir ./`: Current directory for output files.
 
+This section allows for the selection of the model type and the configuration of randomness parameters.
+
+### Entanglement and Thermodynamic Parameters
+
+- **`eth_entro`**: Flag to calculate entropy.
+- **`eth_ipr`**: Flag for inverse participation ratio calculations.
+- **`eth_susc`**: Flag to compute susceptibility.
+- **`eth_end`**: Range of end values for entropy calculations.
+- **`eth_offd`**: Flag to include off-diagonal elements in calculations.
+
+### Observables and Measurements
+
+- **`op`**: Observable measurements (e.g., Sz/L, Sx, etc.).
+- **`modMidStates`**: Number of mid-spectrum states for the diagonal elements.
+- **`modEnDiff`**: Maximum difference divided by average energy for off-diagonal elements.
+
+### NQS Types
+#+++ NQS types +++
+# 	0 - RBM
+#	1 - RBM+PP
+-nqst 1
+
+### Lattice Parameters
+
+- **`-th`**: Number of threads for parallelization.
+- **`-bc`**: Boundary condition (0 = periodic).
+- **`-Lx`, `-Ly`, `-Lz`**: Dimensions of the lattice.
+- **`-l`**: Lattice offset.
+- **`-d`**: Dimension of the model.
+- **`-Ntot`**: Total number of sites (used for non-lattice models).
+- **`-Ntots`**: Range of total site numbers.
+
 
