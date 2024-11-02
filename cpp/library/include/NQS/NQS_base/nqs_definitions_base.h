@@ -177,6 +177,7 @@ struct NQS_info_t
 	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)		{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); };	
 	bool stop(size_t epoch, double _metric = 0.0)					{ if (this->p_) return this->p_->stop(epoch, _metric); else return false; };
 	bool stop(size_t epoch, std::complex<double> _metric)			{ if (this->p_) return this->p_->stop(epoch, std::real(_metric)); else return false; };
+	double best() const												{ return this->p_ ? this->p_->best() : 0.0; };
 	
 	// ---------------------------------------------------------------
 

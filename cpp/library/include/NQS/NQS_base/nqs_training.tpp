@@ -102,7 +102,8 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 
 		{
 			// update the progress bar
-			PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: " + VEQPS(meanEn(i-1), 4) + ". The lr = " + STRPS(this->info_p_.lr_, 4), !quiet);
+			auto best = this->info_p_.best();
+			PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: E(" + STR(i-1) + ")=" + STRPS(meanEn(i-1), 4) + ". \eta=" + STRPS(this->info_p_.lr_, 4) + ". " + VEQPS(best, 4), !quiet);
 			
 			this->updateWeights_ = !this->info_p_.stop(i, meanEn(i - 1));
 #ifdef NQS_SAVE_WEIGHTS

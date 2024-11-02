@@ -315,6 +315,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 {
+	const double std_dev = 1.0 / std::sqrt(this->nPP_);
 	// matrix for the PP wave function - contains all the necessary weights
 	// is initialized according to the distance between the sites
 	this->Fpp_	= NQSB(this->nPP_, arma::fill::zeros);
@@ -330,14 +331,14 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 			for (const auto& spinSec: this->spinSectors_)
 			{
 				// make the weights proportional to the distance
-				this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) = 0.1 * algebra::cast<_T>(this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0));
+				this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, std_dev) + I * this->ran_.template randomNormal<double>(0.0, std_dev));
 				if (distance != 0)
 					this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) /= distance * distance;
 			}
 		}
 	}
 
-	// !TODO
+	// !TODO¿
 	RBM<_spinModes, _Ht, _T, _stateType>::init();
 }
 

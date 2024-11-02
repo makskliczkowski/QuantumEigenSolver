@@ -67,18 +67,18 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
 
 	// Initialize visible biases
 	for (int i = 0; i < this->info_p_.nVis_; i++) {
-		this->bV_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
+		this->bV_(i) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
 	}
 
 	// Initialize hidden biases
 	for (int i = 0; i < this->nHid_; i++) {
-		this->bH_(i) = algebra::cast<_T>(0.05 * (this->ran_.template random<double>(-1.0, 1.0) + I * this->ran_.template randomNormal<double>(-1.0, 1.0)));
+		this->bH_(i) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
 	}
 
 	// Initialize weights matrix using Xavier Initialization
 	for (int i = 0; i < this->W_.n_rows; i++) {
 		for (uint j = 0; j < this->W_.n_cols; j++) {
-			this->W_(i, j) = algebra::cast<_T>((this->ran_.template random<double>(-stddev, stddev) + I * this->ran_.template randomNormal<double>(-stddev, stddev)));
+			this->W_(i, j) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
 		}
 	}
 	// initialize with a random state
