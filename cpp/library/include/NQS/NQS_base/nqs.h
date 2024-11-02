@@ -45,6 +45,9 @@ public:
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
 
+	// ensure numerical stability
+    const _T epsilon_ 					= 		std::numeric_limits<_T>::epsilon();
+
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
 	const uint spinModes_				=		_spinModes;				// number of spin modes -> e.g. 2 for hardcore bosons, 4 for fermions
@@ -79,15 +82,14 @@ protected:
 	
 	// ------------------------ W E I G H T S -----------------------
 	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	NQSW derivativesC_;													// derivatives conjugated (F_k^*) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesC_ = this->derivatives_; };
-#ifdef NQS_USESR
-#	ifndef NQS_USESR_NOMAT
+	NQS_ROW_T derivativesMean_;											// store the mean of the derivatives (F_k) - for the SR (fullSize)
+	NQSW derivativesCentered_;											// store the centered derivatives (F_k - <F_k>) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
+	NQSW derivativesCenteredH_;											// store the centered derivatives (F_k - <F_k>) - for the SR (fullSize x nBlocks), where nBlocks is the number of consecutive observations	
+	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesCentered_ = this->derivatives_; this->derivativesCenteredH_ = this->derivatives_.t(); }; 
+#ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
-#	else
-	NQSB derivativesM_;													// store the mean of the derivatives (F_k) (fullSize)
-#	endif
 #endif
+	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
 	NQSB F_;															// forces acting on the weights (F_k)
 
 protected:
@@ -176,21 +178,17 @@ protected:
 	// stochastic reconfiguration
 	virtual void gradSR(uint step = 0, _T _currLoss = 0.0);
 
-	#ifdef NQS_USESR_NOMAT
-	
-	auto getSRMatrixElement(size_t i, size_t j)							-> _T; 		// stochastic reconfiguration without the matrix construction
-	auto getSRMatVec(const arma::Col<_T>& x, arma::Col<_T>& y, size_t) 	-> void;	// matrix-vector multiplication for the SR
-
+#	ifdef NQS_USESR_NOMAT
 	// helping variables for conjugate gradient method
-	NQSB r_;															// residual
-	NQSB p_;															// search direction
-	NQSB Ap_;															// matrix-vector multiplication result
-	NQSB x_;															// solution
+	// NQSB r_;															// residual
+	// NQSB p_;															// search direction
+	// NQSB Ap_;															// matrix-vector multiplication result
+	// NQSB x_;															// solution
 
-	#endif
-#endif
+#	endif
 	// ---------------------------------------------------------------
 	virtual void covMatrixReg(int _step = 0);
+#endif
 	
 	/* ------------------------------------------------------------ */
 
@@ -227,7 +225,9 @@ public:
 	auto getInfo()								const -> std::string	{ return this->info_;					};
 	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;			};
 	auto getF()									const -> NQSB			{ return this->F_;						};
+#ifdef NQS_USESR_MAT_USED
 	auto getCovarianceMat()						const -> NQSW			{ return this->S_;						};	
+#endif
 	// Hilbert
 	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;				};
 	// Hamiltonian
@@ -249,14 +249,15 @@ public:
 								  bool quiet						= false,
 								  clk::time_point _t				= NOW,
 								  NQSAv::MeasurementNQS<_T>& _mes 	= {},
-								  bool _collectEn					= true);
+								  bool _collectEn					= true,
+								  uint progPrc						= 25);
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
 	virtual void collect(const NQS_train_t& _par, 
 						 const Operators::OperatorNQS<_T>& _opG,
 						 Operators::Containers::OperatorContainer<_T>& _cont);
 	// for collecting the \sum _s f(s) / \psi(s) - used for the gradient calculation
 	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
-
+	virtual void collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
@@ -451,10 +452,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
 	#else
 	{
-		this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
 	}
 	#endif
 #endif

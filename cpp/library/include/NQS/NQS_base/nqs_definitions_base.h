@@ -40,6 +40,7 @@
 #if defined NQS_USE_VEC_ONLY
 	#define NQS_STATE this->curVec_
 	#define NQS_STATE_T const NQSS&
+	#define NQS_ROW_T arma::Row<_T>
 #else 
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 
@@ -54,10 +55,18 @@
 #ifdef NQS_USESR						
 
 // skip the matrix construction for the SR
-	// #define NQS_USESR_NOMAT
+#	define NQS_USESR_NOMAT
+
+// check whether we have SR without matrix
+#	if defined NQS_USESR_NOMAT
+#		define NQS_USESR_NOMAT_USED
+// # 		define NQS_USESR_NOMAT_USEPRECONDITIONING
+# 	else
+#		define NQS_USESR_MAT_USED
+#	endif
+
 
 // how to handle the inverse of the matrix (if needed)
-#	define NQS_PINV					
 #	define NQS_SREG_ATTEMPTS 5
 #   define NQS_SREG_GRAD_NORM_THRESHOLD 1e3
 #endif										

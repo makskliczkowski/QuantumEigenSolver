@@ -207,7 +207,6 @@ void UI::nqsExcited()
 					this->nqsP.nqs_ex_bn_, this->nqsP.nqs_ex_bs_, this->nqsP.nFlips_, dir);
 
 	// calculate ED to compare with Lanczos or Full
-	const auto mean_perc 	= int(_parT.MC_sam_ / 20) == 0 ? 1 : int(_parT.MC_sam_ / 20);
 	const int prec 		 	= 6;
 	u64 Nh					= _NQS[0]->getHilbertSize();
 	auto Nvis 				= _NQS[0]->getNvis();
@@ -269,12 +268,13 @@ void UI::nqsExcited()
 	LOGINFO(1);
 
 	// setup the energies container
-	arma::Mat<_T> _EN(_parT.MC_sam_ + _parC.MC_sam_, this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
-	arma::Mat<_T> _EN_std(_parT.MC_sam_, this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 
 	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
 		_timer.checkpoint(VEQ(i));
+
+		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_std;
+
 		if (!_NQS[i])
 			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, { this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });
 		
@@ -283,15 +283,29 @@ void UI::nqsExcited()
 
 		// train
 		{
-			auto _out 											= _NQS[i]->train(_parT, this->quiet, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
-			_EN.col(i).subvec(0, _parT.MC_sam_ - 1) 			= std::get<0>(_out);
-			_EN_std.col(i).subvec(0, _parT.MC_sam_ - 1) 		= std::get<1>(_out);
+			auto _out			= _NQS[i]->train(_parT, this->quiet, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
+			_EN_TRAIN 			= std::get<0>(_out);
+			_EN_std 			= std::get<1>(_out);
 			// _timer.checkpoint(VEQ(i) + "collect");
 			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
-			_EN.col(i).subvec(_parT.MC_sam_, _EN.n_rows - 1) 	= _NQS[i]->collect(_parC, this->quiet, 
-																					_timer.point(VEQ(i)), (i == 0) ? _measGS : _meas, true);
+			_EN_TESTS			= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), (i == 0) ? _measGS : _meas, true, nqsP.nqs_tr_pc_);
 
-			_meansNQS(i) = arma::mean(_EN.col(i).tail(mean_perc));
+
+			// calculate mean energies
+			{
+				const auto m_perc = int(_EN_TRAIN.n_rows / 20) == 0 ? _EN_TRAIN.n_rows : int(_EN_TRAIN.n_rows / 20);
+				int _elemIter 	= 0;
+				_meansNQS(i)	= 0.0;
+				for (int k = _EN_TRAIN.n_elem - 1; k >= 0; --k) {
+					if (!EQP(_EN_TRAIN(k), 0.0, 1e-6)) {
+						_meansNQS(i) += _EN_TRAIN(k);
+						_elemIter++;
+					}
+					if (_elemIter == m_perc)
+						break;
+				}
+				_meansNQS(i) /= _elemIter;
+			}
 
 			LOGINFOG("Found the NQS state( " + STR(i) + ") to be E=" + STRPS(_meansNQS(i), prec), LOG_TYPES::TRACE, 2);
 			LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
@@ -300,14 +314,19 @@ void UI::nqsExcited()
 
 		// saver
 		{
-			auto _EN_r 		= algebra::cast<double>(_EN);
+			auto _EN_r 		= algebra::cast<double>(_EN_TRAIN);
+			auto _EN_rt 	= algebra::cast<double>(_EN_TESTS);
 			auto _EN_std_r 	= algebra::cast<double>(_EN_std);
-			_EN_r.save(dir + "history.dat", arma::raw_ascii);
-			_EN_std_r.save(dir + "history_std.dat", arma::raw_ascii);
+
+			// save final results to HDF5
+			saveAlgebraic(dir, "history.h5", _EN_r, "train/" + STR(i), i != 0);
+			saveAlgebraic(dir, "history.h5", _EN_rt, "test/" + STR(i), true);
+			saveAlgebraic(dir, "history.h5", _EN_std_r, "std/" + STR(i), true);
 
 			// sumup true energies and those from NQS
-			saveAlgebraic(dir, "ED.dat", _meansED);
-			saveAlgebraic(dir, "NQS.dat", _meansNQS);
+			saveAlgebraic(dir, "history.h5", _meansED, "ED/" + STR(i), true);
+			saveAlgebraic(dir, "history.h5", _meansNQS, "NQS/" + STR(i), true);
+			saveAlgebraic(dir, "history.h5", arma::Col<double>(this->nqsP.nqs_ex_beta_), "betas", true);
 
 			if (i == 0) {
 				// save the measured quantities

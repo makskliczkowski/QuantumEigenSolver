@@ -151,9 +151,16 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
 {
 	auto _rbm_other = dynamic_cast<RBM<_spinModes, _Ht, _T, _stateType>*>(_other);
-	return std::exp(arma::dot(_rbm_other->bV_ - this->bV_, _in)) * arma::prod(_rbm_other->coshF(_in) / this->coshF(_in));
-}
 
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+	_T log_ratio = (arma::dot(_rbm_other->bV_ - this->bV_, _in)) + 
+					arma::sum(arma::log(_rbm_other->coshF(_in))) - 
+					arma::sum(arma::log(this->coshF(_in)));
+	return std::exp(log_ratio);
+#else
+	return std::exp(arma::dot(_rbm_other->bV_ - this->bV_, _in)) * arma::prod(_rbm_other->coshF(_in) / this->coshF(_in));
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -177,9 +184,9 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(const NQSS& v)
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
-	this->bV_	-= this->F_.subvec(0, this->info_p_.nVis_ - 1);
-	this->bH_	-= this->F_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
-	this->W_	-= arma::reshape(this->F_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1),
+	this->bV_	-= this->dF_.subvec(0, this->info_p_.nVis_ - 1);
+	this->bH_	-= this->dF_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
+	this->W_	-= arma::reshape(this->dF_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1),
 								this->W_.n_rows, this->W_.n_cols);
 }
 
@@ -197,19 +204,19 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
 {
+	// get the subviews
 	auto _currDerivative	= this->derivatives_.row(_plc);
+	auto _hiddDerivative	= _currDerivative.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
+	auto _weightsDerivative = _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
+
 	// update the angles if it is necessary
 #ifndef NQS_ANGLES_UPD
 	this->setTheta(_v);
 #endif
 
 	// calculate the flattened part
-	_currDerivative.subvec(0, this->info_p_.nVis_ - 1) = arma::conv_to<arma::Row<_T>>::from(_v);
-
-	auto _hiddDerivative	= _currDerivative.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
-	_hiddDerivative			= arma::tanh(this->theta_).as_row();
-
-	auto _weightsDerivative= _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
+	_currDerivative.head(this->info_p_.nVis_) 	= arma::conv_to<arma::Row<_T>>::from(_v);
+	_hiddDerivative								= arma::tanh(this->theta_).as_row();
 
 // #ifndef _DEBUG
 // #pragma omp parallel for

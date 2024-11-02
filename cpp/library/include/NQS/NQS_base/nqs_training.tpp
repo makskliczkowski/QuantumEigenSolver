@@ -7,6 +7,10 @@
 
 // ##########################################################################################################################################
 
+#include <cmath>
+#include <functional>
+#include <utility>
+
 /*
 * @brief Perform single training of the NQS.
 * @param mcSteps Monte Carlo steps to be used in the training - this is an outer loop for the training (number of iterations)
@@ -18,14 +22,11 @@
 * @param _t timepoint for timestamping the training
 * @param progPrc progress percentage to be displayed in the progress bar
 */
-#include <cmath>
-#include <functional>
-#include <utility>
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateType>::train(const NQS_train_t& _par,
-																bool quiet,
-																clk::time_point _t,
-																uint progPrc)
+																							bool quiet,
+																							clk::time_point _t,
+																							uint progPrc)
 {
 	{
 		// make the pbar!
@@ -218,19 +219,20 @@ inline arma::Col<_T> NQS<_spinModes, _Ht, _T, _stateType>::collect(	const NQS_tr
 																	bool quiet,
 																	clk::time_point _t,
 																	NQSAv::MeasurementNQS<_T>& _meas,
-																	bool _collectEn)
+																	bool _collectEn,
+																	uint progPrc)
 {																							
+	arma::Col<_T> meanEn, En;
 	{
-		this->pBar_	= pBar(20, _par.MC_sam_);
+		this->pBar_	= pBar(progPrc, _par.MC_sam_);
 		_par.hi("Collect: ");
+
+		if (_collectEn) {
+			meanEn 	= arma::Col<_T>(_par.MC_sam_, arma::fill::zeros);
+			En 		= arma::Col<_T>(_par.nblck_, arma::fill::zeros);
+		}
 	}
 	TIMER_CREATE(_timer);
-
-	arma::Col<_T> meanEn, En;
-	if (_collectEn) {
-		meanEn 	= arma::Col<_T>(_par.MC_sam_, arma::fill::zeros);
-		En 		= arma::Col<_T>(_par.nblck_, arma::fill::zeros);
-	}
 
 	// set the random state at the begining
 	this->setRandomFlipNum(_par.nFlip);
@@ -303,6 +305,43 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_
 			const _T _bottom 	= this->ansatz(NQS_STATE);
 			_container(_taken) 	+= _top / _bottom;
 #endif
+		}									
+	}
+	// normalize the measurements - this also creates a new block of measurements - divide by the number of samples
+	if (_par.MC_sam_ > 1)
+		_container /= _par.MC_sam_;
+}
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container)
+{
+	// set the random state at the begining
+	// this->setRandomFlipNum(_par.nFlip);
+	_container.zeros();
+
+	if (!other)
+		return;
+
+	// go through the number of samples to be collected
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
+	{	
+		// random flip
+		if (_par.MC_th_ > 0)
+			this->setRandomState();
+
+		// remove autocorrelations and thermalizes
+		this->blockSample(_par.MC_th_, NQS_STATE, false);
+
+		// iterate blocks - allows to collect samples outside of the block
+		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
+		{
+			// sample them!
+			this->blockSample(_par.bsize_, NQS_STATE, false);
+
+			auto _val 			= this->ansatz_ratio(NQS_STATE, other);
+			_container(_taken) += _val;
 		}									
 	}
 	// normalize the measurements - this also creates a new block of measurements - divide by the number of samples

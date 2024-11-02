@@ -167,7 +167,8 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint 
     this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_[i]);
 
     // get the mean value
-    return this->f_lower_b_[i] * this->containerP_[i].template mean<_T>()(0, 0);
+    _T _mean = this->containerP_[i].template mean<_T>()(0, 0);
+    return this->f_lower_b_[i] * _mean;
 }
 
 // ##########################################################################################################################################
@@ -182,7 +183,8 @@ inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerRatios(uin
     if (this->f_lower_size_ == 0)
         return;
 
-    this->f_lower[i]->collect_ratio(this->train_lower_, this->exc_ansatz_, this->ratios_lower_[i]);
+    this->f_lower[i]->collect_ratio(this->train_lower_, this->nqs_exc_, this->ratios_lower_[i]);
+    // this->f_lower[i]->collect_ratio(this->train_lower_, this->exc_ansatz_, this->ratios_lower_[i]);
 }
 
 // ##########################################################################################################################################
@@ -192,19 +194,22 @@ inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uin
 {
     if (this->f_lower_size_ == 0)
         return _T(0.0);
+    
+    // try an ansatz for both at the same time
+    return this->nqs_exc_->ansatz_ratio(_current_exc_state, this->f_lower[i].get());
 
     // calculate the ansatz at the current state for the excited state
-    _T _bottom  = this->exc_ansatz_(_current_exc_state);
-    _T _top     = _T(0.0);
+    // _T _bottom  = this->exc_ansatz_(_current_exc_state);
+    // _T _top     = _T(0.0);
 
     // calculate the ratio
-#ifdef NQS_LOWER_RATIO_LOGDIFF
-    _top        = this->ansatzlog(_current_exc_state, i);
-    return std::exp(_top - _bottom);
-#else
-    _top        = this->ansatz(_current_exc_state, i);
-    return _top / _bottom;
-#endif
+// #ifdef NQS_LOWER_RATIO_LOGDIFF
+    // _top        = this->ansatzlog(_current_exc_state, i);
+    // return std::exp(_top - _bottom);
+// #else
+    // _top        = this->ansatz(_current_exc_state, i);
+    // return _top / _bottom;
+// #endif
 }
 
 // ##########################################################################################################################################

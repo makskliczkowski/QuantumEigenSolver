@@ -650,7 +650,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::updateWeights()
 	// update RBM weights
 	RBM_S<_spinModes, _Ht, _T, _stateType>::updateWeights();
 	// Fmat is a vector
-	this->Fpp_ += this->F_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
+	this->Fpp_ += this->dF_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
 }
 
 // ##########################################################################################################################################

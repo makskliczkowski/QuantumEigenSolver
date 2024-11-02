@@ -150,7 +150,7 @@ namespace Operators
 			_valTotal 		= _valTotal + _functionVal * _val;
 		}
 		// this->updCurrent(_valTotal, a...);
-		return algebra::cast<_T>(_valTotal);
+		return _valTotal;
 	}
 
 	// ##########################################################################################################################################
@@ -305,10 +305,9 @@ namespace NQSAv
 
 		// ---- MEASUREMENT ---- (STATIC)
 
-		static std::pair<bool, _T> measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, 
+		static _T measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, 
 							NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
-			bool ok  = true;
 			auto val = _gO(_state, _fun);
 			_cont.updCurrent(val);
 
@@ -328,7 +327,7 @@ namespace NQSAv
 			// 		ok = false;
 			// 	}
 			// }
-			return std::make_pair(ok, val);
+			return val;
 		};
 
 		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont)
