@@ -20,10 +20,10 @@
 
 // ######################### NQS ############################
 #ifndef RBMPP_H											 // #
-#	include "../NQS/rbm_pp.h"							 // #
+#	include "../NQS/rbm_pp_final.hpp"					 // #
 #endif													 // #
 #ifndef RBM_H											 // #
-#	include "../NQS/rbm.h"								 // #
+#	include "../NQS/rbm_final.hpp"						 // #
 #endif													 // #
 // ##########################################################
 
