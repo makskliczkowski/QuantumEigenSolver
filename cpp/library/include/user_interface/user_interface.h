@@ -459,11 +459,12 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
-		
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_tol, double, 1e-7); // regularization for the NQS SR method
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_regp, int, 10);		// regularization for the NQS SR method - scheduler patience
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_regd, double, 0.96);// regularization for the NQS SR method - decay
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_prec, int, 0);		// preconditioner for the NQS SR method - 0 - identity, 1 - Jacobi, 2 - Incomplete Cholesky, 3 - SSOR
 
 		// for collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_mc, uint, 1);		// number of samples - outer loop for collecting - excited states

@@ -12,6 +12,36 @@
 #include <utility>
 
 /*
+* @brief Checks the stopping condition for the training and eventually stops the training. Also, saves the weights if needed.
+* @param i current iteration
+* @param _par parameters for the training
+* @param _currLoss current loss value
+* @param _quiet quiet mode
+* @returns whether the training should be stopped
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet)
+{
+	// update the progress bar
+	auto best 				= this->info_p_.best();
+	const std::string _prog = "PROGRESS NQS: E(" + STR(i - 1) + "/" + STR(_par.MC_sam_) + ")=" + STRPS(_currLoss, 4) + ". " + VEQPS(best, 4) + ". eta=" + STRPS(this->info_p_.lr_, 4) + ". reg=" + STRPS(this->info_p_.sreg_, 4);
+	PROGRESS_UPD_Q(i, this->pBar_, _prog, !_quiet);
+	
+	this->updateWeights_ 	= !this->info_p_.stop(i, _currLoss) && this->updateWeights_;
+#ifdef NQS_SAVE_WEIGHTS
+	if (i % this->pBar_.percentageSteps == 0 || !this->updateWeights_)  
+		this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
+#endif	
+	if (!this->updateWeights_) {
+		LOGINFO("Stopping at " + STR(i) + " iteration with last value: " + STRPS(_currLoss, 4), LOG_TYPES::WARNING, 1);
+		return true;
+	}
+	return false;
+}
+
+// ##########################################################################################################################################
+
+/*
 * @brief Perform single training of the NQS.
 * @param mcSteps Monte Carlo steps to be used in the training - this is an outer loop for the training (number of iterations)
 * @param nThrm Monte Carlo steps spent for thermalizing the system - burn-in
@@ -101,22 +131,8 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 		if (this->updateWeights_)
 			this->updateWeights(); // finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
 
-		{
-			// update the progress bar
-			auto best 				= this->info_p_.best();
-			const std::string _prog = "PROGRESS NQS: E(" + STR(i - 1) + "/" + STR(_par.MC_sam_) + ")=" + STRPS(meanEn(i - 1), 4) + ". " + VEQPS(best, 4) + ". eta=" + STRPS(this->info_p_.lr_, 4) + ". reg=" + STRPS(this->info_p_.sreg_, 4);
-			PROGRESS_UPD_Q(i, this->pBar_, _prog, !quiet);
-			
-			this->updateWeights_ = !this->info_p_.stop(i, meanEn(i - 1)) && this->updateWeights_;
-#ifdef NQS_SAVE_WEIGHTS
-			if (i % this->pBar_.percentageSteps == 0 || !this->updateWeights_)  
-				this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
-#endif	
-			if (!this->updateWeights_) {
-				LOGINFO("Stopping at " + STR(i) + " iteration with last value: " + STRPS(meanEn(i - 1), 4), LOG_TYPES::WARNING, 1);
-				break;
-			}
-		}
+		if (this->trainStop(i, _par, meanEn(i - 1), quiet))
+			break;
 	}
 	LOGINFO(_t, "NQS_EQ_" + STR(this->lower_states_.f_lower_size_), 1);
 	return std::make_pair(meanEn.subvec(0, i - 2), stdEn.subvec(0, i - 2));

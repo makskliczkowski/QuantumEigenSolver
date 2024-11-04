@@ -60,7 +60,6 @@
 // check whether we have SR without matrix
 #	if defined NQS_USESR_NOMAT
 #		define NQS_USESR_NOMAT_USED
-// # 		define NQS_USESR_NOMAT_USEPRECONDITIONING
 # 	else
 #		define NQS_USESR_MAT_USED
 #	endif
@@ -154,7 +153,7 @@ struct NQS_info_t
 
     // simulation specific
 	MachineLearning::Parameters* p_	=		nullptr;
-
+	double tol_						=		1e-5;					// tolerance for iterative solvers
 	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
     // architecture specific
     uint nVis_						=		1;						// number of visible neurons (input variables)

@@ -88,6 +88,8 @@ protected:
 	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesCentered_ = this->derivatives_; this->derivativesCenteredH_ = this->derivatives_.t(); }; 
 #ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
+#else 
+	algebra::Solvers::Preconditioners::Preconditioner<_T>* precond_  	= nullptr;	// preconditioner for the conjugate gradient
 #endif
 	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
 	NQSB F_;															// forces acting on the weights (F_k)
@@ -213,14 +215,16 @@ public:
 	virtual double setNormalization();
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
 	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
+	void setTol(double _tol)											{ this->info_p_.tol_ = _tol; if (_tol > 0) LOGINFO("Using tolerance: " + VEQPS(_tol, 3), LOG_TYPES::CHOICE, 3); };
 	void setScheduler(int _sch = 0, double _lr = 1e-3, 
 					double _lrd = 0.96, size_t _epo = 10, 
 					size_t _pat = 5)									{ this->info_p_.p_	  = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
 	void setSregScheduler(int _sch = 0, double _sreg = 1e-7,
 					double _sregd = 0.96, size_t _epo = 10, 
 					size_t _pat = 5)									{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler." : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
-	void setEarlyStopping(size_t _pat, double _minDlt)					{ this->info_p_.setEarlyStopping(_pat, _minDlt); };
-	
+	void setEarlyStopping(size_t _pat, double _minDlt)					{ if (_pat != 0) { this->info_p_.setEarlyStopping(_pat, _minDlt); LOGINFO("Using early stopping.", LOG_TYPES::CHOICE, 3); } };
+	void setPreconditioner(int _pre) 									{ if (_pre != 0) { this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre); LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3); } };
+
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -243,6 +247,7 @@ public:
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
+	bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet = false);	
 	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
 								bool quiet			= false,			// shall talk? (default is false)
 								clk::time_point _t	= NOW,				// time! (default is NOW)
@@ -489,6 +494,10 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 		if (this->threads_.threads_[_thread].joinable())
 			this->threads_.threads_[_thread].join();
 #endif
+	if (this->precond_ != nullptr) {
+		delete this->precond_;
+		this->precond_ = nullptr;
+	}
 }
 
 // ##########################################################################################################################################

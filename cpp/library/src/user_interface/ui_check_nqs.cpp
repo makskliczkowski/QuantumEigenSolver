@@ -77,6 +77,8 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 #endif
 	_NQS->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
 	_NQS->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
+	_NQS->setPreconditioner(this->nqsP.nqs_tr_prec_);
+	_NQS->setTol(this->nqsP.nqs_tr_tol_);
 }
 
 // ##########################################################################################################################################

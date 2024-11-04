@@ -88,10 +88,12 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_tr_pinv);
 		SETOPTION(nqsP,	nqs_tr_pc);
 		// scheduler for the regularization
+		SETOPTION(nqsP, nqs_tr_tol); 
 		SETOPTION(nqsP,	nqs_tr_reg);
 		SETOPTION(nqsP,	nqs_tr_regs);
 		SETOPTION(nqsP,	nqs_tr_regd);
 		SETOPTION(nqsP,	nqs_tr_regp);
+		SETOPTION(nqsP,	nqs_tr_prec);
 
 		// collecting - excited
 		SETOPTION(nqsP,	nqs_ex_mc);
