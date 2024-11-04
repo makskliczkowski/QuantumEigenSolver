@@ -187,7 +187,7 @@ protected:
 
 #	endif
 	// ---------------------------------------------------------------
-	virtual void covMatrixReg(int _step = 0);
+	virtual void covMatrixReg(int _step = 0, _T _currLoss = 0.0);
 #endif
 	
 	/* ------------------------------------------------------------ */
@@ -212,16 +212,19 @@ public:
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
 	virtual double setNormalization();
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
-	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv;				};
-	void setSReg(double _sreg)											{ this->info_p_.sreg_ = _sreg;				};
+	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
 	void setScheduler(int _sch = 0, double _lr = 1e-3, 
 					double _lrd = 0.96, size_t _epo = 10, 
-					size_t _pat = 5)									{ this->info_p_.p_	  = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd); };	
+					size_t _pat = 5)									{ this->info_p_.p_	  = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
+	void setSregScheduler(int _sch = 0, double _sreg = 1e-7,
+					double _sregd = 0.96, size_t _epo = 10, 
+					size_t _pat = 5)									{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler." : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
 	void setEarlyStopping(size_t _pat, double _minDlt)					{ this->info_p_.setEarlyStopping(_pat, _minDlt); };
 	
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
+	auto saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const -> void { this->info_p_.saveInfo(_dir, _name, i); };
 	auto getInfo()								const -> std::string	{ return this->info_;					};
 	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;			};
 	auto getF()									const -> NQSB			{ return this->F_;						};

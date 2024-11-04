@@ -68,8 +68,13 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 	}
 
 	// set the hyperparameters
+#ifdef NQS_USESR_MAT_USED
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
-	_NQS->setSReg(this->nqsP.nqs_tr_reg_);
+#endif
+
+#ifdef NQS_USESR
+	_NQS->setSregScheduler(this->nqsP.nqs_tr_regs_, this->nqsP.nqs_tr_reg_, this->nqsP.nqs_tr_regd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_regp_);
+#endif
 	_NQS->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
 	_NQS->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
 }
@@ -327,6 +332,9 @@ void UI::nqsExcited()
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/" + STR(i), true);
 			saveAlgebraic(dir, "history.h5", _meansNQS, "NQS/" + STR(i), true);
 			saveAlgebraic(dir, "history.h5", arma::Col<double>(this->nqsP.nqs_ex_beta_), "betas", true);
+
+			// save info
+			_NQS[i]->saveInfo(dir, "history.h5", i);
 
 			if (i == 0) {
 				// save the measured quantities

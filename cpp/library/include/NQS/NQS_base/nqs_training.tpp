@@ -55,7 +55,8 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 	}
 
 	// go through the Monte Carlo steps
-	for (uint i = 1; i <= _par.MC_sam_; ++i)
+	uint i = 1;
+	for (i = 1; i <= _par.MC_sam_; ++i)
 	{
 		// set the random state at the begining
 		if (_par.MC_th_ > 0)
@@ -88,7 +89,7 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 #ifndef _DEBUG 
 # 	pragma omp parallel for num_threads(this->threads_.threadNum_)
 #endif
-		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)
+		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++) 
 			this->lower_states_.collectLowerRatios(_low);
 		
 		MonteCarlo::blockmean(En, _par.bsize_, &meanEn(i - 1), &stdEn(i - 1));			// save the mean energy
@@ -102,10 +103,11 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 
 		{
 			// update the progress bar
-			auto best = this->info_p_.best();
-			PROGRESS_UPD_Q(i, this->pBar_, "PROGRESS NQS: E(" + STR(i-1) + ")=" + STRPS(meanEn(i-1), 4) + ". \eta=" + STRPS(this->info_p_.lr_, 4) + ". " + VEQPS(best, 4), !quiet);
+			auto best 				= this->info_p_.best();
+			const std::string _prog = "PROGRESS NQS: E(" + STR(i - 1) + "/" + STR(_par.MC_sam_) + ")=" + STRPS(meanEn(i - 1), 4) + ". " + VEQPS(best, 4) + ". eta=" + STRPS(this->info_p_.lr_, 4) + ". reg=" + STRPS(this->info_p_.sreg_, 4);
+			PROGRESS_UPD_Q(i, this->pBar_, _prog, !quiet);
 			
-			this->updateWeights_ = !this->info_p_.stop(i, meanEn(i - 1));
+			this->updateWeights_ = !this->info_p_.stop(i, meanEn(i - 1)) && this->updateWeights_;
 #ifdef NQS_SAVE_WEIGHTS
 			if (i % this->pBar_.percentageSteps == 0 || !this->updateWeights_)  
 				this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
@@ -117,7 +119,7 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 		}
 	}
 	LOGINFO(_t, "NQS_EQ_" + STR(this->lower_states_.f_lower_size_), 1);
-	return std::make_pair(meanEn, stdEn);
+	return std::make_pair(meanEn.subvec(0, i - 2), stdEn.subvec(0, i - 2));
 }
 
 // ##########################################################################################################################################

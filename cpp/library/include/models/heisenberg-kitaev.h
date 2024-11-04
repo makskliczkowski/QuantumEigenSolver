@@ -254,8 +254,9 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 	const uint NUM_OF_NN= (uint)this->lat_->get_nn_ForwardNum(_site);
 
 	// -------------- perpendicular field --------------
-	const double si		=	checkBit(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-	localVal			+= 	hz[_site] * si;
+	const double si		=	Binary::check(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	if (!EQP(this->hz[_site], 0.0, 1e-9))
+		localVal		+= 	this->hz[_site] * si;
 
 	// ---------------- transverse field ---------------
 	if (!EQP(this->hx[_site], 0.0, 1e-9))
@@ -271,16 +272,16 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
-			const double sj		= 	checkBit(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			localVal			+= 	J[_site] * delta[_site] * si * sj;
+			const double sj		= 	Binary::check(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+= 	this->J[_site] * this->delta[_site] * si * sj;
 
 			// SYiSYj
 			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
 			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto changedIn		=	siY * sjY * J[_site];
+			auto changedIn		=	siY * sjY * this->J[_site];
 
 			// SXiSXj
-			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * this->J[_site];
 
 			// ----------------------- KITAEV -----------------------
 			if (N_NUMBER == 0) 		// z_bond

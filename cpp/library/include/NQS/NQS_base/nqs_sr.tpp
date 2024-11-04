@@ -18,12 +18,12 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
 {
 	bool _inversionSuccess 		= false;
+	if (this->info_p_.sreg_ > 0) 
+		this->covMatrixReg(step);
 
 #ifdef NQS_USESR_MAT_USED
 	{
 		// regularize the covariance matrix before inverting it (if needed and set)
-		// if (this->info_p_.sreg_ > 0) 
-			// this->covMatrixReg(step);
 
 		// calculate the pseudoinverse
 		int _attempts 			= 0;
@@ -68,7 +68,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
                                     step <= 1 ? nullptr : &this->dF_,	// This should also match arma::Col<_T>
                                     1e-6,                  		 		// Tolerance
                                     1000,                    			// Max iterations,
-									&_inversionSuccess
+									&_inversionSuccess,
+									this->info_p_.sreg_
                                 );
 #else 
     this->dF_ = this->info_p_.lr_ * algebra::Solvers::ConjugateGradient::FisherMatrix::conjugate_gradient<_T>(
@@ -79,20 +80,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 									1.0 / this->F_, 					// Preconditioner
 									1e-6,                  		 		// Tolerance
 									1000,                    			// Max iterations,
-									&_inversionSuccess
+									&_inversionSuccess,
+									this->info_p_.sreg_
                                 );
 #endif
-	// arma::Col<_T> _F = this->F_;
-
-	// solve the system manually
-	// algebra::Solvers::solve(this->F_, _Fun, _F, algebra::Solvers::SolverType::MY_CONJ_GRAD, 1.0e-5);
-	// algebra::Solvers::ConjugateGradient::solve_my_conj_grad<_T>(this->F_, _Fun, this->x_, this->r_, this->p_, this->Ap_, 1e-6);
-
-	// _F *= this->info_p_.lr_;
-	// exchange the vectors
-	// this->F_ = std::move(_F);
-	_inversionSuccess = true;
-	// this->F_ = this->info_p_.lr_ * this->x_;
 #endif
     this->updateWeights_ = _inversionSuccess;
 }
@@ -104,13 +95,15 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 * Use regularization to fix that issue.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg(int step)
+inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg(int step, _T _currLoss)
 {
+	this->info_p_.sreg_ = this->info_p_.sreg(step, algebra::real(_currLoss));
 #ifndef NQS_USESR_NOMAT_USED
 	this->S_.diag() += this->info_p_.sreg_ / (step + 1);
 #else
-
 #endif
 }
 
 #endif
+
+// -----------------------------------------------------------------------------------------------------------------------------------

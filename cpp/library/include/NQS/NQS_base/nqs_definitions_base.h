@@ -156,7 +156,6 @@ struct NQS_info_t
 	MachineLearning::Parameters* p_	=		nullptr;
 
 	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
-	double sreg_					=		1e-7;					// regularization for the covariance matrix
     // architecture specific
     uint nVis_						=		1;						// number of visible neurons (input variables)
     uint nSites_					=		1;						// number of lattice sites or fermionic modes
@@ -173,6 +172,10 @@ struct NQS_info_t
 	double lr_						=		1e-3;					// learning rate
 	double lr(size_t epoch, double _metric) const					{ return this->p_ ? (*this->p_)(epoch, _metric) : this->lr_; };
 
+	MachineLearning::Parameters* s_ =		nullptr;				// regularization scheduler
+	double sreg_					=		1e-7;					// regularization for the covariance matrix
+	double sreg(size_t epoch, double _metric) const					{ return this->s_ ? (*this->s_)(epoch, _metric) : this->sreg_; };
+
 	// ---------------------------------------------------------------
 	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)		{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); };	
 	bool stop(size_t epoch, double _metric = 0.0)					{ if (this->p_) return this->p_->stop(epoch, _metric); else return false; };
@@ -182,12 +185,11 @@ struct NQS_info_t
 	// ---------------------------------------------------------------
 
 	NQS_info_t() 					= 		default;
-	~NQS_info_t() {
-		if (p_) {
-			delete p_;
-			p_ = nullptr;
-		}
-	}
+	~NQS_info_t();
+
+	// ---------------------------------------------------------------
+
+	void saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////
