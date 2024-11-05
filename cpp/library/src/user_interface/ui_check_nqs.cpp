@@ -71,14 +71,14 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 #ifdef NQS_USESR_MAT_USED
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
 #endif
-
+	// regarding the solver
+	_NQS->setSolver(this->nqsP.nqs_tr_sol_, this->nqsP.nqs_tr_tol_, this->nqsP.nqs_tr_iter_);
+	_NQS->setPreconditioner(this->nqsP.nqs_tr_prec_);
 #ifdef NQS_USESR
 	_NQS->setSregScheduler(this->nqsP.nqs_tr_regs_, this->nqsP.nqs_tr_reg_, this->nqsP.nqs_tr_regd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_regp_);
 #endif
 	_NQS->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
 	_NQS->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
-	_NQS->setPreconditioner(this->nqsP.nqs_tr_prec_);
-	_NQS->setTol(this->nqsP.nqs_tr_tol_);
 }
 
 // ##########################################################################################################################################

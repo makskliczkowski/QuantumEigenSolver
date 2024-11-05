@@ -89,7 +89,7 @@ protected:
 #ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
 #else 
-	algebra::Solvers::Preconditioners::Preconditioner<_T>* precond_  	= nullptr;	// preconditioner for the conjugate gradient
+	algebra::Solvers::Preconditioners::Preconditioner<_T, true>* precond_ = nullptr;	// preconditioner for the conjugate gradient
 #endif
 	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
 	NQSB F_;															// forces acting on the weights (F_k)
@@ -212,19 +212,28 @@ public:
 	// ------------------------ S E T T E R S ------------------------
 	virtual void init()									=				0; 
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
-	virtual double setNormalization();
+
+	// --------------------------------------------------------------- 
+	// training the excited states (if needed)
 	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
-	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
-	void setTol(double _tol)											{ this->info_p_.tol_ = _tol; if (_tol > 0) LOGINFO("Using tolerance: " + VEQPS(_tol, 3), LOG_TYPES::CHOICE, 3); };
+	// learing rate scheduler
 	void setScheduler(int _sch = 0, double _lr = 1e-3, 
 					double _lrd = 0.96, size_t _epo = 10, 
-					size_t _pat = 5)									{ this->info_p_.p_	  = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
-	void setSregScheduler(int _sch = 0, double _sreg = 1e-7,
-					double _sregd = 0.96, size_t _epo = 10, 
-					size_t _pat = 5)									{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler." : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
+					size_t _pat = 5)									{ this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
+	// early stopping
 	void setEarlyStopping(size_t _pat, double _minDlt)					{ if (_pat != 0) { this->info_p_.setEarlyStopping(_pat, _minDlt); LOGINFO("Using early stopping.", LOG_TYPES::CHOICE, 3); } };
+	// regularization scheduler
+	void setSregScheduler(	int _sch = 0, 
+							double _sreg = 1e-7,
+							double _sregd = 0.96, 
+							size_t _epo = 10, 
+							size_t _pat = 5)							{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler: " + STR(_sch) : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
+	// preconditioner for solving the linear system
 	void setPreconditioner(int _pre) 									{ if (_pre != 0) { this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre); LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3); } };
-
+	// solving method with the tolerance
+	void setSolver(int _sol, double _tol, int i)						{ this-> info_p_.setSolver(_sol, i, _tol); LOGINFO("Using solver: " + algebra::Solvers::FisherMatrix::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(i), LOG_TYPES::CHOICE, 3); };
+	// if the pseudoinverse is used
+	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -242,7 +251,6 @@ public:
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
 	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;						};
 	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
-	auto getNorm()								const -> double			{ return this->info_p_.norm_ <= 0 ? this->setNormalization() : this->info_p_.norm_;	};
 
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
@@ -337,24 +345,6 @@ public:
 		uint _threadNum = 1, int _nParticles = -1, 
 		const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {});
 };
-
-// ##########################################################################################################################################
-
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization [[deprecated]] () 
-{
-	// calculate the normalization factor
-	double _norm = 0.0;
-	for (u64 i = 0; i < this->info_p_.Nh_; i++) 
-	{
-		Binary::int2base(i, this->curVec_, this->discVal_);
-		auto _val 	= 	this->ansatz(this->curVec_);
-		_norm 		+= 	algebra::real(_val * algebra::conjugate(_val));
-	}
-
-	this->info_p_.norm_ = _norm;
-	return _norm;
-}
 
 // ##########################################################################################################################################
 

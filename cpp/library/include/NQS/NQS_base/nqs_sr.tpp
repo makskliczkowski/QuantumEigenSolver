@@ -57,40 +57,21 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 	}
 #else
 
-    // calculate the matrix delta \Delta O = O - <O> as the covariance matrix S = <\Delta O * \Delta O^*>
+	if (this->precond_ != nullptr)
+		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, this->info_p_.sreg_);
 
-    // Ensure this->F_ is properly initialized before use
-	if (this->precond_ == nullptr)
-	{
-		this->dF_ = this->info_p_.lr_ * algebra::Solvers::ConjugateGradient::FisherMatrix::conjugate_gradient<_T>(
-										this->derivativesCentered_,     	// Ensure this matches the type expected by _gramMatrix
-										this->derivativesCenteredH_,		// This should also match arma::Col<_T>
-										this->F_,               			// This should be of type arma::Col<_T>
-										step <= 1 ? nullptr : &this->dF_,	// This should also match arma::Col<_T>
-										this->info_p_.tol_,                  		 		// Tolerance
-										std::min(size_t(2 * this->F_.n_elem), size_t(5000)),// Max iterations,
-										&_inversionSuccess,
-										this->info_p_.sreg_
-									);
-	}
-	else 
-	{
-		// Set the preconditioner
-		this->precond_->set(this->derivativesCentered_, true);
-
-		// Solve the linear system of equations
-		this->dF_ = this->info_p_.lr_ * algebra::Solvers::ConjugateGradient::FisherMatrix::conjugate_gradient<_T>(
-										this->derivativesCentered_,     	// Ensure this matches the type expected by _gramMatrix
-										this->derivativesCenteredH_,		// This should also match arma::Col<_T>
-										this->F_,               			// This should be of type arma::Col<_T>
-										step <= 1 ? nullptr : &this->F_,	// This should also match arma::Col<_T>
-										this->precond_, 					// Preconditioner
-										this->info_p_.tol_,                  		 		// Tolerance
-										std::min(size_t(2 * this->F_.n_elem), size_t(5000)),// Max iterations,
-										&_inversionSuccess,
-										this->info_p_.sreg_
-									);
-	}
+	this->dF_ = this->info_p_.lr_ * algebra::Solvers::FisherMatrix::solve<_T>(
+										this->info_p_.solver_,													// choose the solver type 
+										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
+										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
+										this->F_,               												// This should be of type arma::Col<_T>
+										step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
+										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
+										this->info_p_.tol_,                  		 							// Tolerance
+										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
+										&_inversionSuccess,														// Convergence flag						
+										this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
+										);
 #endif
     this->updateWeights_ = _inversionSuccess;
 }
