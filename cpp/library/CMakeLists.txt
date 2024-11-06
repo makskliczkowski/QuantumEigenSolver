@@ -126,6 +126,7 @@ set(SOURCES
     ${CPPSOURCE}/ui.cpp 
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
+    ${CPPSOURCE}/LinearAlgebra/solvers.cpp
 )
 
 # Set the include directories

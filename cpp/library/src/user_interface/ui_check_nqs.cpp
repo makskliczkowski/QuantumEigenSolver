@@ -300,7 +300,7 @@ void UI::nqsExcited()
 
 			// calculate mean energies
 			{
-				const auto m_perc = int(_EN_TRAIN.n_rows / 20) == 0 ? _EN_TRAIN.n_rows : int(_EN_TRAIN.n_rows / 20);
+				const auto m_perc = 500;
 				int _elemIter 	= 0;
 				_meansNQS(i)	= 0.0;
 				for (int k = _EN_TRAIN.n_elem - 1; k >= 0; --k) {

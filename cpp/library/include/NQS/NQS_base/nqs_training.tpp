@@ -135,7 +135,9 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 			break;
 	}
 	LOGINFO(_t, "NQS_EQ_" + STR(this->lower_states_.f_lower_size_), 1);
-	return std::make_pair(meanEn.subvec(0, i - 2), stdEn.subvec(0, i - 2));
+	if (i > 2) 
+		return std::make_pair(meanEn.subvec(0, i - 2), stdEn.subvec(0, i - 2));
+	return std::make_pair(meanEn, stdEn);
 }
 
 // ##########################################################################################################################################
