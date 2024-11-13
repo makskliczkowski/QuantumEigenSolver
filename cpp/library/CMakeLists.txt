@@ -127,6 +127,7 @@ set(SOURCES
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
     ${CPPSOURCE}/LinearAlgebra/solvers.cpp
+    ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
 )
 
 # Set the include directories

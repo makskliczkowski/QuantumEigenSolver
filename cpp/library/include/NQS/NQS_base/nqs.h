@@ -231,7 +231,7 @@ public:
 	// preconditioner for solving the linear system
 	void setPreconditioner(int _pre) 									{ if (_pre != 0) { this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre); LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3); } };
 	// solving method with the tolerance
-	void setSolver(int _sol, double _tol, int i)						{ this-> info_p_.setSolver(_sol, i, _tol); LOGINFO("Using solver: " + algebra::Solvers::FisherMatrix::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(i), LOG_TYPES::CHOICE, 3); };
+	void setSolver(int _sol, double _tol, int i)						{ this-> info_p_.setSolver(_sol, i, _tol); LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(i), LOG_TYPES::CHOICE, 3); };
 	// if the pseudoinverse is used
 	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
 	/* ------------------------------------------------------------ */
