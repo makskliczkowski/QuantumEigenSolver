@@ -124,10 +124,15 @@ set(SOURCES
     ${CPPSOURCE}/exceptions.cpp 
     ${CPPSOURCE}/str.cpp 
     ${CPPSOURCE}/ui.cpp 
+    ${CPPSOURCE}/time.cpp
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
     ${CPPSOURCE}/LinearAlgebra/solvers.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
     ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
+    ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
 )
 
 # Set the include directories
