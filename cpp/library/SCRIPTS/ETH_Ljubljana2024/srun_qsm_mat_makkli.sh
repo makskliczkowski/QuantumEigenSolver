@@ -14,7 +14,7 @@ FUN=$6
 RUN_DIR=/home/makkli4548/CODES/QuantumEigenSolver/cpp/library/
 cd ${RUN_DIR}
 
-lustredir=/home/makkli4548/DATA
+lustredir=/home/makkli4548/mylustre/DATA
 mkdir -p ${lustredir}
 
 # create log directory
@@ -54,7 +54,7 @@ echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;S
 echo >> ${a}
 echo "rsync -a --remove-source-files \${SAVDIR}/* ${lustredir}" >> ${a}
 echo "rm -rf \${SAVDIR}/*" >> ${a} 
-
+echo ${TMPDIR}/DATA/${SLURM_JOBID} >> last_tmp_jobs.log
 sbatch ${a} 
 # echo ${a}
 # echo ${b}
