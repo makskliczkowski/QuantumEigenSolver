@@ -12,10 +12,10 @@ CPU=$5
 FUN=$6
 # comment
 
-RUN_DIR=/home/makkli4548/CODES/QuantumEigenSolver/cpp/library/
+RUN_DIR=/home/klimak97/CODES/QuantumEigenSolver/cpp/library
 cd ${RUN_DIR}
 
-lustredir=/home/makkli4548/mylustre/DATA/
+lustredir=/home/klimak97/mylustre-hpc-maciek/UM
 mkdir -p ${lustredir}
 
 # create log directory
@@ -26,6 +26,8 @@ mkdir -p $LOGDIR
 
 # parameters
 SSYYMS=$(tr -d ' ' <<< "$PARS")
+
+# save the SLURM ID AND CONNECTED input to it 
 
 b="qsm_mat_ns=${Ns},${SSYYMS}"
 arhname="Ns=${Ns},${b},\${SLURM_JOBID}.tar.gz"

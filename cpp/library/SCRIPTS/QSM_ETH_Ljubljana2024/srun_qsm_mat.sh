@@ -14,7 +14,7 @@ FUN=$6
 RUN_DIR=/home/klimak97/CODES/QuantumEigenSolver/cpp/library/
 cd ${RUN_DIR}
 
-lustredir=/home/klimak97/mylustre-hpc-maciek/QSM/
+lustredir=/home/klimak97/mylustre-hpc-maciek/UM/
 mkdir -p ${lustredir}
 
 # create log directory
