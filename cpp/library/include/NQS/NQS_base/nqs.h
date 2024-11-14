@@ -9,6 +9,7 @@
 #include "../../algebra/general_operator.h"
 #include "../../algebra/operators.h"
 #include "armadillo"
+#include <cstddef>
 #include <functional>
 #include <memory>
 #ifndef NQS_H
@@ -36,13 +37,16 @@ template <uint _spinModes,
 		typename _T			= _Ht, 
 		class _stateType	= double>
 class NQS 
-{
+{	
 	// type definitions 
 	NQS_PUBLIC_TYPES(_T, double);	
 public:
 	using NQSLS_p 						=		typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
+
+	// ensure numerical stability
+    const _T epsilon_ 					= 		std::numeric_limits<_T>::epsilon();
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
@@ -60,11 +64,8 @@ protected:
 	/* ----------------------------------------------------------- */
 
 	// ---------------------- T H R E A D I N G ---------------------
-							
 	bool initThreads(uint _threadNum = 0);
-	NQS_thread_t<_T> threads_;												// thread information
-
-	/* ----------------------------------------------------------- */
+	NQS_thread_t<_T> threads_;											// thread information
 
 	// ----------------------- T R A I N I N G ----------------------
 	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
@@ -81,15 +82,16 @@ protected:
 	
 	// ------------------------ W E I G H T S -----------------------
 	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	NQSW derivativesC_;													// derivatives conjugated (F_k^*) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesC_ = this->derivatives_; };
-#ifdef NQS_USESR
-#	ifndef NQS_USESR_NOMAT
+	NQS_ROW_T derivativesMean_;											// store the mean of the derivatives (F_k) - for the SR (fullSize)
+	NQSW derivativesCentered_;											// store the centered derivatives (F_k - <F_k>) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
+	NQSW derivativesCenteredH_;											// store the centered derivatives (F_k - <F_k>) - for the SR (fullSize x nBlocks), where nBlocks is the number of consecutive observations	
+	void derivativesReset(size_t nBlocks = 1)							{ this->derivatives_ = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros); this->derivativesCentered_ = this->derivatives_; this->derivativesCenteredH_ = this->derivatives_.t(); }; 
+#ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
-#	else
-	NQSB derivativesM_;													// store the mean of the derivatives (F_k) (fullSize)
-#	endif
+#else 
+	algebra::Solvers::Preconditioners::Preconditioner<_T, true>* precond_ = nullptr;	// preconditioner for the conjugate gradient
 #endif
+	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
 	NQSB F_;															// forces acting on the weights (F_k)
 
 protected:
@@ -173,30 +175,21 @@ protected:
 	// --------------------- T R A I N   E T C -----------------------
 	bool updateWeights_ = true;											// shall update the weights in current step?
 	virtual void grad(const NQSS& _v, uint _plc)		=				0;
-	virtual void gradFinal(const NQSB& _energies);
+	virtual void gradFinal(const NQSB& _energies, int step = 0, _T _currLoss = 0.0);
 #ifdef NQS_USESR
 	// stochastic reconfiguration
-	virtual void gradSR(uint step = 0);
+	virtual void gradSR(uint step = 0, _T _currLoss = 0.0);
 
-	#ifdef NQS_USESR_NOMAT
-	
-	auto getSRMatrixElement(size_t i, size_t j)							-> _T; 		// stochastic reconfiguration without the matrix construction
-	auto getSRMatVec(const arma::Col<_T>& x, arma::Col<_T>& y, size_t) 	-> void;	// matrix-vector multiplication for the SR
-
+#	ifdef NQS_USESR_NOMAT
 	// helping variables for conjugate gradient method
-	NQSB r_;															// residual
-	NQSB p_;															// search direction
-	NQSB Ap_;															// matrix-vector multiplication result
-	NQSB x_;															// solution
+	// NQSB r_;															// residual
+	// NQSB p_;															// search direction
+	// NQSB Ap_;															// matrix-vector multiplication result
+	// NQSB x_;															// solution
 
-	#endif
-#endif
+#	endif
 	// ---------------------------------------------------------------
-#ifdef NQS_SREG 
-	double covMatrixRegMult		= 0.95;									// multiplier for the regularization
-	double covMatrixRegStart	= 0.02;									// starting parameter for regularisation (epsilon1)
-	double covMatrixRegStart2	= 0.0;									// starting parameter for regularisation (epsilon2)
-	virtual void covMatrixReg();
+	virtual void covMatrixReg(int _step = 0, _T _currLoss = 0.0);
 #endif
 	
 	/* ------------------------------------------------------------ */
@@ -219,29 +212,50 @@ public:
 	// ------------------------ S E T T E R S ------------------------
 	virtual void init()									=				0; 
 	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
-	virtual double setNormalization();
-	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
-	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv;				};
 
+	// --------------------------------------------------------------- 
+	// training the excited states (if needed)
+	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
+	// learing rate scheduler
+	void setScheduler(int _sch = 0, double _lr = 1e-3, 
+					double _lrd = 0.96, size_t _epo = 10, 
+					size_t _pat = 5)									{ this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
+	// early stopping
+	void setEarlyStopping(size_t _pat, double _minDlt)					{ if (_pat != 0) { this->info_p_.setEarlyStopping(_pat, _minDlt); LOGINFO("Using early stopping.", LOG_TYPES::CHOICE, 3); } };
+	// regularization scheduler
+	void setSregScheduler(	int _sch = 0, 
+							double _sreg = 1e-7,
+							double _sregd = 0.96, 
+							size_t _epo = 10, 
+							size_t _pat = 5)							{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler: " + STR(_sch) : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
+	// preconditioner for solving the linear system
+	void setPreconditioner(int _pre) 									{ if (_pre != 0) { this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre); LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3); } };
+	// solving method with the tolerance
+	void setSolver(int _sol, double _tol, int i)						{ this-> info_p_.setSolver(_sol, i, _tol); LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(i), LOG_TYPES::CHOICE, 3); };
+	// if the pseudoinverse is used
+	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
+	auto saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const -> void { this->info_p_.saveInfo(_dir, _name, i); };
 	auto getInfo()								const -> std::string	{ return this->info_;					};
-	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;					};
+	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;			};
 	auto getF()									const -> NQSB			{ return this->F_;						};
+#ifdef NQS_USESR_MAT_USED
 	auto getCovarianceMat()						const -> NQSW			{ return this->S_;						};	
+#endif
 	// Hilbert
-	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;						};
+	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;				};
 	// Hamiltonian
 	auto getHamiltonianInfo()					const -> std::string	{ return this->H_->getInfo();			};
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
 	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;						};
 	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
-	auto getNorm()								const -> double			{ return this->info_p_.norm_ <= 0 ? this->setNormalization() : this->info_p_.norm_;	};
 
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
+	bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet = false);	
 	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
 								bool quiet			= false,			// shall talk? (default is false)
 								clk::time_point _t	= NOW,				// time! (default is NOW)
@@ -251,14 +265,15 @@ public:
 								  bool quiet						= false,
 								  clk::time_point _t				= NOW,
 								  NQSAv::MeasurementNQS<_T>& _mes 	= {},
-								  bool _collectEn					= true);
+								  bool _collectEn					= true,
+								  uint progPrc						= 25);
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
 	virtual void collect(const NQS_train_t& _par, 
 						 const Operators::OperatorNQS<_T>& _opG,
 						 Operators::Containers::OperatorContainer<_T>& _cont);
 	// for collecting the \sum _s f(s) / \psi(s) - used for the gradient calculation
 	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
-
+	virtual void collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
 
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
@@ -271,7 +286,7 @@ public:
 	virtual ~NQS();
 	NQS() = default;
 	NQS(const NQS& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
 		this->threads_ 		= _n.threads_;
@@ -281,7 +296,7 @@ public:
 		this->init();
 	}
 	NQS(NQS&& _n)
-		: info_p_(_n.info_p_), spinModes_(_n.spinModes_), discVal_(_n.discVal_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
+		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
 		this->threads_ 		= std::move(_n.threads_);
@@ -293,13 +308,10 @@ public:
 	NQS &operator=(const NQS & _n)
 	{	
 		this->info_p_				= _n.info_p_;
-		this->spinModes_			= _n.spinModes_;
-		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
 		this->ran_					= _n.ran_;
-		this->threadNum_			= _n.threadNum_;
 		this->nFlip_				= _n.nFlip_;
 		this->flipPlaces_			= _n.flipPlaces_;
 		this->flipVals_				= _n.flipVals_;
@@ -314,8 +326,6 @@ public:
 	NQS &operator=(NQS &&_n)
 	{
 		this->info_p_				= _n.info_p_;
-		this->spinModes_			= _n.spinModes_;
-		this->discVal_				= _n.discVal_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
@@ -335,24 +345,6 @@ public:
 		uint _threadNum = 1, int _nParticles = -1, 
 		const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {});
 };
-
-// ##########################################################################################################################################
-
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-double NQS<_spinModes, _Ht, _T, _stateType>::setNormalization [[deprecated]] () 
-{
-	// calculate the normalization factor
-	double _norm = 0.0;
-	for (u64 i = 0; i < this->info_p_.Nh_; i++)
-	{
-		Binary::int2base(i, this->curVec_, this->discVal_);
-		auto _val 	= 	this->ansatz(this->curVec_);
-		_norm 		+= 	algebra::real(_val * algebra::conjugate(_val));
-	}
-
-	this->info_p_.norm_ = _norm;
-	return _norm;
-}
 
 // ##########################################################################################################################################
 
@@ -458,10 +450,10 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
 	#else
 	{
-		this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
+		// this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
 	}
 	#endif
 #endif
@@ -492,6 +484,10 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 		if (this->threads_.threads_[_thread].joinable())
 			this->threads_.threads_[_thread].join();
 #endif
+	if (this->precond_ != nullptr) {
+		delete this->precond_;
+		this->precond_ = nullptr;
+	}
 }
 
 // ##########################################################################################################################################
@@ -562,6 +558,7 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	this->lower_states_.exc_ansatz_ = 		[&](const NQSS& _v) { return this->ansatz(_v); };
 #endif
 	this->info_p_.lr_			= 			_lr;
+
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
 	this->info_p_.nVis_ 		= 			_Ns * (this->spinModes_ / 2);

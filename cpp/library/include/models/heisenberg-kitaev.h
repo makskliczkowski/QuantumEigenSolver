@@ -174,9 +174,9 @@ inline HeisenbergKitaev<_T>::HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilber
 }
 
 // ##########################################################################################################################################
-// ##########################################################################################################################################
+
 // ######################################################## L O C A L   E N E R G Y #########################################################
-// ##########################################################################################################################################
+
 // ##########################################################################################################################################
 
 /*
@@ -189,7 +189,7 @@ template <typename _T>
 cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::NQSFun _fun)
 {
 	// value that does not change
-	double localVal	= 0.0;
+	double localVal		= 0.0;
 	cpx changedVal		= 0.0;
 
 	// get number of forward nn
@@ -247,55 +247,54 @@ template<typename _T>
 inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _site, NQSFun _fun)
 {
 	// value that does not change
-	double localVal		= 0.0;
-	cpx changedVal		= 0.0;
+	double localVal		= 	0.0;
+	cpx changedVal		= 	0.0;
 
 	// get number of forward nn
-	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
+	const uint NUM_OF_NN= (uint)this->lat_->get_nn_ForwardNum(_site);
 
 	// -------------- perpendicular field --------------
-	const double si		=	checkBit(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-	localVal			+= hz[_site] * si;
+	const double si		=	Binary::check(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+	if (!EQP(this->hz[_site], 0.0, 1e-9))
+		localVal		+= 	this->hz[_site] * si;
 
 	// ---------------- transverse field ---------------
 	if (!EQP(this->hx[_site], 0.0, 1e-9))
-		changedVal += _fun({ (int)_site }, { si }) * Operators::_SPIN_RBM * hx[_site];
+		changedVal 		+= 	_fun({ (int)_site }, { si }) * Operators::_SPIN_RBM * hx[_site];
 
 	// ------------------- CHECK NN --------------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+
+		// get the nearest neighbor
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0)
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
-			const double sj		=	checkBit(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			localVal			+= J[_site] * delta[_site] * si * sj;
+			const double sj		= 	Binary::check(_cur, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
+			localVal			+= 	this->J[_site] * this->delta[_site] * si * sj;
 
 			// SYiSYj
 			auto siY			=	si > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
 			auto sjY			=	sj > 0 ? I * Operators::_SPIN_RBM : -I * Operators::_SPIN_RBM;
-			auto changedIn		=	siY * sjY * J[_site];
+			auto changedIn		=	siY * sjY * this->J[_site];
 
 			// SXiSXj
-			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * J[_site];
+			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * this->J[_site];
 
 			// ----------------------- KITAEV -----------------------
-			// z_bond
-			if (N_NUMBER == 0)
+			if (N_NUMBER == 0) 		// z_bond
 				localVal		+= this->Kz[_site] * si * sj;
-			// y_bond
-			else if (N_NUMBER == 1)
+			else if (N_NUMBER == 1) // y_bond
 				changedIn		+= siY * sjY * Ky[_site];
-			// x_bond
-			else if (N_NUMBER == 2)
+			else if (N_NUMBER == 2) // x_bond
 				changedIn		+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * Kx[_site];
 
 			// apply change
 			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn;
 		}
 	}
-	// return all
 	return changedVal + localVal;
 }
 
@@ -307,57 +306,53 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 template<typename _T>
 inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 {
-	// get number of forward nn
-	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);
-	u64 newIdx			= 0;
-	_T newVal			= 0;
+	uint NUM_OF_NN		= (uint)this->lat_->get_nn_ForwardNum(_site);			// get number of forward nn at a given site _site 
+	u64 newIdx			= 0;													// new index (for the operators)		
+	_T newVal			= 0;													// new value (for the operators)
 
 	// -------------- perpendicular field --------------
-	if (!EQP(this->hz[_site], 0.0, 1e-9))
-	{
-		std::tie(newIdx, newVal) = Operators::sigma_z<_T>(_elem, this->Ns, { _site });
+	if (!EQP(this->hz[_site], 0.0, 1e-9)) {
+		std::tie(newIdx, newVal) = Operators::SpinOperators::sig_z<_T>(_elem, this->Ns_, { _site });
 		this->setHElem(_elemId, hz[_site] * newVal, newIdx);
 	}
 
 	// -------------- transverse field --------------
-	if (!EQP(this->hx[_site], 0.0, 1e-9)) 
-	{
-		std::tie(newIdx, newVal) = Operators::sigma_x(_elem, this->Ns, { _site });
+	if (!EQP(this->hx[_site], 0.0, 1e-9)) {
+		std::tie(newIdx, newVal) = Operators::SpinOperators::sig_x<_T>(_elem, this->Ns_, { _site });
 		this->setHElem(_elemId, hx[_site] * newVal, newIdx);
 	}
 
 	// ------------------- CHECK NN --------------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+
+		// get the nearest neighbor
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj (diagonal elements)
-			auto [idx_z, val_z]		= Operators::sigma_z<_T>(_elem, this->Ns, { _site });
-			auto [idx_z2, val_z2]	= Operators::sigma_z<_T>(idx_z, this->Ns, { (uint)nei });
+			auto [idx_z, val_z]		= Operators::SpinOperators::sig_z<_T>(_elem, this->Ns_, { _site });
+			auto [idx_z2, val_z2]	= Operators::SpinOperators::sig_z<_T>(idx_z, this->Ns_, { (uint)nei });
 			this->setHElem(_elemId,	J[_site] * delta[_site] * (val_z * val_z2), idx_z2);
 
 			// SYiSYj
 			auto [idx_y, val_y]		= Operators::sigma_y(_elem, this->Ns, { _site });
 			auto [idx_y2, val_y2]	= Operators::sigma_y(idx_y, this->Ns, { (uint)nei });
-			this->setHElem(_elemId, J[_site] * std::real(val_y * val_y2), idx_y2);
+			this->setHElem(_elemId, J[_site] * algebra::real(val_y * val_y2), idx_y2);
 
 			// SXiSXj
-			auto [idx_x, val_x]		= Operators::sigma_x(_elem, this->Ns, { _site });
-			auto [idx_x2, val_x2]	= Operators::sigma_x(idx_x, this->Ns, { (uint)nei });
+			auto [idx_x, val_x]		= Operators::SpinOperators::sig_x<_T>(_elem, this->Ns, { _site });
+			auto [idx_x2, val_x2]	= Operators::SpinOperators::sig_x<_T>(idx_x, this->Ns, { (uint)nei });
 			this->setHElem(_elemId,	J[_site] * val_x * val_x2,	idx_x2);
 
 			// ----------------------- KITAEV -----------------------
-			// z_bond
-			if (N_NUMBER == 0)
-				this->setHElem(_elemId, this->Kz[_site] * std::real(val_z * val_z2), idx_z2);
-			// y_bond
-			else if (N_NUMBER == 1) 
-				this->setHElem(_elemId, this->Ky[_site] * std::real(val_y * val_y2), idx_y2);
-			// x_bond
-			else if (N_NUMBER == 2)
-				this->setHElem(_elemId, this->Kx[_site] * std::real(val_x * val_x2), idx_x2);
+			if (N_NUMBER == 0) 		// z_bond
+				this->setHElem(_elemId, this->Kz[_site] * algebra::real(val_z * val_z2), idx_z2);
+			else if (N_NUMBER == 1) // y_bond
+				this->setHElem(_elemId, this->Ky[_site] * algebra::real(val_y * val_y2), idx_y2);
+			else if (N_NUMBER == 2) // x_bond
+				this->setHElem(_elemId, this->Kx[_site] * algebra::real(val_x * val_x2), idx_x2);
 		}
 	}
 }

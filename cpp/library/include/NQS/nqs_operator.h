@@ -10,17 +10,11 @@
 // #################################
 #include "./NQS_base/nqs_definitions_base.h"
 #include <initializer_list>
+#include <utility>
 #ifndef HAMIL_H
 #	include "../hamil.h"
 #endif
 // #################################
-
-// #################################
-#ifndef ML_H					// #
-#	include "../ml.h"			// #
-#endif // !ML_H					// #
-// #################################
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Operators for the NQS
@@ -156,7 +150,7 @@ namespace Operators
 			_valTotal 		= _valTotal + _functionVal * _val;
 		}
 		// this->updCurrent(_valTotal, a...);
-		return algebra::cast<_T>(_valTotal);
+		return _valTotal;
 	}
 
 	// ##########################################################################################################################################
@@ -315,8 +309,24 @@ namespace NQSAv
 							NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont)
 		{
 			auto val = _gO(_state, _fun);
-			// update the container
 			_cont.updCurrent(val);
+
+			// Check if val is valid (no NaN or Inf)
+			// if constexpr (std::is_arithmetic_v<_T>) {  // For real numbers (float, double)
+			// 	if (std::isfinite(val)) {
+			// 		_cont.updCurrent(val);  // Update only if val is valid
+			// 	} else {
+			// 		_cont.updCurrent(0.0);  // Update with 0.0 if val is not valid
+			// 		ok = false;
+			// 	}
+			// } else if constexpr (std::is_same_v<_T, std::complex<typename _T::value_type>>) {  // For complex numbers
+			// 	if (std::isfinite(val.real()) && std::isfinite(val.imag())) {
+			// 		_cont.updCurrent(val);  // Update only if both parts of val are finite
+			// 	} else {
+			// 		_cont.updCurrent(0.0);  // Update with 0.0 if val is not valid
+			// 		ok = false;
+			// 	}
+			// }
 			return val;
 		};
 

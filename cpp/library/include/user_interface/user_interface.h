@@ -20,10 +20,10 @@
 
 // ######################### NQS ############################
 #ifndef RBMPP_H											 // #
-#	include "../NQS/rbm_pp.h"							 // #
+#	include "../NQS/rbm_pp_final.hpp"					 // #
 #endif													 // #
 #ifndef RBM_H											 // #
-#	include "../NQS/rbm.h"								 // #
+#	include "../NQS/rbm_final.hpp"						 // #
 #endif													 // #
 // ##########################################################
 
@@ -448,17 +448,29 @@ namespace UI_PARAMS
 	{
 		v_1d<u64> layersDim;
 		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM_T);
-		UI_PARAM_CREATE_DEFAULT(nHidden, uint, 1);
 		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
+		UI_PARAM_CREATE_DEFAULTD(nqs_nh, double, 1);
 		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
 		UI_PARAM_CREATE_DEFAULT(nFlips, uint, 1);
 		
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pinv, double, 1e-5);// pseudoinverse for the NQS
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pc, double, 5.0);	// percentage of the samples to be used for display
+		// training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_bs, uint, 8);		// block size for training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
+		// regularization
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_regp, int, 10);		// regularization for the NQS SR method - scheduler patience
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_regd, double, 0.96);// regularization for the NQS SR method - decay
+		// preconditioner
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_prec, int, 0);		// preconditioner for the NQS SR method - 0 - identity, 1 - Jacobi, 2 - Incomplete Cholesky, 3 - SSOR
+		// solver type
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_sol, int, 1);		// solver for the NQS SR method
+		UI_PARAM_CREATE_DEFAULTD(nqs_tr_tol, double, 1e-7); // solver for the NQS SR method - tolerance
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_iter, int, 5000);	// solver for the NQS SR method - maximum number of iterations
 		// for collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_mc, uint, 1);		// number of samples - outer loop for collecting - excited states
 		UI_PARAM_CREATE_DEFAULT(nqs_ex_th, uint, 0);		// thermalize when collecting - excited states
@@ -471,14 +483,21 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bn, uint, 100);		// number of inner blocks for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
 		// learning rate
-		UI_PARAM_CREATE_DEFAULTD(lr, double, 1);
+		UI_PARAM_CREATE_DEFAULT(nqs_sch, int, 0);			// learning rate scheduler - 0 - constant, 1 - exponential decay (default), 2 - step decay, 3 - cosine decay, 4 - adaptive
+		UI_PARAM_CREATE_DEFAULTD(nqs_lr, double, 1e-3);		// learning rate (initial)
+		UI_PARAM_CREATE_DEFAULTD(nqs_lrd, double, 0.96);	// learning rate decay
+		UI_PARAM_CREATE_DEFAULT(nqs_lr_pat, int, 10);		// learning rate decay pattern
+		// early stopping
+		UI_PARAM_CREATE_DEFAULT(nqs_es_pat, int, 5);		// use the early stopping
+		UI_PARAM_CREATE_DEFAULTD(nqs_es_del, double, 1e-3);	// patience for the early stopping
+		UI_PARAM_CREATE_DEFAULT(nqs_ed, bool, false);		// use the exact diagonalization for the NQS
 		// weight load directory
 		inline static const std::string _loadNQS	= ""; 
 		std::string loadNQS_								= "";
 
 		void setDefault() 
 		{
-			UI_PARAM_SET_DEFAULT(nHidden);
+			UI_PARAM_SET_DEFAULT(nqs_nh);
 			UI_PARAM_SET_DEFAULT(nVisible);
 			UI_PARAM_SET_DEFAULT(nLayers);
 			UI_PARAM_SET_DEFAULT(nFlips);
@@ -487,7 +506,7 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_tr_mc);
 			UI_PARAM_SET_DEFAULT(nqs_tr_bs);
 			UI_PARAM_SET_DEFAULT(nqs_tr_th);
-			UI_PARAM_SET_DEFAULT(lr);
+			UI_PARAM_SET_DEFAULT(nqs_lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
 			// collection
 			UI_PARAM_SET_DEFAULT(nqs_col_mc);
@@ -719,10 +738,10 @@ inline void UI::setDefaultMap()
 {
 	this->defaultParams = {
 		UI_OTHER_MAP(nqs	, this->nqsP.type_			, FHANDLE_PARAM_DEFAULT),			// type of the NQS state	
-		// UI_OTHER_MAP(m		, this->nqsP.nMcSteps_		, FHANDLE_PARAM_HIGHER0),			// mcsteps	
-		// UI_OTHER_MAP(nb		, this->nqsP.nBlocks_		, FHANDLE_PARAM_HIGHER0),			// number of blocks
-		// UI_OTHER_MAP(bs		, this->nqsP.blockSize_		, FHANDLE_PARAM_HIGHER0),			// block size
-		UI_OTHER_MAP(nh		, this->nqsP.nHidden_		, FHANDLE_PARAM_HIGHER0),			// hidden params
+		// UI_OTHER_MAP(m		, this->nqsP.nMcSteps_		, FHANDLE_PARAM_HIGHER0),		// mcsteps	
+		// UI_OTHER_MAP(nb		, this->nqsP.nBlocks_		, FHANDLE_PARAM_HIGHER0),		// number of blocks
+		// UI_OTHER_MAP(bs		, this->nqsP.blockSize_		, FHANDLE_PARAM_HIGHER0),		// block size
+		UI_OTHER_MAP(nh		, this->nqsP.nqs_nh_		, FHANDLE_PARAM_HIGHER0),			// hidden params
 		UI_OTHER_MAP(nf		, this->nqsP.nFlips_		, FHANDLE_PARAM_HIGHER0),			// flip number
 		// for collecting in nqs
 		// UI_OTHER_MAP(bsS	, this->nqsP.blockSizeS_	, FHANDLE_PARAM_HIGHER0),			// block size samples

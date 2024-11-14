@@ -40,26 +40,36 @@
 #if defined NQS_USE_VEC_ONLY
 	#define NQS_STATE this->curVec_
 	#define NQS_STATE_T const NQSS&
+	#define NQS_ROW_T arma::Row<_T>
 #else 
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 
 #endif
 
 // optimize the gradient descent with Stochastic Reconfiguration (SR)
-#define NQS_USESR							
-#ifdef NQS_USESR							
+#define NQS_USESR
+#define NQS_LOWER_RATIO_LOGDIFF 
+// #define NQS_CHECK_NAN
+
+// --------------- STOCHASTIC RECONFIGURATION ---------------
+#ifdef NQS_USESR						
 
 // skip the matrix construction for the SR
-	// #define NQS_USESR_NOMAT
+#	define NQS_USESR_NOMAT
+
+// check whether we have SR without matrix
+#	if defined NQS_USESR_NOMAT
+#		define NQS_USESR_NOMAT_USED
+# 	else
+#		define NQS_USESR_MAT_USED
+#	endif
+
 
 // how to handle the inverse of the matrix (if needed)
-#	define NQS_PINV					
-// regularization for the covariance matrix	
-// #	define NQS_SREG													
-// shall one use the iterative solver without constructing the full matrix explicitly?						  
+#	define NQS_SREG_ATTEMPTS 5
+#   define NQS_SREG_GRAD_NORM_THRESHOLD 1e3
 #endif										
 // ##########################################################
-
 
 // ######### NQS TYPES #############
 enum NQSTYPES					// #
@@ -110,6 +120,14 @@ struct CondVarKernel
 
 // #######################################################################################
 
+// #################################
+#ifndef ML_H					// #
+#	include "../../../source/src/Include/ml.h"
+#endif // !ML_H					// #
+// #################################
+
+// #######################################################################################
+
 struct NQS_train_t
 {
 	NQS_train_t() 	= default;
@@ -128,26 +146,55 @@ struct NQS_train_t
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+
 struct NQS_info_t
 {
-    using u64                       =       uint64_t;
+    using u64                       			=       uint64_t;
 
     // simulation specific
-    double lr_						=		1e-3;					// specific learning rate for the NQS - either for gradient descent or stochastic reconfiguration
-	double pinv_ 					= 		-1;						// pseudoinverse for the NQS
-	
-    // architecture specific
-    uint nVis_						=		1;						// number of visible neurons (input variables)
-    uint nSites_					=		1;						// number of lattice sites or fermionic modes
-    uint fullSize_					=		1;						// full number of the parameters (for memory purpose)
+	MachineLearning::Parameters* p_				=		nullptr;
 
-    // Hilbert space info
-    u64 Nh_							=		1;						// Hilbert space size (number of basis states)
-    uint nParticles_				=		1;						// number of particles in the system (if applicable)
-    bool conservesParticles_		=		true;					// whether the system conserves the number of particles
+	// regarding the iterative solvers
+	int solver_									=		1;						// solver for the NQS with SR
+	int maxIter_								= 		5000;					// maximum number of iterations
+	double tol_									=		1e-5;					// tolerance for iterative solvers
+	void setSolver(int _s, int i, double _tol)									{ this->solver_ = _s; this->maxIter_ = i; this->tol_ = _tol; };
 
-    // normalization
-    double norm_					=		0.0;					// normalization factor for the state vector
+	double pinv_ 								= 		-1;						// pseudoinverse for the NQS
+
+    // architecture specific			
+    uint nVis_									=		1;						// number of visible neurons (input variables)
+    uint nSites_								=		1;						// number of lattice sites or fermionic modes
+    uint fullSize_								=		1;						// full number of the parameters (for memory purpose)
+
+    // Hilbert space info			
+    u64 Nh_										=		1;						// Hilbert space size (number of basis states)
+    uint nParticles_							=		1;						// number of particles in the system (if applicable)
+    bool conservesParticles_					=		true;					// whether the system conserves the number of particles
+
+	// training related
+	double lr_									=		1e-3;					// learning rate
+	double lr(size_t epoch, double _metric) const								{ return this->p_ ? (*this->p_)(epoch, _metric) : this->lr_; };
+
+	// early stopping
+	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)					{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); };	
+	bool stop(size_t epoch, double _metric = 0.0)								{ if (this->p_) return this->p_->stop(epoch, _metric); else return false; };
+	bool stop(size_t epoch, std::complex<double> _metric)						{ if (this->p_) return this->p_->stop(epoch, std::real(_metric)); else return false; };
+	double best() const															{ return this->p_ ? this->p_->best() : 0.0; };
+
+	// regularization related
+	MachineLearning::Parameters* s_ =		nullptr;							// regularization scheduler
+	double sreg_					=		1e-7;								// regularization for the covariance matrix
+	double sreg(size_t epoch, double _metric) const								{ return this->s_ ? (*this->s_)(epoch, _metric) : this->sreg_; };
+
+	// ---------------------------------------------------------------
+
+	NQS_info_t() 					= 		default;
+	~NQS_info_t();
+
+	// ---------------------------------------------------------------
+
+	void saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////

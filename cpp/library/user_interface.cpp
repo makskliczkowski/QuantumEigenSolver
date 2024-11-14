@@ -87,6 +87,18 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_tr_th);
 		SETOPTION(nqsP,	nqs_tr_pinv);
 		SETOPTION(nqsP,	nqs_tr_pc);
+		// scheduler for the regularization
+		SETOPTION(nqsP,	nqs_tr_reg);
+		SETOPTION(nqsP,	nqs_tr_regs);
+		SETOPTION(nqsP,	nqs_tr_regd);
+		SETOPTION(nqsP,	nqs_tr_regp);
+		// preconditioner
+		SETOPTION(nqsP,	nqs_tr_prec);
+		// solver type
+		SETOPTION(nqsP,	nqs_tr_sol);
+		SETOPTION(nqsP, nqs_tr_tol); 
+		SETOPTION(nqsP, nqs_tr_iter);
+
 		// collecting - excited
 		SETOPTION(nqsP,	nqs_ex_mc);
 		SETOPTION(nqsP,	nqs_ex_bn);
@@ -100,11 +112,21 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_col_th);	
 		SETOPTION(nqsP,	nqs_col_bs);	
 
-		SETOPTIONV(nqsP, nHidden, "nh");
-		SETOPTION(nqsP,	nFlips);
-		SETOPTIONV(nqsP,	type, 		"nqst");
-		SETOPTION(nqsP,		lr					);
-		SETOPTIONV(nqsP,	loadNQS,	"lNQS"	);
+		// learming rate
+		SETOPTION(nqsP,  nqs_sch);
+		SETOPTION(nqsP,	 nqs_lr);
+		SETOPTION(nqsP,  nqs_lrd);
+		SETOPTION(nqsP,  nqs_lr_pat);
+
+		// early stopping
+		SETOPTION(nqsP,  nqs_es_pat);
+		SETOPTION(nqsP,  nqs_es_del);
+
+		SETOPTION(nqsP, nqs_nh);
+		SETOPTION(nqsP,	 nFlips);
+		SETOPTIONV(nqsP, type, 		"nqst");
+		SETOPTIONV(nqsP, loadNQS,	"lNQS"	);
+		SETOPTION(nqsP,  nqs_ed				);
 	}
 	// ----------------- LATTICE -----------------
 	{
@@ -120,6 +142,13 @@ void UI::parseModel(int argc, cmdArg& argv)
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
 		Ns *= 2;
+	// for now, we set the number of sites in the NQS to the total number of sites from the lattice
+	// !TODO: change this to be more flexible and allow for different number of sites in the NQS (without the need to have the lattice)
+	nqsP.nVisible_ = Ns;
+	if (nqsP.nqs_nh_ < 0)
+		this->nqsP.nqs_nh_ = (int)std::abs(nqsP.nqs_nh_ * Ns);
+	
+
 	// ------------------ MODEL ------------------
 	{
 		// model type

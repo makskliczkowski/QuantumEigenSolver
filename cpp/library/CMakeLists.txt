@@ -124,8 +124,15 @@ set(SOURCES
     ${CPPSOURCE}/exceptions.cpp 
     ${CPPSOURCE}/str.cpp 
     ${CPPSOURCE}/ui.cpp 
+    ${CPPSOURCE}/time.cpp
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
+    ${CPPSOURCE}/LinearAlgebra/solvers.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
+    ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
+    ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
 )
 
 # Set the include directories
@@ -265,13 +272,26 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 message(STATUS "Using Compiler: ${CMAKE_CXX_COMPILER}")
 if (OS_PLATFORM STREQUAL "linux")
     if (CMAKE_CXX_COMPILER STREQUAL "icpx")
+        message (STATUS "\tUsing Intel compilers")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -qopenmp")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -qopenmp -D_DEBUG")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -qopenmp")
+
+        # linker
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp")
+        # Replace any instance of -fopenmp with -qopenmp if necessary
+        string(REPLACE "-fopenmp" "-qopenmp" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        string(REPLACE "-fopenmp" "-qopenmp" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+        string(REPLACE "-fopenmp" "-qopenmp" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     else()
+        message (STATUS "\tUsing GCC compilers")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp -D_DEBUG")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp")
     endif()
 elseif (OS_PLATFORM STREQUAL "windows")
+    message (STATUS "\tUsing MSVC compilers")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /FS /bigobj /DMKL_ILP64 /Qiopenmp /D_DEBUG")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /FS /bigobj /DMKL_ILP64 /Qiopenmp")
 endif()
@@ -310,6 +330,16 @@ add_custom_target(build_rel_reg
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
     COMMAND ${CMAKE_COMMAND} -DNQS_SREG
     COMMAND ${CMAKE_COMMAND} --build .
+)
+
+# Clear target to remove build artifacts
+add_custom_target(clear
+    COMMAND ${CMAKE_COMMAND} --build . --target clean
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/CMakeFiles
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/CMakeCache.txt
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/Makefile
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/cmake_install.cmake
+    COMMENT "Removing all build files and resetting the build directory."
 )
 
 ###################################################################################################

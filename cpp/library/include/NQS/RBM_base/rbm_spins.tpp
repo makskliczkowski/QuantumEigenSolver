@@ -7,6 +7,12 @@
 #ifndef RBM_2_H
 #define RBM_2_H
 
+#ifdef SPIN
+#	define RBM_SPIN_UPD(_val) -2.0 * _val
+#else
+#	define RBM_SPIN_UPD(_val) 1.0 - 2.0 * _val
+#endif
+
 /*
 * @brief Template NQS for Spins (hardcore bosons)
 */
@@ -50,11 +56,8 @@ template<typename _Ht, typename _T, class _stateType>
 inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 {
 	// set the first value of b_visible
-#ifdef SPIN
-	_T val			=	-2.0 * fV;
-#else
-	_T val			=	1.0 - 2.0 * fV;
-#endif
+	_T val 			= 	RBM_SPIN_UPD(fV);
+
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
 	//val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_));
@@ -88,7 +91,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	// set the starting point
 	_T val				=	0;
 	// save the temporary angles
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#ifdef NQS_NOT_OMP_MT
 	auto thId				= std::this_thread::get_id();
 	this->thetaTmp_[thId]	= this->theta_;
 #else
@@ -99,13 +102,9 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	{
 		auto flipPlace	=	this->flipPlaces_[i];
 		auto flipVal	=	this->flipVals_[i];
-		// set the first value of b_visible
-#ifdef SPIN
-		_T currVal		=	-2.0 * flipVal;
-#else
-		_T currVal		=	1.0 - 2.0 * flipVal;
-#endif
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+		_T currVal		=	RBM_SPIN_UPD(flipVal);
+
+#ifdef NQS_NOT_OMP_MT
 		this->thetaTmp_[thId] += currVal * this->W_.col(flipPlace);
 #else
 		this->thetaTmp_ += currVal * this->W_.col(flipPlace);
@@ -114,7 +113,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
-#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#	ifdef NQS_NOT_OMP_MT
 	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 #	else
 	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
@@ -185,7 +184,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	_T val			= 0;
 	auto currVal	= 0.0;
 	// make temporary angles vector
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#ifdef NQS_NOT_OMP_MT
 	this->thetaTmp_[thId] = this->theta_;
 #else
 	auto thetaTmp_ = this->theta_;
@@ -195,14 +194,10 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	{
 		auto flipPlace	= *(fP.begin() + i);
 		auto flipVal	= *(fV.begin() + i);
-		// set the first value of b_visible
-#ifdef SPIN
-		currVal		= -2.0 * flipVal;
-#else
-		currVal		= 1.0 - 2.0 * flipVal;
-#endif
+		currVal			= RBM_SPIN_UPD(flipVal);
+
 		// !TODO speed this up by not creating thetaTMP
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#ifdef NQS_NOT_OMP_MT
 		this->thetaTmp_[thId]	+= currVal * this->W_.col(flipPlace);
 #else
 		thetaTmp_				+= currVal * this->W_.col(flipPlace);
@@ -211,7 +206,7 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, s
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
-#	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
+#	ifdef NQS_NOT_OMP_MT
 	val = std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 #	else
 	val = std::exp(val) * arma::prod(arma::cosh(thetaTmp_) / this->thetaCOSH_);
