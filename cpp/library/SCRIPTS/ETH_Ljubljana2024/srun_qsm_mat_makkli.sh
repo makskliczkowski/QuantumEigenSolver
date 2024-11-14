@@ -10,6 +10,7 @@ TIM=$3
 MEM=$4
 CPU=$5
 FUN=$6
+# comment
 
 RUN_DIR=/home/makkli4548/CODES/QuantumEigenSolver/cpp/library/
 cd ${RUN_DIR}
