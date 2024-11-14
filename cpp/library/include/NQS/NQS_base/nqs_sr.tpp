@@ -70,7 +70,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 										this->info_p_.tol_,                  		 							// Tolerance
 										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
 										&_inversionSuccess,														// Convergence flag						
-										this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
+										this->info_p_.sreg_ //this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
 										);
 #endif
     this->updateWeights_ = _inversionSuccess;

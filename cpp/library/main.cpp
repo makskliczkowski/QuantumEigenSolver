@@ -4,6 +4,7 @@
 //#ifdef _DEBUG
  //#	include "vld.h"
 //#endif
+#include "source/src/lin_alg.h"
 constexpr auto ARMA_VEC_SEED = 0;
 
 // %%%%%%%%%%%%% N Q S %%%%%%%%%%%%%%%
@@ -24,7 +25,45 @@ int main(const int argc, char* argv[])
 	SET_LOG_TIME();
 
 	auto ui = std::make_unique<UI>(argc, argv);
-	ui->funChoice();
+	// ui->funChoice();
+
+	{
+		// test the solvers
+		auto _eps 				= 1e-10;
+		auto _max_iter 			= 1000;
+		auto _reg 				= -1.0;
+
+		// without preconditioner
+		{
+			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = nullptr;
+			
+			auto _type 				= algebra::Solvers::General::Type::ConjugateGradient;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			_type 					= algebra::Solvers::General::Type::MINRES;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			_type 					= algebra::Solvers::General::Type::MINRES_QLP;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			delete _preconditioner;
+		}
+		// with preconditioner
+		{
+			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = new algebra::Solvers::Preconditioners::IdentityPreconditioner<cpx, true>;
+			
+			auto _type 				= algebra::Solvers::General::Type::ConjugateGradient;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			_type 					= algebra::Solvers::General::Type::MINRES;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			_type 					= algebra::Solvers::General::Type::MINRES_QLP;
+			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+
+			delete _preconditioner;
+		}
+	}
 
 	// create GOE matrix and test Lanczos on it
 	//randomGen* r			= new randomGen(169);
