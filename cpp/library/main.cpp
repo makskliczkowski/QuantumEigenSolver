@@ -50,7 +50,9 @@ int main(const int argc, char* argv[])
 		}
 		// with preconditioner
 		{
-			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = new algebra::Solvers::Preconditioners::IdentityPreconditioner<cpx, true>;
+			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = new algebra::Solvers::Preconditioners::JacobiPreconditioner<cpx, true>;
+			auto [A, b]				= algebra::Solvers::General::solve_test_mat_vec<cpx>();
+			_preconditioner->set(A, false);
 			
 			auto _type 				= algebra::Solvers::General::Type::ConjugateGradient;
 			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);

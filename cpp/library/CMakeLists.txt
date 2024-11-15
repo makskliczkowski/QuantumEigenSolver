@@ -108,32 +108,13 @@ link_directories("${HDF5_LIB_DIR}")
 
 ##########################################################################
 
-# src/
-# ├── user_interface/
-# │   ├── ui_check_eth.cpp
-# │   ├── ui_check_nqs.cpp
-# │   ├── ui_check_quadratic.cpp
-# │   └── ui_check_symmetries.cpp
-# ├── LinearAlgebra/
-# │   ├── Solvers/
-# │   │   ├── solvers_cg.cpp
-# │   │   ├── solvers_minres.cpp
-# │   │   └── solvers_minresqlp.cpp
-# │   ├── preconditioners.cpp
-# │   └── pfaffian.cpp
-# ├── Lattices/
-# │   ├── hexagonal.cpp
-# │   └── square.cpp
-# ├── nqs.cpp
-# └── operator_parser.cpp
 # Find all .cpp files recursively in the CPPSOURCE directory
 file(GLOB_RECURSE SOURCES 
     ${CPPSOURCE}/*.cpp
 )
 
 # Set the source files
-# Add additional specific sources if needed
-list(APPEND SOURCES 
+set(SOURCES 
     main.cpp 
     operators.cpp 
     user_interface.cpp 
@@ -141,6 +122,23 @@ list(APPEND SOURCES
     src/user_interface/ui_check_nqs.cpp
     src/user_interface/ui_check_quadratic.cpp
     src/user_interface/ui_check_symmetries.cpp
+    src/nqs.cpp
+    src/operator_parser.cpp
+    ${CPPSOURCE}/common.cpp 
+    ${CPPSOURCE}/directories.cpp 
+    ${CPPSOURCE}/exceptions.cpp 
+    ${CPPSOURCE}/str.cpp 
+    ${CPPSOURCE}/ui.cpp 
+    ${CPPSOURCE}/time.cpp
+    ${CPPSOURCE}/maths.cpp
+    ${CPPSOURCE}/Lattices/hexagonal.cpp 
+    ${CPPSOURCE}/Lattices/square.cpp
+    ${CPPSOURCE}/LinearAlgebra/solvers.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
+    ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
+    ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
 )
 
 # Set the include directories
