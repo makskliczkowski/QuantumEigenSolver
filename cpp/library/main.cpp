@@ -37,7 +37,7 @@ int main(const int argc, char* argv[])
 		LOGINFO("Using real now...", LOG_TYPES::TRACE, 50, 'x', 0);
 		// real 
 		// if (true)
-		if (false)
+		if (true)
 		{
 			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, false);
 			LOGINFO(5);
@@ -49,7 +49,7 @@ int main(const int argc, char* argv[])
 		_preconditionerType = 1;
 		// real with preconditioner
 		// if (true)
-		if (false)
+		if (true)
 		{
 			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, false);
 			LOGINFO(5);
@@ -71,7 +71,7 @@ int main(const int argc, char* argv[])
 			LOGINFO(5);
 		}
 		// add preconditioner
-		if (false)
+		if (true)
 		{
 			_preconditionerType = 1;
 			// complex with preconditioner
