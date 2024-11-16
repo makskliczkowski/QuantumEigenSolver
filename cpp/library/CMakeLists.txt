@@ -134,6 +134,7 @@ set(SOURCES
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
     ${CPPSOURCE}/LinearAlgebra/solvers.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arnoldi.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp

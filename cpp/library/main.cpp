@@ -29,41 +29,57 @@ int main(const int argc, char* argv[])
 
 	{
 		// test the solvers
-		auto _eps 				= 1e-10;
+		auto _eps 				= 1e-13;
 		auto _max_iter 			= 1000;
-		auto _reg 				= -1.0;
+		auto _reg 				= 1e-15;
 
-		// without preconditioner
+		auto _preconditionerType = -1;
+		LOGINFO("Using real now...", LOG_TYPES::TRACE, 50, 'x', 0);
+		// real 
+		// if (true)
+		if (false)
 		{
-			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = nullptr;
-			
-			auto _type 				= algebra::Solvers::General::Type::ConjugateGradient;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
-
-			_type 					= algebra::Solvers::General::Type::MINRES;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
-
-			_type 					= algebra::Solvers::General::Type::MINRES_QLP;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
-
-			delete _preconditioner;
+			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, false);
+			LOGINFO(5);
+			// make random
+			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, true);
+			LOGINFO(5);
 		}
-		// with preconditioner
+		// add preconditioner
+		_preconditionerType = 1;
+		// real with preconditioner
+		// if (true)
+		if (false)
 		{
-			algebra::Solvers::Preconditioners::Preconditioner<cpx, true>* _preconditioner = new algebra::Solvers::Preconditioners::JacobiPreconditioner<cpx, true>;
-			auto [A, b]				= algebra::Solvers::General::solve_test_mat_vec<cpx>();
-			_preconditioner->set(A, false);
-			
-			auto _type 				= algebra::Solvers::General::Type::ConjugateGradient;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
+			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, false);
+			LOGINFO(5);
+			// make random with preconditioner
+			algebra::Solvers::General::Tests::solve_test_multiple<double, true>(_eps, _max_iter, _reg, _preconditionerType, true);
+			LOGINFO(5);
+		}
 
-			_type 					= algebra::Solvers::General::Type::MINRES;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
-
-			_type 					= algebra::Solvers::General::Type::MINRES_QLP;
-			algebra::Solvers::General::solve_test<cpx, true>(_type, _eps, _max_iter, _reg, _preconditioner);
-
-			delete _preconditioner;
+		// complex 
+		LOGINFO("Using complex now...", LOG_TYPES::TRACE, 50, 'x', 0);
+		_preconditionerType = -1;
+		// if (true)
+		if (false)
+		{
+			algebra::Solvers::General::Tests::solve_test_multiple<cpx, true>(_eps, _max_iter, _reg, _preconditionerType, false);
+			LOGINFO(5);
+			// make random
+			algebra::Solvers::General::Tests::solve_test_multiple<cpx, true>(_eps, _max_iter, _reg, _preconditionerType, true);
+			LOGINFO(5);
+		}
+		// add preconditioner
+		if (true)
+		{
+			_preconditionerType = 1;
+			// complex with preconditioner
+			algebra::Solvers::General::Tests::solve_test_multiple<cpx, true>(_eps, _max_iter, _reg, _preconditionerType, false);
+			LOGINFO(5);
+			// make random with preconditioner
+			algebra::Solvers::General::Tests::solve_test_multiple<cpx, true>(_eps, _max_iter, _reg, _preconditionerType, true);
+			LOGINFO(5);
 		}
 	}
 
