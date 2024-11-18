@@ -89,8 +89,38 @@ protected:
 #ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
 #else 
-	algebra::Solvers::Preconditioners::Preconditioner<_T, true>* precond_ = nullptr;	// preconditioner for the conjugate gradient
+	algebra::Solvers::Preconditioners::Preconditioner<_T, true>* precond_ 	= nullptr;	// preconditioner for the conjugate gradient
+	algebra::Solvers::General::Solver<_T, true>* solver_ 					= nullptr;	// solver for the Fisher matrix inversion
 #endif
+public:
+	// preconditioner for solving the linear system
+	void setPreconditioner(int _pre) 									
+	{ 
+		if (_pre != 0) 
+		{ 
+			this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre);
+			LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3);
+		}
+	};
+	// solving method with the tolerance
+	void setSolver(int _sol, double _tol, int _maxiter = 1000, double _reg = -1.0)						
+	{ 
+		this->info_p_.setSolver(_sol, _maxiter, _tol); 
+		this->solver_ = algebra::Solvers::General::choose<_T, true>(_sol, this->info_p_.fullSize_, _tol, _maxiter, _reg);
+		LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(_maxiter), LOG_TYPES::CHOICE, 3); 
+	};
+
+	// if the pseudoinverse is used
+	void setPinv(double _pinv)											
+	{ 
+		this->info_p_.pinv_ = _pinv; 
+		if (_pinv > 0) 
+			LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); 
+		else 
+		LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); 
+	};
+
+protected:
 	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
 	NQSB F_;															// forces acting on the weights (F_k)
 
@@ -228,12 +258,6 @@ public:
 							double _sregd = 0.96, 
 							size_t _epo = 10, 
 							size_t _pat = 5)							{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler: " + STR(_sch) : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
-	// preconditioner for solving the linear system
-	void setPreconditioner(int _pre) 									{ if (_pre != 0) { this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre); LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3); } };
-	// solving method with the tolerance
-	void setSolver(int _sol, double _tol, int i)						{ this-> info_p_.setSolver(_sol, i, _tol); LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(i), LOG_TYPES::CHOICE, 3); };
-	// if the pseudoinverse is used
-	void setPinv(double _pinv)											{ this->info_p_.pinv_ = _pinv; if (_pinv > 0) LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); else LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); };
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -484,10 +508,17 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 		if (this->threads_.threads_[_thread].joinable())
 			this->threads_.threads_[_thread].join();
 #endif
+	// ######################################################################################################################################
 	if (this->precond_ != nullptr) {
 		delete this->precond_;
 		this->precond_ = nullptr;
 	}
+
+	if (this->solver_ != nullptr) {
+		delete this->solver_;
+		this->solver_ = nullptr;
+	}
+	// ######################################################################################################################################
 }
 
 // ##########################################################################################################################################

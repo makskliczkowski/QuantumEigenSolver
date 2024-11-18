@@ -136,6 +136,9 @@ set(SOURCES
     ${CPPSOURCE}/LinearAlgebra/solvers.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arnoldi.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arma.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_direct.cpp
+    ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_pseudo.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
     ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
