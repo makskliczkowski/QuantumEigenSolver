@@ -1,3 +1,5 @@
+
+
 # Quantum State Simulation: INI Configuration
 
 This document outlines the configuration parameters used in the quantum state simulation software. The parameters are organized into different sections, categorizing models and functionalities based on their features and characteristics.
