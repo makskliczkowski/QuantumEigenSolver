@@ -381,3 +381,8 @@ endif()
 
 # Output a message indicating the installation directory
 message(STATUS "Installing qsolver to ${CMAKE_INSTALL_PREFIX}")
+
+# add_custom_command(TARGET budiscovery POST_BUILD
+# COMMAND ${CMAKE_COMMAND} -E copy
+# ${CMAKE_BINARY_DIR}/libbulxi.so     # Replace with your built library path
+# ${CMAKE_BINARY_DIR}/../some/other/location/libbulxi.so)  # Destination path
