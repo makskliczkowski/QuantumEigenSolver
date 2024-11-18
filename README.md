@@ -1,4 +1,4 @@
-# Quantum State Simulation: INI Configuration
+# Quantum Eigensolver
 
 This project provides a comprehensive framework for simulating quantum states using various models and functionalities. It includes tools for testing symmetries, running simulations for quadratic Hamiltonians, and performing QSM ETH simulations. The project leverages advanced mathematical libraries and parallel computing techniques to ensure efficient and accurate simulations.
 
