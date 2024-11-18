@@ -7,7 +7,7 @@ It is a general solver for physical Hamiltonians. The work is in progress. Curre
 - Implementation of point and global symmetries for the systems.
 - the variational Quantum Monte Carlo solver for ansatz ground (and excited) states with RBM and RBM-PP ansatzes.
 
-For detailed documentation and usage instructions, please refer to the [project wiki]([https://github.com/your-repo/wiki](https://github.com/makskliczkowski/QuantumEigenSolver/wiki).
+For detailed documentation and usage instructions, please refer to the [project wiki](https://github.com/makskliczkowski/QuantumEigenSolver/wiki).
 
 Copyright 2024
 Maksymilian Kliczkowski
