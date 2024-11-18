@@ -1,19 +1,3 @@
-# Hamiltonian Solver
-
-This is the general solver for lattice Hamiltonians. The works is in progress but currently it includes:
-- ED
-- ED with symmetries
-- the variational Quantum Monte Carlo solver for ansatz ground state Jastrov functions
-
-The plan for the future is to extend it to either more than 1D Hamitlonians in the case of symmetries or add symmetries to the variational ansatz potentially 
-in higher dimensions and non-spin Hamiltonians.
-
-Copyright 2022 <br> 
-Maksymilian Kliczkowski <br> 
-PhD candidate <br> 
-Wroclaw University of Science and Technology <br> 
-maksymilian.kliczkowski.at.pwr.edu.pl <br> 
-
 # Quantum State Simulation: INI Configuration
 
 This document outlines the configuration parameters used in the quantum state simulation software. The parameters are organized into different sections, categorizing models and functionalities based on their features and characteristics.
