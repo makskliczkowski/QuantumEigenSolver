@@ -314,29 +314,35 @@ file(WRITE ${OUTPUT_FILE} "Compilation output will be redirected to ${OUTPUT_FIL
 add_custom_target(redirect_output ALL DEPENDS ${OUTPUT_FILE})
 
 add_custom_target(build_all
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
     COMMAND ${CMAKE_COMMAND} --build .
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
     COMMAND ${CMAKE_COMMAND} --build .
 )
 
 add_custom_target(build_deb
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
     COMMAND ${CMAKE_COMMAND} --build .
 )
 
 add_custom_target(build_deb_reg
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ..
     COMMAND ${CMAKE_COMMAND} -DNQS_SREG
     COMMAND ${CMAKE_COMMAND} --build .
 )
 
 add_custom_target(build_rel
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
     COMMAND ${CMAKE_COMMAND} --build .
 )
 
 add_custom_target(build_rel_reg
+    COMMAND rm -rf CMakeCache.txt
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
     COMMAND ${CMAKE_COMMAND} -DNQS_SREG
     COMMAND ${CMAKE_COMMAND} --build .
