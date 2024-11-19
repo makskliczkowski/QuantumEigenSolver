@@ -57,26 +57,127 @@ HDF5 is a file format and library for storing large amounts of data efficiently 
 
 ---
 
+---
+
+## Features
+
+- Cross-platform support (Linux and Windows).
+- Utilizes Intel MKL for high-performance linear algebra and numerical computations.
+- Leverages Armadillo for user-friendly matrix operations.
+- Supports HDF5 for efficient and portable data storage.
+- Implements `xorshiro256` for fast and high-quality random number generation.
+- Parallel processing support using OpenMP.
+- Modular design for ease of extension and customization.
+
+---
+
 ## File Structure
 
 ```plaintext
 QuantumEigenSolver/
-├── CMakeLists.txt        # Build configuration file
-├── src/                  # Source files
-│   ├── main.cpp          # Entry point of the application
-│   ├── solver.cpp        # Core solver implementation
-│   ├── rng.cpp           # xorshiro256 RNG implementation
-│   └── ...
-├── include/              # Header files
-│   ├── solver.h          # Solver declarations
-│   ├── rng.h             # Random number generator declarations
-│   └── ...
-├── lib/                  # External library integrations
-├── tests/                # Unit and integration tests
-├── data/                 # Sample input/output data
-├── docs/                 # Documentation files
-└── README.md             # Project overview
+├── CMakeLists.txt             # Build configuration file
+├── main.cpp                   # Entry point of the application
+├── operators.cpp              # Operator implementation
+├── src/                       # Source files
+│   ├── operator_parser.cpp
+│   ├── user_interface/        # User interface-related files
+│   │   ├── ui_check_eth.cpp
+│   │   ├── ui_check_nqs.cpp
+│   │   ├── ui_check_symmetries.cpp
+│   │   └── ui_check_quadratic.cpp
+│   └── nqs.cpp
+├── include/                   # Header files
+│   ├── quantities/            # Statistical quantities and calculations
+│   │   ├── density_matrix.h
+│   │   ├── thermal.h
+│   │   ├── entropy.h
+│   │   └── measure.h
+│   ├── models/                # Physical models
+│   │   ├── quadratic/
+│   │   │   ├── AubryAndre.h
+│   │   │   ├── FreeFermions.h
+│   │   │   ├── SYK2.h
+│   │   │   └── PowerLawRandomBanded.h
+│   │   ├── heisenberg-kitaev.h
+│   │   ├── XYZ.h
+│   │   ├── ultrametric.h
+│   │   ├── quantum_sun.h
+│   │   ├── heisenberg_dots.h
+│   │   ├── ising.h
+│   │   ├── rosenzweig-porter.h
+│   │   └── heisenberg.h
+│   ├── hamil.h
+│   ├── hamilQ.h
+│   ├── hamilF.h
+│   ├── NQS/                   # Neural Quantum States
+│   │   ├── NQS_base/
+│   │   │   ├── nqs.h
+│   │   │   └── nqs_definitions_base.h
+│   │   ├── RBM_PP_base/rbm_pp.h
+│   │   ├── RBM_base/rbm.h
+│   │   └── nqs_operator.h
+│   ├── hilbert_sym.h
+│   ├── user_interface/user_interface.h
+│   ├── algebra/               # Algebraic tools
+│   │   ├── quantities/
+│   │   │   ├── density_matrix.h
+│   │   │   ├── thermal.h
+│   │   │   ├── entropy.h
+│   │   │   └── measure.h
+│   │   ├── operators.h
+│   │   ├── operator_algebra.h
+│   │   ├── hilbert.h
+│   │   ├── general_operator.h
+│   │   └── global_symmetries.h
+│   └── rbm.h
+├── source/                    # External and utility source files
+│   ├── src/                   # Source files from the external library
+│   │   ├── binary.h
+│   │   ├── lin_alg.h
+│   │   ├── plotter.h
+│   │   ├── lattices.h
+│   │   ├── xoshiro_pp.h
+│   │   ├── Include/
+│   │   │   ├── random.h
+│   │   │   ├── str.h
+│   │   │   ├── directories.h
+│   │   │   ├── linalg/
+│   │   │   │   ├── generalized_matrix.h
+│   │   │   │   ├── diagonalizers.h
+│   │   │   └── exceptions.h
+│   │   ├── flog.h
+│   │   ├── Lattices/
+│   │   │   ├── square.h
+│   │   │   └── hexagonal.h
+│   │   ├── UserInterface/ui.h
+│   │   └── common.h
+│   └── cpp/
+│       ├── time.cpp
+│       ├── signatures.cpp
+│       ├── exceptions.cpp
+│       ├── str.cpp
+│       ├── ui.cpp
+│       ├── LinearAlgebra/
+│       │   ├── preconditioners.cpp
+│       │   ├── pfaffian.cpp
+│       │   ├── Solvers/
+│       │   │   ├── solvers_pseudo.cpp
+│       │   │   ├── solvers_direct.cpp
+│       │   │   ├── solvers_minres.cpp
+│       │   │   ├── solvers_arma.cpp
+│       │   │   ├── solvers_minresqlp.cpp
+│       │   │   ├── solvers_arnoldi.cpp
+│       │   │   └── solvers_cg.cpp
+│       │   └── solvers.cpp
+│       ├── directories.cpp
+│       ├── Lattices/
+│       │   ├── square.cpp
+│       │   └── hexagonal.cpp
+│       ├── common.cpp
+│       └── maths.cpp
+└── README.md                 # Project overview
 ```
+
 ## Installation Guide
 ### Step 1: Prerequisites
 
@@ -95,6 +196,9 @@ Ensure the following tools and libraries are installed:
     Optional:
         OpenMP (for parallel processing)
 ```
+Notes on source/
+
+The source/ directory contains files sourced from the external library GenUtils C++ Project[https://github.com/makskliczkowski/general_cpp] available as is. These files include utility functions, random number generators, and linear algebra utilities that are integrated into the project.
 
 ### Step 2: Clone the Repository
 
