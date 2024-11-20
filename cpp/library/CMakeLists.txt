@@ -139,8 +139,10 @@ set(SOURCES
     ${CPPSOURCE}/ui.cpp 
     ${CPPSOURCE}/time.cpp
     ${CPPSOURCE}/maths.cpp
+    ${CPPSOURCE}/Lattices/lattices.cpp 
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
+    ${CPPSOURCE}/Lattices/honeycomb.cpp
     ${CPPSOURCE}/LinearAlgebra/solvers.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arnoldi.cpp
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp

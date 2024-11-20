@@ -140,7 +140,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTIONVECTORRESIZE(latP, Ntots, 10);
 	}
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
-	if (latP.typ_ == LatticeTypes::HEX && latP.dim_ > 1)
+	if (latP.typ_ > LatticeTypes::SQ && latP.dim_ > 1)
 		Ns *= 2;
 	// for now, we set the number of sites in the NQS to the total number of sites from the lattice
 	// !TODO: change this to be more flexible and allow for different number of sites in the NQS (without the need to have the lattice)
@@ -433,6 +433,9 @@ bool UI::defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ)
 			break;
 		case LatticeTypes::HEX:
 			_lat = std::make_shared<HexagonalLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
+			break;
+		case LatticeTypes::HON:
+			_lat = std::make_shared<Honeycomb>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
 			break;
 		default:
 			_lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
