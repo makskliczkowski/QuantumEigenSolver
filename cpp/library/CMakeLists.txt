@@ -1,23 +1,20 @@
 cmake_minimum_required(VERSION 3.23.0)
-project(QuantumEigenSolver)
+# set version number
+set (QuantumEigenSolver_VERSION_MAJOR 1)
+project(QuantumEigenSolver VERSION ${QuantumEigenSolver_VERSION_MAJOR}.0.1)
 
 # Detect platform
 if (WIN32)
     set(OS_PLATFORM "windows")
     message(STATUS "Compiling on Windows")
-elseif (UNIX)
+elseif (UNIX AND NOT APPLE)
     set(OS_PLATFORM "linux")
     message(STATUS "Compiling on Linux")
+elseif (APPLE)  # adding apple support for macOS
+    set(OS_PLATFORM "macos")
+    message(STATUS "Compiling on macOS")
 else()
     message(FATAL_ERROR "Unsupported platform")
-endif()
-
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(OS_PLATFORM "linux")
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(OS_PLATFORM "windows")
-else()
-    message(FATAL_ERROR "Unsupported OS: ${CMAKE_SYSTEM_NAME}")
 endif()
 
 ##########################################################################
@@ -28,7 +25,7 @@ if (OS_PLATFORM STREQUAL "windows")
     set(CMAKE_CXX_COMPILER "$ENV{CXX}")
     set(COMPILER_LIBS_WIN "$ENV{ONE_API_COMPILER_LIB}")
     message(STATUS "Compiler libraries: ${COMPILER_LIBS_WIN}")
-else()
+elseif (OS_PLATFORM STREQUAL "linux")
     find_program(ICPX_COMPILER icpx)
     if (ICPX_COMPILER)
         set(CMAKE_C_COMPILER icx)
@@ -39,31 +36,38 @@ else()
         set(CMAKE_CXX_COMPILER "/usr/bin/g++")
         message(STATUS "Using GCC compilers")
     endif()
+else()
+    # macOS
+    set(CMAKE_C_COMPILER "/usr/bin/gcc")
+    set(CMAKE_CXX_COMPILER "/usr/bin/g++")
+    message(STATUS "Using compilers: ${CMAKE_C_COMPILER} ${CMAKE_CXX_COMPILER}")
 endif()
 
-message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
-message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "\tC compiler: ${CMAKE_C_COMPILER}")
+message(STATUS "\tC++ compiler: ${CMAKE_CXX_COMPILER}")
 
 ##########################################################################
 
-# Set variables necessary for the project
+# Set variables necessary for the project - this is additional library path comming from the source code (https://github.com/makskliczkowski/general_cpp)
 set(CPPSOURCE "${CMAKE_SOURCE_DIR}/source/cpp")
 
 ##########################################################################
 
-# Find the path of the MKL include directory using an environment variable
-find_path(MKL_INCL_DIR
-    NAMES "mkl.h"
-    PATHS "$ENV{MKL_INCL_DIR}"
-    DOC "Path to MKL include directory"
-)
+if (WIN32 OR UNIX AND NOT APPLE)
+    # Find the path of the MKL include directory using an environment variable
+    find_path(MKL_INCL_DIR
+        NAMES "mkl.h"
+        PATHS "$ENV{MKL_INCL_DIR}"
+        DOC "Path to MKL include directory")
 
-# Find the path of the MKL library directory using an environment variable
-find_path(MKL_LIB_DIR
-    NAMES "mkl_core.lib" "libmkl_core.so"
-    PATHS "$ENV{MKL_LIB_DIR}" "/usr/lib" "/usr/local/lib" "/opt/intel/mkl/lib"
-    DOC "Path to MKL library directory"
-)
+    # Find the path of the MKL library directory using an environment variable
+    find_path(MKL_LIB_DIR
+        NAMES "mkl_core.lib" "libmkl_core.so"
+        PATHS "$ENV{MKL_LIB_DIR}" "/usr/lib" "/usr/local/lib" "/opt/intel/mkl/lib"
+        DOC "Path to MKL library directory"
+    )
+endif()
+
 
 # Find the path of the HDF5 include directory using an environment variable or common paths
 find_path(HDF5_INCL_DIR
@@ -97,8 +101,12 @@ find_path(ARMADILLO_INCL_DIR
 ##########################################################################
 
 # Print the paths found
-message(STATUS "MKL include directory: ${MKL_INCL_DIR}")
-message(STATUS "MKL library directory: ${MKL_LIB_DIR}")
+if (WIN32 OR UNIX AND NOT APPLE)
+    message(STATUS "MKL include directory: ${MKL_INCL_DIR}")
+    message(STATUS "MKL library directory: ${MKL_LIB_DIR}")
+else()
+    message(STATUS "MKL not searched on macOS")
+endif()
 message(STATUS "Armadillo include directory: ${ARMADILLO_INCL_DIR}")
 message(STATUS "HDF5 include directory: ${HDF5_INCL_DIR}")
 message(STATUS "HDF5 library directory: ${HDF5_LIB_DIR}")
@@ -304,6 +312,11 @@ elseif (OS_PLATFORM STREQUAL "windows")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /FS /bigobj /DMKL_ILP64 /Qiopenmp /D_DEBUG")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /FS /bigobj /DMKL_ILP64 /Qiopenmp")
+elseif (OS_PLATFORM STREQUAL "macos")
+    message (STATUS "\tUsing Clang compilers")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp -D_DEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp")
 endif()
 
 # Redirect output to compilation.txt

@@ -181,3 +181,4 @@ dmypy.json
 *.o
 *.exe
 cpp/library/LOG/RANDOM_MODELS/log_qsm_mat_ns=7,-mod6-modRanN1000-modRanSeed0-modMidStates0.75-modEnDiff0.02-um_alpha0.6000-um_g1.0000-um_N3-eth_entro1-eth_ipr1-eth_susc1-eth_end0.1
+.vscode/settings.json
