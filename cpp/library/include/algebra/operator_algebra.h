@@ -1,5 +1,4 @@
 #pragma once
-#include "armadillo"
 #ifndef OPALG_H
 #define OPALG_H
 
