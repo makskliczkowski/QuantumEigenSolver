@@ -323,6 +323,12 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	}
 
 	// ------------------- CHECK NN --------------------
+
+#ifdef _DEBUG 
+	if (_elemId == 0)
+		std::cout << "Site: " << _site << " - ";
+#endif
+
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
 		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
@@ -330,6 +336,10 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 		// get the nearest neighbor
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
 		{
+			#ifdef _DEBUG 
+				if (_elemId == 0)
+					std::cout << nei << "[" << (N_NUMBER == 0 ? "Z" : (N_NUMBER == 1 ? "Y" : "X")) << "]" << " - ";
+			#endif
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj (diagonal elements)
 			auto [idx_z, val_z]		= Operators::SpinOperators::sig_z<_T>(_elem, this->Ns_, { _site });
@@ -355,6 +365,13 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 				this->setHElem(_elemId, this->Kx[_site] * algebra::real(val_x * val_x2), idx_x2);
 		}
 	}
+#ifdef _DEBUG
+	if (_elemId == 0)
+	{
+		std::cout << std::endl;
+		std::flush(std::cout);
+	}	
+#endif	
 }
 
 

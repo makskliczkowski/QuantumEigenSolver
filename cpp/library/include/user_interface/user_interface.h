@@ -77,6 +77,9 @@
 #ifndef HEXAGONAL_H										 // #
 #include "../../source/src/Lattices/hexagonal.h"		 // #
 #endif													 // #
+#ifndef HONEYCOMB_H										 // #
+#include "../../source/src/Lattices/honeycomb.h"		 // #
+#endif													 // #
 #endif													 // #
 // ##########################################################
 
@@ -755,7 +758,7 @@ inline void UI::setDefaultMap()
 		// ---------------- lattice parameters ----------------
 		UI_OTHER_MAP(d		, this->latP._dim			, FHANDLE_PARAM_BETWEEN(1., 3.)),
 		UI_OTHER_MAP(bc		, this->latP._bc			, FHANDLE_PARAM_BETWEEN(0., 3.)),
-		UI_OTHER_MAP(l		, this->latP._typ			, FHANDLE_PARAM_BETWEEN(0., 1.)),
+		UI_OTHER_MAP(l		, this->latP._typ			, FHANDLE_PARAM_BETWEEN(0., 5)),
 		UI_OTHER_MAP(lx		, this->latP._Lx			, FHANDLE_PARAM_HIGHER0),
 		UI_OTHER_MAP(ly		, this->latP._Ly			, FHANDLE_PARAM_HIGHER0),
 		UI_OTHER_MAP(lz		, this->latP._Lz			, FHANDLE_PARAM_HIGHER0),
