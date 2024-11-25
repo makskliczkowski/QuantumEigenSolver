@@ -6,7 +6,7 @@ usage() {
   echo "Options:"
   echo "  -rs          Remove source files after successful copy"
   echo "  -p <password>  Password for SSH authentication (use with caution)"
-  echo "Example: $0 -rs -p yourpassword user@remote:/path/to/destination directories.txt /path/to/local/directory"
+  echo "Example: $0 -rs -p yourpassword user@remote:/base/path directories.txt /local/destination"
   exit 1
 }
 
@@ -60,16 +60,14 @@ perform_rsync() {
   if [ -n "$PASSWORD" ]; then
     if $REMOVE_SOURCE_FILES; then
       sshpass -p "$PASSWORD" rsync -rv --ignore-existing --remove-source-files -e 'ssh -p 22' "$SRC" "$DST"
-      echo "Removing empty directories in: $DIR"
-      find "$DIR" -type d -empty -delete
+      find "$SRC" -type d -empty -delete
     else
       sshpass -p "$PASSWORD" rsync -rv --ignore-existing -e 'ssh -p 22' "$SRC" "$DST"
     fi
   else
     if $REMOVE_SOURCE_FILES; then
       rsync -rv --ignore-existing --remove-source-files -e 'ssh -p 22' "$SRC" "$DST"
-      echo "Removing empty directories in: $DIR"
-      find "$DIR" -type d -empty -delete
+      find "$SRC" -type d -empty -delete
     else
       rsync -rv --ignore-existing -e 'ssh -p 22' "$SRC" "$DST"
     fi
@@ -79,8 +77,10 @@ perform_rsync() {
 # Loop through the list of directories and copy them
 while IFS= read -r DIR; do
   if [ -d "$DIR" ]; then
-    echo "Syncing directory: $DIR to $REMOTE"
-    perform_rsync "$DIR/" "$REMOTE/"
+    # Append the directory path to the remote base path
+    REMOTE_DEST="$REMOTE/$DIR"
+    echo "Syncing directory: $DIR to $REMOTE_DEST"
+    perform_rsync "$DIR/" "$REMOTE_DEST/"
     if [ $? -eq 0 ]; then
       echo "Successfully synced: $DIR"
     else
