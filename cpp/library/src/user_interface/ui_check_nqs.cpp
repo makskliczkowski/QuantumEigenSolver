@@ -265,7 +265,7 @@ void UI::nqsExcited()
 		_H->clearEigVec();
 		
 		{
-			_H->diagH(false, 100, 0, 1000, 1e-15, "lanczos");				// get LANCZOS diagonalization
+			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");				// get LANCZOS diagonalization
 			
 			// measure the ground state and save the results				
 			const auto& _eigvec 	= _H->getEigVec();
@@ -323,6 +323,7 @@ void UI::nqsExcited()
 			_EN_std 			= std::get<1>(_out);
 			// _timer.checkpoint(VEQ(i) + "collect");
 			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+			
 			if (i == 0)
 				_EN_TESTS		= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), _measGS, true, nqsP.nqs_tr_pc_);
 			else if (i == 1)

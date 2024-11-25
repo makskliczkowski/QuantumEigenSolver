@@ -279,11 +279,22 @@ public:
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
-	bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet = false);	
+	// single
+	virtual bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet = false);	
+	virtual bool trainStep(size_t i, arma::Col<_T>& En,
+									arma::Col<_T>& meanEn, 
+									arma::Col<_T>& stdEn, 
+									const NQS_train_t& _par, const bool quiet, Timer& _timer);
+
 	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
 								bool quiet			= false,			// shall talk? (default is false)
 								clk::time_point _t	= NOW,				// time! (default is NOW)
 								uint progPrc		= 25);
+
+	// --------------------- C O L L E C T I N G ---------------------
+
+	// single 
+	virtual _T collect(const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, v_1d<_T>* _opvals, v_1d<_T>* _energies = nullptr, bool quiet = false, clk::time_point _t = NOW);
 
 	virtual arma::Col<_T> collect(const NQS_train_t& _par,
 								  bool quiet						= false,

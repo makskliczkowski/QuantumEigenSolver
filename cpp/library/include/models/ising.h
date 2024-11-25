@@ -146,18 +146,18 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	}
 
 	// -------------- CHECK NN ---------------
-	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
-		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
-		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) {
+	for (uint nn = 0; nn < NUM_OF_NN; nn++) 
+	{
+		const uint N_NUMBER = nn;
+		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
+		{
 			// Ising-like spin correlation
 			auto [idx_z, val_z]			=		Operators::sigma_z<_T>(_elem, this->Ns, { _site });
 			auto [idx_z2, val_z2]		=		Operators::sigma_z<_T>(idx_z, this->Ns, { (uint)nei });
 			//stout << "NEI:" << idx_z2 << ":" << val_z2 * val_z << EL;
 			//intToBase(idx_z2, tmp);
 			//stout << tmp.t() << EL << EL;
-			this->setHElem(_elemId, 
-								PARAM_W_DISORDER(J, _site) * (val_z * val_z2), 
-								idx_z2);
+			this->setHElem(_elemId, PARAM_W_DISORDER(J, _site) * (val_z * val_z2), idx_z2);
 		}
 	}
 	//stout << "____________________________" << EL << EL;
@@ -214,8 +214,8 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	// check the S_i^z * S_{i+1}^z
 	for (uint nn = 0; nn < (uint)this->lat_->get_nn_ForwardNum(_site); ++nn) 
 	{
-		auto N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
-		if (auto nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
+		const uint N_NUMBER = nn;
+		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
 		{
 			double _Sj	=	Binary::check(v, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 			_locVal		+=	PARAM_W_DISORDER(J, _site) * _Si * _Sj;
