@@ -21,34 +21,34 @@ public:
 	using NQSFun								= typename Hamiltonian<_T>::NQSFun;
 protected:
 	// ######################################### Parameters ########################################
-	v_1d<double> Kx;
-	v_1d<double> Ky;
-	v_1d<double> Kz;
-	v_1d<double> J;
-	v_1d<double> delta;
-	v_1d<double> hz;
-	v_1d<double> hx;
+	std::vector<double> Kx;
+	std::vector<double> Ky;
+	std::vector<double> Kz;
+	std::vector<double> J;
+	std::vector<double> delta;
+	std::vector<double> hz;
+	std::vector<double> hx;
 
 public:
 	// ######################################## Constructors ########################################
 	~HeisenbergKitaev()						{ LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 3); };
 	HeisenbergKitaev()						= default;
 	HeisenbergKitaev( const Hilbert::HilbertSpace<_T>& hilbert,
-							const v_1d<double>& _Kx,
-							const v_1d<double>& _Ky,
-							const v_1d<double>& _Kz,
-							const v_1d<double>& _J,
-							const v_1d<double>& _delta,
-							const v_1d<double>& _hz = {},
-							const v_1d<double>& _hx = {});
+							const std::vector<double>& _Kx,
+							const std::vector<double>& _Ky,
+							const std::vector<double>& _Kz,
+							const std::vector<double>& _J,
+							const std::vector<double>& _delta,
+							const std::vector<double>& _hz = {},
+							const std::vector<double>& _hx = {});
 	HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilbert,
-							const v_1d<double>& _Kx,
-							const v_1d<double>& _Ky,
-							const v_1d<double>& _Kz,
-							const v_1d<double>& _J,
-							const v_1d<double>& _delta,
-							const v_1d<double>& _hz = {},
-							const v_1d<double>& _hx = {});
+							const std::vector<double>& _Kx,
+							const std::vector<double>& _Ky,
+							const std::vector<double>& _Kz,
+							const std::vector<double>& _J,
+							const std::vector<double>& _delta,
+							const std::vector<double>& _hz = {},
+							const std::vector<double>& _hx = {});
 
 	// ########################################### Methods ###########################################
 	void locEnergy(u64 _elemId,
@@ -111,25 +111,25 @@ inline std::string HeisenbergKitaev<_T>::info(const strVec& skip, std::string se
 
 template<typename _T>
 inline HeisenbergKitaev<_T>::HeisenbergKitaev(const Hilbert::HilbertSpace<_T>& hilbert, 
-															 const v_1d<double>& _Kx,
-															 const v_1d<double>& _Ky,
-															 const v_1d<double>& _Kz,
-															 const v_1d<double>& _J,
-															 const v_1d<double>& _delta,
-															 const v_1d<double>& _hz,
-															 const v_1d<double>& _hx)
+															 const std::vector<double>& _Kx,
+															 const std::vector<double>& _Ky,
+															 const std::vector<double>& _Kz,
+															 const std::vector<double>& _J,
+															 const std::vector<double>& _delta,
+															 const std::vector<double>& _hz,
+															 const std::vector<double>& _hx)
 
 
 	: Hamiltonian<_T>(hilbert), Kx(_Kx), Ky(_Ky), Kz(_Kz), J(_J), delta(_delta)
 {
 	// handle perpendicular field
 	if (_hz.size() == 0)
-		this->hz = v_1d<double>(J.size(), 0.0);
+		this->hz = std::vector<double>(J.size(), 0.0);
 	else
 		this->hz = _hz;
 	// handle transverse field
 	if (_hx.size() == 0)
-		this->hx = v_1d<double>(J.size(), 0.0);
+		this->hx = std::vector<double>(J.size(), 0.0);
 	else
 		this->hx = _hx;
 
@@ -144,23 +144,23 @@ inline HeisenbergKitaev<_T>::HeisenbergKitaev(const Hilbert::HilbertSpace<_T>& h
 
 template<typename _T>
 inline HeisenbergKitaev<_T>::HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilbert, 
-															 const v_1d<double>& _Kx,
-															 const v_1d<double>& _Ky,
-															 const v_1d<double>& _Kz,
-															 const v_1d<double>& _J,
-															 const v_1d<double>& _delta,
-															 const v_1d<double>& _hz,
-															 const v_1d<double>& _hx)
+															 const std::vector<double>& _Kx,
+															 const std::vector<double>& _Ky,
+															 const std::vector<double>& _Kz,
+															 const std::vector<double>& _J,
+															 const std::vector<double>& _delta,
+															 const std::vector<double>& _hz,
+															 const std::vector<double>& _hx)
 	: Hamiltonian<_T>(std::move(hilbert)), Kx(_Kx), Ky(_Ky), Kz(_Kz), J(_J), delta(_delta)
 {
 	// handle perpendicular field
 	if (_hz.size() == 0)
-		this->hz = v_1d<double>(J.size(), 0.0);
+		this->hz = std::vector<double>(J.size(), 0.0);
 	else
 		this->hz = _hz;
 	// handle transverse field
 	if (_hx.size() == 0)
-		this->hx = v_1d<double>(J.size(), 0.0);
+		this->hx = std::vector<double>(J.size(), 0.0);
 	else
 		this->hx = _hx;
 
@@ -323,6 +323,12 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	}
 
 	// ------------------- CHECK NN --------------------
+
+#ifdef _DEBUG 
+	if (_elemId == 0)
+		std::cout << "Site: " << _site << " - ";
+#endif
+
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
 		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
@@ -330,6 +336,10 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 		// get the nearest neighbor
 		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
 		{
+			#ifdef _DEBUG 
+				if (_elemId == 0)
+					std::cout << nei << "[" << (N_NUMBER == 0 ? "Z" : (N_NUMBER == 1 ? "Y" : "X")) << "]" << " - ";
+			#endif
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj (diagonal elements)
 			auto [idx_z, val_z]		= Operators::SpinOperators::sig_z<_T>(_elem, this->Ns_, { _site });
@@ -355,6 +365,13 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 				this->setHElem(_elemId, this->Kx[_site] * algebra::real(val_x * val_x2), idx_x2);
 		}
 	}
+#ifdef _DEBUG
+	if (_elemId == 0)
+	{
+		std::cout << std::endl;
+		std::flush(std::cout);
+	}	
+#endif	
 }
 
 

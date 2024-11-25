@@ -59,19 +59,33 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 
 	if (this->precond_ != nullptr)
 		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, this->info_p_.sreg_);
+	
+	if (this->solver_ != nullptr) 
+	{
+		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
+		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
+							this->F_, 														// b
+							step <= 1 ? nullptr : &this->dF_, 								// x0
+							this->precond_);												// preconditioner
+		_inversionSuccess = this->solver_->isConverged();
+		this->dF_ = this->info_p_.lr_ * this->solver_->solution();							// get the solution
+	} 
+	else {
+		// !DEPRECATED - use solver class instead
+		this->dF_ = this->info_p_.lr_ * algebra::Solvers::FisherMatrix::solve<_T>(
+											this->info_p_.solver_,													// choose the solver type 
+											this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
+											this->derivativesCenteredH_,											// This should also match arma::Col<_T>
+											this->F_,               												// This should be of type arma::Col<_T>
+											step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
+											this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
+											this->info_p_.tol_,                  		 							// Tolerance
+											std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
+											&_inversionSuccess,														// Convergence flag						
+											this->info_p_.sreg_ //this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
+											);
+	}
 
-	this->dF_ = this->info_p_.lr_ * algebra::Solvers::FisherMatrix::solve<_T>(
-										this->info_p_.solver_,													// choose the solver type 
-										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
-										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
-										this->F_,               												// This should be of type arma::Col<_T>
-										step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
-										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
-										this->info_p_.tol_,                  		 							// Tolerance
-										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
-										&_inversionSuccess,														// Convergence flag						
-										this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
-										);
 #endif
     this->updateWeights_ = _inversionSuccess;
 }
