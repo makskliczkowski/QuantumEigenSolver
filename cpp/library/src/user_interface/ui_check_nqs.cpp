@@ -191,16 +191,20 @@ void UI::nqsExcited()
 	this->defineModel<_T>(_hilbert, _H);
 	
 	// define the NQS states for the excited states
-	arma::Col<_T> _meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _meansED(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
+	arma::Col<_T> _meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _meansED(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros),
+																					_meansLAN(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
+	// define the NQS states
 	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);
 	// define the first one already here for the ground state
 	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);
 	
-	_timer.reset();
-	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
-	LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
-	LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
-
+	{
+		_timer.reset();
+		LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
+		LOGINFO("Started building the NQS Hamiltonian", LOG_TYPES::TRACE, 1);
+		LOGINFO("Using: " + SSTR(getSTR_NQSTYPES(this->nqsP.type_)), LOG_TYPES::TRACE, 2);
+	}
+	
 	// get info
 	std::string nqsInfo		= _NQS[0]->getInfo();
 	std::string modelInfo	= _NQS[0]->getHamiltonianInfo();
@@ -223,45 +227,68 @@ void UI::nqsExcited()
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};
 	{
 		Operators::Operator<_T, uint> _SzL = Operators::SpinOperators::sig_z_l<_T>(Nvis);
-		_SzL.setNameS("Sz/L");
+		_SzL.setNameS("Sz");
 		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
 	}
-	NQSAv::MeasurementNQS<_T> _measGS(this->latP.lat, dir,  
-									_opsG, 
-									_opsL, 
-									_opsC, this->threadNum);
-	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir,  
-									{}, 
-									{}, 
-									{}, this->threadNum);
+	NQSAv::MeasurementNQS<_T> _measGS(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum), _measES = _measGS;
+	NQSAv::MeasurementNQS<_T> _measLAN(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum), _measLANES = _measLAN;
+	NQSAv::MeasurementNQS<_T> _meas(this->latP.lat, dir, {}, {}, {}, this->threadNum);
 
-	if (this->nqsP.nqs_ed_) {
-		_H->buildHamiltonian();
-
-		// try with the full diagonalization
-		if (Nh <= UI_LIMITS_NQS_FULLED) {
-			_H->diagH(false);
+	if (this->nqsP.nqs_ed_ && Nh <= ULLPOW(24)) 
+	{
+		_H->buildHamiltonian();	
+		arma::Col<_T> _mbsed, _exsed;											// build the Hamiltonian
+		if (Nh <= UI_LIMITS_NQS_FULLED) 
+		{																	// try with the full diagonalization
+			_H->diagH(false);												// diagonalize the Hamiltonian
 
 			// get the ground state and find the measurements
-			arma::Col<_T> _mbs = _H->getEigVec(0);
-			if(Nh < ULLPOW(7))
-				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
+			_mbsed = _H->getEigVec(0);
+			_exsed = _H->getEigVec(1);
+
+			if(Nh <= ULLPOW(7)) {
+				_H->prettyPrint(stout, _mbsed, latP.lat->get_Ns(), 1e-3);
+				_H->prettyPrint(stout, _exsed, latP.lat->get_Ns(), 1e-3);
+			}
 			
 			// save the measured quantities
-			_measGS.measure(_mbs, _hilbert);
-		
-			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
+			_measGS.measure(_mbsed, _hilbert);
+			_measES.measure(_exsed, _hilbert);
+
+			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 	// save the energies
+			{
 				_meansED(i) = _H->getEigVal(i);
 				LOGINFO("Found the ED (full) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
 			}
 		}
-		// get LANCZOS
+		_H->clearEigVal();
+		_H->clearEigVec();
+		
 		{
-			_H->diagH(false, 100, 0, 1000, 1e-10, "lanczos");
+			_H->diagH(false, 100, 0, 1000, 1e-15, "lanczos");				// get LANCZOS diagonalization
 			
-			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
-				_meansED(i) = _H->getEigVal(i);
-				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], prec), LOG_TYPES::INFO, 2);
+			// measure the ground state and save the results				
+			const auto& _eigvec 	= _H->getEigVec();
+			const auto& _krylov_mb 	= _H->getKrylov();
+			
+			auto _mbs 				= LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, 0);
+			auto _exs 				= LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, 1);
+			if(Nh <= ULLPOW(7)) {
+				_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
+				_H->prettyPrint(stout, _exs, latP.lat->get_Ns(), 1e-3);
+				// print the overlap
+				if (!_mbsed.is_empty()) {
+					LOGINFO("Overlap between the ED and Lanczos ground state: " + STRPS(arma::cdot(_mbsed, _mbs), prec), LOG_TYPES::INFO, 2);
+					LOGINFO("Overlap between the ED and Lanczos excited state: " + STRPS(arma::cdot(_exsed, _exs), prec), LOG_TYPES::INFO, 2);
+				}
+			}
+			_measLAN.measure(_mbs, _hilbert);
+			_measLANES.measure(_exs, _hilbert);
+
+			for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 	// save the energies
+			{
+				_meansLAN(i) = _H->getEigVal(i);
+				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansLAN[i], prec), LOG_TYPES::INFO, 2);
 			}
 		}
 		_H->clearEigVal();
@@ -275,9 +302,10 @@ void UI::nqsExcited()
 	LOGINFO(1);
 
 	// setup the energies container
-
 	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};
-	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
+	
+	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 
+	{
 		_timer.checkpoint(VEQ(i));
 
 		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_std;
@@ -295,15 +323,20 @@ void UI::nqsExcited()
 			_EN_std 			= std::get<1>(_out);
 			// _timer.checkpoint(VEQ(i) + "collect");
 			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
-			_EN_TESTS			= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), (i == 0) ? _measGS : _meas, true, nqsP.nqs_tr_pc_);
-
+			if (i == 0)
+				_EN_TESTS		= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), _measGS, true, nqsP.nqs_tr_pc_);
+			else if (i == 1)
+				_EN_TESTS		= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), _measES, true, nqsP.nqs_tr_pc_);
+			else
+				_EN_TESTS		= _NQS[i]->collect(_parC, this->quiet, _timer.point(VEQ(i)), _meas, true, nqsP.nqs_tr_pc_);
 
 			// calculate mean energies
 			{
-				const auto m_perc = 500;
-				int _elemIter 	= 0;
-				_meansNQS(i)	= 0.0;
-				for (int k = _EN_TRAIN.n_elem - 1; k >= 0; --k) {
+				const auto m_perc 	= 500;
+				int _elemIter 		= 0;
+				_meansNQS(i)		= 0.0;
+				for (int k = _EN_TRAIN.n_elem - 1; k >= 0; --k) 
+				{
 					if (!EQP(_EN_TRAIN(k), 0.0, 1e-6)) {
 						_meansNQS(i) += _EN_TRAIN(k);
 						_elemIter++;
@@ -332,15 +365,19 @@ void UI::nqsExcited()
 
 			// sumup true energies and those from NQS
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/" + STR(i), true);
+			saveAlgebraic(dir, "history.h5", _meansLAN, "LAN/" + STR(i), true);
 			saveAlgebraic(dir, "history.h5", _meansNQS, "NQS/" + STR(i), true);
 			saveAlgebraic(dir, "history.h5", arma::Col<double>(this->nqsP.nqs_ex_beta_), "betas", true);
 
 			// save info
 			_NQS[i]->saveInfo(dir, "history.h5", i);
 
-			if (i == 0) {
+			if (i <= 1) {
 				// save the measured quantities
-				_measGS.save();
+				_measGS.save({".h5"}, "ED_0_G", "ED_0_L", "ED_0_C");
+				_measES.save({".h5"}, "ED_1_G", "ED_1_L", "ED_1_C");
+				_measLAN.save({".h5"}, "OP_0_G", "OP_0_L", "OP_0_C");
+				_measLANES.save({".h5"}, "OP_1_G", "OP_1_L", "OP_1_C");
 			}
 		}
 

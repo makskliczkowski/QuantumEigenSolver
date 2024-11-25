@@ -65,8 +65,7 @@ set(CPPSOURCE "${CMAKE_SOURCE_DIR}/source/cpp")
 
 ##########################################################################
 
-if (WIN32 OR (UNIX AND NOT APPLE) AND NOT $ENV{USE_MKL})
-    # Find the path of the MKL include directory using an environment variable
+if (WIN32 OR (UNIX AND NOT APPLE) OR DEFINED ENV{USE_MKL})
     find_path(MKL_INCL_DIR
         NAMES "mkl.h"
         PATHS "$ENV{MKL_INCL_DIR}"
@@ -320,10 +319,10 @@ target_include_directories(qsolver PRIVATE ${INCLUDE_DIRS})
 
 # Link libraries to the executable
 # add linker flags for GNU ld
-if (UNIX AND NOT APPLE)
-    set(CMAKE_EXE_LINKER_FLAGS_S "${CMAKE_EXE_LINKER_FLAGS} ,--start-group")
-    set(CMAKE_EXE_LINKER_FLAGS_E "${CMAKE_EXE_LINKER_FLAGS} ,--end-group")
-endif()
+# if (UNIX AND NOT APPLE)
+#     set(CMAKE_EXE_LINKER_FLAGS_S "${CMAKE_EXE_LINKER_FLAGS} ,--start-group")
+#     set(CMAKE_EXE_LINKER_FLAGS_E "${CMAKE_EXE_LINKER_FLAGS} ,--end-group")
+# endif()
 
 # print the libraries
 message(STATUS "Libraries: ${CMAKE_EXE_LINKER_FLAGS_S}\n\t${MKL_CORE_LIBRARY}\n\t${MKL_SEQUENTIAL_LIBRARY}\n\t${MKL_RT_LIBRARY}\n\t${MKL_INTEL_ILP64_LIBRARY}\n\t${CMAKE_EXE_LINKER_FLAGS_E}\n\t${PTHREAD_LIBRARY}\n\t${DL_LIBRARY}\n\t${LIBHDF5_HL_LIBRARY}")

@@ -206,8 +206,10 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 	// ------------------- CHECK NN --------------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
-		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0)
+		const uint N_NUMBER = nn;//this->lat_->get_nn(_site);
+
+		// get the nearest neighbor
+		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
@@ -265,10 +267,10 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 	// ------------------- CHECK NN --------------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		const uint N_NUMBER = nn;//this->lat_->get_nn(_site);
 
 		// get the nearest neighbor
-		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0)
+		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
 		{
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj
@@ -331,10 +333,10 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		const uint N_NUMBER = this->lat_->get_nn_ForwardNum(_site, nn);
+		const uint N_NUMBER = nn;//this->lat_->get_nn(_site);
 
 		// get the nearest neighbor
-		if (int nei = this->lat_->get_nn(_site, N_NUMBER); nei >= 0) 
+		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
 		{
 			#ifdef _DEBUG 
 				if (_elemId == 0)

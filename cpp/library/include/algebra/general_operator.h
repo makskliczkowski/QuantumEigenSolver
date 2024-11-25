@@ -976,10 +976,6 @@ namespace Operators {
 	typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 		Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 	{
-	#ifdef _DEBUG
-		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-	#endif
-
 		_MatType<_TinMat> op(_dim, _dim);
 
 		// check whether the operator has an overriden matrix function
@@ -1015,10 +1011,6 @@ namespace Operators {
 	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
 	Operators::Operator<_T, _Ts...>::generateMat(_InT _dim, _Ts ..._arg) const
 	{
-	#ifdef _DEBUG
-		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-	#endif
-
 		GeneralizedMatrix<_TinMat> op(_dim);
 
 		// check whether the operator has an overriden matrix function
@@ -1380,10 +1372,6 @@ namespace Operators {
 	typename std::enable_if<HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, _MatType<_TinMat>>::type
 	OperatorComb<_T, _Ts...>::generateMat(_InT _dim, _Ts... _arg) const
 	{
-	#ifdef _DEBUG
-		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-	#endif
-	
 		_MatType<_TinMat> op(_dim, _dim);
 
 		// check whether the operator has an overriden matrix function
@@ -1407,11 +1395,7 @@ namespace Operators {
 	template<bool _standarize, typename _TinMat, template <class _TM> class _MatType, typename _InT>
 	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
 	OperatorComb<_T, _Ts...>::generateMat(_InT _dim, _Ts... _arg) const
-	{
-	#ifdef _DEBUG
-		LOGINFO("Creating operator matrix: " + VEQ(this->nameS_), LOG_TYPES::INFO, 3);
-	#endif
-		
+	{	
 		GeneralizedMatrix<_TinMat> op(_dim);
 
 		// check whether the operator has an overriden matrix function

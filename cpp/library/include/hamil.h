@@ -209,6 +209,7 @@ public:
 	auto getEigVec(u64 idx, u64 elem)					const -> _T									{ return this->eigVal_(elem, idx);												};				
 	auto getEigVec(std::string _dir, u64 _mid, 
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
+	auto getKrylov()									const -> const arma::Mat<_T>&				{ return this->K_;																};
 	// eigenvalues
 	auto getEigVal()									const -> const arma::vec&					{ return this->eigVal_;															};						
 	virtual auto getEigVal(std::string _dir,
