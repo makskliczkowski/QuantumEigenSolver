@@ -137,7 +137,8 @@ inline std::pair<arma::Col<_T>, arma::Col<_T>> NQS<_spinModes, _Ht, _T, _stateTy
 		// set the size of the containers for the lower states
 		this->lower_states_.setDerivContSize(_par.nblck_);
 	}
-	TIMER_CREATE(_timer);
+
+	Timer _timer;															// timer for the training
 	arma::Col<_T> meanEn(_par.MC_sam_, arma::fill::zeros);					// here we save the mean energy
 	arma::Col<_T> stdEn(_par.MC_sam_, arma::fill::zeros);					// here we save the standard deviation of the energy
 	arma::Col<_T> En(_par.nblck_, arma::fill::zeros);						// history of energies (for given weights) - here we save the local energies at each block
