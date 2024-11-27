@@ -39,6 +39,7 @@ protected:
 	// ------------------------- A N G L E S -------------------------
 	NQSB theta_;
 	NQSB thetaCOSH_;
+	NQSB thetaCOSH_log_;
 	// calculate the hiperbolic cosine of the function to obtain the ansatz
 	auto coshF(const NQSS& _v)		const -> NQSB			{ return arma::cosh(this->bH_ + this->W_ * _v);		};
 	auto coshF()					const -> NQSB			{ return arma::cosh(this->theta_);					};
@@ -173,6 +174,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(const NQSS& v)
 {
 	this->theta_		= this->bH_ + this->W_ * v;
 	this->thetaCOSH_	= this->coshF();
+	this->thetaCOSH_log_= arma::log(this->thetaCOSH_);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -250,6 +252,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 #endif
 	}
 	this->thetaCOSH_	=	this->coshF();
+	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -273,7 +276,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFl
 #endif
 	}
 	this->thetaCOSH_	=	this->coshF();
-
+	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
 }
 #endif
 
