@@ -61,14 +61,15 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
 	//val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_));
-	//val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / arma::cosh(this->theta_)));
-	val				=	std::exp(val * this->bV_(fP)) * arma::prod(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_);
+	// val				=	std::exp(val * this->bV_(fP)) * arma::prod(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_);
+	val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP))) - arma::log(this->thetaCOSH_));
+	val 			= 	std::exp(val);
 #else
 	// flip the temporary vector
 	this->tmpVec_	=	this->curVec_;
 	flip(this->tmpVec_, fP, Operators::_SPIN_RBM);
 	// calculate
-	val				=	val * this->bV_(fP) + arma::sum(arma::log(this->coshF(this->tmpVec_) / this->coshF(this->curVec_)));
+	val				=	val * this->bV_(fP) + arma::sum(arma::log(this->coshF(this->tmpVec_)) - arma::log(this->coshF(this->curVec_)));
 	val				=	std::exp(val);
 #endif
 	return val;
@@ -114,8 +115,10 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
 #	ifdef NQS_NOT_OMP_MT
+	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 #	else
+	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
 	val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
 #	endif
 #else
