@@ -47,25 +47,27 @@ public:
 
 	// ensure numerical stability
     const _T epsilon_ 					= 		std::numeric_limits<_T>::epsilon();
+	u64 accepted_ 						= 		0;						// number of accepted flips
+	u64 total_ 							= 		0;						// total number of flips
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
 	const uint spinModes_				=		_spinModes;				// number of spin modes -> e.g. 2 for hardcore bosons, 4 for fermions
 	const double discVal_				=		Operators::_SPIN_RBM;   // discrete value for the numbers in vector representation
+	bool updateWeights_ 				= 		true;					// shall update the weights in current step? (default is true)
+
 	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> H_;					// pointer to the Hamiltonian instance (for the energy calculation)
 
 protected:
 	std::string info_					=		"General NQS";
 	pBar pBar_;															// for printing out the progress
-
-	// Random number generator
 	randomGen ran_;														// consistent quick random number generator
 
-	/* ----------------------------------------------------------- */
-
 	// ---------------------- T H R E A D I N G ---------------------
+#ifdef NQS_NOT_OMP_MT
 	bool initThreads(uint _threadNum = 0);
 	NQS_thread_t<_T> threads_;											// thread information
+#endif
 
 	// ----------------------- T R A I N I N G ----------------------
 	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
@@ -75,7 +77,6 @@ protected:
 	NQSS curVec_;														// currently processed state vector for convenience
 	u64 curState_						=		0;						// currently processed state - may or may not be used
 	
-	// temporary placeholders for the vectors
 	v_1d<NQSS> tmpVecs_;												// temporary vectors for the flips
 	u64 tmpState_						=		0;						// temporary state for the flips
 	NQSS tmpVec_;														// temporary vector for the flips (for the current state)
@@ -93,62 +94,31 @@ protected:
 	algebra::Solvers::General::Solver<_T, true>* solver_ 					= nullptr;	// solver for the Fisher matrix inversion
 #endif
 public:
-	// preconditioner for solving the linear system
-	void setPreconditioner(int _pre) 									
-	{ 
-		if (_pre != 0) 
-		{ 
-			this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre);
-			LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3);
-		}
-	};
-	// solving method with the tolerance
-	void setSolver(int _sol, double _tol, int _maxiter = 1000, double _reg = -1.0)						
-	{ 
-		this->info_p_.setSolver(_sol, _maxiter, _tol); 
-		this->solver_ = algebra::Solvers::General::choose<_T, true>(_sol, this->info_p_.fullSize_, _tol, _maxiter, _reg);
-		LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(_maxiter), LOG_TYPES::CHOICE, 3); 
-	};
-
-	// if the pseudoinverse is used
-	void setPinv(double _pinv)											
-	{ 
-		this->info_p_.pinv_ = _pinv; 
-		if (_pinv > 0) 
-			LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); 
-		else 
-		LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); 
-	};
+	void setSolver(int _s, double _t, int _mi = 1000, double _r = -1.0);// solving method with the tolerance						
+	void setPreconditioner(int _pre);									// set the preconditioner						
+	void setPinv(double _pinv);											// if the pseudoinverse is used
 
 protected:
-	NQSB dF_;															// forces acting on the weights (F_k) - final gradient
-	NQSB F_;															// forces acting on the weights (F_k)
+	NQSB dF_;															// forces acting on the weights (F_k) - final gradient (dF)
+	NQSB F_;															// forces acting on the weights (F_k) - to be used for the SR
 
 protected:
 	// ----------------------- S T A R T E R S ----------------------
-	virtual void setInfo()								=			0;
-	virtual void allocate();
-	
-	/* ----------------------------------------------------------- */
-
+	virtual void setInfo()								=			0; 	// set the information about the NQS (e.g., type, number of hidden units, etc.)
+	virtual void allocate();											// allocate the memory for the NQS (e.g., vectors, matrices, etc.)
+		
 	// ------------------------ S E T T E R S -----------------------
-	// column vector state
-	virtual void setState(const NQSS& _st, bool _set)	=			0;
-	virtual void setState(const NQSS& _st);
-	// integer state
-	virtual void setState(u64 _st, bool _set)			=			0;
+	virtual void setState(const NQSS& _st, bool _set)	=			0;	// column vector state
+	virtual void setState(const NQSS& _st);								// column vector state (set the current state)
+	virtual void setState(u64 _st, bool _set)			=			0; 	// set the state (integer)
 	virtual void setState(u64 _st);
 	
 	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips()					=			0;	// important for the flipPlaces_ and flipVals_ to be set!
-
-	// apply flips to the temporary vector or the current vector according the template
-	virtual void applyFlipsT()							=			0;	// apply flips to the temporary vector
-	virtual void applyFlipsC()							=			0;	// apply flips to the current vector
-	
-	virtual void unapplyFlipsT()						{ this->applyFlipsT(); }; // unapply flips of the temporary vector according the template
+	virtual void chooseRandomFlips()					=			0;	// important for the flipPlaces_ and flipVals_ to be set! - choose random flips
+	virtual void applyFlipsT()							=			0;	// apply flips to the temporary vector (tmpVec_)
+	virtual void applyFlipsC()							=			0;	// apply flips to the current vector (curVec_)	
+	virtual void unapplyFlipsT()						{ this->applyFlipsT(); }; // unapply flips of the temporary vector according the template 
 	virtual void unapplyFlipsC()						{ this->applyFlipsC(); }; // unapply flips of the current vector according the template
-	
 	virtual void setRandomFlipNum(uint _nFlips)			=			0;	// set the number of flips to be done
 
 public:
@@ -174,21 +144,15 @@ public:
 	// as it's updates are easy. Effectively, one needs to calculate
 	// only the new <\psi|s'> given from the new state s'. This is exactly what the NQS does.
 
-	// ratio when only 1 (single) flip is used and flips are stored inside (flipPlaces_ & flipVals_)
-	virtual auto pRatio()								-> _T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
-	// ratio when only 1 (single) flip is used and flips are provided to the function (fP, fV)
-	virtual auto pRatio(uint fP, float fV)				->_T			= 0;
-	// ratio when multiple flips are used, provided the number of flips taken
+	virtual auto pRatio()								->_T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
+	virtual auto pRatio(uint fP, float fV)				->_T			= 0;	// ratio when only 1 (single) flip is used and flips are provided to the function (fP, fV)
 	virtual auto pRatio(uint nFlips)					->_T			= 0;
-	// ratio when a new vector is provided (after flip) - (uses current vector as well)
 	virtual auto pRatio(const NQSS& _v)					->_T			{ return this->pRatio(this->curVec_, _v);							};			
-	// ratio when a new vector is provided (after flip) - (uses two different vectors - one for the current state and one for the new state)
 	virtual auto pRatio(const NQSS& _v1,
-						const NQSS& _v2)				->_T			= 0;
-	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
+						const NQSS& _v2)				->_T			= 0;	// ratio when a new vector is provided (after flip) - (uses two different vectors - one for the current state and one for the new state)
 	virtual auto pRatio(std::initializer_list<int> fP, 
-						std::initializer_list<double> fV)->_T			= 0;
-	std::function<_T(const NQSS&)> pRatioFunc_;							// function for the probability ratio
+						std::initializer_list<double> fV)->_T			= 0; 	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
+	std::function<_T(const NQSS&)> pRatioFunc_;									// function for the probability ratio
 
 	// ----------------------- W E I G H T S -------------------------
 #ifdef NQS_ANGLES_UPD
@@ -196,37 +160,21 @@ public:
 	virtual void update(const NQSS& v, uint nFlips = 1)					{};
 	virtual void unupdate(uint nFlips = 1)								{};
 #endif
-	virtual void updateWeights()						=				0;
+	virtual void updateWeights()										= 0;
 public:
 	virtual bool saveWeights(std::string _path, std::string _file);
 	virtual bool setWeights(std::string _path, std::string _file);
 
 protected:
 	// --------------------- T R A I N   E T C -----------------------
-	bool updateWeights_ = true;											// shall update the weights in current step?
-	virtual void grad(const NQSS& _v, uint _plc)		=				0;
-	virtual void gradFinal(const NQSB& _energies, int step = 0, _T _currLoss = 0.0);
+	virtual void grad(const NQSS& _v, uint _plc)						= 0;
+	virtual void gradFinal(const NQSB& _energies, int step = 0, _T _cL = 0.0);
 #ifdef NQS_USESR
-	// stochastic reconfiguration
-	virtual void gradSR(uint step = 0, _T _currLoss = 0.0);
-
-#	ifdef NQS_USESR_NOMAT
-	// helping variables for conjugate gradient method
-	// NQSB r_;															// residual
-	// NQSB p_;															// search direction
-	// NQSB Ap_;															// matrix-vector multiplication result
-	// NQSB x_;															// solution
-
-#	endif
-	// ---------------------------------------------------------------
-	virtual void covMatrixReg(int _step = 0, _T _currLoss = 0.0);
+	virtual void gradSR(uint step = 0, _T _cL = 0.0);					// stochastic reconfiguration
+	virtual void covMatrixReg(int _step = 0, _T _cL = 0.0);
 #endif
 	
-	/* ------------------------------------------------------------ */
-
 	// ------------------------ E N E R G Y --------------------------
-	auto pKernel(std::initializer_list<int>  fP,
-				 std::initializer_list<double> fV)		-> _T			{ return this->pRatio(fP, fV); };
 	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> pKernelFunc_;	// function for the probability ratio
 
 	/* ------------------------------------------------------------ */
@@ -240,24 +188,15 @@ protected:
 
 public:
 	// ------------------------ S E T T E R S ------------------------
-	virtual void init()									=				0; 
-	virtual void setRandomState(bool _upd = true)						{ this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_), _upd);	};
+	virtual void init()													= 0; // initialize the NQS (e.g., set the random state, etc.)
+	virtual void setRandomState(bool _upd = true);						// set the random state of the NQS
 
 	// --------------------------------------------------------------- 
-	// training the excited states (if needed)
-	void setTrainParExc(const NQS_train_t& _par)  						{ this->lower_states_.train_lower_ = _par;	};
-	// learing rate scheduler
-	void setScheduler(int _sch = 0, double _lr = 1e-3, 
-					double _lrd = 0.96, size_t _epo = 10, 
-					size_t _pat = 5)									{ this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); };	
-	// early stopping
-	void setEarlyStopping(size_t _pat, double _minDlt)					{ if (_pat != 0) { this->info_p_.setEarlyStopping(_pat, _minDlt); LOGINFO("Using early stopping.", LOG_TYPES::CHOICE, 3); } };
-	// regularization scheduler
-	void setSregScheduler(	int _sch = 0, 
-							double _sreg = 1e-7,
-							double _sregd = 0.96, 
-							size_t _epo = 10, 
-							size_t _pat = 5)							{ this->info_p_.sreg_ = _sreg; if (_sreg > 0) { LOGINFO("Using regularization: " + VEQPS(_sreg, 3) + (_sch > 0 ? " with scheduler: " + STR(_sch) : ""), LOG_TYPES::CHOICE, 3); this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); } };
+	
+	void setEarlyStopping(size_t _pat, double _minDlt);	
+	void setSregScheduler(int _sch = 0, double _sreg = 1e-7, double _sregd = 0.96, size_t _epo = 10, size_t _pat = 5);							
+	void setTrainParExc(const NQS_train_t& _par);  						// training the excited states (if needed)
+	void setScheduler(int _sch = 0, double _lr = 1e-3, double _lrd = 0.96, size_t _epo = 10, size_t _pat = 5);									
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
@@ -273,35 +212,51 @@ public:
 	// Hamiltonian
 	auto getHamiltonianInfo()					const -> std::string	{ return this->H_->getInfo();			};
 	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
-	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht>>	{ return this->H_;						};
-	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht>			{ return this->H_->getHilbertSpace();	};
+	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht, _spinModes>> { return this->H_;						};
+	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht, _spinModes> { return this->H_->getHilbertSpace();	};
 
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
 	// single
-	virtual bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, bool _quiet = false);	
+	virtual bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false);	
 	virtual bool trainStep(size_t i, arma::Col<_T>& En,
 									arma::Col<_T>& meanEn, 
 									arma::Col<_T>& stdEn, 
-									const NQS_train_t& _par, const bool quiet, Timer& _timer);
+									const NQS_train_t& _par, 
+									const bool quiet, 
+									const bool randomStart,
+									Timer& _timer);
 
 	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
-								bool quiet			= false,			// shall talk? (default is false)
-								clk::time_point _t	= NOW,				// time! (default is NOW)
-								uint progPrc		= 25);
+														  bool quiet			= false,	// shall talk? (default is false)
+														  bool randomStart 		= false,	// random start (default is false)
+														  clk::time_point _t	= NOW,		// time! (default is NOW)
+														  uint progPrc		= 25);
 
 	// --------------------- C O L L E C T I N G ---------------------
 
 	// single 
 	virtual _T collect(const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, v_1d<_T>* _opvals, v_1d<_T>* _energies = nullptr, bool quiet = false, clk::time_point _t = NOW);
 
-	virtual arma::Col<_T> collect(const NQS_train_t& _par,
-								  bool quiet						= false,
-								  clk::time_point _t				= NOW,
-								  NQSAv::MeasurementNQS<_T>& _mes 	= {},
-								  bool _collectEn					= true,
-								  uint progPrc						= 25);
+	virtual bool collectStep(size_t i, const NQS_train_t& _par, 
+							NQSAv::MeasurementNQS<_T>& _meas,
+							arma::Col<_T>* _E, 
+							arma::Col<_T>* _EM,
+							arma::Col<_T>* _ES, 
+							const bool quiet,
+							const bool randomStart,
+							Timer& _timer);
+
+	virtual void collect(const NQS_train_t& _par,
+						NQSAv::MeasurementNQS<_T>& _mes 	= {},
+						arma::Col<_T>* _energies			= nullptr,
+						arma::Col<_T>* _energiesStd			= nullptr,
+						bool quiet							= false,
+						bool randomStart 					= false,
+						clk::time_point _t					= NOW,
+						uint progPrc						= 25);
+
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
 	virtual void collect(const NQS_train_t& _par, 
 						 const Operators::OperatorNQS<_T>& _opG,
@@ -324,21 +279,27 @@ public:
 		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
-		this->threads_ 		= _n.threads_;
+		// this->threads_ 		= _n.threads_;
 		// initialize the information 
 		this->info_p_  		= _n.info_p_;
 		this->lower_states_ = _n.lower_states_;
-		this->init();
+		// this->init();
+#ifdef NQS_NOT_OMP_MT
+		this->initThreads(_n.threads_.threadNum_);
+#endif
 	}
 	NQS(NQS&& _n)
 		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
 		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
-		this->threads_ 		= std::move(_n.threads_);
+		// this->threads_ 		= std::move(_n.threads_);
 		// initialize the information
 		this->info_p_  		= std::move(_n.info_p_);
 		this->lower_states_ = std::move(_n.lower_states_);
-		this->init();
+		// this->init();
+#ifdef NQS_NOT_OMP_MT
+		this->initThreads(_n.threads_.threadNum_);
+#endif
 	}
 	NQS &operator=(const NQS & _n)
 	{	
@@ -353,9 +314,11 @@ public:
 		// initialize the information
 		this->info_p_				= _n.info_p_;
 		this->lower_states_			= _n.lower_states_;
-		this->threads_				= _n.threads_;		
 
 		this->init();
+#ifdef NQS_NOT_OMP_MT
+	this->initThreads(_n.threads_.threadNum_);
+#endif
 		return *this;
 	}
 	NQS &operator=(NQS &&_n)
@@ -371,14 +334,37 @@ public:
 		// initialize the information
 		this->info_p_				= std::move(_n.info_p_);
 		this->lower_states_			= std::move(_n.lower_states_);
-		this->threads_				= std::move(_n.threads_);
 
 		this->init();
+#ifdef NQS_NOT_OMP_MT
+		this->initThreads(_n.threads_.threadNum_);
+#endif
 		return *this;
 	}
-	NQS(std::shared_ptr<Hamiltonian<_Ht>> &_H, double _lr = 1e-2,
+	NQS(std::shared_ptr<Hamiltonian<_Ht,_spinModes>> &_H, double _lr = 1e-2,
 		uint _threadNum = 1, int _nParticles = -1, 
 		const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {});
+};
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setRandomState(bool _upd)
+{ 
+	if (this->discVal_ == 0.5) {
+#ifdef SPIN
+		NQSS randomState = arma::randi<NQSS>(this->info_p_.nVis_, arma::distr_param(0, 1)) - 0.5;
+#else
+		NQSS randomState = arma::randi<NQSS>(this->info_p_.nVis_, arma::distr_param(0, 1)) * 0.5;
+#endif
+		this->setState(randomState, _upd);
+	} else if (this->discVal_ == 1){
+		NQSS randomState = arma::randi<NQSS>(this->info_p_.nVis_, arma::distr_param(0, 1));
+		this->setState(randomState, _upd);
+	} else {
+		// set from integer
+		this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_ - 1), _upd);
+	}
 };
 
 // ##########################################################################################################################################
@@ -481,16 +467,9 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	// allocate gradients
 	this->F_.resize(this->info_p_.fullSize_);
 #ifdef NQS_USESR
-	#ifndef NQS_USESR_NOMAT
+#	ifndef NQS_USESR_NOMAT
 	this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
-	#else
-	{
-		// this->r_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		// this->p_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		// this->Ap_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-		// this->x_ 	= NQSB(this->info_p_.fullSize_, arma::fill::zeros);
-	}
-	#endif
+#	endif
 #endif
 	this->curVec_ = arma::ones(this->info_p_.nVis_);
 	this->tmpVec_ = arma::ones(this->info_p_.nVis_);
@@ -580,7 +559,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 * @param _lower 
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, 
 													double _lr, 
 													uint _threadNum, 
 													int _nParticles,

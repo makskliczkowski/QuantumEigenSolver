@@ -157,11 +157,12 @@ set(SOURCES
     main.cpp 
     operators.cpp 
     user_interface.cpp 
+    src/nqs/nqs.cpp
+    src/nqs/nqs_opt.cpp
     src/user_interface/ui_check_eth.cpp
     src/user_interface/ui_check_nqs.cpp
     src/user_interface/ui_check_quadratic.cpp
     src/user_interface/ui_check_symmetries.cpp
-    src/nqs.cpp
     src/operator_parser.cpp
     ${CPPSOURCE}/common.cpp 
     ${CPPSOURCE}/directories.cpp 

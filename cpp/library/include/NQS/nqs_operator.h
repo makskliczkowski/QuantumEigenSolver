@@ -310,7 +310,7 @@ namespace NQSAv
 				std::string _nameCorr = "");											// save the measurements
 
 		// ---- MEASUREMENT ---- (STATIC)
-
+		
 		static _T measure(Operators::_OP_V_T_CR _state, const Operators::OperatorNQS<_T>& _gO, NQSFunCol _fun, Operators::Containers::OperatorContainer<_T>& _cont);
 		static void normalize(uint _nBlck, Operators::Containers::OperatorContainer<_T>& _cont) { _cont.normalize(_nBlck, true); };
 

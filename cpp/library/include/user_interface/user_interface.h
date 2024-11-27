@@ -463,6 +463,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_rst, bool, 0);		// should I reset the state before each step?
 		// regularization
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
@@ -485,6 +486,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_col_th, uint, 0);		// thermalize when collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bn, uint, 100);		// number of inner blocks for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
+		UI_PARAM_CREATE_DEFAULT(nqs_col_rst, bool, 0);		// should I reset the state before each step?
 		// learning rate
 		UI_PARAM_CREATE_DEFAULT(nqs_sch, int, 0);			// learning rate scheduler - 0 - constant, 1 - exponential decay (default), 2 - step decay, 3 - cosine decay, 4 - adaptive
 		UI_PARAM_CREATE_DEFAULTD(nqs_lr, double, 1e-3);		// learning rate (initial)
@@ -509,6 +511,7 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_tr_mc);
 			UI_PARAM_SET_DEFAULT(nqs_tr_bs);
 			UI_PARAM_SET_DEFAULT(nqs_tr_th);
+			UI_PARAM_SET_DEFAULT(nqs_tr_rst);			
 			UI_PARAM_SET_DEFAULT(nqs_lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
 			// collection
@@ -516,6 +519,7 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_col_th);
 			UI_PARAM_SET_DEFAULT(nqs_col_bn);
 			UI_PARAM_SET_DEFAULT(nqs_col_bs);
+			UI_PARAM_SET_DEFAULT(nqs_col_rst);
 		}
 	};
 };

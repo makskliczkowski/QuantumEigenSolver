@@ -21,7 +21,8 @@ icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ./src/user_interface/ui_check_nqs.cpp                   \
         ./src/user_interface/ui_check_quadratic.cpp             \
         ./src/user_interface/ui_check_symmetries.cpp            \
-        ./src/nqs.cpp                                           \
+        ./src/nsq/nqs.cpp                                       \
+        ./src/nqs/nqs_opt.cpp                                    \
         ./src/operator_parser.cpp                               \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp    \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp        \

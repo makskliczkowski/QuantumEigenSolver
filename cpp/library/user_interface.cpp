@@ -85,6 +85,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_tr_mc);
 		SETOPTION(nqsP,	nqs_tr_bs);
 		SETOPTION(nqsP,	nqs_tr_th);
+		SETOPTION(nqsP,	nqs_tr_rst);
 		SETOPTION(nqsP,	nqs_tr_pinv);
 		SETOPTION(nqsP,	nqs_tr_pc);
 		// scheduler for the regularization
@@ -110,7 +111,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 		SETOPTION(nqsP,	nqs_col_mc);
 		SETOPTION(nqsP,	nqs_col_bn);
 		SETOPTION(nqsP,	nqs_col_th);	
-		SETOPTION(nqsP,	nqs_col_bs);	
+		SETOPTION(nqsP,	nqs_col_bs);
+		SETOPTION(nqsP,	nqs_col_rst);	
 
 		// learming rate
 		SETOPTION(nqsP,  nqs_sch);

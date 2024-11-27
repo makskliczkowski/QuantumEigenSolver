@@ -53,7 +53,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 
 ////////////////////////////////////////////////////////////////////////////
 
-/*
+/**
 * @brief Initializes the weights and biases for the RBM NQS model
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -63,7 +63,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
 // #ifndef _DEBUG
 // #pragma omp parallel for num_threads(this->threads_.threadNum_)
 // #endif
-	double stddev = sqrt(2.0 / (this->info_p_.nVis_ + this->nHid_));
+	double stddev = std::max(std::sqrt(2.0 / (this->info_p_.nVis_ + this->nHid_)), 0.01);
 
 	// Initialize visible biases
 	for (int i = 0; i < this->info_p_.nVis_; i++) {
@@ -95,7 +95,6 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setInfo()
 {
 	this->info_ = "";
 	strSeparatedS(this->info_, ',', "RBM", 
-		VEQV(mod, this->H_->getType()), 
 		VEQV(nv, this->info_p_.nVis_), 
 		VEQV(nh, this->nHid_), 
 		VEQV(nS, this->spinModes_),

@@ -209,4 +209,32 @@ struct NQS_thread_t
 		std::vector<CondVarKernel<_T>> kernels_;				// condition variables for the threads
 		std::mutex mutex;										// global mutex for the threads	
 	#endif
+
+	// ----------
+	NQS_thread_t()					=	default;
+	~NQS_thread_t()					{ this->threads_.clear(); };
+	// copy assignment
+	// NQS_thread_t& operator=(const NQS_thread_t& _n) 
+	// {
+	// 	if (this == &_n) return *this;
+	// 	this->threadNum_		= _n.threadNum_;
+	// 	#ifdef NQS_NOT_OMP_MT
+	// 		this->threadsNumLeft_	= _n.threadsNumLeft_;
+	// 		this->threads_			= _n.threads_;
+	// 		this->kernels_			= _n.kernels_;
+	// 		this->mutex				= _n.mutex;
+	// 	#endif
+	// }
+	// // move assignment
+	// NQS_thread_t& operator=(NQS_thread_t&& _n) 
+	// {
+	// 	if (this == &_n) return *this;
+	// 	this->threadNum_		= _n.threadNum_;
+	// 	#ifdef NQS_NOT_OMP_MT
+	// 		this->threadsNumLeft_	= _n.threadsNumLeft_;
+	// 		this->threads_			= std::move(_n.threads_);
+	// 		this->kernels_			= std::move(_n.kernels_);
+	// 		this->mutex				= std::move(_n.mutex);
+	// 	#endif
+	// }
 };

@@ -2,6 +2,37 @@
 
 // ##########################################################################################################################################
 
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setPreconditioner(int _pre) 									
+{ 
+	if (_pre != 0) 
+	{ 
+		this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre);
+		LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3);
+	}
+};
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setSolver(int _sol, double _tol, int _maxiter, double _reg)						
+{ 
+	this->info_p_.setSolver(_sol, _maxiter, _tol); 
+	this->solver_ = algebra::Solvers::General::choose<_T, true>(_sol, this->info_p_.fullSize_, _tol, _maxiter, _reg);
+	LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(_maxiter), LOG_TYPES::CHOICE, 3); 
+};
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setPinv(double _pinv)											
+{ 
+	this->info_p_.pinv_ = _pinv; 
+	if (_pinv > 0) 
+		LOGINFO("Using pseudoinverse: " + VEQPS(_pinv, 3), LOG_TYPES::CHOICE, 3); 
+	else 
+	LOGINFO("Using ARMA solver", LOG_TYPES::CHOICE, 3); 
+};
+
+
+// ##########################################################################################################################################
+
 // ############################################################ G R A D I E N T #############################################################
 
 // ##########################################################################################################################################
@@ -24,7 +55,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 	// calculate current learning rate based on the scheduler
 	this->info_p_.lr_ = this->info_p_.lr(_step, algebra::real(_currLoss));
 	const _T _samples = static_cast<_T>(_energies.n_elem);
-	// calculate the derivatives 
+
 	{
 		// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
 		// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
@@ -47,12 +78,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 			this->F_ 					+= this->derivativesCenteredH_ * ((ratios_excited - _meanExcited) * (f_lower_b * _meanLower / _samples));
 		}
 	}
-	// fix the NANs
-	// if (!arma::is_finite(this->F_)) {
-	// 	stoutd("Non-finite values in the gradient: ");
-	// 	this->F_.replace(arma::datum::nan, 0.0);	// replace NaNs with zeros
-	// }
-	
+
 	// ---- STOCHASTIC RECONFIGURATION WITH MATRIX CALCULATION ----
 #ifdef NQS_USESR_MAT_USED
 	// update model by recalculating the gradient (applying the stochastic reconfiguration)

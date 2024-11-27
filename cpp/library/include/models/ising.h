@@ -121,14 +121,6 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 	u64 newIdx		= 0;
 	_T newVal		= 0;
 
-	//stout << EL << "____________________________" << EL;
-	//stout << VEQ(_elemId) << EL;
-	//stout << VEQ(_site) << EL;
-	//stout << VEQ(_elem) << EL;
-	//arma::Col<int> tmp(4, arma::fill::zeros);
-	//intToBase(_elem, tmp);
-	//stout << tmp.t() << EL << EL;
-
 	// -------------- perpendicular field --------------
 	std::tie(newIdx, newVal) = Operators::sigma_z<_T>(_elem, this->Ns, { _site });
 	//stout << "Z:" << newIdx << ":" << newVal << EL;
@@ -214,8 +206,7 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	// check the S_i^z * S_{i+1}^z
 	for (uint nn = 0; nn < (uint)this->lat_->get_nn_ForwardNum(_site); ++nn) 
 	{
-		const uint N_NUMBER = nn;
-		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
+		if (int nei = this->lat_->get_nnf(_site, nn); nei >= 0) 
 		{
 			double _Sj	=	Binary::check(v, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 			_locVal		+=	PARAM_W_DISORDER(J, _site) * _Si * _Sj;
@@ -223,46 +214,11 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	}
 	// -----------------------------------------------------------
 	if (!EQP(this->g, 0.0, 1e-9)) {
-		_changedVal			+=	f1(std::initializer_list<int>({ (int)_site }),
-								std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, _site) * Operators::_SPIN_RBM;
+		_changedVal += f1(std::initializer_list<int>({ (int)_site }), std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, _site) * Operators::_SPIN_RBM;
 	}
 	// -----------------------------------------------------------
 	return _changedVal + _locVal;
 }
-
-//
-///*
-//* Calculate the local energy end return the corresponding vectors with the value
-//* @param _id base state index
-//*/
-//template <typename _type>
-//cpx IsingModel<_type>::locEnergy(const vec& v, uint site, std::function<cpx(int, double)> f1, std::function<cpx(const vec&)> f2, vec& tmp) {
-//	double localVal = 0;
-//	cpx changedVal = 0.0;
-//
-//	const uint nn_number = this->lattice->get_nn_forward_num(site);
-//
-//	// check Sz 
-//	const double si = checkBitV(v, site) > 0 ? this->_SPIN : -this->_SPIN;
-//
-//	// diagonal elements setting the perpendicular field
-//	localVal += (this->h + dh(site)) * si;
-//
-//	// check the Siz Si+1z
-//	for (auto nn = 0; nn < nn_number; nn++) {
-//		// double checking neighbors
-//		auto n_num = this->lattice->get_nn_forward_num(site, nn);
-//		if (auto nei = this->lattice->get_nn(site, n_num); nei >= 0) {
-//			double sj = checkBitV(v, nei) > 0 ? this->_SPIN : -this->_SPIN;
-//			localVal += (this->J + this->dJ(site)) * si * sj;
-//		}
-//	}
-//	// flip with S^x_i with the transverse field
-//
-//	changedVal += f1(site, si) * this->_SPIN * (this->g + this->dg(site));
-//
-//	return changedVal + localVal;
-//}
 
 // ----------------------------------------------------------------------------- HAMILTONIAN -------------------------------------------------------------------------------------
 

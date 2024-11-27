@@ -189,7 +189,7 @@ public:
 	auto getEnAv()										const -> double								{ return this->avEn;															};
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
-	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
+	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T, _spinModes>& { return this->hilbertSpace;													};							
 	// energy
 	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_));									};
 	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
@@ -833,15 +833,27 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 
 // ##########################################################################################################################################
 
-/*
-* @brief Clears the memory of the Hamiltonian, eigenvectors and eigenvalues
-*/
+/**
+ * @brief Clears the Hamiltonian object by resetting its internal state.
+ *
+ * This function performs the following actions:
+ * - Clears the eigenvectors by calling `clearEigVec()`.
+ * - Clears the eigenvalues by calling `clearEigVal()`.
+ * - Clears the Hamiltonian matrix by calling `clearH()`.
+ * - Clears the Krylov subspace by calling `clearKrylov()`.
+ * - Resets the Hamiltonian matrix pointer `H_`.
+ *
+ * This function is intended to reset the Hamiltonian object to an initial state,
+ * ensuring that all dynamically allocated resources are properly released.
+ */
 template<typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::clear()
 { 
 	this->clearEigVec(); 
 	this->clearEigVal(); 
 	this->clearH();
+	this->clearKrylov();
+	this->H_.reset();
 }; 
 
 // ##########################################################################################################################################

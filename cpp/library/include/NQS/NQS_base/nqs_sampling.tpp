@@ -6,17 +6,17 @@
 
 // ##########################################################################################################################################
 
-/*
+/** 
 * @brief Block updates the current state according to Metropolis-Hastings algorithm. The block size is chosen so that
 * it gives the given statistics of the averages found.
 * @param _bSize the size of the correlation block; how many flips one needs to do in order to get rid of the MC correlations - bin size 
 * @param _start the state to start from
 * @param _nFlip number of flips in a single step
+* @param _therm whether the thermalization is needed
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start, bool _therm)
 {
-	// check whether we should set a state again or thermalize the whole process (applies on integer state)
 	// Set state based on whether thermalization is required or _start differs from current state
 	if (_therm 
 #ifndef NQS_USE_VEC_ONLY
@@ -24,44 +24,39 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_S
 #endif
 		) this->setState(_start, _therm);
 
-	// set the temporary state - the vectors are usefull so set them accordingly
-	this->tmpVec_ = this->curVec_;
-
-	for (uint bStep = 0; bStep < _bSize; ++bStep) // go through each block step
+	this->tmpVec_ = this->curVec_; 													// set the temporary state - the vectors are useful so set them accordingly
+	for (uint bStep = 0; bStep < _bSize; ++bStep) 									// go through each block step
 	{
-		this->chooseRandomFlips(); 	// set the random flip sites - it depends on a given implementation of the NQS
-		this->applyFlipsT();		// flip the vector - use temporary vector tmpVec to store the flipped vector
+		this->chooseRandomFlips(); 													// set the random flip sites - it depends on a given implementation of the NQS
+		this->applyFlipsT(); 														// flip the vector - use temporary vector tmpVec to store the flipped vector
 
-		// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
 #ifndef NQS_ANGLES_UPD
 		double proba = std::abs(this->pRatio(this->curVec_, this->tmpVec_));
 #else
-		double proba = std::norm(this->pRatio(this->nFlip_));
+		double proba = std::abs(this->pRatio(this->nFlip_)); 						// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
 #endif
-		// we need to take into account the probability comming from the ratio of states (after and before the flip)
-		if (this->ran_.template random<float>() < proba)
+		proba = proba * proba;
+		if (this->ran_.template random<double>() < proba) 							// we need to take into account the probability coming from the ratio of states (after and before the flip)
 		{
-			// update current state and vector when the flip has been accepted (the probability is higher than the random number)
-			this->applyFlipsC();
-			// update angles if needed
-			this->update(this->nFlip_);
+			this->accepted_++; 														// increase the number of accepted flips
+			this->applyFlipsC(); 													// update current state and vector when the flip has been accepted (the probability is higher than the random number)
+			this->update(this->nFlip_); 											// update angles if needed
 		}
 		else
 		{
-			// set the vector back to normal (unflip)
-			this->unupdate();
+			this->unupdate(); 														// set the vector back to normal (unflip)
 			this->unapplyFlipsT();
 		}
+		this->total_++; 															// increase the total number of flips
 	}
 
-	// set the current integer state
 #ifndef NQS_USE_VEC_ONLY
-	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_);
+	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_); // set the integer state			
 #endif
 
 	// Set the state again if angles update is disabled
 #ifndef NQS_ANGLES_UPD
-	this->setState(NQS_STATE, true);
+	this->setState(NQS_STATE, true); // set the state again									
 #endif
 }
 
@@ -71,7 +66,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_S
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP is used
 * when the omp pragma NQS_USE_OMP is set or multithreading is not used, otherwise threadpool is used
 * to calculate the local energies.
@@ -143,7 +138,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef NQS_NOT_OMP_MT
-/*
+/**
 * @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program.
 * The threads are killed when the program is finished. The function calculates the local energy for a given thread.
 * @param _start starting site for a given thread
@@ -155,9 +150,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 {
 	while (!this->threads_.kernels_[_threadNum].flagThreadKill_)	// does not go in if the simulation is finished
 	{
-		// wait for the lock to end
 		{
-			// aquire mutex lock as required by condition variable
+			// acquire mutex lock as required by condition variable
 			std::unique_lock<std::mutex> lock(this->threads_.kernels_[_threadNum].mutex);	
 			// thread will suspend here and release the lock if the expression does not return true
 			this->threads_.kernels_[_threadNum].cv.wait(lock, [this, _threadNum] { return this->threads_.kernels_[_threadNum].flagThreadRun_; });	
@@ -172,23 +166,14 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		// Process the work
 		this->threads_.kernels_[_threadNum].kernelValue_ = 0.0;
 		for (auto site = _start; site < _end; ++site)
-		{
-			// this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE,
-			// 																				site, 
-			// 																				std::bind(&NQS<_spinModes, _Ht, _T, _stateType>::pKernel,
-			// 																				this,
-			// 																				std::placeholders::_1,
-			// 																				std::placeholders::_2)));
 			this->threads_.kernels_[_threadNum].kernelValue_ += algebra::cast<_T>(this->H_->locEnergy(NQS_STATE, site, this->pKernelFunc_));
-		}
 
-		// lock again
 		{
 			std::lock_guard<std::mutex> lock(this->threads_.kernels_[_threadNum].mutex);
 			this->threads_.kernels_[_threadNum].flagThreadRun_	= false;
-			this->threads_.kernels_[_threadNum].end_				= true; 
+			this->threads_.kernels_[_threadNum].end_			= true; 
 		}
-		this->threads_.kernels_[_threadNum].cv.notify_one(); // Notify waiting threads if needed
+		this->threads_.kernels_[_threadNum].cv.notify_one(); 		// Notify waiting threads if needed
 	}
 }
 #endif
