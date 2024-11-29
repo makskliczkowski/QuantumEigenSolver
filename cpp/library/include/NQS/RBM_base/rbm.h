@@ -252,6 +252,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 #endif
 	}
 	this->thetaCOSH_	=	this->coshF();
+	this->thetaCOSH_ 	= 	this->coshF(this->curVec_);
 	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
 }
 

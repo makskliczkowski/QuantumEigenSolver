@@ -3,30 +3,6 @@
 
 // ##########################################################################################################################################
 
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _par, 
-														Operators::OperatorNQS<_T>& _opG, v_1d<_T>* _opvals, v_1d<_T>* _energies, bool quiet, clk::time_point _t)
-{
-	if (!_opvals)
-		throw std::runtime_error("NQS::collect: _opvals is not initialized!");
-
-	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
-	{
-		this->blockSample(_par.bsize_, NQS_STATE, false);			// sample them to calculate the operator and the energy
-		
-		if (_energies)
-			_energies->push_back(this->locEnKernel());				// local energy - stored at each point within the estimation of the gradient (stochastic)
-
-		const auto _val = _opG(NQS_STATE, this->pRatioFunc_);	// calculate the operator value
-		_opvals->push_back(_val);						// calculate the operator value
-	}
-	if (_energies)
-		return std::accumulate(_energies->begin(), _energies->end(), (_T)0.0) / static_cast<_T>(_energies->size());
-	return 0.0;
-}
-
-// ##########################################################################################################################################
-
 /*
 * @brief Collects the samples for the given number of Monte Carlo steps. The samples are collected in the form of the measurements
 * of the operator. The operator is given as a function that calculates the probability of the operator.

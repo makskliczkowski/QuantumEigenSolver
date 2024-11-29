@@ -1,5 +1,5 @@
 // -----------------------------------------------------------------------------------------------------------------------------------
-#include "./nqs_sampling.tpp"
+#include "./nqs_fermions.tpp"
 // -----------------------------------------------------------------------------------------------------------------------------------
 
 #ifdef NQS_USESR
@@ -7,10 +7,10 @@
 // ###################################################################################################################################
 
 /**
- * @brief Sets the training parameters for the lower states.
- * 
- * @param _par Training parameters to be set.
- */
+* @brief Sets the training parameters for the lower states.
+* 
+* @param _par Training parameters to be set.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const NQS_train_t& _par)
 {
@@ -19,14 +19,14 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const NQS_train_t& _pa
 }
 
 /**
- * @brief Sets the learning rate scheduler.
- * 
- * @param _sch Scheduler type.
- * @param _lr Initial learning rate.
- * @param _lrd Learning rate decay.
- * @param _epo Number of epochs.
- * @param _pat Patience for early stopping.
- */
+* @brief Sets the learning rate scheduler.
+* 
+* @param _sch Scheduler type.
+* @param _lr Initial learning rate.
+* @param _lrd Learning rate decay.
+* @param _epo Number of epochs.
+* @param _pat Patience for early stopping.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double _lr, double _lrd, size_t _epo, size_t _pat)
 {
@@ -36,11 +36,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double _lr, do
 }
 
 /**
- * @brief Sets the early stopping parameters.
- * 
- * @param _pat Patience for early stopping.
- * @param _minDlt Minimum delta for improvement.
- */
+* @brief Sets the early stopping parameters.
+* 
+* @param _pat Patience for early stopping.
+* @param _minDlt Minimum delta for improvement.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, double _minDlt)
 {
@@ -52,14 +52,14 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, double 
 }
 
 /**
- * @brief Sets the regularization scheduler for the covariance matrix.
- * 
- * @param _sch Scheduler type.
- * @param _sreg Initial regularization factor.
- * @param _sregd Regularization factor decay.
- * @param _epo Number of epochs.
- * @param _pat Patience for early stopping.
- */
+* @brief Sets the regularization scheduler for the covariance matrix.
+* 
+* @param _sch Scheduler type.
+* @param _sreg Initial regularization factor.
+* @param _sregd Regularization factor decay.
+* @param _epo Number of epochs.
+* @param _pat Patience for early stopping.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, double _sreg, double _sregd, size_t _epo, size_t _pat)
 {
@@ -74,15 +74,21 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, double _sr
 
 // ###################################################################################################################################
 
-/*
-* @brief Calculates the update parameters for weights to be updated in a form:
-* weights[new] <- weights[old] - lr * S^{-1} * F --> second order optimization method (stochastic reconfiguration)
-* It uses the matrix S = <\Delta _k* \Delta _k> - <\Delta _k*><\Delta _k> to calculate the update. This matrix is 
-* called the geometric tensor. It is used as a regularizer for the gradient descent method.
-* This method can be either calculated with the pseudoinverse or with the direct inversion of the matrix.
-* Otherwise, one can skip the stochastic reconfiguration and use the standard gradient descent.
-* @note The method can be run without calculating the geometric tensor S explicitly.
-* @param step current step of updating - for the regularization purpose
+
+/**
+* @brief Calculates the update parameters for weights using the stochastic reconfiguration (SR) method.
+* 
+* This function updates the weights using a second-order optimization method, where the update rule is:
+* weights[new] <- weights[old] - lr * S^{-1} * F
+* Here, S is the geometric tensor, calculated as S = <\Delta _k* \Delta _k> - <\Delta _k*><\Delta _k>.
+* The geometric tensor acts as a regularizer for the gradient descent method.
+* 
+* The method can use either the pseudoinverse or direct inversion of the matrix S. If the stochastic reconfiguration
+* is skipped, the standard gradient descent is used instead. The function can also run without explicitly calculating
+* the geometric tensor S.
+* 
+* @param step Current step of updating, used for regularization purposes.
+* @param _currLoss Current loss value, used for regularization purposes.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
@@ -135,7 +141,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							this->F_, 														// b
-							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
+							step <= 1 ? nullptr : &this->dF_, 								// x0
 							this->precond_);												// preconditioner
 		_inversionSuccess = this->solver_->isConverged();
 		this->dF_ = this->info_p_.lr_ * this->solver_->solution();							// get the solution
@@ -147,7 +153,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss
 											this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
 											this->derivativesCenteredH_,											// This should also match arma::Col<_T>
 											this->F_,               												// This should be of type arma::Col<_T>
-											nullptr, // step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
+											step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
 											this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
 											this->info_p_.tol_,                  		 							// Tolerance
 											std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,

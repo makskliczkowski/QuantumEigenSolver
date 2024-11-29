@@ -1,4 +1,4 @@
-#include "./nqs_fermions.tpp"
+#include "../../include/NQS/nqs_final.hpp"
 
 // ##########################################################################################################################################
 
@@ -15,7 +15,7 @@
 * @param _therm whether the thermalization is needed
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start, bool _therm)
+void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start, bool _therm)
 {
 	// Set state based on whether thermalization is required or _start differs from current state
 	if (_therm 
@@ -60,6 +60,12 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_S
 #endif
 }
 
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+NQS_INST_CMB(double, double, blockSample, void, (uint, NQS_STATE_T, bool));
+NQS_INST_CMB(double, std::complex<double>, blockSample, void, (uint, NQS_STATE_T, bool));
+NQS_INST_CMB(std::complex<double>, double, blockSample, void, (uint, NQS_STATE_T, bool));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, blockSample, void, (uint, NQS_STATE_T, bool));
+
 // ##########################################################################################################################################
 
 // ########################################################## L O C   E N E R G Y ###########################################################
@@ -72,7 +78,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_S
 * to calculate the local energies.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
+_T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 {	
 #ifdef NQS_USE_OMP
 	{
@@ -135,6 +141,12 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 #endif
 }
 
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+NQS_INST_CMB(double, double, locEnKernel, double, ());
+NQS_INST_CMB(double, std::complex<double>, locEnKernel, std::complex<double>, ());
+NQS_INST_CMB(std::complex<double>, double, locEnKernel, double, ());
+NQS_INST_CMB(std::complex<double>, std::complex<double>, locEnKernel, std::complex<double>, ());
+
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef NQS_NOT_OMP_MT
@@ -146,7 +158,7 @@ inline _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 * @param _threadNum number of the thread currently run
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)
+void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)
 {
 	while (!this->threads_.kernels_[_threadNum].flagThreadKill_)	// does not go in if the simulation is finished
 	{
@@ -176,4 +188,13 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint 
 		this->threads_.kernels_[_threadNum].cv.notify_one(); 		// Notify waiting threads if needed
 	}
 }
+
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+NQS_INST_CMB(double, double, locEnKernel, void, (uint, uint, uint));
+NQS_INST_CMB(double, std::complex<double>, locEnKernel, void, (uint, uint, uint));
+NQS_INST_CMB(std::complex<double>, double, locEnKernel, void, (uint, uint, uint));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, locEnKernel, void, (uint, uint, uint));
+
 #endif
+
+// ##########################################################################################################################################

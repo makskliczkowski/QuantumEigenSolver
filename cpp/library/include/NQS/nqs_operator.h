@@ -18,6 +18,15 @@
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // Operators for the NQS
+
+// #define NQS_OP_TEMP(_T, FUN, RET, ARGS, ADD) 							\
+// 		template RET OperatorNQS<_T>::FUN() ARGS ADD;					\
+// 		template RET OperatorNQS<_T, uint>::FUN() ARGS ADD;				\
+// 		template RET OperatorNQS<_T, int>::FUN() ARGS	ADD;			\
+// 		template RET OperatorNQS<_T, uint, uint>::FUN() ARGS ADD;		\
+// 		template RET OperatorNQS<_T, int, int>::FUN() ARGS ADD;			\
+		// no more exotics
+
 #ifndef NQS_OPERATOR_H
 #	define NQS_OPERATOR_H
 namespace Operators
@@ -33,7 +42,7 @@ namespace Operators
 		// -----------------------------------------------------------------------------
 
 		// Inherit constructors from GeneralOperator
-   	 	using OperatorComb<_T, _Ts...>::OperatorComb;  									
+		using OperatorComb<_T, _Ts...>::OperatorComb;  									
 		using OperatorComb<_T, _Ts...>::operator=;
 		using OperatorComb<_T, _Ts...>::operator();
 		
@@ -52,6 +61,7 @@ namespace Operators
 		// -----------------------------------------------------------------------------
 		using NQSFunCol		= std::function<cpx(const NQSS& _v)>;						// for initializing the pRatio function with a single column vector (state)
 		using NQSFun		= std::function<cpx(fP_t, fV_t)>; 							// for initializing the pRatio function with initializer list - for the Hamiltonian probability ratio (or other operators)
+		_OP_V_T state_;																	// store the column state vector						
 
 		// -----------------------------------------------------------------------------
 
@@ -88,72 +98,12 @@ namespace Operators
 		// @note The class uses general implementation of the operator, so it can be used for any operator in the future
 
 		// for the integer type of the state
-		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		const -> _T;
+		auto operator()(u64 s, NQSFunCol _fun, _Ts... a)		 -> _T;
 		// for the column vector type of the state
 		auto operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts... a) const -> _T;
 
 		// ------------------------------------------------------------------------------
 	};
-
-	// ##########################################################################################################################################
-
-	/*
-	* @brief Apply the operators with a value change (!with pRatio). The function is used to calculate the 
-	* probability ratio for the given state and the operator.
-	* @param s base state to apply the operators to
-	* @param _fun pRatio function from the NQS
-	* @param ...a additional parameters to the operators
-	* @returns value of the operator acting on the state with the probability ratio applied
-	*/
-	template<typename _T, typename ..._Ts>
-	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a) const
-	{
-		// starting value
-		// this->container_.currentIdx_	= 0;
-		_T _valTotal = 0.0;
-
-		// go through operator acting on the state
-		for (auto& [s2, _val] : this->operator()(s, a...))
-		{
-			// transform to state
-			INT_TO_BASE(s2, this->state_, Operators::_SPIN_RBM);
-
-			// calculate the probability ratio
-			_valTotal += _val * algebra::cast<_T>(_fun(this->state_));
-		}
-		// this->updCurrent(_valTotal, a...);
-		return algebra::cast<_T>(_valTotal);
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-
-	/*
-	* @brief Apply the operators with a value change (!with pRatio). The function is used to calculate the
-	* probability ratio for the given state and the operator.
-	* @param s base state to apply the operators to - vector version
-	* @param _fun pRatio function from the NQS
-	* @param ...a additional parameters to the operators
-	* @returns value of the operator acting on the state with the probability ratio applied
-	*/
-	template<typename _T, typename ..._Ts>
-	inline _T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a) const
-	{
-		// starting value
-		// this->container_.currentIdx_	= 0;
-		_T _valTotal = 0.0;
-
-		// go through operator acting on the state
-		for (auto& [s2, _val] : this->operator()(s, a...))
-		{
-			// calculate the probability ratio
-			_T _functionVal = CAST<_T>(_fun(s2));
-			_valTotal 		= _valTotal + _functionVal * _val;
-		}
-		// this->updCurrent(_valTotal, a...);
-		return _valTotal;
-	}
-
-	// ##########################################################################################################################################
 };
 
 #endif

@@ -23,7 +23,10 @@ icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ./src/user_interface/ui_check_quadratic.cpp             \
         ./src/user_interface/ui_check_symmetries.cpp            \
         ./src/nsq/nqs.cpp                                       \
-        ./src/nqs/nqs_opt.cpp                                    \
+        ./src/nqs/nqs_opt.cpp                                   \
+        ./src/nqs/nqs_lower.cpp                                 \
+        ./src/nqs/nqs_sampling.cpp                              \
+        ./src/nqs/operators/nqs_operator.cpp                    \
         ./src/operator_parser.cpp                               \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp    \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp        \

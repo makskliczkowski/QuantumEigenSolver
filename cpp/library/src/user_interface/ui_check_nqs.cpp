@@ -240,9 +240,15 @@ void UI::nqsExcited()
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>> _opsL = {};						// set up the operators to save - local
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};				// set up the operators to save - correlation
 	{
-		Operators::Operator<_T, uint> _SzL = Operators::SpinOperators::sig_z_l<_T>(Nvis);
-		_SzL.setNameS("Sz");
+		Operators::Operator<_T, uint> _SzL 			= Operators::SpinOperators::sig_z_l<_T>(Nvis);
 		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
+		Operators::Operator<_T, uint> _SxL 			= Operators::SpinOperators::sig_x_l<_T>(Nvis);
+		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SxL)));
+		Operators::Operator<_T, uint, uint> _SzC 	= Operators::SpinOperators::sig_z_c<_T>(Nvis);
+		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SzC)));
+		// special flux operator
+		Operators::Operator<_T> _flux 				= Operators::SpinOperators::Flux::sig_f<_T>(Nvis, this->latP.lat->get_flux_sites(0, 0));
+		_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
 	}
 	NQSAv::MeasurementNQS<_T> _measGS(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum), _measES = _measGS;
 	NQSAv::MeasurementNQS<_T> _measLAN(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum), _measLANES = _measLAN;
@@ -336,12 +342,11 @@ void UI::nqsExcited()
 			// ------------------
 			_meansNQS(i) 	= arma::mean(_EN_TESTS);
 			_stdsNQS(i) 	= arma::stddev(_EN_TESTS);
-			LOGINFOG("Found the NQS state(" + STR(i) + ") to be E=" + STRPS(_meansNQS(i), prec), LOG_TYPES::TRACE, 2);
+			LOGINFOG("Found the NQS state(" + STR(i) + ") to be E=" + STRPS(_meansNQS(i), prec) + " +- " + STRPS(_stdsNQS(i) / 2.0, prec), LOG_TYPES::TRACE, 2);
 			LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 			LOGINFO(4);
 		}
 
-		// Save results
 		{
 			auto _EN_r 		= algebra::cast<double>(_EN_TRAIN);
 			auto _EN_rt 	= algebra::cast<double>(_EN_TESTS);

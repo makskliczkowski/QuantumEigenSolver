@@ -1,64 +1,9 @@
-/***********************************
-* Contains the most common operators.
-* Is used for more general opeartors.
-* Also defines various acting on a 
-* Hilbert space.
-* DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
-* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
-***********************************/
-#pragma once
-
-#include "general_operator.h"
-#include "operator_algebra.h"
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-#include <type_traits>
-
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
-#ifndef ENTROPY_H
-#	include "quantities/entropy.h"
-#endif // !ENTROPY_H
-
-/*
-* Separators used for the later parsing of the operators and their names:
-* - OPERATOR_SEP: separator between the operator type and the operator name
-* - OPERATOR_SEP_CORR: separator between the operator name and the correlation site - this means that "-" separates 
-*	different sites in the correlation operator (e.g. "nn-1-2" = nn operator acting on sites 1 and 2 as multiplication)
-* - OPERATOR_SEP_MULT: separator between the operator name and multiple sites - this means that "," separates different sites
-	For instance, "nn,1,2" = nn operator acting on sites 1 and 2 as separate operators
-* - OPERATOR_SEP_DIFF: separator between the operator name and the site. "m" stands for the difference between the sites
-* - OPERATOR_SEP_RANGE: separator between the operator name and the site. ":" stands for the range of the sites
-* - OPERATOR_SEP_RANDOM: separator between the operator name and the site. "r" stands for the random operator
-* - OPERATOR_SEP_DIV: separator between the operator name and the site. "_" stands for the division of the sites
-*/
-constexpr auto OPERATOR_SEP			= "/";
-constexpr auto OPERATOR_SEP_CORR	= "-";
-constexpr auto OPERATOR_SEP_MULT 	= ",";
-constexpr auto OPERATOR_SEP_DIFF	= "m";
-constexpr auto OPERATOR_SEP_RANGE	= ":";
-constexpr auto OPERATOR_SEP_RANDOM	= "r";
-constexpr auto OPERATOR_SEP_DIV		= "_";
-constexpr auto OPERATOR_PI			= "pi";
-constexpr auto OPERATOR_SITE		= "l";
-constexpr auto OPERATOR_SITEU    	= "L";
-constexpr auto OPERATOR_SITE_M_1    = true;
-#define OPERATOR_INT_CAST(x) static_cast<size_t>(x)
-#define OPERATOR_INT_CAST_S(v, x, p) (v ? STR(OPERATOR_INT_CAST(x)) : STRP(x, p))
+#include "operators/operators_final.hpp"
 
 // ##########################################################################################################################################
-
-namespace Operators 
-{
-	constexpr double _SPIN			=		0.5;
-	constexpr double _SPIN_RBM		=		_SPIN;
-};
-
-#include "operators/operator_spins.hpp"
-#include "operators/operator_quadratic.hpp"
 
 namespace Operators
 {

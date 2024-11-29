@@ -237,8 +237,12 @@ public:
 	// --------------------- C O L L E C T I N G ---------------------
 
 	// single 
-	virtual _T collect(const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, v_1d<_T>* _opvals, v_1d<_T>* _energies = nullptr, bool quiet = false, clk::time_point _t = NOW);
+	template <typename _CT>
+	bool collectStep(size_t i, const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr);
+	template <typename _CT>
+	void collect(const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr, bool reset = false);
 
+	// measurement
 	virtual bool collectStep(size_t i, const NQS_train_t& _par, 
 							NQSAv::MeasurementNQS<_T>& _meas,
 							arma::Col<_T>* _E, 
@@ -247,7 +251,6 @@ public:
 							const bool quiet,
 							const bool randomStart,
 							Timer& _timer);
-
 	virtual void collect(const NQS_train_t& _par,
 						NQSAv::MeasurementNQS<_T>& _mes 	= {},
 						arma::Col<_T>* _energies			= nullptr,
@@ -256,7 +259,7 @@ public:
 						bool randomStart 					= false,
 						clk::time_point _t					= NOW,
 						uint progPrc						= 25);
-
+	// other
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
 	virtual void collect(const NQS_train_t& _par, 
 						 const Operators::OperatorNQS<_T>& _opG,

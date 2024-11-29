@@ -159,6 +159,9 @@ set(SOURCES
     user_interface.cpp 
     src/nqs/nqs.cpp
     src/nqs/nqs_opt.cpp
+    src/nqs/nqs_lower.cpp
+    src/nqs/nqs_sampling.cpp
+    src/nqs/operators/nqs_operator.cpp
     src/user_interface/ui_check_eth.cpp
     src/user_interface/ui_check_nqs.cpp
     src/user_interface/ui_check_quadratic.cpp
