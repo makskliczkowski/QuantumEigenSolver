@@ -1,11 +1,38 @@
-/***************************************
-* Defines a class for a general operator.
-* It can be later expanded for some more
-* complicated operators acting on Hiblert
-* space.
-* APRIL 2023. UNDER CONSTANT DEVELOPMENT
-* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
-***************************************/
+/**
+* @file general_operator.h
+* @brief This file defines a set of classes and functions for handling general operators in quantum mechanics, particularly in the context of Hilbert spaces.
+* 
+* The main components of this file include:
+* 
+* - **Namespaces**:
+*   - `Hilbert`: Contains the template class `HilbertSpace` which represents a Hilbert space with a specified number of spin modes.
+*   - `Operators`: Contains various classes and functions related to operators.
+* 
+* - **Classes**:
+*   - `GeneralOperator`: A template class that describes a general operator. It can be expanded for more complicated operators acting on Hilbert space or other spaces. It supports various constructors for different initializations and provides methods for setting and getting operator properties.
+*   - `Operator`: A template class derived from `GeneralOperator` that describes a local operator acting on specific states. It includes methods for operator overloading and matrix generation.
+*   - `OperatorComb`: A template class derived from `GeneralOperator` that describes a combination of operators. It includes methods for operator overloading and matrix generation.
+*   - `OperatorContainer`: A template class that stores elements in a matrix form and provides methods for updating, sampling, and normalizing operator values.
+* 
+* - **Functions**:
+*   - `standarizeOperator`: Standardizes a given matrix operator by modifying its diagonal elements and normalizing it.
+*   - `operatorInfo`: Prints information about the operator matrix in debug mode.
+* 
+* - **Enumerations**:
+*   - `SymGenerators`: Enumerates various implemented symmetry types.
+*   - `FermionicOperators`: Enumerates various implemented fermionic operators.
+* 
+* - **Macros**:
+*   - `BEGIN_ENUM`, `DECL_ENUM_ELEMENT`, `END_ENUM`: Macros for defining enumerations.
+* 
+* - **Templates**:
+*   - Various template functions and classes for handling different types of operators and their combinations.
+* 
+* This file is under constant development and is intended to be expanded for more complex operators and functionalities.
+* 
+* @date April 2023
+* @author Maksymilian Kliczkowski, WUST, Poland
+*/
 #pragma once
 
 // =====================================
@@ -38,16 +65,24 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
-	* @brief Standarizes the operator so that it is traceless and has a unit norm 1. The norm is calculated as the Frobenius norm.
-	* @param _mat the matrix to standarize 
+	/**
+	* @brief Standardizes the given matrix operator.
+	*
+	* This function modifies the input matrix by performing the following operations:
+	* 1. Subtracts the trace of the matrix divided by the number of rows from the diagonal elements.
+	* 2. Normalizes the matrix by dividing it by the square root of the trace of the squared matrix divided by the number of rows.
+	*
+	* @tparam _MatT Type of the matrix, which should support Armadillo-like operations.
+	* @param _mat Reference to the matrix to be standardized.
 	*/
 	template<typename _MatT>
 	inline void standarizeOperator(_MatT& _mat)
 	{
+		assert(_mat.n_rows == _mat.n_cols && "Matrix must be square");
 		auto _nrows = _mat.n_rows;
 		_mat.diag() -= arma::trace(_mat) / double(_nrows);
 		auto _Hs	= arma::trace(arma::square(_mat)) / (double)_nrows;
+		assert(_Hs > 0 && "Norm must be positive");
 		_mat		= _mat / std::sqrt(_Hs);	
 	}
 
@@ -141,12 +176,27 @@ namespace Operators {
 
 // ################################################################### G E N E R A L ############################################################################
 
-namespace Operators {
+namespace Operators 
+{
+	// ##########################################################################################################################################################
 
-	/*
-	* @brief A class describing the general operator. It can be later expanded for some more complicated operators acting on Hiblert space or other spaces.
-	* Can take several template arguments - the first one is the type of the operator, the rest are the potential non-local variables (like the index of the state (site) etc.)
-	* The operator can be acting on the states or can be a matrix operator.
+	/**
+	* @class GeneralOperator
+	* @brief A template class representing a general operator that can act on various spaces, such as Hilbert space.
+	* 
+	* This class can be extended to represent more complex operators. It supports multiple template arguments:
+	* - _T: The type of the operator.
+	* - repType: The type of the function representing the operator.
+	* - repTypeV: The type of the function representing the operator for vectors.
+	* - _Ts: Additional template arguments for non-local variables (e.g., state indices).
+	* 
+	* The operator can act on states or be a matrix operator. It provides various constructors to initialize the operator
+	* with different parameters such as lattice, eigenvalue, functions, and names.
+	* 
+	* @tparam _T The type of the operator.
+	* @tparam repType The type of the function representing the operator.
+	* @tparam repTypeV The type of the function representing the operator for vectors.
+	* @tparam _Ts Additional template arguments for non-local variables.
 	*/
 	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
 	class GeneralOperator
@@ -175,6 +225,7 @@ namespace Operators {
 
 		// -------------- QUADRATIC -----------------
 		bool isQuadratic_									=			false;				// based on this, we will create the operator differently (we want act on a many body state per se)
+		bool modifiesState_									=			true;				// if the operator modifies the state (e.g., creation or annihilation operator)
 
 		// -------------- SYMMETRY ------------------
 		// used for checking on which states the operator acts when forgetting and using the matrix only
@@ -185,7 +236,6 @@ namespace Operators {
 		// ====================================================================================================
 
 	public:
-				
 		using repType_ 										= 			repType;
 		using repTypeV_ 									= 			repTypeV;
 		repType_ fun_;																		// function allowing to use the symmetry operation
@@ -194,9 +244,7 @@ namespace Operators {
 		// ====================================================================================================
 	
 	public:
-		
-		// return type of the operator
-	    using ReturnType 									= 			decltype(std::declval<repType>()(std::declval<u64>(), std::declval<_Ts>()...));
+		using ReturnType 									= 			decltype(std::declval<repType>()(std::declval<u64>(), std::declval<_Ts>()...));
 		using ReturnTypeV 									= 			decltype(std::declval<repTypeV>()(std::declval<_VT_CR>(), std::declval<_Ts>()...));
 
 		// ====================================================================================================
@@ -206,14 +254,9 @@ namespace Operators {
 
 		// ----------------------------------------------------------------------------------------------------
 
-		// Default constructor
-		GeneralOperator() 
-		{
-			this->init();
-		}
+		GeneralOperator() 									{ this->init(); }
 
-		// Constructor with state size and optional name
-		GeneralOperator(size_t Ns, const std::string& _nameS = "")
+		GeneralOperator(size_t Ns, const std::string& _nameS = "")							// Constructor with state size and optional name
 			: GeneralOperator()
 		{
 			this->Ns_ = Ns;
@@ -551,6 +594,84 @@ namespace Operators {
 			}
 			return *this;
 		}
+		// ----------------------------------------------------------------------------------------------------
+
+		// *= Operator
+		template <typename _T2 = _T>
+		constexpr GeneralOperator& operator*=(const _T2& scalar) noexcept {
+			this->eigVal_ *= algebra::cast<_T>(scalar);
+			return *this;
+		}
+
+		// /= Operator with Division by Zero Check
+		template <typename _T2 = _T>
+		GeneralOperator& operator/=(const _T2& scalar) {
+			if (scalar == 0) {
+				throw std::runtime_error("Division by zero in GeneralOperator::operator/=");
+			}
+			this->eigVal_ /= algebra::cast<_T>(scalar);
+			return *this;
+		}
+
+		// * Operator (Const lvalue version)
+		template <typename _T2 = _T>
+		constexpr GeneralOperator operator*(const _T2& scalar) const & {
+			GeneralOperator result(*this); 				
+			result *= algebra::cast<_T>(scalar); 
+			return result;
+		}
+
+		// * Operator (Rvalue version)
+		template <typename _T2 = _T>
+		GeneralOperator operator*(const _T2& scalar) && noexcept {
+			this->eigVal_ *= algebra::cast<_T>(scalar);
+			return std::move(*this);
+		}
+
+		// / Operator (Const lvalue version)
+		template <typename _T2 = _T>
+		GeneralOperator operator/(const _T2& scalar) const & {
+			if (scalar == 0) {
+				throw std::runtime_error("Division by zero in GeneralOperator::operator/=");
+			}
+			GeneralOperator result(*this);
+			result /= algebra::cast<_T>(scalar);
+			return result;
+		}
+
+		// / Operator (Rvalue version)
+		template <typename _T2 = _T>
+		GeneralOperator operator/(const _T2& scalar) && {
+			if (scalar == 0) {
+				throw std::runtime_error("Division by zero in GeneralOperator::operator/=");
+			}
+			this->eigVal_ /= algebra::cast<_T>(scalar); 
+			return std::move(*this);
+		}
+
+		// Friend * Operator
+		template <typename _T2 = _T>
+		friend GeneralOperator operator*(const _T2& scalar, const GeneralOperator& op) {
+			return op * algebra::cast<_T>(scalar);
+		}
+
+		// Friend * Operator (Rvalue optimization)
+		template <typename _T2 = _T>
+		friend GeneralOperator operator*(const _T2& scalar, GeneralOperator&& op) {
+			return std::move(op) * algebra::cast<_T>(scalar);
+		}
+
+		// Friend / Operator
+		template <typename _T2 = _T>
+		friend GeneralOperator operator/(const _T2& scalar, const GeneralOperator& op) {
+			return op / algebra::cast<_T>(scalar);
+		}
+
+		// Friend / Operator (Rvalue optimization)
+		template <typename _T2 = _T>
+		friend GeneralOperator operator/(const _T2& scalar, GeneralOperator&& op) {
+			return std::move(op) / algebra::cast<_T>(scalar);
+		}
 
 		// ----------------------------------------------------------------------------------------------------
 
@@ -562,7 +683,8 @@ namespace Operators {
 				
 		auto setIsQuadratic(bool _is)					-> void							{ this->isQuadratic_ = _is;								};	// set if the operator is quadratic
 		auto setActOn(u64 _acton)						-> void							{ this->acton_ = _acton;								};	// which states the operator acts on, saved in a number form (binary bitmask)
-		
+		auto setModifiesState(bool _mod)				-> void							{ this->modifiesState_ = _mod;							};	// set if the operator modifies the state
+
 		// names
 		auto setName(SymGenerators _name)				-> void							{ this->name_ = _name;									}; 
 		auto setNameS(const std::string& _name)			-> void							{ this->nameS_ = _name;									};
@@ -672,6 +794,24 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
+	/**
+	* @brief Generates a generalized matrix for the operator.
+	* 
+	* This function generates a generalized matrix for the operator. If the operator has a special, overridden matrix function,
+	* it uses that function to generate the matrix. Otherwise, it throws a logic error.
+	* 
+	* @tparam _standarize A boolean template parameter to indicate whether to standardize.
+	* @tparam _TinMat The type of the matrix elements.
+	* @tparam _MatType The template class for the matrix type.
+	* @tparam _InT The type of the input dimension, must be an integral type.
+	* 
+	* @param _dim The dimension of the matrix to be generated.
+	* @param _arg Additional arguments for the matrix generation.
+	* 
+	* @return GeneralizedMatrix<_TinMat> The generated generalized matrix.
+	* 
+	* @throws std::logic_error If the operator does not have a special, overridden matrix function.
+	*/
 	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
 	template<bool _standarize, typename _TinMat, template <class> class _MatType, typename _InT>
 	typename std::enable_if<!HasMatrixType<_MatType<_TinMat>> && std::is_integral<_InT>::value, GeneralizedMatrix<_TinMat>>::type
@@ -695,11 +835,23 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 	
-	/*
-	* @brief Standarizes the matrix representation of the operator. This is a default implementation for the operators that are acting on the states.
-	* The matrix here is standarized by the standarizeOperator function. If the function is not overriden, the function throws an error.
-	* @param _mat matrix to be standarized
-	* @returns the standarized matrix representation of the operator
+	/**
+	* @brief Standardizes the given matrix if the _standarize flag is set to true.
+	*
+	* This function takes a matrix of type _MatType<_TinMat> and standardizes it if the _standarize
+	* template parameter is true. The standardization process involves calling the standarizeOperator
+	* and operatorInfo functions from the Operators namespace on the matrix.
+	*
+	* @tparam _T The type of the elements in the operator.
+	* @tparam repType The representation type of the operator.
+	* @tparam repTypeV The vector representation type of the operator.
+	* @tparam _Ts Variadic template parameters for additional types.
+	* @tparam _standarize Boolean flag indicating whether to standardize the matrix.
+	* @tparam _TinMat The type of the elements in the input matrix.
+	* @tparam _MatType Template template parameter for the matrix type.
+	*
+	* @param _mat The matrix to be standardized.
+	* @return The standardized matrix of type _MatType<_TinMat>.
 	*/
 	template <typename _T, typename repType, typename repTypeV, typename ..._Ts>
 	template<bool _standarize, typename _TinMat, template <class> class _MatType>
@@ -734,15 +886,68 @@ namespace Operators {
 
 // ################################################################ N O N - M I X I N G #########################################################################
 
+/**
+ * @brief Creates an operator matrix for a given Hilbert space dimension.
+ * 
+ * This function generates a matrix representation of the operator acting on a Hilbert space of specified dimension.
+ * It supports both standard and generalized matrix types, and can handle operators that transform states within the same symmetry sector.
+ * 
+ * @tparam _standarize A boolean flag indicating whether to standardize the matrix.
+ * @tparam _TinMat The type of the elements in the matrix.
+ * @tparam _MatType The template class for the matrix type.
+ * @tparam _InT The type of the dimension parameter, which must be an integral type.
+ * @tparam _Ts Variadic template parameters representing additional types used by the operator.
+ * 
+ * @param _dim The dimension of the Hilbert space.
+ * @param _arg Additional arguments for the operator.
+ * 
+ * @return A matrix representing the operator. The type of the matrix depends on the template parameters.
+ * 
+ * @note If the operator has an overridden matrix function, it will be used to generate the matrix. Otherwise, the operator will be applied to each basis state to construct the matrix.
+ * 
+ * @details
+ * - If the operator has an overridden matrix function, it will be used to generate the matrix.
+ * - If the operator does not have an overridden matrix function, the matrix will be constructed by applying the operator to each basis state.
+ * - The matrix can be standardized if the _standarize flag is set to true.
+ * 
+ * @example
+ * @code
+ * Operators::Operator<double, int> op;
+ * auto matrix = op.generateMat<true, double, arma::Mat>(100, 1);
+ * @endcode
+ */
 namespace Operators {
 	
 	// forward declaration
 	template <typename _T, typename ..._Ts>
 	class OperatorComb;
 
-	/*
-	* @brief A class describing the local operator acting on specific states. It returns a value and changes a state.
-	* Can take several template arguments
+	/**
+	* @class Operator
+	* @brief A class representing a local operator acting on specific states in a quantum system.
+	* 
+	* This class is designed to handle operators that can act on quantum states, returning a value and potentially changing the state.
+	* It supports multiple template arguments to allow for flexibility in the types of states and parameters it can operate on.
+	* 
+	* @tparam _T The type of the operator's eigenvalue.
+	* @tparam _Ts Variadic template parameters representing additional types used by the operator.
+	* 
+	* @details
+	* The Operator class inherits from GeneralOperator and provides various functionalities including:
+	* - Overloaded operator() to apply the operator to a state.
+	* - Static methods for generating identity operators.
+	* - Operator overloading for combining and concatenating operators.
+	* - Methods for generating matrices representing the operator in a given Hilbert space.
+	* 
+	* The class also includes friend functions for calculating the action of the operator on a state.
+	* 
+	* @note This class assumes the existence of several other types and functions, such as GeneralOperator, _OP, _OP_V, and HilbertSpace.
+	* 
+	* @section Example
+	* @code
+	* Operators::Operator<double, int> op;
+	* auto result = op(5, 3); // Apply the operator to state 5 with parameter 3
+	* @endcode
 	*/
 	template<typename _T, typename ..._Ts>
 	class Operator : public GeneralOperator<_T, 
@@ -758,7 +963,7 @@ namespace Operators {
 		// ----------------------------------------------------------------------------------------------------
 
 		// Inherit constructors from GeneralOperator
-   	 	using GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
+		using GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  									
 		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator=;
 		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();		
 		
@@ -778,6 +983,10 @@ namespace Operators {
 		
 		explicit operator OperatorComb<_T, _Ts...>() const {
 			return OperatorComb<_T, _Ts...>(*this);
+		}
+
+		explicit operator GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>() const {
+			return GeneralOperator<_T, typename _OP<_T>::template INP<_Ts...>, typename _OP_V<_T>::template INP<_Ts...>, _Ts...>(*this);
 		}
 
 		// ----------------------------------------------------------------------------------------------------
@@ -868,7 +1077,7 @@ namespace Operators {
 		template <typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type* = nullptr>
 		[[nodiscard]]
 		Operator<_T, _Ts...> operator^(_T1 _n);
-			
+
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 		/*
@@ -917,10 +1126,21 @@ namespace Operators {
 
 	// ##############################################################################################################################################################
 
-	/*
-	* @brief Raising the operator to the power of n (n is an integer) 
-	* @param _n the power to which the operator is raised
-	* @returns the operator raised to the power of n
+	/**
+	* @brief Overloads the power operator (^) for the Operator class.
+	* 
+	* This function allows raising an Operator object to an integral power.
+	* 
+	* @tparam _T The type of the elements in the operator.
+	* @tparam _Ts Variadic template parameters.
+	* @tparam _T1 The type of the exponent, which must be an integral type.
+	* 
+	* @param _n The exponent to which the operator is to be raised.
+	* 
+	* @return A new Operator object that is the result of raising the current operator to the power of _n.
+	* 
+	* If _n is 0, the function returns an identity operator. If _n is 1, it returns the current operator.
+	* For other values of _n, it applies the operator _n times and returns the resulting operator.
 	*/
 	template<typename _T, typename ..._Ts>
 	template<typename _T1, typename std::enable_if<std::is_integral<_T1>::value>::type*>
@@ -1133,7 +1353,7 @@ namespace Operators {
 		// ----------------------------------------------------------------------------------------------------
 
 		// Inherit constructors from GeneralOperator
-   	 	using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  
+		using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::GeneralOperator;  
 		using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator=;
 		// using GeneralOperator<_T, typename OperatorsCombination::_OP<_T>::template INP<_Ts...>, typename OperatorsCombination::_OP_V<_T>::template INP<_Ts...>, _Ts...>::operator();				
 		

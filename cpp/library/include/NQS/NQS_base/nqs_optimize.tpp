@@ -37,18 +37,23 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setPinv(double _pinv)
 
 // ##########################################################################################################################################
 
-/*
-* @brief Calculate the final step for the weights to be updated.
-* First of all, it calculates the generalized forces for the weights.
-* The forces are calculated as the covariance of the derivatives and the local energies.
-* The forces are then used to update the weights.
-* 
-* @param _energies vector of the local energies for the current state
-* @param _step current step of the training
-* @param _currLoss current loss of the system - here is the energy
-* @warning Uses the forces vector (member F_) to store the forces that update the weights
-* 
-*/
+
+/**
+* @brief Computes the final gradient for the Neural Quantum State (NQS) optimization.
+*
+* This function calculates the gradient for the NQS optimization process, taking into account
+* the current learning rate, the centered derivatives, and the covariance vector. It also
+* includes the derivatives for the lower states if they are used. The function can optionally
+* apply stochastic reconfiguration with or without matrix calculation.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the calculations.
+* @tparam _stateType State type.
+* @param _energies Energies of the NQS.
+* @param _step Current optimization step.
+* @param _currLoss Current loss value.
+ */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energies, int _step, _T _currLoss)
 {
@@ -104,3 +109,61 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 }
 
 // ##########################################################################################################################################
+
+/**
+* @brief Perform the final gradient evolution step for the Neural Quantum State (NQS) optimization.
+* 
+* This function calculates the covariance derivatives and centered derivatives for the gradient evolution.
+* Performs the time evolution of the quantum state using the stochastic reconfiguration method - minimizing the Fubini-Study metric.
+* It also handles the inclusion of lower state derivatives if they are used.
+* 
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for calculations.
+* @tparam _stateType State type.
+* @param _energies Vector of local energies.
+* @param _step Current optimization step.
+* @param _dt Time step for the gradient evolution.
+* @param _currLoss Current loss value.
+* 
+* @throws std::runtime_error If the function is not implemented - this is a placeholder for future implementation when no S matrix is used. !TODO: (HOW?)
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::gradEvoFinal(const NQSB& _energies, int _step, double _dt, _T _currLoss)
+{
+	const _T _samples = static_cast<_T>(_energies.n_elem);
+	{
+		// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
+		// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
+		// - for the excited states, the derivatives are appe	
+		// calculate the centered derivatives
+		this->derivativesMean_ 			= arma::mean(this->derivatives_, 0);									// calculate the mean of the derivatives
+		this->derivativesCentered_ 		= this->derivatives_.each_row() - this->derivativesMean_;				// calculate the centered derivatives
+		this->derivativesCenteredH_		= this->derivativesCentered_.t();										// calculate the transposed centered derivatives
+		this->F_						= this->derivativesCenteredH_ * ((_energies - _currLoss) / _samples);	// calculate the covariance vector for the gradient 
+
+	// #pragma omp parallel for num_threads(this->threads_.threadNum_)
+		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)			// append with the lower states derivatives - if the lower states are used
+		{
+			// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
+			const auto& ratios_excited	= this->lower_states_.ratios_excited_[_low];	// <Psi_W_j / Psi_W> evaluated at W - column vector
+			const auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];		// <Psi_W / Psi_W_j> evaluated at W_j - column vector
+			const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states 
+			const _T _meanLower 		= arma::mean(ratios_lower);						// mean of the ratios in the lower state
+			const _T _meanExcited 		= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+			this->F_ 					+= this->derivativesCenteredH_ * ((ratios_excited - _meanExcited) * (f_lower_b * _meanLower / _samples));
+		}
+	}
+
+	// ---- STOCHASTIC RECONFIGURATION WITH MATRIX CALCULATION ----
+#ifdef NQS_USESR_MAT_USED
+	this->S_ = this->derivativesCenteredH_ * this->derivativesCentered_ / _samples;
+#endif
+
+	// ---- STOCHASTIC RECONFIGURATION POSSIBLY WITHOUT MATRIX CALCULATION ----
+#if defined NQS_USESR
+	return this->gradTime(_step, _dt, _currLoss);
+#else
+	throw std::runtime_error("The function is not implemented yet.");
+#endif
+}

@@ -31,9 +31,9 @@ namespace Operators
 	_T OperatorNQS<_T, _Ts...>::operator()(u64 s, NQSFunCol _fun, _Ts ...a)
 	{
 		_T _valTotal = 0.0;
-		for (const auto& [s2, _val] : this->operator()(s, a...)) {            // go through operator acting on the state
-			Binary::int2base(s2, this->state_, _SPIN_RBM);              // set the state
-			_valTotal += _val * algebra::cast<_T>(_fun(this->state_));  // calculate the probability ratio
+		for (const auto& [s2, _val] : this->operator()(s, a...)) {                                          // go through operator acting on the state
+			Binary::int2base(s2, this->state_, _SPIN_RBM);                                                  // set the state
+			_valTotal += _val * (this->modifiesState_ ? algebra::cast<_T>(_fun(this->state_)) : _T(1.0));   // calculate the probability ratio
 		}
 		return algebra::cast<_T>(_valTotal);
 	}
@@ -64,13 +64,13 @@ namespace Operators
 	template<typename _T, typename ..._Ts>
 	_T Operators::OperatorNQS<_T, _Ts...>::operator()(_OP_V_T_CR s, NQSFunCol _fun, _Ts ...a) const
 	{
-		_T _valTotal = 0.0;
-		for (auto& [s2, _val] : this->operator()(s, a...))
-		{
-			_T _functionVal = CAST<_T>(_fun(s2));                   // calculate the probability ratio
-			_valTotal 		= _valTotal + _functionVal * _val;      // calculate the value
-		}
-		return _valTotal;
+        _T _valTotal = 0.0;
+        for (const auto& [s2, _val] : this->operator()(s, a...))
+        {
+            _T _functionVal = this->modifiesState_ ? algebra::cast<_T>(_fun(s2)) : _T(1.0);  // calculate the probability ratio
+            _valTotal += _functionVal * _val;                                                // calculate the value
+        }
+        return _valTotal;
 	}
 
     // template instantiation

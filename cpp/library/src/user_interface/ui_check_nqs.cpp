@@ -187,7 +187,7 @@ void UI::nqsExcited()
 
 				_meas_ED[i].measure(_mbs, _hilbert);										// save the measured quantities
 				_meansED(i) = _H->getEigVal(i);
-				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED", i > 0);	
+				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0);	
 				LOGINFO("Found the ED (full) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
 			}
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false);					// save the results to HDF5 file
@@ -213,7 +213,7 @@ void UI::nqsExcited()
 				// if (_mbs0 != nullptr && i == 0 && _mbs0->size() == _mbs.size())
 					// LOGINFO("Overlap between ED and Lanczos: " + STRPS(arma::cdot(*_mbs0, _mbs), UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
 				// save the measured quantities
-				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN", fullED || i > 0);
+				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN/" + STR(i), fullED || i > 0);
 
 			}
 			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);			// save the results to HDF5 file
@@ -266,7 +266,7 @@ void UI::nqsExcited()
 			saveAlgebraic(dir, "history.h5", _meansNQS, "NQS/" + STR(i), true);
 			saveAlgebraic(dir, "history.h5", arma::Col<double>(this->nqsP.nqs_ex_beta_), "betas", true);
 			_NQS[i]->saveInfo(dir, "history.h5", i);
-			_meas_NQS[i].saveNQS({".h5"}, "measurement", "measurement", "measurement", "NQS", lanED || fullED || i > 0);
+			_meas_NQS[i].saveNQS({".h5"}, "measurement", "measurement", "measurement", "NQS/" + STR(i), lanED || fullED || i > 0);
 		}
 		_NQS_lower.push_back(_NQS[i]);
 	}

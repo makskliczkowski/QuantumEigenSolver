@@ -198,3 +198,84 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, locEnKernel, void, (uin
 #endif
 
 // ##########################################################################################################################################
+
+// time evolution
+
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double _dt, _T _currLoss)
+{
+	bool _inversionSuccess 		= false;
+	const _T _multiplier 		= algebra::cast<_T>(I) * _dt;
+	if (this->info_p_.sreg_ > 0) 
+		this->covMatrixReg(_step);
+
+#ifdef NQS_USESR_MAT_USED
+	assert(this->S_.empty() == false && this->F_.empty() == false && "Covariance matrix S and gradient vector F must be set before the inversion.");
+
+	{
+		// regularize the covariance matrix before inverting it (if needed and set)
+
+		// calculate the pseudoinverse
+		int _attempts 			= 0;
+		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-5;
+
+		while (!_inversionSuccess && _attempts < NQS_SREG_ATTEMPTS)
+		{
+			try {
+				if (this->info_p_.pinv_ > 0.0)
+					this->dF_ = _multiplier * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
+				else if (this->info_p_.pinv_ == 0.0)
+					this->dF_ = _multiplier * (arma::pinv(this->S_) * this->F_);
+				else 
+					this->dF_ = _multiplier * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+				
+				// if the inversion was successful, set the flag
+				_inversionSuccess = true;
+			} catch (std::exception& e) {
+                // Increase regularization factor and apply to diagonal
+				LOGINFO("Inverse calculation failed, attempt " + STR(_attempts + 1) + ". E: " + e.what(), LOG_TYPES::ERROR, 1);
+				if (!arma::is_finite(this->S_)) {
+					LOGINFO("Non-finite values in the diagonal of the covariance matrix. Stopping the training.", LOG_TYPES::ERROR, 1);
+					break;
+				}
+
+                this->S_.diag() += _regFactor;  	// Apply regularization to diagonal
+                _regFactor 		*= 10;  			// Increase regularization factor for next attempt
+                ++_attempts;
+			}
+		}
+	}
+#else
+	assert(this->derivativesCentered_.empty() == false && this->derivativesCenteredH_.empty() == false && "Centered derivatives F_k and F_k^T must be set before the inversion.");
+	if (this->precond_ != nullptr)
+		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, -1.0);
+	
+	if (this->solver_ != nullptr) 
+	{
+		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
+		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
+							this->F_, 														// b
+							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
+							this->precond_);												// preconditioner
+		_inversionSuccess = this->solver_->isConverged();
+		this->dF_ = _multiplier * this->solver_->solution();								// get the solution
+	} 
+	else {
+		// !DEPRECATED - use solver class instead
+		this->dF_ = _multiplier * algebra::Solvers::FisherMatrix::solve<_T>(
+										this->info_p_.solver_,													// choose the solver type 
+										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
+										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
+										this->F_,               												// This should be of type arma::Col<_T>
+										nullptr, //step <= 1 ? nullptr : &this->dF_,							// This should also match arma::Col<_T>
+										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
+										this->info_p_.tol_,                  		 							// Tolerance
+										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
+										&_inversionSuccess,														// Convergence flag						
+										this->info_p_.sreg_ //this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
+										);
+	}
+
+#endif
+    this->updateWeights_ = _inversionSuccess;
+}

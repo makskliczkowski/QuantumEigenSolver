@@ -169,10 +169,12 @@ protected:
 	// --------------------- T R A I N   E T C -----------------------
 	virtual void grad(const NQSS& _v, uint _plc)						= 0;
 	virtual void gradFinal(const NQSB& _energies, int step = 0, _T _cL = 0.0);
+	virtual void gradEvoFinal(const NQSB& _energies, int step = 0, double _dt = 1e-4, _T _cL = 0.0);
 #ifdef NQS_USESR
 	virtual void gradSR(uint step = 0, _T _cL = 0.0);					// stochastic reconfiguration
 	virtual void covMatrixReg(int _step = 0, _T _cL = 0.0);
 #endif
+	virtual void gradTime(size_t _step = 0, double _dt = 1e-4, _T _cL = 0.0);
 	
 	// ------------------------ E N E R G Y --------------------------
 	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> pKernelFunc_;	// function for the probability ratio
@@ -265,6 +267,15 @@ public:
 	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
 	virtual void collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
 
+	// ----------------------- E V O L V E -----------------------
+
+	// single
+	virtual bool evolveStep(double dt, arma::Col<_T>& En,
+							const NQS_train_t& _par, 
+							const bool quiet, 
+							const bool randomStart,
+							Timer& _timer);
+							
 	// ----------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
 	virtual auto ansatzlog(const NQSS& _in)		const ->_T				= 0;

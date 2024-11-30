@@ -370,6 +370,7 @@ namespace Operators
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			_op.setNameS("Sz");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
@@ -402,6 +403,7 @@ namespace Operators
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
 			_op.setNameS("Sz_m");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
@@ -447,6 +449,7 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
+			_op.setModifiesState(false);
 			return _op;
 		}
 
@@ -480,6 +483,7 @@ namespace Operators
 			// set the operator
 			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setNameS("Sz/C");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
@@ -502,6 +506,7 @@ namespace Operators
 
 			Operator<_T, uint, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setNameS("Sz/C");
+			_op.setModifiesState(false);
 			return _op;
 		}
 		
@@ -1139,7 +1144,7 @@ namespace Operators
 
 				// save on which elements the operator acts (for the sake of the correctness)
 				u64 _acts = 0;
-				// |set the bitmask on the state, remember that this is counted from the left|
+				// set the bitmask on the state, remember that this is counted from the left|
 				// the first position is leftwise 0, the last is leftwise Ns - 1
 				for (auto const& site : sites)
 					_acts |= 1 << (_Ns - 1 - site);
