@@ -44,9 +44,8 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	// allocate the vector for using it in the RBM
 	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
 		this->thetaTmp_[this->threads_.threads_[_thread].get_id()] = NQSB(this->nHid_);
-#else
-	this->thetaTmp_ = NQSB(this->nHid_);
 #endif
+	this->thetaTmpCol_ = NQSB(this->nHid_);
 	// allocate the rest
 	NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();
 }

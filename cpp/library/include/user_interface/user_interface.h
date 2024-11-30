@@ -600,9 +600,6 @@ private:
 	// ####################### N Q S #######################
 
 	template<typename _T, uint _spinModes>
-	void nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS);
-
-	template<typename _T, uint _spinModes>
 	void nqsExcited();
 
 	// ##################### QUADRATIC #####################

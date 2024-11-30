@@ -34,20 +34,32 @@ protected:
 
 // !!!!!!!!!!!!!!!!!! F L I P S !!!!!!!!!!!!!!!!!!
 
+#include <unordered_set>
+
 /*
-* @brief Randomly flip the discrete variables at chosen flip places. Sets the random flips to the vector already saved.
+* @brief Randomly flip the discrete variables at chosen flip places without repetition. Sets the random flips to the vector already saved.
 */
 template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 {
-	// go through the vector elements
-	for (auto i = 0; i < this->flipPlaces_.size(); ++i)
+	
+	this->flipPlaces_[0] 	= this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
+	this->flipVals_[0] 		= this->tmpVec_(this->flipPlaces_[0]);
+	if (this->nFlip_ == 1)
+		return;
+
+	// choose the flip places
+	std::unordered_set<uint> chosenPlaces = { this->flipPlaces_[0] };
+	for (auto i = 1; i < this->flipPlaces_.size(); ++i)
 	{
-		auto fP					= this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
-		// choose the flip place of the vector
-		this->flipPlaces_[i]	= fP;
-		// save the element of a vector before the flip
-		this->flipVals_[i]		= this->tmpVec_(fP);
+		uint fP;
+		do {
+			fP = this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
+		} while (chosenPlaces.find(fP) != chosenPlaces.end());
+		chosenPlaces.insert(fP);
+		
+		this->flipPlaces_[i] 	= fP;						// choose the flip place of the vector
+		this->flipVals_[i] 		= this->tmpVec_(fP);		// save the element of a vector before the flip
 	}
 }
 

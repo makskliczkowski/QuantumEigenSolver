@@ -90,31 +90,29 @@ inline _T RBM_S<2, _Ht, _T, _stateType>::pRatio(uint nFlips)
 	if (nFlips == 1)											// you know what to do after one flip
 		return RBM_S<2, _Ht, _T, _stateType>::pRatio(this->flipPlaces_[0], this->flipVals_[0]);
 	_T val				=	0;									// set the starting point
-#ifdef NQS_NOT_OMP_MT
-	auto thId				= std::this_thread::get_id();
-	this->thetaTmp_[thId]	= this->theta_;
+#if defined NQS_NOT_OMP_MT && !defined _DEBUG
+	const auto _thId	=	std::this_thread::get_id();
+	if (this->thetaTmp_.find(_thId) == this->thetaTmp_.end())
+		this->thetaTmp_[_thId] = this->theta_;
+	arma::Col<_T>& thetaTMP	= this->thetaTmp_[_thId];
 #else
-	this->thetaTMP		=	this->theta_;
-#endif // 
+	arma::Col<_T>& thetaTMP	= this->thetaTmpCol_;
+#endif
+	thetaTMP			= this->theta_;
 	
 	for (uint i = 0; i < nFlips; ++i)							// iterate through the flips
 	{
 		auto flipPlace	=	this->flipPlaces_[i];
 		auto flipVal	=	this->flipVals_[i];
 		_T currVal		=	RBM_SPIN_UPD(flipVal);
-
-#ifdef NQS_NOT_OMP_MT
-		this->thetaTmp_[thId] += currVal * this->W_.col(flipPlace);
-#else
-		this->thetaTmp_ += currVal * this->W_.col(flipPlace);
-#endif
+		thetaTMP		+=	currVal * this->W_.col(flipPlace);
 		val				+=	currVal * this->bV_(flipPlace);
 	}
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
 #	ifdef NQS_NOT_OMP_MT
 	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
-	val				=	val + arma::sum(arma::log(arma::cosh(this->thetaTmp_[thId])) - this->thetaCOSH_log_);
+	val				=	val + arma::sum(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
 	val 			= 	std::exp(val);
 #	else
 	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);

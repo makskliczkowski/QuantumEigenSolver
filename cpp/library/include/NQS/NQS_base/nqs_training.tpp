@@ -35,46 +35,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const NQS_train_t& _p
 	}
 }
 
-/*
-* @brief Collects the samples for the given number of Monte Carlo steps. The samples are collected in the form of the measurements
-* of the operator. The operator is given as a function that 
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::collect(const NQS_train_t& _par, 
-														const Operators::OperatorNQS<_T>& _opG,
-														Operators::Containers::OperatorContainer<_T>& _cont)
-{
-	// set the random state at the begining
-	// this->setRandomFlipNum(_par.nFlip);
-
-	// allows to calculate the probability of the operator (for operator measurements)
-	// std::function<_T(const NQSS& _v)> opFun = [&](const NQSS& v) { return this->pRatio(v); };
-	
-	// go through the number of samples to be collected
-	for (uint i = 1; i <= _par.MC_sam_; ++i)
-	{	
-		// random flip
-		if (_par.MC_th_ > 0)
-			this->setRandomState();
-
-		// remove autocorrelations and thermalizes
-		this->blockSample(_par.MC_th_, NQS_STATE, false);
-
-		// iterate blocks - allows to collect samples outside of the block
-		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
-		{
-			// sample them!
-			this->blockSample(_par.bsize_, NQS_STATE, false);
-			
-			// measure 
-			// auto [_, _val] = 
-			NQSAv::MeasurementNQS<_T>::measure(NQS_STATE, _opG, this->pRatioFunc_, _cont);
-		}
-		// normalize the measurements - this also creates a new block of measurements
-		NQSAv::MeasurementNQS<_T>::normalize(_par.nblck_, _cont);
-	}
-}
-
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>

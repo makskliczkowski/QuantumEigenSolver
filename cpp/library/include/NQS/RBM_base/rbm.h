@@ -47,9 +47,8 @@ protected:
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
 	// create the map for thetas for a given thread
 	std::map<std::thread::id, NQSB> thetaTmp_;
-#else
-	NQSB thetaTmp_;
 #endif
+	NQSB thetaTmpCol_;
 	
 	/* ------------------------------------------------------------ */
 protected:
@@ -252,7 +251,6 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 #endif
 	}
 	this->thetaCOSH_	=	this->coshF();
-	this->thetaCOSH_ 	= 	this->coshF(this->curVec_);
 	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
 }
 

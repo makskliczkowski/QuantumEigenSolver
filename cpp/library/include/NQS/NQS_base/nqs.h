@@ -261,9 +261,6 @@ public:
 						uint progPrc						= 25);
 	// other
 	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
-	virtual void collect(const NQS_train_t& _par, 
-						 const Operators::OperatorNQS<_T>& _opG,
-						 Operators::Containers::OperatorContainer<_T>& _cont);
 	// for collecting the \sum _s f(s) / \psi(s) - used for the gradient calculation
 	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
 	virtual void collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
