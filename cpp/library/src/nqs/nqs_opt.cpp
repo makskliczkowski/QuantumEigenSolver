@@ -11,7 +11,6 @@
 #include <functional>
 #include <complex>
 
-
 // ##########################################################################################################################################
 
 /**
@@ -522,13 +521,15 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const N
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(double dt, arma::Col<_T>& En, const NQS_train_t& _par, const bool quiet, const bool randomStart, Timer& _timer)
+bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, arma::Col<_T>& En, const NQS_train_t& _par, const bool quiet, const bool randomStart, Timer& _timer)
 {
 	this->total_ 	= 0;										// reset the total number of flips
 	this->accepted_ = 0;										// reset the number of accepted flips
 	if (randomStart && _par.MC_th_ > 0) 
 		this->setRandomState();									// set the random state at the begining
 	this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
+
+	_T _meanEn = 0.0, _stdEn = 0.0;
 
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
 	{		
@@ -537,19 +538,19 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(double dt, arma::Col<_T>& 
 		En(_taken) = this->locEnKernel();						// local energy - stored at each point within the estimation of the gradient (stochastic)
 	}
 
-	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 				// save the mean energy
-	TIMER_START_MEASURE(this->gradFinal(En, i, meanEn(i - 1)), (i % this->pBar_.percentageSteps == 0), _timer, STR(i)); // calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
-
+	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &_meanEn, &_stdEn); 				// save the mean energy
+	this->gradEvoFinal(En, _step, dt, _meanEn);					// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
+	
 	if (this->updateWeights_)
 		this->updateWeights(); 									// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
 
-	if (this->trainStop(i, _par, meanEn(i - 1), stdEn(i - 1), quiet))
-		return true;
-	return false;
+	// if (this->trainStop(i, _par, meanEn(i - 1), stdEn(i - 1), quiet))
+	// 	return true;
+	return true;
 }
 
 // template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, evolveStep, bool, (double, arma::Col<double>&, const NQS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(double, std::complex<double>, evolveStep, bool, (double, arma::Col<std::complex<double>>&, const NQS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, double, evolveStep, bool, (double, arma::Col<double>&, const NQS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, evolveStep, bool, (double, arma::Col<std::complex<double>>&, const NQS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(double, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const NQS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(double, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const NQS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(std::complex<double>, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const NQS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const NQS_train_t&, const bool, const bool, Timer&));

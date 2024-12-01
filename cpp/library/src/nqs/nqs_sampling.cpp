@@ -279,3 +279,9 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double 
 #endif
     this->updateWeights_ = _inversionSuccess;
 }
+
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+NQS_INST_CMB(double, double, gradTime, void, (size_t, double, double));
+NQS_INST_CMB(double, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>));
+NQS_INST_CMB(std::complex<double>, double, gradTime, void, (size_t, double, double));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>));

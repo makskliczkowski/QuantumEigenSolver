@@ -270,7 +270,7 @@ public:
 	// ----------------------- E V O L V E -----------------------
 
 	// single
-	virtual bool evolveStep(double dt, arma::Col<_T>& En,
+	virtual bool evolveStep(size_t step, double dt, arma::Col<_T>& En,
 							const NQS_train_t& _par, 
 							const bool quiet, 
 							const bool randomStart,
