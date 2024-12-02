@@ -97,8 +97,11 @@ _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint i)
     // Collect the energy estimation for the lower states
     this->f_lower[i]->template collect<std::vector<_T>>(this->train_lower_, this->enP_, &this->containerP_[i], nullptr, false);
     
+    _T _mean = 0.0;
+    MonteCarlo::blockmean(this->containerP_[i], std::max(this->train_lower_.bsize_, uint(8)), &_mean);
+
     // Calculate the mean value of the energy contributions
-    _T _mean = std::accumulate(this->containerP_[i].begin(), this->containerP_[i].end(), _T(0.0)) / _T(this->containerP_[i].size());
+    // _T _mean = std::accumulate(this->containerP_[i].begin(), this->containerP_[i].end(), _T(0.0)) / _T(this->containerP_[i].size());
     
     // Return the weighted mean value
     return this->f_lower_b_[i] * _mean;
@@ -128,8 +131,7 @@ inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerRatios(uin
     if (this->f_lower_size_ == 0)
         return;
 
-    // Collect the ratio for the lower states
-    this->f_lower[i]->collect_ratio(this->train_lower_, this->nqs_exc_, this->ratios_lower_[i]);
+    this->f_lower[i]->collect_ratio(this->train_lower_, this->nqs_exc_, this->ratios_lower_[i]); // Collect the ratio for the lower states
 }
 
 // template instantiation of function above
@@ -170,3 +172,107 @@ NQS_INST_L_CMB(std::complex<double>, double, collectExcitedRatios, double, (uint
 NQS_INST_L_CMB(std::complex<double>, std::complex<double>, collectExcitedRatios, std::complex<double>, (uint, Operators::_OP_V_T_CR));
 
 // ##########################################################################################################################################
+
+/**
+* @brief Collects the ratio of function values over ansatz values for a given number of blocks.
+* 
+* This function performs Monte Carlo sampling to collect the ratio of a given function applied to 
+* the neural quantum state (NQS) over the ansatz values. The sampling is done in blocks to reduce 
+* autocorrelations and thermalize the state. 
+* The ratio is calculated as f(s) / \psi(s) for each sampled state, where \psi is the NQS ansatz sampled at this time.
+* 
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type for the calculations.
+* @tparam _stateType The type of the state.
+* @param _par The training parameters, including the number of flips, block size, and number of blocks.
+* @param _f A function that takes the NQS state and returns a value of type _T.
+* @param _container An Armadillo column vector to store the collected ratios. !TODO - change to a more general container.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container)
+{
+	this->setRandomFlipNum(_par.nFlip);						// set the random state at the begining
+	if (_par.MC_th_ > 0) 
+		this->setRandomState();								// set the random state at the begining
+	this->blockSample(_par.MC_th_, NQS_STATE, false);		// remove autocorrelations and thermalizes
+
+	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 	// iterate blocks - allows to collect samples outside of the block
+	{
+		this->blockSample(_par.bsize_, NQS_STATE, false);	// sample them!
+		
+		const _T _top 		= _f(NQS_STATE);				// calculate f(s) / \psi(s)
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+		const _T _bottom 	= this->ansatzlog(NQS_STATE);	// calculate the log of the lower ansatz
+		_container(_taken) 	= std::exp(_top - _bottom);		// collect samples
+#else 
+		const _T _bottom 	= this->ansatz(NQS_STATE);
+		_container(_taken) 	+= _top / _bottom;
+#endif
+	}											
+}
+
+// template instantiation of function above
+NQS_INST_CMB(double, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(const NQSS&)>, arma::Col<double>&));
+NQS_INST_CMB(double, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(const NQSS&)>, arma::Col<std::complex<double>>&));
+NQS_INST_CMB(std::complex<double>, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(const NQSS&)>, arma::Col<double>&));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(const NQSS&)>, arma::Col<std::complex<double>>&));
+
+// ##########################################################################################################################################
+
+/**
+* @brief Collects the ratio of the ansatz function values between the current NQS and another NQS.
+*
+* This function collects the ratio of the ansatz function values between the current NQS and another provided NQS
+* and stores the results in the provided container. It performs block sampling to remove autocorrelations and 
+* thermalizes the system before collecting the samples.
+*
+* The ratio collected is given by:
+* \f[
+* \text{ratio} = \frac{\psi_{\text{other}}(s)}{\psi_{\text{current}}(s)}
+* \f]
+* where \(\psi_{\text{current}}(s)\) is the ansatz function value of the current NQS and \(\psi_{\text{other}}(s)\) 
+* is the ansatz function value of the other NQS for the sampled state \(s\). Reffer to the NQS::ansatz_ratio() function for more details.
+*
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type for the calculations.
+* @tparam _stateType The state type.
+* @param _par The training parameters for the NQS.
+* @param other Pointer to another NQS object to compare against.
+* @param _container The container to store the collected ratio values.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container)
+{
+	if (!other)													// if the other NQS is not provided, return
+		return;
+
+	this->setRandomFlipNum(_par.nFlip);							// set the random state at the begining
+	if (_par.MC_th_ > 0) 
+			this->setRandomState();								// set the random state at the begining
+    this->blockSample(_par.MC_th_, NQS_STATE, false);		    // remove autocorrelations and thermalizes
+
+	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - allows to collect samples outside of the block
+	{
+		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them! - remove autocorrelations and thermalizes
+		const auto _val 	= this->ansatz_ratio(NQS_STATE, other);
+		_container(_taken) 	= _val;								// store the value of f(s) / \psi(s)
+	}									
+}
+
+// template instantiation of function above
+template void NQS<2u, double, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<2u, double, double, double>*, arma::Col<double>&);
+template void NQS<2u, double, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<2u, double, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+template void NQS<2u, std::complex<double>, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<2u, std::complex<double>, double, double>*, arma::Col<double>&);
+template void NQS<2u, std::complex<double>, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<2u, std::complex<double>, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+template void NQS<3u, double, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<3u, double, double, double>*, arma::Col<double>&);
+template void NQS<3u, double, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<3u, double, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+template void NQS<3u, std::complex<double>, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<3u, std::complex<double>, double, double>*, arma::Col<double>&);
+template void NQS<3u, std::complex<double>, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<3u, std::complex<double>, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+template void NQS<4u, double, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<4u, double, double, double>*, arma::Col<double>&);
+template void NQS<4u, double, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<4u, double, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+template void NQS<4u, std::complex<double>, double, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<4u, std::complex<double>, double, double>*, arma::Col<double>&);
+template void NQS<4u, std::complex<double>, std::complex<double>, double>::collect_ratio(const MonteCarlo::MCS_train_t&, NQS<4u, std::complex<double>, std::complex<double>, double>*, arma::Col<std::complex<double>>&);
+// ##########################################################################################################################################
+

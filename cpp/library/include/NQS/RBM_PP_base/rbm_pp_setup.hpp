@@ -31,10 +31,11 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) co
 * @note the ratio is calculated as: _other->ansatz / this->ansatz * _other->getPfaffian(_in) / this->getPfaffian(_in)
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
 {
 	auto _rbm_pp_other = dynamic_cast<RBM_PP<_spinModes, _Ht, _T, _stateType>*>(_other);
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(_in, _other) * _rbm_pp_other->getPfaffian(_in) / this->getPfaffian(_in);
+	// return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(_in, _other) * _rbm_pp_other->getPfaffian(_in) / this->getPfaffian(_in);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(_in, _other) + std::log(_rbm_pp_other->getPfaffian(_in)) - std::log(this->getPfaffian(_in));
 }
 
 
@@ -123,7 +124,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 			for (const auto& spinSec: this->spinSectors_)
 			{
 				// make the weights proportional to the distance
-				this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, std_dev) + I * this->ran_.template randomNormal<double>(0.0, std_dev));
+				this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, std_dev) + I * this->ran_->template randomNormal<double>(0.0, std_dev));
 				if (distance != 0)
 					this->Fpp_(this->getFPPIndex(spinSec[0], spinSec[1], i, j)) /= distance * distance;
 			}

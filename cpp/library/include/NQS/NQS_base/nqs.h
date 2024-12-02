@@ -19,7 +19,7 @@
 #include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
 
-/*
+/**
 * @class NQS
 * @brief General template class for Neural Quantum States (NQS) solver.
 * 
@@ -31,24 +31,22 @@
 * @tparam _Ht Type of Hamiltonian used for energy calculations.
 * @tparam _T General type for numerical precision (default: same as _Ht).
 * @tparam _stateType Type of quantum state (default: double).
+* @!TODO Add more flexible configuration type for the state 
 */
 template <uint _spinModes, 
 		typename _Ht,
 		typename _T			= _Ht, 
 		class _stateType	= double>
-class NQS 
+class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<double>>
 {	
 	// type definitions 
 	NQS_PUBLIC_TYPES(_T, double);	
+
 public:
 	using NQSLS_p 						=		typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	using Config_t 						=		MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<double>>::Config_t;
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
-
-	// ensure numerical stability
-    const _T epsilon_ 					= 		std::numeric_limits<_T>::epsilon();
-	u64 accepted_ 						= 		0;						// number of accepted flips
-	u64 total_ 							= 		0;						// total number of flips
 
 protected:
 	// for the Hamiltonian information, types and the Hilbert space
@@ -59,9 +57,6 @@ protected:
 	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> H_;					// pointer to the Hamiltonian instance (for the energy calculation)
 
 protected:
-	std::string info_					=		"General NQS";
-	pBar pBar_;															// for printing out the progress
-	randomGen ran_;														// consistent quick random number generator
 
 	// ---------------------- T H R E A D I N G ---------------------
 #ifdef NQS_NOT_OMP_MT
@@ -104,7 +99,6 @@ protected:
 
 protected:
 	// ----------------------- S T A R T E R S ----------------------
-	virtual void setInfo()								=			0; 	// set the information about the NQS (e.g., type, number of hidden units, etc.)
 	virtual void allocate();											// allocate the memory for the NQS (e.g., vectors, matrices, etc.)
 		
 	// ------------------------ S E T T E R S -----------------------
@@ -144,15 +138,29 @@ public:
 	// as it's updates are easy. Effectively, one needs to calculate
 	// only the new <\psi|s'> given from the new state s'. This is exactly what the NQS does.
 
-	virtual auto pRatio()								->_T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
-	virtual auto pRatio(uint fP, float fV)				->_T			= 0;	// ratio when only 1 (single) flip is used and flips are provided to the function (fP, fV)
-	virtual auto pRatio(uint nFlips)					->_T			= 0;
-	virtual auto pRatio(const NQSS& _v)					->_T			{ return this->pRatio(this->curVec_, _v);							};			
+	virtual auto logPRatio(uint fP, float fV)			->_T			= 0;	// log of the probability ratio	- when flip places (single) are used
+	virtual auto pRatio(uint fP, float fV)				->_T			{ return std::exp(this->logPRatio(fP, fV));										};
+
+	virtual auto logPRatio()							->_T			{ return this->logPRatio(this->flipPlaces_[0], this->flipVals_[0]);				};
+	virtual auto pRatio()								->_T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);				};	
+
+	virtual auto logPRatio(uint nFlips)					->_T			= 0;	// log of the probability ratio	- when number of flips is used
+	virtual auto pRatio(uint nFlips)					->_T			{ return std::exp(this->logPRatio(nFlips));										};	
+
+	virtual auto logPRatio(const NQSS& _v)				->_T			{ return this->logPRatio(this->curVec_, _v);									};
+	virtual auto pRatio(const NQSS& _v)					->_T			{ return std::exp(this->logPRatio(_v));											};	
+
+	virtual auto logPRatio(	const NQSS& _v1, 
+							const NQSS& _v2)			->_T			= 0;	// log of the probability ratio	- when two vectors are used (one for the current state and one for the new state)
 	virtual auto pRatio(const NQSS& _v1,
-						const NQSS& _v2)				->_T			= 0;	// ratio when a new vector is provided (after flip) - (uses two different vectors - one for the current state and one for the new state)
+						const NQSS& _v2)				->_T			{ return std::exp(this->logPRatio(_v1, _v2));									};
+	
+	virtual auto logPRatio(std::initializer_list<int> fP,
+					std::initializer_list<double> fV) 	-> _T			= 0; 	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto pRatio(std::initializer_list<int> fP, 
-						std::initializer_list<double> fV)->_T			= 0; 	// ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
-	std::function<_T(const NQSS&)> pRatioFunc_;									// function for the probability ratio
+						std::initializer_list<double> fV)->_T			{ return std::exp(this->logPRatio(fP, fV));										};
+	std::function<_T(const NQSS&)> logPRatioFunc_;						// function for the probability ratio (log)
+	std::function<_T(const NQSS&)> pRatioFunc_;							// function for the probability ratio
 
 	// ----------------------- W E I G H T S -------------------------
 #ifdef NQS_ANGLES_UPD
@@ -177,7 +185,8 @@ protected:
 	virtual void gradTime(size_t _step = 0, double _dt = 1e-4, _T _cL = 0.0);
 	
 	// ------------------------ E N E R G Y --------------------------
-	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> pKernelFunc_;	// function for the probability ratio
+	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> pKernelFunc_;		// function for the probability ratio
+	std::function<_T(std::initializer_list<int>, std::initializer_list<double>)> logPKernelFunc_;	// function for the probability ratio
 
 	/* ------------------------------------------------------------ */
 protected:
@@ -190,62 +199,68 @@ protected:
 
 public:
 	// ------------------------ S E T T E R S ------------------------
-	virtual void init()													= 0; // initialize the NQS (e.g., set the random state, etc.)
-	virtual void setRandomState(bool _upd = true);						// set the random state of the NQS
+	virtual void setRandomState(bool _upd = true) override;											// set the random state of the NQS
 
 	// --------------------------------------------------------------- 
 	
 	void setEarlyStopping(size_t _pat, double _minDlt);	
 	void setSregScheduler(int _sch = 0, double _sreg = 1e-7, double _sregd = 0.96, size_t _epo = 10, size_t _pat = 5);							
-	void setTrainParExc(const NQS_train_t& _par);  						// training the excited states (if needed)
+	void setTrainParExc(const MonteCarlo::MCS_train_t& _par);  										// training the excited states (if needed)
 	void setScheduler(int _sch = 0, double _lr = 1e-3, double _lrd = 0.96, size_t _epo = 10, size_t _pat = 5);									
 	/* ------------------------------------------------------------ */
 
 	// ------------------------ G E T T E R S ------------------------
 	auto saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const -> void { this->info_p_.saveInfo(_dir, _name, i); };
-	auto getInfo()								const -> std::string	{ return this->info_;					};
-	auto getNvis()								const -> uint			{ return this->info_p_.nVis_;			};
-	auto getF()									const -> NQSB			{ return this->F_;						};
-#ifdef NQS_USESR_MAT_USED
-	auto getCovarianceMat()						const -> NQSW			{ return this->S_;						};	
-#endif
-	// Hilbert
-	auto getHilbertSize()						const -> u64			{ return this->info_p_.Nh_;				};
-	// Hamiltonian
-	auto getHamiltonianInfo()					const -> std::string	{ return this->H_->getInfo();			};
-	auto getHamiltonianEigVal(u64 _idx)			const -> double			{ return this->H_->getEigVal(_idx);		};
-	auto getHamiltonian() const -> std::shared_ptr<Hamiltonian<_Ht, _spinModes>> { return this->H_;						};
-	auto getHilbertSpace() const -> Hilbert::HilbertSpace<_Ht, _spinModes> { return this->H_->getHilbertSpace();	};
+	auto getNvis()								const -> uint				{ return this->info_p_.nVis_;			};
+	auto getF()									const -> NQSB				{ return this->F_;						};
+#ifdef NQS_USESR_MAT_USED	
+	auto getCovarianceMat()						const -> NQSW				{ return this->S_;						};	
+#endif	
+	// Hilbert	
+	auto getHilbertSize()						const -> u64				{ return this->info_p_.Nh_;				};
+	// Hamiltonian	
+	auto getHamiltonianInfo()					const -> std::string		{ return this->H_->getInfo();			};
+	auto getHamiltonianEigVal(u64 _idx)			const -> double				{ return this->H_->getEigVal(_idx);		};
+	std::shared_ptr<Hamiltonian<_Ht, _spinModes>> getHamiltonian() const	{ return this->H_;						};
+	Hilbert::HilbertSpace<_Ht, _spinModes> getHilbertSpace() const   		{ return this->H_->getHilbertSpace();	};
+
+	// overriden MonteCarloSolver methods - get the state
+	virtual auto getLastConfig() 				const -> Config_t override 	{ return NQS_STATE; 					};
+
+	// overriden MonteCarloSolver methods - set the state
+	virtual auto setConfig(const Config_t& _state) 	-> void override 		{ this->setState(_state); 				};
+	virtual void reset(size_t _n) override;
+public:
 
 	// ----------------------- S A M P L I N G -----------------------
 	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
 
 	// single
-	virtual bool trainStop(size_t i, const NQS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false);	
+	virtual bool trainStop(size_t i, const MonteCarlo::MCS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false) override;
 	virtual bool trainStep(size_t i, arma::Col<_T>& En,
 									arma::Col<_T>& meanEn, 
 									arma::Col<_T>& stdEn, 
-									const NQS_train_t& _par, 
+									const MonteCarlo::MCS_train_t& _par, 
 									const bool quiet, 
 									const bool randomStart,
-									Timer& _timer);
+									Timer& _timer) override;
 
-	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(const NQS_train_t& _par,
-														  bool quiet			= false,	// shall talk? (default is false)
-														  bool randomStart 		= false,	// random start (default is false)
-														  clk::time_point _t	= NOW,		// time! (default is NOW)
-														  uint progPrc		= 25);
+	virtual std::pair<arma::Col<_T>, arma::Col<_T>> train(	const MonteCarlo::MCS_train_t& _par,
+														  	bool quiet			= false,		// shall talk? (default is false)
+														  	bool randomStart 		= false,	// random start (default is false)
+														  	clk::time_point _t	= NOW,			// time! (default is NOW)
+															uint progPrc		= 25);
 
 	// --------------------- C O L L E C T I N G ---------------------
 
 	// single 
 	template <typename _CT>
-	bool collectStep(size_t i, const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr);
+	bool collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr);
 	template <typename _CT>
-	void collect(const NQS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr, bool reset = false);
+	void collect(const MonteCarlo::MCS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr, bool reset = false);
 
 	// measurement
-	virtual bool collectStep(size_t i, const NQS_train_t& _par, 
+	virtual bool collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, 
 							NQSAv::MeasurementNQS<_T>& _meas,
 							arma::Col<_T>* _E, 
 							arma::Col<_T>* _EM,
@@ -253,7 +268,7 @@ public:
 							const bool quiet,
 							const bool randomStart,
 							Timer& _timer);
-	virtual void collect(const NQS_train_t& _par,
+	virtual void collect(const MonteCarlo::MCS_train_t& _par,
 						NQSAv::MeasurementNQS<_T>& _mes 	= {},
 						arma::Col<_T>* _energies			= nullptr,
 						arma::Col<_T>* _energiesStd			= nullptr,
@@ -262,34 +277,39 @@ public:
 						clk::time_point _t					= NOW,
 						uint progPrc						= 25);
 	// other
-	virtual void collect(const NQS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
+	virtual void collect(const MonteCarlo::MCS_train_t& _par, NQSAv::MeasurementNQS<_T>& _mes);
 	// for collecting the \sum _s f(s) / \psi(s) - used for the gradient calculation
-	virtual void collect_ratio(const NQS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
-	virtual void collect_ratio(const NQS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
+	virtual void collect_ratio(const MonteCarlo::MCS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container);
+	virtual void collect_ratio(const MonteCarlo::MCS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container);
 
 	// ----------------------- E V O L V E -----------------------
 
 	// single
 	virtual bool evolveStep(size_t step, double dt, arma::Col<_T>& En,
-							const NQS_train_t& _par, 
+							const MonteCarlo::MCS_train_t& _par, 
 							const bool quiet, 
 							const bool randomStart,
 							Timer& _timer);
 							
 	// ----------------------- F I N A L E -----------------------
-	virtual auto ansatz(const NQSS& _in)		const ->_T				= 0;
-	virtual auto ansatzlog(const NQSS& _in)		const ->_T				= 0;
-	virtual auto ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const -> _T = 0;
+	virtual auto ansatzlog(const NQSS& _in)															const -> _T 	= 0;
+	virtual auto ansatz(const NQSS& _in)															const -> _T 	= 0;
+	virtual auto ansatz_ratiolog(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) 	const -> _T 	= 0;
+	virtual auto ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T 	{ return std::exp(this->ansatz_ratiolog(_in, _other)); };
 
 	// -------------------- C O N S T R U C T --------------------
 
 public:
-	virtual ~NQS();
+	virtual ~NQS() override;
 	NQS() = default;
 	NQS(const NQS& _n)
-		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
-		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+		: info_p_(_n.info_p_), H_(_n.H_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
+		this->accepted_ 	= _n.accepted_;
+		this->total_ 		= _n.total_;
+		this->info_ 		= _n.info_;
+		this->ran_			= _n.ran_;
+		this->pBar_			= _n.pBar_;
 		// this->threads_ 		= _n.threads_;
 		// initialize the information 
 		this->info_p_  		= _n.info_p_;
@@ -300,9 +320,14 @@ public:
 #endif
 	}
 	NQS(NQS&& _n)
-		: info_p_(_n.info_p_), H_(_n.H_), info_(_n.info_), pBar_(_n.pBar_), 
-		ran_(_n.ran_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+		: info_p_(_n.info_p_), H_(_n.H_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 	{
+		this->accepted_ 	= _n.accepted_;
+		this->total_ 		= _n.total_;
+		this->beta_ 		= _n.beta_;
+		this->info_ 		= std::move(_n.info_);
+		this->ran_			= std::move(_n.ran_);
+		this->pBar_			= std::move(_n.pBar_);
 		// this->threads_ 		= std::move(_n.threads_);
 		// initialize the information
 		this->info_p_  		= std::move(_n.info_p_);
@@ -314,7 +339,6 @@ public:
 	}
 	NQS &operator=(const NQS & _n)
 	{	
-		this->info_p_				= _n.info_p_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
@@ -334,7 +358,6 @@ public:
 	}
 	NQS &operator=(NQS &&_n)
 	{
-		this->info_p_				= _n.info_p_;
 		this->H_					= _n.H_;
 		this->info_					= _n.info_;
 		this->pBar_					= _n.pBar_;
@@ -374,7 +397,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setRandomState(bool _upd)
 		this->setState(randomState, _upd);
 	} else {
 		// set from integer
-		this->setState(this->ran_.template randomInt<u64>(0, this->info_p_.Nh_ - 1), _upd);
+		this->setState(this->ran_->template randomInt<u64>(0, this->info_p_.Nh_ - 1), _upd);
 	}
 };
 
@@ -510,6 +533,16 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
 			this->threads_.threads_[_thread].join();
 #endif
 	// ######################################################################################################################################
+
+	// don't delete the random number generator as it is shared with the Hamiltonian
+	
+	// ######################################################################################################################################
+	if (this->pBar_ != nullptr) {
+		delete this->pBar_;
+		this->pBar_ = nullptr;
+	}
+
+	// ######################################################################################################################################
 	if (this->precond_ != nullptr) {
 		delete this->precond_;
 		this->precond_ = nullptr;
@@ -562,7 +595,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief General constructor of the NQS solver
 * @param _H Hamiltonian to be used for correct data sampling
 * @param _lr learning rate to be used for the training
@@ -581,6 +614,7 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	const size_t _Ns			= 			_H->getNs();	
 	this->pRatioFunc_			= 			[&](const NQSS& _v) { return this->pRatio(_v); };
 	this->pKernelFunc_			= 			[&](std::initializer_list<int> fP, std::initializer_list<double> fV) { return this->pRatio(fP, fV); };
+	this->logPKernelFunc_		= 			[&](std::initializer_list<int> fP, std::initializer_list<double> fV) { return this->logPRatio(fP, fV); };
 
 	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta, this);
 	this->lower_states_.exc_ratio_ = 		[&](const NQSS& _v) { return this->pRatio(_v); };
@@ -601,7 +635,7 @@ inline NQS<_spinModes, _Ht, _T, _stateType>::NQS(std::shared_ptr<Hamiltonian<_Ht
 	// check the Hilbert space
 	this->info_p_.Nh_			=			_H->getHilbertSize();
 	// set the random number generator
-	this->ran_					=			_H->ran_;
+	this->ran_					=			&_H->ran_;
 	// set threads
 	this->initThreads(_threadNum);
 

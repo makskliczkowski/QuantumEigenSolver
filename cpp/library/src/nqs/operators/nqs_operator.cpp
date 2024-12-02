@@ -349,7 +349,7 @@ namespace NQSAv
                     const arma::Mat<_T>& M = _cont.mbval();
                     if (M.size() != 0)
                         for (const auto& ext : _ext)
-                            saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || app);
+                            saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || this->opG_.size() > 0 || app);
                 }
             }
         }
@@ -369,7 +369,7 @@ namespace NQSAv
                     const arma::Mat<_T>& M = _cont.mbval();
                     if (M.size() != 0)
                         for (const auto& ext : _ext)
-                            saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || app);
+                            saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || this->opG_.size() > 0 || this->opL_.size() > 0 || app);
                 }
             }
         }

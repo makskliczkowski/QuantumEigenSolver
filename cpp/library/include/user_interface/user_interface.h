@@ -896,13 +896,10 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
-		break;
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
@@ -971,13 +968,10 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
-		break;
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
@@ -1043,12 +1037,10 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 		break;
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);

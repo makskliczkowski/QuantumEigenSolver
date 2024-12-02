@@ -1,4 +1,5 @@
 #include "../../include/NQS/nqs_final.hpp"
+#include "../../source/src/Include/random.h"
 
 // ##########################################################################################################################################
 
@@ -6,13 +7,24 @@
 
 // ##########################################################################################################################################
 
-/** 
-* @brief Block updates the current state according to Metropolis-Hastings algorithm. The block size is chosen so that
-* it gives the given statistics of the averages found.
-* @param _bSize the size of the correlation block; how many flips one needs to do in order to get rid of the MC correlations - bin size 
-* @param _start the state to start from
-* @param _nFlip number of flips in a single step
-* @param _therm whether the thermalization is needed
+/**
+* @brief Perform block sampling for the Neural Quantum State (NQS).
+*
+* This function performs block sampling for the NQS, which involves flipping spins and 
+* updating the state based on the Metropolis-Hastings algorithm. The function can also 
+* handle thermalization if required.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the NQS.
+* @tparam _stateType Type of the state representation.
+* @param _bSize Number of block steps to perform.
+* @param _start Initial state to start sampling from.
+* @param _therm Boolean flag indicating whether thermalization is required.
+* @note For the probability calculation, here the temperature is used as the inverse of the beta parameter. As for default, beta is set to 1. and 
+*	   	the temperature is set to 1.0 - we recall the original implementation of the Metropolis-Hastings algorithm for NQS. Otherwise the beta parameter
+*		should be set to the desired value (0 - infinite) and the temperature should be set to 1.0 / beta - used for the parallel tempering algorithm.
+* 		!TODO: Implement the parallel tempering algorithm and check whether the temperature is set correctly.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start, bool _therm)
@@ -31,12 +43,14 @@ void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T 
 		this->applyFlipsT(); 														// flip the vector - use temporary vector tmpVec to store the flipped vector
 
 #ifndef NQS_ANGLES_UPD
-		double proba = std::abs(this->pRatio(this->curVec_, this->tmpVec_));
+		// double proba = std::abs(this->pRatio(this->curVec_, this->tmpVec_));
+		double proba = std::abs(std::exp(this->beta_ * this->logPRatio(this->curVec_, this->tmpVec_)));
 #else
-		double proba = std::abs(this->pRatio(this->nFlip_)); 						// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
+		// double proba = std::abs(this->pRatio(this->nFlip_)); 					// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
+		double proba = std::abs(std::exp(this->beta_ * this->logPRatio(this->nFlip_)));
 #endif
 		proba = proba * proba;
-		if (this->ran_.template random<double>() < proba) 							// we need to take into account the probability coming from the ratio of states (after and before the flip)
+		if (this->ran_->template random<double>() < proba) 							// we need to take into account the probability coming from the ratio of states (after and before the flip)
 		{
 			this->accepted_++; 														// increase the number of accepted flips
 			this->applyFlipsC(); 													// update current state and vector when the flip has been accepted (the probability is higher than the random number)
@@ -51,12 +65,10 @@ void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T 
 	}
 
 #ifndef NQS_USE_VEC_ONLY
-	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_); // set the integer state			
+	this->curState_ = BASE_TO_INT<u64>(this->curVec_, discVal_); 					// set the integer state			
 #endif
-
-	// Set the state again if angles update is disabled
 #ifndef NQS_ANGLES_UPD
-	this->setState(NQS_STATE, true); // set the state again									
+	this->setState(NQS_STATE, true); 												// Set the state again if angles update is disabled
 #endif
 }
 
@@ -73,9 +85,22 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, blockSample, void, (uin
 // ##########################################################################################################################################
 
 /**
-* @brief Calculate the local energy depending on the given Hamiltonian - kernel with OpenMP is used
-* when the omp pragma NQS_USE_OMP is set or multithreading is not used, otherwise threadpool is used
-* to calculate the local energies.
+* @brief Computes the local energy kernel for the Neural Quantum State (NQS).
+*
+* This function calculates the local energy of the NQS using either OpenMP for parallelization
+* or a custom threading mechanism, depending on the compilation flags. The local energy is 
+* computed by iterating over all sites and summing up the contributions from each site (quantum state mode within a Hamiltonian).
+* The function also handles the computation of the local energy for lower states if they are used as:
+* E_loc += \sum _{s'} <s|psi_wl><psi_wl|s'> \times \frac{\psi _w(s')}{\psi _w(s)} \times \frac{\psi _wl(s)}{\psi _wl(s')} \times proba_wl(s', s)
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the energy.
+* @tparam _stateType State type.
+* @return The computed local energy of type _T - this is always casted to the correct type (double or complex).
+*
+* @note If NQS_USE_OMP is defined, OpenMP is used for parallelization. Otherwise, a custom 
+*       threading mechanism is employed.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
@@ -133,7 +158,7 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel()
 #endif
 			for (int _low = 0; _low < this->lower_states_.f_lower.size(); _low++)
 				_elower += this->lower_states_.collectLowerEnergy(_low);
-			energy += _elower;
+			energy += _elower;													// add the lower states energy contribution (at the end)
 		}
 
 		return energy;
@@ -150,12 +175,22 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, locEnKernel, std::compl
 ///////////////////////////////////////////////////////////////////////
 
 #ifdef NQS_NOT_OMP_MT
+
 /**
-* @brief Allows to run a thread pool based on the condition that all threads wait for a mutex to further run the program.
-* The threads are killed when the program is finished. The function calculates the local energy for a given thread.
-* @param _start starting site for a given thread
-* @param _end ending site for a given thread
-* @param _threadNum number of the thread currently run
+* @brief Kernel function to compute the local energy for a range of sites.
+*
+* This function is executed by a thread to compute the local energy for a specified range of sites (quantum state modes).
+* The thread will wait until it is signaled to run, and will terminate if the kill flag is set.
+* The computed local energy is stored in the thread's kernel value and the flag is set to indicate that the thread has finished.
+* The flag is given in the form of a condition variable to notify other threads if needed.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the local energy.
+* @tparam _stateType State type.
+* @param _start The starting index of the site range.
+* @param _end The ending index of the site range.
+* @param _threadNum The index of the thread executing this function.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::locEnKernel(uint _start, uint _end, uint _threadNum)

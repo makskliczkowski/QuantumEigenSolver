@@ -43,7 +43,7 @@
 *
 * #### Example:
 * ```cpp
-* NQS_train_t params = {1000, 100, 10, 50, "training_data", 1}; // example parameters
+* MonteCarlo::MCS_train_t params = {1000, 100, 10, 50, "training_data", 1}; // example parameters
 * auto meanEnergies = nqs.train(params, false, std::chrono::system_clock::now(), 25);
 * ```
 *

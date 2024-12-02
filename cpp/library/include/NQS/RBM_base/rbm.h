@@ -37,16 +37,14 @@ protected:
 	NQSB bH_;												// hidden bias
 	
 	// ------------------------- A N G L E S -------------------------
-	NQSB theta_;
-	NQSB thetaCOSH_;
-	NQSB thetaCOSH_log_;
+	NQSB theta_, thetaCOSH_, thetaCOSH_log_;				// for storing the angles for the RBM
+
 	// calculate the hiperbolic cosine of the function to obtain the ansatz
 	auto coshF(const NQSS& _v)		const -> NQSB			{ return arma::cosh(this->bH_ + this->W_ * _v);		};
 	auto coshF()					const -> NQSB			{ return arma::cosh(this->theta_);					};
 	// ---------------------- T H R E A D I N G ---------------------
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
-	// create the map for thetas for a given thread
-	std::map<std::thread::id, NQSB> thetaTmp_;
+#ifdef NQS_NOT_OMP_MT
+    thread_local static inline NQSB thetaTMP_;				// Thread-local storage for thetaTMP
 #endif
 	NQSB thetaTmpCol_;
 	
@@ -62,13 +60,12 @@ protected:
 
 	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
-	virtual auto pRatio(uint fP, float fV)			-> _T	override = 0;
-	virtual auto pRatio(uint nFlips)				-> _T	override = 0;
-	virtual auto pRatio(const NQSS& _v1,
-					const NQSS& _v2)				-> _T	override = 0;
-	virtual auto pRatio(const NQSS& _v1)			-> _T	override = 0;
-	virtual auto pRatio(std::initializer_list<int> fP,
-						std::initializer_list<double> fV) -> _T	override = 0;
+	virtual auto logPRatio(uint fP, float fV)				-> _T override = 0;
+	virtual auto logPRatio(uint nFlips)						-> _T override = 0;
+	virtual auto logPRatio(const NQSS& _v1, const NQSS& _v2)-> _T override = 0;
+	virtual auto logPRatio(const NQSS& _v1)					-> _T override = 0;
+	virtual auto logPRatio(std::initializer_list<int> fP,
+						std::initializer_list<double> fV) 	-> _T override = 0;
 
 	// ------------------------ W E I G H T S ------------------------
 public:
@@ -97,7 +94,7 @@ protected:
 	// -------------------------------------------------------------------
 public:
 	virtual ~RBM()											{ DESTRUCTOR_CALL; };
-	RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1,
+	RBM(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1,
 													const NQSLS_p& _lower = {}, 
 													const std::vector<double>& _beta = {});
 
@@ -113,54 +110,14 @@ public:
 	// --------------------- F I N A L E -----------------------
 	virtual auto ansatz(const NQSS& _in) 					const -> _T override;
 	virtual auto ansatzlog(const NQSS& _in) 				const -> _T override;
-	virtual auto ansatz_ratio(const NQSS& _in, 
+	virtual auto ansatz_ratiolog(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
 };	
 
-// ##########################################################################################################################################
-
-// ############################################################## A N S A T Z ###############################################################
-
-// ##########################################################################################################################################
-
-/*
-* @brief reproduces the RBM NQS ANSATZ.
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
-{
-	return std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in));
-	// / std::sqrt(this->info_p_.nVis_);
-};
-
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) const
-{
-	return arma::dot(this->bV_, _in) + arma::sum(arma::log(this->coshF(_in)));
-}
-
-////////////////////////////////////////////////////////////////////////////
-
-/*
-* @brief calculates the ratio of the two RBM states - used for calculating the excited states (_other->ansatz / this->ansatz)
-* @param _in vector to calculate the ratio for
-* @param _other pointer to the other NQS to calculate the ratio with
-* @return ratio of the two states (other / this) for a given state _in (vector)
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
-{
-	auto _rbm_other = dynamic_cast<RBM<_spinModes, _Ht, _T, _stateType>*>(_other);
-
-#ifdef NQS_LOWER_RATIO_LOGDIFF
-	_T log_ratio = (arma::dot(_rbm_other->bV_ - this->bV_, _in)) + 
-					arma::sum(arma::log(_rbm_other->coshF(_in))) - 
-					arma::sum(arma::log(this->coshF(_in)));
-	return std::exp(log_ratio);
-#else
-	return std::exp(arma::dot(_rbm_other->bV_ - this->bV_, _in)) * arma::prod(_rbm_other->coshF(_in) / this->coshF(_in));
-#endif
-}
+#define RBM_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS, ADD) 							\
+					template FUNRET  RBM<2u, _Ht, _T, double>::FUN ARGS ADD; 	\
+					template FUNRET  RBM<3u, _Ht, _T, double>::FUN ARGS ADD; 	\
+					template FUNRET  RBM<4u, _Ht, _T, double>::FUN ARGS ADD; 	
 
 ////////////////////////////////////////////////////////////////////////////
 
@@ -191,40 +148,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 								this->W_.n_rows, this->W_.n_cols);
 }
 
-// ##########################################################################################################################################
 
-// ############################################################ G R A D I E N T #############################################################
-
-// ##########################################################################################################################################
-
-/*
-* @brief At each step calculates the variational derivatives and stores them in the _derivatives matrix.
-* @param _v vector to calculate the derivatives for
-* @param _plc row at which to store the derivatives
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
-{
-	// get the subviews
-	auto _currDerivative	= this->derivatives_.row(_plc);
-	auto _hiddDerivative	= _currDerivative.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
-	auto _weightsDerivative = _currDerivative.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1);
-
-	// update the angles if it is necessary
-#ifndef NQS_ANGLES_UPD
-	this->setTheta(_v);
-#endif
-
-	// calculate the flattened part
-	_currDerivative.head(this->info_p_.nVis_) 	= arma::conv_to<arma::Row<_T>>::from(_v);
-	_hiddDerivative								= arma::tanh(this->theta_).as_row();
-
-// #ifndef _DEBUG
-// #pragma omp parallel for
-// #endif
-	for (int j = 0; j < this->info_p_.nVis_; ++j)
-		_weightsDerivative.subvec(j * this->nHid_, (j + 1) * this->nHid_ - 1) = _v(j) * _hiddDerivative;
-}
 
 // ##########################################################################################################################################
 
@@ -233,6 +157,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc
 // ##########################################################################################################################################
 
 ///////////////////////////////////////////////////////////////////////
+
 #ifdef NQS_ANGLES_UPD
 /*
 * @brief Update angles with the flipped spin (spins)

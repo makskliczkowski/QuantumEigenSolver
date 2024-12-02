@@ -78,12 +78,12 @@ protected:
 
 	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
-	auto pRatio(uint fP, float fV)			-> _T				override final;
-	auto pRatio(uint nFlips)				-> _T				override final;
-	auto pRatio(const NQSS& _v1,
-					const NQSS& _v2)		-> _T				override final;
-	auto pRatio(std::initializer_list<int> fP,
-				std::initializer_list<double> fV) -> _T			override final;
+	auto logPRatio(uint fP, float fV)							-> _T override final;
+	auto logPRatio(uint nFlips)									-> _T override final;
+	auto logPRatio(const NQSS& _v1,
+					const NQSS& _v2)							-> _T override final;
+	auto logPRatio(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)				-> _T override final;
 
 	// ------------------------ W E I G H T S ------------------------
 public:
@@ -114,7 +114,7 @@ protected:
 						arma::Mat<_T>& _Xtmp)					= 0;
 public: 				  
 	~RBM_PP() override											{ DESTRUCTOR_CALL;												};
-	RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, double _lr, uint _threadNum = 1, 
+	RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, double _lr, uint _threadNum = 1, 
 													int _nPart = -1, 
 													const NQSLS_p& _lower = {}, 
 													std::vector<double> _beta = {});
@@ -177,7 +177,7 @@ public:
 	// --------------------- F I N A L E -----------------------
 	auto ansatz(const NQSS& _in)			const -> _T			override final;
 	auto ansatzlog(const NQSS& _in)			const -> _T			override final;
-	auto ansatz_ratio(const NQSS& _in, 
+	auto ansatz_ratiolog(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 			const -> _T override final;
 };
 
@@ -188,7 +188,7 @@ public:
 // ##########################################################################################################################################
 
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht>> _H, uint _nHid, 
+RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, 
 							double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta)
 	: RBM_S<_spinModes, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nPart, _lower, _beta)
 {

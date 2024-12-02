@@ -2137,16 +2137,31 @@ namespace Operators {
 
 		// ##########################################################################################################################################
 
-		/*
-		* @brief Normalizes the operator value and stores it in the samples - for the Monte Carlo sampling etc. - this allows 
-		* to store the value of the operator for the given state and then normalize it to the number of samples taken and obtain
-		* all averages for multiple blocks of the samples. [nBlocks x nSamples (average)]
-		* @param reset if true, the current value of the operator is reset to zero and the number of samples is reset to zero 
+
+		/**
+		* @brief Normalizes the operator based on the number of samples and optionally resets the current value and sample count.
+		*
+		* This function normalizes the operator by dividing the current value by the number of samples and storing the result.
+		* If the number of samples is 1, the current value is directly stored without division.
+		* Optionally, the function can reset the current value and sample count after normalization.
+		*
+		* @tparam _T The type of the operator's value.
+		* @param _samples The number of samples to normalize the operator with.
+		* @param reset A boolean flag indicating whether to reset the current value and sample count after normalization.
+		* @throws std::runtime_error If no samples have been taken for the operator.
 		*/
 		template <typename _T>
 		inline void Operators::Containers::OperatorContainer<_T>::normalize(size_t _samples, bool reset)
 		{
-			this->samples_.push_back(this->currentValue_ / (long double)_samples);
+			if (_samples == 0)
+				throw std::runtime_error("No samples taken for the operator!");
+
+			// normalize the operator
+			if (_samples == 1)
+				this->samples_.push_back(this->currentValue_);
+			else			
+				this->samples_.push_back(this->currentValue_ / (long double)_samples);
+
 			if (reset)
 			{
 				this->resetValue();

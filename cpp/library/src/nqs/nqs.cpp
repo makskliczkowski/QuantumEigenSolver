@@ -26,36 +26,6 @@
 // ##########################################################################################################################################
 
 /**
-* @brief Logs the configuration details of the NQS training process.
-*
-* This function constructs a formatted string containing various parameters
-* related to the Neural Quantum State (NQS) training process and logs it
-* with a specified log level and type.
-*
-* @param _in A string to be prefixed to the log message.
-*
-* The logged information includes:
-* - Monte Carlo Samples: The number of Monte Carlo samples used in the training.
-* - Thermalization Steps: The number of thermalization steps performed.
-* - Number of blocks (single sample): The number of blocks in a single sample.
-* - Size of the single block: The size of each block.
-* - Number of flips taken at each step: The number of flips performed at each step.
-*/
-void NQS_train_t::hi(const std::string& _in) const
-{
-    std::string outstr = "";
-    strSeparatedP(outstr, ',', 2,
-                VEQV(Monte Carlo Samples, this->MC_sam_),
-                VEQV(Thermalization Steps, this->MC_th_),
-                VEQV(Number of blocks (single sample), this->nblck_),
-                VEQV(Size of the single block, this->bsize_),
-                VEQV(Number of flips taken at each step, this->nFlip));
-    LOGINFOG(_in + outstr, LOG_TYPES::TRACE, 1);
-}
-
-// ##########################################################################################################################################
-
-/**
 * @brief Saves the NQS (Neural Quantum State) information to a specified file.
 * 
 * This function saves various parameters and histories related to the NQS to an HDF5 file.
@@ -135,5 +105,20 @@ template class NQS<4u, cpx, double, double>;
 template class NQS<2u, double, cpx, double>;
 template class NQS<3u, double, cpx, double>;
 template class NQS<4u, double, cpx, double>;
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::reset(size_t _n)
+{
+    this->derivativesReset(_n); 				// reset the derivatives
+	this->lower_states_.setDerivContSize(_n);	// set the size of the containers for the lower states
+}
+
+// template instantiation of the function above
+NQS_INST_CMB(double, double, reset, void, (size_t));
+NQS_INST_CMB(double, std::complex<double>, reset, void, (size_t));
+NQS_INST_CMB(std::complex<double>, double, reset, void, (size_t));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, reset, void, (size_t));
 
 // ##########################################################################################################################################

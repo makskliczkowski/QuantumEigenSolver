@@ -26,6 +26,8 @@ icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ./src/nqs/nqs_opt.cpp                                   \
         ./src/nqs/nqs_lower.cpp                                 \
         ./src/nqs/nqs_sampling.cpp                              \
+        ./src/nqs/rbm/rbm.cpp                                   \
+        ./src/nqs/rbm/rbm_spin.cpp                             \
         ./src/nqs/operators/nqs_operator.cpp                    \
         ./src/operator_parser.cpp                               \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp    \

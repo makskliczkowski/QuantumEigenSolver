@@ -52,7 +52,7 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
-    NQS_train_t train_lower_;                                       // training information for the lower states                       
+    MonteCarlo::MCS_train_t train_lower_;                           // training information for the lower states                       
     NQS<_spinModes, _Ht, _T, _stateType>* nqs_exc_;			    	// pointer to the excited state NQS instance
     size_t Ns_                      =       0;                      // number of the states in the basis
     bool isSet_						= 		false;

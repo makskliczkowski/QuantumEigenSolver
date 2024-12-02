@@ -407,12 +407,6 @@ namespace Operators
 			return _op;
 		}
 
-		/*
-		* @brief multiplication of sigma_zi | state > - correlation - global
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at
-		* @returns the operator acting on the _part site
-		*/
 		/**
 		* @brief Constructs a sigma_z (Pauli-Z) operator for a quantum system of size _Ns.
 		*
@@ -1031,7 +1025,7 @@ namespace Operators
 				_T _val = 1.0;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 0)
+					if (i % 2 == 1)
 					{
 						for (auto const& site : sites)
 						{
@@ -1070,7 +1064,7 @@ namespace Operators
 				_OP_V_T _base_vec = base_vec;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 0)
+					if (i % 2 == 1)
 					{
 						for (auto const& site : sites)
 						{
@@ -1111,7 +1105,7 @@ namespace Operators
 
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 0)
+					if (i % 2 == 1)
 					{
 						for (auto const& site : sites)
 						{

@@ -8,7 +8,7 @@
 
 #include <memory>
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, 
+RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, uint _nHid, 
 										double _lr, uint _threadNum, int _nPart,
 										const NQSLS_p& _lower, 
 										const std::vector<double>& _beta)
@@ -43,7 +43,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	// allocate the vector for using it in the RBM
 	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
-		this->thetaTmp_[this->threads_.threads_[_thread].get_id()] = NQSB(this->nHid_);
+		this->thetaTMP_ = NQSB(this->nHid_);
 #endif
 	this->thetaTmpCol_ = NQSB(this->nHid_);
 	// allocate the rest
@@ -66,18 +66,18 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
 
 	// Initialize visible biases
 	for (int i = 0; i < this->info_p_.nVis_; i++) {
-		this->bV_(i) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
+		this->bV_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
 	}
 
 	// Initialize hidden biases
 	for (int i = 0; i < this->nHid_; i++) {
-		this->bH_(i) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
+		this->bH_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
 	}
 
 	// Initialize weights matrix using Xavier Initialization
 	for (int i = 0; i < this->W_.n_rows; i++) {
 		for (uint j = 0; j < this->W_.n_cols; j++) {
-			this->W_(i, j) = algebra::cast<_T>(this->ran_.template randomNormal<double>(0.0, stddev) + I * this->ran_.template randomNormal<double>(0.0, stddev));
+			this->W_(i, j) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
 		}
 	}
 	// initialize with a random state

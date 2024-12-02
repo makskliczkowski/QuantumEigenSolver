@@ -155,18 +155,6 @@ file(GLOB_RECURSE SOURCES
 # Set the source files
 set(SOURCES 
     main.cpp 
-    operators.cpp 
-    user_interface.cpp 
-    src/nqs/nqs.cpp
-    src/nqs/nqs_opt.cpp
-    src/nqs/nqs_lower.cpp
-    src/nqs/nqs_sampling.cpp
-    src/nqs/operators/nqs_operator.cpp
-    src/user_interface/ui_check_eth.cpp
-    src/user_interface/ui_check_nqs.cpp
-    src/user_interface/ui_check_quadratic.cpp
-    src/user_interface/ui_check_symmetries.cpp
-    src/operator_parser.cpp
     ${CPPSOURCE}/common.cpp 
     ${CPPSOURCE}/directories.cpp 
     ${CPPSOURCE}/exceptions.cpp 
@@ -174,6 +162,7 @@ set(SOURCES
     ${CPPSOURCE}/ui.cpp 
     ${CPPSOURCE}/time.cpp
     ${CPPSOURCE}/maths.cpp
+    ${CPPSOURCE}/Random/montecarlo.cpp
     ${CPPSOURCE}/Lattices/lattices.cpp 
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
@@ -188,6 +177,20 @@ set(SOURCES
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
     ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
     ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
+    operators.cpp 
+    user_interface.cpp 
+    src/nqs/nqs.cpp
+    src/nqs/nqs_opt.cpp
+    src/nqs/nqs_lower.cpp
+    src/nqs/nqs_sampling.cpp
+    src/nqs/rbm/rbm.cpp
+    src/nqs/rbm/rbm_spin.cpp
+    src/nqs/operators/nqs_operator.cpp
+    src/user_interface/ui_check_eth.cpp
+    src/user_interface/ui_check_nqs.cpp
+    src/user_interface/ui_check_quadratic.cpp
+    src/user_interface/ui_check_symmetries.cpp
+    src/operator_parser.cpp
 )
 
 # Set the include directories

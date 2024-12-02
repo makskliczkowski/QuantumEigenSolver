@@ -12,7 +12,7 @@
 * @param _par Training parameters to be set.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const NQS_train_t& _par)
+void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const MonteCarlo::MCS_train_t& _par)
 {
 	this->lower_states_.train_lower_ = _par;
 	LOGINFO("Training parameters for lower states set.", LOG_TYPES::INFO, 2);

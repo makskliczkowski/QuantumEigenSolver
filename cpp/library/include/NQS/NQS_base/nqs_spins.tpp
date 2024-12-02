@@ -18,7 +18,7 @@ class NQS_S<2, _Ht, _T, _stateType> : public NQS<2, _Ht, _T, _stateType>
 	NQS_PUBLIC_TYPES(_T, _stateType);
 	using NQSLS_p =	typename NQS<2, _Ht, _T, _stateType>::NQSLS_p;
 public:
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum = 1, int _nParticles = 1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
+	NQS_S(std::shared_ptr<Hamiltonian<_Ht, 2>>& _H, double _lr, uint _threadNum = 1, int _nParticles = 1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
 		: NQS<2, _Ht, _T, _stateType>(_H, _lr, _threadNum, _H->getNs(), _lower, _beta) 
 	{	};
 
@@ -43,7 +43,7 @@ template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 {
 	
-	this->flipPlaces_[0] 	= this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
+	this->flipPlaces_[0] 	= this->ran_->template randomInt<uint>(0, this->info_p_.nVis_);
 	this->flipVals_[0] 		= this->tmpVec_(this->flipPlaces_[0]);
 	if (this->nFlip_ == 1)
 		return;
@@ -54,7 +54,7 @@ inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 	{
 		uint fP;
 		do {
-			fP = this->ran_.template randomInt<uint>(0, this->info_p_.nVis_);
+			fP = this->ran_->template randomInt<uint>(0, this->info_p_.nVis_);
 		} while (chosenPlaces.find(fP) != chosenPlaces.end());
 		chosenPlaces.insert(fP);
 		

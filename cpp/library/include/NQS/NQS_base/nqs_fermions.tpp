@@ -18,13 +18,13 @@ class NQS_S<4, _Ht, _T, _stateType> : public NQS<4, _Ht, _T, _stateType>
 	NQS_PUBLIC_TYPES(_T, _stateType);
 	using NQSLS_p =	typename NQS<4, _Ht, _T, _stateType>::NQSLS_p;
 public:
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, double _lr, uint _threadNum, int _nParticles, 
+	NQS_S(std::shared_ptr<Hamiltonian<_Ht, 4>>& _H, double _lr, uint _threadNum, int _nParticles, 
 									const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
 		: NQS<4, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nParticles, _lower, _beta) {};
 	
 protected:
 	// -------------------------- F L I P S --------------------------
-	virtual void chooseRandomFlips();
+	virtual void chooseRandomFlips() override;
 
 	// apply flips to the temporary vector or the current vector according the template
 	virtual void applyFlipsT() override								{ LOG_ERROR("NOT IMPLEMENTED FOR FERMIONS YET"); };
@@ -50,10 +50,7 @@ inline void NQS_S<4, _Ht, _T, _stateType>::chooseRandomFlips()
 template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<4, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
 {
-	// check if the NQS shall conserve particles
-	this->nFlip_ = this->conservesParticles_ ? 2 * _nFlips : _nFlips;
-	this->flipPlaces_.resize(this->nFlip_);
-	this->flipVals_.resize(this->nFlip_);
+	LOG_ERROR("NOT IMPLEMENTED FOR FERMIONS YET");
 }
 
 #endif
