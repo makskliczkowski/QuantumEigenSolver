@@ -122,3 +122,41 @@ NQS_INST_CMB(std::complex<double>, double, reset, void, (size_t));
 NQS_INST_CMB(std::complex<double>, std::complex<double>, reset, void, (size_t));
 
 // ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::swapConfig(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _other)
+{
+    auto _st_other = _other->getLastConfig();           // get the last configuration of the other solver
+    _other->setConfig(NQS_STATE);                       // swap the configurations
+    this->setConfig(_st_other);                         // swap the configurations
+}
+
+// template instantiation of the function above
+NQS_INST_CMB(double, double, swapConfig, void, (MC_t_p));
+NQS_INST_CMB(double, std::complex<double>, swapConfig, void, (MC_t_p));
+NQS_INST_CMB(std::complex<double>, double, swapConfig, void, (MC_t_p));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, swapConfig, void, (MC_t_p));
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p NQS<_spinModes, _Ht, _T, _stateType>::clone() const
+{
+    return std::make_shared<NQS<_spinModes, _Ht, _T, _stateType>>(*this);
+}
+
+// template instantiation of the function above
+template NQS<2u, double, double, double>::MC_t_p NQS<2u, double, double, double>::clone() const;
+template NQS<3u, double, double, double>::MC_t_p NQS<3u, double, double, double>::clone() const;
+template NQS<4u, double, double, double>::MC_t_p NQS<4u, double, double, double>::clone() const;
+template NQS<2u, cpx, cpx, double>::MC_t_p NQS<2u, cpx, cpx, double>::clone() const;
+template NQS<3u, cpx, cpx, double>::MC_t_p NQS<3u, cpx, cpx, double>::clone() const;
+template NQS<4u, cpx, cpx, double>::MC_t_p NQS<4u, cpx, cpx, double>::clone() const;
+template NQS<2u, cpx, double, double>::MC_t_p NQS<2u, cpx, double, double>::clone() const;
+template NQS<3u, cpx, double, double>::MC_t_p NQS<3u, cpx, double, double>::clone() const;
+template NQS<4u, cpx, double, double>::MC_t_p NQS<4u, cpx, double, double>::clone() const;
+template NQS<2u, double, cpx, double>::MC_t_p NQS<2u, double, cpx, double>::clone() const;
+template NQS<3u, double, cpx, double>::MC_t_p NQS<3u, double, cpx, double>::clone() const;
+template NQS<4u, double, cpx, double>::MC_t_p NQS<4u, double, cpx, double>::clone() const;
+
+// ##########################################################################################################################################

@@ -184,9 +184,9 @@ struct NQS_thread_t
 #define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 							\
 					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 	\
 					template FUNRET  NQS<3u, _Ht, _T, double>::FUN ARGS; 	\
-					template FUNRET  NQS<4u, _Ht, _T, double>::FUN ARGS; 	\
-					template FUNRET  NQS<2u, _Ht, _T, cpx>::FUN ARGS; 		\
-					template FUNRET  NQS<3u, _Ht, _T, cpx>::FUN ARGS; 		\
-					template FUNRET  NQS<4u, _Ht, _T, cpx>::FUN ARGS; 	
+					template FUNRET  NQS<4u, _Ht, _T, double>::FUN ARGS; 
+					// template FUNRET  NQS<2u, _Ht, _T, cpx>::FUN ARGS; 
+					// template FUNRET  NQS<3u, _Ht, _T, cpx>::FUN ARGS; 
+					// template FUNRET  NQS<4u, _Ht, _T, cpx>::FUN ARGS; 	
 
 // ##########################################################################################################################################

@@ -37,14 +37,17 @@ template <uint _spinModes,
 		typename _Ht,
 		typename _T			= _Ht, 
 		class _stateType	= double>
-class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<double>>
+class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>
 {	
 	// type definitions 
 	NQS_PUBLIC_TYPES(_T, double);	
+	using MC_t							=		MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>;
+	using MC_t_p 						= 		std::shared_ptr<MC_t>;
+	using Container_t 					=		MC_t::Container_t;
+	using Config_t 						=		MC_t::Config_t;
 
 public:
 	using NQSLS_p 						=		typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
-	using Config_t 						=		MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<double>>::Config_t;
 	NQS_info_t info_p_;													// information about the NQS
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
 
@@ -69,12 +72,12 @@ protected:
 	v_1d<uint> flipPlaces_;												// stores flip spots to be flipped during one sampling step
 	v_1d<_stateType> flipVals_;											// stores values before (!!!) the flip to be used for the gradients
 	
-	NQSS curVec_;														// currently processed state vector for convenience
+	Config_t curVec_;													// currently processed state vector for convenience
 	u64 curState_						=		0;						// currently processed state - may or may not be used
 	
-	v_1d<NQSS> tmpVecs_;												// temporary vectors for the flips
+	v_1d<Config_t> tmpVecs_;											// temporary vectors for the flips
+	Config_t tmpVec_;													// temporary vector for the flips (for the current state)
 	u64 tmpState_						=		0;						// temporary state for the flips
-	NQSS tmpVec_;														// temporary vector for the flips (for the current state)
 	
 	// ------------------------ W E I G H T S -----------------------
 	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
@@ -228,8 +231,10 @@ public:
 	virtual auto getLastConfig() 				const -> Config_t override 	{ return NQS_STATE; 					};
 
 	// overriden MonteCarloSolver methods - set the state
-	virtual auto setConfig(const Config_t& _state) 	-> void override 		{ this->setState(_state); 				};
-	virtual void reset(size_t _n) override;
+	virtual auto setConfig(const Config_t& _s) 	-> void override 			{ this->setState(_s); 					};
+	virtual auto swapConfig(MC_t_p _other) 		-> void override;
+	virtual auto reset(size_t _n) 				-> void override;
+	virtual auto clone() 						const -> MC_t_p override;
 public:
 
 	// ----------------------- S A M P L I N G -----------------------
