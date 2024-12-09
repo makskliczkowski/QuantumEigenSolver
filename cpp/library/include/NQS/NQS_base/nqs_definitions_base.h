@@ -19,14 +19,15 @@
 											
 #ifdef NQS_USE_CPU							
 #	define NQS_USE_MULTITHREADING			
-
 //#	define NQS_USE_OMP						
 # 	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 #		define NQS_NOT_OMP_MT 
 #	endif
-
-#elif defined NSQ_USE_GPU					
-// something !TODO								
+# 	if defined NQS_USE_GPU
+#		undef NQS_USE_GPU
+#	endif
+#elif defined NQS_USE_GPU					
+#	include <cuda_runtime.h>						
 #endif		
 
 // ----------------------------------------------------------					
@@ -67,9 +68,13 @@ enum NQSTYPES					// #
 // ##########################################################################################################################################
 
 // all the types that are to be used in each NQS implementation
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
-											using NQSB = arma::Col<_type>; 				\
-											using NQSW = arma::Mat<_type>;			 	
+#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;											\
+											using NQSB = arma::Col<_type>; 														\
+											using NQSW = arma::Mat<_type>;			 											\
+											using Solver_t_p = algebra::Solvers::General::Solver<_T, true>*;					\
+											using Precond_t_p = algebra::Solvers::Preconditioners::Preconditioner<_T, true>*;	\
+											using int_ini_t = std::initializer_list<int>;										\
+											using dbl_ini_t = std::initializer_list<double>;									
 											
 
 
@@ -82,7 +87,7 @@ enum NQSTYPES					// #
 	#include <functional>
 	#include <condition_variable>
 	#include <future>
-/*
+/**
 * @brief structure with condition variables for the NQS to perfom multithread operations
 */
 template <typename _T>
@@ -181,12 +186,14 @@ struct NQS_thread_t
 	~NQS_thread_t()					{ this->threads_.clear(); };
 };
 
-#define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 							\
-					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 	\
-					template FUNRET  NQS<3u, _Ht, _T, double>::FUN ARGS; 	\
+#define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 									\
+					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 			\
+					template FUNRET  NQS<3u, _Ht, _T, double>::FUN ARGS; 			\
 					template FUNRET  NQS<4u, _Ht, _T, double>::FUN ARGS; 
-					// template FUNRET  NQS<2u, _Ht, _T, cpx>::FUN ARGS; 
-					// template FUNRET  NQS<3u, _Ht, _T, cpx>::FUN ARGS; 
-					// template FUNRET  NQS<4u, _Ht, _T, cpx>::FUN ARGS; 	
+#define NQS_INST_CMB_ALL(FUN, FUNRET, ARGS) 										\
+					NQS_INST_CMB(double, double, FUN, FUNRET, ARGS)					\
+					NQS_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS)	\
+					NQS_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS)	\
+					NQS_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS)
 
 // ##########################################################################################################################################

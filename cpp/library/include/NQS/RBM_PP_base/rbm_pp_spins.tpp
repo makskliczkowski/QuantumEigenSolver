@@ -12,9 +12,10 @@
 * @brief Restricted Boltzmann Machines ansatz with Pair Product reference state for NQS
 */
 template <typename _Ht, typename _T, class _stateType>
-class RBM_PP_S<2, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
+class RBM_PP_S<2u, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
 	using NQSLS_p = typename RBM_PP<2, _Ht, _T, _stateType>::NQSLS_p;
 	/* ------------------------------------------------------- */
 public:
@@ -44,6 +45,16 @@ protected:
 	void updFPP_F(std::initializer_list<int> fP,
 				std::initializer_list<double> fV,
 				arma::Mat<_T>& _Xtmp)						override;
+
+	// ---------------------------------------------------------
+
+public:
+	virtual auto clone() const -> MC_t_p override
+	{
+		return std::make_shared<RBM_PP_S<2, _Ht, _T, _stateType>>(*this);
+	}
+
+	// ---------------------------------------------------------
 };
 
 // !!!!!!!!!!!!!!!! P F F A F I A N   S T A T E !!!!!!!!!!!!!!!!

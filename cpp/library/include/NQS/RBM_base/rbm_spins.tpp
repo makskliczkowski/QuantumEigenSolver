@@ -23,6 +23,7 @@ template <typename _Ht, typename _T, class _stateType>
 class RBM_S<2, _Ht, _T, _stateType> : public RBM<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
 	using NQSLS_p =	typename RBM<2, _Ht, _T, _stateType>::NQSLS_p;
 public:
 	RBM_S(std::shared_ptr<Hamiltonian<_Ht, 2>>& _H, uint _nHid, double _lr,
@@ -43,6 +44,14 @@ protected:
 	virtual auto logPRatio(const NQSS& _v1)			-> _T	override;
 	virtual auto logPRatio(std::initializer_list<int> fP,		
 				std::initializer_list<double> fV)	-> _T	override;
+
+	/////////////////////////////////////////////////////////////////
+
+	virtual MC_t_p clone() const override {
+		return std::make_shared<RBM_S>(*this); 
+	}
+
+	/////////////////////////////////////////////////////////////////
 };
 
 // ##########################################################################################################################################

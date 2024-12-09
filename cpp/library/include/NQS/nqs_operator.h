@@ -198,6 +198,12 @@ namespace NQSAv
 
 		// !ED
 		void measure(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&);		// measure the operators for the given state (from the exact diagonalization)
+		_T measureGlob(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which);									// measure the global operators for the given state
+		_T measureLocl(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which, uint site);						// measure the local operators for the given state
+		_T measureCorr(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which, uint site1, uint site2);			// measure the correlation operators for the given state
+		arma::Col<_T> applyGlob(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which);							// apply the operator to the state
+		arma::Col<_T> applyLocl(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which, uint site);				// apply the operator to the state
+		arma::Col<_T> applyCorr(const arma::Col<_T>& state, const Hilbert::HilbertSpace<_T>&, int which, uint site1, uint site2);	// apply the operator to the state
 		void save(const strVec& _ext 	= { ".h5" }, 
 				std::string _nameGlobal = "", 
 				std::string _nameLocal 	= "", 
@@ -225,9 +231,16 @@ namespace NQSAv
 
 		// ---- GETTERS ----
 		auto getOpG()				const		->		const OPG& { return this->opG_; };
+		auto getOpG(int i)			const		->		const std::shared_ptr<Operators::OperatorNQS<_T>>& { return this->opG_[i]; };
 		auto getOpL()				const		->		const OPL& { return this->opL_; };
+		auto getOpL(int i)			const		->		const std::shared_ptr<Operators::OperatorNQS<_T, uint>>& { return this->opL_[i]; };
 		auto getOpC()				const		->		const OPC& { return this->opC_; };
+		auto getOpC(int i)			const		->		const std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>& { return this->opC_[i]; };
 		auto getDir()				const		->		const std::string& { return this->dir_; };
+		// values from the MB containers	
+		auto getMBCont_G(uint which) 					const -> _T;
+		auto getMBCont_L(uint which, uint i)			const -> _T;
+		auto getMBCont_C(uint which, uint i, uint j) 	const -> _T;
 
 		// values from the containers
 		auto getContMean_G(uint i) 	const		-> 		_T { return this->containersG_[i].template mean<_T>()(0,0); };

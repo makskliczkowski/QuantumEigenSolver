@@ -25,8 +25,7 @@
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo::MCS_train_t& _par, _T _currLoss, _T _currstd, bool _quiet)
 {
-	auto best 				= this->info_p_.best();
-	
+	const auto best			= this->info_p_.best();
 	const std::string _prog = "Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
 								", Loss: " + STRPS(_currLoss, 4) + " ± " + STRPS(_currstd / 2.0, 3) +
 								", Best: " + VEQPS(best, 4) + 
@@ -83,9 +82,9 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, trainStop, bool, (size_
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i, 
-													arma::Col<_T>& En,
-													arma::Col<_T>& meanEn, 
-													arma::Col<_T>& stdEn, 
+													Container_t& En,
+													Container_t& meanEn, 
+													Container_t& stdEn, 
 													const MonteCarlo::MCS_train_t& _par, 
                                                     const bool quiet, 
                                                     const bool randomStart,
@@ -168,7 +167,7 @@ using NQS_TRAIN_PAIR = std::pair<arma::Col<_T>, arma::Col<_T>>;
 *         over the Monte Carlo samples.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-NQS_TRAIN_PAIR<_T> NQS<_spinModes, _Ht, _T, _stateType>::train(const MonteCarlo::MCS_train_t& _par, 
+NQS<_spinModes, _Ht, _T, _stateType>::Container_pair_t NQS<_spinModes, _Ht, _T, _stateType>::train(const MonteCarlo::MCS_train_t& _par, 
                                                                                             bool quiet, 
                                                                                             bool randomStart, 
                                                                                             clk::time_point _t, 
@@ -511,8 +510,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::collect(const MonteCarlo::MCS_train_t
 		}
 		else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
 		{
-			if (_opvals->n_elem != _par.MC_sam_)
-				_opvals->resize(_par.MC_sam_);
+			if (_opvals->n_elem != _par.MC_sam_ * _par.nblck_)
+				_opvals->resize(_par.MC_sam_ * _par.nblck_);
 		}
 	}
 #endif
@@ -543,16 +542,24 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const M
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, arma::Col<_T>& En, const MonteCarlo::MCS_train_t& _par, const bool quiet, const bool randomStart, Timer& _timer)
+bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, 
+									arma::Col<_T>& En, 
+									const MonteCarlo::MCS_train_t& _par, 
+									const bool quiet, 
+									const bool randomStart, 
+									Timer& _timer,
+									bool _useRungeKutta)
 {
+	if (En.n_elem != _par.nblck_)
+		En.resize(_par.nblck_);
+
 	this->total_ 	= 0;										// reset the total number of flips
 	this->accepted_ = 0;										// reset the number of accepted flips
 	if (randomStart && _par.MC_th_ > 0) 
 		this->setRandomState();									// set the random state at the begining
 	this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
 
-	_T _meanEn = 0.0, _stdEn = 0.0;
-
+	_T _meanEn = 0.0, _stdEn = 0.0;								// mean and standard deviation of the energy
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
 	{		
 		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them using the local Metropolis sampling
@@ -561,7 +568,7 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, a
 	}
 
 	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &_meanEn, &_stdEn); 				// save the mean energy
-	this->gradEvoFinal(En, _step, dt, _meanEn);					// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
+	this->gradEvoFinal(En, _step, dt, _meanEn, _useRungeKutta);	// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
 	
 	if (this->updateWeights_)
 		this->updateWeights(); 									// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
@@ -572,7 +579,9 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, a
 }
 
 // template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(double, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(double, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
+NQS_INST_CMB(double, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
+NQS_INST_CMB(std::complex<double>, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
+
+// ##########################################################################################################################################

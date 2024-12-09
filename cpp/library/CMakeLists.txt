@@ -147,6 +147,24 @@ endif()
 
 ##########################################################################
 
+# find the OpenMPI package and set the include directories
+find_package(MPI QUIET)
+# If MPI is found, include its directories and link the libraries
+if(MPI_FOUND)
+    message(STATUS "MPI")
+    message(STATUS "\tMPI include directory: ${MPI_INCLUDE_PATH}")
+    message(STATUS "\tMPI C libraries: ${MPI_C_LIBRARIES}")
+    message(STATUS "\tMPI C++ libraries: ${MPI_CXX_LIBRARIES}")
+    message("\tMPI definitions added: -DENABLE_MPI")
+    include_directories(${MPI_INCLUDE_PATH})
+    set(LIBRARIES ${LIBRARIES} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
+    add_definitions(-DENABLE_MPI)
+else()
+    message(STATUS "MPI not found, proceeding without MPI support")
+endif()
+
+##########################################################################
+
 # Find all .cpp files recursively in the CPPSOURCE directory
 file(GLOB_RECURSE SOURCES 
     ${CPPSOURCE}/*.cpp
@@ -185,6 +203,7 @@ set(SOURCES
     src/nqs/nqs_sampling.cpp
     src/nqs/rbm/rbm.cpp
     src/nqs/rbm/rbm_spin.cpp
+    src/nqs/rbmpp/rbmpp.cpp
     src/nqs/operators/nqs_operator.cpp
     src/user_interface/ui_check_eth.cpp
     src/user_interface/ui_check_nqs.cpp

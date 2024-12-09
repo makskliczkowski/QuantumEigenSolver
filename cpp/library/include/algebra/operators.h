@@ -44,9 +44,17 @@ namespace Operators
 	* @returns the overlap <\Psi|O|\Psi>
 	*/
 	template<typename _M, typename _Ct>
-	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const _M& _mat)
+	inline typename std::enable_if<!is_complex<typename _Ct::elem_type>::value, inner_type_t<_Ct>>::type
+	applyOverlap(const _Ct& _C, const _M& _mat)
 	{
-		return arma::cdot(_C, _mat * _C);
+		return arma::dot(_C, _mat * _C);  // For real types, use dot product.
+	}
+
+	template<typename _M, typename _Ct>
+	inline typename std::enable_if<is_complex<typename _Ct::elem_type>::value, std::complex<double>>::type
+	applyOverlap(const _Ct& _C, const _M& _mat)
+	{
+		return arma::cdot(_C, _mat * _C);  // For complex types, use the complex dot product.
 	}
 
 	/*

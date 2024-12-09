@@ -24,6 +24,7 @@ class RBM : public NQS_S<_spinModes, _Ht, _T, _stateType>
 {
 public:
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
 	using NQSLS_p =	typename NQS_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 protected:
 	// architecture parameters
@@ -79,6 +80,7 @@ public:
 							std::string _file)				override;
 protected:
 	virtual void updateWeights()							override;
+
 	// set the angles for the RBM to be updated
 	void setTheta()											{ this->setTheta(this->curVec_); };
 	void setTheta(const NQSS& v);
@@ -112,16 +114,31 @@ public:
 	virtual auto ansatzlog(const NQSS& _in) 				const -> _T override;
 	virtual auto ansatz_ratiolog(const NQSS& _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
+
+	////////////////////////////////////////////////////////////
+
+	virtual auto clone() 			const -> MC_t_p 		override = 0;
+
+	////////////////////////////////////////////////////////////
 };	
+
+// ##########################################################################################################################################
 
 #define RBM_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS, ADD) 							\
 					template FUNRET  RBM<2u, _Ht, _T, double>::FUN ARGS ADD; 	\
 					template FUNRET  RBM<3u, _Ht, _T, double>::FUN ARGS ADD; 	\
 					template FUNRET  RBM<4u, _Ht, _T, double>::FUN ARGS ADD; 	
 
-////////////////////////////////////////////////////////////////////////////
 
-/*
+#define RBM_INST_CMB_ALL(FUN, FUNRET, ARGS, ADD) 								\
+					RBM_INST_CMB(double, double, FUN, FUNRET, ARGS, ADD) 		\
+					RBM_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS, ADD) \
+					RBM_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS, ADD) \
+					RBM_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS, ADD)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
 * @brief sets the current angles vector according to arXiv:1606.02318v1
 * @param v replaces current vector
 */
@@ -133,75 +150,5 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(const NQSS& v)
 	this->thetaCOSH_log_= arma::log(this->thetaCOSH_);
 }
 
-////////////////////////////////////////////////////////////////////////////
-
-/*
-* @brief Updates the weights in the system according to a given gradient
-* @warning uses forces vector (member of NQS : F_) to update the gradients - preallocation for optimization
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
-{
-	this->bV_	-= this->dF_.subvec(0, this->info_p_.nVis_ - 1);
-	this->bH_	-= this->dF_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
-	this->W_	-= arma::reshape(this->dF_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1),
-								this->W_.n_rows, this->W_.n_cols);
-}
-
-
-
-// ##########################################################################################################################################
-
-// ############################################################ U P D A T E R S #############################################################
-
-// ##########################################################################################################################################
-
-///////////////////////////////////////////////////////////////////////
-
-#ifdef NQS_ANGLES_UPD
-/*
-* @brief Update angles with the flipped spin (spins)
-* @param nFlips number of flips to be used
-* @warning values are stored in flipVals_ before the flip, hence "-" is taken
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
-{
-	for (uint i = 0; i < nFlips; ++i)
-	{
-#ifdef SPIN
-		this->theta_	-=	(2.0 * this->flipVals_[i]) * this->W_.col(this->flipPlaces_[i]);
-#else
-		this->theta_	+=	(1.0 - 2.0 * this->flipVals_[i]) * this->W.col(flipPlaces_[i]);
-#endif
-	}
-	this->thetaCOSH_	=	this->coshF();
-	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
-}
-
-///////////////////////////////////////////////////////////////////////
-
-/*
-* @brief Update angles with the flipped spin (spins)
-* @param vector after the flips has been done
-* @param nFlips number of flips to be used
-* @warning values are stored in flipVals_ before the flip, hence "-" is taken
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFlips)
-{
-	for (uint i = 0; i < nFlips; i++)
-	{
-		const auto fP	=	this->flipPlaces_[i];
-#ifdef SPIN
-		this->theta_	-=	(2.0 * v(fP)) * this->W_.col(fP);
-#else
-		this->theta_	+=	(1.0 - 2.0 * v(fP)) * this->W.col(fP);
-#endif
-	}
-	this->thetaCOSH_	=	this->coshF();
-	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
-}
-#endif
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #endif

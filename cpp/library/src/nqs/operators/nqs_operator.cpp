@@ -87,7 +87,6 @@ namespace Operators
     template cpx OperatorNQS<cpx, int, int>::operator()(_OP_V_T_CR, NQSFunCol, int, int) const;		
 
 	// ##########################################################################################################################################
-
 };
 
 // ##########################################################################################################################################
@@ -491,4 +490,320 @@ namespace NQSAv
     template void MeasurementNQS<cpx>::save(const strVec&, std::string, std::string, std::string, std::string, bool);
     // ##########################################################################################################################################
 
+    // ##########################################################################################################################################
+    // Operator Application Methods
+    // ##########################################################################################################################################
+
+    /**
+    * @brief Applies a global operator to a quantum state vector
+    * @param _state Input quantum state vector
+    * @param _H Hilbert space context
+    * @param which Index of the global operator to apply
+    * @return Modified quantum state vector
+    * @throws std::out_of_range if operator index is invalid
+    */
+    template <typename _T>
+    arma::Col<_T> MeasurementNQS<_T>::applyGlob(const arma::Col<_T>& _state, 
+                                                const Hilbert::HilbertSpace<_T>& _H, 
+                                                int which)
+    {
+        if (which < 0 || which >= this->opG_.size()) {
+            LOGINFO("Invalid global operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0); 
+            throw std::out_of_range("Global operator index out of bounds");
+        }
+            
+        auto& _op = this->opG_[which];
+        auto& _cont = this->containersG_[which];
+        
+        _cont.resetMB();
+        _cont.setManyBodyMat(_H, _op.get());
+        auto _ret = Operators::apply(_state, _cont.mbmat());
+        _cont.resetMBMat();
+        return _ret;
+    }
+    
+    // Template instantiations
+    template arma::Col<double> MeasurementNQS<double>::applyGlob(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int);
+    template arma::Col<cpx> MeasurementNQS<cpx>::applyGlob(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int);
+
+    /**
+    * @brief Applies a local operator to a quantum state vector at a specific site
+    * @param _state Input quantum state vector 
+    * @param _H Hilbert space context
+    * @param which Index of the local operator to apply
+    * @param site Lattice site to apply operator
+    * @return Modified quantum state vector
+    * @throws std::out_of_range if operator index is invalid
+    */
+    template <typename _T>
+    arma::Col<_T> MeasurementNQS<_T>::applyLocl(const arma::Col<_T>& _state,
+                                                const Hilbert::HilbertSpace<_T>& _H,
+                                                int which, uint site) 
+    {
+        if (which < 0 || which >= this->opL_.size()) {
+            LOGINFO("Invalid local operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Local operator index out of bounds");
+        }
+        
+        if (site >= this->Ns_) {
+            LOGINFO("Invalid site index: " + std::to_string(site), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Site index out of bounds");
+        }
+            
+        auto& _op = this->opL_[which];
+        auto& _cont = this->containersL_[which];
+        
+        _cont.resetMB();
+        _cont.setManyBodyMat(_H, _op.get(), site);
+        auto _ret = Operators::apply(_state, _cont.mbmat());
+        _cont.resetMBMat();
+        return _ret;
+    }
+
+    // Template instantiations
+    template arma::Col<double> MeasurementNQS<double>::applyLocl(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int, uint);
+    template arma::Col<cpx> MeasurementNQS<cpx>::applyLocl(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int, uint);
+
+    /**
+    * @brief Applies a correlation operator to a quantum state vector between two sites
+    * @param _state Input quantum state vector
+    * @param _H Hilbert space context  
+    * @param which Index of the correlation operator to apply
+    * @param site1 First lattice site
+    * @param site2 Second lattice site
+    * @return Modified quantum state vector
+    * @throws std::out_of_range if operator or site indices are invalid
+    */
+    template <typename _T>
+    arma::Col<_T> MeasurementNQS<_T>::applyCorr(const arma::Col<_T>& _state,
+                                                const Hilbert::HilbertSpace<_T>& _H,
+                                                int which, uint site1, uint site2)
+    {
+        if (which < 0 || which >= this->opC_.size()) {
+            LOGINFO("Invalid correlation operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Correlation operator index out of bounds");
+        }
+
+        if (site1 >= this->Ns_ || site2 >= this->Ns_) {
+            LOGINFO("Invalid site indices: " + std::to_string(site1) + "," + std::to_string(site2), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Site indices out of bounds");
+        }
+            
+        auto& _op = this->opC_[which];
+        auto& _cont = this->containersC_[which];
+        
+        _cont.resetMB();
+        _cont.setManyBodyMat(_H, _op.get(), site1, site2);
+        auto _ret = Operators::apply(_state, _cont.mbmat());
+        _cont.resetMBMat();
+        return _ret;
+    }
+
+    // Template instantiations  
+    template arma::Col<double> MeasurementNQS<double>::applyCorr(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int, uint, uint);
+    template arma::Col<cpx> MeasurementNQS<cpx>::applyCorr(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int, uint, uint);
+
+    // ##########################################################################################################################################
+
+    // measure global
+    // ##########################################################################################################################################
+    // Measurement Methods
+    // ##########################################################################################################################################
+
+    /**
+    * @brief Measures expectation value of a global operator on a quantum state
+    * @param _state Input quantum state vector
+    * @param _H Hilbert space context
+    * @param which Index of the global operator to measure
+    * @throws std::out_of_range If operator index is invalid
+    * @throws std::runtime_error If container or operator is null
+    * @note Updates the measurement container with <state|Op|state>
+    */
+    template <typename _T>
+    _T MeasurementNQS<_T>::measureGlob(const arma::Col<_T>& _state, 
+                                        const Hilbert::HilbertSpace<_T>& _H, 
+                                        int which)
+    {
+        _T _val = 0.0;
+        // Validate inputs
+        if (which < 0 || which >= this->opG_.size()) {
+            LOGINFO("Invalid global operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Global operator index out of bounds");
+        }
+
+        auto& _op = this->opG_[which];
+        auto& _cont = this->containersG_[which];
+
+        if (!_op) {
+            throw std::runtime_error("Null operator or invalid container");
+        }
+
+        try {
+            _cont.resetMB();
+            _cont.setManyBodyMat(_H, _op.get());
+            _val = Operators::applyOverlap(_state, _cont.mbmat());
+            _cont.resetMBMat();
+            this->usedMB_ = true;
+
+        }
+        catch (const std::exception& e) {
+            LOGINFO("Error measuring global operator: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+            throw;
+        }
+        return _val;
+    }
+
+    // Template instantiations
+    template double MeasurementNQS<double>::measureGlob(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int);
+    template cpx MeasurementNQS<cpx>::measureGlob(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int);
+
+    /**
+    * @brief Measures expectation value of a local operator at specific site
+    * @param _state Input quantum state vector
+    * @param _H Hilbert space context
+    * @param which Index of the local operator to measure 
+    * @param site Lattice site where to apply measurement
+    * @throws std::out_of_range If operator/site indices invalid
+    * @throws std::runtime_error If container or operator is null
+    * @note Updates measurement container with <state|Op_site|state>
+    */
+    template <typename _T>
+    _T MeasurementNQS<_T>::measureLocl(const arma::Col<_T>& _state,
+                                        const Hilbert::HilbertSpace<_T>& _H,
+                                        int which, uint site)
+    {
+        _T _val = 0.0;
+        // Validate inputs
+        if (which < 0 || which >= this->opL_.size()) {
+            LOGINFO("Invalid local operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Local operator index out of bounds");
+        }
+
+        if (site >= this->Ns_) {
+            LOGINFO("Invalid site index: " + std::to_string(site), LOG_TYPES::ERROR, 0); 
+            throw std::out_of_range("Site index out of bounds");
+        }
+
+        auto& _op = this->opL_[which];
+        auto& _cont = this->containersL_[which];
+
+        if (!_op)
+            throw std::runtime_error("Null operator or invalid container");
+
+        try {
+            _cont.resetMB();
+            _cont.setManyBodyMat(_H, _op.get(), site);
+            _val = Operators::applyOverlap(_state, _cont.mbmat());
+            _cont.updCurrent(_val, site);
+            _cont.resetMBMat();
+            this->usedMB_ = true;
+        }
+        catch (const std::exception& e) {
+            LOGINFO("Error measuring local operator: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+            throw;
+        }
+        return _val;
+    }
+
+    // Template instantiations  
+    template double MeasurementNQS<double>::measureLocl(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int, uint);
+    template cpx MeasurementNQS<cpx>::measureLocl(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int, uint);
+
+    /**
+    * @brief Measures expectation value of correlation operator between two sites
+    * @param _state Input quantum state vector
+    * @param _H Hilbert space context
+    * @param which Index of correlation operator to measure
+    * @param site1 First lattice site 
+    * @param site2 Second lattice site
+    * @throws std::out_of_range If operator/site indices invalid
+    * @throws std::runtime_error If container or operator is null
+    * @note Updates measurement container with <state|Op_site1,site2|state>
+    */
+    template <typename _T>
+    _T MeasurementNQS<_T>::measureCorr(const arma::Col<_T>& _state,
+                                        const Hilbert::HilbertSpace<_T>& _H,
+                                        int which, uint site1, uint site2)
+    {
+        _T _val = 0.0;
+        // Validate inputs
+        if (which < 0 || which >= this->opC_.size()) {
+            LOGINFO("Invalid correlation operator index: " + std::to_string(which), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Correlation operator index out of bounds");
+        }
+
+        if (site1 >= this->Ns_ || site2 >= this->Ns_) {
+            LOGINFO("Invalid site indices: " + std::to_string(site1) + "," + std::to_string(site2), LOG_TYPES::ERROR, 0);
+            throw std::out_of_range("Site indices out of bounds");
+        }
+
+        auto& _op = this->opC_[which];
+        auto& _cont = this->containersC_[which];
+
+        if (!_op)
+            throw std::runtime_error("Null operator or invalid container"); 
+
+        try {
+            _cont.resetMB();
+            _cont.setManyBodyMat(_H, _op.get(), site1, site2);
+            _val = Operators::applyOverlap(_state, _cont.mbmat());
+            _cont.updCurrent(_val, site1, site2);
+            _cont.resetMBMat();
+            this->usedMB_ = true;
+        }
+        catch (const std::exception& e) {
+            LOGINFO("Error measuring correlation operator: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+            throw;
+        }
+        return _val;
+    }
+
+    // Template instantiations
+    template double MeasurementNQS<double>::measureCorr(const arma::Col<double>&, const Hilbert::HilbertSpace<double>&, int, uint, uint);
+    template cpx MeasurementNQS<cpx>::measureCorr(const arma::Col<cpx>&, const Hilbert::HilbertSpace<cpx>&, int, uint, uint);
+
+    // ##########################################################################################################################################
+
+    // getters
+    template <typename _T>
+    _T MeasurementNQS<_T>::getMBCont_G(uint which) const
+    {
+        if (which < 0 || which >= this->containersG_.size())
+            throw std::out_of_range("Global container index out of bounds");
+        return this->containersG_[which].mbval(0, 0);
+    }
+
+    // Template instantiations
+    template double MeasurementNQS<double>::getMBCont_G(uint) const;
+    template cpx MeasurementNQS<cpx>::getMBCont_G(uint) const;
+
+    template <typename _T>
+    _T MeasurementNQS<_T>::getMBCont_L(uint which, uint site) const
+    {
+        if (which < 0 || which >= this->containersL_.size())
+            throw std::out_of_range("Local container index out of bounds");
+        if (site < 0 || site >= this->Ns_)
+            throw std::out_of_range("Site index out of bounds");
+        return this->containersL_[which].mbval(site, 0);
+    }
+
+    // Template instantiations
+    template double MeasurementNQS<double>::getMBCont_L(uint, uint) const;
+    template cpx MeasurementNQS<cpx>::getMBCont_L(uint, uint) const;
+
+    template <typename _T>
+    _T MeasurementNQS<_T>::getMBCont_C(uint which, uint site1, uint site2) const
+    {
+        if (which < 0 || which >= this->containersC_.size())
+            throw std::out_of_range("Correlation container index out of bounds");
+        if (site1 < 0 || site1 >= this->Ns_ || site2 < 0 || site2 >= this->Ns_)
+            throw std::out_of_range("Site indices out of bounds");
+        return this->containersC_[which].mbval(site1, site2);
+    }
+
+    // Template instantiations
+    template double MeasurementNQS<double>::getMBCont_C(uint, uint, uint) const;
+    template cpx MeasurementNQS<cpx>::getMBCont_C(uint, uint, uint) const;
+
+    // ##########################################################################################################################################
 };

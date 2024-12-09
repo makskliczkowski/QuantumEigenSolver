@@ -129,7 +129,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const NQSB& _energie
 * @throws std::runtime_error If the function is not implemented - this is a placeholder for future implementation when no S matrix is used. !TODO: (HOW?)
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::gradEvoFinal(const NQSB& _energies, int _step, double _dt, _T _currLoss)
+inline void NQS<_spinModes, _Ht, _T, _stateType>::gradEvoFinal(const NQSB& _energies, int _step, double _dt, _T _currLoss, bool _useRungeKutta)
 {
 	const _T _samples = static_cast<_T>(_energies.n_elem);
 	{
@@ -162,7 +162,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradEvoFinal(const NQSB& _ener
 
 	// ---- STOCHASTIC RECONFIGURATION POSSIBLY WITHOUT MATRIX CALCULATION ----
 #if defined NQS_USESR
-	return this->gradTime(_step, _dt, _currLoss);
+	return this->gradTime(_step, _dt, _currLoss, _useRungeKutta);
 #else
 	throw std::runtime_error("The function is not implemented yet.");
 #endif

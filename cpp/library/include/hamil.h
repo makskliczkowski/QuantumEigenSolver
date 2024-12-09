@@ -265,6 +265,7 @@ public:
 	
 	// ----------------------------------------- FOR OTHER TYPES -----------------------------------------------
 	virtual void updateInfo()							= 0;
+	virtual void quenchHamiltonian()					{};											// quench the Hamiltonian - for the time evolution => just a placeholder !TODO implement more general
 
 public:
 	void generateFullMap()								{ this->hilbertSpace.generateFullMap();		}; // generates the full Hilbert space map

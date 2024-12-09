@@ -139,6 +139,41 @@ namespace Operators
 			template <typename _T = double>
 			Operators::Operator<_T> sig_f(size_t _Ns, const v_1d<uint>& sites);
 		}
+
+		// --------------------------------------------------------------------------------
+
+		// sig q
+		template <typename _T = double>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, const v_1d<uint>& sites, double _k = 1.0);
+		template <typename _T = double>
+		std::pair<u64, _T> sig_q(u64 base_vec, size_t _Ns, const v_1d<uint>& sites, uint _q = 1) { return sig_k<_T>(base_vec, _Ns, sites, 2.0 * M_PI * _q / (double)_Ns); }
+		// ---
+		template <typename _T = double>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, double _k = 1.0);
+		template <typename _T = double>
+		std::pair<u64, _T> sig_q(u64 base_vec, size_t _Ns, uint _q = 0) { return sig_k<_T>(base_vec, _Ns, 2.0 * M_PI * _q / (double)_Ns); }
+		// ---
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, double _k = 1.0);
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_q(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, uint _q = 0) { return sig_k<_T>(base_vec, _Ns, sites, 2.0 * M_PI * _q / (double)_Ns); }
+		// ---
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, double _k = 1.0);
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_q(_OP_V_T_CR base_vec, size_t _Ns, uint _q = 0) { return sig_k<_T>(base_vec, _Ns, 2.0 * M_PI * _q / (double)_Ns); }
+		// ---
+		template <typename _T = double>
+		Operators::Operator<_T> sig_k(size_t _Ns, const v_1d<uint>& sites, double _k = 0);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_q(size_t _Ns, const v_1d<uint>& sites, uint _q = 0) { return sig_k<_T>(_Ns, sites, 2.0 * M_PI * _q / (double)_Ns); }
+		// ---
+		template <typename _T = double>
+		Operators::Operator<_T> sig_k(size_t _Ns, double _k = 0.0);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_q(size_t _Ns, uint _q = 0) { return sig_k<_T>(_Ns, 2.0 * M_PI * _q / (double)_Ns); }
+
+		// --------------------------------------------------------------------------------
 	};
 
 	namespace SpinOperators

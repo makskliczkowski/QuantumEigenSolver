@@ -236,11 +236,41 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, locEnKernel, void, (uin
 
 // time evolution
 
+/**
+* @brief Computes the gradient over time for the Neural Quantum State (NQS) using either a standard method or Runge-Kutta method.
+* This means that the time evolution of the state is computed by solving the Fubini Study equation.
+* 
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the computation.
+* @tparam _stateType State type.
+* 
+* @param _step Current step in the gradient computation.
+* @param _dt Time step for the gradient computation.
+* @param _currLoss Current loss value.
+* @param _useRungeKutta Flag indicating whether to use the Runge-Kutta method.
+* 
+* @throws std::runtime_error If the covariance matrix S and gradient vector F are not set before the inversion.
+* @throws std::runtime_error If the solver is not set.
+* 
+* This function performs the following steps:
+* 1. If regularization is enabled, it updates the covariance matrix.
+* 2. If the NQS_USESR_MAT_USED flag is defined, it throws a runtime error indicating that the function is not implemented.
+* 3. If the NQS_USESR_MAT_USED flag is not defined, it checks that the centered derivatives are set.
+* 4. If a preconditioner is set, it updates the preconditioner.
+* 5. If a solver is set, it performs the following:
+*    - Sets the regularization for the solver.
+*    - Solves the system using the solver.
+*    - If Runge-Kutta method is not used, it checks for convergence and updates the solution.
+*    - If Runge-Kutta method is used, it performs multiple steps to compute the final solution.
+* 6. If the solver is not set, it logs an error and throws a runtime error.
+* 7. Updates the weights based on the success of the inversion.
+*/
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double _dt, _T _currLoss)
+void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double _dt, _T _currLoss, const bool _useRungeKutta)
 {
 	bool _inversionSuccess 		= false;
-	const _T _multiplier 		= algebra::cast<_T>(I) * _dt;
+	const _T _multiplier 		= algebra::cast<_T>(I);
 	if (this->info_p_.sreg_ > 0) 
 		this->covMatrixReg(_step);
 
@@ -248,37 +278,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double 
 	assert(this->S_.empty() == false && this->F_.empty() == false && "Covariance matrix S and gradient vector F must be set before the inversion.");
 
 	{
-		// regularize the covariance matrix before inverting it (if needed and set)
-
-		// calculate the pseudoinverse
-		int _attempts 			= 0;
-		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-5;
-
-		while (!_inversionSuccess && _attempts < NQS_SREG_ATTEMPTS)
-		{
-			try {
-				if (this->info_p_.pinv_ > 0.0)
-					this->dF_ = _multiplier * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
-				else if (this->info_p_.pinv_ == 0.0)
-					this->dF_ = _multiplier * (arma::pinv(this->S_) * this->F_);
-				else 
-					this->dF_ = _multiplier * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
-				
-				// if the inversion was successful, set the flag
-				_inversionSuccess = true;
-			} catch (std::exception& e) {
-                // Increase regularization factor and apply to diagonal
-				LOGINFO("Inverse calculation failed, attempt " + STR(_attempts + 1) + ". E: " + e.what(), LOG_TYPES::ERROR, 1);
-				if (!arma::is_finite(this->S_)) {
-					LOGINFO("Non-finite values in the diagonal of the covariance matrix. Stopping the training.", LOG_TYPES::ERROR, 1);
-					break;
-				}
-
-                this->S_.diag() += _regFactor;  	// Apply regularization to diagonal
-                _regFactor 		*= 10;  			// Increase regularization factor for next attempt
-                ++_attempts;
-			}
-		}
+		throw std::runtime_error("Function not implemented.");
+		// !TODO: Implement the inversion of the matrix S using the Cholesky decomposition
 	}
 #else
 	assert(this->derivativesCentered_.empty() == false && this->derivativesCenteredH_.empty() == false && "Centered derivatives F_k and F_k^T must be set before the inversion.");
@@ -289,26 +290,33 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double 
 	{
 		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
-							this->F_, 														// b
-							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
+							_multiplier * this->F_, 										// b
+							nullptr, //step <= 1 ? nullptr : &this->dF_, 					// x0
 							this->precond_);												// preconditioner
-		_inversionSuccess = this->solver_->isConverged();
-		this->dF_ = _multiplier * this->solver_->solution();								// get the solution
-	} 
-	else {
-		// !DEPRECATED - use solver class instead
-		this->dF_ = _multiplier * algebra::Solvers::FisherMatrix::solve<_T>(
-										this->info_p_.solver_,													// choose the solver type 
-										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
-										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
-										this->F_,               												// This should be of type arma::Col<_T>
-										nullptr, //step <= 1 ? nullptr : &this->dF_,							// This should also match arma::Col<_T>
-										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
-										this->info_p_.tol_,                  		 							// Tolerance
-										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
-										&_inversionSuccess,														// Convergence flag						
-										this->info_p_.sreg_ //this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
-										);
+		if (!_useRungeKutta)
+		{
+			_inversionSuccess = this->solver_->isConverged();
+			this->dF_ = _dt * this->solver_->solution();									// get the solution
+		} else {
+			this->RK_.k1 = this->solver_->solution();										// get the solution for the first step
+			// solve for next
+			this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 
+								this->F_ + (_dt / 2.0 * this->RK_.k1), nullptr, this->precond_);
+			this->RK_.k2 = this->solver_->solution();										// get the solution for the second step
+			// solve for next
+			this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 
+								this->F_ + (_dt / 2.0 * this->RK_.k2), nullptr, this->precond_);
+			this->RK_.k3 = this->solver_->solution();										// get the solution for the third step	
+			// solve for next
+			this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 
+								this->F_ + (_dt * this->RK_.k3), nullptr, this->precond_);
+			this->RK_.k4 = this->solver_->solution();										// get the solution for the fourth step
+			// calculate the final solution
+			this->dF_ = (_dt / 6.0) * (this->RK_.k1 + 2.0 * this->RK_.k2 + 2.0 * this->RK_.k3 + this->RK_.k4);	
+		}
+	} else {
+		LOGINFO("Solver is not set. Cannot perform the inversion.", LOG_TYPES::ERROR, 1);
+		throw std::runtime_error("Solver is not set. Cannot perform the inversion.");
 	}
 
 #endif
@@ -316,7 +324,9 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, double 
 }
 
 // template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, gradTime, void, (size_t, double, double));
-NQS_INST_CMB(double, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>));
-NQS_INST_CMB(std::complex<double>, double, gradTime, void, (size_t, double, double));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>));
+NQS_INST_CMB(double, double, gradTime, void, (size_t, double, double, const bool));
+NQS_INST_CMB(double, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>, const bool));
+NQS_INST_CMB(std::complex<double>, double, gradTime, void, (size_t, double, double, const bool));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, gradTime, void, (size_t, double, std::complex<double>, const bool));
+
+// ##########################################################################################################################################

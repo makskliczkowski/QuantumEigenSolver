@@ -3,6 +3,7 @@
 #include "include/algebra/operator_algebra.h"
 #include "include/algebra/operators/operators_generic.hpp"
 #include "source/src/Include/str.h"
+#include "source/src/common.h"
 #include "source/src/lin_alg.h"
 #include <complex>
 #include <string>
@@ -99,12 +100,9 @@ namespace Operators
 		}
 
 		// template instantiation
-		template std::pair<u64, double> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<u64, std::complex<double>> sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		template std::pair<_OP_V_T, std::complex<double>> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		OP_TMPLT_INST_PAIR(sig_x,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
 		// #####################################
 
@@ -317,15 +315,9 @@ namespace Operators
 			return std::make_pair(base_vec, _val);
 		}
 
-		// template instantiation
-		template std::pair<u64, double> sig_z<double>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_z<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_z<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		// cpx
-		template std::pair<u64, std::complex<double>> sig_z<std::complex<double>>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_z<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_z<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-
+		OP_TMPLT_INST_PAIR(sig_z,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
 		/**
 		* @brief Creates a sigma-z (Pauli-Z) operator for a quantum system.
@@ -593,12 +585,9 @@ namespace Operators
 		}
 
 		// template instantiation
-		template std::pair<u64, double> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<u64, std::complex<double>> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		template std::pair<_OP_V_T, std::complex<double>> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		OP_TMPLT_INST_PAIR(sig_p,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_p,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_p,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
 		// #############################################################################################
 
@@ -689,12 +678,9 @@ namespace Operators
 		}
 
 		// template instantiation
-		template std::pair<u64, double> sig_m(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<u64, std::complex<double>> sig_m(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		template std::pair<_OP_V_T, std::complex<double>> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		OP_TMPLT_INST_PAIR(sig_m,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_m,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_m,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
 		// #############################################################################################
 
@@ -971,19 +957,13 @@ namespace Operators
 		}
 
 		// template instantiation
-		template std::pair<u64, double> sig_pm<double>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<u64, std::complex<double>> sig_pm<std::complex<double>>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_pm<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_pm<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_pm<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		template std::pair<_OP_V_T, std::complex<double>> sig_pm<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		OP_TMPLT_INST_PAIR(sig_pm,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_pm,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_pm,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
-		template std::pair<u64, double> sig_mp<double>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<u64, std::complex<double>> sig_mp<std::complex<double>>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_mp<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, std::complex<double>> sig_mp<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-		template std::pair<_OP_V_T, double> sig_mp<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-		template std::pair<_OP_V_T, std::complex<double>> sig_mp<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);		
+		OP_TMPLT_INST_PAIR(sig_mp,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_mp,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_mp,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
 
 		// #############################################################################################
 
@@ -1154,6 +1134,8 @@ namespace Operators
 			template Operators::Operator<std::complex<double>> sig_f(size_t _Ns, const v_1d<uint>& sites);
 		};
 
+		// #############################################################################################
+
 		namespace RandomSuperposition 
 		{
 
@@ -1237,35 +1219,189 @@ namespace Operators
 			}
 
 		};
+
+		// #############################################################################################
+
+		/**
+		* @brief Calculates the Fourier transform of spin operators for a given momentum q
+		* 
+		* This function computes the Fourier transform of spin operators (sigma+/sigma-) 
+		* for a specific momentum q in a spin chain system. It evaluates the operation 
+		* on a basis state and returns both the resulting state and its coefficient.
+		* 
+		* @tparam _T Template parameter for the coefficient type (typically double or complex<double>)
+		* @param base_vec The input basis state represented as a binary number
+		* @param _Ns The total number of sites in the system
+		* @param sites Vector containing the site indices to apply the operator
+		* @param _q The momentum number
+		* 
+		* @return std::pair<u64, _T> where:
+		*         - first: The resulting basis state (unchanged in this case)
+		*         - second: The coefficient after applying the operator
+		* 
+		* @note The function includes phase factors exp(ikr) where k = 2π*q/N
+		* @note The result is normalized by 1/sqrt(N) where N is the number of sites
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, const v_1d<uint>& sites, double _k)
+		{
+			_T _val = 1.0;
+			for (auto const& site : sites)
+			{
+				cpx _valin	= 	Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(base_vec, _val / std::sqrt(sites.size()));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (u64, size_t, const v_1d<uint>&, double), u64);
+		// ############################################################################################
+		
+		/**
+		* @brief Calculates the Fourier transform of spin operators for a given quantum state
+		* 
+		* This function computes the momentum space representation of spin operators
+		* by performing a Fourier transform on the real space spin configuration.
+		* 
+		* @tparam _T Template parameter for return value type (typically double or complex<double>)
+		* @param base_vec Input state represented as a bit string where 1/0 corresponds to up/down spins
+		* @param _Ns Number of lattice sites/spins in the system
+		* @param _q Momentum index q for the Fourier transform
+		* @return std::pair<u64,_T> Pair containing:
+		*         - First element: The unchanged input state (base_vec)
+		*         - Second element: Fourier transformed value normalized by sqrt(N)
+		* 
+		* The function:
+		* 1. Iterates through each site
+		* 2. Determines spin value (+/-S) based on bit value
+		* 3. Multiplies by phase factor exp(ikx)
+		* 4. Accumulates the sum and normalizes by sqrt(N)
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, double _k)
+		{
+			_T _val = 1.0;
+			for(size_t site = 0; site < _Ns; ++site)
+			{
+				cpx _valin	= 	Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(base_vec, _val / std::sqrt(_Ns));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (u64, size_t, double), u64);
+
+		// #############################################################################################
+
+		/**
+		* @brief Calculates quantum spin operator with momentum q
+		* 
+		* This template function computes the quantum spin operator with momentum q for a given basis vector.
+		* It applies the spin operator to specified sites and includes phase factors based on momentum q.
+		* 
+		* @tparam _T The numeric type used for calculations (typically double or complex<double>)
+		* @param base_vec Input basis vector to apply the operator to
+		* @param _Ns Total number of sites in the system
+		* @param sites Vector containing the site indices to apply the operator
+		* @param _q Momentum quantum number
+		* 
+		* @return std::pair containing:
+		*         - first: The resulting basis vector after operator application
+		*         - second: The corresponding coefficient/value (_T type)
+		* 
+		* @note The function normalizes the result by dividing by sqrt(number of sites)
+		* @note Uses TWOPI constant and applies exp(ikx) phase factors
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, double _k)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for (auto const& site : sites)
+			{
+				cpx _valin	= 	Binary::check(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(_base_vec, _val / std::sqrt(sites.size()));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (_OP_V_T_CR, size_t, const v_1d<uint>&, double), _OP_V_T)
+
+		// #############################################################################################
+
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, double _k)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for(size_t site = 0; site < _Ns; ++site)
+			{
+				cpx _valin	= 	Binary::check(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(_base_vec, _val / std::sqrt(_Ns));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (_OP_V_T_CR, size_t, double), _OP_V_T)
+
+		// #############################################################################################
+
+		// operator
+		template <typename _T>
+		Operators::Operator<_T> sig_k(size_t _Ns, const v_1d<uint>& _sites, double _k)
+		{
+			_GLB<_T> fun_		= [_Ns, _sites, _k](u64 state) { return sig_k<_T>(state, _Ns, _sites, _k); };
+			_GLB_V<_T> funV_ 	= [_Ns, _sites, _k](_OP_V_T_CR state) { return sig_k<_T>(state, _Ns, _sites, _k); };
+			u64 _acts			= (ULLPOW(_Ns)) - 1;
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+			_op.setActOn(_acts);
+			_op.setModifiesState(false);
+
+			// set the name
+			const uint _q 		= (uint)std::round(_k * _Ns / TWOPI);
+			_op.setNameS("sigk_" + std::to_string(_q));
+			return _op;
+		}
+		// template instantiation
+		OP_TMPLT_INST_OPG(sig_k, , (size_t, const v_1d<uint>&, double), double);
+		// #############################################################################################
+		
+		template <typename _T>
+		Operators::Operator<_T> sig_k(size_t _Ns, double _k)
+		{	
+			_GLB<_T> fun_		= [_Ns, _k](u64 state) { return sig_k<_T>(state, _Ns, _k); };
+			_GLB_V<_T> funV_ 	= [_Ns, _k](_OP_V_T_CR state) { return sig_k<_T>(state, _Ns, _k); };
+			u64 _acts			= (ULLPOW(_Ns)) - 1;
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+			_op.setActOn(_acts);
+			_op.setModifiesState(false);
+
+			// set the name
+			const uint _q 		= (uint)std::round(_k * _Ns / TWOPI);
+			_op.setNameS("sigk_" + std::to_string(_q));
+			return _op;
+		}
+		// template instantiation
+		OP_TMPLT_INST_OPG(sig_k, , (size_t, double), double);
+		// #############################################################################################
+
 	};
-
-
-	// definitions of the tamplates with given types
-
-	// sigx - double 
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, size_t _part);
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns);
-	template Operators::Operator<double, uint> SpinOperators::sig_x_l(size_t _Ns);
-	template Operators::Operator<double, uint, uint> SpinOperators::sig_x_c(size_t _Ns);
-	// sigz - double
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, size_t _part);
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns);
-	template Operators::Operator<double, uint> SpinOperators::sig_z_l(size_t _Ns);
-	template Operators::Operator<double, uint, uint> SpinOperators::sig_z_c(size_t _Ns);
-	// sigx - complex
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, size_t _part);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_x_l(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint, uint> SpinOperators::sig_x_c(size_t _Ns);
-	// sigz - complex
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, size_t _part);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_z_l(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint, uint> SpinOperators::sig_z_c(size_t _Ns);
+	// sigx 
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t, size_t),);
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t, const v_1d<uint>&),);
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPL(sig_x_l, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPC(sig_x_c, SpinOperators::, (size_t),);
+	// sigz
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t, size_t),);
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t, const v_1d<uint>&),);
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPL(sig_z_l, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPC(sig_z_c, SpinOperators::, (size_t),);
 
 	// ##############################################################################################################################
 

@@ -59,7 +59,8 @@ public:
 		name += ",BC=" + SSTR(getSTR_BoundaryConditions(BC));
 		return this->Hamiltonian<_T>::info(name, skip, sep);
 	}
-	void updateInfo()									override final { this->info_ = this->info(); };
+	void updateInfo()									override final { this->info_ = this->info(); 			};
+	void quenchHamiltonian()							override final { this->h *= -1.0; this->updateInfo(); 	};
 };
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------

@@ -82,7 +82,7 @@ namespace Operators {
 		auto _nrows = _mat.n_rows;
 		_mat.diag() -= arma::trace(_mat) / double(_nrows);
 		auto _Hs	= arma::trace(arma::square(_mat)) / (double)_nrows;
-		assert(_Hs > 0 && "Norm must be positive");
+		// assert(_Hs > 0 && "Norm must be positive");
 		_mat		= _mat / std::sqrt(_Hs);	
 	}
 
@@ -1753,6 +1753,7 @@ namespace Operators {
 			auto mbmat()			   	-> const GeneralizedMatrix<_T>&				{ return this->manyBodyMatrix_;						};
 			auto mbval()			   	const -> arma::Mat<_T>						{ return this->manyBodyVal_;						};
 			auto mbval()			   	-> const arma::Mat<_T>&						{ return this->manyBodyVal_;						};
+			auto mbval(uint i, uint j)	const -> _T									{ return this->manyBodyVal_(i, j);					};
 			template<typename _T1>
 			auto var()				   	const -> OperatorContainer_t<_T1>			{ return CAST<_T1>(Vectors::var<_T>(this->samples_));	};
 			template<typename _T1>

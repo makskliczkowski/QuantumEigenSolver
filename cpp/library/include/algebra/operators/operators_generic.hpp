@@ -70,3 +70,21 @@ namespace Operators
 };
 
 // ##########################################################################################################################################
+
+#define OP_TMPLT_INST_PAIR(FUN, NAMESPACE, ARGS, STATE)											\
+	template std::pair<STATE, double>  NAMESPACE FUN<double> ARGS;								\
+	template std::pair<STATE, std::complex<double>> NAMESPACE FUN <std::complex<double>> ARGS;
+
+#define OP_TMPLT_INST_OPG(FUN, NAMESPACE, ARGS, STATE)											\
+	template Operators::Operator<double> NAMESPACE FUN<double> ARGS;							\
+	template Operators::Operator<std::complex<double>> NAMESPACE FUN<std::complex<double>> ARGS;
+
+#define OP_TMPLT_INST_OPL(FUN, NAMESPACE, ARGS, STATE)											\
+	template Operators::Operator<double, uint> NAMESPACE FUN<double> ARGS;				\
+	template Operators::Operator<std::complex<double>, uint> NAMESPACE FUN<std::complex<double>> ARGS;
+
+#define OP_TMPLT_INST_OPC(FUN, NAMESPACE, ARGS, STATE)											\
+	template Operators::Operator<double, uint, uint> NAMESPACE FUN<double> ARGS;	\
+	template Operators::Operator<std::complex<double>, uint, uint> NAMESPACE FUN<std::complex<double>> ARGS;
+
+// ##########################################################################################################################################

@@ -25,10 +25,7 @@ class NQS;
 #define NQS_INST_L_CMB(_Ht, _T, FUN, FUNRET, ARGS) 							        \
 					template FUNRET  NQS_lower_t<2u, _Ht, _T, double>::FUN ARGS; 	\
 					template FUNRET  NQS_lower_t<3u, _Ht, _T, double>::FUN ARGS; 	\
-					template FUNRET  NQS_lower_t<4u, _Ht, _T, double>::FUN ARGS; 	\
-					template FUNRET  NQS_lower_t<2u, _Ht, _T, cpx>::FUN ARGS; 		\
-					template FUNRET  NQS_lower_t<3u, _Ht, _T, cpx>::FUN ARGS; 		\
-					template FUNRET  NQS_lower_t<4u, _Ht, _T, cpx>::FUN ARGS; 	
+					template FUNRET  NQS_lower_t<4u, _Ht, _T, double>::FUN ARGS; 	
 
 // ##########################################################################################################################################
 
@@ -48,7 +45,8 @@ class NQS;
 [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>]
 * This structure intends that for each given state <s| that is used for the estimation of 
 */
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>	// clone
+
 struct NQS_lower_t
 {
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
