@@ -68,6 +68,11 @@ public:
 							std::string sep		= "_",
 							int prec = 2)		const override final;
 	void updateInfo()							override final { this->info_ = this->info({}, ",", 3); };
+
+	// ############################################# Getters ##########################################
+
+	virtual void quenchHamiltonian()			override final { for (auto& _J : this->J) _J *= -1.0; };
+
 };
 
 // ##########################################################################################################################################
@@ -248,12 +253,9 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 template<typename _T>
 inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _site, NQSFun _fun)
 {
-	// value that does not change
-	double localVal		= 	0.0;
-	cpx changedVal		= 	0.0;
-
-	// get number of forward nn
-	const uint NUM_OF_NN= (uint)this->lat_->get_nn_ForwardNum(_site);
+	const uint NUM_OF_NN= (uint)this->lat_->get_nn_ForwardNum(_site);	// get number of forward nn
+	cpx localVal		= 	0.0;										// value that does not change
+	cpx changedVal		= 	0.0;										// value that changes
 
 	// -------------- perpendicular field --------------
 	const double si		=	Binary::check(_cur, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
@@ -267,9 +269,8 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 	// ------------------- CHECK NN --------------------
 	for (uint nn = 0; nn < NUM_OF_NN; nn++)
 	{
-		const uint N_NUMBER = nn;//this->lat_->get_nn(_site);
+		const uint N_NUMBER = nn;
 
-		// get the nearest neighbor
 		if (int nei = this->lat_->get_nnf(_site, N_NUMBER); nei >= 0) 
 		{
 			// --------------------- HEISENBERG ---------------------
@@ -289,9 +290,9 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 			if (N_NUMBER == 0) 		// z_bond
 				localVal		+= this->Kz[_site] * si * sj;
 			else if (N_NUMBER == 1) // y_bond
-				changedIn		+= siY * sjY * Ky[_site];
+				changedIn		+= this->Ky[_site] * siY * sjY;
 			else if (N_NUMBER == 2) // x_bond
-				changedIn		+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * Kx[_site];
+				changedIn		+= this->Kx[_site] * Operators::_SPIN_RBM * Operators::_SPIN_RBM;
 
 			// apply change
 			changedVal			+= _fun({ (int)_site, nei }, { si, sj }) * changedIn;

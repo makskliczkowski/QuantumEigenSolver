@@ -224,7 +224,7 @@ template void NQS<4u, double, std::complex<double>, double>::gradFinal(const arm
 
 // ############################################################ T R A I N I N G #############################################################
 
-// ##########################################################################################################################################
+// ##########################################################################################################################################b
 
 #include <cmath>
 #include <utility>
@@ -245,12 +245,25 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo::MCS_train_t& _par, _T _currLoss, _T _currstd, bool _quiet)
 {
 	const auto best			= this->info_p_.best();
+	const double acceptance = (double)this->accepted_ / this->total_ * 100.0;
+
+	double coolingRate 		= 1.001; 	// Cooling rate (how fast to decrease beta)
+
+	// If acceptance rate is too low, adjust beta
+	if (acceptance < 5e-2) 
+	{
+		// this->setRandomState(); 		// Reset the state
+		this->beta_ *= coolingRate;
+		LOGINFO("Acceptance rate is too low: " + STR(acceptance) + "%. Changing beta: " + STRP(this->beta_, 3), LOG_TYPES::DEBUG, 3);
+	}
+
 	const std::string _prog = "Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
 								", Loss: " + STRPS(_currLoss, 4) + " ± " + STRPS(_currstd / 2.0, 3) +
 								", Best: " + VEQPS(best, 4) + 
-								", Acceptance: " + STR(this->accepted_) + "/" + STR(this->total_) + " (" + STRP((double)this->accepted_ / this->total_ * 100, 2) + "%)" +
+								", Acceptance: " + STR(this->accepted_) + "/" + STR(this->total_) + " (" + STRP(acceptance, 2) + "%)" +
 								", LR: " + STRPS(this->info_p_.lr_, 4) +
-								", Reg: " + STRPS(this->info_p_.sreg_, 4);
+								", Reg: " + STRPS(this->info_p_.sreg_, 4) + 
+								", Beta: " + STRPS(this->beta_, 4);
 
 	PROGRESS_UPD_Q(i, (*this->pBar_), _prog, !_quiet);
 	

@@ -303,6 +303,7 @@ void UI::nqsExcited()
 		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
 		_H->quenchHamiltonian();
 		_parC.MC_sam_ = 1;
+		auto _RKsolver = algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
@@ -314,18 +315,24 @@ void UI::nqsExcited()
 			
 			// reset the NQS
 			_NQS[j]->reset(_parTime.nblck_);											// reset the derivatives	
+			_NQS[j]->evolveSet(_parTime, this->quiet, false);							// set the evolution function
 			_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method - before the time evolution
 			_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));						// save the mean value
 			for (int i = 0; i < _timespace.size() - 1; ++i)
 			{
 				double _dt = _timespace(i + 1) - _timespace(i);							// set the time step for the evolution
-				_NQS[j]->evolveStep(i, _dt, _parTime, false, this->nqsP.nqs_te_rst_);	// evolve the system
+				_NQS[j]->evolveStepSet(i, _dt, _RKsolver);								// evolve the NQS
 				_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);			// collect the data using ratio method
 				_sz0_mean(i + 1) = algebra::cast<double>(arma::mean(_sz0));				// save the mean value
 				if (i % 10 == 0)
 					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i + 1), 3) + ", Sz_0 = " + STRPS(_sz0_mean(i + 1), 3) + ", dt = " + STRPS(_dt, 2), LOG_TYPES::TRACE, 2);
 			}
 			saveAlgebraic(dir, "measurement.h5", _sz0_mean, "NQS/" + STR(j) + "/time_evo/Sz/0", true);
+		}
+
+		if (_RKsolver) {
+			delete _RKsolver;
+			_RKsolver = nullptr;
 		}
 	}
 }

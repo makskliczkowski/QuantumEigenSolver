@@ -143,12 +143,14 @@ public:
 	// only the new <\psi|s'> given from the new state s'. This is exactly what the NQS does.
 	// ***********************************************************************************************************************************
 	virtual auto logPRatio(uint fP, float fV)			->_T			= 0; // log of the probability ratio - when flip places (single) are used
+	virtual auto logPRatio(uint, uint, float, float)	->_T			= 0; // log of the probability ratio - when flip places (double) are used
 	virtual auto logPRatio(uint nFlips)					->_T			= 0; // log of the probability ratio - when number of flips is used
 	virtual auto logPRatio(Config_cr_t v, Config_cr_t w)->_T			= 0; // log of the probability ratio - when two vectors are used (one for the current state and one for the new state)
 	virtual auto logPRatio(int_ini_t fP, dbl_ini_t fV) -> _T			= 0; // ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto logPRatio(Config_cr_t _v)				->_T			{ return this->logPRatio(this->curVec_, _v);						};
 	virtual auto logPRatio()							->_T			{ return this->logPRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
 	virtual auto pRatio(uint fP, float fV)				->_T			{ return std::exp(this->logPRatio(fP, fV));							};
+	virtual auto pRatio(uint f1, uint f2, float v1, float v2) ->_T		{ return std::exp(this->logPRatio(f1, f2, v1, v2));					}; 
 	virtual auto pRatio(uint nFlips)					->_T			{ return std::exp(this->logPRatio(nFlips));							};	
 	virtual auto pRatio(Config_cr_t _v, Config_cr_t _w)	->_T			{ return std::exp(this->logPRatio(_v, _w));							};
 	virtual auto pRatio(int_ini_t fP, dbl_ini_t fV)		->_T			{ return std::exp(this->logPRatio(fP, fV));							};
