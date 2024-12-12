@@ -190,7 +190,7 @@ NQS_INST_L_CMB(std::complex<double>, std::complex<double>, collectExcitedRatios,
 * @param _container An Armadillo column vector to store the collected ratios. !TODO - change to a more general container.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, std::function<_T(const NQSS&)> _f, arma::Col<_T>& _container)
+void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, std::function<_T(Config_cr_t)> _f, Container_t& _container)
 {
 	this->setRandomFlipNum(_par.nFlip);						// set the random state at the begining
 	if (_par.MC_th_ > 0) 
@@ -213,10 +213,10 @@ void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_t
 }
 
 // template instantiation of function above
-NQS_INST_CMB(double, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(const NQSS&)>, arma::Col<double>&));
-NQS_INST_CMB(double, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(const NQSS&)>, arma::Col<std::complex<double>>&));
-NQS_INST_CMB(std::complex<double>, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(const NQSS&)>, arma::Col<double>&));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(const NQSS&)>, arma::Col<std::complex<double>>&));
+NQS_INST_CMB(double, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(Config_cr_t)>, arma::Col<double>&));
+NQS_INST_CMB(double, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(Config_cr_t)>, arma::Col<std::complex<double>>&));
+NQS_INST_CMB(std::complex<double>, double, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<double(Config_cr_t)>, arma::Col<double>&));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, collect_ratio, void, (const MonteCarlo::MCS_train_t&, std::function<std::complex<double>(Config_cr_t)>, arma::Col<std::complex<double>>&));
 
 // ##########################################################################################################################################
 
@@ -243,7 +243,7 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, collect_ratio, void, (c
 * @param _container The container to store the collected ratio values.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, arma::Col<_T>& _container)
+void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, NQS<_spinModes, _Ht, _T, _stateType>* other, Container_t& _container)
 {
 	if (!other)													// if the other NQS is not provided, return
 		return;

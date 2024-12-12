@@ -23,7 +23,7 @@ class RBM_PP_S : public RBM_PP<_spinModes, _Ht, _T, _stateType>
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPPMat(const NQSS& _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
 #endif

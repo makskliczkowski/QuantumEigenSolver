@@ -39,9 +39,9 @@ protected:
 	// -------------------- P R O B A B I L I T Y -------------------
 	virtual auto logPRatio(uint fP, float fV)		-> _T	override;
 	virtual auto logPRatio(uint nFlips)				-> _T	override;
-	virtual auto logPRatio(const NQSS& _v1,					
-					const NQSS& _v2)				-> _T	override;
-	virtual auto logPRatio(const NQSS& _v1)			-> _T	override;
+	virtual auto logPRatio(Config_cr_t _v1,					
+					Config_cr_t _v2)				-> _T	override;
+	virtual auto logPRatio(Config_cr_t _v1)			-> _T	override;
 	virtual auto logPRatio(std::initializer_list<int> fP,		
 				std::initializer_list<double> fV)	-> _T	override;
 

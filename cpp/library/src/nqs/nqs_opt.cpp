@@ -2,13 +2,232 @@
 
 // ##########################################################################################################################################
 
+// ############################################################ G R A D I E N T #############################################################
+
+// ##########################################################################################################################################
+
+/**
+* @brief Computes the gradient of the loss function with respect to the network parameters.
+*
+* This function calculates the gradient of the loss function using the covariance derivatives
+* and updates the learning rate based on the scheduler. It also accounts for the derivatives
+* of the lower states if they are used.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Numeric type for calculations.
+* @tparam _stateType Type of the state.
+* @param _energies Container holding the energy values.
+* @param _step Current step in the optimization process.
+* @param _currLoss Current loss value.
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, int _step,  _T _currLoss)
+{
+	this->info_p_.lr_ = this->info_p_.lr(_step, algebra::real(_currLoss));										// calculate current learning rate based on the scheduler
+	const _T _samples = static_cast<_T>(_energies.n_elem);
+	{
+		// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
+		// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
+		// - for the excited states, the derivatives are appe	
+		// calculate the centered derivatives
+		this->derivativesMean_ 			= arma::mean(this->derivatives_, 0);									// calculate the mean of the derivatives
+		this->derivativesCentered_ 		= this->derivatives_.each_row() - this->derivativesMean_;				// calculate the centered derivatives
+		this->derivativesCenteredH_		= arma::trans(this->derivativesCentered_);								// calculate the transposed centered derivatives
+		this->F_						= this->derivativesCenteredH_ * ((_energies - _currLoss) / _samples);	// calculate the covariance vector for the gradient 
+
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threads_.threadNum_)
+#endif
+		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)			// append with the lower states derivatives - if the lower states are used
+		{
+			// Calculate <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> 
+			const auto& ratios_excited	= this->lower_states_.ratios_excited_[_low];	// <Psi_W_j / Psi_W> evaluated at W - column vector
+			const auto& ratios_lower 	= this->lower_states_.ratios_lower_[_low];		// <Psi_W / Psi_W_j> evaluated at W_j - column vector
+			const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states 
+			const _T _meanLower 		= arma::mean(ratios_lower);						// mean of the ratios in the lower state
+			const _T _meanExcited 		= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+			this->F_ 					+= this->derivativesCenteredH_ * ((ratios_excited - _meanExcited) * (f_lower_b * _meanLower / _samples));
+		}
+	}
+}
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+template void NQS<2u, double, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<2u, std::complex<double>, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<2u, std::complex<double>, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<2u, double, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<3u, double, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<3u, std::complex<double>, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<3u, std::complex<double>, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<3u, double, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<4u, double, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<4u, std::complex<double>, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<4u, std::complex<double>, double, double>::gradF(const arma::Col<double>&, int, double);
+template void NQS<4u, double, std::complex<double>, double>::gradF(const arma::Col<cpx>&, int, std::complex<double>);
+
+// ##########################################################################################################################################
+
+#ifdef NQS_USESR
+/**
+* @brief Calculates the update parameters for weights using the stochastic reconfiguration (SR) method.
+* 
+* This function updates the weights using a second-order optimization method, where the update rule is:
+* weights[new] <- weights[old] - lr * S^{-1} * F
+* Here, S is the geometric tensor, calculated as S = <\Delta _k* \Delta _k> - <\Delta _k*><\Delta _k>.
+* The geometric tensor acts as a regularizer for the gradient descent method.
+* 
+* The method can use either the pseudoinverse or direct inversion of the matrix S. If the stochastic reconfiguration
+* is skipped, the standard gradient descent is used instead. The function can also run without explicitly calculating
+* the geometric tensor S.
+* 
+* @param step Current step of updating, used for regularization purposes.
+* @param _currLoss Current loss value, used for regularization purposes.
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
+{
+	bool _inversionSuccess 		= false;
+	if (this->info_p_.sreg_ > 0) 
+		this->covMatrixReg(step);
+
+#ifdef NQS_USESR_MAT_USED
+	{
+		// regularize the covariance matrix before inverting it (if needed and set)
+
+		// calculate the pseudoinverse
+		int _attempts 			= 0;
+		double _regFactor		= this->info_p_.sreg_ > 0 ? this->info_p_.sreg_ : 1e-5;
+
+		while (!_inversionSuccess && _attempts < NQS_SREG_ATTEMPTS)
+		{
+			try {
+				if (this->info_p_.pinv_ > 0.0)
+					this->dF_ = this->info_p_.lr_ * (arma::pinv(this->S_, this->info_p_.pinv_) * this->F_);
+				else if (this->info_p_.pinv_ == 0.0)
+					this->dF_ = this->info_p_.lr_ * (arma::pinv(this->S_) * this->F_);
+				else 
+					this->dF_ = this->info_p_.lr_ * arma::solve(this->S_, this->F_, arma::solve_opts::likely_sympd);
+				
+				// if the inversion was successful, set the flag
+				_inversionSuccess = true;
+			} catch (std::exception& e) {
+                // Increase regularization factor and apply to diagonal
+				LOGINFO("Inverse calculation failed, attempt " + STR(_attempts + 1) + ". E: " + e.what(), LOG_TYPES::ERROR, 1);
+				if (!arma::is_finite(this->S_)) {
+					LOGINFO("Non-finite values in the diagonal of the covariance matrix. Stopping the training.", LOG_TYPES::ERROR, 1);
+					break;
+				}
+
+                this->S_.diag() += _regFactor;  	// Apply regularization to diagonal
+                _regFactor 		*= 10;  			// Increase regularization factor for next attempt
+                ++_attempts;
+			}
+		}
+	}
+#else
+	if (this->precond_ != nullptr)
+		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, -1.0);
+	
+	if (this->solver_ != nullptr) 
+	{
+		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
+		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
+							this->F_, 														// b
+							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
+							this->precond_);												// preconditioner
+		_inversionSuccess = this->solver_->isConverged();
+		this->dF_ = this->info_p_.lr_ * this->solver_->moveSolution();						// get the solution
+	} 
+	else {
+		// !DEPRECATED - use solver class instead
+		this->dF_ = this->info_p_.lr_ * algebra::Solvers::FisherMatrix::solve<_T>(
+										this->info_p_.solver_,													// choose the solver type 
+										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
+										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
+										this->F_,               												// This should be of type arma::Col<_T>
+										nullptr, //step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
+										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
+										this->info_p_.tol_,                  		 							// Tolerance
+										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
+										&_inversionSuccess,														// Convergence flag						
+										this->info_p_.sreg_ //this->precond_ ? -1.0 : this->info_p_.sreg_								// Set the regularization only if no preconditioner is used 
+										);
+	}
+
+#endif
+    this->updateWeights_ = _inversionSuccess;
+}
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+NQS_INST_CMB(double, double, gradSR, void, (uint, double));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, gradSR, void, (uint, std::complex<double>));
+NQS_INST_CMB(std::complex<double>, double, gradSR, void, (uint, double));
+NQS_INST_CMB(double, std::complex<double>, gradSR, void, (uint, std::complex<double>));
+#endif
+
+// ##########################################################################################################################################
+
+/**
+* @brief Computes the final gradient for the Neural Quantum State (NQS) optimization.
+*
+* This function calculates the gradient for the NQS optimization process, taking into account
+* the current learning rate, the centered derivatives, and the covariance vector. It also
+* includes the derivatives for the lower states if they are used. The function can optionally
+* apply stochastic reconfiguration with or without matrix calculation.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the calculations.
+* @tparam _stateType State type.
+* @param _energies Energies of the NQS.
+* @param _step Current optimization step.
+* @param _currLoss Current loss value.
+ */
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const Container_t& _energies, int _step, _T _currLoss)
+{
+	this->gradF(_energies, _step, _currLoss);					// calculate the gradient of the loss function
+#ifdef NQS_USESR_MAT_USED										// ---- STOCHASTIC RECONFIGURATION WITH MATRIX CALCULATION ----
+	// update model by recalculating the gradient (applying the stochastic reconfiguration)
+	// this->S_ = arma::cov(this->derivativesC_, this->derivatives_, 1);
+	this->S_ = this->derivativesCenteredH_ * this->derivativesCentered_ / _samples;
+	
+	// check the norm of the gradient and normalize it if needed
+	// if (auto gradNorm = arma::norm(this->F_); gradNorm > NQS_SREG_GRAD_NORM_THRESHOLD)
+	// {
+	// 	std::cerr << "Gradient norm is too large: " << gradNorm << std::endl;
+	// 	this->F_ *= NQS_SREG_GRAD_NORM_THRESHOLD / gradNorm;
+	// }
+#endif
+#if defined NQS_USESR											// ---- STOCHASTIC RECONFIGURATION POSSIBLY WITHOUT MATRIX CALCULATION ----
+	return this->gradSR(_step, _currLoss);
+#else
+	// standard updater with the gradient only!
+	this->updateWeights_ = true;
+	this->dF_ = this->info_p_.lr_ * this->F_;
+#endif
+}
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+template void NQS<2u, double, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<2u, std::complex<double>, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<2u, std::complex<double>, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<2u, double, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<3u, double, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<3u, std::complex<double>, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<3u, std::complex<double>, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<3u, double, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<4u, double, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<4u, std::complex<double>, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+template void NQS<4u, std::complex<double>, double, double>::gradFinal(const arma::Col<double>&, int, double);
+template void NQS<4u, double, std::complex<double>, double>::gradFinal(const arma::Col<cpx>&, int, std::complex<double>);
+
+// ##########################################################################################################################################
+
 // ############################################################ T R A I N I N G #############################################################
 
 // ##########################################################################################################################################
 
 #include <cmath>
 #include <utility>
-#include <functional>
 #include <complex>
 
 // ##########################################################################################################################################
@@ -36,14 +255,13 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 	PROGRESS_UPD_Q(i, (*this->pBar_), _prog, !_quiet);
 	
 	this->updateWeights_ 	= !this->info_p_.stop(i, _currLoss) && this->updateWeights_;
-
 #ifdef NQS_SAVE_WEIGHTS
-	if (i % this->pBar_->percentageSteps == 0 || !this->updateWeights_)  
+	if ((i % this->pBar_->percentageSteps == 0) || !this->updateWeights_) 
 		this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
 #endif
 
 	if (!this->updateWeights_) {
-		LOGINFO("Stopping at iteration " + STR(i) + " with last loss value: " + STRPS(_currLoss, 4), LOG_TYPES::WARNING, 1);
+		LOGINFO("Stopping at iteration " + STR(i) + " with last loss value: " + STRPS(_currLoss, 4) + "+-" + STRPS(_currstd/2.0, 4), LOG_TYPES::WARNING, 1);
 		return true;
 	}
 	return false;
@@ -121,8 +339,8 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 			this->lower_states_.collectLowerRatios(_low);
 	}
 	
-	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 				// save the mean energy
-	TIMER_START_MEASURE(this->gradFinal(En, i, meanEn(i - 1)), (i % this->pBar_->percentageSteps == 0), _timer, STR(i)); // calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
+	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 					// save the mean energy
+	TIMER_START_MEASURE(this->gradFinal(En, i, meanEn(i - 1)), (i % this->pBar_->percentageSteps == 0), _timer, STR(i)); 	// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
 
 	if (this->updateWeights_)
 		this->updateWeights(); 									// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
@@ -142,7 +360,6 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, trainStep, bool, (size_
 
 template <typename _T>
 using NQS_TRAIN_PAIR = std::pair<arma::Col<_T>, arma::Col<_T>>;
-
 
 /**
 * @brief Trains the Neural Quantum State (NQS) using Monte Carlo sampling.
@@ -184,13 +401,13 @@ NQS<_spinModes, _Ht, _T, _stateType>::Container_pair_t NQS<_spinModes, _Ht, _T, 
 	Timer _timer;															// timer for the training
 	arma::Col<_T> meanEn(_par.MC_sam_, arma::fill::zeros);					// here we save the mean energy
 	arma::Col<_T> stdEn(_par.MC_sam_, arma::fill::zeros);					// here we save the standard deviation of the energy
-	arma::Col<_T> En(_par.nblck_, arma::fill::zeros);						// history of energies (for given weights) - here we save the local energies at each block
+	this->E_ = arma::Col<_T>(_par.nblck_, arma::fill::zeros);				// history of energies (for given weights) - here we save the local energies at each block
 	this->setRandomState();													// set the random state at the begining and the number of flips
 	this->setRandomFlipNum(_par.nFlip);										// set the random state at the begining and the number of flips
 
 	uint i = 1;
 	for (i = 1; i <= _par.MC_sam_; ++i) {									// go through the Monte Carlo steps
-		if (this->trainStep(i, En, meanEn, stdEn, _par, quiet, randomStart, _timer)) // perform the training step
+		if (this->trainStep(i, this->E_ , meanEn, stdEn, _par, quiet, randomStart, _timer)) // perform the training step
 			break;
 	}
 
@@ -259,9 +476,9 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, train, NQS_TRAIN_PAIR<s
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, 
                                                         NQSAv::MeasurementNQS<_T>& _meas,
-                                                        arma::Col<_T>* _E, 
-                                                        arma::Col<_T>* _EM,           
-                                                        arma::Col<_T>* _ES, 
+                                                        Container_t* _E, 
+                                                        Container_t* _EM,           
+                                                        Container_t* _ES, 
                                                         const bool quiet,
                                                         const bool randomStart,
                                                         Timer& _timer)
@@ -321,8 +538,8 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, collectStep, bool, (siz
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::collect(const MonteCarlo::MCS_train_t& _par,
 																	NQSAv::MeasurementNQS<_T>& _meas,
-																	arma::Col<_T>* _energies,
-																	arma::Col<_T>* _energiesStd,
+																	Container_t* _energies,
+																	Container_t* _energiesStd,
 																	bool quiet,
                                                                     bool randomStart,
 																	clk::time_point _t,
@@ -534,54 +751,5 @@ NQS_INST_CMB(double, double, collect, void, (const MonteCarlo::MCS_train_t&, Ope
 NQS_INST_CMB(double, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, Operators::OperatorNQS<std::complex<double>>&, arma::Col<std::complex<double>>*, arma::Col<std::complex<double>>*, bool));
 NQS_INST_CMB(std::complex<double>, double, collect, void, (const MonteCarlo::MCS_train_t&, Operators::OperatorNQS<double>&, arma::Col<double>*, arma::Col<double>*, bool));
 NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, Operators::OperatorNQS<std::complex<double>>&, arma::Col<std::complex<double>>*, arma::Col<std::complex<double>>*, bool));
-
-// ##########################################################################################################################################
-
-// ########################################################## E V O L U T I O N ############################################################
-
-// ##########################################################################################################################################
-
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-bool NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step, double dt, 
-									arma::Col<_T>& En, 
-									const MonteCarlo::MCS_train_t& _par, 
-									const bool quiet, 
-									const bool randomStart, 
-									Timer& _timer,
-									bool _useRungeKutta)
-{
-	if (En.n_elem != _par.nblck_)
-		En.resize(_par.nblck_);
-
-	this->total_ 	= 0;										// reset the total number of flips
-	this->accepted_ = 0;										// reset the number of accepted flips
-	if (randomStart && _par.MC_th_ > 0) 
-		this->setRandomState();									// set the random state at the begining
-	this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
-
-	_T _meanEn = 0.0, _stdEn = 0.0;								// mean and standard deviation of the energy
-	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
-	{		
-		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them using the local Metropolis sampling
-		this->grad(NQS_STATE, _taken);							// calculate the gradient at each point of the iteration! - this is implementation specific!!!
-		En(_taken) = this->locEnKernel();						// local energy - stored at each point within the estimation of the gradient (stochastic)
-	}
-
-	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &_meanEn, &_stdEn); 				// save the mean energy
-	this->gradEvoFinal(En, _step, dt, _meanEn, _useRungeKutta);	// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
-	
-	if (this->updateWeights_)
-		this->updateWeights(); 									// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!
-
-	// if (this->trainStop(i, _par, meanEn(i - 1), stdEn(i - 1), quiet))
-	// 	return true;
-	return true;
-}
-
-// template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
-NQS_INST_CMB(double, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
-NQS_INST_CMB(std::complex<double>, double, evolveStep, bool, (size_t, double, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, evolveStep, bool, (size_t, double, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&, const bool));
 
 // ##########################################################################################################################################

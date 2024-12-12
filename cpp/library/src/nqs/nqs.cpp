@@ -126,7 +126,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::reset(size_t _n)
     this->derivativesReset(_n); 				// reset the derivatives
 	this->lower_states_.setDerivContSize(_n);	// set the size of the containers for the lower states
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(reset, void, (size_t));
 
@@ -153,7 +152,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::swapConfig(NQS<_spinModes, _Ht, _T, _
     _other->setConfig(NQS_STATE);                       // swap the configurations
     this->setConfig(_st_other);                         // swap the configurations
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(swapConfig, void, (MC_t_p));
 
@@ -175,11 +173,13 @@ NQS_INST_CMB_ALL(swapConfig, void, (MC_t_p));
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::derivativesReset(size_t nBlocks)
 {
-    this->derivatives_          = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros);
-    this->derivativesCentered_  = this->derivatives_; 
-    this->derivativesCenteredH_ = this->derivatives_.t();  
+    if (nBlocks != this->derivatives_.n_rows)
+    {
+        this->derivatives_          = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros);
+        this->derivativesCentered_  = this->derivatives_; 
+        this->derivativesCenteredH_ = this->derivatives_.t();  
+    }
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(derivativesReset, void, (size_t));
 
@@ -522,7 +522,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
     }
     // ######################################################################################################################################
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(~NQS, void, ());
 
@@ -537,16 +536,15 @@ NQS_INST_CMB_ALL(~NQS, void, ());
 * @param _st Column vector to be set as a new state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st)
+void NQS<_spinModes, _Ht, _T, _stateType>::setState(Config_cr_t _st)
 {
     this->curVec_	= _st;
 #ifndef NQS_USE_VEC_ONLY
     this->curState_ = BASE_TO_INT<u64>(_st, this->discVal_);
 #endif
 }
-
 // template instantiation of the function above
-NQS_INST_CMB_ALL(setState, void, (const NQSS&));
+NQS_INST_CMB_ALL(setState, void, (const Config_t&));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -571,7 +569,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 #endif
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(setState, void, (u64));
 
@@ -586,6 +583,9 @@ void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 {
 	// allocate gradients
 	this->F_.resize(this->info_p_.fullSize_);
+    this->dF_.resize(this->info_p_.fullSize_);
+    if (this->Weights_.size() != this->info_p_.fullSize_)
+        this->Weights_.resize(this->info_p_.fullSize_);
 #ifdef NQS_USESR
 #	ifndef NQS_USESR_NOMAT
 	this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
@@ -594,12 +594,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->curVec_ = arma::ones(this->info_p_.nVis_);
 	this->tmpVec_ = arma::ones(this->info_p_.nVis_);
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(allocate, void, ());
-
-// ##########################################################################################################################################
-
 
 // ##########################################################################################################################################
 
@@ -626,8 +622,8 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path, std::string _file)
 {
 	LOGINFO("Saving the checkpoint configuration.", LOG_TYPES::INFO, 2, '#');
-	auto _isSaved = saveAlgebraic(_path, _file, this->F_, "weights/" + STRP(this->beta_, 5));	// save the weights to a given path
-	if (!_isSaved && (_file != "weights.h5"))													// if not saved properly
+	auto _isSaved = saveAlgebraic(_path, _file, this->Weights_, "weights/" + STRP(this->beta_, 5));	// save the weights to a given path
+	if (!_isSaved && (_file != "weights.h5"))													    // if not saved properly
 	{
 		LOGINFO("Couldn't save the weights to the given path.", LOG_TYPES::ERROR, 3);
 		LOGINFO("Saving to default... ", LOG_TYPES::ERROR, 3);
@@ -635,12 +631,10 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path, std::s
 	}
 	return _isSaved;
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(saveWeights, bool, (std::string, std::string));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 /**
 * @brief Sets the weights of the Neural Quantum State (NQS) from a specified file.
@@ -659,14 +653,123 @@ NQS_INST_CMB_ALL(saveWeights, bool, (std::string, std::string));
 * @return true if the weights were successfully loaded, false otherwise.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, std::string _file)
+inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, std::string _file)
 {
 	LOGINFO("Loading the checkpoint weights:", LOG_TYPES::INFO, 2);
-	return loadAlgebraic(_path, _file, this->F_, "weights/" + STRP(this->beta_, 5));
+	return loadAlgebraic(_path, _file, this->Weights_, "weights/" + STRP(this->beta_, 5));
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(setWeights, bool, (std::string, std::string));
+
+
+/**
+* @brief Sets the weights of the Neural Quantum State (NQS) object.
+* 
+* This function sets the weights of the current NQS object to the weights of the provided NQS object.
+* It then calls the setWeights() function to apply these weights.
+* 
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type for weights.
+* @tparam _stateType The state type.
+* @param _nqs A shared pointer to another NQS object from which to copy the weights.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>> _nqs)
+{
+    this->Weights_ = _nqs->Weights_;
+    this->setWeights();
+}
+// template instantiation of the function above
+template void NQS<2u, double, double, double>::setWeights(std::shared_ptr<NQS<2u, double, double, double>>);
+template void NQS<3u, double, double, double>::setWeights(std::shared_ptr<NQS<3u, double, double, double>>);
+template void NQS<4u, double, double, double>::setWeights(std::shared_ptr<NQS<4u, double, double, double>>);
+template void NQS<2u, cpx, cpx, double>::setWeights(std::shared_ptr<NQS<2u, cpx, cpx, double>>);
+template void NQS<3u, cpx, cpx, double>::setWeights(std::shared_ptr<NQS<3u, cpx, cpx, double>>);
+template void NQS<4u, cpx, cpx, double>::setWeights(std::shared_ptr<NQS<4u, cpx, cpx, double>>);
+template void NQS<2u, cpx, double, double>::setWeights(std::shared_ptr<NQS<2u, cpx, double, double>>);
+template void NQS<3u, cpx, double, double>::setWeights(std::shared_ptr<NQS<3u, cpx, double, double>>);
+template void NQS<4u, cpx, double, double>::setWeights(std::shared_ptr<NQS<4u, cpx, double, double>>);
+template void NQS<2u, double, cpx, double>::setWeights(std::shared_ptr<NQS<2u, double, cpx, double>>);
+template void NQS<3u, double, cpx, double>::setWeights(std::shared_ptr<NQS<3u, double, cpx, double>>);
+template void NQS<4u, double, cpx, double>::setWeights(std::shared_ptr<NQS<4u, double, cpx, double>>);
+
+// ##########################################################################################################################################
+
+/**
+* @brief Sets the weights of the Neural Quantum State
+* 
+* This method assigns new weights to the Neural Quantum State (NQS).
+* The weights determine the parameters of the neural network representation
+* of the quantum state.
+* 
+* @param _w New weights to be assigned (NQSB type)
+* 
+* @note The dimensions of _w should match the architecture of the NQS
+* 
+* @see NQSB
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setWeights(const NQSB& _w)
+{
+    this->Weights_ = _w;
+    this->setWeights();
+}
+// template instantiation of the function above
+template void NQS<2u, double, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<3u, double, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<4u, double, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<2u, cpx, cpx, double>::setWeights(const arma::Col<cpx>&);
+template void NQS<3u, cpx, cpx, double>::setWeights(const arma::Col<cpx>&);
+template void NQS<4u, cpx, cpx, double>::setWeights(const arma::Col<cpx>&);
+template void NQS<2u, cpx, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<3u, cpx, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<4u, cpx, double, double>::setWeights(const arma::Col<double>&);
+template void NQS<2u, double, cpx, double>::setWeights(const arma::Col<cpx>&);
+template void NQS<3u, double, cpx, double>::setWeights(const arma::Col<cpx>&);
+template void NQS<4u, double, cpx, double>::setWeights(const arma::Col<cpx>&);
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::setWeights(NQSB&& _w)
+{
+    this->Weights_ = std::move(_w);
+    this->setWeights();
+}
+// template instantiation of the function above
+template void NQS<2u, double, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<3u, double, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<4u, double, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<2u, cpx, cpx, double>::setWeights(arma::Col<cpx>&&);
+template void NQS<3u, cpx, cpx, double>::setWeights(arma::Col<cpx>&&);
+template void NQS<4u, cpx, cpx, double>::setWeights(arma::Col<cpx>&&);
+template void NQS<2u, cpx, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<3u, cpx, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<4u, cpx, double, double>::setWeights(arma::Col<double>&&);
+template void NQS<2u, double, cpx, double>::setWeights(arma::Col<cpx>&&);
+template void NQS<3u, double, cpx, double>::setWeights(arma::Col<cpx>&&);
+template void NQS<4u, double, cpx, double>::setWeights(arma::Col<cpx>&&);
+
+// ##########################################################################################################################################
+
+/**
+* @brief Updates the weights of the neural network by adding the gradient to the current weights
+* 
+* This method performs a simple update step where the gradient (dF_) is added to
+* the current weights (F_) of the neural network.
+* 
+* @tparam _spinModes Number of spin modes in the system
+* @tparam _Ht Type of the Hamiltonian
+* @tparam _T Numeric data type (typically float or double)
+* @tparam _stateType Type representing the quantum state
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::updateWeights()
+{
+    this->Weights_ -= this->dF_;
+}
+// template instantiation of the function above
+NQS_INST_CMB_ALL(updateWeights, void, ());
 
 // ##########################################################################################################################################
 
@@ -716,7 +819,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setRandomState(bool _upd)
 
     this->setState(randomState, _upd);
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(setRandomState, void, (bool));
 
@@ -787,7 +889,6 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
 #endif
 	return true;
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(initThreads, bool, (uint));
 
@@ -809,10 +910,10 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::init()
 {
     this->allocate();
-    this->setRandomState();
+    // this->setRandomState();
 }
-
 // template instantiation of the function above
 NQS_INST_CMB_ALL(init, void, ());
 
 // ##########################################################################################################################################
+

@@ -464,6 +464,17 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_rst, bool, 0);		// should I reset the state before each step?
+		// timeevolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te, bool, 0);			// time evolution - do or do not? - 0 - no, 1 - yes
+		UI_PARAM_CREATE_DEFAULT(nqs_te_mc, uint, 1);		// number of samples - outer loop for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_th, uint, 0);		// thermalize when time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_bn, uint, 100);		// number of inner blocks for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_bs, uint, 4);		// block size for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_rst, bool, 0);		// should I reset the state before each step?
+		UI_PARAM_CREATE_DEFAULTD(nqs_te_dt, double, 0.01);	// time step for the time evolution - initial time step
+		UI_PARAM_CREATE_DEFAULTD(nqs_te_tf, double, 1.0);	// final time for the time evolution - final time
+		UI_PARAM_CREATE_DEFAULT(nqs_te_tlog, uint, 0);		// use the logarithmic time steps? - 0 - no, > 0 - yes (use this number as the number of steps)
+		UI_PARAM_CREATE_DEFAULT(nqs_te_rk, bool, 0);		// use the Runge-Kutta method for the time evolution - 0 - Euler, 1 - Runge-Kutta (2nd order)
 		// regularization
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
@@ -520,6 +531,36 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_col_bn);
 			UI_PARAM_SET_DEFAULT(nqs_col_bs);
 			UI_PARAM_SET_DEFAULT(nqs_col_rst);
+			// time evolution
+			UI_PARAM_SET_DEFAULT(nqs_te);
+			UI_PARAM_SET_DEFAULT(nqs_te_mc);
+			UI_PARAM_SET_DEFAULT(nqs_te_th);
+			UI_PARAM_SET_DEFAULT(nqs_te_bn);
+			UI_PARAM_SET_DEFAULT(nqs_te_bs);
+			UI_PARAM_SET_DEFAULT(nqs_te_rst);
+			UI_PARAM_SET_DEFAULT(nqs_te_dt);
+			UI_PARAM_SET_DEFAULT(nqs_te_tf);
+			UI_PARAM_SET_DEFAULT(nqs_te_tlog);
+			UI_PARAM_SET_DEFAULT(nqs_te_rk);
+			// regularization
+			UI_PARAM_SET_DEFAULT(nqs_tr_reg);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regs);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regd);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regp);
+			// preconditioner
+			UI_PARAM_SET_DEFAULT(nqs_tr_prec);
+			// solver type
+			UI_PARAM_SET_DEFAULT(nqs_tr_sol);
+			UI_PARAM_SET_DEFAULT(nqs_tr_tol);
+			UI_PARAM_SET_DEFAULT(nqs_tr_iter);
+			// early stopping
+			UI_PARAM_SET_DEFAULT(nqs_es_pat);
+			UI_PARAM_SET_DEFAULT(nqs_es_del);
+			// excited states
+			UI_PARAM_SET_DEFAULT(nqs_ex_mc);
+			UI_PARAM_SET_DEFAULT(nqs_ex_th);
+			UI_PARAM_SET_DEFAULT(nqs_ex_bn);
+			UI_PARAM_SET_DEFAULT(nqs_ex_bs);
 		}
 	};
 };

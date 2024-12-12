@@ -44,16 +44,16 @@ template class RBM<4u, double, cpx, double>;
 * @return The computed ansatz value.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
+_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz(Config_cr_t _in) const
 {
 	return algebra::cast<_T>(std::exp(arma::dot(this->bV_, _in)) * arma::prod(this->coshF(_in)));
 };
 
 // template instantiation of the function above
-RBM_INST_CMB(double, double, ansatz, double, (const NQSS&), const);
-RBM_INST_CMB(cpx, cpx, ansatz, cpx, (const NQSS&), const);
-RBM_INST_CMB(double, cpx, ansatz, cpx, (const NQSS&), const);
-RBM_INST_CMB(cpx, double, ansatz, double, (const NQSS&), const);
+RBM_INST_CMB(double, double, ansatz, double, (const arma::Col<double>&), const);
+RBM_INST_CMB(cpx, cpx, ansatz, cpx, (const arma::Col<double>&), const);
+RBM_INST_CMB(double, cpx, ansatz, cpx, (const arma::Col<double>&), const);
+RBM_INST_CMB(cpx, double, ansatz, double, (const arma::Col<double>&), const);
 
 // ##########################################################################################################################################
 
@@ -73,16 +73,16 @@ RBM_INST_CMB(cpx, double, ansatz, double, (const NQSS&), const);
 * @return The logarithm of the ansatz function for the given input state.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) const 
+_T RBM<_spinModes, _Ht, _T, _stateType>::ansatzlog(Config_cr_t _in) const 
 {
 	return algebra::cast<_T>(arma::dot(this->bV_, _in) + arma::sum(arma::log(this->coshF(_in))));
 }
 
 // template instantiation of the function above
-RBM_INST_CMB(double, double, ansatzlog, double, (const NQSS&), const);
-RBM_INST_CMB(cpx, cpx, ansatzlog, cpx, (const NQSS&), const);
-RBM_INST_CMB(double, cpx, ansatzlog, cpx, (const NQSS&), const);
-RBM_INST_CMB(cpx, double, ansatzlog, double, (const NQSS&), const);
+RBM_INST_CMB(double, double, ansatzlog, double, (const arma::Col<double>&), const);
+RBM_INST_CMB(cpx, cpx, ansatzlog, cpx, (const arma::Col<double>&), const);
+RBM_INST_CMB(double, cpx, ansatzlog, cpx, (const arma::Col<double>&), const);
+RBM_INST_CMB(cpx, double, ansatzlog, double, (const arma::Col<double>&), const);
 
 // ##########################################################################################################################################
 
@@ -97,7 +97,7 @@ RBM_INST_CMB(cpx, double, ansatzlog, double, (const NQSS&), const);
 * @return The logarithm of the ratio of the two states (other / this) for the given state vector _in.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
+_T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(Config_cr_t _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
 {
 	auto _rbm_other = dynamic_cast<RBM<_spinModes, _Ht, _T, _stateType>*>(_other);
 	_T log_ratio = (arma::dot(_rbm_other->bV_ - this->bV_, _in)) + 
@@ -106,20 +106,20 @@ _T RBM<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(const NQSS& _in, NQS<_s
 }
 
 // template instantiation of the function above
-template double RBM<2u, double, double, double>::ansatz_ratiolog(const NQSS&, NQS<2u, double, double, double>*) const;
-template std::complex<double> RBM<2u, double, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<2u, double, std::complex<double>, double>*) const;
-template double RBM<2u, std::complex<double>, double, double>::ansatz_ratiolog(const NQSS&, NQS<2u, std::complex<double>, double, double>*) const;
-template std::complex<double> RBM<2u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<2u, std::complex<double>, std::complex<double>, double>*) const;
+template double RBM<2u, double, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<2u, double, double, double>*) const;
+template std::complex<double> RBM<2u, double, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<2u, double, std::complex<double>, double>*) const;
+template double RBM<2u, std::complex<double>, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<2u, std::complex<double>, double, double>*) const;
+template std::complex<double> RBM<2u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<2u, std::complex<double>, std::complex<double>, double>*) const;
 // 3 
-template double RBM<3u, double, double, double>::ansatz_ratiolog(const NQSS&, NQS<3u, double, double, double>*) const;
-template std::complex<double> RBM<3u, double, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<3u, double, std::complex<double>, double>*) const;
-template double RBM<3u, std::complex<double>, double, double>::ansatz_ratiolog(const NQSS&, NQS<3u, std::complex<double>, double, double>*) const;
-template std::complex<double> RBM<3u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<3u, std::complex<double>, std::complex<double>, double>*) const;
+template double RBM<3u, double, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<3u, double, double, double>*) const;
+template std::complex<double> RBM<3u, double, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<3u, double, std::complex<double>, double>*) const;
+template double RBM<3u, std::complex<double>, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<3u, std::complex<double>, double, double>*) const;
+template std::complex<double> RBM<3u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<3u, std::complex<double>, std::complex<double>, double>*) const;
 // 4
-template double RBM<4u, double, double, double>::ansatz_ratiolog(const NQSS&, NQS<4u, double, double, double>*) const;
-template std::complex<double> RBM<4u, double, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<4u, double, std::complex<double>, double>*) const;
-template double RBM<4u, std::complex<double>, double, double>::ansatz_ratiolog(const NQSS&, NQS<4u, std::complex<double>, double, double>*) const;
-template std::complex<double> RBM<4u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const NQSS&, NQS<4u, std::complex<double>, std::complex<double>, double>*) const;
+template double RBM<4u, double, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<4u, double, double, double>*) const;
+template std::complex<double> RBM<4u, double, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<4u, double, std::complex<double>, double>*) const;
+template double RBM<4u, std::complex<double>, double, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<4u, std::complex<double>, double, double>*) const;
+template std::complex<double> RBM<4u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(const arma::Col<double>&, NQS<4u, std::complex<double>, std::complex<double>, double>*) const;
 
 // ##########################################################################################################################################
 
@@ -142,7 +142,7 @@ template std::complex<double> RBM<4u, std::complex<double>, std::complex<double>
 * @param _plc The index specifying the position in the derivatives matrix to update.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
+void RBM<_spinModes, _Ht, _T, _stateType>::grad(Config_cr_t _v, uint _plc)
 {
 	// get the subviews
 	auto _currDerivative	= this->derivatives_.row(_plc);
@@ -157,20 +157,29 @@ void RBM<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
 	_currDerivative.head(this->info_p_.nVis_) 	= arma::conv_to<arma::Row<_T>>::from(_v);
 	_hiddDerivative								= arma::tanh(this->theta_).as_row();
 
-// #ifndef _DEBUG
-// #pragma omp parallel for
-// #endif
+#ifndef _DEBUG
+#pragma omp parallel for num_threads(this->threads_.threadNum_)
+#endif
 	for (int j = 0; j < this->info_p_.nVis_; ++j)
 		_weightsDerivative.subvec(j * this->nHid_, (j + 1) * this->nHid_ - 1) = _v(j) * _hiddDerivative;
 }
-
 // template instantiation of the function above
-RBM_INST_CMB(double, double, grad, void, (const NQSS&, uint), );
-RBM_INST_CMB(cpx, cpx, grad, void, (const NQSS&, uint), );
-RBM_INST_CMB(double, cpx, grad, void, (const NQSS&, uint), );
-RBM_INST_CMB(cpx, double, grad, void, (const NQSS&, uint), );
+RBM_INST_CMB(double, double, grad, void, (const arma::Col<double>&, uint), );
+RBM_INST_CMB(cpx, cpx, grad, void, (const arma::Col<double>&, uint), );
+RBM_INST_CMB(double, cpx, grad, void, (const arma::Col<double>&, uint), );
+RBM_INST_CMB(cpx, double, grad, void, (const arma::Col<double>&, uint), );
 
 // ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void RBM<_spinModes, _Ht, _T, _stateType>::setWeights()
+{
+	this->bV_	= this->Weights_.subvec(0, this->info_p_.nVis_ - 1);
+	this->bH_	= this->Weights_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
+	this->W_	= arma::reshape(this->Weights_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1), this->W_.n_rows, this->W_.n_cols);
+}
+// template instantiation of the function above
+RBM_INST_CMB_ALL(setWeights, void, (), );
 
 /**
 * @brief Updates the weights in the system according to a given gradient
@@ -178,19 +187,13 @@ RBM_INST_CMB(cpx, double, grad, void, (const NQSS&, uint), );
 * @note the function is called after the gradient is calculated and inlined to the optimization process
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
+void RBM<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
-	this->bV_	-= this->dF_.subvec(0, this->info_p_.nVis_ - 1);
-	this->bH_	-= this->dF_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1);
-	this->W_	-= arma::reshape(this->dF_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1),
-								this->W_.n_rows, this->W_.n_cols);
+	NQS_S<_spinModes, _Ht, _T, _stateType>::updateWeights();
+	this->setWeights();
 }
-
 // template instantiation of the function above
-RBM_INST_CMB(double, double, updateWeights, void, (), );
-RBM_INST_CMB(cpx, cpx, updateWeights, void, (), );
-RBM_INST_CMB(double, cpx, updateWeights, void, (), );
-RBM_INST_CMB(cpx, double, updateWeights, void, (), );
+RBM_INST_CMB_ALL(updateWeights, void, (), ); 
 
 // ##########################################################################################################################################
 
@@ -229,7 +232,7 @@ void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 * @warning values are stored in flipVals_ before the flip, hence "-" is taken
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void RBM<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFlips)
+void RBM<_spinModes, _Ht, _T, _stateType>::update(Config_cr_t v, uint nFlips)
 {
 	for (uint i = 0; i < nFlips; ++i)
 	{

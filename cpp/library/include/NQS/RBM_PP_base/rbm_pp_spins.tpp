@@ -30,7 +30,7 @@ public:
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPPMat(const NQSS& _n)	const -> NQSW	override;
+	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW	override;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW	override;
 #endif
@@ -74,7 +74,7 @@ public:
 * @returns the Pfaffian matrix
 */
 template <typename _Ht, typename _T, class _stateType>
-typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(const NQSS& _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(Config_cr_t _n) const
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN})
 	NQSW _out(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);

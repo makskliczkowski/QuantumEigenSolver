@@ -195,12 +195,14 @@ set(SOURCES
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
     ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
     ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
+    ${CPPSOURCE}/LinearAlgebra/ode.cpp
     operators.cpp 
     user_interface.cpp 
     src/nqs/nqs.cpp
     src/nqs/nqs_opt.cpp
     src/nqs/nqs_lower.cpp
     src/nqs/nqs_sampling.cpp
+    src/nqs/nqs_evo.cpp
     src/nqs/rbm/rbm.cpp
     src/nqs/rbm/rbm_spin.cpp
     src/nqs/rbmpp/rbmpp.cpp

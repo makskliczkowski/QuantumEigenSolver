@@ -29,17 +29,23 @@ namespace SystemProperties
 {
 	namespace TimeEvolution
 	{
-		/*
-		* @brief Calculate the time evolution of the state. The 
-		* time evolution is calculated based on the eigenstates and
-		* eigenvalues of the system. The overlaps are also given. This specifies the 
-		* coefficients of the state at time t = 0 with each of the eigenvectors of the system.
-		* @param _eigenstates - the eigenstates of the system
-		* @param _eigvals - the eigenvalues of the system
-		* @param _overlaps - the overlaps of the state with the eigenstates
-		* @returns the time evolved state
+		/**
+		* @brief Computes the time evolution of a quantum state.
+		*
+		* This function calculates the time evolution of a quantum state given its eigenstates, 
+		* eigenvalues, and overlaps. The result is a column vector of complex numbers representing 
+		* the evolved state at a specified time.
+		*
+		* @tparam _T Type of the elements in the eigenstates matrix.
+		* @tparam _S Type of the overlaps vector.
+		* @param _eigenstates Matrix of eigenstates (each column is an eigenstate).
+		* @param _eigvals Column vector of eigenvalues corresponding to the eigenstates.
+		* @param _overlaps Vector of overlaps (coefficients) of the initial state with the eigenstates.
+		* @param _time Time at which to evaluate the evolved state.
+		* @param _threads Number of threads to use for parallel computation (default is 1).
+		* @return Column vector of complex numbers representing the evolved state at the specified time.
 		*/
-		template <typename _T, typename _S>
+		template <typename _T, typename _S = arma::Col<_T>>
 		[[nodiscard]]
 		inline arma::Col<std::complex<double>> time_evo(const arma::Mat<_T>& _eigenstates, 
 														const arma::Col<double>& _eigvals,
@@ -47,21 +53,12 @@ namespace SystemProperties
 														const double _time,
 														size_t _threads = 1)
 		{
-			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);
+			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);		// precompute the exponential
 			// try armadillo multiplication
 			//return _eigenstates * (_exp % _overlaps);
-
 			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
-
-		
-			// go through the eigenstates
-//#ifndef _DEBUG
-//#pragma omp parallel for num_threads(_threads) reduction(+: _ret)
-//#endif // _DEBUG
 			for (auto i = 0; i < _eigenstates.n_cols; ++i)
-			{
-				_ret += _exp(i) * _overlaps(i) * _eigenstates.col(i);
-			}
+				_ret += (_exp(i) * _overlaps(i)) * _eigenstates.col(i);
 			return _ret;
 		}
 

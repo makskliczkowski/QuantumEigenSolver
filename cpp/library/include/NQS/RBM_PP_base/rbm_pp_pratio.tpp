@@ -65,7 +65,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(uint nFlips)
 * @brief computes (Psi'/Psi), where (Psi') is the state with certain positions flipped. 
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(const NQSS& _v1, const NQSS& _v2)
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
 {
 	// return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPfaffian(_v2) / this->getPfaffian(_v1);
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::logPRatio(_v1, _v2) + std::log(this->getPfaffian(_v2)) - std::log(this->getPfaffian(_v1));

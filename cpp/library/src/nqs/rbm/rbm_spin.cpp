@@ -138,7 +138,7 @@ template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double
 * @return The logarithm of the probability ratio between the two states.
 */
 template<typename _Ht, typename _T, class _stateType>
-_T RBM_S<2, _Ht, _T, _stateType>::logPRatio(const NQSS& _v1, const NQSS& _v2)
+_T RBM_S<2, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
 {
 	_T val	=	arma::dot(this->bV_, arma::Col<double>(_v2 - _v1));
 	val		+=	RBM_ACCU_ARMA(arma::log(this->coshF(_v2)) - arma::log(this->coshF(_v1)));
@@ -146,10 +146,10 @@ _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(const NQSS& _v1, const NQSS& _v2)
 }
 
 // function instantiations
-template double RBM_S<2, double, double, double>::logPRatio(const NQSS&, const NQSS&);
-template std::complex<double> RBM_S<2, double, std::complex<double>, double>::logPRatio(const NQSS&, const NQSS&);
-template double RBM_S<2, std::complex<double>, double, double>::logPRatio(const NQSS&, const NQSS&);
-template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double>, double>::logPRatio(const NQSS&, const NQSS&);
+template double RBM_S<2, double, double, double>::logPRatio(Config_cr_t, Config_cr_t);
+template std::complex<double> RBM_S<2, double, std::complex<double>, double>::logPRatio(Config_cr_t, Config_cr_t);
+template double RBM_S<2, std::complex<double>, double, double>::logPRatio(Config_cr_t, Config_cr_t);
+template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double>, double>::logPRatio(Config_cr_t, Config_cr_t);
 
 ////////////////////////////////////////////////////////////////
 
@@ -169,7 +169,7 @@ template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double
 * @return The logarithm of the probability ratio.
 */
 template<typename _Ht, typename _T, class _stateType>
-_T RBM_S<2, _Ht, _T, _stateType>::logPRatio(const NQSS& _v1)
+_T RBM_S<2, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1)
 {
 	_T val	= arma::dot(this->bV_, _v1 - this->curVec_);
 #ifdef NQS_ANGLES_UPD
@@ -182,10 +182,10 @@ _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(const NQSS& _v1)
 }
 
 // function instantiations
-template double RBM_S<2, double, double, double>::logPRatio(const NQSS&);
-template std::complex<double> RBM_S<2, double, std::complex<double>, double>::logPRatio(const NQSS&);
-template double RBM_S<2, std::complex<double>, double, double>::logPRatio(const NQSS&);
-template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double>, double>::logPRatio(const NQSS&);
+template double RBM_S<2, double, double, double>::logPRatio(Config_cr_t);
+template std::complex<double> RBM_S<2, double, std::complex<double>, double>::logPRatio(Config_cr_t);
+template double RBM_S<2, std::complex<double>, double, double>::logPRatio(Config_cr_t);
+template std::complex<double> RBM_S<2, std::complex<double>, std::complex<double>, double>::logPRatio(Config_cr_t);
 
 // %%%%%%%%%%%%% U S I N G   I N I T I A L I Z E R %%%%%%%%%%%%%
 

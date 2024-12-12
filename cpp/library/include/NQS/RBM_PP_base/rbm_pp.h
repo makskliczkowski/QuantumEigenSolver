@@ -100,15 +100,15 @@ protected:
 	void allocate()												override final;
 
 	// ------------------------ S E T T E R S ------------------------
-	virtual void setState(const NQSS& _st, bool _set)			override final;
+	virtual void setState(const Config_t& _st, bool _set)		override final;
 	virtual void setState(u64 _st, bool _set)					override final;
 
 	/* ------------------------------------------------------------ */
 	// -------------------- P R O B A B I L I T Y --------------------
 	auto logPRatio(uint fP, float fV)							-> _T override final;
 	auto logPRatio(uint nFlips)									-> _T override final;
-	auto logPRatio(const NQSS& _v1,
-					const NQSS& _v2)							-> _T override final;
+	auto logPRatio(Config_cr_t _v1,
+					Config_cr_t _v2)							-> _T override final;
 	auto logPRatio(std::initializer_list<int> fP,
 				std::initializer_list<double> fV)				-> _T override final;
 
@@ -116,18 +116,18 @@ protected:
 public:
 	bool setWeights(std::string _path, std::string _file)		override final;
 	bool saveWeights(std::string _path, std::string _file)		override final;
-
+	void setWeights()											override final;
 protected:
 	void updateWeights()										override final;
 	// updates
 #ifdef NQS_ANGLES_UPD
 	void update(uint nFlips)									override final;
-	void update(const NQSS& v, uint nFlips)						override final;
+	void update(Config_cr_t v, uint nFlips)						override final;
 	void unupdate(uint nFlips)									override final;
 #endif
 
 	// ---------------------------- T R A I N ----------------------------	
-	void grad(const NQSS& _v, uint _plc)						override final;
+	void grad(Config_cr_t _v, uint _plc)						override final;
 
 	// --------------------------- A N S A T Z ---------------------------
 	virtual void updFPP_C(uint fP, float fV)					= 0;
@@ -150,19 +150,19 @@ public:
 	void init()													override final;
 	// for the PP matrix
 	void setFPP()												{ this->X_ = this->getPPMat();									};
-	void setFPP(const NQSS& _n)									{ this->X_ = this->getPPMat(_n);								};
+	void setFPP(Config_cr_t _n)									{ this->X_ = this->getPPMat(_n);								};
 	// void setFPP(u64 _n)											{ this->X_ = this->getPPMat(_n);								};
 	// for the new PP matrix
 	void setFPP_C()												{ this->Xnew_ = this->getPPMat();								};
-	void setFPP_C(const NQSS& _n)								{ this->Xnew_ = this->getPPMat(_n);								};
+	void setFPP_C(Config_cr_t _n)								{ this->Xnew_ = this->getPPMat(_n);								};
 	// void setFPP_C(u64 _n)										{ this->Xnew_ = this->getPPMat(_n);								};
 	// for the pfaffian value
 	void setPfaffian()											{ this->pfaffian_ = this->getPfaffian();						};
-	void setPfaffian(const NQSS& _n)							{ this->setFPP(_n); this->setPfaffian();						};
+	void setPfaffian(Config_cr_t _n)							{ this->setFPP(_n); this->setPfaffian();						};
 	void setPfaffian(const NQSW& _M)							{ this->pfaffian_ = this->getPfaffian(_M);						};
 	// for the candidate pfaffian value 
 	void setPfaffian_C()										{ this->pfaffianNew_ = this->getPfaffian_C();					};
-	void setPfaffian_C(const NQSS& _n)							{ this->setFPP_C(_n); this->setPfaffian_C();					};
+	void setPfaffian_C(Config_cr_t _n)							{ this->setFPP_C(_n); this->setPfaffian_C();					};
 	void setPfaffian_C(const NQSW& _M)							{ this->pfaffianNew_ = this->getPfaffian(_M);					};
 
 	// -------------------- U P D A T E R S --------------------
@@ -178,7 +178,7 @@ public:
 
 	// --------------------- G E T T E R S ---------------------
 	
-	virtual auto getPPMat(const NQSS& _n)	const -> NQSW		= 0;
+	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW		= 0;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW		= 0;
 #endif
@@ -189,7 +189,7 @@ public:
 	// based on the current candidate matrix, obtain the Pffafian
 	auto getPfaffian_C()					const -> _T			{ return algebra::Pfaffian::pfaffian<_T>(this->Xnew_, this->info_p_.nParticles_);	};
 	// get the Pffafian value for a given vector
-	auto getPfaffian(const NQSS& _in)		const -> _T			{ return this->getPfaffian(this->getPPMat(_in));							};
+	auto getPfaffian(Config_cr_t _in)		const -> _T			{ return this->getPfaffian(this->getPPMat(_in));							};
 	// based on given matrix, obtain the Pffafian
 	static auto getPfaffian(const NQSW& _M)	-> _T				{ return algebra::Pfaffian::pfaffian<_T>(_M, _M.n_rows);					};
 	
@@ -202,9 +202,9 @@ public:
 	// get size of the PP function matrix
 	auto getNPP()							const -> uint		{ return this->nPP_;														};
 	// --------------------- F I N A L E -----------------------
-	auto ansatz(const NQSS& _in)			const -> _T			override final;
-	auto ansatzlog(const NQSS& _in)			const -> _T			override final;
-	auto ansatz_ratiolog(const NQSS& _in, 
+	auto ansatz(Config_cr_t _in)			const -> _T			override final;
+	auto ansatzlog(Config_cr_t _in)			const -> _T			override final;
+	auto ansatz_ratiolog(Config_cr_t _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 			const -> _T override final;
 
 	// ---------------------------------------------------------

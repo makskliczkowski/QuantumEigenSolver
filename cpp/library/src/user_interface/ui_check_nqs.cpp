@@ -151,7 +151,9 @@ void UI::nqsExcited()
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};				// set up the operators to save - correlation
 	
 	// for the time evolution
-	auto _timespace = arma::logspace(-3, std::log(5), 10000);
+	const auto _timespace = this->nqsP.nqs_te_tlog_ > 0 ? arma::logspace(this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_, this->nqsP.nqs_te_tlog_) : arma::regspace(this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
+	saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
+	// operators
 	{
 		Operators::Operator<_T, uint> _SzL 			= Operators::SpinOperators::sig_z_l<_T>(Nvis);
 		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
@@ -175,53 +177,46 @@ void UI::nqsExcited()
 	if (lanED || fullED)
 	{
 		_H->buildHamiltonian();
-		const arma::Col<_T>* _mbs0 = nullptr;
+
 		if (fullED)
 		{																					// try with the full diagonalization
 			_H->diagH(false);																// diagonalize the Hamiltonian
 			for (int i = 0; i < stateNum; ++i) 												// save the energies
 			{
 				const arma::Col<_T>& _mbs = _H->getEigVec(i);
-				if (i == 0)
-					_mbs0 = &_mbs;
-
-				if(Nh <= ULLPOW(7)) 
-					_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
-
+				if(Nh <= ULLPOW(7)) _H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);	// measure the quantities
 				_meas_ED[i].measure(_mbs, _hilbert);										// save the measured quantities
 				_meansED(i) = _H->getEigVal(i);
-				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0);	
+				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0 || this->nqsP.nqs_te_);	
 				LOGINFO("Found the ED (full) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
 
-				if (i == 0)
+				if (this->nqsP.nqs_te_)
 				{
-					// Operators::Operator<cpx> _Szk 		= Operators::SpinOperators::sig_k<cpx>(Nvis, 0.0);
+					// Operators::Operator<cpx> _Szk 	= Operators::SpinOperators::sig_k<cpx>(Nvis, 0.0);
 					// arma::SpMat<cpx> _SkMat 			= _Szk.template generateMat<false, cpx, arma::SpMat>(Nh);
-					Operators::Operator<cpx> _Sz0 		= Operators::SpinOperators::sig_z<cpx>(Nvis, 0);
-					arma::SpMat<cpx> _Sz0Mat 			= _Sz0.template generateMat<false, cpx, arma::SpMat>(Nh);
-
+					// arma::Col<cpx> _mbs1 			= _SkMat * _mbs;
+					arma::SpMat<cpx> _Sz0Mat 			= Operators::SpinOperators::sig_z<cpx>(Nvis, 0).template generateMat<false, cpx, arma::SpMat>(Nh);
 					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);
-					// arma::Col<cpx> _mbs1 				= _SkMat * _mbs;
-					arma::Col<cpx> _mbs1 				= algebra::cast<cpx>(_mbs);
 					_H->quenchHamiltonian();
-					_H->buildHamiltonian();
-					_H->diagH(false);				// diagonalize the Hamiltonian
+					_H->buildHamiltonian(false);
+					_H->diagH(false, false);			// diagonalize the Hamiltonian
 
 					arma::Mat<_T> _eigv 				= _H->getEigVec();
-					arma::Col<cpx> _ovrl 				= _eigv.t() * _mbs1;
+					arma::Col<_T> _ovrl 				= _eigv.t() * _mbs;
+
+#pragma omp parallel for num_threads(this->threadNum)
 					for (int j = 0; j < _timespace.size(); ++j)
 					{
 						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
 						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
 					}
-					saveAlgebraic(dir, "measurement.h5", _vals, "ED/0/time_evo/Sz/0", true);
-					saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", true);
+					saveAlgebraic(dir, "measurement.h5", _vals, "ED/" + STR(i) + "/time_evo/Sz/0", true);
 					_H->quenchHamiltonian();
-					_H->buildHamiltonian();
-					_H->diagH(false);					// diagonalize the Hamiltonian
+					_H->buildHamiltonian(false);
+					_H->diagH(false, false);			// diagonalize the Hamiltonian
 				}
 			}
-			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", true); 					// save the results to HDF5 file
+			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false); 				// save the results to HDF5 file
 		}
 		// ---------------
 		_H->clearEigVal();
@@ -229,22 +224,15 @@ void UI::nqsExcited()
 		// ---------------
 		{
 			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");								// get LANCZOS diagonalization
-			const auto& _eigvec 	= _H->getEigVec();
-			const auto& _krylov_mb 	= _H->getKrylov();
+			const auto& _eigvec 	= _H->getEigVec();										// get the eigenvectors in Krylov basis
+			const auto& _krylov_mb 	= _H->getKrylov();										// get the Krylov basis
 			for (int i = 0; i < stateNum; ++i) 												// save the energies
 			{
 				const arma::Col<_T> _mbs = LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
-				if(Nh <= ULLPOW(7)) 
-					_H->prettyPrint(stout, _mbs, latP.lat->get_Ns(), 1e-3);
-
 				_meas_LAN[i].measure(_mbs, _hilbert);										// save the measured quantities
-				_meansLAN(i) = _H->getEigVal(i);
+				_meansLAN(i) = _H->getEigVal(i);											// save the energies to the container
 				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansLAN[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
-				
-				// if (_mbs0 != nullptr && i == 0 && _mbs0->size() == _mbs.size())
-				// LOGINFO("Overlap between ED and Lanczos: " + STRPS(arma::cdot(*_mbs0, _mbs), UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
-				// save the measured quantities
-				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN/" + STR(i), fullED || i > 0);
+				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN/" + STR(i), fullED || i > 0 || this->nqsP.nqs_te_);
 			}
 			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);			// save the results to HDF5 file
 		}
@@ -308,31 +296,37 @@ void UI::nqsExcited()
 				" +- " + STRPS(_stdsNQS(i) / 2.0, UI_NQS_PRECISION), LOG_TYPES::TRACE, 2);
 	}
 
-	// try time evolution - only the GS
+	// try time evolution 
+	if (this->nqsP.nqs_te_)
 	{
-		_timer.checkpoint("Time evolution");
-		// _parC.MC_sam_ = 1;
+		LOGINFO(3);
+		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
 		_H->quenchHamiltonian();
-		arma::Col<_T> _sz0(_parC.MC_sam_ * _parC.nblck_), _En(_parC.nblck_);
-		arma::Col<double> _sz0_mean(_timespace.size(), arma::fill::zeros);
-		Operators::OperatorNQS<_T> _Sz0 = Operators::SpinOperators::sig_z<_T>(Nvis, 0);
-		
-		// measure the time evolution
-		_NQS[0]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method
-		_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));
+		_parC.MC_sam_ = 1;
 
-		for (int i = 0; i < _timespace.size() - 1; ++i)
+		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
-			double _dt = _timespace(i + 1) - _timespace(i);
-			_NQS[0]->evolveStep(i, _dt, _En, _parT, false, false, _timer, false); 	// evolve the state
-			_NQS[0]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);			// collect the data using ratio method
-			_sz0_mean(i + 1) = algebra::cast<double>(arma::mean(_sz0));
-			if (i % 10 == 0)
-				LOGINFO(STR(i) + ")Time evolution: " + STRPS(_timespace(i + 1), 3) + " -> " + STRPS(_sz0_mean(i + 1), 3) + ". Step = " + STRPS(_dt, 2), LOG_TYPES::TRACE, 2);
+			_timer.checkpoint("Time evolution for NQS state(" + STR(j) + ")");
+			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
+			arma::Col<_T> _sz0(_parC.MC_sam_ * _parC.nblck_), _En(_parTime.nblck_);		// set up the containers for the time evolution
+			arma::Col<double> _sz0_mean(_timespace.size(), arma::fill::zeros);			// set up the container for the mean values
+			Operators::OperatorNQS<_T> _Sz0 = Operators::SpinOperators::sig_z<_T>(Nvis, 0);
+			
+			// reset the NQS
+			_NQS[j]->reset(_parTime.nblck_);											// reset the derivatives	
+			_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method - before the time evolution
+			_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));						// save the mean value
+			for (int i = 0; i < _timespace.size() - 1; ++i)
+			{
+				double _dt = _timespace(i + 1) - _timespace(i);							// set the time step for the evolution
+				_NQS[j]->evolveStep(i, _dt, _parTime, false, this->nqsP.nqs_te_rst_);	// evolve the system
+				_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);			// collect the data using ratio method
+				_sz0_mean(i + 1) = algebra::cast<double>(arma::mean(_sz0));				// save the mean value
+				if (i % 10 == 0)
+					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i + 1), 3) + ", Sz_0 = " + STRPS(_sz0_mean(i + 1), 3) + ", dt = " + STRPS(_dt, 2), LOG_TYPES::TRACE, 2);
+			}
+			saveAlgebraic(dir, "measurement.h5", _sz0_mean, "NQS/" + STR(j) + "/time_evo/Sz/0", true);
 		}
-
-		// save the results
-		saveAlgebraic(dir, "measurement.h5", _sz0_mean, "NQS/0/time_evo/Sz/0", true);
 	}
 }
 

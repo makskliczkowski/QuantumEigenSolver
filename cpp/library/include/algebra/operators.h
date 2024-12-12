@@ -26,45 +26,59 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Applies the many body matrix to a given state O|\Psi>
 	* @param _C many body state
 	* @param _M many body matrix
 	*/
 	template<typename _Ct, typename _M>
-	inline _Ct apply(const _Ct& _C, const _M& _mat)
+	inline auto apply(const _Ct& _C, const _M& _mat)
 	{
 		return _mat * _C;
 	}
 
-	/*
-	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* @param _C many body state
-	* @param _M many body matrix
-	* @returns the overlap <\Psi|O|\Psi>
+	// ##########################################################################################################################################
+
+	/**
+	* @brief Applies the overlap operation on a given vector and matrix.
+	*
+	* This function computes the dot product of a vector `_C` and the product of a matrix `_mat` with the vector `_C`.
+	* It is only enabled for non-complex element types.
+	*
+	* @tparam _M Type of the matrix.
+	* @tparam _Ct Type of the column vector, defaults to `arma::Col` with the element type of `_M`.
+	* @param _C The column vector.
+	* @param _mat The matrix.
+	* @return The result of the overlap operation as an inner type of `_Ct`.
 	*/
-	template<typename _M, typename _Ct>
+	template<typename _M, typename _Ct = arma::Col<typename _M::elem_type>>
 	inline typename std::enable_if<!is_complex<typename _Ct::elem_type>::value, inner_type_t<_Ct>>::type
 	applyOverlap(const _Ct& _C, const _M& _mat)
 	{
-		return arma::dot(_C, _mat * _C);  // For real types, use dot product.
+		return arma::dot(_C, _mat * _C);
 	}
 
-	template<typename _M, typename _Ct>
+	template<typename _M, typename _Ct = arma::Col<typename _M::elem_type>>
 	inline typename std::enable_if<is_complex<typename _Ct::elem_type>::value, std::complex<double>>::type
 	applyOverlap(const _Ct& _C, const _M& _mat)
 	{
 		return arma::cdot(_C, _mat * _C);  // For complex types, use the complex dot product.
 	}
 
-	/*
-	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* @param _Cleft many body state
-	* @param _Cright many body state
-	* @param _M many body matrix
-	* @returns the overlap <\Psi|O|\Psi>
+	/**
+	* @brief Applies the overlap operation on a given container and a generalized matrix.
+	*
+	* This function computes the overlap of a container with a generalized matrix.
+	* If the matrix is sparse, it uses the sparse representation for the computation.
+	* Otherwise, it uses the dense representation.
+	*
+	* @tparam _Ct The type of the container.
+	* @tparam _T2 The type of the elements in the generalized matrix (default is the element type of _Ct).
+	* @param _C The container on which the overlap operation is applied.
+	* @param _mat The generalized matrix used in the overlap operation.
+	* @return The result of the overlap operation as an inner type of the container.
 	*/
-	template<typename _Ct, typename _T2>
+	template<typename _Ct, typename _T2 = typename _Ct::elem_type, typename = std::enable_if_t<arma::is_arma_type<_Ct>::value>>
 	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const GeneralizedMatrix<_T2>& _mat)
 	{	
 		if (_mat.isSparse())

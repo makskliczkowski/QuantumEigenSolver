@@ -28,7 +28,7 @@ template class RBM_PP<2u, cpx, double, double>;
 * !TODO - not half filling / not spins
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
+void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(Config_cr_t _v, uint _plc)
 {
 	// calculate the RBM derivative
 	RBM_S<_spinModes, _Ht, _T, _stateType>::grad(_v, _plc);
@@ -77,7 +77,7 @@ void RBM_PP<_spinModes, _Ht, _T, _stateType>::grad(const NQSS& _v, uint _plc)
 }
 
 // template instantiation of the function above
-RBM_PP_INST_CMB_ALL(grad, void, (const NQSS&, uint), );
+RBM_PP_INST_CMB_ALL(grad, void, (Config_cr_t, uint), );
 
 // ##########################################################################################################################################
 
@@ -148,7 +148,7 @@ RBM_PP_INST_CMB_ALL(unupdate, void, (uint), );
 * @warning values are stored in flipVals_ before the flip, hence "-" is taken
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFlips)
+void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(Config_cr_t v, uint nFlips)
 {
 	// update the angles in the RBM
 	RBM_S<_spinModes, _Ht, _T, _stateType>::update(v, nFlips);
@@ -168,6 +168,6 @@ void RBM_PP<_spinModes, _Ht, _T, _stateType>::update(const NQSS& v, uint nFlips)
 #endif
 
 // template instantiation of the class above
-RBM_PP_INST_CMB_ALL(update, void, (const NQSS&, uint), );
+RBM_PP_INST_CMB_ALL(update, void, (Config_cr_t, uint), );
 
 ////////////////////////////////////////////////////////////////////////////////////

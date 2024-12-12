@@ -1,4 +1,4 @@
-/*
+/**
 * @brief Definitions for the lower states in the NQS class
 * @file nqs_definitions_lower.h
 * Uses those definitions for the training and the overlaps when one is looking for the excited states.
@@ -7,7 +7,6 @@
 #pragma once
 
 /////////////////////////////////////////////////////////////
-#include "armadillo"
 #include "nqs_definitions_base.h"
 #include <cmath>
 #include <functional>
@@ -45,33 +44,36 @@ class NQS;
 [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>]
 * This structure intends that for each given state <s| that is used for the estimation of 
 */
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>	// clone
-
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
-    MonteCarlo::MCS_train_t train_lower_;                           // training information for the lower states                       
-    NQS<_spinModes, _Ht, _T, _stateType>* nqs_exc_;			    	// pointer to the excited state NQS instance
+    using Container_t               =       arma::Col<_T>;
+    using Config_t                  =       arma::Col<_stateType>;
+    using Config_cr_t               =       const Config_t&;
+    using MCS_train_t               =       MonteCarlo::MCS_train_t;
+    using NQS_t                     =       NQS<_spinModes, _Ht, _T, _stateType>;
+    using NQS_p_t                   =       NQS_t*;
+
+    MCS_train_t train_lower_;                                       // training information for the lower states                       
+    NQS_p_t nqs_exc_;			    	                            // pointer to the excited state NQS instance
     size_t Ns_                      =       0;                      // number of the states in the basis
     bool isSet_						= 		false;
     uint f_lower_size_				=		0;						// number of the lower states
-    std::vector<double> f_lower_b_	=		{};						// pentalties for the lower states - for the excited states calculation
+    v_1d<double> f_lower_b_	        =		{};						// pentalties for the lower states - for the excited states calculation
     NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
 
     // ##########################################################################################################################################
-
     NQS_lower_t() : containerP_({}) {};
-    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc);
-    
+    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS_p_t _nqs_exc);
     // ##########################################################################################################################################
-    
     // for the energy estimation
     v_2d<_T> containerP_;                                           // containers for the projectors  
     Operators::OperatorNQS<_T> enP_;                                // operator for the energy estimation - it is a combination of the projectors to the basis state currently used in the excited state estimation
 
     // for the gradient ratio estimation
-    std::vector<arma::Col<_T>> ratios_lower_;                       // calculate this->ansatz(s) / \psi _wj(s) at each MC step (average in the lower states)
-    std::vector<arma::Col<_T>> ratios_excited_;                     // calculate \psi _wj(s) / this->ansatz(s) at each MC step
+    v_1d<Container_t> ratios_lower_;                                // calculate this->ansatz(s) / \psi _wj(s) at each MC step (average in the lower states)
+    v_1d<Container_t> ratios_excited_;                              // calculate \psi _wj(s) / this->ansatz(s) at each MC step
 
     // ##########################################################################################################################################
     

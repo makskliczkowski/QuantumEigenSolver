@@ -243,8 +243,8 @@ public:
 	auto calcEnIdx(double _E)							-> u64;										// calculate the index of the energy closest to the given energy
 
 public:
-	virtual auto buildHamiltonian()						-> void;
-	virtual auto diagH(bool woEigVec = false)			-> void;									// diagonalize the Hamiltonian
+	virtual auto buildHamiltonian(bool = false)			-> void;
+	virtual auto diagH(bool = false, bool = true)		-> void;									// diagonalize the Hamiltonian
 	auto diagHs(bool woEigVec = false)					-> void;									// diagonalize the Hamiltonian sparse
 	auto diagH(bool woEigVec, 
 			   uint k, 
@@ -543,13 +543,17 @@ void Hamiltonian<_T, _spinModes>::init()
 * @builds Hamiltonian and gets specific info! 
 */
 template<typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::buildHamiltonian()
+inline void Hamiltonian<_T, _spinModes>::buildHamiltonian(bool _verbose)
 {
 	auto _t = NOW;
-	LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+	if (_verbose)
+		LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
 	this->hamiltonian();
-	LOGINFO("Finished buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
-	LOGINFO(_t, "Hamiltonian: " + this->getInfo(), 3);
+	if (_verbose) {
+		LOGINFO("Finished buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+		LOGINFO(_t, "Hamiltonian: " + this->getInfo(), 3);
+	}	
+	
 }
 
 // ##########################################################################################################################################
@@ -756,7 +760,7 @@ inline void Hamiltonian<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
+inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, bool _verbose)
 {
 	if (woEigVec)
 	{

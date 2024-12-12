@@ -11,14 +11,14 @@
 * @param _in the state for which the ansatz shall be calculated
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(const NQSS& _in) const
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz(Config_cr_t _in) const
 {
 	// set the Jacobian before!
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz(_in) * this->getPfaffian(_in); //* std::pow(2.0, this->n_hidden)
 };
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) const
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatzlog(Config_cr_t _in) const
 {
 	return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatzlog(_in) + std::log(this->getPfaffian(_in));
 }
@@ -31,7 +31,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatzlog(const NQSS& _in) co
 * @note the ratio is calculated as: _other->ansatz / this->ansatz * _other->getPfaffian(_in) / this->getPfaffian(_in)
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(const NQSS& _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::ansatz_ratiolog(Config_cr_t _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
 {
 	auto _rbm_pp_other = dynamic_cast<RBM_PP<_spinModes, _Ht, _T, _stateType>*>(_other);
 	// return RBM_S<_spinModes, _Ht, _T, _stateType>::ansatz_ratio(_in, _other) * _rbm_pp_other->getPfaffian(_in) / this->getPfaffian(_in);
@@ -84,11 +84,10 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 	// !TODO implement changable number of fermions
 	// allocate weights
 	// matrix for each step
+	RBM_S<_spinModes, _Ht, _T, _stateType>::allocate();
 	this->X_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 	this->Xinv_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
-
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-	// allocate the vector for using it in the RBM
+#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP	// allocate the vector for using it in the RBM
 	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
 		this->XTmp_[this->threads_.threads_[_thread].get_id()] = NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 #endif
@@ -96,8 +95,6 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 	// allocate the weights themselves !TODO - make this symmetric? 
 	// square matrix with spin changes F_{ij}^{\\sigma, \\sigma '}
 	this->Fpp_		= NQSB(this->nPP_);
-	// allocate the rest
-	RBM_S<_spinModes, _Ht, _T, _stateType>::allocate();
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -108,19 +105,18 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 {
+	RBM<_spinModes, _Ht, _T, _stateType>::init();
 	const double std_dev = 1.0 / std::sqrt(this->nPP_);
 	// matrix for the PP wave function - contains all the necessary weights
 	// is initialized according to the distance between the sites
 	this->Fpp_	= NQSB(this->nPP_, arma::fill::zeros);
 	auto _lat	= this->H_->getLat();
-	
-	// go through the lattice
-	for (uint i = 0; i < this->info_p_.nSites_; i++)
+	for (uint i = 0; i < this->info_p_.nSites_; i++)	// go through the lattice
 	{
-		for (uint j = 0; j < this->info_p_.nSites_; j++)
+		for (uint j = 0; j < this->info_p_.nSites_; j++)	// go through the lattice
 		{
 			// get the distance between the sites
-			auto distance = _lat->getSiteDistance(i, j);
+			auto distance = _lat ? _lat->getSiteDistance(i, j) : std::abs<int>(i - j);
 			for (const auto& spinSec: this->spinSectors_)
 			{
 				// make the weights proportional to the distance
@@ -130,9 +126,8 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::init()
 			}
 		}
 	}
-
 	// !TODO¿
-	RBM<_spinModes, _Ht, _T, _stateType>::init();
+	this->Weights_.subvec(this->rbmSize_, this->rbmPPSize_ - 1) = this->Fpp_;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -159,14 +154,14 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setInfo()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Sets the state and the corresponding PP state as well.
 * Updates the pfaffian matrix.
 * @param _st column state to be set
 * @param _set set the matrices?
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st, bool _set)
+inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const Config_t& _st, bool _set)
 {
 	RBM_S<_spinModes, _Ht, _T, _stateType>::setState(_st, _set);
 #ifdef NQS_ANGLES_UPD
@@ -187,7 +182,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(const NQSS& _st, b
 
 ////////////////////////////////////////////////////////////////////////
 
-/*
+/**
 * @brief Sets the state and the corresponding PP state as well.
 * Updates the pfaffian matrix.
 * @param _st integer state to be set
@@ -219,7 +214,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setState(u64 _st, bool _set
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief After reading the weights from the path specified by the user, it sets the inner vectors from them.
 * @param _path folder for the weights to be saved onto
 * @param _file name of the file to save the weights onto
@@ -235,7 +230,7 @@ inline bool RBM_PP<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _pat
 	BEGIN_CATCH_HANDLER
 	{
 		// Fmat is a vector
-		this->Fpp_ = this->F_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
+		this->Fpp_ = this->Weights_.subvec(this->rbmSize_, this->rbmPPSize_ - 1);
 	}
 	END_CATCH_HANDLER("Couldn't set the weights for the RBM PP NQS...", return false);
 	return true;
@@ -243,7 +238,7 @@ inline bool RBM_PP<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _pat
 
 ////////////////////////////////////////////////////////////////////////
 
-/*
+/**
 * @brief After reading the weights from the path specified by the user, it sets the inner vectors from them.
 * @param _path folder for the weights to be saved onto
 * @param _file name of the file to save the weights onto
@@ -257,7 +252,7 @@ inline bool RBM_PP<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _pa
 	BEGIN_CATCH_HANDLER
 	{
 		// Fmat is a vector
-		this->F_.subvec(this->rbmSize_, this->rbmPPSize_ - 1) = this->Fpp_;
+		this->Weights_.subvec(this->rbmSize_, this->rbmPPSize_ - 1) = this->Fpp_;
 		// set the forces vector for the weights
 		if(!RBM_S<_spinModes, _Ht, _T, _stateType>::saveWeights(_path, _file))
 			return false;

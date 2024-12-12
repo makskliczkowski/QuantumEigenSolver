@@ -35,7 +35,7 @@
 #define NQS_USE_VEC_ONLY					// use vector only?							
 #if defined NQS_USE_VEC_ONLY
 	#define NQS_STATE this->curVec_
-	#define NQS_STATE_T const NQSS&
+	#define NQS_STATE_T Config_cr_t
 	#define NQS_ROW_T arma::Row<_T>
 #else 
 	#define NQS_STATE this->curState_
