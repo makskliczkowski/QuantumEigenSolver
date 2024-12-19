@@ -221,6 +221,8 @@ void RBM<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 	}
 	this->thetaCOSH_	=	this->coshF();
 	this->thetaCOSH_log_= 	arma::log(this->thetaCOSH_);
+
+	NQS<_spinModes, _Ht, _T, _stateType>::update(nFlips);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -245,7 +247,9 @@ void RBM<_spinModes, _Ht, _T, _stateType>::update(Config_cr_t v, uint nFlips)
 	}
 	this->thetaCOSH_ = this->coshF();
 	this->thetaCOSH_log_ = arma::log(this->thetaCOSH_);
+	NQS<_spinModes, _Ht, _T, _stateType>::update(v, nFlips);
 }
 #endif
 
 // ##########################################################################################################################################
+

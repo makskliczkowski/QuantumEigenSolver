@@ -432,9 +432,10 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 	: H_(_H)
 {	
 	const size_t _Ns			= 			_H->getNs();	
-	this->pRatioFunc_			= 			[&](const Config_t& _v)         { return this->pRatio(_v); };
-	this->pKernelFunc_			= 			[&](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
-	this->logPKernelFunc_		= 			[&](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+	this->pRatioFunc_			= 			[this](const Config_t& _v)         { return this->pRatio(_v); };
+	this->pKernelFunc_			= 			[this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
+	this->logPKernelFunc_		= 			[this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+    this->logPRatioFuncFlips_   =           [this](uint nFlips)                { return this->logPRatio(nFlips); };
 
 	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta, this);
 	this->lower_states_.exc_ratio_ = 		[&](const Config_t& _v)         { return this->pRatio(_v); };
@@ -538,10 +539,11 @@ NQS_INST_CMB_ALL(~NQS, void, ());
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setState(Config_cr_t _st)
 {
-    this->curVec_	= _st;
+    NQS_STATE = _st;
 #ifndef NQS_USE_VEC_ONLY
     this->curState_ = BASE_TO_INT<u64>(_st, this->discVal_);
 #endif
+    this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
 // template instantiation of the function above
 NQS_INST_CMB_ALL(setState, void, (const Config_t&));
@@ -568,6 +570,7 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 	this->curState_ = _st;
 #endif
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
+    this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
 // template instantiation of the function above
 NQS_INST_CMB_ALL(setState, void, (u64));
@@ -695,6 +698,26 @@ template void NQS<3u, double, cpx, double>::setWeights(std::shared_ptr<NQS<3u, d
 template void NQS<4u, double, cpx, double>::setWeights(std::shared_ptr<NQS<4u, double, cpx, double>>);
 
 // ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
+{
+    if (this->modified()) 
+        this->a_mod_p_.logAMod_ = this->logAnsatzModifier(nFlips);
+}
+NQS_INST_CMB_ALL(update, void, (uint));
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void NQS<_spinModes, _Ht, _T, _stateType>::update(Config_cr_t _v, uint nFlips)
+{
+    if (this->modified()) {
+        // what to do with this vector?
+        this->a_mod_p_.logAMod_ = this->logAnsatzModifier(nFlips);
+    }
+}
+NQS_INST_CMB_ALL(update, void, (Config_cr_t, uint));
+
 
 /**
 * @brief Sets the weights of the Neural Quantum State
@@ -917,3 +940,134 @@ NQS_INST_CMB_ALL(init, void, ());
 
 // ##########################################################################################################################################
 
+// MODIFIED NQS BY OPERATOR
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::setModifier(std::shared_ptr<Operators::OperatorComb<_T>> _op)
+{
+    this->a_mod_p_.modifier_ = _op;                                                                        // set the modifier operator
+    this->a_mod_p_.modtype_  = _op->getNameS();     
+    this->a_mod_p_.modified_ = true;                                                                        // set the modifier type
+    // *****************************************************************************************************
+    this->a_mod_p_.logAMod_  = this->logAnsatzModifier(NQS_STATE);                                          // get the log of the modified states
+    // *****************************************************************************************************
+    this->pRatioFunc_        = [this](const Config_t& _v)          { return this->pRatioMod(_v); };         // change the function pointer
+    this->pKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV)  { return this->pRatioMod(fP, fV); };     // change the function pointer  
+    this->logPKernelFunc_    = [this](int_ini_t fP, dbl_ini_t fV)  { return this->logPRatioMod(fP, fV); };  // change the function pointer
+    this->logPRatioFuncFlips_= [this](uint nFlips)                 { return this->logPRatioMod(nFlips); };
+    this->lower_states_.exc_ratio_ = [this](const Config_t& _v)    { return this->pRatioMod(_v); };         // change the function pointer
+    
+}
+// template instantiation of the function above
+template void NQS<2u, double, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<3u, double, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<4u, double, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<2u, cpx, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+template void NQS<3u, cpx, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+template void NQS<4u, cpx, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+template void NQS<2u, cpx, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<3u, cpx, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<4u, cpx, double, double>::setModifier(std::shared_ptr<Operators::OperatorComb<double>>);
+template void NQS<2u, double, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+template void NQS<3u, double, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+template void NQS<4u, double, cpx, double>::setModifier(std::shared_ptr<Operators::OperatorComb<cpx>>);
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::unsetModifier()
+{
+    this->a_mod_p_.modifier_ = nullptr;                                                                         // set the modifier operator
+    this->a_mod_p_.modtype_  = "";          
+    this->a_mod_p_.modified_ = false;                                                                           // set the modifier type
+    // *****************************************************************************************************
+    this->a_mod_p_.logAMod_  = 0.0;
+    this->pRatioFunc_        = [this](const Config_t& _v)           { return this->pRatio(_v); };               // change the function pointer
+    this->pKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV)   { return this->pRatio(fP, fV); };           // change the function pointer  
+    this->logPKernelFunc_    = [this](int_ini_t fP, dbl_ini_t fV)   { return this->logPRatio(fP, fV); };        // change the function pointer
+    this->logPRatioFuncFlips_= [this](uint nFlips)                  { return this->logPRatio(nFlips); };
+    this->lower_states_.exc_ratio_ = [this](const Config_t& _v)     { return this->pRatio(_v); };               // change the function pointer
+}
+//template instantiation of the function above
+NQS_INST_CMB_ALL(unsetModifier, void, ());
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(Config_cr_t _v)
+{
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+    _T _out = 0.0;
+    auto _ret                = this->a_mod_p_.modifier_->operator()(_v);                                     // get the modified states 
+    for (const auto& [_, _v]: _ret)
+        _out += _v; 
+    _out = std::log(algebra::conjugate(-_out));                                                               // get the log of the modified states
+    // _out = std::log(_out);                                                               // get the log of the modified states
+    return _out;
+}
+// templates
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (Config_cr_t));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (Config_cr_t));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (Config_cr_t));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (Config_cr_t));
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint nFlips)
+{
+    auto _state = NQS_STATE;
+    for (int i = 0; i < nFlips; ++i)
+        flip(_state, this->flipPlaces_[i], 0, this->discVal_);
+    return logAnsatzModifier(_state);
+}
+// template instantiation of the function above
+NQS_INST_CMB(double, double, logAnsatzModifier,double, (uint));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint));
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint fP, float fV)
+{
+    auto _state = NQS_STATE;
+    flip(_state, fP, 0, this->discVal_);
+    return logAnsatzModifier(_state);
+}
+// template instantiation of the function above
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (uint, float));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint, float));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, float));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint, float));
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint f, uint g, float v, float w)
+{
+    auto _state = NQS_STATE;
+    flip(_state, f, 0, this->discVal_);
+    flip(_state, g, 0, this->discVal_);
+    return logAnsatzModifier(_state);
+}
+// template instantiation of the function above
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (uint, uint, float, float));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint, uint, float, float));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, uint, float, float));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint, uint, float, float));
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(int_ini_t f, dbl_ini_t w)
+{
+    auto _state = NQS_STATE;
+    for (auto& fp : f)
+        flip(_state, fp, 0, this->discVal_);
+    return logAnsatzModifier(_state);
+}
+//  template instantiation of the function above
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (int_ini_t, dbl_ini_t));
+// #################################################################################################≠≠≠≠≠≠#########################################

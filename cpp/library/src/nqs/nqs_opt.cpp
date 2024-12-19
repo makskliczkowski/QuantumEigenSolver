@@ -323,13 +323,16 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 {
 	this->total_ 	= 0;										// reset the total number of flips
 	this->accepted_ = 0;										// reset the number of accepted flips
-	if (randomStart && _par.MC_th_ > 0) 						// only if the random start is used and the thermalization is used. Otherwise, the random state is set at the beginning of the training
+	if (randomStart && _par.MC_th_ > 0) {
 		this->setRandomState();									// set the random state at the begining
-	this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
+		this->blockSample<false>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+	} else {
+		this->blockSample<true>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+	}															// only if the random start is used and the thermalization is used. Otherwise, the random state is set at the beginning of the training
 
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
 	{		
-		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them using the local Metropolis sampling
+		this->blockSample<false>(_par.bsize_, NQS_STATE);		// sample them using the local Metropolis sampling
 		this->grad(NQS_STATE, _taken);							// calculate the gradient at each point of the iteration! - this is implementation specific!!!
 		En(_taken) = this->locEnKernel();						// local energy - stored at each point within the estimation of the gradient (stochastic)
 
@@ -503,13 +506,16 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::collectStep(size_t i, const MonteCarl
         if (_collectEn)
             assert(_E->size() >= _startElem + _par.nblck_);         
 
-        if (randomStart && _par.MC_th_ > 0) 
+        if (randomStart && _par.MC_th_ > 0) {
             this->setRandomState();									// set the random state at the begining
-        this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
+			this->blockSample<false>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+		} else {
+        	this->blockSample<true>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+		}
         
         for (uint _taken = 0; _taken < _par.nblck_; ++_taken)       // iterate blocks - allows to collect samples outside of the block
         {
-            this->blockSample(_par.bsize_, NQS_STATE, false);       // sample them using the local Metropolis sampling - sample the states
+            this->blockSample<false>(_par.bsize_, NQS_STATE);       // sample them using the local Metropolis sampling - sample the states
 
             if (_collectEn)
                 (*_E)(_startElem + _taken) = this->locEnKernel();   // local energy - stored at each point within the estimation of the gradient (stochastic)
@@ -644,10 +650,10 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::collectStep(size_t i, const MonteCarl
 		}
 #endif
 
-        this->blockSample(_par.MC_th_, NQS_STATE, false);			// thermalize the system - burn-in - does not need to set the state at the beginning
+        this->blockSample<false>(_par.MC_th_, NQS_STATE);			// thermalize the system - burn-in - does not need to set the state at the beginning
         for (uint _taken = 0; _taken < _par.nblck_; ++_taken)       // iterate blocks - allows to collect samples outside of the block
         {
-            this->blockSample(_par.bsize_, NQS_STATE, false);       // sample them using the local Metropolis sampling - sample the states
+            this->blockSample<false>(_par.bsize_, NQS_STATE);       // sample them using the local Metropolis sampling - sample the states
 
             if (_energies) {
 				if constexpr (std::is_same_v<_CT, v_1d<_T>>)

@@ -145,24 +145,52 @@ public:
 	virtual auto logPRatio(uint fP, float fV)			->_T			= 0; // log of the probability ratio - when flip places (single) are used
 	virtual auto logPRatio(uint, uint, float, float)	->_T			= 0; // log of the probability ratio - when flip places (double) are used
 	virtual auto logPRatio(uint nFlips)					->_T			= 0; // log of the probability ratio - when number of flips is used
-	virtual auto logPRatio(Config_cr_t v, Config_cr_t w)->_T			= 0; // log of the probability ratio - when two vectors are used (one for the current state and one for the new state)
 	virtual auto logPRatio(int_ini_t fP, dbl_ini_t fV) -> _T			= 0; // ratio when exact points are provided (used for the Hamiltonian probability ratio - when the Hamiltonian changes the state)
 	virtual auto logPRatio(Config_cr_t _v)				->_T			{ return this->logPRatio(this->curVec_, _v);						};
+	virtual auto logPRatio(Config_cr_t v, Config_cr_t w)->_T			= 0; // log of the probability ratio - when two vectors are used (one for the current state and one for the new state)
 	virtual auto logPRatio()							->_T			{ return this->logPRatio(this->flipPlaces_[0], this->flipVals_[0]);	};
 	virtual auto pRatio(uint fP, float fV)				->_T			{ return std::exp(this->logPRatio(fP, fV));							};
-	virtual auto pRatio(uint f1, uint f2, float v1, float v2) ->_T		{ return std::exp(this->logPRatio(f1, f2, v1, v2));					}; 
+	virtual auto pRatio(uint f, uint g, float v, float w) ->_T			{ return std::exp(this->logPRatio(f, g, v, w));						}; 
 	virtual auto pRatio(uint nFlips)					->_T			{ return std::exp(this->logPRatio(nFlips));							};	
 	virtual auto pRatio(Config_cr_t _v, Config_cr_t _w)	->_T			{ return std::exp(this->logPRatio(_v, _w));							};
 	virtual auto pRatio(int_ini_t fP, dbl_ini_t fV)		->_T			{ return std::exp(this->logPRatio(fP, fV));							};
 	virtual auto pRatio(Config_cr_t _v)					->_T			{ return std::exp(this->logPRatio(_v));								};	
 	virtual auto pRatio()								->_T			{ return this->pRatio(this->flipPlaces_[0], this->flipVals_[0]);	};		
+	// ansatz modification with a single operator O: O|psi> = \sum _s Psi(s) \sum _s' o_s' |s'>
+	void setModifier(std::shared_ptr<Operators::OperatorComb<_T>> _mod);
+	void unsetModifier();
+	bool modified()														{ return this->a_mod_p_.modified_; 									};
+protected:
+	struct AnsatzModifier {
+		bool modified_ 			= false;
+		std::string modtype_ 	= "none";
+		std::shared_ptr<Operators::OperatorComb<_T>> modifier_;
+		_T logAMod_ = 0.0;
+	} a_mod_p_;
+	auto logAnsatzModifier(uint fP, float fV)			->_T;
+	auto logAnsatzModifier(int_ini_t fP, dbl_ini_t fV)	->_T;
+	auto logAnsatzModifier(uint, uint, float, float)	->_T;
+	auto logAnsatzModifier(Config_cr_t v)				->_T;
+	auto logAnsatzModifier(uint nFlips)					->_T;
+	auto logPRatioMod(uint fP, float fV)				->_T 			{ return this->logPRatio(fP, fV) + (logAnsatzModifier(fP, fV) - a_mod_p_.logAMod_); 			};
+	auto logPRatioMod(uint f, uint g, float v, float w) ->_T 			{ return this->logPRatio(f, g, v, w) + (logAnsatzModifier(f, g, v, w) - a_mod_p_.logAMod_); 	};
+	auto logPRatioMod(int_ini_t fP, dbl_ini_t fV)		->_T 			{ return this->logPRatio(fP, fV) + (logAnsatzModifier(fP, fV) - a_mod_p_.logAMod_);				};
+	auto logPRatioMod(Config_cr_t v)					->_T 			{ return this->logPRatio(v) + (logAnsatzModifier(v) - a_mod_p_.logAMod_);						};
+	auto logPRatioMod(Config_cr_t v, Config_cr_t w)		->_T 			{ return this->logPRatio(v) + (logAnsatzModifier(v) - logAnsatzModifier(w));					};
+	auto logPRatioMod(uint nFlips)						->_T			{ return this->logPRatio(nFlips) + (logAnsatzModifier(nFlips) - a_mod_p_.logAMod_);				};
+	auto pRatioMod(uint fP, float fV)					->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 													};
+	auto pRatioMod(uint f, uint g, float v, float w)	->_T 			{ return std::exp(this->logPRatioMod(f, g, v, w)); 												};
+	auto pRatioMod(int_ini_t fP, dbl_ini_t fV)			->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 													};
+	auto pRatioMod(Config_cr_t v)						->_T 			{ return std::exp(this->logPRatioMod(v)); 														};
+	auto pRatioMod(Config_cr_t v, Config_cr_t w)		->_T 			{ return std::exp(this->logPRatioMod(v, w)); 													};
 	std::function<_T(Config_cr_t)> logPRatioFunc_;						// function for the probability ratio (log)
+	std::function<_T(uint)> logPRatioFuncFlips_;						// 
 	std::function<_T(Config_cr_t)> pRatioFunc_;							// function for the probability ratio
 	// ***********************************************************************************************************************************
 protected:																// ----------------------- W E I G H T S -------------------------
 #ifdef NQS_ANGLES_UPD
-	virtual void update(uint nFlips = 1)								{}; // update the weights after one flip (if needed and possible)
-	virtual void update(const Config_t& v, uint nFlips = 1)				{}; // update the weights after state change (if needed and possible)
+	virtual void update(uint nFlips = 1); 								// update the weights after one flip (if needed and possible)
+	virtual void update(Config_cr_t v, uint nFlips = 1);		 		// update the weights after state change (if needed and possible)
 	virtual void unupdate(uint nFlips = 1)								{}; // unupdate the weights after one flip (if needed and possible)
 #endif
 public:
@@ -235,7 +263,9 @@ public:																	// ------------------------ G E T T E R S --------------
 	auto getWeights_ref() 					-> const NQSB&				{ return this->Weights_;				};
 	// ***********************************************************************************************************************************
 public:																	// ----------------------- S A M P L I N G -----------------------
-	virtual void blockSample(uint _bSize, NQS_STATE_T _start, bool _therm = false);
+	template <bool _setState = false>
+	void blockSample(uint _bSize, NQS_STATE_T _start);
+	// !TODO - change this to template to make it more efficient
 public:																	// ------------------------ T R A I N I N G ----------------------
 	virtual bool trainStop(size_t i, const MCS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false) override;
 	virtual bool trainStep(size_t i,Container_t& En,

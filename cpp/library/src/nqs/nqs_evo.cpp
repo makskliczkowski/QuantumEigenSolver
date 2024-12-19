@@ -48,6 +48,17 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 	
 	if (this->solver_ != nullptr) 
 	{
+		{
+			// !TODO check the SVD, whether it correctly works for regularization
+			// arma::Mat<_T> _U, _V;
+			// arma::vec _sigma;
+			// arma::svd(_U, _sigma, _V, this->derivativesCentered_);
+			// clamp the singular values
+			// _sigma = arma::clamp(_sigma, 1e-6, arma::datum::inf);
+			// this->derivativesCentered_ = (_U * arma::diagmat(_sigma)) * _V.t();
+			// this->derivativesCenteredH_ = (_V * arma::diagmat(_sigma)) * _U.t();
+		}
+
 		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							_multiplier * this->F_, 										// b
@@ -131,14 +142,17 @@ void NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step,
 
 	this->total_ 	= 0;										// reset the total number of flips
 	this->accepted_ = 0;										// reset the number of accepted flips
-	if (randomStart && _par.MC_th_ > 0) 
+	if (randomStart && _par.MC_th_ > 0) {
 		this->setRandomState();									// set the random state at the begining
-	this->blockSample(_par.MC_th_, NQS_STATE, !randomStart);	// thermalize the system - burn-in
+		this->blockSample<false>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+	} else {
+		this->blockSample<true>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
+	}
 
 	_T _meanEn = 0.0, _stdEn = 0.0;								// mean and standard deviation of the energy
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - this ensures the calculation of a stochastic gradient constructed within the block
 	{		
-		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them using the local Metropolis sampling
+		this->blockSample<false>(_par.bsize_, NQS_STATE);		// sample them using the local Metropolis sampling
 		this->grad(NQS_STATE, _taken);							// calculate the gradient at each point of the iteration! - this is implementation specific!!!
 		this->E_ (_taken) = this->locEnKernel();				// local energy - stored at each point within the estimation of the gradient (stochastic)
 	}

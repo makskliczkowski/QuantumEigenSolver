@@ -19,13 +19,13 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>:: collect(const MonteCarlo::MCS
 			this->setRandomState();
 
 		// remove autocorrelations and thermalize
-		this->blockSample(_par.MC_th_, NQS_STATE, false);
+		this->blockSample<false>(_par.MC_th_, NQS_STATE);
 
 		// iterate blocks - allows to collect samples outside of the block
 		for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 
 		{
 			// sample them!
-			this->blockSample(_par.bsize_, NQS_STATE, false);
+			this->blockSample<false>(_par.bsize_, NQS_STATE);
 			
 			// measure 
 			_meas.measure(this->curVec_, this->pRatioFunc_);

@@ -193,13 +193,16 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_train_t& _par, std::function<_T(Config_cr_t)> _f, Container_t& _container)
 {
 	this->setRandomFlipNum(_par.nFlip);						// set the random state at the begining
-	if (_par.MC_th_ > 0) 
+	if (_par.MC_th_ > 0) {
 		this->setRandomState();								// set the random state at the begining
-	this->blockSample(_par.MC_th_, NQS_STATE, false);		// remove autocorrelations and thermalizes
+        this->blockSample<false>(_par.MC_th_, NQS_STATE);   // remove autocorrelations and thermalizes
+    } else {
+	    this->blockSample<true>(_par.MC_th_, NQS_STATE);	// remove autocorrelations and thermalizes
+    }
 
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 	// iterate blocks - allows to collect samples outside of the block
 	{
-		this->blockSample(_par.bsize_, NQS_STATE, false);	// sample them!
+		this->blockSample<false>(_par.bsize_, NQS_STATE);	// sample them!
 		
 		const _T _top 		= _f(NQS_STATE);				// calculate f(s) / \psi(s)
 #ifdef NQS_LOWER_RATIO_LOGDIFF
@@ -251,11 +254,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::collect_ratio(const MonteCarlo::MCS_t
 	this->setRandomFlipNum(_par.nFlip);							// set the random state at the begining
 	if (_par.MC_th_ > 0) 
 			this->setRandomState();								// set the random state at the begining
-    this->blockSample(_par.MC_th_, NQS_STATE, false);		    // remove autocorrelations and thermalizes
+    this->blockSample<false>(_par.MC_th_, NQS_STATE);		    // remove autocorrelations and thermalizes
 
 	for (uint _taken = 0; _taken < _par.nblck_; ++_taken) 		// iterate blocks - allows to collect samples outside of the block
 	{
-		this->blockSample(_par.bsize_, NQS_STATE, false);		// sample them! - remove autocorrelations and thermalizes
+		this->blockSample<false>(_par.bsize_, NQS_STATE);		// sample them! - remove autocorrelations and thermalizes
 		const auto _val 	= this->ansatz_ratio(NQS_STATE, other);
 		_container(_taken) 	= _val;								// store the value of f(s) / \psi(s)
 	}									

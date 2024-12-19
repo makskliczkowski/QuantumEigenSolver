@@ -174,9 +174,17 @@ void UI::nqsExcited()
 		_meas_NQS.push_back(NQSAv::MeasurementNQS<_T>(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum));
 	}
 
+	// quench
+	std::shared_ptr<Operators::OperatorComb<_T>> _quenchOp;
+	if (this->nqsP.nqs_te_)
+		_quenchOp = std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0));
+
 	if (lanED || fullED)
 	{
 		_H->buildHamiltonian();
+		arma::SpMat<_T> _Sz0Mat;
+		if (this->nqsP.nqs_te_)
+			_Sz0Mat = _quenchOp->template generateMat<false, _T, arma::SpMat>(Nh);
 
 		if (fullED)
 		{																					// try with the full diagonalization
@@ -192,17 +200,10 @@ void UI::nqsExcited()
 
 				if (this->nqsP.nqs_te_)
 				{
-					// Operators::Operator<cpx> _Szk 	= Operators::SpinOperators::sig_k<cpx>(Nvis, 0.0);
-					// arma::SpMat<cpx> _SkMat 			= _Szk.template generateMat<false, cpx, arma::SpMat>(Nh);
-					// arma::Col<cpx> _mbs1 			= _SkMat * _mbs;
-					arma::SpMat<cpx> _Sz0Mat 			= Operators::SpinOperators::sig_z<cpx>(Nvis, 0).template generateMat<false, cpx, arma::SpMat>(Nh);
+					arma::Col<_T> _mbsIn 				= _Sz0Mat * _mbs;
 					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);
-					_H->quenchHamiltonian();
-					_H->buildHamiltonian(false);
-					_H->diagH(false, false);			// diagonalize the Hamiltonian
-
-					arma::Mat<_T> _eigv 				= _H->getEigVec();
-					arma::Col<_T> _ovrl 				= _eigv.t() * _mbs;
+					const arma::Mat<_T>& _eigv 			= _H->getEigVec();
+					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
 
 #pragma omp parallel for num_threads(this->threadNum)
 					for (int j = 0; j < _timespace.size(); ++j)
@@ -211,9 +212,6 @@ void UI::nqsExcited()
 						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
 					}
 					saveAlgebraic(dir, "measurement.h5", _vals, "ED/" + STR(i) + "/time_evo/Sz/0", true);
-					_H->quenchHamiltonian();
-					_H->buildHamiltonian(false);
-					_H->diagH(false, false);			// diagonalize the Hamiltonian
 				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false); 				// save the results to HDF5 file
@@ -226,6 +224,7 @@ void UI::nqsExcited()
 			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");								// get LANCZOS diagonalization
 			const auto& _eigvec 	= _H->getEigVec();										// get the eigenvectors in Krylov basis
 			const auto& _krylov_mb 	= _H->getKrylov();										// get the Krylov basis
+			_Sz0Mat 				= (_krylov_mb.t() * _Sz0Mat) * _krylov_mb;				// get the Sz0 matrix in the Krylov basis
 			for (int i = 0; i < stateNum; ++i) 												// save the energies
 			{
 				const arma::Col<_T> _mbs = LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
@@ -233,6 +232,22 @@ void UI::nqsExcited()
 				_meansLAN(i) = _H->getEigVal(i);											// save the energies to the container
 				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansLAN[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
 				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN/" + STR(i), fullED || i > 0 || this->nqsP.nqs_te_);
+				// ---------------
+				if (this->nqsP.nqs_te_)
+				{
+					arma::Col<_T> _mbsIn 				= _Sz0Mat * _eigvec.col(i);
+					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);
+					const arma::Mat<_T>& _eigv 			= _H->getEigVec();
+					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
+
+#pragma omp parallel for num_threads(this->threadNum)
+					for (int j = 0; j < _timespace.size(); ++j)
+					{
+						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
+						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
+					}
+					saveAlgebraic(dir, "measurement.h5", _vals, "LAN/" + STR(i) + "/time_evo/Sz/0", true);
+				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);			// save the results to HDF5 file
 		}
@@ -301,7 +316,7 @@ void UI::nqsExcited()
 	{
 		LOGINFO(3);
 		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
-		_H->quenchHamiltonian();
+		// _H->quenchHamiltonian();
 		_parC.MC_sam_ = 1;
 		auto _RKsolver = algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
 
@@ -315,6 +330,7 @@ void UI::nqsExcited()
 			
 			// reset the NQS
 			_NQS[j]->reset(_parTime.nblck_);											// reset the derivatives	
+			_NQS[j]->setModifier(_quenchOp);
 			_NQS[j]->evolveSet(_parTime, this->quiet, false);							// set the evolution function
 			_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method - before the time evolution
 			_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));						// save the mean value

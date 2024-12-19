@@ -27,14 +27,15 @@
 * 		!TODO: Implement the parallel tempering algorithm and check whether the temperature is set correctly.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start, bool _therm)
+template <bool _setState>
+void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T _start)
 {
 	// Set state based on whether thermalization is required or _start differs from current state
-	if (_therm 
-#ifndef NQS_USE_VEC_ONLY
-		|| _start != this->curState_
-#endif
-		) this->setState(_start, _therm);
+	if constexpr (_setState)
+		this->setState(_start, _setState);
+	
+	if (_bSize == 0)
+		return;
 
 	this->tmpVec_ = this->curVec_; 													// set the temporary state - the vectors are useful so set them accordingly
 	for (uint bStep = 0; bStep < _bSize; ++bStep) 									// go through each block step
@@ -47,7 +48,7 @@ void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T 
 		double proba = std::abs(std::exp(this->beta_ * this->logPRatio(this->curVec_, this->tmpVec_)));
 #else
 		// double proba = std::abs(this->pRatio(this->nFlip_)); 					// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
-		double proba = std::abs(std::exp(this->beta_ * this->logPRatio(this->nFlip_)));
+		double proba = std::abs(std::exp(this->beta_ * this->logPRatioFuncFlips_(this->nFlip_)));
 #endif
 		proba = proba * proba;
 		if (this->ran_->template random<double>() < proba) 							// we need to take into account the probability coming from the ratio of states (after and before the flip)
@@ -71,12 +72,22 @@ void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T 
 	this->setState(NQS_STATE, true); 												// Set the state again if angles update is disabled
 #endif
 }
-
 // template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, blockSample, void, (uint, NQS_STATE_T, bool));
-NQS_INST_CMB(double, std::complex<double>, blockSample, void, (uint, NQS_STATE_T, bool));
-NQS_INST_CMB(std::complex<double>, double, blockSample, void, (uint, NQS_STATE_T, bool));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, blockSample, void, (uint, NQS_STATE_T, bool));
+#define NQS_BLOCK_SAMPLE_INST(T1) \
+template void NQS<2u, double, double, double>::blockSample<T1>(uint, NQS_STATE_T);	\
+template void NQS<3u, double, double, double>::blockSample<T1>(uint, NQS_STATE_T);	\
+template void NQS<4u, double, double, double>::blockSample<T1>(uint, NQS_STATE_T);	\
+template void NQS<2u, cpx, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<3u, cpx, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<4u, cpx, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<2u, double, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<3u, double, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<4u, double, cpx, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<2u, cpx, double, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<3u, cpx, double, double>::blockSample<T1>(uint, NQS_STATE_T);		\
+template void NQS<4u, cpx, double, double>::blockSample<T1>(uint, NQS_STATE_T);
+NQS_BLOCK_SAMPLE_INST(false);
+NQS_BLOCK_SAMPLE_INST(true);
 
 // ##########################################################################################################################################
 

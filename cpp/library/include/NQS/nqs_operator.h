@@ -344,7 +344,7 @@ namespace NQSAv
 	{
 		// Clear existing global containers and create new ones
 		this->containersG_.clear();
-		for (const auto& _ : this->opG_)
+		for (const auto& _ [[maybe_unused]] : this->opG_)
 		{
 			auto _cont = Operators::Containers::OperatorContainer<_T>(this->Ns_);
 			_cont.decideSize(); // Decide size for global containers
@@ -353,7 +353,7 @@ namespace NQSAv
 
 		// Clear existing local containers and create new ones
 		this->containersL_.clear();
-		for (const auto& _ : this->opL_)
+		for (const auto& _ [[maybe_unused]] : this->opL_)
 		{
 			auto _cont = Operators::Containers::OperatorContainer<_T>(this->Ns_);
 			_cont.template decideSize<uint>(); // Decide size for local containers
@@ -362,7 +362,7 @@ namespace NQSAv
 
 		// Clear existing correlation containers and create new ones
 		this->containersC_.clear();
-		for (const auto& _ : this->opC_)
+		for (const auto& _ [[maybe_unused]] : this->opC_)
 		{
 			auto _cont = Operators::Containers::OperatorContainer<_T>(this->Ns_);
 			_cont.template decideSize<uint, uint>(); // Decide size for correlation containers
