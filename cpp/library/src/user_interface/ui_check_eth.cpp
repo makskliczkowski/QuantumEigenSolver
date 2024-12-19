@@ -604,22 +604,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			this->ui_eth_randomize(_H);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
-
-			// check the image of the Hamiltonian
-			// if (_r == 0 && _Nh < ULLPOW(8))
-			// {
-			// 	GeneralizedMatrix<_T> _hamilmatrix = _H->getHamiltonian();
-			// 	arma::Mat<_T> _hamilMatrixCast;
-
-			// 	if (_hamilmatrix.isSparse())
-			// 		_hamilMatrixCast = _hamilmatrix.getSparse();
-			// 	else
-			// 		_hamilMatrixCast = _hamilmatrix.getDense();
-
-			// 	LOGINFO("Saving the Hamiltonian matrix", LOG_TYPES::TRACE, 1);
-			// 	LOGINFO("Shape: " + STR(_hamilMatrixCast.n_rows) + "x" + STR(_hamilMatrixCast.n_cols), LOG_TYPES::TRACE, 2);
-			// 	saveAlgebraic(dir, "hamil" + randomStr + extension, _hamilMatrixCast, "hamiltonian", _r != 0);
-			// }
 		}
 
 		// -----------------------------------------------------------------------------
@@ -833,7 +817,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 #endif
 				for (int _opi = 0; _opi < _matrices.size(); _opi++)
 				{
-					LOGINFO("Doing operator: " + _opsN[_opi], LOG_TYPES::TRACE, 2);
+					// LOGINFO("Doing operator: " + _opsN[_opi], LOG_TYPES::TRACE, 2);
 					arma::Mat<_T> _overlaps = Operators::applyOverlapMat(_eigVec, _matrices[_opi]);
 					std::atomic<size_t> _totalIteratorIn(0);
 
@@ -860,7 +844,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 						{
 							std::atomic<size_t> _totalIteratorIn2(0);
 							auto _energyIn = _eigVal(0) + this->modP.eth_end_[_epi] * _bw;
-							LOGINFO("Doing epsilon = " + STR(this->modP.eth_end_[_epi]) + " at " + VEQP(_energyIn, 3), LOG_TYPES::TRACE, 3);
+							// LOGINFO("Doing epsilon = " + STR(this->modP.eth_end_[_epi]) + " at " + VEQP(_energyIn, 3), LOG_TYPES::TRACE, 3);
 
 							v_1d<std::array<double, 6>> _out = Threading::createFutures<UI, std::array<double, 6>>(this, _totalIteratorIn2, this->threadNum, 
 																	(!check_multithread_operator(_Nh) && this->threadNum != 1), 
