@@ -257,7 +257,7 @@ namespace SystemProperties
 			double _E 			= _energies(_idx);
 
 			// go through other elements
-			auto _Velems 					= 	_V.row(_idx);
+			auto& _Velems 					= 	_V.row(_idx);
 			const arma::Col<double> _omm  	= 	arma::square(_energies - _E);
 			const double _mu2				= 	_mu * _mu;
 
@@ -270,11 +270,25 @@ namespace SystemProperties
 
 				auto _nom = 	_Velems(i) * algebra::conjugate(_Velems(i)) * _omm(i);
 				auto _den = 	(_omm(i) + _mu2);
-				_sum 	  += 	_nom / _den;
+				_sum 	  += 	_nom / _den / _den;
 			}
 			return _sum;
 		}
 
+		/**
+		* @brief Computes the fidelity susceptibility for a given index.
+		*
+		* This function calculates the fidelity susceptibility for a given index `_idx` 
+		* using the provided energy levels `_energies`, matrix `_V`, and parameter `_mu`.
+		*
+		* @tparam _T The type of the elements in the matrix `_V`.
+		* @tparam _ET The type of the energy levels.
+		* @param _idx The index for which the fidelity susceptibility is computed.
+		* @param _energies A container holding the energy levels.
+		* @param _V A matrix containing the eigenvectors.
+		* @param _mu A parameter used in the computation.
+		* @return The computed fidelity susceptibility.
+		*/
 		template <typename _T, typename _ET>
 		[[nodiscard]]
 		inline _T fidelity_susceptability(const size_t _idx, const _ET& _energies, const arma::Mat<_T>& _V, double _mu)
@@ -283,7 +297,7 @@ namespace SystemProperties
 			double _E 						= 	_energies(_idx);
 
 			// Precompute constants
-			const arma::Row<_T> _Velems 	= _V.row(_idx);
+			const arma::Row<_T>& _Velems 	= _V.row(_idx);
 			const arma::Col<double> _omm 	= arma::square(_energies - _E);
 			const double _mu2 				= _mu * _mu;
 

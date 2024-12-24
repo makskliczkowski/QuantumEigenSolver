@@ -284,10 +284,9 @@ void UI::parseModel(int argc, cmdArg& argv)
 				this->modP.ultrametric.um_Ntot_ = this->latP.Ntot_;
 				SETOPTION(modP.ultrametric, um_N);	
 				SETOPTION(modP.ultrametric, um_g);
-				
+				// resize
 				this->modP.ultrametric.resizeUM();
-
-				SETOPTIONVECTOR(modP.ultrametric, um_alpha);
+				SETOPTIONVECTORRESIZET(modP.ultrametric, um_alpha, 10, double);
 
 			}
 		}

@@ -67,8 +67,8 @@ namespace PRLB_types
             { 1.450, {0.713023201, 0.825459422, 0.812646467, 0.850390579, 0.809342010, 0.804667727, 0.810090763, 0.797955096, 0.803088631,   0.802263679  , 0.802263679  }}};
 		
         static int getIndex(int _Ns)                               { return _Ns - minNs_; };
-        static double getBandwidth(double alpha, int _Ns)          { return bandwidth_.contains(alpha) ? bandwidth_[alpha][getIndex(_Ns)] : bandwidth_[alpha - 0.05][getIndex(_Ns)]; };
-        static double getVariance(double alpha, int _Ns)           { return variance_.contains(alpha) ? variance_[alpha][getIndex(_Ns)] : variance_[alpha - 0.05][getIndex(_Ns)]; };
+        static double getBandwidth(double alpha, int _Ns)          { return bandwidth_.contains(alpha) ? bandwidth_[alpha][getIndex(_Ns)] : bandwidth_[alpha < 1.0 ? 0.200 : 1.400][getIndex(_Ns)]; };
+        static double getVariance(double alpha, int _Ns)           { return variance_.contains(alpha) ? variance_[alpha][getIndex(_Ns)] : variance_[alpha < 1.0 ? 0.200 : 1.400][getIndex(_Ns)]; };
 	} PRLB_default;
 
 
