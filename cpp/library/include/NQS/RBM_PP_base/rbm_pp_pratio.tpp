@@ -15,7 +15,7 @@
 * @returns probability ratio for a given ansatz based on the current state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(uint fP, float fV)
 {
 	// update pfaffian candidate matrix and its corresponding value
 	this->updFPP_C(fP, fV);
@@ -24,7 +24,9 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 #else
 	this->setPfaffian_C();
 #endif
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * (this->pfaffianNew_ / this->pfaffian_);
+	// return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * (this->pfaffianNew_ / this->pfaffian_);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::logPRatio(fP, fV) + std::log(this->pfaffianNew_) - std::log(this->pfaffian_);
+
 }
 
 
@@ -39,7 +41,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint fP, float fV)
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 [[deprecated("Use pRatio(uint fP, float fV) instead")]]
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(uint nFlips)
 {
 	// update pfaffian candidate matrix and its corresponding value
 	for (auto i = 0; i < nFlips; ++i)
@@ -53,7 +55,8 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 #else
 	this->setPfaffian_C();
 #endif
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * (this->pfaffianNew_ / this->pfaffian_);
+	// return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(nFlips) * (this->pfaffianNew_ / this->pfaffian_);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::logPRatio(nFlips) + std::log(this->pfaffianNew_) - std::log(this->pfaffian_);
 }
 
 // %%%%%%%%%%%%%%%%% U S I N G   V E C T O R S %%%%%%%%%%%%%%%%%
@@ -62,9 +65,10 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(uint nFlips)
 * @brief computes (Psi'/Psi), where (Psi') is the state with certain positions flipped. 
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const NQSS& _v2)
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
 {
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPfaffian(_v2) / this->getPfaffian(_v1);
+	// return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(_v1, _v2) * this->getPfaffian(_v2) / this->getPfaffian(_v1);
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::logPRatio(_v1, _v2) + std::log(this->getPfaffian(_v2)) - std::log(this->getPfaffian(_v1));
 }
 
 // %%%%%%%%%%%%% U S I N G   I N I T I A L I Z E R %%%%%%%%%%%%%
@@ -77,7 +81,7 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(const NQSS& _v1, const
 * @returns probability ratio for a given ansatz based on the current state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
+inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
 #if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 	auto thId			= std::this_thread::get_id();
@@ -101,7 +105,8 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::pRatio(std::initializer_list<
 	this->updFPP_F(fP, fV, this->XTmp_);
 	auto _pfaffian		= this->getPfaffian(this->XTmp_);
 #endif
-	return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * _pfaffian / this->pfaffian_;
+	// return RBM_S<_spinModes, _Ht, _T, _stateType>::pRatio(fP, fV) * _pfaffian / this->pfaffian_;
+	return RBM_S<_spinModes, _Ht, _T, _stateType>::logPRatio(fP, fV) + std::log(_pfaffian) - std::log(this->pfaffian_);
 }
 
 // ##########################################################################################################################################

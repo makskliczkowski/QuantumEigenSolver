@@ -463,6 +463,18 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_rst, bool, 0);		// should I reset the state before each step?
+		// timeevolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te, bool, 0);			// time evolution - do or do not? - 0 - no, 1 - yes
+		UI_PARAM_CREATE_DEFAULT(nqs_te_mc, uint, 1);		// number of samples - outer loop for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_th, uint, 0);		// thermalize when time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_bn, uint, 100);		// number of inner blocks for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_bs, uint, 4);		// block size for time evolution
+		UI_PARAM_CREATE_DEFAULT(nqs_te_rst, bool, 0);		// should I reset the state before each step?
+		UI_PARAM_CREATE_DEFAULTD(nqs_te_dt, double, 0.01);	// time step for the time evolution - initial time step
+		UI_PARAM_CREATE_DEFAULTD(nqs_te_tf, double, 1.0);	// final time for the time evolution - final time
+		UI_PARAM_CREATE_DEFAULT(nqs_te_tlog, uint, 0);		// use the logarithmic time steps? - 0 - no, > 0 - yes (use this number as the number of steps)
+		UI_PARAM_CREATE_DEFAULT(nqs_te_rk, bool, 0);		// use the Runge-Kutta method for the time evolution - 0 - Euler, 1 - Runge-Kutta (2nd order)
 		// regularization
 		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
@@ -485,6 +497,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_col_th, uint, 0);		// thermalize when collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bn, uint, 100);		// number of inner blocks for collecting
 		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
+		UI_PARAM_CREATE_DEFAULT(nqs_col_rst, bool, 0);		// should I reset the state before each step?
 		// learning rate
 		UI_PARAM_CREATE_DEFAULT(nqs_sch, int, 0);			// learning rate scheduler - 0 - constant, 1 - exponential decay (default), 2 - step decay, 3 - cosine decay, 4 - adaptive
 		UI_PARAM_CREATE_DEFAULTD(nqs_lr, double, 1e-3);		// learning rate (initial)
@@ -509,6 +522,7 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_tr_mc);
 			UI_PARAM_SET_DEFAULT(nqs_tr_bs);
 			UI_PARAM_SET_DEFAULT(nqs_tr_th);
+			UI_PARAM_SET_DEFAULT(nqs_tr_rst);			
 			UI_PARAM_SET_DEFAULT(nqs_lr);
 			UI_PARAM_SET_DEFAULT(loadNQS);
 			// collection
@@ -516,6 +530,37 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(nqs_col_th);
 			UI_PARAM_SET_DEFAULT(nqs_col_bn);
 			UI_PARAM_SET_DEFAULT(nqs_col_bs);
+			UI_PARAM_SET_DEFAULT(nqs_col_rst);
+			// time evolution
+			UI_PARAM_SET_DEFAULT(nqs_te);
+			UI_PARAM_SET_DEFAULT(nqs_te_mc);
+			UI_PARAM_SET_DEFAULT(nqs_te_th);
+			UI_PARAM_SET_DEFAULT(nqs_te_bn);
+			UI_PARAM_SET_DEFAULT(nqs_te_bs);
+			UI_PARAM_SET_DEFAULT(nqs_te_rst);
+			UI_PARAM_SET_DEFAULT(nqs_te_dt);
+			UI_PARAM_SET_DEFAULT(nqs_te_tf);
+			UI_PARAM_SET_DEFAULT(nqs_te_tlog);
+			UI_PARAM_SET_DEFAULT(nqs_te_rk);
+			// regularization
+			UI_PARAM_SET_DEFAULT(nqs_tr_reg);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regs);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regd);
+			UI_PARAM_SET_DEFAULT(nqs_tr_regp);
+			// preconditioner
+			UI_PARAM_SET_DEFAULT(nqs_tr_prec);
+			// solver type
+			UI_PARAM_SET_DEFAULT(nqs_tr_sol);
+			UI_PARAM_SET_DEFAULT(nqs_tr_tol);
+			UI_PARAM_SET_DEFAULT(nqs_tr_iter);
+			// early stopping
+			UI_PARAM_SET_DEFAULT(nqs_es_pat);
+			UI_PARAM_SET_DEFAULT(nqs_es_del);
+			// excited states
+			UI_PARAM_SET_DEFAULT(nqs_ex_mc);
+			UI_PARAM_SET_DEFAULT(nqs_ex_th);
+			UI_PARAM_SET_DEFAULT(nqs_ex_bn);
+			UI_PARAM_SET_DEFAULT(nqs_ex_bs);
 		}
 	};
 };
@@ -594,9 +639,6 @@ private:
 	std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> createSymmetries();
 
 	// ####################### N Q S #######################
-
-	template<typename _T, uint _spinModes>
-	void nqsSingle(std::shared_ptr<NQS<_spinModes, _T>> _NQS);
 
 	template<typename _T, uint _spinModes>
 	void nqsExcited();
@@ -895,13 +937,10 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
-		break;
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
@@ -970,13 +1009,10 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
-		break;
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);
 
@@ -1042,12 +1078,10 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 			this->modP.power_law_random_bandwidth.plrb_b_, this->modP.power_law_random_bandwidth.plrb_mb_);
 		break;
 	default:
-		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
-			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
-			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
-			false);
+		throw std::runtime_error("Model not defined!" 
+								"Usage: "
+								"MB: 1 - Ising, 2 - XYZ, 3 - Heisenberg-Kitaev, 4 - QSM, 5 - RP, 6 - Ultrametric, " 
+								"SP: 100 - Free Fermions, 101 - Aubry-Andre, 102 - SYK2, 103 - Power Law Random Banded");
 		break;
 	}
 	if (this->modP.modRanSeed_ != 0) _H->setSeed(this->modP.modRanSeed_);

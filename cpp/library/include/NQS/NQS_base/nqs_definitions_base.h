@@ -19,55 +19,41 @@
 											
 #ifdef NQS_USE_CPU							
 #	define NQS_USE_MULTITHREADING			
-
 //#	define NQS_USE_OMP						
 # 	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 #		define NQS_NOT_OMP_MT 
 #	endif
-
-#elif defined NSQ_USE_GPU					
-// something !TODO								
+# 	if defined NQS_USE_GPU
+#		undef NQS_USE_GPU
+#	endif
+#elif defined NQS_USE_GPU					
+#	include <cuda_runtime.h>						
 #endif		
 
 // ----------------------------------------------------------					
-											
-// shall one update the angles or calculate them from scratch						
-#define NQS_ANGLES_UPD						
-											
-// use vector only?							
-#define NQS_USE_VEC_ONLY
-
+#define NQS_ANGLES_UPD						// shall one update the angles or calculate them from scratch			
+#define NQS_USE_VEC_ONLY					// use vector only?							
 #if defined NQS_USE_VEC_ONLY
 	#define NQS_STATE this->curVec_
-	#define NQS_STATE_T const NQSS&
+	#define NQS_STATE_T Config_cr_t
 	#define NQS_ROW_T arma::Row<_T>
 #else 
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 
 #endif
-
-// optimize the gradient descent with Stochastic Reconfiguration (SR)
-#define NQS_USESR
-#define NQS_LOWER_RATIO_LOGDIFF 
-// #define NQS_CHECK_NAN
-
+// ----------------------------------------------------------
+#define NQS_USESR							// optimize the gradient descent with Stochastic Reconfiguration (SR)
+#define NQS_LOWER_RATIO_LOGDIFF 			// use the logarithm of the ratio of the probabilities
 // --------------- STOCHASTIC RECONFIGURATION ---------------
-#ifdef NQS_USESR						
-
-// skip the matrix construction for the SR
-#	define NQS_USESR_NOMAT
-
-// check whether we have SR without matrix
-#	if defined NQS_USESR_NOMAT
-#		define NQS_USESR_NOMAT_USED
+#ifdef NQS_USESR							// if we use the SR
+#	define NQS_USESR_NOMAT					// skip the matrix construction for the SR - use iterative solvers
+#	if defined NQS_USESR_NOMAT				// if we do not use the matrix
+#		define NQS_USESR_NOMAT_USED			
 # 	else
 #		define NQS_USESR_MAT_USED
 #	endif
-
-
-// how to handle the inverse of the matrix (if needed)
-#	define NQS_SREG_ATTEMPTS 5
-#   define NQS_SREG_GRAD_NORM_THRESHOLD 1e3
+#	define NQS_SREG_ATTEMPTS 5				// how to handle the inverse of the matrix (if needed)
+#   define NQS_SREG_GRAD_NORM_THRESHOLD 1e3	// threshold for the gradient norm
 #endif										
 // ##########################################################
 
@@ -82,9 +68,13 @@ enum NQSTYPES					// #
 // ##########################################################################################################################################
 
 // all the types that are to be used in each NQS implementation
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;	\
-											using NQSB = arma::Col<_type>; 				\
-											using NQSW = arma::Mat<_type>;			 	
+#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;											\
+											using NQSB = arma::Col<_type>; 														\
+											using NQSW = arma::Mat<_type>;			 											\
+											using Solver_t_p = algebra::Solvers::General::Solver<_T, true>*;					\
+											using Precond_t_p = algebra::Solvers::Preconditioners::Preconditioner<_T, true>*;	\
+											using int_ini_t = std::initializer_list<int>;										\
+											using dbl_ini_t = std::initializer_list<double>;									
 											
 
 
@@ -97,7 +87,7 @@ enum NQSTYPES					// #
 	#include <functional>
 	#include <condition_variable>
 	#include <future>
-/*
+/**
 * @brief structure with condition variables for the NQS to perfom multithread operations
 */
 template <typename _T>
@@ -127,25 +117,6 @@ struct CondVarKernel
 // #################################
 
 // #######################################################################################
-
-struct NQS_train_t
-{
-	NQS_train_t() 	= default;
-	NQS_train_t(uint _mcs, uint _mcth, uint _nblck, uint _bsize, uint _nFlip, const std::string& _dir = "") 
-		: MC_sam_(_mcs), MC_th_(_mcth), nblck_(_nblck), bsize_(_bsize), dir(_dir), nFlip(_nFlip) {};
-
-	uint MC_sam_	=	10;					// number of Monte Carlo Steps (outer loops for the training or collecting)
-	uint MC_th_		=	0;					// number of mcSteps to thermalize (burn-in)
-	uint nblck_		= 	32;					// number of such blocks for one average step (single iteration step after which the gradient is calculated)
-	uint bsize_		= 	4;					// for killing correlations - (single block size)
-	std::string dir	=	"";					// saving directory (for the weights) - try to flip this many times (many flips)
-	uint nFlip		= 	1;					// number of flips to set (default is 1)
-
-	void hi(const std::string& _in = "Train: ") const;
-};
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
 
 struct NQS_info_t
 {
@@ -209,4 +180,20 @@ struct NQS_thread_t
 		std::vector<CondVarKernel<_T>> kernels_;				// condition variables for the threads
 		std::mutex mutex;										// global mutex for the threads	
 	#endif
+
+	// ----------
+	NQS_thread_t()					=	default;
+	~NQS_thread_t()					{ this->threads_.clear(); };
 };
+
+#define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 									\
+					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 			\
+					template FUNRET  NQS<3u, _Ht, _T, double>::FUN ARGS; 			\
+					template FUNRET  NQS<4u, _Ht, _T, double>::FUN ARGS; 
+#define NQS_INST_CMB_ALL(FUN, FUNRET, ARGS) 										\
+					NQS_INST_CMB(double, double, FUN, FUNRET, ARGS)					\
+					NQS_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS)	\
+					NQS_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS)	\
+					NQS_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS)
+
+// ##########################################################################################################################################

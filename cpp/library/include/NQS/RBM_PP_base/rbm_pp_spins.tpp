@@ -12,13 +12,14 @@
 * @brief Restricted Boltzmann Machines ansatz with Pair Product reference state for NQS
 */
 template <typename _Ht, typename _T, class _stateType>
-class RBM_PP_S<2, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
+class RBM_PP_S<2u, _Ht, _T, _stateType> : public RBM_PP<2, _Ht, _T, _stateType>
 {
 	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
 	using NQSLS_p = typename RBM_PP<2, _Ht, _T, _stateType>::NQSLS_p;
 	/* ------------------------------------------------------- */
 public:
-	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht>>& _H, uint _nHid, double _lr, uint _threadNum = 1, 
+	RBM_PP_S(std::shared_ptr<Hamiltonian<_Ht, 2>>& _H, uint _nHid, double _lr, uint _threadNum = 1, 
 				int _nParticles = -1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
 		: RBM_PP<2, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles, _lower, _beta) 
 	{
@@ -29,7 +30,7 @@ public:
 
 	/* ------------------------------------------------------- */
 	// --------------------- G E T T E R S ---------------------
-	virtual auto getPPMat(const NQSS& _n)	const -> NQSW	override;
+	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW	override;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW	override;
 #endif
@@ -44,6 +45,16 @@ protected:
 	void updFPP_F(std::initializer_list<int> fP,
 				std::initializer_list<double> fV,
 				arma::Mat<_T>& _Xtmp)						override;
+
+	// ---------------------------------------------------------
+
+public:
+	virtual auto clone() const -> MC_t_p override
+	{
+		return std::make_shared<RBM_PP_S<2, _Ht, _T, _stateType>>(*this);
+	}
+
+	// ---------------------------------------------------------
 };
 
 // !!!!!!!!!!!!!!!! P F F A F I A N   S T A T E !!!!!!!!!!!!!!!!
@@ -63,7 +74,7 @@ protected:
 * @returns the Pfaffian matrix
 */
 template <typename _Ht, typename _T, class _stateType>
-typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(const NQSS& _n) const
+typename RBM_PP_S<2, _Ht, _T, _stateType>::NQSW RBM_PP_S<2, _Ht, _T, _stateType>::getPPMat(Config_cr_t _n) const
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN})
 	NQSW _out(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);

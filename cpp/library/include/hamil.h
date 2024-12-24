@@ -189,7 +189,7 @@ public:
 	auto getEnAv()										const -> double								{ return this->avEn;															};
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
-	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T>&	{ return this->hilbertSpace;													};							
+	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T, _spinModes>& { return this->hilbertSpace;													};							
 	// energy
 	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_));									};
 	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
@@ -209,6 +209,7 @@ public:
 	auto getEigVec(u64 idx, u64 elem)					const -> _T									{ return this->eigVal_(elem, idx);												};				
 	auto getEigVec(std::string _dir, u64 _mid, 
 		HAM_SAVE_EXT _typ, bool _app = false)			const -> void;
+	auto getKrylov()									const -> const arma::Mat<_T>&				{ return this->K_;																};
 	// eigenvalues
 	auto getEigVal()									const -> const arma::vec&					{ return this->eigVal_;															};						
 	virtual auto getEigVal(std::string _dir,
@@ -242,8 +243,8 @@ public:
 	auto calcEnIdx(double _E)							-> u64;										// calculate the index of the energy closest to the given energy
 
 public:
-	virtual auto buildHamiltonian()						-> void;
-	virtual auto diagH(bool woEigVec = false)			-> void;									// diagonalize the Hamiltonian
+	virtual auto buildHamiltonian(bool = false)			-> void;
+	virtual auto diagH(bool = false, bool = true)		-> void;									// diagonalize the Hamiltonian
 	auto diagHs(bool woEigVec = false)					-> void;									// diagonalize the Hamiltonian sparse
 	auto diagH(bool woEigVec, 
 			   uint k, 
@@ -264,6 +265,7 @@ public:
 	
 	// ----------------------------------------- FOR OTHER TYPES -----------------------------------------------
 	virtual void updateInfo()							= 0;
+	virtual void quenchHamiltonian()					{};											// quench the Hamiltonian - for the time evolution => just a placeholder !TODO implement more general
 
 public:
 	void generateFullMap()								{ this->hilbertSpace.generateFullMap();		}; // generates the full Hilbert space map
@@ -541,13 +543,17 @@ void Hamiltonian<_T, _spinModes>::init()
 * @builds Hamiltonian and gets specific info! 
 */
 template<typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::buildHamiltonian()
+inline void Hamiltonian<_T, _spinModes>::buildHamiltonian(bool _verbose)
 {
 	auto _t = NOW;
-	LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+	if (_verbose)
+		LOGINFO("Started buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
 	this->hamiltonian();
-	LOGINFO("Finished buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
-	LOGINFO(_t, "Hamiltonian: " + this->getInfo(), 3);
+	if (_verbose) {
+		LOGINFO("Finished buiding Hamiltonian" + this->getInfo(), LOG_TYPES::TRACE, 2);
+		LOGINFO(_t, "Hamiltonian: " + this->getInfo(), 3);
+	}	
+	
 }
 
 // ##########################################################################################################################################
@@ -754,7 +760,7 @@ inline void Hamiltonian<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
 template <typename _T, uint _spinModes>
-inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec)
+inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, bool _verbose)
 {
 	if (woEigVec)
 	{
@@ -832,15 +838,27 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, uint k, uint subdi
 
 // ##########################################################################################################################################
 
-/*
-* @brief Clears the memory of the Hamiltonian, eigenvectors and eigenvalues
-*/
+/**
+ * @brief Clears the Hamiltonian object by resetting its internal state.
+ *
+ * This function performs the following actions:
+ * - Clears the eigenvectors by calling `clearEigVec()`.
+ * - Clears the eigenvalues by calling `clearEigVal()`.
+ * - Clears the Hamiltonian matrix by calling `clearH()`.
+ * - Clears the Krylov subspace by calling `clearKrylov()`.
+ * - Resets the Hamiltonian matrix pointer `H_`.
+ *
+ * This function is intended to reset the Hamiltonian object to an initial state,
+ * ensuring that all dynamically allocated resources are properly released.
+ */
 template<typename _T, uint _spinModes>
 inline void Hamiltonian<_T, _spinModes>::clear()
 { 
 	this->clearEigVec(); 
 	this->clearEigVal(); 
 	this->clearH();
+	this->clearKrylov();
+	this->H_.reset();
 }; 
 
 // ##########################################################################################################################################

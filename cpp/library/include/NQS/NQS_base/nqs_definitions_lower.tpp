@@ -1,4 +1,4 @@
-/*
+/**
 * @brief Definitions for the lower states in the NQS class
 * @file nqs_definitions_lower.h
 * Uses those definitions for the training and the overlaps when one is looking for the excited states.
@@ -7,7 +7,6 @@
 #pragma once
 
 /////////////////////////////////////////////////////////////
-#include "armadillo"
 #include "nqs_definitions_base.h"
 #include <cmath>
 #include <functional>
@@ -22,9 +21,14 @@
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 class NQS;
 
+#define NQS_INST_L_CMB(_Ht, _T, FUN, FUNRET, ARGS) 							        \
+					template FUNRET  NQS_lower_t<2u, _Ht, _T, double>::FUN ARGS; 	\
+					template FUNRET  NQS_lower_t<3u, _Ht, _T, double>::FUN ARGS; 	\
+					template FUNRET  NQS_lower_t<4u, _Ht, _T, double>::FUN ARGS; 	
+
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Structure for storing the lower states information - for the training and the overlaps 
 * when one is looking for the excited states - the lower states are needed for the energy estimation and gradients
 * @see Adv. Physics Res. 2024, 3, 2300078 for more information
@@ -43,31 +47,33 @@ class NQS;
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 struct NQS_lower_t
 {
-    NQS_train_t train_lower_;                                       // training information for the lower states                       
-    NQS<_spinModes, _Ht, _T, _stateType>* nqs_exc_;			    	// pointer to the excited state NQS instance
     using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
+    using Container_t               =       arma::Col<_T>;
+    using Config_t                  =       arma::Col<_stateType>;
+    using Config_cr_t               =       const Config_t&;
+    using MCS_train_t               =       MonteCarlo::MCS_train_t;
+    using NQS_t                     =       NQS<_spinModes, _Ht, _T, _stateType>;
+    using NQS_p_t                   =       NQS_t*;
 
-    // for the excited states 
+    MCS_train_t train_lower_;                                       // training information for the lower states                       
+    NQS_p_t nqs_exc_;			    	                            // pointer to the excited state NQS instance
     size_t Ns_                      =       0;                      // number of the states in the basis
     bool isSet_						= 		false;
     uint f_lower_size_				=		0;						// number of the lower states
+    v_1d<double> f_lower_b_	        =		{};						// pentalties for the lower states - for the excited states calculation
     NQSLS_p f_lower					=		{};						// lower states (for the training and looking for the overlaps)
-    std::vector<double> f_lower_b_	=		{};						// pentalties for the lower states - for the excited states calculation
 
     // ##########################################################################################################################################
-
     NQS_lower_t() : containerP_({}) {};
-    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc);
-    
+    NQS_lower_t(size_t _Ns, NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS_p_t _nqs_exc);
     // ##########################################################################################################################################
-    
     // for the energy estimation
-    v_1d<Operators::Containers::OperatorContainer<_T>> containerP_; // containers for the projectors  
+    v_2d<_T> containerP_;                                           // containers for the projectors  
     Operators::OperatorNQS<_T> enP_;                                // operator for the energy estimation - it is a combination of the projectors to the basis state currently used in the excited state estimation
 
     // for the gradient ratio estimation
-    std::vector<arma::Col<_T>> ratios_lower_;                       // calculate this->ansatz(s) / \psi _wj(s) at each MC step (average in the lower states)
-    std::vector<arma::Col<_T>> ratios_excited_;                     // calculate \psi _wj(s) / this->ansatz(s) at each MC step
+    v_1d<Container_t> ratios_lower_;                                // calculate this->ansatz(s) / \psi _wj(s) at each MC step (average in the lower states)
+    v_1d<Container_t> ratios_excited_;                              // calculate \psi _wj(s) / this->ansatz(s) at each MC step
 
     // ##########################################################################################################################################
     
@@ -93,123 +99,20 @@ struct NQS_lower_t
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns, 
                         NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc)
-    : nqs_exc_(_nqs_exc), 
-    Ns_(_Ns),
-    isSet_(!_f_lower.empty()),
-    f_lower_size_(_f_lower.size()),
-    f_lower(_f_lower),
-    f_lower_b_(_f_lower_b)    
+    : nqs_exc_(_nqs_exc), Ns_(_Ns), isSet_(!_f_lower.empty()), f_lower_size_(_f_lower.size()), f_lower_b_(_f_lower_b), f_lower(_f_lower)
 {
-    // keep empty
+    LOGINFO("NQS_lower_t: Initializing with Ns = " + std::to_string(_Ns), LOG_TYPES::DEBUG, 1);
+    LOGINFO("NQS_lower_t: Penalties for lower states set.", LOG_TYPES::DEBUG, 1);
+    LOGINFO("NQS_lower_t: Number of lower states = " + std::to_string(f_lower_size_), LOG_TYPES::INFO, 3);
+
     if (!_nqs_exc)
     {
         LOGINFO("NQS_lower_t: No excited state NQS instance has been set...", LOG_TYPES::WARNING, 3);
         return;
     }
 
-    this->containerP_ = v_1d<Operators::Containers::OperatorContainer<_T>>(this->f_lower_size_, Operators::Containers::OperatorContainer<_T>(_Ns));
-    for (auto& i : this->containerP_)
-        i.decideSize();
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Sets the size of the containers for the derivatives of the lower states - for the gradient estimation of the excited state.
-* @param _mcslower size of the Monte Carlo steps for the lower states - ratios sampled in the lower states
-* @param _mcsexcited size of the Monte Carlo steps for the excited state - ratios sampled in the excited state
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setDerivContSize(size_t _mcsexcited)
-{
-    if (this->f_lower_size_ == 0)
-        return;
-    
-    this->ratios_lower_             = std::vector<arma::Col<_T>>(this->f_lower_size_, arma::Col<_T>(this->train_lower_.nblck_, arma::fill::zeros));
-    this->ratios_excited_           = std::vector<arma::Col<_T>>(this->f_lower_size_, arma::Col<_T>(_mcsexcited, arma::fill::zeros));
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Sets the projector for the lower states - for the energy estimation of the excited state. 
-* The measurement class is reset and new projector operator is being set. 
-* @param _Ns number of states in the basis vector
-* @param _current_exc_state current excited state vector
-* @param _exc_state_pratio function for calculating the probability ratio for the excited state
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::setProjector(Operators::_OP_V_T_CR _current_exc_state)
-{
-    // create the projection operator
-    this->enP_ = Operators::GeneralOperators::projectorSumComb(Ns_, 
-                    _current_exc_state,     // project to current state <s|psi_w>
-                    this->exc_ratio_);      // calculate the probability ratio (for the excited state) using the vector representation \psi _w(s') / \psi _w(s)
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Collect the addition to the energy coming from the overlap with the lower states - for the excited state energy estimation
-* @param i index of the lower state
-* @returns the mean value of the energy estimation coming from the lower states overlap
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerEnergy(uint i)
-{
-    if (this->f_lower_size_ == 0)
-        return _T(0.0);
-    
-    // reset the container
-    this->containerP_[i].reset();
-
-    // collect the energy addition from the lower states
-    this->f_lower[i]->collect(this->train_lower_, this->enP_, this->containerP_[i]);
-
-    // get the mean value
-    _T _mean = this->containerP_[i].template mean<_T>()(0, 0);
-    return this->f_lower_b_[i] * _mean;
-}
-
-// ##########################################################################################################################################
-
-/*
-* @brief Collect the ratios for the lower states - for the gradient estimation of the excited state. This ratio is given by the
-* \psi _w(s') / \psi _w_j(s) at each MC step (average in the lower states)
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectLowerRatios(uint i)
-{
-    if (this->f_lower_size_ == 0)
-        return;
-
-    this->f_lower[i]->collect_ratio(this->train_lower_, this->nqs_exc_, this->ratios_lower_[i]);
-    // this->f_lower[i]->collect_ratio(this->train_lower_, this->exc_ansatz_, this->ratios_lower_[i]);
-}
-
-// ##########################################################################################################################################
-
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline _T NQS_lower_t<_spinModes, _Ht, _T, _stateType>::collectExcitedRatios(uint i, Operators::_OP_V_T_CR _current_exc_state)
-{
-    if (this->f_lower_size_ == 0)
-        return _T(0.0);
-    
-    // try an ansatz for both at the same time
-    return this->nqs_exc_->ansatz_ratio(_current_exc_state, this->f_lower[i].get());
-
-    // calculate the ansatz at the current state for the excited state
-    // _T _bottom  = this->exc_ansatz_(_current_exc_state);
-    // _T _top     = _T(0.0);
-
-    // calculate the ratio
-// #ifdef NQS_LOWER_RATIO_LOGDIFF
-    // _top        = this->ansatzlog(_current_exc_state, i);
-    // return std::exp(_top - _bottom);
-// #else
-    // _top        = this->ansatz(_current_exc_state, i);
-    // return _top / _bottom;
-// #endif
+    this->containerP_ = v_2d<_T>(this->f_lower_size_, v_1d<_T>(this->train_lower_.nblck_ * this->train_lower_.MC_sam_, _T(0.0)));
+    LOGINFO("NQS_lower_t: Container for projectors initialized.", LOG_TYPES::DEBUG, 1);
 }
 
 // ##########################################################################################################################################
@@ -222,3 +125,5 @@ BEGIN_ENUM(NQSTYPES)			// #
 }								// #
 END_ENUM(NQSTYPES)				// #
 // #################################
+
+// ##########################################################################################################################################

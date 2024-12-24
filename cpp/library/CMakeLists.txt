@@ -65,8 +65,7 @@ set(CPPSOURCE "${CMAKE_SOURCE_DIR}/source/cpp")
 
 ##########################################################################
 
-if (WIN32 OR (UNIX AND NOT APPLE) AND NOT $ENV{USE_MKL})
-    # Find the path of the MKL include directory using an environment variable
+if (WIN32 OR (UNIX AND NOT APPLE) OR DEFINED ENV{USE_MKL})
     find_path(MKL_INCL_DIR
         NAMES "mkl.h"
         PATHS "$ENV{MKL_INCL_DIR}"
@@ -148,6 +147,24 @@ endif()
 
 ##########################################################################
 
+# find the OpenMPI package and set the include directories
+find_package(MPI QUIET)
+# If MPI is found, include its directories and link the libraries
+if(MPI_FOUND)
+    message(STATUS "MPI")
+    message(STATUS "\tMPI include directory: ${MPI_INCLUDE_PATH}")
+    message(STATUS "\tMPI C libraries: ${MPI_C_LIBRARIES}")
+    message(STATUS "\tMPI C++ libraries: ${MPI_CXX_LIBRARIES}")
+    message("\tMPI definitions added: -DENABLE_MPI")
+    include_directories(${MPI_INCLUDE_PATH})
+    set(LIBRARIES ${LIBRARIES} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
+    add_definitions(-DENABLE_MPI)
+else()
+    message(STATUS "MPI not found, proceeding without MPI support")
+endif()
+
+##########################################################################
+
 # Find all .cpp files recursively in the CPPSOURCE directory
 file(GLOB_RECURSE SOURCES 
     ${CPPSOURCE}/*.cpp
@@ -156,14 +173,6 @@ file(GLOB_RECURSE SOURCES
 # Set the source files
 set(SOURCES 
     main.cpp 
-    operators.cpp 
-    user_interface.cpp 
-    src/user_interface/ui_check_eth.cpp
-    src/user_interface/ui_check_nqs.cpp
-    src/user_interface/ui_check_quadratic.cpp
-    src/user_interface/ui_check_symmetries.cpp
-    src/nqs.cpp
-    src/operator_parser.cpp
     ${CPPSOURCE}/common.cpp 
     ${CPPSOURCE}/directories.cpp 
     ${CPPSOURCE}/exceptions.cpp 
@@ -171,6 +180,7 @@ set(SOURCES
     ${CPPSOURCE}/ui.cpp 
     ${CPPSOURCE}/time.cpp
     ${CPPSOURCE}/maths.cpp
+    ${CPPSOURCE}/Random/montecarlo.cpp
     ${CPPSOURCE}/Lattices/lattices.cpp 
     ${CPPSOURCE}/Lattices/hexagonal.cpp 
     ${CPPSOURCE}/Lattices/square.cpp
@@ -185,6 +195,23 @@ set(SOURCES
     ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp
     ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp
     ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp
+    ${CPPSOURCE}/LinearAlgebra/ode.cpp
+    operators.cpp 
+    user_interface.cpp 
+    src/nqs/nqs.cpp
+    src/nqs/nqs_opt.cpp
+    src/nqs/nqs_lower.cpp
+    src/nqs/nqs_sampling.cpp
+    src/nqs/nqs_evo.cpp
+    src/nqs/rbm/rbm.cpp
+    src/nqs/rbm/rbm_spin.cpp
+    src/nqs/rbmpp/rbmpp.cpp
+    src/nqs/operators/nqs_operator.cpp
+    src/user_interface/ui_check_eth.cpp
+    src/user_interface/ui_check_nqs.cpp
+    src/user_interface/ui_check_quadratic.cpp
+    src/user_interface/ui_check_symmetries.cpp
+    src/operator_parser.cpp
 )
 
 # Set the include directories
@@ -320,10 +347,10 @@ target_include_directories(qsolver PRIVATE ${INCLUDE_DIRS})
 
 # Link libraries to the executable
 # add linker flags for GNU ld
-if (UNIX AND NOT APPLE)
-    set(CMAKE_EXE_LINKER_FLAGS_S "${CMAKE_EXE_LINKER_FLAGS} ,--start-group")
-    set(CMAKE_EXE_LINKER_FLAGS_E "${CMAKE_EXE_LINKER_FLAGS} ,--end-group")
-endif()
+# if (UNIX AND NOT APPLE)
+#     set(CMAKE_EXE_LINKER_FLAGS_S "${CMAKE_EXE_LINKER_FLAGS} ,--start-group")
+#     set(CMAKE_EXE_LINKER_FLAGS_E "${CMAKE_EXE_LINKER_FLAGS} ,--end-group")
+# endif()
 
 # print the libraries
 message(STATUS "Libraries: ${CMAKE_EXE_LINKER_FLAGS_S}\n\t${MKL_CORE_LIBRARY}\n\t${MKL_SEQUENTIAL_LIBRARY}\n\t${MKL_RT_LIBRARY}\n\t${MKL_INTEL_ILP64_LIBRARY}\n\t${CMAKE_EXE_LINKER_FLAGS_E}\n\t${PTHREAD_LIBRARY}\n\t${DL_LIBRARY}\n\t${LIBHDF5_HL_LIBRARY}")

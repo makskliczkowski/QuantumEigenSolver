@@ -1,64 +1,9 @@
-/***********************************
-* Contains the most common operators.
-* Is used for more general opeartors.
-* Also defines various acting on a 
-* Hilbert space.
-* DECEMBER 2023. UNDER CONSTANT DEVELOPMENT
-* MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
-***********************************/
-#pragma once
-
-#include "general_operator.h"
-#include "operator_algebra.h"
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-#include <type_traits>
-
 #ifndef OPERATORS_H
 #define OPERATORS_H
 
-#ifndef ENTROPY_H
-#	include "quantities/entropy.h"
-#endif // !ENTROPY_H
-
-/*
-* Separators used for the later parsing of the operators and their names:
-* - OPERATOR_SEP: separator between the operator type and the operator name
-* - OPERATOR_SEP_CORR: separator between the operator name and the correlation site - this means that "-" separates 
-*	different sites in the correlation operator (e.g. "nn-1-2" = nn operator acting on sites 1 and 2 as multiplication)
-* - OPERATOR_SEP_MULT: separator between the operator name and multiple sites - this means that "," separates different sites
-	For instance, "nn,1,2" = nn operator acting on sites 1 and 2 as separate operators
-* - OPERATOR_SEP_DIFF: separator between the operator name and the site. "m" stands for the difference between the sites
-* - OPERATOR_SEP_RANGE: separator between the operator name and the site. ":" stands for the range of the sites
-* - OPERATOR_SEP_RANDOM: separator between the operator name and the site. "r" stands for the random operator
-* - OPERATOR_SEP_DIV: separator between the operator name and the site. "_" stands for the division of the sites
-*/
-constexpr auto OPERATOR_SEP			= "/";
-constexpr auto OPERATOR_SEP_CORR	= "-";
-constexpr auto OPERATOR_SEP_MULT 	= ",";
-constexpr auto OPERATOR_SEP_DIFF	= "m";
-constexpr auto OPERATOR_SEP_RANGE	= ":";
-constexpr auto OPERATOR_SEP_RANDOM	= "r";
-constexpr auto OPERATOR_SEP_DIV		= "_";
-constexpr auto OPERATOR_PI			= "pi";
-constexpr auto OPERATOR_SITE		= "l";
-constexpr auto OPERATOR_SITEU    	= "L";
-constexpr auto OPERATOR_SITE_M_1    = true;
-#define OPERATOR_INT_CAST(x) static_cast<size_t>(x)
-#define OPERATOR_INT_CAST_S(v, x, p) (v ? STR(OPERATOR_INT_CAST(x)) : STRP(x, p))
+#include "operators/operators_final.hpp"
 
 // ##########################################################################################################################################
-
-namespace Operators 
-{
-	constexpr double _SPIN			=		0.5;
-	constexpr double _SPIN_RBM		=		_SPIN;
-};
-
-#include "operators/operator_spins.hpp"
-#include "operators/operator_quadratic.hpp"
 
 namespace Operators
 {
@@ -81,37 +26,59 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Applies the many body matrix to a given state O|\Psi>
 	* @param _C many body state
 	* @param _M many body matrix
 	*/
 	template<typename _Ct, typename _M>
-	inline _Ct apply(const _Ct& _C, const _M& _mat)
+	inline auto apply(const _Ct& _C, const _M& _mat)
 	{
 		return _mat * _C;
 	}
 
-	/*
-	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* @param _C many body state
-	* @param _M many body matrix
-	* @returns the overlap <\Psi|O|\Psi>
+	// ##########################################################################################################################################
+
+	/**
+	* @brief Applies the overlap operation on a given vector and matrix.
+	*
+	* This function computes the dot product of a vector `_C` and the product of a matrix `_mat` with the vector `_C`.
+	* It is only enabled for non-complex element types.
+	*
+	* @tparam _M Type of the matrix.
+	* @tparam _Ct Type of the column vector, defaults to `arma::Col` with the element type of `_M`.
+	* @param _C The column vector.
+	* @param _mat The matrix.
+	* @return The result of the overlap operation as an inner type of `_Ct`.
 	*/
-	template<typename _M, typename _Ct>
-	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const _M& _mat)
+	template<typename _M, typename _Ct = arma::Col<typename _M::elem_type>>
+	inline typename std::enable_if<!is_complex<typename _Ct::elem_type>::value, inner_type_t<_Ct>>::type
+	applyOverlap(const _Ct& _C, const _M& _mat)
 	{
-		return arma::cdot(_C, _mat * _C);
+		return arma::dot(_C, _mat * _C);
 	}
 
-	/*
-	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
-	* @param _Cleft many body state
-	* @param _Cright many body state
-	* @param _M many body matrix
-	* @returns the overlap <\Psi|O|\Psi>
+	template<typename _M, typename _Ct = arma::Col<typename _M::elem_type>>
+	inline typename std::enable_if<is_complex<typename _Ct::elem_type>::value, std::complex<double>>::type
+	applyOverlap(const _Ct& _C, const _M& _mat)
+	{
+		return arma::cdot(_C, _mat * _C);  // For complex types, use the complex dot product.
+	}
+
+	/**
+	* @brief Applies the overlap operation on a given container and a generalized matrix.
+	*
+	* This function computes the overlap of a container with a generalized matrix.
+	* If the matrix is sparse, it uses the sparse representation for the computation.
+	* Otherwise, it uses the dense representation.
+	*
+	* @tparam _Ct The type of the container.
+	* @tparam _T2 The type of the elements in the generalized matrix (default is the element type of _Ct).
+	* @param _C The container on which the overlap operation is applied.
+	* @param _mat The generalized matrix used in the overlap operation.
+	* @return The result of the overlap operation as an inner type of the container.
 	*/
-	template<typename _Ct, typename _T2>
+	template<typename _Ct, typename _T2 = typename _Ct::elem_type, typename = std::enable_if_t<arma::is_arma_type<_Ct>::value>>
 	inline inner_type_t<_Ct> applyOverlap(const _Ct& _C, const GeneralizedMatrix<_T2>& _mat)
 	{	
 		if (_mat.isSparse())

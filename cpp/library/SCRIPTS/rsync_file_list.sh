@@ -69,14 +69,14 @@ perform_rsync() {
   if [ -n "$PASSWORD" ]; then
     if $REMOVE_SOURCE_FILES; then
       sshpass -p "$PASSWORD" rsync -rv --ignore-existing --remove-source-files -e 'ssh -p 22' "$SRC" "$DST"
-      find "$SRC" -type d -empty -delete
+      # find "$SRC" -type d -empty -delete
     else
       sshpass -p "$PASSWORD" rsync -rv --ignore-existing -e 'ssh -p 22' "$SRC" "$DST"
     fi
   else
     if $REMOVE_SOURCE_FILES; then
       rsync -rv --ignore-existing --remove-source-files -e 'ssh -p 22' "$SRC" "$DST"
-      find "$SRC" -type d -empty -delete
+      # find "$SRC" -type d -empty -delete
     else
       rsync -rv --ignore-existing -e 'ssh -p 22' "$SRC" "$DST"
     fi
@@ -84,24 +84,20 @@ perform_rsync() {
 }
 
 # Loop through the list of directories and copy them
-while IFS= read -r DIR; do
-  if [ -d "$DIR" ]; then
-    # Append the directory path to the remote base path
-    REMOTE_DEST="$REMOTE/$DIR"
-    echo "Syncing directory: $DIR to $REMOTE_DEST"
-    perform_rsync "$DIR/" "$REMOTE_DEST/"
-    if [ $? -eq 0 ]; then
-      echo "Successfully synced: $DIR"
-    else
-      echo "Error syncing: $DIR"
-    fi
+while IFS= read -r REMOTE_DIR; do
+  # Construct the full remote directory path
+  REMOTE_DEST="$REMOTE/$REMOTE_DIR"
+
+  echo "Syncing from remote directory: $REMOTE_DEST to local"
+  
+  # Perform the rsync from remote to local
+  perform_rsync "$REMOTE_DEST/" "$LOCAL_DIRECTORY/"
+  
+  if [ $? -eq 0 ]; then
+    echo "Successfully synced from: $REMOTE_DEST"
   else
-    echo "Warning: Directory '$DIR' does not exist. Skipping."
+    echo "Error syncing from: $REMOTE_DEST"
   fi
 done < "$DIRECTORIES_FILE"
-
-# Sync files back from remote to local directory
-echo "Syncing back from $REMOTE to $LOCAL_DIRECTORY"
-perform_rsync "$REMOTE/" "$LOCAL_DIRECTORY/"
 
 echo "Batch rsync completed."

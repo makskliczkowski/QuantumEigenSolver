@@ -63,71 +63,33 @@ void UI::setDefault()
 
 // ###############################################################################################
 
-/*
-* @brief model parser
-* @param argc number of line arguments
-* @param argv line arguments
+/**
+* @brief Parses the command line arguments and sets the model parameters accordingly.
+* 
+* This function processes the command line arguments to configure the simulation parameters,
+* lattice parameters, model parameters, symmetries, and other settings. It also handles the 
+* help option and sets default values for various parameters.
+* 
+* @param argc The number of command line arguments.
+* @param argv The command line arguments.
+* 
+* The function performs the following tasks:
+* - Checks for the help option and displays help information if requested.
+* - Sets default values for various parameters.
+* - Configures simulation parameters such as training parameters, learning rate, early stopping, etc.
+* - Configures lattice parameters such as lattice type, dimensions, boundary conditions, etc.
+* - Calculates the number of sites in the lattice and sets the number of visible units in the NQS.
+* - Configures model parameters such as model type, random seed, operators, and various model-specific settings.
+* - Configures symmetries such as momentum, parity, and spin symmetries.
+* - Parses other miscellaneous options.
+* - Parses the main directory for output files.
 */
 void UI::parseModel(int argc, cmdArg& argv)
 {
-	// --------- HELP
 	if (std::string option = this->getCmdOption(argv, "-h"); option != "")
 		this->exitWithHelp();
-
-	// set default at first
-	this->setDefault();
-
-	std::string choosen_option = "";
-	// ---------- SIMULATION PARAMETERS ----------
-	{
-		// training parameters
-		SETOPTION(nqsP,	nqs_tr_epo);
-		SETOPTION(nqsP,	nqs_tr_mc);
-		SETOPTION(nqsP,	nqs_tr_bs);
-		SETOPTION(nqsP,	nqs_tr_th);
-		SETOPTION(nqsP,	nqs_tr_pinv);
-		SETOPTION(nqsP,	nqs_tr_pc);
-		// scheduler for the regularization
-		SETOPTION(nqsP,	nqs_tr_reg);
-		SETOPTION(nqsP,	nqs_tr_regs);
-		SETOPTION(nqsP,	nqs_tr_regd);
-		SETOPTION(nqsP,	nqs_tr_regp);
-		// preconditioner
-		SETOPTION(nqsP,	nqs_tr_prec);
-		// solver type
-		SETOPTION(nqsP,	nqs_tr_sol);
-		SETOPTION(nqsP, nqs_tr_tol); 
-		SETOPTION(nqsP, nqs_tr_iter);
-
-		// collecting - excited
-		SETOPTION(nqsP,	nqs_ex_mc);
-		SETOPTION(nqsP,	nqs_ex_bn);
-		SETOPTION(nqsP,	nqs_ex_th);
-		SETOPTION(nqsP,	nqs_ex_bs);
-		SETOPTIONVECTORRESIZET(nqsP, nqs_ex_beta, 1, double);
-
-		// collecting - all
-		SETOPTION(nqsP,	nqs_col_mc);
-		SETOPTION(nqsP,	nqs_col_bn);
-		SETOPTION(nqsP,	nqs_col_th);	
-		SETOPTION(nqsP,	nqs_col_bs);	
-
-		// learming rate
-		SETOPTION(nqsP,  nqs_sch);
-		SETOPTION(nqsP,	 nqs_lr);
-		SETOPTION(nqsP,  nqs_lrd);
-		SETOPTION(nqsP,  nqs_lr_pat);
-
-		// early stopping
-		SETOPTION(nqsP,  nqs_es_pat);
-		SETOPTION(nqsP,  nqs_es_del);
-
-		SETOPTION(nqsP, nqs_nh);
-		SETOPTION(nqsP,	 nFlips);
-		SETOPTIONV(nqsP, type, 		"nqst");
-		SETOPTIONV(nqsP, loadNQS,	"lNQS"	);
-		SETOPTION(nqsP,  nqs_ed				);
-	}
+	this->setDefault();								// set default at first
+	std::string choosen_option = "";				// the choosen option placeholder
 	// ----------------- LATTICE -----------------
 	{
 		SETOPTIONV(latP,	typ,	"l"	);
@@ -142,33 +104,96 @@ void UI::parseModel(int argc, cmdArg& argv)
 	int Ns [[maybe_unused]] = latP.Lx_ * latP.Ly_ * latP.Lz_;
 	if (latP.typ_ > LatticeTypes::SQ && latP.dim_ > 1)
 		Ns *= 2;
-	// for now, we set the number of sites in the NQS to the total number of sites from the lattice
-	// !TODO: change this to be more flexible and allow for different number of sites in the NQS (without the need to have the lattice)
-	nqsP.nVisible_ = Ns;
-	if (nqsP.nqs_nh_ < 0)
-		this->nqsP.nqs_nh_ = (int)std::abs(nqsP.nqs_nh_ * Ns);
-	
-
-	// ------------------ MODEL ------------------
+	// SIMULATION
+	{
+		// NEURAL QUANTUM STATE PARAMETERS 
+		{
+			// training parameters
+			SETOPTION(nqsP,	nqs_tr_epo);
+			SETOPTION(nqsP,	nqs_tr_mc);
+			SETOPTION(nqsP,	nqs_tr_bs);
+			SETOPTION(nqsP,	nqs_tr_th);
+			SETOPTION(nqsP,	nqs_tr_rst);
+			SETOPTION(nqsP,	nqs_tr_pinv);
+			SETOPTION(nqsP,	nqs_tr_pc);
+			// scheduler for the regularization
+			SETOPTION(nqsP,	nqs_tr_reg);
+			SETOPTION(nqsP,	nqs_tr_regs);
+			SETOPTION(nqsP,	nqs_tr_regd);
+			SETOPTION(nqsP,	nqs_tr_regp);
+			// preconditioner
+			SETOPTION(nqsP,	nqs_tr_prec);
+			// solver type
+			SETOPTION(nqsP,	nqs_tr_sol);
+			SETOPTION(nqsP, nqs_tr_tol); 
+			SETOPTION(nqsP, nqs_tr_iter);
+			// excited states parameters
+			SETOPTION(nqsP,	nqs_ex_mc);
+			SETOPTION(nqsP,	nqs_ex_bn);
+			SETOPTION(nqsP,	nqs_ex_th);
+			SETOPTION(nqsP,	nqs_ex_bs);
+			SETOPTIONVECTORRESIZET(nqsP, nqs_ex_beta, 1, double);
+			// collecting samples parameters
+			SETOPTION(nqsP,	nqs_col_mc);
+			SETOPTION(nqsP,	nqs_col_bn);
+			SETOPTION(nqsP,	nqs_col_th);	
+			SETOPTION(nqsP,	nqs_col_bs);
+			SETOPTION(nqsP,	nqs_col_rst);	
+			// time evolution
+			SETOPTION(nqsP,	nqs_te);
+			SETOPTION(nqsP,	nqs_te_mc);
+			SETOPTION(nqsP,	nqs_te_th);
+			SETOPTION(nqsP,	nqs_te_bn);
+			SETOPTION(nqsP,	nqs_te_bs);
+			SETOPTION(nqsP,	nqs_te_rst);
+			SETOPTION(nqsP,	nqs_te_dt);
+			SETOPTION(nqsP, nqs_te_tlog);
+			SETOPTION(nqsP,	nqs_te_tf);
+			SETOPTION(nqsP,	nqs_te_rk);
+			// learming rate
+			SETOPTION(nqsP,  nqs_sch);
+			SETOPTION(nqsP,	 nqs_lr);
+			SETOPTION(nqsP,  nqs_lrd);
+			SETOPTION(nqsP,  nqs_lr_pat);
+			// early stopping
+			SETOPTION(nqsP,  nqs_es_pat);
+			SETOPTION(nqsP,  nqs_es_del);
+			// other hidden units
+			SETOPTION(nqsP, nqs_nh);
+			SETOPTION(nqsP,	 nFlips);
+			SETOPTIONV(nqsP, type, 		"nqst");
+			SETOPTIONV(nqsP, loadNQS,	"lNQS"	);
+			// compare the NQS with the ED
+			SETOPTION(nqsP,  nqs_ed				);
+		}
+		// for now, we set the number of sites in the NQS to the total number of sites from the lattice
+		// !TODO: change this to be more flexible and allow for different number of sites in the NQS (without the need to have the lattice)
+		nqsP.nVisible_ = Ns;
+		if (nqsP.nqs_nh_ < 0)
+			this->nqsP.nqs_nh_ = (int)std::abs(nqsP.nqs_nh_ * Ns);
+	}
+	// ------------------ MODELS ------------------
 	{
 		// model type
 		SETOPTIONV(modP, modTyp, "mod");
-		this->modP.modRanN_ = { 1 };
-		SETOPTIONVECTORRESIZET(modP, modRanN, 10, uint);
-		SETOPTION(modP, modRanSeed);
-		SETOPTION(modP, modMidStates);
-		SETOPTION(modP, modEnDiff);
-
-		// eth
-		SETOPTION(modP, eth_entro);
-		SETOPTION(modP, eth_susc);
-		SETOPTION(modP, eth_ipr);
-		SETOPTION(modP, eth_offd);
-		SETOPTIONVECTORRESIZET(modP, eth_end, 10, double);
-
+		// randomness
+		{
+			this->modP.modRanN_ = { 1 };
+			SETOPTIONVECTORRESIZET(modP, modRanN, 10, uint);
+			SETOPTION(modP, modRanSeed);
+			SETOPTION(modP, modMidStates);
+			SETOPTION(modP, modEnDiff);
+		}
+		// eth related
+		{
+			SETOPTION(modP, eth_entro);
+			SETOPTION(modP, eth_susc);
+			SETOPTION(modP, eth_ipr);
+			SETOPTION(modP, eth_offd);
+			SETOPTIONVECTORRESIZET(modP, eth_end, 10, double);
+		}
 		// set operators vector
 		this->setOption<std::string>(modP.operators, argv, "op", "sz/L", true);
-
 		// ---- quadratic ----
 		{
 			SETOPTIONV(modP, q_manybody,		"q_mb");
@@ -195,7 +220,6 @@ void UI::parseModel(int argc, cmdArg& argv)
 				SETOPTION(modP.power_law_random_bandwidth, plrb_mb);
 			}
 		}
-		
 		// ------ spin ------
 		{
 			// ------ ising ------
@@ -286,8 +310,42 @@ void UI::parseModel(int argc, cmdArg& argv)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
-* @brief chooses the method to be used later based on input -fun argument
+/**
+* @brief Executes a function based on the user's choice.
+*
+* This function logs the number of threads being used, resets the timer, and 
+* then executes a specific simulation or operation based on the value of 
+* `this->chosenFun`. The available options include:
+*
+* - -1: Shows help information and exits.
+*
+* ------------------------------- NEURAL QST -------------------------------
+* - 10: Runs a Hamiltonian simulation with NQS ansatz.
+* - 11: Runs a Hamiltonian simulation with NQS ansatz for excited states.
+*
+* ------------------------------- SYMMETRIES -------------------------------
+* - 20: Runs a Hamiltonian simulation with symmetries for all sectors.
+* - 21: Runs a Hamiltonian simulation with symmetries.
+* - 22: Runs a Hamiltonian simulation with symmetries and sweeps all.
+* - 23: Creates a map between Hamiltonian type and Hilbert space size with symmetries.
+* - 24: Runs a Hamiltonian simulation with symmetries and saves states.
+* - 25: Runs a Hamiltonian simulation with symmetries and saves degeneracies.
+* - 26: Calculates entropy of combination of states in a given symmetry sector.
+*
+* ------------------------------- QUADRATIC -------------------------------
+* - 30: Runs a quadratic Hamiltonian simulation for states mixing.
+* - 31: Runs a quadratic Hamiltonian simulation with spectral functions.
+*
+* ----------------------------------- ETH ---------------------------------
+* - 40: Runs a Hamiltonian simulation for ETH.
+* - 41: Runs a Hamiltonian simulation for ETH with sweep.
+* - 42: Runs a Hamiltonian simulation for ETH statistics.
+* - 43: Runs a Hamiltonian simulation for ETH statistics with sweep.
+* - 44: Runs a Hamiltonian simulation for ETH statistics with offdiagonal elements scaling.
+* - 45: Runs a Hamiltonian time evolution simulation for ETH statistics.
+* - 46: Runs a Hamiltonian time evolution simulation for ETH statistics with sweep.
+*
+* If an invalid option is chosen, the function shows help information and exits.
 */
 void UI::funChoice()
 {
@@ -409,22 +467,28 @@ void UI::funChoice()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Defines the lattice in the system
+* @return true if the lattice was defined successfully, false otherwise
 */
 bool UI::defineLattice()
 {
-	return this->defineLattice(this->latP.lat, this->latP.typ_);
+	if (!this->latP.lat)
+	{
+		return this->defineLattice(this->latP.lat, this->latP.typ_);
+	}
+	return true;
 }
 
 /*
 * @brief Defines the lattice in the system
 * @param _lat lattice to be defined
-* @return true if the lattice was defined
+* @param _typ type of the lattice
+* @return true if the lattice was defined successfully, false otherwise
 */
 bool UI::defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ)
 {
-	BEGIN_CATCH_HANDLER
+	try
 	{
 		switch (_typ)
 		{
@@ -440,13 +504,17 @@ bool UI::defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ)
 		default:
 			_lat = std::make_shared<SquareLattice>(this->latP.Lx_, this->latP.Ly_, this->latP.Lz_, this->latP.dim_, this->latP.bc_);
 			break;
-		};
+		}
 	}
-	END_CATCH_HANDLER("Exception in setting the lattices: ", return false;);
+	catch (const std::exception& e)
+	{
+		LOGINFO("Exception in setting the lattices: " + std::string(e.what()), LOG_TYPES::ERROR, 0);
+		return false;
+	}
 	return true;
 }
 
-// ----------------------------------------------------------------------------------------------
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /*
 * @brief defines the models based on the input parameters - interacting

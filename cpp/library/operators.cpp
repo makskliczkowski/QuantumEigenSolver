@@ -1,6 +1,9 @@
 #include "./include/algebra/operators.h"
 #include "include/algebra/general_operator.h"
+#include "include/algebra/operator_algebra.h"
+#include "include/algebra/operators/operators_generic.hpp"
 #include "source/src/Include/str.h"
+#include "source/src/common.h"
 #include "source/src/lin_alg.h"
 #include <complex>
 #include <string>
@@ -22,7 +25,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		/*
+		/**
 		* @brief multiplication of sigma_xi | state >
 		* @param base_vec the base vector to be acted on. This is given by the copy.
 		* @param _Ns lattice dimensionality (base vector length)
@@ -41,39 +44,89 @@ namespace Operators
 			return std::make_pair(base_vec, _val);
 		}
 
+		/**
+		* @brief Applies the sigma_x (Pauli-X) operator to a given base vector.
+		*
+		* This function takes a base vector and a list of sites, and applies the sigma_x
+		* operator to each specified site. The sigma_x operator flips the spin at the given
+		* site and multiplies the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The input base vector on which the sigma_x operator will be applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_x operator will be applied.
+		* @return A pair consisting of the modified base vector and the resulting value after
+		*         applying the sigma_x operator to the specified sites.
+		*/
 		template <typename _T>
 		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			_T _val 			= 1.0;
-			_OP_V_T _base_vec 	= base_vec;
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
 			for (auto const& site : sites)
 			{
-				flip(_base_vec, site, Operators::_SPIN);
+				flip(_base_vec, site, 0, Operators::_SPIN);
 				_val *= Operators::_SPIN;
 			}
 			return std::make_pair(_base_vec, _val);
 		}
 
+		/**
+		* @brief Applies the sigma_x operator to a given base vector.
+		*
+		* This function applies the sigma_x (Pauli-X) operator to a given base vector
+		* at specified sites and returns the resulting vector and a value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma_x operator is applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_x operator is applied.
+		* @param _ref A reference vector that will be modified to store the result (in the process).
+		* @return A pair containing the modified vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		{
+			_T _val = 1.0;
+			if (_ref.size() != base_vec.size())
+				_ref = base_vec;
+
+			for (auto const& site : sites)
+			{
+				flip(_ref, site, 0, Operators::_SPIN);
+				_val *= Operators::_SPIN;
+			}
+			return std::make_pair(_ref, _val);
+		}
+
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_x,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
 		// #####################################
 
-		/*
-		* @brief multiplication of sigma_xi | state > - local
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param _part the site to meassure correlation at
-		* @returns the operator acting on the _part site
+		/**
+		* @brief Applies the sigma_x (Pauli-X) operator to a specific site in the lattice.
+		*
+		* This function creates an operator that applies the sigma_x operator to a specific site
+		* in the lattice. The sigma_x operator flips the spin at the given site and multiplies
+		* the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @param _part The site index where the sigma_x operator will be applied.
+		* @return An Operator object that applies the sigma_x operator to the specified site.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_x(size_t _Ns, size_t _part)
 		{
 			// create the function
-			_GLB<_T> fun_		= [_Ns, _part](u64 state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
-			_GLB_V<_T> funV_	= [_Ns, _part](_OP_V_T_CR state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
+			_GLB<_T> fun_ = [_Ns, _part](u64 state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
+			_GLB_V<_T> funV_ = [_Ns, _part](_OP_V_T_CR state) { return sig_x<_T>(state, _Ns, { (uint)_part }); };
 
 			// save on which elements the operator acts (for the sake of the correctness)
-			u64 _acts = 0;
-			// |set the bitmask on the state, remember that this is counted from the left|
-			// the first position is leftwise 0, the last is leftwise Ns - 1
-			_acts |= 1 << (_Ns - 1 - _part);
+			u64 _acts = 1ULL << (_Ns - 1 - _part);
 
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
@@ -81,11 +134,11 @@ namespace Operators
 			return _op;
 		}
 
-		/*
-		* @brief multiplication of sigma_xi | state > - correlation
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at
-		* @returns the operator acting on the _part site
+		/**
+		* @brief Applies the sigma_x (Pauli-X) operator to a given set of sites in the lattice.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_x operator will be applied. This acts as a multiplication of the operators - Pauli strings.
+		* @returns The operator acting on the specified sites.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_x(size_t _Ns, const v_1d<uint>& sites)
@@ -104,36 +157,52 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
+			_op.setNameS("Sx");
 			return _op;
 		}
 
-		/*
-		* @brief multiplication of sigma_xi | state > - correlation - global
-		* @param _Ns lattice dimensionality (base vector length)
-		* @returns the operator acting on the _part site
+		/**
+		* @brief Creates a global sigma_x (Pauli-X) operator for the entire lattice.
+		*
+		* This function constructs an operator that applies the sigma_x operator to all sites
+		* in the lattice. The sigma_x operator flips the spin at each site and multiplies
+		* the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @return An Operator object that applies the sigma_x operator to all sites in the lattice.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_x(size_t _Ns)
 		{
 			// set the vector of sites
-			v_1d<uint> _sites		= Vectors::vecAtoB<uint>(_Ns);
+			v_1d<uint> _sites = Vectors::vecAtoB<uint>(_Ns);
+			
 			// create the function
-			_GLB<_T> fun_			= [_Ns, _sites](u64 state) { return sig_x<_T>(state, _Ns, _sites); };
-			_GLB_V<_T> funV_ 		= [_Ns, _sites](_OP_V_T_CR state) { return sig_x<_T>(state, _Ns, _sites); };
+			_GLB<_T> fun_ = [_Ns, _sites](u64 state) { return sig_x<_T>(state, _Ns, _sites); };
+			_GLB_V<_T> funV_ = [_Ns, _sites](_OP_V_T_CR state) { return sig_x<_T>(state, _Ns, _sites); };
 
-			// save on which elements the operator acts (for the sake of the correctness)
-			// |set the bitmask on the state, remember that this is counted from the left|
-			// the first position is leftwise 0, the last is leftwise Ns - 1
-
-			// take all of them!
-			u64 _acts				= (ULLPOW(_Ns)) - 1;
+			// save on which elements the operator acts (for the sake of correctness)
+			u64 _acts = (1ULL << _Ns) - 1; // set the bitmask on the state, covering all sites
 
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
+			_op.setNameS("Sx/L");
 			return _op;
 		}
 
+		/**
+		* @brief Creates a local sigma_x (Pauli-X) operator for a specific site in the lattice.
+		*
+		* This function constructs an operator that applies the sigma_x operator to a specific site
+		* in the lattice. The sigma_x operator flips the spin at the given site and multiplies
+		* the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @return An Operator object that applies the sigma_x operator to a specific site in the lattice.
+		*/
 		template <typename _T>
 		Operators::Operator<_T, uint> sig_x_l(size_t _Ns)
 		{
@@ -142,9 +211,31 @@ namespace Operators
 
 			// set the operator
 			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			_op.setNameS("Sx/C");
 			return _op;
 		}
 
+		/**
+		* @brief Creates a correlation sigma_x (Pauli-X) operator for a set of sites in the lattice.
+		*
+		* This function constructs an operator that applies the sigma_x operator to a set of sites
+		* in the lattice. The sigma_x operator flips the spin at each specified site and multiplies
+		* the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @return An Operator object that applies the sigma_x operator to the specified sites in the lattice.
+		*/
+		template <typename _T>
+		Operators::Operator<_T, uint, uint> sig_x_c(size_t _Ns)
+		{
+			_COR<_T> fun_ 		= [_Ns](u64 state, uint _s1, uint _s2) { return sig_x<_T>(state, _Ns, {_s1, _s2}); };
+			_COR_V<_T> funV_ 	= [_Ns](_OP_V_T_CR state, uint _s1, uint _s2) { return sig_x<_T>(state, _Ns, {_s1, _s2}); };
+
+			Operator<_T, uint, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
+			_op.setNameS("Sx");
+			return _op;
+		}
 
 		// ############################################################################################# 
 
@@ -152,22 +243,44 @@ namespace Operators
 
 		// #############################################################################################
 		
-		/*
-		* @brief multiplication of sigma_zi | state >
-		* @param base_vec the base vector to be acted on. This is given by the copy.
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at. The order of the sites matters!
-		* @returns the pair of the new state and the value of the operator
+		/**
+		* @brief Applies the sigma_z (Pauli-Z) operator to a given base vector.
+		*
+		* This function takes a base vector and a list of sites, and applies the sigma_z
+		* operator to each specified site. The sigma_z operator measures the spin at the given
+		* site and multiplies the resulting value by a constant factor.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The input base vector on which the sigma_z operator will be applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_z operator will be applied.
+		* @return A pair consisting of the base vector and the resulting value after
+		*         applying the sigma_z operator to the specified sites.
 		*/
 		template <typename _T>
 		std::pair<u64, _T> sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
 			_T _val = 1.0;
 			for (auto const& site : sites)
+			{
 				_val *= Binary::check(base_vec, _Ns - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
+			}
 			return std::make_pair(base_vec, _val);
 		}
 
+		/**
+		* @brief Computes the Z-component of the spin operator for a given base vector.
+		*
+		* This function calculates the Z-component of the spin operator (σ_z) for a given base vector.
+		* It iterates over the specified sites and multiplies the spin value based on the binary check
+		* of the base vector at each site.
+		*
+		* @tparam _T The type of the spin value.
+		* @param base_vec The base vector representing the quantum state.
+		* @param _Ns The number of sites (not used in the function).
+		* @param sites A vector of site indices where the spin operator is applied.
+		* @return A pair consisting of the original base vector and the computed Z-component value.
+		*/
 		template <typename _T>
 		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
@@ -178,11 +291,59 @@ namespace Operators
 			return std::make_pair(base_vec, _val);
 		}
 
-		/*
-		* @brief multiplication of sigma_zi | state > - local
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param _part the site to meassure correlation at
-		* @returns the operator acting on the _part site
+
+		/**
+		 * @brief Applies the sigma_z operator to a given base vector.
+		 *
+		 * This function calculates the product of the sigma_z operator applied to the specified sites
+		 * of the base vector. The result is a pair consisting of the original base vector and the 
+		 * calculated value.
+		 *
+		 * @tparam _T The type of the value to be returned.
+		 * @param base_vec The base vector to which the sigma_z operator is applied.
+		 * @param _Ns The size of the system (number of sites).
+		 * @param sites A vector containing the indices of the sites where the sigma_z operator is applied.
+		 * @param _ref A reference vector used to check the binary state of each site (unnecessary parameter).
+		 * @return A pair consisting of the original base vector and the calculated value after applying the sigma_z operator.
+		 */
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		{
+			_T _val = 1.0;
+			for (auto const& site : sites)
+				_val *= Binary::check(_ref, site) ? Operators::_SPIN : -Operators::_SPIN;
+			return std::make_pair(base_vec, _val);
+		}
+
+		OP_TMPLT_INST_PAIR(sig_z,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
+		/**
+		* @brief Creates a sigma-z (Pauli-Z) operator for a quantum system.
+		* 
+		* This function generates a sigma-z operator that acts on a specific particle in a quantum system.
+		* The operator is represented as a functor that can be applied to quantum states.
+		* 
+		* @tparam _T The data type used for the operator's elements (e.g., float, double).
+		* @param _Ns The total number of particles (or qubits) in the quantum system.
+		* @param _part The index of the particle (or qubit) on which the sigma-z operator acts.
+		* @return Operators::Operator<_T> The constructed sigma-z operator.
+		* 
+		* The function creates two functors:
+		* - `fun_`: A functor that applies the sigma-z operator to a single quantum state.
+		* - `funV_`: A functor that applies the sigma-z operator to a vector of quantum states.
+		* 
+		* The function also sets a bitmask (`_acts`) to indicate which particle the operator acts on.
+		* The bitmask is used to ensure the correctness of the operator's application.
+		* 
+		* The constructed operator is then initialized with the following parameters:
+		* - The total number of particles (`_Ns`).
+		* - The scaling factor (set to 1.0).
+		* - The functors (`fun_` and `funV_`).
+		* - The symmetry generator type (`SymGenerators::SZ`).
+		* 
+		* Finally, the function sets the bitmask on the operator and returns it.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_z(size_t _Ns, size_t _part)
@@ -200,40 +361,60 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
+			_op.setNameS("Sz");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
-		/*
-		* @brief multiplication of sigma_zi | state > - correlation
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at
-		* @returns the operator acting on the _part site
+		/**
+		* @brief Creates a sigma_z (Pauli-Z) operator for a given set of sites in the lattice.
+		*
+		* This function constructs an operator that applies the sigma_z operator to a set of sites
+		* in the lattice. The sigma_z operator measures the spin at each specified site and multiplies
+		* the resulting value by a constant factor.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_z operator will be applied.
+		* @note The name of the operator is set to "Sz_m" - is appended to the name of the operator as we multiply the operators.
+		* @return An Operator object that applies the sigma_z operator to the specified sites in the lattice.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_z(size_t _Ns, const v_1d<uint>& sites)
 		{
 			// create the function
-			_GLB<_T> fun_		= [_Ns, sites](u64 state) { return sig_z<_T>(state, _Ns, sites); };
-			_GLB_V<_T> funV_	= [_Ns, sites](_OP_V_T_CR state) { return sig_z<_T>(state, _Ns, sites); };
+			_GLB<_T> fun_ = [_Ns, sites](u64 state) { return sig_z<_T>(state, _Ns, sites); };
+			_GLB_V<_T> funV_ = [_Ns, sites](_OP_V_T_CR state) { return sig_z<_T>(state, _Ns, sites); };
 
-			// save on which elements the operator acts (for the sake of the correctness)
+			// save on which elements the operator acts (for the sake of correctness)
 			u64 _acts = 0;
-			// |set the bitmask on the state, remember that this is counted from the left|
-			// the first position is leftwise 0, the last is leftwise Ns - 1
-			for(auto _part : sites)
-				_acts |= 1 << (_Ns - 1 - _part);
+			for (auto _part : sites)
+				_acts |= 1ULL << (_Ns - 1 - _part);
 
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
+			_op.setNameS("Sz_m");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
-		/*
-		* @brief multiplication of sigma_zi | state > - correlation - global
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at
-		* @returns the operator acting on the _part site
+		/**
+		* @brief Constructs a sigma_z (Pauli-Z) operator for a quantum system of size _Ns.
+		*
+		* This function creates a sigma_z operator which acts on a quantum state of size _Ns.
+		* The operator is represented using a lambda function that applies the sigma_z operation
+		* on a given state. The operator acts on all sites of the quantum system.
+		*
+		* @tparam _T The data type of the operator elements.
+		* @param _Ns The number of sites in the quantum system.
+		* @return Operators::Operator<_T> The constructed sigma_z operator.
+		*
+		* The function performs the following steps:
+		* 1. Sets the vector of sites from 0 to _Ns-1.
+		* 2. Creates lambda functions to apply the sigma_z operation on a given state.
+		* 3. Sets the bitmask to indicate that the operator acts on all sites.
+		* 4. Constructs and returns the sigma_z operator.
 		*/
 		template <typename _T>
 		Operators::Operator<_T> sig_z(size_t _Ns)
@@ -254,9 +435,31 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
+			_op.setModifiesState(false);
 			return _op;
 		}
 
+		/**
+		* @brief Generates a sig_z operator for a given system size.
+		*
+		* This function creates a sig_z operator for a quantum system of size _Ns.
+		* The sig_z operator is used in quantum mechanics to represent the Pauli-Z
+		* matrix, which is a fundamental operator in the study of quantum systems.
+		*
+		* @tparam _T The data type of the operator elements.
+		* @param _Ns The size of the quantum system.
+		* @return An Operator object representing the sig_z operator for the given system size.
+		*
+		* The function uses lambda expressions to define the operator's action on
+		* quantum states. The operator is then constructed with these lambda functions
+		* and a symmetry generator (SymGenerators::SZ).
+		*
+		* Example usage:
+		* @code
+		* size_t system_size = 4;
+		* auto sig_z_operator = Operators::sig_z_l<double>(system_size);
+		* @endcode
+		*/
 		template <typename _T>
 		Operators::Operator<_T, uint> sig_z_l(size_t _Ns)
 		{
@@ -265,104 +468,673 @@ namespace Operators
 
 			// set the operator
 			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+			_op.setNameS("Sz/C");
+			_op.setModifiesState(false);
 			return _op;
 		}
 
+		/**
+		* @brief Generates a sig_z operator for a given system size. The operator acts on a pair of sites.
+		
+		* This function constructs an operator that applies the sigma_z operator to a set of sites
+		* in the lattice. The sigma_z operator measures the spin at each specified site and multiplies
+		* the resulting value by a constant factor.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param _Ns The size of the system (number of sites).
+		* @return An Operator object that applies the sigma_z operator to the specified sites in the lattice.
+		*/
+		template <typename _T>
+		Operators::Operator<_T, uint, uint> sig_z_c(size_t _Ns)
+		{
+			_COR<_T> fun_ 		= [_Ns](u64 state, uint _s1, uint _s2) { return sig_z<_T>(state, _Ns, {_s1, _s2}); };
+			_COR_V<_T> funV_ 	= [_Ns](_OP_V_T_CR state, uint _s1, uint _s2) { return sig_z<_T>(state, _Ns, {_s1, _s2}); };
+
+			Operator<_T, uint, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+			_op.setNameS("Sz/C");
+			_op.setModifiesState(false);
+			return _op;
+		}
+		
 		// ############################################################################################# 
 
 		// ######################################## SIGMA P ############################################
 
 		// #############################################################################################
 
-		/*
-		* @brief Operator S^+ acting on the state | state >
-		* @param base_vec the base vector to be acted on. This is given by the copy.
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at. The order of the sites matters!
-		* @returns the pair of the new state and the value of the operator
+		/**
+		* @brief Applies the sigma_p (raising) operator to a given base vector.
+		*
+		* This function takes a base vector and a list of sites, and applies the sigma_p
+		* operator to each specified site. The sigma_p operator raises the spin at the given
+		* site and multiplies the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The input base vector on which the sigma_p operator will be applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_p operator will be applied.
+		* @return A pair consisting of the modified base vector and the resulting value after
+		*         applying the sigma_p operator to the specified sites.
 		*/
-		std::pair<u64, double> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<u64, _T> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val		=	1.0;
+			_T _val = 1.0;
 			for (auto const& site : sites)
 			{
-				// this op
 				if (checkBit(base_vec, _Ns - 1 - site))
 				{
-					_val	=	0.0;
+					_val = 0.0;
 					break;
 				}
-				base_vec	=	flip(base_vec, _Ns - 1 - site);
-				_val		*=	Operators::_SPIN;
+				base_vec = flip(base_vec, _Ns - 1 - site);
+				_val *= Operators::_SPIN;
 			}
 			return std::make_pair(base_vec, _val);
 		}
 
-		/*
-		* @brief Operator S^+ acting on the state | state >
-		* @param base_vec the base vector to be acted on. This is given by the copy.
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at. The order of the sites matters!
-		* @returns the pair of the new state and the value of the operator
+		/**
+		* @brief Applies the sigma plus (σ⁺) operator to a given base vector.
+		*
+		* This function applies the sigma plus (σ⁺) operator to a given base vector `base_vec`
+		* at the specified `sites`. The sigma plus operator flips the spin at the given sites
+		* and multiplies the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma plus operator is applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma plus operator is applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
 		*/
-		std::pair<u64, double> sig_m(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			auto _val		=	1.0;
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
 			for (auto const& site : sites)
 			{
-				// this op
-				if (!checkBit(base_vec, _Ns - 1 - site))
+				if (checkBit(_base_vec, site))
 				{
-					_val	=	0.0;
+					_val = 0.0;
 					break;
 				}
-				base_vec	=	flip(base_vec, _Ns - 1 - site);
-				_val		*=	Operators::_SPIN;
+				flip(_base_vec, site, 0, Operators::_SPIN);
+				_val *= Operators::_SPIN;
+			}
+			return std::make_pair(_base_vec, _val);
+		}
+
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_p(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		{
+			_T _val = 1.0;
+			if (_ref.size() != base_vec.size())
+				_ref = base_vec;
+
+			for (auto const& site : sites)
+			{
+				if (checkBit(_ref, site))
+				{
+					_val = 0.0;
+					break;
+				}
+				flip(_ref, site, 0, Operators::_SPIN);
+				_val *= Operators::_SPIN;
+			}
+			return std::make_pair(_ref, _val);
+		}
+
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_p,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_p,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_p,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
+		// #############################################################################################
+
+		// ######################################## SIGMA M ############################################
+
+		// #############################################################################################
+
+		/**
+		* @brief Applies the sigma_m (lowering) operator to a given base vector.
+		*
+		* This function takes a base vector and a list of sites, and applies the sigma_m
+		* operator to each specified site. The sigma_m operator lowers the spin at the given
+		* site and multiplies the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The input base vector on which the sigma_m operator will be applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_m operator will be applied.
+		* @return A pair consisting of the modified base vector and the resulting value after
+		*         applying the sigma_m operator to the specified sites.
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_m(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			_T _val = 1.0;
+			for (auto const& site : sites)
+			{
+				if (!checkBit(base_vec, _Ns - 1 - site))
+				{
+					_val = 0.0;
+					break;
+				}
+				base_vec = flip(base_vec, _Ns - 1 - site);
+				_val *= Operators::_SPIN;
 			}
 			return std::make_pair(base_vec, _val);
 		}
 
-		/*
-		* @brief multiplication of S^+S^- | state >
-		* @param base_vec the base vector to be acted on. This is given by the copy.
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at. The order of the sites matters!
-		* @returns the pair of the new state and the value of the operator
+		/**
+		* @brief Applies the sigma_m (lowering) operator to a given base vector.
+		*
+		* This function applies the sigma_m (lowering) operator to a given base vector `base_vec`
+		* at the specified `sites`. The sigma_m operator flips the spin at the given sites
+		* and multiplies the resulting vector by a constant value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma_m operator is applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma_m operator is applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
 		*/
-		std::pair<u64, double> sig_pm(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 		{
-			uint _size			= sites.size();
-			auto _mid			= sites.begin() + std::floor(_size / 2);
-
-			v_1d<uint> _left(sites.begin(), _mid);
-			v_1d<uint> _right(_mid, sites.end());
-
-			auto [_out, _val]	= sig_p(base_vec, _Ns, _left);
-
-			// return the value
-			return sig_m(_out, _Ns, _right);
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for (auto const& site : sites)
+			{
+				if (!checkBit(_base_vec, site))
+				{
+					_val = 0.0;
+					break;
+				}
+				flip(_base_vec, site, 0, Operators::_SPIN);
+				_val *= Operators::_SPIN;
+			}
+			return std::make_pair(_base_vec, _val);
 		}
 
-		/*
-		* @brief multiplication of S^-S^+ | state >
-		* @param base_vec the base vector to be acted on. This is given by the copy.
-		* @param _Ns lattice dimensionality (base vector length)
-		* @param sites the sites to meassure correlation at. The order of the sites matters!
-		* @returns the pair of the new state and the value of the operator
-		*/
-		std::pair<u64, double> sig_mp(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_m(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
 		{
-			uint _size			= sites.size();
-			auto _mid			= sites.begin() + std::floor(_size / 2);
+			_T _val = 1.0;
+			if (_ref.size() != base_vec.size())
+				_ref = base_vec;
 
-			v_1d<uint> _left(sites.begin(), _mid);
-			v_1d<uint> _right(_mid, sites.end());
-
-			auto [_out, _val]	= sig_m(base_vec, _Ns, _left);
-
-			// return the value
-			return sig_p(_out, _Ns, _right);
+			for (auto const& site : sites)
+			{
+				if (!checkBit(_ref, site))
+				{
+					_val = 0.0;
+					break;
+				}
+				flip(_ref, site, 0, Operators::_SPIN);
+				_val *= Operators::_SPIN;
+			}
+			return std::make_pair(_ref, _val);
 		}
+
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_m,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_m,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_m,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
+		// #############################################################################################
+
+		// ######################################## SIGMA PM ###########################################
+
+		// #############################################################################################
+
+		/**
+		* @brief Applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector.
+		*
+		* This function applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma plus operator raises the spin at the given sites, and the sigma minus operator
+		* lowers the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma plus and sigma minus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma plus and sigma minus operators are applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_pm(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			_T _val = 1.0;
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (checkBit(base_vec, _Ns - 1 - sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					base_vec = flip(base_vec, _Ns - 1 - sites[i]);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (!checkBit(base_vec, _Ns - 1 - sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					base_vec = flip(base_vec, _Ns - 1 - sites[i]);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(base_vec, _val);
+		}
+
+		/**
+		* @brief Applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector.
+		*
+		* This function applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma plus operator raises the spin at the given sites, and the sigma minus operator
+		* lowers the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma plus and sigma minus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma plus and sigma minus operators are applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_pm(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (checkBit(_base_vec, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_base_vec, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (!checkBit(_base_vec, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_base_vec, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(_base_vec, _val);
+		}
+
+		/**
+		* @brief Applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector.
+		*
+		* This function applies the product of sigma plus (σ⁺) and sigma minus (σ⁻) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma plus operator raises the spin at the given sites, and the sigma minus operator
+		* lowers the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma plus and sigma minus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma plus and sigma minus operators are applied.
+		* @param _ref A reference vector used to store the result.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_pm(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		{
+			_T _val = 1.0;
+			if (_ref.size() != base_vec.size())
+				_ref = base_vec;
+
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (checkBit(_ref, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_ref, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (!checkBit(_ref, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_ref, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(_ref, _val);
+		}
+
+		/**
+		* @brief Applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector.
+		*
+		* This function applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma minus operator lowers the spin at the given sites, and the sigma plus operator
+		* raises the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma minus and sigma plus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma minus and sigma plus operators are applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_mp(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			_T _val = 1.0;
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (!checkBit(base_vec, _Ns - 1 - sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					base_vec = flip(base_vec, _Ns - 1 - sites[i]);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (checkBit(base_vec, _Ns - 1 - sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					base_vec = flip(base_vec, _Ns - 1 - sites[i]);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(base_vec, _val);
+		}
+
+		/**
+		* @brief Applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector.
+		*
+		* This function applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma minus operator lowers the spin at the given sites, and the sigma plus operator
+		* raises the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma minus and sigma plus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma minus and sigma plus operators are applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_mp(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (!checkBit(_base_vec, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_base_vec, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (checkBit(_base_vec, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_base_vec, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(_base_vec, _val);
+		}
+
+		/**
+		* @brief Applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector.
+		*
+		* This function applies the product of sigma minus (σ⁻) and sigma plus (σ⁺) operators to a given base vector `base_vec`
+		* at the specified `sites`. The sigma minus operator lowers the spin at the given sites, and the sigma plus operator
+		* raises the spin at the given sites. The order of the sites matters.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma minus and sigma plus operators are applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the sigma minus and sigma plus operators are applied.
+		* @param _ref A reference vector used to store the result.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_mp(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		{
+			_T _val = 1.0;
+			if (_ref.size() != base_vec.size())
+				_ref = base_vec;
+
+			for (size_t i = 0; i < sites.size(); ++i)
+			{
+				if (i % 2 == 0)
+				{
+					if (!checkBit(_ref, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_ref, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+				else
+				{
+					if (checkBit(_ref, sites[i]))
+					{
+						_val = 0.0;
+						break;
+					}
+					flip(_ref, sites[i], 0, Operators::_SPIN);
+					_val *= Operators::_SPIN;
+				}
+			}
+			return std::make_pair(_ref, _val);
+		}
+
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_pm,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_pm,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_pm,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
+		OP_TMPLT_INST_PAIR(sig_mp,, (u64, size_t, const v_1d<uint>&), u64);
+		OP_TMPLT_INST_PAIR(sig_mp,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
+		OP_TMPLT_INST_PAIR(sig_mp,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+
+		// #############################################################################################
+
+		/**
+		* @brief Applies a series of quantum spin operations on a base vector.
+		*
+		* This function template applies a series of quantum spin operations (X and Z) on a given base vector.
+		* The operations are applied based on the indices provided in the `sites` vector. The function returns
+		* a pair consisting of the modified base vector and the resulting value after applying the operations.
+		*
+		* @tparam _T The type of the value to be returned (e.g., double, std::complex<double>).
+		* @param base_vec The initial base vector on which the operations will be applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector of site indices where the operations will be applied.
+		* @return A pair consisting of the modified base vector and the resulting value.
+		*
+		* This function is important for simulating quantum systems on a honeycomb lattice, where specific
+		* spin operations need to be applied to certain sites in a controlled manner. The alternation between
+		* X and Z operations allows for the simulation of complex quantum behaviors and interactions.
+		*/
+		namespace Flux
+		{
+			/**
+			* @brief Applies a series of quantum spin operations (X and Z) on a base vector.
+			*
+			* This function applies a series of quantum spin operations (X and Z) on a given base vector.
+			* The operations are applied based on the indices provided in the `sites` vector. The function returns
+			* a pair consisting of the modified base vector and the resulting value after applying the operations.
+			*
+			* @tparam _T The type of the value to be returned (e.g., double, std::complex<double>).
+			* @param base_vec The initial base vector on which the operations will be applied.
+			* @param _Ns The size of the system (number of sites).
+			* @param sites A vector of site indices where the operations will be applied.
+			* @return A pair consisting of the modified base vector and the resulting value.
+			*/
+			template <typename _T>
+			std::pair<u64, _T> sig_f(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
+			{
+				_T _val = 1.0;
+				for (size_t i = 0; i < sites.size(); ++i)
+				{
+					if (i % 2 == 1)
+					{
+						for (auto const& site : sites)
+						{
+							base_vec = flip(base_vec, _Ns - 1 - site);
+							_val *= Operators::_SPIN;
+						}
+					}
+					else
+					{
+						for (auto const& site : sites)
+						{
+							_val *= checkBit(base_vec, _Ns - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
+						}
+					}
+				}
+				return std::make_pair(base_vec, _val);
+			}
+
+			/**
+			* @brief Applies a series of quantum spin operations (X and Z) on a base vector.
+			*
+			* This function applies a series of quantum spin operations (X and Z) on a given base vector.
+			* The operations are applied based on the indices provided in the `sites` vector. The function returns
+			* a pair consisting of the modified base vector and the resulting value after applying the operations.
+			*
+			* @tparam _T The type of the value to be returned (e.g., double, std::complex<double>).
+			* @param base_vec The initial base vector on which the operations will be applied.
+			* @param _Ns The size of the system (number of sites).
+			* @param sites A vector of site indices where the operations will be applied.
+			* @return A pair consisting of the modified base vector and the resulting value.
+			*/
+			template <typename _T>
+			std::pair<_OP_V_T, _T> sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
+			{
+				_T _val = 1.0;
+				_OP_V_T _base_vec = base_vec;
+				for (size_t i = 0; i < sites.size(); ++i)
+				{
+					if (i % 2 == 1)
+					{
+						for (auto const& site : sites)
+						{
+							flip(_base_vec, site, 0, _SPIN);
+							_val *= Operators::_SPIN;
+						}
+					}
+					else
+					{
+						for (auto const& site : sites)
+							_val *= checkBit(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+					}
+				}
+				return std::make_pair(_base_vec, _val);
+			}
+
+			/**
+			* @brief Applies a series of quantum spin operations (X and Z) on a base vector with a reference vector.
+			*
+			* This function applies a series of quantum spin operations (X and Z) on a given base vector,
+			* using a reference vector to store intermediate results. The operations are applied based on the indices
+			* provided in the `sites` vector. The function returns a pair consisting of the modified reference vector
+			* and the resulting value after applying the operations.
+			*
+			* @tparam _T The type of the value to be returned (e.g., double, std::complex<double>).
+			* @param base_vec The initial base vector on which the operations will be applied.
+			* @param _Ns The size of the system (number of sites).
+			* @param sites A vector of site indices where the operations will be applied.
+			* @param _ref A reference vector to store intermediate results.
+			* @return A pair consisting of the modified reference vector and the resulting value.
+			*/
+			template <typename _T>
+			std::pair<_OP_V_T, _T> sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+			{
+				_T _val = 1.0;
+				if (_ref.size() != base_vec.size())
+					_ref = base_vec;
+
+				for (size_t i = 0; i < sites.size(); ++i)
+				{
+					if (i % 2 == 1)
+					{
+						for (auto const& site : sites)
+						{
+							flip(_ref, site, 0, _SPIN);
+							_val *= Operators::_SPIN;
+						}
+					}
+					else
+						for (auto const& site : sites)
+							_val *= checkBit(_ref, site) ? Operators::_SPIN : -Operators::_SPIN;
+				}
+				return std::make_pair(_ref, _val);
+			}
+
+			// template instantiation
+			template std::pair<u64, double> sig_f<double>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+			template std::pair<u64, std::complex<double>> sig_f<std::complex<double>>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+			template std::pair<_OP_V_T, double> sig_f<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+			template std::pair<_OP_V_T, std::complex<double>> sig_f<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+			template std::pair<_OP_V_T, double> sig_f<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+			template std::pair<_OP_V_T, std::complex<double>> sig_f<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+
+			// operator 
+			template <typename _T>
+			Operators::Operator<_T> sig_f(size_t _Ns, const v_1d<uint>& sites)
+			{
+				// create the function
+				_GLB<_T> fun_ 		= [_Ns, sites](u64 state) 			{ return Flux::sig_f<_T>(state, _Ns, sites); };
+				_GLB_V<_T> funV_ 	= [_Ns, sites](_OP_V_T_CR state) 	{ return Flux::sig_f<_T>(state, _Ns, sites); };
+
+				// save on which elements the operator acts (for the sake of the correctness)
+				u64 _acts = 0;
+				// set the bitmask on the state, remember that this is counted from the left|
+				// the first position is leftwise 0, the last is leftwise Ns - 1
+				for (auto const& site : sites)
+					_acts |= 1 << (_Ns - 1 - site);
+
+				// set the operator
+				Operators::Operator<_T> _op(_Ns, 1.0, fun_, funV_);
+				_op.setActOn(_acts);
+				_op.setNameS("Flux");
+				return _op;
+			}
+
+			template Operators::Operator<double> sig_f(size_t _Ns, const v_1d<uint>& sites);
+			template Operators::Operator<std::complex<double>> sig_f(size_t _Ns, const v_1d<uint>& sites);
+		};
+
+		// #############################################################################################
 
 		namespace RandomSuperposition 
 		{
@@ -447,39 +1219,189 @@ namespace Operators
 			}
 
 		};
+
+		// #############################################################################################
+
+		/**
+		* @brief Calculates the Fourier transform of spin operators for a given momentum q
+		* 
+		* This function computes the Fourier transform of spin operators (sigma+/sigma-) 
+		* for a specific momentum q in a spin chain system. It evaluates the operation 
+		* on a basis state and returns both the resulting state and its coefficient.
+		* 
+		* @tparam _T Template parameter for the coefficient type (typically double or complex<double>)
+		* @param base_vec The input basis state represented as a binary number
+		* @param _Ns The total number of sites in the system
+		* @param sites Vector containing the site indices to apply the operator
+		* @param _q The momentum number
+		* 
+		* @return std::pair<u64, _T> where:
+		*         - first: The resulting basis state (unchanged in this case)
+		*         - second: The coefficient after applying the operator
+		* 
+		* @note The function includes phase factors exp(ikr) where k = 2π*q/N
+		* @note The result is normalized by 1/sqrt(N) where N is the number of sites
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, const v_1d<uint>& sites, double _k)
+		{
+			_T _val = 1.0;
+			for (auto const& site : sites)
+			{
+				cpx _valin	= 	Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(base_vec, _val / std::sqrt(sites.size()));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (u64, size_t, const v_1d<uint>&, double), u64);
+		// ############################################################################################
+		
+		/**
+		* @brief Calculates the Fourier transform of spin operators for a given quantum state
+		* 
+		* This function computes the momentum space representation of spin operators
+		* by performing a Fourier transform on the real space spin configuration.
+		* 
+		* @tparam _T Template parameter for return value type (typically double or complex<double>)
+		* @param base_vec Input state represented as a bit string where 1/0 corresponds to up/down spins
+		* @param _Ns Number of lattice sites/spins in the system
+		* @param _q Momentum index q for the Fourier transform
+		* @return std::pair<u64,_T> Pair containing:
+		*         - First element: The unchanged input state (base_vec)
+		*         - Second element: Fourier transformed value normalized by sqrt(N)
+		* 
+		* The function:
+		* 1. Iterates through each site
+		* 2. Determines spin value (+/-S) based on bit value
+		* 3. Multiplies by phase factor exp(ikx)
+		* 4. Accumulates the sum and normalizes by sqrt(N)
+		*/
+		template <typename _T>
+		std::pair<u64, _T> sig_k(u64 base_vec, size_t _Ns, double _k)
+		{
+			_T _val = 1.0;
+			for(size_t site = 0; site < _Ns; ++site)
+			{
+				cpx _valin	= 	Binary::check(base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(base_vec, _val / std::sqrt(_Ns));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (u64, size_t, double), u64);
+
+		// #############################################################################################
+
+		/**
+		* @brief Calculates quantum spin operator with momentum q
+		* 
+		* This template function computes the quantum spin operator with momentum q for a given basis vector.
+		* It applies the spin operator to specified sites and includes phase factors based on momentum q.
+		* 
+		* @tparam _T The numeric type used for calculations (typically double or complex<double>)
+		* @param base_vec Input basis vector to apply the operator to
+		* @param _Ns Total number of sites in the system
+		* @param sites Vector containing the site indices to apply the operator
+		* @param _q Momentum quantum number
+		* 
+		* @return std::pair containing:
+		*         - first: The resulting basis vector after operator application
+		*         - second: The corresponding coefficient/value (_T type)
+		* 
+		* @note The function normalizes the result by dividing by sqrt(number of sites)
+		* @note Uses TWOPI constant and applies exp(ikx) phase factors
+		*/
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, double _k)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for (auto const& site : sites)
+			{
+				cpx _valin	= 	Binary::check(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(_base_vec, _val / std::sqrt(sites.size()));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (_OP_V_T_CR, size_t, const v_1d<uint>&, double), _OP_V_T)
+
+		// #############################################################################################
+
+		template <typename _T>
+		std::pair<_OP_V_T, _T> sig_k(_OP_V_T_CR base_vec, size_t _Ns, double _k)
+		{
+			_T _val = 1.0;
+			_OP_V_T _base_vec = base_vec;
+			for(size_t site = 0; site < _Ns; ++site)
+			{
+				cpx _valin	= 	Binary::check(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+				_valin 		*= 	std::exp(std::complex<double>(0.0, 1.0) * _k * (double)site);
+				_val 		+= 	algebra::cast<_T>(_valin);
+			}
+			return std::make_pair(_base_vec, _val / std::sqrt(_Ns));
+		}
+		// template instantiation
+		OP_TMPLT_INST_PAIR(sig_k, , (_OP_V_T_CR, size_t, double), _OP_V_T)
+
+		// #############################################################################################
+
+		// operator
+		template <typename _T>
+		Operators::Operator<_T> sig_k(size_t _Ns, const v_1d<uint>& _sites, double _k)
+		{
+			_GLB<_T> fun_		= [_Ns, _sites, _k](u64 state) { return sig_k<_T>(state, _Ns, _sites, _k); };
+			_GLB_V<_T> funV_ 	= [_Ns, _sites, _k](_OP_V_T_CR state) { return sig_k<_T>(state, _Ns, _sites, _k); };
+			u64 _acts			= (ULLPOW(_Ns)) - 1;
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+			_op.setActOn(_acts);
+			_op.setModifiesState(false);
+
+			// set the name
+			const uint _q 		= (uint)std::round(_k * _Ns / TWOPI);
+			_op.setNameS("sigk_" + std::to_string(_q));
+			return _op;
+		}
+		// template instantiation
+		OP_TMPLT_INST_OPG(sig_k, , (size_t, const v_1d<uint>&, double), double);
+		// #############################################################################################
+		
+		template <typename _T>
+		Operators::Operator<_T> sig_k(size_t _Ns, double _k)
+		{	
+			_GLB<_T> fun_		= [_Ns, _k](u64 state) { return sig_k<_T>(state, _Ns, _k); };
+			_GLB_V<_T> funV_ 	= [_Ns, _k](_OP_V_T_CR state) { return sig_k<_T>(state, _Ns, _k); };
+			u64 _acts			= (ULLPOW(_Ns)) - 1;
+			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
+			_op.setActOn(_acts);
+			_op.setModifiesState(false);
+
+			// set the name
+			const uint _q 		= (uint)std::round(_k * _Ns / TWOPI);
+			_op.setNameS("sigk_" + std::to_string(_q));
+			return _op;
+		}
+		// template instantiation
+		OP_TMPLT_INST_OPG(sig_k, , (size_t, double), double);
+		// #############################################################################################
+
 	};
-
-
-	// definitions of the tamplates with given types
-
-	// sigx - double 
-	template std::pair<u64, double> SpinOperators::sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template std::pair<_OP_V_T, double> SpinOperators::sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, size_t _part);
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_x(size_t _Ns);
-	template Operators::Operator<double, uint> SpinOperators::sig_x_l(size_t _Ns);
-	// sigz - double
-	template std::pair<u64, double> SpinOperators::sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template std::pair<_OP_V_T, double> SpinOperators::sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, size_t _part);
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<double> SpinOperators::sig_z(size_t _Ns);
-	template Operators::Operator<double, uint> SpinOperators::sig_z_l(size_t _Ns);
-	// sigx - complex
-	template std::pair<u64, std::complex<double>> SpinOperators::sig_x(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template std::pair<_OP_V_T, std::complex<double>> SpinOperators::sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, size_t _part);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_x(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_x_l(size_t _Ns);
-	// sigz - complex
-	template std::pair<u64, std::complex<double>> SpinOperators::sig_z(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template std::pair<_OP_V_T, std::complex<double>> SpinOperators::sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, size_t _part);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns, const v_1d<uint>& sites);
-	template Operators::Operator<std::complex<double>> SpinOperators::sig_z(size_t _Ns);
-	template Operators::Operator<std::complex<double>, uint> SpinOperators::sig_z_l(size_t _Ns);
+	// sigx 
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t, size_t),);
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t, const v_1d<uint>&),);
+	OP_TMPLT_INST_OPG(sig_x, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPL(sig_x_l, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPC(sig_x_c, SpinOperators::, (size_t),);
+	// sigz
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t, size_t),);
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t, const v_1d<uint>&),);
+	OP_TMPLT_INST_OPG(sig_z, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPL(sig_z_l, SpinOperators::, (size_t),);
+	OP_TMPLT_INST_OPC(sig_z_c, SpinOperators::, (size_t),);
 
 	// ##############################################################################################################################
 
@@ -778,6 +1700,22 @@ namespace Operators
 	}
 
 }
+
+// ##############################################################################################################################
+namespace Operators
+{
+
+
+
+	// ##########################################################################################################################
+
+
+
+};
+
+// ##############################################################################################################################
+
+
 
 // ##############################################################################################################################
 

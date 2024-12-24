@@ -88,11 +88,11 @@
         "**/.cmake": true
     },
     "explorerExclude.backup": {},
-    "cmake.sourceDirectory": "/home/klimak/Codes/QuantumEigenSolver/cpp/library",
+    "cmake.sourceDirectory": "/Users/makskliczkowski/Codes/QuantumEigenSolver/cpp/library",
     "C_Cpp.intelliSenseEngineFallback": "enabled",
-    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
     "autoHide.autoHideSideBar": true,
     "autoHide.autoHidePanel": true,
     "autoHide.autoHideAuxiliaryBar": true,
-    "notebook.stickyScroll.enabled": true
+    "notebook.stickyScroll.enabled": true,
+    "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json"
 }
