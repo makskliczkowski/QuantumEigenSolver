@@ -25,21 +25,30 @@ icpx ./main.cpp ./operators.cpp ./user_interface.cpp            \
         ./src/nqs/nqs_opt.cpp                                   \
         ./src/nqs/nqs_lower.cpp                                 \
         ./src/nqs/nqs_sampling.cpp                              \
+        ./src/nqs/nqs_evo.cpp                                   \
         ./src/nqs/rbm/rbm.cpp                                   \
-        ./src/nqs/rbm/rbm_spin.cpp                             \
+        ./src/nqs/rbm/rbm_spin.cpp                              \
         ./src/nqs/operators/nqs_operator.cpp                    \
         ./src/operator_parser.cpp                               \
         ${CPPSOURCE}/common.cpp ${CPPSOURCE}/directories.cpp    \
         ${CPPSOURCE}/exceptions.cpp ${CPPSOURCE}/str.cpp        \
         ${CPPSOURCE}/ui.cpp                                     \
         ${CPPSOURCE}/time.cpp                                   \
+        ${CPPSOURCE}/Random/montecarlo.cpp                      \
+        ${CPPSOURCE}/lattices.cpp                               \
         ${CPPSOURCE}/Lattices/hexagonal.cpp                     \
+        ${CPPSOURCE}/Lattices/honeycomb.cpp                     \
         ${CPPSOURCE}/LinearAlgebra/solvers.cpp                  \
         ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_cg.cpp       \
+        ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arnoldi.cpp  \
+        ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_arma.cpp     \
+        ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_direct.cpp   \
+        ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_pseudo.cpp   \
         ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minres.cpp   \
         ${CPPSOURCE}/LinearAlgebra/Solvers/solvers_minresqlp.cpp\
         ${CPPSOURCE}/LinearAlgebra/preconditioners.cpp          \
         ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp                 \
+        ${CPPSOURCE}/LinearAlgebra/ode.cpp                      \
         ${CPPSOURCE}/Lattices/square.cpp -o ./qsolver.o         \
         -I${ARMADIR}/include/ -pthread -lhdf5 -Wall             \
         -Wformat=0 -lmkl_intel_lp64 -lmkl_core -lmkl_core       \

@@ -598,7 +598,7 @@ namespace Operators
 
 		// *= Operator
 		template <typename _T2 = _T>
-		constexpr GeneralOperator& operator*=(const _T2& scalar) noexcept {
+		GeneralOperator& operator*=(const _T2& scalar) noexcept {
 			this->eigVal_ *= algebra::cast<_T>(scalar);
 			return *this;
 		}
@@ -615,7 +615,7 @@ namespace Operators
 
 		// * Operator (Const lvalue version)
 		template <typename _T2 = _T>
-		constexpr GeneralOperator operator*(const _T2& scalar) const & {
+		GeneralOperator operator*(const _T2& scalar) const & {
 			GeneralOperator result(*this); 				
 			result *= algebra::cast<_T>(scalar); 
 			return result;
