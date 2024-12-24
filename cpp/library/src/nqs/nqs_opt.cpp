@@ -400,7 +400,7 @@ using NQS_TRAIN_PAIR = std::pair<arma::Col<_T>, arma::Col<_T>>;
 *         over the Monte Carlo samples.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-NQS<_spinModes, _Ht, _T, _stateType>::Container_pair_t NQS<_spinModes, _Ht, _T, _stateType>::train(const MonteCarlo::MCS_train_t& _par, 
+typename NQS<_spinModes, _Ht, _T, _stateType>::Container_pair_t NQS<_spinModes, _Ht, _T, _stateType>::train(const MonteCarlo::MCS_train_t& _par, 
                                                                                             bool quiet, 
                                                                                             bool randomStart, 
                                                                                             clk::time_point _t, 

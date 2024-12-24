@@ -735,11 +735,10 @@ namespace Operators
 
 		// -------------- O P E R A T O R ( ) -------------
 		
-		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType				= 0;		// operator acting on the states
-		virtual auto operator()(u64 s, _Ts... a)		-> ReturnType					= 0;		// operator acting on the states			
-		virtual auto operator()(_VT_CR s, _Ts... a)		const -> ReturnTypeV			= 0;		// operator acting on the vectors
-		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV					= 0;		// operator acting on the vectors
-
+		virtual auto operator()(u64 s, _Ts... a)		const -> ReturnType				{ return this->fun_(s, a...); };		// operator acting on the states
+		virtual auto operator()(u64 s, _Ts... a)		-> ReturnType					{ return this->fun_(s, a...); };		// operator acting on the states		
+		virtual auto operator()(_VT_CR s, _Ts... a)		const -> ReturnTypeV			{ return this->funV_(s, a...); };		// operator acting on the vectors
+		virtual auto operator()(_VT_CR s, _Ts... a)		-> ReturnTypeV					{ return this->funV_(s, a...); };		// operator acting on the vectors
 		// ----------------------------------------------------------------------------------------------------		
 
 		template<bool _standarize = false, typename _TinMat = _T, template <class _TM = _TinMat> class _MatType, typename _InT = u64>
