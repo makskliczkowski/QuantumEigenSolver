@@ -52,6 +52,15 @@ if [ -n "$PASSWORD" ] && ! command -v sshpass &> /dev/null; then
   exit 1
 fi
 
+# Cleanup function for Ctrl+C
+cleanup() {
+  echo "Script terminated by user (Ctrl+C). Cleaning up..."
+  exit 130
+}
+
+# Trap SIGINT (Ctrl+C) and call cleanup
+trap cleanup SIGINT
+
 # Function to perform rsync
 perform_rsync() {
   local SRC=$1
