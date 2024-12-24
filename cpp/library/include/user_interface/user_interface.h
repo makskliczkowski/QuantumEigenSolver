@@ -575,6 +575,7 @@ namespace UI_PARAMS
 #define RUN_CPX_REAL(TAKE_COMPLEX, _F, _MREAL, _MCPX) if (TAKE_COMPLEX) _F(_MCPX); else _F(_MREAL);
 // default containers
 #define UI_DEF_VMAT(Type, _sizex, _sizey, _sizez) VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5)
+#define UI_DEF_VMAT_COND(Type, _sizex, _sizey, _sizez, _cond) _cond ? VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5) : VMAT<Type>(0, 0, 0, arma::fill::ones, -1e5)
 #define UI_DEF_MAT_D(sizex, sizey) -1e5 * arma::ones<arma::Mat<double>>(sizex, sizey)
 #define UI_DEF_MAT_D_COND(sizex, sizey, cond) cond ? arma::Mat<double>(sizex, sizey, arma::fill::ones) : arma::Mat<double>()
 #define UI_DEF_MAT_D_CONDT(sizex, sizey, cond, T) cond ? arma::Mat<T>(sizex, sizey, arma::fill::ones) : arma::Mat<T>()

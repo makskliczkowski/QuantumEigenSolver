@@ -80,9 +80,9 @@ namespace Ultrametric_types
             { 1.000, {0.092920178, 0.051333115, 0.025161331, 0.013628306, 0.007006992, 0.003588097, 0.001890809, 0.000967919, 0.000492987,  }}};
 		
         static int getIndex(int _Ns)                               { return _Ns - minNs_; };
-        static double getBandwidth(double alpha, int _Ns)          { return bandwidth_.contains(alpha) ? bandwidth_[alpha][getIndex(_Ns)] : bandwidth_[alpha - 0.01][getIndex(_Ns)]; };
-        static double getVariance(double alpha, int _Ns)           { return variance_.contains(alpha) ? variance_[alpha][getIndex(_Ns)] : variance_[alpha - 0.01][getIndex(_Ns)]; };
-        static double getMeanLvlSpacing(double alpha, int _Ns)     { return mean_lvl_spacing.contains(alpha) ? mean_lvl_spacing[alpha][getIndex(_Ns)] : mean_lvl_spacing[alpha - 0.01][getIndex(_Ns)]; };
+        static double getBandwidth(double alpha, int _Ns)          { return bandwidth_.contains(alpha) ? bandwidth_[alpha][getIndex(_Ns)] : bandwidth_[0.600][getIndex(_Ns)]; };
+        static double getVariance(double alpha, int _Ns)           { return variance_.contains(alpha) ? variance_[alpha][getIndex(_Ns)] : variance_[0.600][getIndex(_Ns)]; };
+        static double getMeanLvlSpacing(double alpha, int _Ns)     { return mean_lvl_spacing.contains(alpha) ? mean_lvl_spacing[alpha][getIndex(_Ns)] : mean_lvl_spacing[0.600][getIndex(_Ns)]; };
 	} UM_default;
 
 

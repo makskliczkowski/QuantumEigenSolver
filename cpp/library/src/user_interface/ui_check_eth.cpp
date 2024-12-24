@@ -5,6 +5,21 @@
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/**
+* @brief Executes the ETH (Eigenstate Thermalization Hypothesis) simulation based on the chosen function.
+*
+* This function sets up the necessary models and determines whether to use complex numbers based on the model type.
+* It then defines the models and executes the appropriate ETH-related function based on the value of `chosenFun`.
+*
+* The function handles the following cases for `chosenFun`:
+* - 40: Placeholder for a potential ETH check function (currently commented out).
+* - 42, 43: Executes `checkETH_statistics` with either real or complex Hamiltonian.
+* - 45, 46: Executes `checkETH_time_evo` with either real or complex Hamiltonian.
+*
+* If the models cannot be defined successfully, the function returns early.
+*
+* @note The function uses the macro `RUN_CPX_REAL` to handle the execution of functions with either real or complex Hamiltonians.
+*/
 void UI::makeSimETH()
 {
 	// define the models - we don't need complex numbers (only for the RP model)
@@ -196,7 +211,7 @@ void UI::ui_eth_randomize(std::shared_ptr<Hamiltonian<_T>> _H, int _r, uint _spi
 
 // ###############################################################################################
 
-/*
+/**
 * @brief Check the ETH statistics for the matrix elements
 * @param _startElem: start index
 * @param _stopElem: stop index
@@ -449,8 +464,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// histograms for other epsilons - for all 
 	v_2d<HistogramAverage<double>> _histAvEps(std::max(this->modP.eth_end_.size(), (size_t)1), v_1d<HistogramAverage<double>>(_ops.size(), HistogramAverage<double>(1)));
 	v_2d<HistogramAverage<double>> _histAvTypicalEps(std::max(this->modP.eth_end_.size(), (size_t)1), v_1d<HistogramAverage<double>>(_ops.size(), HistogramAverage<double>(1)));
-	auto _fidelitySusceptibility 	= UI_DEF_MAT_D_CONDT(_Nh, this->modP.getRanReal(), this->modP.eth_susc_, _T);	// with regularization
-	auto _fidelitySusceptibilityZ 	= UI_DEF_MAT_D_CONDT(_Nh, this->modP.getRanReal(), this->modP.eth_susc_, _T);	// without regularization
+	auto _fidelitySusceptibility 	= UI_DEF_VMAT_COND(_T, _ops.size(), _Nh, this->modP.getRanReal(), this->modP.eth_susc_);	// with regularization
+	auto _fidelitySusceptibilityZ 	= UI_DEF_VMAT_COND(_T, _ops.size(), _Nh, this->modP.getRanReal(), this->modP.eth_susc_);	// without regularization
 	
 	// nbins operators 
 	const size_t _nbinOperators 	= (size_t)(20 * std::log2(_Nh));
@@ -504,8 +519,12 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			if (this->modP.eth_susc_)
 			{
-				saveStat("fidelity_susceptibility/mu", _fidelitySusceptibility);
-				saveStat("fidelity_susceptibility/0", _fidelitySusceptibilityZ);
+				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+				{
+					auto _name = _measure.getOpGN(_opi);
+					saveStat(_name + "/fidelity_susceptibility/mu", algebra::cast<double>(_fidelitySusceptibility[_opi]));
+					saveStat(_name + "/fidelity_susceptibility/0", algebra::cast<double>(_fidelitySusceptibilityZ[_opi]));
+				}
 			}
 
 			if (this->modP.eth_ipr_)
@@ -524,8 +543,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
 					auto _name = _measure.getOpGN(_opi);
-					saveStat(_name, algebra::cast<double>(_offdiagElems[_opi]), _opi > 0);
-					saveStat(_name, algebra::cast<double>(_offdiagElemsLow[_opi]), _opi > 0);
+					saveStat(_name + "/offdiag", algebra::cast<double>(_offdiagElems[_opi]), _opi > 0 || this->modP.eth_susc_);
+					saveStat(_name + "/offdiag", algebra::cast<double>(_offdiagElemsLow[_opi]), _opi > 0 || this->modP.eth_susc_);
 				}
 				saveStat("omega", _offdiagElemsOmega);
 				saveStat("omega", _offdiagElemsOmegaLow);
@@ -854,9 +873,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					// fidelity susceptability
 					if (this->modP.eth_susc_)
 					{
-						auto _fidelitySusceptibilityIn = _fidelitySusceptibility.col(_r);
+						auto _fidelitySusceptibilityIn = _fidelitySusceptibility[_opi].col(_r);
 						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, _bw / (unsigned long long)_Nh, _fidelitySusceptibilityIn);
-						auto _fidelitySusceptibilityZIn = _fidelitySusceptibilityZ.col(_r);
+						auto _fidelitySusceptibilityZIn = _fidelitySusceptibilityZ[_opi].col(_r);
 						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, 0.0, _fidelitySusceptibilityZIn);
 					}
 
