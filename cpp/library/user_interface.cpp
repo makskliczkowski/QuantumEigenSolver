@@ -106,6 +106,10 @@ void UI::parseModel(int argc, cmdArg& argv)
 		Ns *= 2;
 	// SIMULATION
 	{
+		// OTHER
+		{
+			SETOPTION(symP, checkpoint);
+		}
 		// NEURAL QUANTUM STATE PARAMETERS 
 		{
 			// training parameters

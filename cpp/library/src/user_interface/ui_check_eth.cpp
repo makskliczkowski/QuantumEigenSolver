@@ -475,6 +475,9 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	// create the saving function
 	std::function<void(uint)> _saver = [&](uint _r)
 		{
+			if (_r == 0)
+				return;
+			const bool _use_subview = _r < modP.getRanReal();
 
 			auto saveAny = [&](const std::string& fname, const std::string& name, const auto& data, bool append = true) {
 				saveAlgebraic(dir, fname + randomStr + extension, data, name, append);
@@ -496,25 +499,25 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				saveAlgebraic(dir, "dist" + randomStr + extension, data, name, append);
 			};
 
-			saveStat("gap_ratio", _gaps, false);
-			saveStat("gap_ratios", _gapsall);
-			saveStat("mean_energy", _meanEn);
-			saveStat("mean_energy_index", _meanEnIdx);
-			saveStat("mean_level_spacing", _meanlvl);
-			saveStat("bandwidth", _bandwidth);
-			saveStat("H2", _H2);
-			saveStat("energy", _en);
+			saveStat("gap_ratio", _use_subview ? _gaps.subvec(0, _r) : _gaps, false);
+			saveStat("gap_ratios", _use_subview ? _gapsall.rows(0, _r) : _gapsall);
+			saveStat("mean_energy", _use_subview ? _meanEn.subvec(0, _r) : _meanEn);
+			saveStat("mean_energy_index", _use_subview ? _meanEnIdx.subvec(0, _r) : _meanEnIdx);
+			saveStat("mean_level_spacing", _use_subview ? _meanlvl.subvec(0, _r) : _meanlvl);
+			saveStat("bandwidth", _use_subview ? _bandwidth.subvec(0, _r) : _bandwidth);
+			saveStat("H2", _use_subview ? _H2.subvec(0, _r) : _H2);
+			saveStat("energy", _use_subview ? _en.cols(0, _r) : _en);
 
 			if (this->modP.eth_entro_)
 			{
-				saveEntro("vN/half", _entroHalf, false);
-				saveEntro("vN/first", _entroFirst);
-				saveEntro("vN/last", _entroLast);
-				saveEntro("renyi/2.0/first", _entroRFirst);
-				saveEntro("renyi/2.0/half", _entroRHalf);
-				saveEntro("renyi/2.0/last", _entroRLast);
-				saveEntro("schmid/first", _schmidFirst);
-				saveEntro("schmid/last", _schmidLast);
+				saveEntro("vN/half", _use_subview ? _entroHalf.cols(0, _r) : _entroHalf, false);
+				saveEntro("vN/first", _use_subview ? _entroFirst.cols(0, _r) : _entroFirst);
+				saveEntro("vN/last", _use_subview ? _entroLast.cols(0, _r) : _entroLast);
+				saveEntro("renyi/2.0/first", _use_subview ? _entroRFirst.cols(0, _r) : _entroRFirst);
+				saveEntro("renyi/2.0/half", _use_subview ? _entroRHalf.cols(0, _r) : _entroRHalf);
+				saveEntro("renyi/2.0/last", _use_subview ? _entroRLast.cols(0, _r) : _entroRLast);
+				saveEntro("schmid/first", _use_subview ? _schmidFirst.cols(0, _r) : _schmidFirst);
+				saveEntro("schmid/last", _use_subview ? _schmidLast.cols(0, _r) : _schmidLast);
 			}
 
 			if (this->modP.eth_susc_)
@@ -522,32 +525,37 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
 					auto _name = _measure.getOpGN(_opi);
-					saveStat(_name + "/fidelity_susceptibility/mu", algebra::cast<double>(_fidelitySusceptibility[_opi]));
-					saveStat(_name + "/fidelity_susceptibility/0", algebra::cast<double>(_fidelitySusceptibilityZ[_opi]));
+					saveStat(_name + "/fidelity_susceptibility/mu", _use_subview ? _fidelitySusceptibility[_opi].cols(0, _r) : _fidelitySusceptibility[_opi]);
+					saveStat(_name + "/fidelity_susceptibility/0", _use_subview ? _fidelitySusceptibilityZ[_opi].cols(0, _r) : _fidelitySusceptibilityZ[_opi]);
 				}
 			}
 
 			if (this->modP.eth_ipr_)
 			{
-				saveAny("ipr", "info/0.1", _e_ipr01, false);
-				saveAny("ipr", "info/0.5", _e_ipr05);
-				saveAny("ipr", "info/1.0", _e_ipr1);
-				saveAny("ipr", "info/2.0", _e_ipr2);
+				saveAny("ipr", "info/0.1", _use_subview ? _e_ipr01.cols(0, _r) : _e_ipr01, false);
+				saveAny("ipr", "info/0.5", _use_subview ? _e_ipr05.cols(0, _r) : _e_ipr05);
+				saveAny("ipr", "info/1.0", _use_subview ? _e_ipr1.cols(0, _r) : _e_ipr1);
+				saveAny("ipr", "info/2.0", _use_subview ? _e_ipr2.cols(0, _r) : _e_ipr2);
 			}
 
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-				saveAny("diag", _measure.getOpGN(_opi), algebra::cast<double>(_diagElems[_opi]), _opi > 0);
+			{
+				if (_use_subview)
+					saveAny("diag", _measure.getOpGN(_opi), _diagElems[_opi].cols(0, _r), _opi > 0);
+				else
+					saveAny("diag", _measure.getOpGN(_opi), _diagElems[_opi], _opi > 0);
+			}
 
 			if (this->modP.eth_offd_)
 			{
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
 					auto _name = _measure.getOpGN(_opi);
-					saveStat(_name + "/offdiag", algebra::cast<double>(_offdiagElems[_opi]), _opi > 0 || this->modP.eth_susc_);
-					saveStat(_name + "/offdiag", algebra::cast<double>(_offdiagElemsLow[_opi]), _opi > 0 || this->modP.eth_susc_);
+					saveStat(_name + "/offdiag", _use_subview ? (_offdiagElems[_opi].cols(0, _r)) : (_offdiagElems[_opi]), _opi > 0 || this->modP.eth_susc_);
+					saveStat(_name + "/offdiag", _use_subview ? (_offdiagElemsLow[_opi].cols(0, _r)) : (_offdiagElemsLow[_opi]), _opi > 0 || this->modP.eth_susc_);
 				}
-				saveStat("omega", _offdiagElemsOmega);
-				saveStat("omega", _offdiagElemsOmegaLow);
+				saveStat("omega", _use_subview ? _offdiagElemsOmega.cols(0, _r) : _offdiagElemsOmega);
+				saveStat("omega", _use_subview ? _offdiagElemsOmegaLow.cols(0, _r) : _offdiagElemsOmegaLow);
 			}
 
 			for (uint _opi = 0; _opi < _ops.size(); ++_opi)
@@ -613,7 +621,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 		};
 
 	// ---------------------------------------------------------------
-	// go through realizations
+	
+	long _single_run_seconds 		= 0l;
 	for (int _r = 0; _r < this->modP.getRanReal(); ++_r)
 	{
 		// ----------------------------------------------------------------------------
@@ -881,7 +890,6 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 					// ############## finalize statistics ##############
 
-					LOGINFO("Finalizing statistics for operator: " + _opsN[_opi], LOG_TYPES::TRACE, 3);
 					// offdiagonal
 					{
 						for (uint ii = 0; ii < 6; ii++)
@@ -905,9 +913,21 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			END_CATCH_HANDLER("Operators failed:", break;)
 		}
 
+		// -----------------------------------------------------------------------------
+
+		_single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
+		LOGINFO("Single run time: " + STR(_single_run_seconds) + " seconds", LOG_TYPES::TRACE, 1);
+
 		// save the checkpoints
-		if (check_saving_size(_Nh, _r))
+		if (check_saving_size(_Nh, _r) && symP.checkpoint_)
 			_saver(_r);
+
+		// remaining time saver
+		if (Slurm::is_overtime(_single_run_seconds * 2)) 
+		{
+			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
+			break;
+		}
 
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
 	}

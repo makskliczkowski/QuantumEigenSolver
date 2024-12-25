@@ -403,6 +403,8 @@ namespace UI_PARAMS
 	* @warning By default, the parameters are -maximal integer in order to tell that no symmetry is used
 	*/
 	struct SymP {
+
+		// symmetry parameters
 		UI_PARAM_CREATE_DEFAULT(S, bool, false);
 		UI_PARAM_CREATE_DEFAULT(k, int, -INT_MAX);
 		UI_PARAM_CREATE_DEFAULT(px, int, -INT_MAX);
@@ -410,6 +412,9 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(pz, int, -INT_MAX);
 		UI_PARAM_CREATE_DEFAULT(x, int, -INT_MAX);
 		UI_PARAM_CREATE_DEFAULT(U1, int, -INT_MAX);
+
+		// other
+		UI_PARAM_CREATE_DEFAULT(checkpoint, bool, true);
 
 		void setDefault() {
 			UI_PARAM_SET_DEFAULT(S);
@@ -419,6 +424,7 @@ namespace UI_PARAMS
 			UI_PARAM_SET_DEFAULT(pz);
 			UI_PARAM_SET_DEFAULT(x);
 			UI_PARAM_SET_DEFAULT(U1);
+			UI_PARAM_SET_DEFAULT(checkpoint);
 		}
 
 
