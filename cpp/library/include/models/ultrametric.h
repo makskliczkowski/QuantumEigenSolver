@@ -116,7 +116,11 @@ inline void Ultrametric<_T>::checkSizes()
 	this->Nout_ = this->Ns_ - this->Nin_;
 
 	if(this->a_.size() != this->Nout_)	
-		throw(std::invalid_argument("Ultrametric: the size of the coupling vector 'a' is not equal to the number of particles outside the dot."));
+	{
+		LOGINFO("Ultrametric: the size of the coupling vector 'a' is not equal to the number of particles outside the dot. Resizing...", LOG_TYPES::WARNING, 2);
+		auto _a = this->a_[0];
+		this->a_.resize(this->Nout_, _a);
+	}
 }
 
 // ##########################################################################################################################################
