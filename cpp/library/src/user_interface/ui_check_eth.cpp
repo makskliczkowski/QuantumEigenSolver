@@ -1233,7 +1233,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	// go through realizations
 	for (int _r = 0; _r < this->modP.getRanReal(); ++_r)
 	{
-		const arma::Col<_T>& _diagonal = _H->getDiag();
+		arma::Col<_T> _diagonal;
 		
 		// checkpoints etc
 		{
@@ -1244,8 +1244,9 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			this->ui_eth_randomize(_H, _r);
 			LOGINFO(_timer.point(STR(_r)), "Diagonalization", 1);
-
-			_initial_state_me = SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::SEEK, _Nh, _Ns, _H->getEnAv(), _diagonal);
+			// get the diagonal
+			_diagonal 			= _H->getDiag();
+			_initial_state_me 	= SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::SEEK, _Nh, _Ns, _H->getEnAv(), _diagonal);
 		}
 
 		// -----------------------------------------------------------------------------
