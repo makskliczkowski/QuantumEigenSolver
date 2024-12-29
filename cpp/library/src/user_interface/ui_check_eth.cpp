@@ -1311,11 +1311,24 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				LOGINFO(_timer.point(STR(_r) + ": time evolution"), "Time evolution: " + STR(_r), 3);
 			}
 		}
+		// -----------------------------------------------------------------------------
+
+		_single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
+		LOGINFO("Single run time: " + STR(_single_run_seconds) + " seconds", LOG_TYPES::TRACE, 1);
+
 		// save the checkpoints
-		if (check_saving_size(_Nh, _r))
+		if (check_saving_size(_Nh, _r) && symP.checkpoint_)
 			_saver(_r);
 
+		// remaining time saver
+		if (Slurm::is_overtime(_single_run_seconds * 2)) 
+		{
+			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
+			break;
+		}
+
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+		
 		// -----------------------------------------------------------------------------
 	}
 
