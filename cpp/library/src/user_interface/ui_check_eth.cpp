@@ -395,7 +395,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 	std::tie(_ops, _opsN)	= this->ui_eth_getoperators(_Nh, isQuadratic, isManyBody);
 
 	// get info about the model
-	std::string modelInfo = "", dir = "ETH_MAT_STAT", randomStr = "", extension = ".h5";
+	std::string modelInfo 	= "", dir = "ETH_MAT_STAT", randomStr = "", extension = ".h5";
 	this->get_inf_dir_ext_r(_H, dir, modelInfo, randomStr, extension);
 
 	// set the placeholder for the values to save (will save only the diagonal elements and other measures)
@@ -1122,7 +1122,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			}
 
 			// evolution
-#pragma omp parallel for num_threads(this->threadNum)
+#pragma omp parallel for num_threads(this->threadNum) schedule(dynamic)
 			for (int _ti = 0; _ti < _timespace.size(); _ti++)
 			{
 				const auto _time					= _timespace(_ti);
@@ -1132,19 +1132,18 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				for (uint _opi = 0; _opi < _ops.size(); ++_opi)
 				{
 					const cpx _rt					= arma::as_scalar(arma::cdot(_st, (_matrices[_opi] * _st))) * (_autocor ? _zerovalues[_opi] : 1.0);
-					if (!_append && !_uselog)
-						(*_timeEvolution)[_opi](_ti, _r)	= algebra::cast<_T>(_rt);
-					else if (!_append && _uselog)
-						(*_timeEvolution)[_opi](_ti, _r)	= std::log(std::abs(algebra::cast<_T>(_rt)));
-					else if (_append && !_uselog)
-						(*_timeEvolution)[_opi](_ti, _r)	+= algebra::cast<_T>(_rt);
-					else
-						(*_timeEvolution)[_opi](_ti, _r)	+= std::log(std::abs(algebra::cast<_T>(_rt)));
+					auto& _time_evo 				= (*_timeEvolution)[_opi](_ti, _r);
+					if (_append) {
+						_time_evo += _uselog ? std::log(std::abs(algebra::cast<_T>(_rt))) : algebra::cast<_T>(_rt);
+					} else {
+						_time_evo = _uselog ? std::log(std::abs(algebra::cast<_T>(_rt))) : algebra::cast<_T>(_rt);
+					}
 				}
 
 				// say the time
-				if (_ti % int(_timespace.size() / 10) == 0)
+				if (_ti % (std::max(1, static_cast<int>(_timespace.size() / 10))) == 0)
 					LOGINFO(VEQ(_ti) + "/" + STR(_timespace.size()), LOG_TYPES::TRACE, 3);
+				
 
 				// calculate the entanglement entropy for each site
 				if (this->modP.eth_entro_ && _entropyCalculate)
@@ -1313,7 +1312,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 		}
 		// -----------------------------------------------------------------------------
 
-		_single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
+		auto _single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
 		LOGINFO("Single run time: " + STR(_single_run_seconds) + " seconds", LOG_TYPES::TRACE, 1);
 
 		// save the checkpoints
@@ -1328,7 +1327,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 		}
 
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-		
+
 		// -----------------------------------------------------------------------------
 	}
 
