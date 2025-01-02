@@ -61,8 +61,8 @@ icpx ./main.cpp                                                 \
         -o qsolver                                              \
         -I${ARMADIR}/include/                                   \
         -pthread -lhdf5                                         \
-        -Wformat=0 -lmkl_intel_lp64 -lmkl_core                  \
-        -liomp5 -lpthread -lm -ldl                              \
+        -Wformat=0 -lmkl_intel_lp64 -lmkl_core -lmkl_core       \
+        -liomp5 -lpthread -lm -ldl -lmkl_sequential             \
         -lstdc++fs -std=c++2a -O3 -fopenmp                      \
         > compilation.txt 2>&1
 
