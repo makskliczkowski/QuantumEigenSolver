@@ -742,6 +742,8 @@ public:
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% S I M U L A T I O N %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+	bool remainingSlurmTime(int _r, Timer* _timer, long _single_run_time, long _job_time = -1, std::string _checkpoint = "START");
+
 	// ############################################### N Q S 
 
 	void makeSimNQS();

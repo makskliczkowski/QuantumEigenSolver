@@ -622,7 +622,8 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// ---------------------------------------------------------------
 	
-	long _single_run_seconds 		= 0l;
+	long _single_run_time 		= -1;
+	long _remaining_time		= -1;
 	for (int _r = 0; _r < this->modP.getRanReal(); ++_r)
 	{
 		// ----------------------------------------------------------------------------
@@ -883,7 +884,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 					if (this->modP.eth_susc_)
 					{
 						auto _fidelitySusceptibilityIn = _fidelitySusceptibility[_opi].col(_r);
-						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, _bw / (unsigned long long)_Nh, _fidelitySusceptibilityIn);
+						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, _bw / (unsigned long)_Nh, _fidelitySusceptibilityIn);
 						auto _fidelitySusceptibilityZIn = _fidelitySusceptibilityZ[_opi].col(_r);
 						SystemProperties::AGP::fidelity_susceptability_tot(_eigVal, _overlaps, 0.0, _fidelitySusceptibilityZIn);
 					}
@@ -915,21 +916,19 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 		// -----------------------------------------------------------------------------
 
-		_single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
-		LOGINFO("Single run time: " + STR(_single_run_seconds) + " seconds", LOG_TYPES::TRACE, 1);
+		// get single runtime
+		_single_run_time = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
+		LOGINFO("Single run time: " + STR(_single_run_time) + " seconds", LOG_TYPES::TRACE, 1);
 
 		// save the checkpoints
 		if (check_saving_size(_Nh, _r) && symP.checkpoint_)
 			_saver(_r);
 
-		// remaining time saver
-		if (!symP.checkpoint_ && (_Nh > ULLPOW(12)) && Slurm::is_overtime(_single_run_seconds * 2)) 
-		{
-			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
+		if (this->remainingSlurmTime(_r, &_timer, _single_run_time, _remaining_time))
 			break;
-		}
-
-		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
+			
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '%', 1);
+		// -----------------------------------------------------------------------------
 	}
 	_saver(this->modP.getRanReal());
 	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
@@ -982,14 +981,14 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	VMAT<_T> _diagonals					= UI_DEF_VMAT(_T, _ops.size(), _Nh, this->modP.getRanReal());
 	// save the time evolution here
 	VMAT<_T> _timeEvolutionME			= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.getRanReal());
-	VMAT<_T> _timeEvolutionME_AV, _timeEvolutionME_TP;		
-	size_t _timeEvolutionME_AV_num		= 20;
+	// VMAT<_T> _timeEvolutionME_AV, _timeEvolutionME_TP;		
+	// size_t _timeEvolutionME_AV_num		= 20;
 
 	// add the average over states
-	if (_Nh < ULLPOW(13)) {
-		_timeEvolutionME_AV				= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.getRanReal());
-		_timeEvolutionME_TP				= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.getRanReal());
-	}
+	// if (_Nh < ULLPOW(13)) {
+	// 	_timeEvolutionME_AV				= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.getRanReal());
+	// 	_timeEvolutionME_TP				= UI_DEF_VMAT(_T, _ops.size(), _timespace.size(), this->modP.getRanReal());
+	// }
 	arma::Mat<double> _timePEntro		= UI_DEF_MAT_D(_timespace.size(), this->modP.getRanReal());
 	// entropies to take
 	v_1d<int> _entropiesSites			= {1, int(_Ns / 2), (int)_Ns};
@@ -1141,7 +1140,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				}
 
 				// say the time
-				if (_ti % (std::max(1, static_cast<int>(_timespace.size() / 10))) == 0)
+				if (_ti % (std::max(1, static_cast<int>(_timespace.size() / 3))) == 0)
 					LOGINFO(VEQ(_ti) + "/" + STR(_timespace.size()), LOG_TYPES::TRACE, 3);
 				
 
@@ -1210,10 +1209,10 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				// evolution
 				saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolutionME[_opi], _name + "/ME", true);
 
-				if (_Nh < ULLPOW(13)) {
-					saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolutionME_AV[_opi], _name + "/mean", true);
-					saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolutionME_TP[_opi], _name + "/typ", true);
-				}
+				// if (_Nh < ULLPOW(13)) {
+				// 	saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolutionME_AV[_opi], _name + "/mean", true);
+				// 	saveAlgebraic(dir, "evo" + randomStr + extension, _timeEvolutionME_TP[_opi], _name + "/typ", true);
+				// }
 
 				// at zero
 				saveAlgebraic(dir, "evo" + randomStr + extension, _timeZeroME[_opi], _name + "/zero/ME", true);
@@ -1228,6 +1227,12 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 			LOGINFO("Checkpoint:" + STR(_r), LOG_TYPES::TRACE, 4);
 		};
+
+	// -----------------------
+	long _single_run_time 	= -1;
+	long _remaining_time	= Slurm::get_remaining_time();
+	_timer.checkpoint("START");
+	// -----------------------
 
 	// go through realizations
 	for (int _r = 0; _r < this->modP.getRanReal(); ++_r)
@@ -1292,42 +1297,38 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				_evolveState(_r, _initial_state_me, &_ldos_me, &_energydensitiesME,  
 					&_microcanonicalME, &_microcanonical2ME, &_diagonalME, &_timeEvolutionME, &_timeZeroME, _matrices, false, false, false);
 
-				if (_Nh < ULLPOW(13))
-				{
-					for (int ii = 0; ii < _timeEvolutionME_AV_num; ++ii)
-					{
-						LOGINFO(VEQ(ii), LOG_TYPES::TRACE, 2);
-						_initial_state_me = SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::RANDP, _Nh, _Ns, _H->getEnAv(), _diagonal);
-						_evolveState(_r, _initial_state_me, nullptr, nullptr, nullptr, nullptr, nullptr, &_timeEvolutionME_AV, nullptr, _matrices, false, ii != 0, false, true);
-						_evolveState(_r, _initial_state_me, nullptr, nullptr, nullptr, nullptr, nullptr, &_timeEvolutionME_TP, nullptr, _matrices, false, ii != 0, true, true);
-					}
-					for (uint _opi = 0; _opi < _ops.size(); ++_opi)
-					{
-						_timeEvolutionME_AV[_opi].col(_r) /= _timeEvolutionME_AV_num;
-						_timeEvolutionME_TP[_opi].col(_r) =	arma::exp(_timeEvolutionME_TP[_opi].col(_r) / _timeEvolutionME_AV_num);
-					}
-				}
+				// if (_Nh < ULLPOW(13))
+				// {
+				// 	for (int ii = 0; ii < _timeEvolutionME_AV_num; ++ii)
+				// 	{
+				// 		LOGINFO(VEQ(ii), LOG_TYPES::TRACE, 2);
+				// 		_initial_state_me = SystemProperties::TimeEvolution::create_initial_quench_state<_T>(SystemProperties::TimeEvolution::QuenchTypes::RANDP, _Nh, _Ns, _H->getEnAv(), _diagonal);
+				// 		_evolveState(_r, _initial_state_me, nullptr, nullptr, nullptr, nullptr, nullptr, &_timeEvolutionME_AV, nullptr, _matrices, false, ii != 0, false, true);
+				// 		_evolveState(_r, _initial_state_me, nullptr, nullptr, nullptr, nullptr, nullptr, &_timeEvolutionME_TP, nullptr, _matrices, false, ii != 0, true, true);
+				// 	}
+				// 	for (uint _opi = 0; _opi < _ops.size(); ++_opi)
+				// 	{
+				// 		_timeEvolutionME_AV[_opi].col(_r) /= _timeEvolutionME_AV_num;
+				// 		_timeEvolutionME_TP[_opi].col(_r) =	arma::exp(_timeEvolutionME_TP[_opi].col(_r) / _timeEvolutionME_AV_num);
+				// 	}
+				// }
 				LOGINFO(_timer.point(STR(_r) + ": time evolution"), "Time evolution: " + STR(_r), 3);
 			}
 		}
 		// -----------------------------------------------------------------------------
 
-		auto _single_run_seconds = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
-		LOGINFO("Single run time: " + STR(_single_run_seconds) + " seconds", LOG_TYPES::TRACE, 1);
+		// get single runtime
+		_single_run_time = _timer.elapsed<long>(STR(_r), Timer::TimePrecision::SECONDS);
+		LOGINFO("Single run time: " + STR(_single_run_time) + " seconds", LOG_TYPES::TRACE, 1);
 
 		// save the checkpoints
 		if (check_saving_size(_Nh, _r) && symP.checkpoint_)
 			_saver(_r);
 
-		// remaining time saver
-		if (!symP.checkpoint_ && (_Nh > ULLPOW(12)) && Slurm::is_overtime(_single_run_seconds * 2)) 
-		{
-			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
+		if (this->remainingSlurmTime(_r, &_timer, _single_run_time, _remaining_time))
 			break;
-		}
-
-		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '#', 1);
-
+		
+		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '%', 1);
 		// -----------------------------------------------------------------------------
 	}
 

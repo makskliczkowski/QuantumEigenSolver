@@ -1,5 +1,6 @@
 #include "include/user_interface/user_interface.h"
 #include "source/src/UserInterface/ui.h"
+#include <cstddef>
 int LASTLVL = 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -466,6 +467,47 @@ void UI::funChoice()
 		}
 	}
 	END_CATCH_HANDLER("The function chooser returned with: ", return);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/**
+* @brief Checks the remaining time for the Slurm job and determines if the job should stop.
+* 
+* This function calculates the total elapsed time of the job and compares it with the 
+* specified job time limit. If the remaining time is less than a threshold (5 times the 
+* single run time), it logs a message and returns true, indicating that the job should stop.
+* 
+* @param _r The realization number.
+* @param _timer Pointer to the Timer object.
+* @param _single_run_time The time taken for a single run.
+* @param _job_time The total time allocated for the job.
+* @param _checkpoint The checkpoint name for the timer.
+* @return true if the remaining time is less than the threshold, false otherwise.
+*/
+bool UI::remainingSlurmTime(int _r, Timer* _timer, long _single_run_time, long _job_time, std::string _checkpoint)
+{
+	constexpr long TIME_LIMIT_THRESHOLD = 2; // Threshold multiplier for the single run time
+
+	if (_timer == NULL)
+		return false;
+
+	// get the elapsed time
+	auto _total_elapsed_sec = (*_timer).elapsed<long>(_checkpoint, Timer::TimePrecision::SECONDS);
+
+	LOGINFO("Total elapsed seconds: " + STR(_total_elapsed_sec) + " seconds", LOG_TYPES::TRACE, 1);
+
+	if (_job_time < 0)
+		return false;
+	auto _remaining_time 	= _job_time - _total_elapsed_sec;
+	LOGINFO("Remaining time: " + STR(_remaining_time) + " seconds", LOG_TYPES::TRACE, 1);
+
+	if (_remaining_time < TIME_LIMIT_THRESHOLD * _single_run_time)
+	{
+		LOGINFO("Slurm overtime reached for realization " + STR(_r) + "!", LOG_TYPES::TRACE, 1);
+		return true;
+	}
+	return false;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
