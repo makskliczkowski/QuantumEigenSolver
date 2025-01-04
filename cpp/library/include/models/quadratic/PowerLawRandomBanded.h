@@ -18,6 +18,13 @@ class PowerLawRandomBanded : public QuadraticHamiltonian<_T>
 	double a_ = 1.0;
 	double b_ = 1.0;
 protected:
+	void sayHi() 
+	{
+		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+		LOGINFO("System size (Ns): " + std::to_string(this->Ns), LOG_TYPES::CHOICE, 3);
+		LOGINFO("Parameter a: " + STRP(this->a_, 3), LOG_TYPES::CHOICE, 3);
+		LOGINFO("Parameter b: " + STRP(this->b_, 3), LOG_TYPES::CHOICE, 3);
+	};
 	void checkQuadratic() override;
 public:
 	~PowerLawRandomBanded()
@@ -35,7 +42,7 @@ public:
 		this->info_ = this->info();
 		// check if the model is quadratic
 		this->checkQuadratic();
-		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+		this->sayHi();
 	};
 	PowerLawRandomBanded(std::shared_ptr<Lattice> _lat, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
 		: QuadraticHamiltonian<_T>(_lat, _constant, true, false), a_(_a), b_(_b)
@@ -49,7 +56,7 @@ public:
 		this->info_ = this->info();
 		// check if the model is quadratic
 		this->checkQuadratic();
-		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+		this->sayHi();
 	};
 	// Hilbert space constructor
 	PowerLawRandomBanded(const Hilbert::HilbertSpace<_T>& _hil, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
@@ -64,7 +71,7 @@ public:
 		this->info_ = this->info();
 		// check if the model is quadratic
 		this->checkQuadratic();
-		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+		this->sayHi();
 	};
 	// Hilbert space constructor move
 	PowerLawRandomBanded(Hilbert::HilbertSpace<_T>&& _hil, double _a = 1.0, double _b = 1.0, bool _mb = false, double _constant = 0.0)
@@ -79,7 +86,7 @@ public:
 		this->info_ = this->info();
 		// check if the model is quadratic
 		this->checkQuadratic();
-		LOGINFO("I am Power Law Random Banded model: ", LOG_TYPES::CHOICE, 2);
+		this->sayHi();
 	};
 
 

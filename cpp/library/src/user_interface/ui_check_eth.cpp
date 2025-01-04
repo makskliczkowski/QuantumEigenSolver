@@ -622,8 +622,11 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// ---------------------------------------------------------------
 	
+	_timer.checkpoint("START");
 	long _single_run_time 		= -1;
-	long _remaining_time		= -1;
+	long _remaining_time	= Slurm::get_remaining_time();
+	LOGINFO("Remaining time: " + STR(_remaining_time) + " seconds", LOG_TYPES::INFO, 0);
+	// ---------------------------------------------------------------------------------
 	for (int _r = 0; _r < this->modP.getRanReal(); ++_r)
 	{
 		// ----------------------------------------------------------------------------
@@ -1231,6 +1234,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	// -----------------------
 	long _single_run_time 	= -1;
 	long _remaining_time	= Slurm::get_remaining_time();
+	LOGINFO("Remaining time: " + STR(_remaining_time) + " seconds", LOG_TYPES::INFO, 0);
 	_timer.checkpoint("START");
 	// -----------------------
 
@@ -1327,7 +1331,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 		if (this->remainingSlurmTime(_r, &_timer, _single_run_time, _remaining_time))
 			break;
-		
+
 		LOGINFO(VEQ(_r), LOG_TYPES::TRACE, 30, '%', 1);
 		// -----------------------------------------------------------------------------
 	}
