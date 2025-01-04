@@ -923,7 +923,7 @@ void UI::checkETH_statistics(std::shared_ptr<Hamiltonian<_T>> _H)
 			_saver(_r);
 
 		// remaining time saver
-		if (Slurm::is_overtime(_single_run_seconds * 2)) 
+		if (!symP.checkpoint_ && (_Nh > ULLPOW(12)) && Slurm::is_overtime(_single_run_seconds * 2)) 
 		{
 			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
 			break;
@@ -1320,7 +1320,7 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 			_saver(_r);
 
 		// remaining time saver
-		if (Slurm::is_overtime(_single_run_seconds * 2)) 
+		if (!symP.checkpoint_ && (_Nh > ULLPOW(12)) && Slurm::is_overtime(_single_run_seconds * 2)) 
 		{
 			LOGINFO("Slurm overtime reached!", LOG_TYPES::TRACE, 1);
 			break;
