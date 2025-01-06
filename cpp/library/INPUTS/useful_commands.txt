@@ -1,0 +1,37 @@
+# SLURM RELATED
+#   squeue      - list jobs in the queue system
+#   sstat       - display statistics of a running job
+#   sacct       - display information about completed jobs
+#   reportseff  - allows checking multiple jobs that meet specified criteria
+#   CANCEL ONLY SPECIFIC JOB
+#       squeue --user user --format="%A,%j" | grep "^.*,fun=45," | awk -F, '{print $1}' | xargs scancel
+#   CANCEL ALL JOBS
+#       scancel -u user                 - cancel all jobs
+#       scancel -u user -t PENDING      - cancel all pending jobs
+#       scancel -u user -t RUNNING      - cancel all running jobs
+#       scancel -u user -t COMPLETED    - cancel all completed jobs
+#       scancel -u user -t FAILED       - cancel all failed jobs
+#       scancel -u user -t TIMEOUT      - cancel all timed out jobs
+
+# BASH RELATED
+#   DISPLAY ALL FILES IN A DIRECTORY AND SUBDIRECTORIES WITH A SPECIFIC FILE
+#       find . -name ETH_MAT_STAT -exec dirname {} \; | sort | uniq | while read dir; do     
+#       echo "Directory: $dir";     
+#       find "$dir" -type d; done &> ~/filesrsynced_2_all.txt
+#   REMOVE EMPTY DIRECTORIES
+#       find . -type d -empty -exec rmdir {} \;
+#   REMOVE ALL FILES IN A DIRECTORY
+#       find . -type f -exec rm -f {} \;
+#   REMOVE ALL FILES IN A DIRECTORY AND SUBDIRECTORIES
+#       find . -type f -exec rm -f {} \;
+#   FIND FOLDERS THAT ARE NOT 'PERMISSION DENIED'
+#       find . -name DATA 2>&1 | grep -v "Permission denied"
+#   FIND FILES THAT ARE NOT 'PERMISSION DENIED' - use -type f for files
+#       find . -name name 2>&1 -type f | grep -v "Permission denied"
+#   DELETE ONLY SPECIFIC FILES
+#       find -type f -name './*Ns=8*/*.tmp_*' -delete
+
+# RSYNC MOST USEFUL COMMANDS
+#   rsync -rv --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:mylustre-hpc-maciek/QSolver/DATA_LJUBLJANA_BIG_SWEEP ./
+#   rsync --rsh --ignore-existing -e 'ssh -p 22' klimak97@ui.wcss.pl:
+#   rsync -rv --rsh --ignore-existing --progress -e 'ssh -p 22' kliczkowski@f1login.ijs.si:/scratch/kliczkowski/ ./
