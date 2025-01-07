@@ -50,12 +50,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::blockSample(uint _bSize, NQS_STATE_T 
 		// double proba = std::abs(this->pRatio(this->nFlip_)); 					// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
 		double proba = std::abs(std::exp(this->beta_ * this->logPRatioFuncFlips_(this->nFlip_)));
 #endif
-		proba = proba * proba;
-		if (this->ran_->template random<double>() < proba) 							// we need to take into account the probability coming from the ratio of states (after and before the flip)
+		if (this->ran_->template random<double>() < proba * proba)					// we need to take into account the probability coming from the ratio of states (after and before the flip)
 		{
 			this->accepted_++; 														// increase the number of accepted flips
-			this->applyFlipsC(); 													// update current state and vector when the flip has been accepted (the probability is higher than the random number)
 			this->update(this->nFlip_); 											// update angles if needed
+			this->applyFlipsC(); 													// update current state and vector when the flip has been accepted (the probability is higher than the random number)
 		}
 		else
 		{

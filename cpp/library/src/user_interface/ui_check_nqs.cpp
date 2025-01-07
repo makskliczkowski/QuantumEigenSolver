@@ -9,7 +9,7 @@ constexpr int UI_NQS_PRECISION = 6;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief A placeholder for making the simulation with NQS. It uses the complex Hamiltonian.
 */
 void UI::makeSimNQS()
@@ -90,7 +90,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 // ##########################################################################################################################################
 
 // ######################################################### V A R I A T I O N A L ##########################################################
-// 
+
 // ##########################################################################################################################################
 
 /**
@@ -122,7 +122,7 @@ void UI::nqsExcited()
 	
 	// define the NQS states for the excited states
 	arma::Col<_T> _meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _meansED(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros),
-					_meansLAN(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
+				_meansLAN(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 	
 	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);	// define the NQS states
 	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);											// define the first one already here for the ground state
@@ -144,16 +144,12 @@ void UI::nqsExcited()
 
 	u64 Nh					= _NQS[0]->getHilbertSize();									// get the size of the Hilbert space						
 	auto Nvis 				= _NQS[0]->getNvis();											// get the number of visible units
-	const bool fullED 		= Nh <= UI_LIMITS_NQS_FULLED;
-	const bool lanED 		= (this->nqsP.nqs_ed_ && Nh <= ULLPOW(24));
+	const bool fullED 		= Nh <= UI_LIMITS_LANCZOS;										// use the full diagonalization
+	const bool lanED 		= this->nqsP.nqs_ed_ && Nh <= ULLPOW(24);						// use the Lanczos method for the ED
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>> _opsG = {};							// set up the operators to save - global
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>> _opsL = {};						// set up the operators to save - local
 	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};				// set up the operators to save - correlation
 	
-	// for the time evolution
-	const auto _timespace = this->nqsP.nqs_te_tlog_ > 0 ? arma::logspace(this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_, this->nqsP.nqs_te_tlog_) : arma::regspace(this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
-	saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
-	// operators
 	{
 		Operators::Operator<_T, uint> _SzL 			= Operators::SpinOperators::sig_z_l<_T>(Nvis);
 		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
@@ -174,10 +170,14 @@ void UI::nqsExcited()
 		_meas_NQS.push_back(NQSAv::MeasurementNQS<_T>(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum));
 	}
 
-	// quench
+	// ---------------
+	arma::vec _timespace;
 	std::shared_ptr<Operators::OperatorComb<_T>> _quenchOp;
-	if (this->nqsP.nqs_te_)
-		_quenchOp = std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0));
+	if (this->nqsP.nqs_te_) {
+		_quenchOp 	= std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0));
+		_timespace 	= time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
+		saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
+	}
 
 	if (lanED || fullED)
 	{
@@ -264,7 +264,6 @@ void UI::nqsExcited()
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 
 	{
 		_timer.checkpoint(VEQ(i));
-
 		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD;							// set up the energies container for NQS
 
 		if (!_NQS[i])
@@ -278,28 +277,17 @@ void UI::nqsExcited()
 			// -------------------------------------
 			_NQS[i]->collect(_parC, _meas_NQS[i], &_EN_TESTS, &_EN_TESTS_STD, this->quiet, this->nqsP.nqs_col_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);			
 			// -------------------------------------
-			_meansNQS(i) 	= arma::mean(_EN_TESTS);
-			_stdsNQS(i) 	= arma::stddev(_EN_TESTS);
-			LOGINFOG("Found the NQS state(" + STR(i) + ") to be E=" + STRPS(_meansNQS(i), UI_NQS_PRECISION) + " +- " + STRPS(_stdsNQS(i) / 2.0, UI_NQS_PRECISION), LOG_TYPES::TRACE, 2);
-			LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
+LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 			LOGINFO(4);
 		}
 
 		{
-			auto _EN_r 		= algebra::cast<double>(_EN_TRAIN);
-			auto _EN_rt 	= algebra::cast<double>(_EN_TESTS);
-			auto _EN_std_r 	= algebra::cast<double>(_EN_STD);
-			auto _EN_std_rt = algebra::cast<double>(_EN_TESTS_STD);
-
-			// Save final results to HDF5
-			saveAlgebraic(dir, "history.h5", _EN_r, "train/history/" + STR(i), lanED || fullED || i > 0);
-			saveAlgebraic(dir, "history.h5", _EN_rt, "collect/history/" + STR(i), true);
-			saveAlgebraic(dir, "history.h5", _EN_std_r, "train/std/" + STR(i), true);
-			saveAlgebraic(dir, "history.h5", _EN_std_rt, "collect/std/" + STR(i), true);
-			saveAlgebraic(dir, "history.h5", _meansNQS, "NQS/" + STR(i), true);
-			saveAlgebraic(dir, "history.h5", arma::Col<double>(this->nqsP.nqs_ex_beta_), "betas", true);
+			const bool _append = lanED || fullED || i > 0;
+			_NQS[i]->save_history(dir, _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD, 
+										this->nqsP.nqs_ex_beta_, 
+										_meansNQS, _stdsNQS, i, _append);
 			_NQS[i]->saveInfo(dir, "history.h5", i);
-			_meas_NQS[i].saveNQS({".h5"}, "measurement", "measurement", "measurement", "NQS/" + STR(i), lanED || fullED || i > 0);
+			_meas_NQS[i].saveNQS({".h5"}, "measurement", "measurement", "measurement", "NQS/" + STR(i), _append);
 		}
 		_NQS_lower.push_back(_NQS[i]);
 	}
@@ -317,16 +305,15 @@ void UI::nqsExcited()
 		LOGINFO(3);
 		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
 		// _H->quenchHamiltonian();
-		_parC.MC_sam_ = 1;
-		auto _RKsolver = algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
+		_parC.MC_sam_ 	= 1;
+		auto _RKsolver 	= algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
-			_timer.checkpoint("Time evolution for NQS state(" + STR(j) + ")");
 			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
 			arma::Col<_T> _sz0(_parC.MC_sam_ * _parC.nblck_), _En(_parTime.nblck_);		// set up the containers for the time evolution
 			arma::Col<double> _sz0_mean(_timespace.size(), arma::fill::zeros);			// set up the container for the mean values
-			Operators::OperatorNQS<_T> _Sz0 = Operators::SpinOperators::sig_z<_T>(Nvis, 0);
+			Operators::OperatorNQS<_T> _Sz0 = *_quenchOp.get();
 			
 			// reset the NQS
 			_NQS[j]->reset(_parTime.nblck_);											// reset the derivatives	
@@ -334,6 +321,7 @@ void UI::nqsExcited()
 			_NQS[j]->evolveSet(_parTime, this->quiet, false);							// set the evolution function
 			_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method - before the time evolution
 			_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));						// save the mean value
+			LOGINFO("TE(" + STR(0) + "/" + STR(_timespace.size()) + ") Time = 0" + ", Sz_0 = " + STRPS(_sz0_mean(0), 3), LOG_TYPES::TRACE, 2);
 			for (int i = 0; i < _timespace.size() - 1; ++i)
 			{
 				double _dt = _timespace(i + 1) - _timespace(i);							// set the time step for the evolution

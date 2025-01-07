@@ -170,7 +170,7 @@ struct NQS_info_t
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-template <typename _T>
+template <typename _T = double>
 struct NQS_thread_t
 {
 	int threadNum_					=	1;						// number of threads to be used for the NQS
@@ -185,6 +185,37 @@ struct NQS_thread_t
 	NQS_thread_t()					=	default;
 	~NQS_thread_t()					{ this->threads_.clear(); };
 };
+
+// ##########################################################################################################################################
+
+// forward declaration
+namespace Operators
+{
+	template <typename _T, typename ..._Ts>
+	class OperatorComb;
+};
+
+/**
+* @brief Struct to modify the ansatz.
+* 
+* This struct is used to apply modifications to the ansatz in a quantum eigen solver.
+* 
+* @tparam _T The data type used for the modifications, default is double.
+*/
+template <typename _T = double>
+struct AnsatzModifier 
+{
+	std::shared_ptr<Operators::OperatorComb<_T>> modifier_;
+	bool modified_ 			= false;
+	std::string modtype_ 	= "none";
+
+	// used only when the ansatz is modified
+	bool modifies_state_	= false;
+	_T logAMod_ 			= 0.0;
+	_T logTmpAMod_			= 0.0;
+};
+
+// ##########################################################################################################################################
 
 #define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 									\
 					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 			\

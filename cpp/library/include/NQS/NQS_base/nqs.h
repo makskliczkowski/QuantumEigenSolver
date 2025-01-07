@@ -15,6 +15,7 @@
 ***************************************/
 #include "../nqs_operator.h"
 #include "../../algebra/general_operator.h"
+#include "armadillo"
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -24,6 +25,25 @@
 // include all the definions
 #include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
+
+/**
+* @brief Generates a time space vector using either logarithmic or regular spacing.
+*
+* This function creates a vector of time points between 0 and _tmax, with spacing
+* determined by _dt. If _log is greater than 0, the spacing will be logarithmic,
+* otherwise it will be regular.
+*
+* @param _log Determines the type of spacing. If greater than 0, logarithmic spacing is used.
+* @param _dt The time step size for regular spacing or the base for logarithmic spacing.
+* @param _tmax The maximum time value.
+* @return arma::vec A vector of time points.
+*/
+inline arma::vec time_space_nqs(int _log = 0, double _dt = 0.01, double _tmax = 1.0)
+{
+	if (_log > 0)
+		return arma::logspace(_dt, _tmax, _log);
+	return arma::regspace(_dt, _dt, _tmax);
+}
 
 // #################################################################################################################################
 
@@ -161,30 +181,28 @@ public:
 	void unsetModifier();
 	bool modified()														{ return this->a_mod_p_.modified_; 									};
 protected:
-	struct AnsatzModifier {
-		bool modified_ 			= false;
-		std::string modtype_ 	= "none";
-		std::shared_ptr<Operators::OperatorComb<_T>> modifier_;
-		_T logAMod_ = 0.0;
-	} a_mod_p_;
+	AnsatzModifier<_T> a_mod_p_;										// ansatz modifier - for the probability ratio
+
+	// used only when the ansatz is modified
 	auto logAnsatzModifier(uint fP, float fV)			->_T;
 	auto logAnsatzModifier(int_ini_t fP, dbl_ini_t fV)	->_T;
 	auto logAnsatzModifier(uint, uint, float, float)	->_T;
 	auto logAnsatzModifier(Config_cr_t v)				->_T;
 	auto logAnsatzModifier(uint nFlips)					->_T;
-	auto logPRatioMod(uint fP, float fV)				->_T 			{ return this->logPRatio(fP, fV) + (logAnsatzModifier(fP, fV) - a_mod_p_.logAMod_); 			};
-	auto logPRatioMod(uint f, uint g, float v, float w) ->_T 			{ return this->logPRatio(f, g, v, w) + (logAnsatzModifier(f, g, v, w) - a_mod_p_.logAMod_); 	};
-	auto logPRatioMod(int_ini_t fP, dbl_ini_t fV)		->_T 			{ return this->logPRatio(fP, fV) + (logAnsatzModifier(fP, fV) - a_mod_p_.logAMod_);				};
-	auto logPRatioMod(Config_cr_t v)					->_T 			{ return this->logPRatio(v) + (logAnsatzModifier(v) - a_mod_p_.logAMod_);						};
-	auto logPRatioMod(Config_cr_t v, Config_cr_t w)		->_T 			{ return this->logPRatio(v) + (logAnsatzModifier(v) - logAnsatzModifier(w));					};
-	auto logPRatioMod(uint nFlips)						->_T			{ return this->logPRatio(nFlips) + (logAnsatzModifier(nFlips) - a_mod_p_.logAMod_);				};
-	auto pRatioMod(uint fP, float fV)					->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 													};
-	auto pRatioMod(uint f, uint g, float v, float w)	->_T 			{ return std::exp(this->logPRatioMod(f, g, v, w)); 												};
-	auto pRatioMod(int_ini_t fP, dbl_ini_t fV)			->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 													};
-	auto pRatioMod(Config_cr_t v)						->_T 			{ return std::exp(this->logPRatioMod(v)); 														};
-	auto pRatioMod(Config_cr_t v, Config_cr_t w)		->_T 			{ return std::exp(this->logPRatioMod(v, w)); 													};
+	// ***********************************************************************************************************************************
+	auto logPRatioMod(uint fP, float fV)				->_T;
+	auto logPRatioMod(uint f, uint g, float v, float w) ->_T;
+	auto logPRatioMod(int_ini_t fP, dbl_ini_t fV)		->_T;
+	auto logPRatioMod(Config_cr_t v)					->_T;
+	auto logPRatioMod(Config_cr_t v, Config_cr_t w)		->_T;
+	auto logPRatioMod(uint nFlips)						->_T;
+	auto pRatioMod(uint fP, float fV)					->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 						};
+	auto pRatioMod(uint f, uint g, float v, float w)	->_T 			{ return std::exp(this->logPRatioMod(f, g, v, w)); 					};
+	auto pRatioMod(int_ini_t fP, dbl_ini_t fV)			->_T 			{ return std::exp(this->logPRatioMod(fP, fV)); 						};
+	auto pRatioMod(Config_cr_t v)						->_T 			{ return std::exp(this->logPRatioMod(v)); 							};
+	auto pRatioMod(Config_cr_t v, Config_cr_t w)		->_T 			{ return std::exp(this->logPRatioMod(v, w)); 						};
 	std::function<_T(Config_cr_t)> logPRatioFunc_;						// function for the probability ratio (log)
-	std::function<_T(uint)> logPRatioFuncFlips_;						// 
+	std::function<_T(uint)> logPRatioFuncFlips_;						// function for the probability ratio (log) - for the number of flips
 	std::function<_T(Config_cr_t)> pRatioFunc_;							// function for the probability ratio
 	// ***********************************************************************************************************************************
 protected:																// ----------------------- W E I G H T S -------------------------
@@ -340,6 +358,19 @@ public:																	// -------------------- C O N S T R U C T --------------
 	NQS &operator=(const NQS & _n);
 	NQS &operator=(NQS &&_n);
 	NQS(Hamil_t_p _H, double _lr = 1e-2, uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const v_1d<double>& _beta = {});
+	// ***********************************************************************************************************************************
+
+	static void save_history(const std::string& _dir, 	
+							const arma::Col<_T>& _EN_TRAIN,				// training
+							const arma::Col<_T>& _EN_TESTS,				// test
+							const arma::Col<_T>& _EN_STD,				// stamdard deviations - training
+							const arma::Col<_T>& _EN_TESTS_STD,			// standard deviations - test
+							const arma::Col<double>& _betas,			// betas - for the training of the excited states
+							arma::Col<_T>& _means,						// means of the energies
+							arma::Col<_T>& _stds,						// standard deviations of the energies
+							const int _i 				= 0,			// index of the excited state
+							const bool _append 			= false,		// append the data to the existing file
+							const std::string& _name 	= "history.h5");
 	// ***********************************************************************************************************************************
 };
 

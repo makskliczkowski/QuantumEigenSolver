@@ -1433,6 +1433,7 @@ namespace Operators {
 			this->Ns_               = std::move(other.Ns_);
 			this->eigVal_           = std::move(other.eigVal_);
 			this->hasVectorFun_     = other.hasVectorFun_;
+			this->modifiesState_	= other.modifiesState_;
 
 			// Move scalar function
 			this->s_fun_ 			= std::move(other.fun_);

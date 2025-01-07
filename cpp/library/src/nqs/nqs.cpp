@@ -22,6 +22,7 @@
 #include "../../include/NQS/nqs_final.hpp"
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 // ##########################################################################################################################################
 
@@ -152,7 +153,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::swapConfig(NQS<_spinModes, _Ht, _T, _
     _other->setConfig(NQS_STATE);                       // swap the configurations
     this->setConfig(_st_other);                         // swap the configurations
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(swapConfig, void, (MC_t_p));
 
 // ##########################################################################################################################################
@@ -180,7 +180,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::derivativesReset(size_t nBlocks)
         this->derivativesCenteredH_ = this->derivatives_.t();  
     }
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(derivativesReset, void, (size_t));
 
 // ##########################################################################################################################################
@@ -523,7 +522,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
     }
     // ######################################################################################################################################
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(~NQS, void, ());
 
 // ##########################################################################################################################################
@@ -545,7 +543,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(Config_cr_t _st)
 #endif
     this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(setState, void, (const Config_t&));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -572,12 +569,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
     this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(setState, void, (u64));
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Allocates the main gradient parameters and the temporary and current vectors.
 * The vectors are set to ones for the start.  
 */
@@ -597,7 +593,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
 	this->curVec_ = arma::ones(this->info_p_.nVis_);
 	this->tmpVec_ = arma::ones(this->info_p_.nVis_);
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(allocate, void, ());
 
 // ##########################################################################################################################################
@@ -634,7 +629,6 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path, std::s
 	}
 	return _isSaved;
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(saveWeights, bool, (std::string, std::string));
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -661,7 +655,6 @@ inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, 
 	LOGINFO("Loading the checkpoint weights:", LOG_TYPES::INFO, 2);
 	return loadAlgebraic(_path, _file, this->Weights_, "weights/" + STRP(this->beta_, 5));
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(setWeights, bool, (std::string, std::string));
 
 
@@ -683,7 +676,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::shared_ptr<NQS
     this->Weights_ = _nqs->Weights_;
     this->setWeights();
 }
-// template instantiation of the function above
 template void NQS<2u, double, double, double>::setWeights(std::shared_ptr<NQS<2u, double, double, double>>);
 template void NQS<3u, double, double, double>::setWeights(std::shared_ptr<NQS<3u, double, double, double>>);
 template void NQS<4u, double, double, double>::setWeights(std::shared_ptr<NQS<4u, double, double, double>>);
@@ -703,11 +695,24 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 {
     if (this->modified()) 
-        this->a_mod_p_.logAMod_ = this->logAnsatzModifier(nFlips);
+        this->a_mod_p_.logAMod_ = this->a_mod_p_.logTmpAMod_;
 }
 NQS_INST_CMB_ALL(update, void, (uint));
 // ##########################################################################################################################################
 
+/**
+* @brief Updates the Neural Quantum State (NQS) with the given configuration and number of flips.
+*
+* This function updates the NQS based on the provided configuration and the number of spin flips.
+* If the NQS has been modified, it updates the logarithm of the ansatz modifier based on the given modifier.
+*
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type.
+* @tparam _stateType State type.
+* @param _v The configuration to update the NQS with.
+* @param nFlips The number of spin flips to consider for the update.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::update(Config_cr_t _v, uint nFlips)
 {
@@ -791,7 +796,6 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::updateWeights()
 {
     this->Weights_ -= this->dF_;
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(updateWeights, void, ());
 
 // ##########################################################################################################################################
@@ -842,7 +846,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setRandomState(bool _upd)
 
     this->setState(randomState, _upd);
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(setRandomState, void, (bool));
 
 // ##########################################################################################################################################
@@ -912,7 +915,6 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
 #endif
 	return true;
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(initThreads, bool, (uint));
 
 // ##########################################################################################################################################
@@ -935,7 +937,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::init()
     this->allocate();
     // this->setRandomState();
 }
-// template instantiation of the function above
 NQS_INST_CMB_ALL(init, void, ());
 
 // ##########################################################################################################################################
@@ -947,9 +948,10 @@ NQS_INST_CMB_ALL(init, void, ());
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::setModifier(std::shared_ptr<Operators::OperatorComb<_T>> _op)
 {
-    this->a_mod_p_.modifier_ = _op;                                                                        // set the modifier operator
-    this->a_mod_p_.modtype_  = _op->getNameS();     
+    this->a_mod_p_.modifier_ = _op;                                                                         // set the modifier operator
+    this->a_mod_p_.modtype_  = _op->getNameS();                                                             // set the modifier type
     this->a_mod_p_.modified_ = true;                                                                        // set the modifier type
+    LOGINFO("Set the modifier operator: " + this->a_mod_p_.modtype_, LOG_TYPES::INFO, 2);
     // *****************************************************************************************************
     this->a_mod_p_.logAMod_  = this->logAnsatzModifier(NQS_STATE);                                          // get the log of the modified states
     // *****************************************************************************************************
@@ -979,8 +981,9 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::unsetModifier()
 {
     this->a_mod_p_.modifier_ = nullptr;                                                                         // set the modifier operator
-    this->a_mod_p_.modtype_  = "";          
+    this->a_mod_p_.modtype_  = "";                                                                              // set the modifier type
     this->a_mod_p_.modified_ = false;                                                                           // set the modifier type
+    LOGINFO("Unset the modifier operator.", LOG_TYPES::INFO, 2);
     // *****************************************************************************************************
     this->a_mod_p_.logAMod_  = 0.0;
     this->pRatioFunc_        = [this](const Config_t& _v)           { return this->pRatio(_v); };               // change the function pointer
@@ -989,28 +992,45 @@ void NQS<_spinModes, _Ht, _T, _stateType>::unsetModifier()
     this->logPRatioFuncFlips_= [this](uint nFlips)                  { return this->logPRatio(nFlips); };
     this->lower_states_.exc_ratio_ = [this](const Config_t& _v)     { return this->pRatio(_v); };               // change the function pointer
 }
-//template instantiation of the function above
 NQS_INST_CMB_ALL(unsetModifier, void, ());
+
 // #################################################################################################≠≠≠≠≠≠#########################################
 
+/**
+* @brief Computes the logarithm of the modified ansatz.
+* 
+* This function calculates the logarithm of the modified ansatz based on the provided configuration.
+* It first checks if the ansatz modifier is enabled and valid. If not, it returns 0.0.
+* Otherwise, it applies the modifier to the configuration and sums up the results.
+* Finally, it computes the logarithm of the conjugate of the negative sum.
+* 
+* !IMPORTANT: This function is only available when the state is not modified.
+*
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type for the result.
+* @tparam _stateType The state type.
+* @param _v The configuration for which the modified ansatz is computed.
+* @return _T The logarithm of the modified ansatz.
+*/
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(Config_cr_t _v)
 {
-    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_ || this->a_mod_p_.modifies_state_)
         return 0.0;
+
     _T _out = 0.0;
-    auto _ret                = this->a_mod_p_.modifier_->operator()(_v);                                     // get the modified states 
+    auto _ret = this->a_mod_p_.modifier_->operator()(_v);                                   // get the modified states 
     for (const auto& [_, _v]: _ret)
         _out += _v; 
-    _out = std::log(algebra::conjugate(-_out));                                                               // get the log of the modified states
-    // _out = std::log(_out);                                                               // get the log of the modified states
+    _out = std::log(algebra::conjugate(_out));                                              // get the log of the modified states
     return _out;
 }
-// templates
 NQS_INST_CMB(double, double, logAnsatzModifier, double, (Config_cr_t));
 NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (Config_cr_t));
-NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (Config_cr_t));
 NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (Config_cr_t));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (Config_cr_t));
+
 // #################################################################################################≠≠≠≠≠≠#########################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -1019,13 +1039,21 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint nFlips)
     auto _state = NQS_STATE;
     for (int i = 0; i < nFlips; ++i)
         flip(_state, this->flipPlaces_[i], 0, this->discVal_);
+    // //
+    // stout << "Flips: " << nFlips << " | ";
+    // for (int i = 0; i < nFlips; ++i)
+    //     stout << this->flipPlaces_[i] << " ";
+    // stout << " | ";
+    // // 
+    // stout << NQS_STATE << " | " << _state << " | " << std::endl;
+    // // 
     return logAnsatzModifier(_state);
 }
-// template instantiation of the function above
-NQS_INST_CMB(double, double, logAnsatzModifier,double, (uint));
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (uint));
 NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint));
-NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint));
 NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint));
+
 // #################################################################################################≠≠≠≠≠≠#########################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -1035,11 +1063,11 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint fP, float fV)
     flip(_state, fP, 0, this->discVal_);
     return logAnsatzModifier(_state);
 }
-// template instantiation of the function above
 NQS_INST_CMB(double, double, logAnsatzModifier, double, (uint, float));
 NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint, float));
-NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, float));
 NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint, float));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, float));
+
 // #################################################################################################≠≠≠≠≠≠#########################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -1050,11 +1078,11 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint f, uint g, float
     flip(_state, g, 0, this->discVal_);
     return logAnsatzModifier(_state);
 }
-// template instantiation of the function above
 NQS_INST_CMB(double, double, logAnsatzModifier, double, (uint, uint, float, float));
 NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (uint, uint, float, float));
-NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, uint, float, float));
 NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (uint, uint, float, float));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, uint, float, float));
+
 // #################################################################################################≠≠≠≠≠≠#########################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -1065,9 +1093,209 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(int_ini_t f, dbl_ini_
         flip(_state, fp, 0, this->discVal_);
     return logAnsatzModifier(_state);
 }
-//  template instantiation of the function above
-NQS_INST_CMB(double, double, logAnsatzModifier, double, (int_ini_t, dbl_ini_t));
-NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (int_ini_t, dbl_ini_t));
-NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (int_ini_t, dbl_ini_t));
-NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(double, double, logAnsatzModifier, double, (int_ini_t f, dbl_ini_t w));
+NQS_INST_CMB(cpx, cpx, logAnsatzModifier, cpx, (int_ini_t f, dbl_ini_t w));
+NQS_INST_CMB(double, cpx, logAnsatzModifier, cpx, (int_ini_t f, dbl_ini_t w));
+NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (int_ini_t f, dbl_ini_t w));
+
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(Config_cr_t _v)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        // !TODO: Implement the logPRatioMod function
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+            return this->logPRatio(_v) + (this->logAnsatzModifier(_v) - this->a_mod_p_.logAMod_);
+    }
+    return this->logPRatio(_v);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (Config_cr_t));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (Config_cr_t));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (Config_cr_t));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (Config_cr_t));
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(uint nFlips)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+        {
+            this->a_mod_p_.logTmpAMod_ = this->logAnsatzModifier(nFlips);
+            // stout << "Old: " << _oldF << " | New: " << _newF << " | " << "Diff: " << (_newF - _oldF) << std::endl;
+            return this->logPRatio(nFlips) + (this->a_mod_p_.logTmpAMod_ - this->a_mod_p_.logAMod_);
+            // return this->logPRatio(nFlips) + (this->logAnsatzModifier(nFlips) - this->a_mod_p_.logAMod_);
+        }
+    }
+    return this->logPRatio(nFlips);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (uint));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (uint));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (uint));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (uint));
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(uint fP, float fV)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+            return this->logPRatio(fP, fV) + (this->logAnsatzModifier(fP, fV) - this->a_mod_p_.logAMod_);
+    }
+    return this->logPRatio(fP, fV);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (uint, float));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (uint, float));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (uint, float));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (uint, float));
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(uint f, uint g, float v, float w)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+            return this->logPRatio(f, g, v, w) + (this->logAnsatzModifier(f, g, v, w) - this->a_mod_p_.logAMod_);
+    }
+    return this->logPRatio(f, g, v, w);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (uint, uint, float, float));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (uint, uint, float, float));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (uint, uint, float, float));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (uint, uint, float, float));
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(int_ini_t f, dbl_ini_t w)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+            return this->logPRatio(f, w) + (this->logAnsatzModifier(f, w) - this->a_mod_p_.logAMod_);
+    }
+    return this->logPRatio(f, w);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (int_ini_t, dbl_ini_t));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (int_ini_t, dbl_ini_t));
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+_T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(Config_cr_t v, Config_cr_t w)
+{
+    if (this->a_mod_p_.modified_)
+    {
+        if (this->a_mod_p_.modifies_state_)
+        {
+            throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
+        }
+        else    // the state is not modified by the operator - it only includes a multiplicative factor 
+            return this->logPRatio(v, w) + (this->logAnsatzModifier(v) - this->logAnsatzModifier(w));
+    }
+    return this->logPRatio(v, w);
+}
+NQS_INST_CMB(double, double, logPRatioMod, double, (Config_cr_t, Config_cr_t));
+NQS_INST_CMB(cpx, cpx, logPRatioMod, cpx, (Config_cr_t, Config_cr_t));
+NQS_INST_CMB(double, cpx, logPRatioMod, cpx, (Config_cr_t, Config_cr_t));
+NQS_INST_CMB(cpx, double, logPRatioMod, double, (Config_cr_t, Config_cr_t));
+
+// #################################################################################################≠≠≠≠≠≠#########################################
+
+/**
+* @brief Saves the history of the Neural Quantum State (NQS) training and testing process.
+* 
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type for the energy values.
+* @tparam _stateType State type.
+* @param _dir Directory where the history files will be saved.
+* @param _EN_TRAIN Column vector of training energy values.
+* @param _EN_TESTS Column vector of testing energy values.
+* @param _EN_STD Column vector of standard deviations of training energy values.
+* @param _EN_TESTS_STD Column vector of standard deviations of testing energy values.
+* @param _betas Column vector of beta values used for training excited states.
+* @param _meansNQS Column vector to store the means of the NQS states.
+* @param _stdsNQS Column vector to store the standard deviations of the NQS states.
+* @param i Index of the current state.
+* @param _append Boolean flag indicating whether to append to the file.
+* @param _name Name of the history file. If empty, defaults to "history.h5".
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::save_history(const std::string& _dir, 							
+                                                        const arma::Col<_T>& _EN_TRAIN,				// training
+                                                        const arma::Col<_T>& _EN_TESTS,				// test
+                                                        const arma::Col<_T>& _EN_STD,				// standard deviations - training
+                                                        const arma::Col<_T>& _EN_TESTS_STD,			// standard deviations - test
+                                                        const arma::Col<double>& _betas,			// betas - for the training of the excited states
+                                                        arma::Col<_T>& _meansNQS,					// means of the NQS states
+                                                        arma::Col<_T>& _stdsNQS,					// standard deviations of the NQS states
+                                                        const int i,								// the state number
+                                                        const bool _append,                         // append to the file
+                                                        const std::string& _name)
+{
+    auto _EN_r      = algebra::cast<double>(_EN_TRAIN);
+    auto _EN_rt     = algebra::cast<double>(_EN_TESTS);
+    auto _EN_std_r  = algebra::cast<double>(_EN_STD);
+    auto _EN_std_rt = algebra::cast<double>(_EN_TESTS_STD);
+
+    // calculate means
+    _meansNQS(i) 	= arma::mean(_EN_TESTS);
+    _stdsNQS(i) 	= arma::stddev(_EN_TESTS);
+
+    LOGINFOG("Found the NQS state(" + STR(i) + ") to be E=" + STRPS(_meansNQS(i), 6) + " +- " + STRPS(_stdsNQS(i) / 2.0, 6), LOG_TYPES::TRACE, 2);
+
+    // save the results
+    const std::string history_file = _name.empty() ? "history.h5" : _name;
+    saveAlgebraic(_dir, history_file, _EN_r, "train/history/" + STR(i), _append);
+    saveAlgebraic(_dir, history_file, _EN_rt, "collect/history/" + STR(i), true);
+    saveAlgebraic(_dir, history_file, _EN_std_r, "train/std/" + STR(i), true);
+    saveAlgebraic(_dir, history_file, _EN_std_rt, "collect/std/" + STR(i), true);
+    saveAlgebraic(_dir, history_file, _betas, "betas", true);
+
+    // save imaginary part if _T is complex
+    if constexpr (std::is_same_v<_T, cpx>)
+    {
+        arma::vec _EN_i      = arma::imag(_EN_TRAIN);
+        arma::vec _EN_it     = arma::imag(_EN_TESTS);
+        arma::vec _EN_std_i  = arma::imag(_EN_STD);
+        arma::vec _EN_std_it = arma::imag(_EN_TESTS_STD);
+
+        saveAlgebraic(_dir, history_file, _EN_i, "train/history/im/" + STR(i), true);
+        saveAlgebraic(_dir, history_file, _EN_it, "collect/history/im/" + STR(i), true);
+        saveAlgebraic(_dir, history_file, _EN_std_i, "train/std/im/" + STR(i), true);
+        saveAlgebraic(_dir, history_file, _EN_std_it, "collect/std/im/" + STR(i), true);
+    }
+}
+
+#define NQS_INSTANTIATE_SAVE_HISTORY(Ht, T, stateType) \
+template void NQS<2u, Ht, T, stateType>::save_history(const std::string&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<double>&, arma::Col<T>&, arma::Col<T>&, const int, const bool, const std::string&);   \
+template void NQS<3u, Ht, T, stateType>::save_history(const std::string&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<double>&, arma::Col<T>&, arma::Col<T>&, const int, const bool, const std::string&);   \
+template void NQS<4u, Ht, T, stateType>::save_history(const std::string&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<T>&, const arma::Col<double>&, arma::Col<T>&, arma::Col<T>&, const int, const bool, const std::string&);
+
+NQS_INSTANTIATE_SAVE_HISTORY(double, double, double)
+NQS_INSTANTIATE_SAVE_HISTORY(cpx, cpx, double)
+NQS_INSTANTIATE_SAVE_HISTORY(cpx, double, double)
+NQS_INSTANTIATE_SAVE_HISTORY(double, cpx, double)
+
 // #################################################################################################≠≠≠≠≠≠#########################################
