@@ -47,8 +47,8 @@ void NQS_info_t::saveInfo(const std::string& _dir, const std::string& _name, int
 {
     if (_name.ends_with(".h5")) {
         LOGINFO("Saving the NQS information to the file: " + _name, LOG_TYPES::INFO, 2);
-        const bool _append = std::filesystem::exists(_dir + _name);
-        const std::string _namePar = "parameters/" + STR(i) + "/";
+        const bool _append          = std::filesystem::exists(_dir + _name);
+        const std::string _namePar  = std::format("parameters/{}/", STR(i));
 
         // Save pseudoinverse information
 #ifdef NQS_USESR_MAT_USED
@@ -437,7 +437,7 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
     this->logPRatioFuncFlips_   =           [this](uint nFlips)                { return this->logPRatio(nFlips); };
 
 	this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _lower, _beta, this);
-	this->lower_states_.exc_ratio_ = 		[&](const Config_t& _v)         { return this->pRatio(_v); };
+    this->lower_states_.exc_ratio_ = 		[this](const Config_t& _v)         { return this->pRatio(_v); };
 #ifdef NQS_LOWER_RATIO_LOGDIFF
 	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatzlog(_v); };
 #else
@@ -447,8 +447,8 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
-	this->info_p_.nVis_ 		= 			_Ns * (this->spinModes_ / 2);
-	this->info_p_.nSites_		=			_Ns;
+    this->info_p_.nVis_ 		= 			static_cast<uint>(_Ns * (this->spinModes_ / 2));
+	this->info_p_.nSites_		=			static_cast<uint>(_Ns);
 
 	// make it half filling if necessary
 	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_nParticles;
@@ -541,7 +541,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(Config_cr_t _st)
 #ifndef NQS_USE_VEC_ONLY
     this->curState_ = BASE_TO_INT<u64>(_st, this->discVal_);
 #endif
-    this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
+    if (this->a_mod_p_.modified_)
+        this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
 NQS_INST_CMB_ALL(setState, void, (const Config_t&));
 
@@ -567,7 +568,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setState(u64 _st)
 	this->curState_ = _st;
 #endif
 	INT_TO_BASE(_st, this->curVec_, this->discVal_);
-    this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
+    if (this->a_mod_p_.modified_)
+        this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);
 }
 NQS_INST_CMB_ALL(setState, void, (u64));
 
@@ -694,8 +696,8 @@ template void NQS<4u, double, cpx, double>::setWeights(std::shared_ptr<NQS<4u, d
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::update(uint nFlips)
 {
-    if (this->modified()) 
-        this->a_mod_p_.logAMod_ = this->a_mod_p_.logTmpAMod_;
+    if (this->a_mod_p_.modified_)
+        this->a_mod_p_.logAMod_ = this->a_mod_p_.logTmpAMod_;   // update the logarithm of the ansatz modifier
 }
 NQS_INST_CMB_ALL(update, void, (uint));
 // ##########################################################################################################################################
@@ -953,7 +955,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::setModifier(std::shared_ptr<Operators
     this->a_mod_p_.modified_ = true;                                                                        // set the modifier type
     LOGINFO("Set the modifier operator: " + this->a_mod_p_.modtype_, LOG_TYPES::INFO, 2);
     // *****************************************************************************************************
-    this->a_mod_p_.logAMod_  = this->logAnsatzModifier(NQS_STATE);                                          // get the log of the modified states
+    this->a_mod_p_.logAMod_ = this->logAnsatzModifier(NQS_STATE);                                           // get the log of the modified states
+    this->a_mod_p_.logTmpAMod_ = this->a_mod_p_.logAMod_;                                                   // set the temporary log of the modified states
     // *****************************************************************************************************
     this->pRatioFunc_        = [this](const Config_t& _v)          { return this->pRatioMod(_v); };         // change the function pointer
     this->pKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV)  { return this->pRatioMod(fP, fV); };     // change the function pointer  
@@ -980,17 +983,19 @@ template void NQS<4u, double, cpx, double>::setModifier(std::shared_ptr<Operator
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::unsetModifier()
 {
-    this->a_mod_p_.modifier_ = nullptr;                                                                         // set the modifier operator
-    this->a_mod_p_.modtype_  = "";                                                                              // set the modifier type
-    this->a_mod_p_.modified_ = false;                                                                           // set the modifier type
+    this->a_mod_p_.modifier_ = nullptr;                                                                     // set the modifier operator
+    this->a_mod_p_.modtype_  = "";                                                                          // set the modifier type
+    this->a_mod_p_.modified_ = false;                                                                       // set the modifier type
     LOGINFO("Unset the modifier operator.", LOG_TYPES::INFO, 2);
     // *****************************************************************************************************
     this->a_mod_p_.logAMod_  = 0.0;
-    this->pRatioFunc_        = [this](const Config_t& _v)           { return this->pRatio(_v); };               // change the function pointer
-    this->pKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV)   { return this->pRatio(fP, fV); };           // change the function pointer  
-    this->logPKernelFunc_    = [this](int_ini_t fP, dbl_ini_t fV)   { return this->logPRatio(fP, fV); };        // change the function pointer
+    this->a_mod_p_.logTmpAMod_ = 0.0;
+    // *****************************************************************************************************
+    this->pRatioFunc_        = [this](const Config_t& _v)           { return this->pRatio(_v); };           // change the function pointer
+    this->pKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV)   { return this->pRatio(fP, fV); };       // change the function pointer  
+    this->logPKernelFunc_    = [this](int_ini_t fP, dbl_ini_t fV)   { return this->logPRatio(fP, fV); };    // change the function pointer
     this->logPRatioFuncFlips_= [this](uint nFlips)                  { return this->logPRatio(nFlips); };
-    this->lower_states_.exc_ratio_ = [this](const Config_t& _v)     { return this->pRatio(_v); };               // change the function pointer
+    this->lower_states_.exc_ratio_ = [this](const Config_t& _v)     { return this->pRatio(_v); };           // change the function pointer
 }
 NQS_INST_CMB_ALL(unsetModifier, void, ());
 
@@ -1016,14 +1021,16 @@ NQS_INST_CMB_ALL(unsetModifier, void, ());
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(Config_cr_t _v)
 {
-    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_ || this->a_mod_p_.modifies_state_)
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+    if (this->a_mod_p_.modifies_state_)
         return 0.0;
 
-    _T _out = 0.0;
-    auto _ret = this->a_mod_p_.modifier_->operator()(_v);                                   // get the modified states 
-    for (const auto& [_, _v]: _ret)
-        _out += _v; 
-    _out = std::log(algebra::conjugate(_out));                                              // get the log of the modified states
+    _T _out     = 0.0;
+    auto _ret   = this->a_mod_p_.modifier_->operator()(_v);                     // get the modified states 
+    for (const auto& [_, val]: _ret)                                            // sum up the modified states
+        _out += val; 
+    _out = std::log(algebra::conjugate(_out));                                 // get the log of the modified states
     return _out;
 }
 NQS_INST_CMB(double, double, logAnsatzModifier, double, (Config_cr_t));
@@ -1036,6 +1043,13 @@ NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (Config_cr_t));
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint nFlips)
 {
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+
+    // !TODO: Implement the logAnsatzModifier function if the state is modified
+    if (this->a_mod_p_.modifies_state_)
+        return 0.0;    
+
     auto _state = NQS_STATE;
     for (int i = 0; i < nFlips; ++i)
         flip(_state, this->flipPlaces_[i], 0, this->discVal_);
@@ -1059,6 +1073,11 @@ NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint));
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint fP, float fV)
 {
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+    if (this->a_mod_p_.modifies_state_)
+        return 0.0;
+
     auto _state = NQS_STATE;
     flip(_state, fP, 0, this->discVal_);
     return logAnsatzModifier(_state);
@@ -1073,6 +1092,10 @@ NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, float));
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(uint f, uint g, float v, float w)
 {
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+    if (this->a_mod_p_.modifies_state_)
+        return 0.0;
     auto _state = NQS_STATE;
     flip(_state, f, 0, this->discVal_);
     flip(_state, g, 0, this->discVal_);
@@ -1088,6 +1111,11 @@ NQS_INST_CMB(cpx, double, logAnsatzModifier, double, (uint, uint, float, float))
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 _T NQS<_spinModes, _Ht, _T, _stateType>::logAnsatzModifier(int_ini_t f, dbl_ini_t w)
 {
+    if (!this->a_mod_p_.modified_ || !this->a_mod_p_.modifier_)
+        return 0.0;
+    if (this->a_mod_p_.modifies_state_)
+        return 0.0; 
+    
     auto _state = NQS_STATE;
     for (auto& fp : f)
         flip(_state, fp, 0, this->discVal_);
@@ -1111,7 +1139,10 @@ _T NQS<_spinModes, _Ht, _T, _stateType>::logPRatioMod(Config_cr_t _v)
             throw std::runtime_error("The state is modified by the operator. This is not yet implemented.");
         }
         else    // the state is not modified by the operator - it only includes a multiplicative factor 
-            return this->logPRatio(_v) + (this->logAnsatzModifier(_v) - this->a_mod_p_.logAMod_);
+        {
+            this->a_mod_p_.logTmpAMod_ = this->logAnsatzModifier(_v);
+            return this->logPRatio(_v) + this->a_mod_p_.logTmpAMod_ - this->a_mod_p_.logAMod_;
+        }
     }
     return this->logPRatio(_v);
 }

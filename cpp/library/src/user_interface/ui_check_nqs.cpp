@@ -196,13 +196,13 @@ void UI::nqsExcited()
 				_meas_ED[i].measure(_mbs, _hilbert);										// save the measured quantities
 				_meansED(i) = _H->getEigVal(i);
 				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0 || this->nqsP.nqs_te_);	
-				LOGINFO("Found the ED (full) state(" + STR(i) + ") to be E=" + STRPS(_meansED[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
+				LOGINFO(std::format("Found the ED (full) state({}) to be E={}", i, STRPS(_meansED[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
 
 				if (this->nqsP.nqs_te_)
 				{
-					arma::Col<_T> _mbsIn 				= _Sz0Mat * _mbs;
-					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);
-					const arma::Mat<_T>& _eigv 			= _H->getEigVec();
+					arma::Col<_T> _mbsIn 				= _Sz0Mat * _mbs;					// apply the quench operator to the state
+					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);			// measure the time evolution of the operator
+					const arma::Mat<_T>& _eigv 			= _H->getEigVec();					
 					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
 
 #pragma omp parallel for num_threads(this->threadNum)
@@ -211,7 +211,7 @@ void UI::nqsExcited()
 						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
 						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
 					}
-					saveAlgebraic(dir, "measurement.h5", _vals, "ED/" + STR(i) + "/time_evo/Sz/0", true);
+					saveAlgebraic(dir, "measurement.h5", _vals, std::format("ED/{}/time_evo/Sz/0", i), true);
 				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false); 				// save the results to HDF5 file
@@ -230,8 +230,8 @@ void UI::nqsExcited()
 				const arma::Col<_T> _mbs = LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
 				_meas_LAN[i].measure(_mbs, _hilbert);										// save the measured quantities
 				_meansLAN(i) = _H->getEigVal(i);											// save the energies to the container
-				LOGINFO("Found the ED (Lanczos) state(" + STR(i) + ") to be E=" + STRPS(_meansLAN[i], UI_NQS_PRECISION), LOG_TYPES::INFO, 2);
-				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "LAN/" + STR(i), fullED || i > 0 || this->nqsP.nqs_te_);
+				LOGINFO(std::format("Found the ED (Lanczos) state({}) to be E={}", i, STRPS(_meansLAN[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
+				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", std::format("LAN/{}", i), fullED || i > 0 || this->nqsP.nqs_te_);
 				// ---------------
 				if (this->nqsP.nqs_te_)
 				{
@@ -246,7 +246,7 @@ void UI::nqsExcited()
 						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
 						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
 					}
-					saveAlgebraic(dir, "measurement.h5", _vals, "LAN/" + STR(i) + "/time_evo/Sz/0", true);
+					saveAlgebraic(dir, "measurement.h5", _vals, std::format("LAN/{}/time_evo/Sz/0", i), true);
 				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);			// save the results to HDF5 file
