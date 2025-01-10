@@ -53,7 +53,7 @@ icpx ./main.cpp                                                 \
         ./src/nqs/rbm/rbm_spin.cpp                              \
         ./src/nqs/rbmpp/rbmpp.cpp                               \
         ./src/nqs/operators/nqs_operator.cpp                    \
-        ./src/operator_parser.cpp                               \
+        ./src/operators/operator_parser.cpp                     \
         ./src/user_interface/ui_check_eth.cpp                   \
         ./src/user_interface/ui_check_nqs.cpp                   \
         ./src/user_interface/ui_check_quadratic.cpp             \

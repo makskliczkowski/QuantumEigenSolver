@@ -211,7 +211,7 @@ set(SOURCES
     src/user_interface/ui_check_nqs.cpp
     src/user_interface/ui_check_quadratic.cpp
     src/user_interface/ui_check_symmetries.cpp
-    src/operator_parser.cpp
+    src/operators/operator_parser.cpp
 )
 
 # Set the include directories

@@ -173,18 +173,30 @@ void UI::nqsExcited()
 	// ---------------
 	arma::vec _timespace;
 	std::shared_ptr<Operators::OperatorComb<_T>> _quenchOp;
-	if (this->nqsP.nqs_te_) {
-		_quenchOp 	= std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0));
-		_timespace 	= time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
+	v_sp_t<Operators::OperatorComb<_T>> _quenchOpMeasure;
+	strVec _quenchOpNames;
+	if (this->nqsP.nqs_te_) 
+	{
+		_quenchOp 			= std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0));
+		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0)));
+		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, Nvis - 1)));
+		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, {1, Nvis - 1})));
+		_quenchOpNames 		= { "Sz/0", std::format("Sz/{}", Nvis - 1), std::format("Sz/1_{}", Nvis - 1) };
+		_timespace 			= time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
 		saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
 	}
 
 	if (lanED || fullED)
 	{
 		_H->buildHamiltonian();
-		arma::SpMat<_T> _Sz0Mat;
+		arma::SpMat<_T> _QMat;
+		v_1d<arma::SpMat<_T>> _QOMat;
 		if (this->nqsP.nqs_te_)
-			_Sz0Mat = _quenchOp->template generateMat<false, _T, arma::SpMat>(Nh);
+		{
+			_QMat 	= _quenchOp->template generateMat<false, _T, arma::SpMat>(Nh);
+			for (auto& _quenchOpMeasure_ : _quenchOpMeasure)
+				_QOMat.push_back(_quenchOpMeasure_->template generateMat<false, _T, arma::SpMat>(Nh));
+		}
 
 		if (fullED)
 		{																					// try with the full diagonalization
@@ -200,18 +212,24 @@ void UI::nqsExcited()
 
 				if (this->nqsP.nqs_te_)
 				{
-					arma::Col<_T> _mbsIn 				= _Sz0Mat * _mbs;					// apply the quench operator to the state
-					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);			// measure the time evolution of the operator
+					arma::Col<_T> _mbsIn 				= _QMat * _mbs;						// apply the quench operator to the state (i'th)
+					_mbsIn 								= _mbsIn / arma::norm(_mbsIn);		// normalize the state - be sure
+					arma::Mat<double> _vals(_timespace.size() + 1, _QOMat.size(), arma::fill::zeros); // measure the time evolution of the operator
 					const arma::Mat<_T>& _eigv 			= _H->getEigVec();					
 					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
+					for (int j = 0; j < _QOMat.size(); ++j)
+						_vals(0, j) 					= algebra::cast<double>(Operators::applyOverlap(_mbsIn, _QOMat[j]));
 
 #pragma omp parallel for num_threads(this->threadNum)
 					for (int j = 0; j < _timespace.size(); ++j)
 					{
-						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
-						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
+						arma::Col<cpx> _mbs_te 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
+						for (int k = 0; k < _QOMat.size(); ++k)
+							_vals(j + 1, k) 			= algebra::cast<double>(Operators::applyOverlap(_mbs_te, _QOMat[k]));
 					}
-					saveAlgebraic(dir, "measurement.h5", _vals, std::format("ED/{}/time_evo/Sz/0", i), true);
+
+					for (int j = 0; j < _QOMat.size(); ++j)
+						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("ED/{}/time_evo", _quenchOpNames[j]), true);
 				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false); 				// save the results to HDF5 file
@@ -221,35 +239,48 @@ void UI::nqsExcited()
 		_H->clearEigVec();
 		// ---------------
 		{
-			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");								// get LANCZOS diagonalization
-			const auto& _eigvec 	= _H->getEigVec();										// get the eigenvectors in Krylov basis
-			const auto& _krylov_mb 	= _H->getKrylov();										// get the Krylov basis
-			_Sz0Mat 				= (_krylov_mb.t() * _Sz0Mat) * _krylov_mb;				// get the Sz0 matrix in the Krylov basis
-			for (int i = 0; i < stateNum; ++i) 												// save the energies
+			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");									// get LANCZOS diagonalization
+			const auto& _eigvec 	= _H->getEigVec();											// get the eigenvectors in Krylov basis
+			const auto& _krylov_mb 	= _H->getKrylov();											// get the Krylov basis
+			if (this->nqsP.nqs_te_)
+			{
+				_QMat 				= algebra::change_basis_matrix(_krylov_mb, _QMat, true);	// change the basis of the quench operator
+				for (auto& _QOMat_ : _QOMat)
+					_QOMat_ 		= algebra::change_basis_matrix(_krylov_mb, _QOMat_, true);	// change the basis of the quench operator
+				// _QMat 				= (_krylov_mb.t() * _QMat) * _krylov_mb;				// get the Sz0 matrix in the Krylov basis
+				// _QOMat 				= (_krylov_mb.t() * _QOMat) * _krylov_mb;				// get the Sz0 matrix in the Krylov basis
+			}
+			
+			for (int i = 0; i < stateNum; ++i) 													// save the energies
 			{
 				const arma::Col<_T> _mbs = LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
-				_meas_LAN[i].measure(_mbs, _hilbert);										// save the measured quantities
-				_meansLAN(i) = _H->getEigVal(i);											// save the energies to the container
+				_meas_LAN[i].measure(_mbs, _hilbert);											// save the measured quantities
+				_meansLAN(i) = _H->getEigVal(i);												// save the energies to the container
 				LOGINFO(std::format("Found the ED (Lanczos) state({}) to be E={}", i, STRPS(_meansLAN[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
 				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", std::format("LAN/{}", i), fullED || i > 0 || this->nqsP.nqs_te_);
 				// ---------------
 				if (this->nqsP.nqs_te_)
 				{
-					arma::Col<_T> _mbsIn 				= _Sz0Mat * _eigvec.col(i);
-					arma::Col<double> _vals(_timespace.size(), arma::fill::zeros);
+					arma::Col<_T> _mbsIn 				= _QMat * _H->getEigVec(i);				// apply the quench operator to the state (i'th)
+					_mbsIn 								= _mbsIn / arma::norm(_mbsIn);			// normalize the state - be sure
+					arma::Mat<double> _vals(_timespace.size() + 1, _QOMat.size(), arma::fill::zeros);
 					const arma::Mat<_T>& _eigv 			= _H->getEigVec();
 					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
+					for (int j = 0; j < _QOMat.size(); ++j)
+						_vals(0, j) 					= algebra::cast<double>(Operators::applyOverlap(_mbsIn, _QOMat[j]));
 
 #pragma omp parallel for num_threads(this->threadNum)
 					for (int j = 0; j < _timespace.size(); ++j)
 					{
-						arma::Col<cpx> _mbsin 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
-						_vals(j) 						= algebra::cast<double>(Operators::applyOverlap(_mbsin, _Sz0Mat));
+						arma::Col<cpx> _mb_te 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
+						for (int k = 0; k < _QOMat.size(); ++k)
+							_vals(j + 1, k) 			= algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
 					}
-					saveAlgebraic(dir, "measurement.h5", _vals, std::format("LAN/{}/time_evo/Sz/0", i), true);
+					for (int j = 0; j < _QOMat.size(); ++j)
+						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("LAN/{}/time_evo", _quenchOpNames[j]), true);
 				}
 			}
-			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);			// save the results to HDF5 file
+			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);				// save the results to HDF5 file
 		}
 		// ---------------
 		_H->clear();
@@ -260,16 +291,16 @@ void UI::nqsExcited()
 	LOGINFO(nqsInfo, LOG_TYPES::TRACE, 2);
 	LOGINFO(1);
 
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};								// define the NQS states for the excited states
+	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};									// define the NQS states for the excited states
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 
 	{
 		_timer.checkpoint(VEQ(i));
-		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD;							// set up the energies container for NQS
+		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD;								// set up the energies container for NQS
 
 		if (!_NQS[i])
 			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, { this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });
 		
-		_NQS[i]->setTrainParExc(_parE);														// set the parameters in the excited states
+		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
 		{
 			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
 			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
@@ -311,27 +342,46 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
 			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
-			arma::Col<_T> _sz0(_parC.MC_sam_ * _parC.nblck_), _En(_parTime.nblck_);		// set up the containers for the time evolution
-			arma::Col<double> _sz0_mean(_timespace.size(), arma::fill::zeros);			// set up the container for the mean values
-			Operators::OperatorNQS<_T> _Sz0 = *_quenchOp.get();
+			arma::Col<_T> _vals(_parC.MC_sam_ * _parC.nblck_), _En(_parTime.nblck_);	// set up the containers for the time evolution
+			arma::Mat<double> _vals_mean(_timespace.size() + 1, 2, arma::fill::zeros);	// set up the container for the mean values
+			Operators::OperatorNQS<_T> _QOpM 	= *_quenchOpMeasure[0].get();
+			Operators::OperatorNQS<_T> _QOpM2 	= *_quenchOpMeasure[1].get();
 			
 			// reset the NQS
 			_NQS[j]->reset(_parTime.nblck_);											// reset the derivatives	
 			_NQS[j]->setModifier(_quenchOp);
 			_NQS[j]->evolveSet(_parTime, this->quiet, false);							// set the evolution function
-			_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);				// collect the data using ratio method - before the time evolution
-			_sz0_mean(0) = algebra::cast<double>(arma::mean(_sz0));						// save the mean value
-			LOGINFO("TE(" + STR(0) + "/" + STR(_timespace.size()) + ") Time = 0" + ", Sz_0 = " + STRPS(_sz0_mean(0), 3), LOG_TYPES::TRACE, 2);
+
+			// first operator
+			_NQS[j]->template collect<arma::Col<_T>>(_parC, _QOpM, &_vals);				// collect the data using ratio method - before the time evolution
+			_vals_mean(0, 0) = algebra::cast<double>(arma::mean(_vals));				// save the mean value
+			// second operator
+			_NQS[j]->template collect<arma::Col<_T>>(_parC, _QOpM2, &_vals);			// collect the data using ratio method - before the time evolution
+			_vals_mean(0, 1) = algebra::cast<double>(arma::mean(_vals));				// save the mean value
+
+			LOGINFO("TE(" + STR(0) + "/" + STR(_timespace.size()) + ") Time = 0", LOG_TYPES::TRACE, 2);
+			LOGINFO(_quenchOpNames[0] + STRPS(_vals_mean(0, 0), 3), LOG_TYPES::TRACE, 3);
+			LOGINFO(_quenchOpNames[1] + STRPS(_vals_mean(0, 1), 3), LOG_TYPES::TRACE, 3);
+
 			for (int i = 0; i < _timespace.size() - 1; ++i)
 			{
 				double _dt = _timespace(i + 1) - _timespace(i);							// set the time step for the evolution
 				_NQS[j]->evolveStepSet(i, _dt, _RKsolver);								// evolve the NQS
-				_NQS[j]->template collect<arma::Col<_T>>(_parC, _Sz0, &_sz0);			// collect the data using ratio method
-				_sz0_mean(i + 1) = algebra::cast<double>(arma::mean(_sz0));				// save the mean value
+				// first operator
+				_NQS[j]->template collect<arma::Col<_T>>(_parC, _QOpM, &_vals);			// collect the data using ratio method
+				_vals_mean(i + 1, 0) = algebra::cast<double>(arma::mean(_vals));		// save the mean value
+				// second operator
+				_NQS[j]->template collect<arma::Col<_T>>(_parC, _QOpM2, &_vals);		// collect the data using ratio method
+				_vals_mean(i + 1, 1) = algebra::cast<double>(arma::mean(_vals));		// save the mean value
 				if (i % 10 == 0)
-					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i + 1), 3) + ", Sz_0 = " + STRPS(_sz0_mean(i + 1), 3) + ", dt = " + STRPS(_dt, 2), LOG_TYPES::TRACE, 2);
+				{
+					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i + 1), 3), LOG_TYPES::TRACE, 2);
+					LOGINFO(_quenchOpNames[0] + STRPS(_vals_mean(i + 1, 0), 3), LOG_TYPES::TRACE, 3);
+					LOGINFO(_quenchOpNames[1] + STRPS(_vals_mean(i + 1, 1), 3), LOG_TYPES::TRACE, 3);
+				}
 			}
-			saveAlgebraic(dir, "measurement.h5", _sz0_mean, "NQS/" + STR(j) + "/time_evo/Sz/0", true);
+			saveAlgebraic(dir, "measurement.h5", _vals_mean.col(0), "NQS/" + STR(j) + std::format("/time_evo/{}", _quenchOpNames[0]), true);
+			saveAlgebraic(dir, "measurement.h5", _vals_mean.col(1), "NQS/" + STR(j) + std::format("/time_evo/{}", _quenchOpNames[1]), true);
 		}
 
 		if (_RKsolver) {

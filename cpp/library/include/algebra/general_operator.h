@@ -202,7 +202,7 @@ namespace Operators
 	class GeneralOperator
 	{
 	public:
-		/*
+		/**
 		* @brief Function for creating the matrix (overriden). If this is set, the matrix will be created using this function. Otherwise it is created 
 		* via standard procedure of acting on the states. This is useful for the operators that are not acting on the states directly or are random operators.
 		*/
@@ -240,7 +240,7 @@ namespace Operators
 		using repTypeV_ 									= 			repTypeV;
 		repType_ fun_;																		// function allowing to use the symmetry operation
 		repTypeV_ funV_;																	// function allowing to use the symmetry operation - for vectors
-
+		using innerType 									= 			_T;					// inner type of the operator	
 		// ====================================================================================================
 	
 	public:

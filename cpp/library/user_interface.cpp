@@ -513,6 +513,38 @@ bool UI::remainingSlurmTime(int _r, Timer* _timer, long _single_run_time, long _
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /**
+* @brief Retrieves a pair of global operators and their string representations.
+* 
+* This function generates a pair consisting of a vector of shared pointers to 
+* operators and a vector of their string representations based on the provided 
+* parameters. The operators are created using the OperatorNameParser class.
+* 
+* @tparam _T The type of the elements in the operators.
+* @tparam _OpT The type of the operator template.
+* @param _Nh The number of operators to be created.
+* @param _isquadratic A boolean flag indicating if the operators are quadratic.
+* @param _ismanybody A boolean flag indicating if the operators are many-body.
+* @return std::pair<v_sp_t<_OpT<_T>>, strVec> A pair containing a vector of 
+*         shared pointers to the operators and a vector of their string 
+*         representations.
+* 
+* @requires std::is_base_of_v<Operators::GeneralOperator<_T, typename _Op::repType, typename _Op::repTypeV>, _Op>
+*           && std::is_same_v<typename _Op::innerType, _T>
+*/
+template <typename _T, typename _OpT>
+std::pair<v_sp_t<_OpT>, strVec>
+	UI::ui_getoperators(const size_t _Nh, bool _isquadratic, bool _ismanybody) 
+		requires std::is_base_of_v<Operators::GeneralOperator<_T, typename _OpT::repType, typename _OpT::repTypeV>, _OpT> &&
+		std::is_same_v<typename _OpT::innerType, _T>
+{
+	const size_t _Ns = this->latP.Ntot_;
+	Operators::OperatorNameParser _parser(_Ns, _Nh);
+	return _parser.createGlobalOperators<double, _OpT>(this->modP.operators, _ismanybody, _isquadratic, &this->ran_);
+}
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/**
 * @brief Defines the lattice in the system
 * @return true if the lattice was defined successfully, false otherwise
 */
@@ -525,7 +557,7 @@ bool UI::defineLattice()
 	return true;
 }
 
-/*
+/**
 * @brief Defines the lattice in the system
 * @param _lat lattice to be defined
 * @param _typ type of the lattice
@@ -561,7 +593,7 @@ bool UI::defineLattice(std::shared_ptr<Lattice>& _lat, LatticeTypes _typ)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief defines the models based on the input parameters - interacting
 * Using the Hamiltonians defined within the class...
 */
@@ -597,8 +629,15 @@ bool UI::defineModels(bool _createLat, bool _checkSyms, bool _useHilbert)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
-* @brief defines the models based on the input parameters - quadratic
+
+/**
+* @brief Defines the models for the quantum eigen solver.
+*
+* This function creates a lattice if required, checks if the model is complex,
+* and defines the Hamiltonian accordingly. It logs the process at various stages.
+*
+* @param _createLat A boolean flag indicating whether to create a lattice.
+* @return True if the model is successfully defined, false otherwise.
 */
 bool UI::defineModelsQ(bool _createLat)
 {

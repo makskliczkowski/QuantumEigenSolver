@@ -1,12 +1,228 @@
-#include "../include/algebra/operators.h"
+#include "../../include/algebra/operators.h"
+#include "../../include/NQS/nqs_operator.h"
 
-// ------------------------------------------------------------------------------------------------------------------------------
+// ##########################################################################################################################
+
+namespace Operators
+{
+
+    // OperatorNameParser
+
+    // ##########################################################################################################################
+
+    /**
+    * @brief Creates a global operator based on the input string.
+    * 
+    * This function parses the input string to determine the type of operator and the sites it acts on.
+    * It then creates the corresponding operator and assigns it to the provided shared pointer.
+    * 
+    * @tparam _T The data type used by the operator.
+    * @tparam _Op The template for the operator type.
+    * @param _input The input string specifying the operator and sites.
+    * @param _operator A shared pointer to the operator to be created.
+    * @param _usesRealAllowed Flag indicating if real operators are allowed.
+    * @param _useHilbertAllowed Flag indicating if Hilbert space operators are allowed.
+    * @param _rgen Pointer to a random number generator, used for creating random operators.
+    * @return true If the operator was successfully created.
+    * @return false If the operator could not be created.
+    * @requires _Op is a subclass of GeneralOperator.
+    */
+	template <typename _T, typename _Op>
+    bool Operators::OperatorNameParser::createGlobalOperator(const std::string& _input, std::shared_ptr<_Op>& _operator,
+            bool _usesRealAllowed, bool _useHilbertAllowed, randomGen* _rgen)
+			requires std::is_base_of_v<Operators::GeneralOperator<_T, typename _Op::repType, typename _Op::repTypeV>, _Op> &&
+					 std::is_same_v<typename _Op::innerType, _T>
+    {
+        auto [op, sites] 		= this->resolveOperatorSeparator(_input);       // resolve the operator and the sites based on the input
+        
+        if (!this->operator_map_.contains(op))                                  // check if the operator is known
+            return false;
+
+        // check if the operator uses the Hilbert space or the lattice size
+        bool _usesHilbert 		= OperatorTypes::needsHilbertSpaceDim(this->operator_map_[op]);
+        
+        size_t _dimension 		= _usesHilbert ? this->Nh_ : this->L_;          // get the dimension - either the Hilbert space or the lattice size (depending on the character of the operator)
+        v_1d<long double> _sites= { 0 };
+        
+        bool _containsRandom 	= false;                                        // check if the sites contain the random operator
+        if (_containsRandom = sites.find(OPERATOR_SEP_RANDOM) != std::string::npos; !_containsRandom)
+            _sites = this->resolveSites(splitStr(sites, OPERATOR_SEP_CORR), _usesHilbert);
+
+        // filter the operators
+        if (!_useHilbertAllowed && (_usesHilbert || _containsRandom))
+            return false;
+        else if (!_usesRealAllowed && !_usesHilbert)
+            return false;
+
+        switch (operator_map_[op])
+        {
+        // !!!!! SPIN OPERATORS !!!!!
+        case OperatorTypes::OperatorsAvailable::Sx: 
+            _operator = std::make_shared<_Op>(Operators::SpinOperators::sig_x<_T>(_dimension, Vectors::convert<uint>(_sites)));
+            break;
+        case OperatorTypes::OperatorsAvailable::Sy:
+            // return Operators::SpinOperators::sig_y(this->L_, _sites);
+            break;
+        case OperatorTypes::OperatorsAvailable::Sz:
+            _operator = std::make_shared<_Op>(Operators::SpinOperators::sig_z<_T>(_dimension, Vectors::convert<uint>(_sites)));
+            break;
+        case OperatorTypes::OperatorsAvailable::SzR:
+			if constexpr (std::is_same_v<_T, double>)
+				_operator = std::make_shared<_Op>(Operators::SpinOperators::RandomSuperposition::sig_z(_dimension));
+            break;
+        case OperatorTypes::OperatorsAvailable::SzRV:
+			if constexpr (std::is_same_v<_T, double>)
+				_operator = std::make_shared<_Op>(Operators::SpinOperators::RandomSuperposition::sig_z_vanish(_dimension));
+            break;
+        // !!!!! QUADRATIC OPERATORS !!!!!
+        case OperatorTypes::OperatorsAvailable::ni:
+			if constexpr (std::is_same_v<_T, double>)
+				_operator = std::make_shared<_Op>(Operators::QuadraticOperators::site_occupation(_dimension, _sites[0]));	
+            break;
+        case OperatorTypes::OperatorsAvailable::nq:
+			if constexpr (std::is_same_v<_T, double>)		
+				_operator = std::make_shared<_Op>(Operators::QuadraticOperators::site_nq(_dimension, _sites[0]));
+            break;
+        case OperatorTypes::OperatorsAvailable::nn:
+			if constexpr (std::is_same_v<_T, double>)
+			{
+				if(_sites.size() == 1)
+					_operator = std::make_shared<_Op>(Operators::QuadraticOperators::nn_correlation(_dimension, _sites[0], _sites[0]));
+				else if (_sites.size() > 1)
+					_operator = std::make_shared<_Op>(Operators::QuadraticOperators::nn_correlation(_dimension, _sites[0], _sites[1]));
+			}
+            break;
+        case OperatorTypes::OperatorsAvailable::nk:
+			if constexpr (std::is_same_v<_T, double>)
+			{
+				if (_sites[0] == 0)
+					_operator = std::make_shared<_Op>(Operators::QuadraticOperators::quasimomentum_occupation(_dimension));
+			}
+            // else 
+                // return Operators::QuadraticOperators::quasimomentum_occupation(this->L_, _sites[0]);
+            break;
+        // !!!!!! RANDOM OPERATOR !!!!!!
+        case OperatorTypes::OperatorsAvailable::nr:
+        {
+			if constexpr (std::is_same_v<_T, double>)
+			{
+				if (_rgen)
+				{
+					// create the random operator
+					v_1d<double> _rcoefs = _rgen->random<double>(-1.0, 1.0, _dimension);
+					_operator = std::make_shared<_Op>(Operators::QuadraticOperators::site_occupation_r(_dimension, _rcoefs));
+				}
+				else 
+					return false;
+			}
+            break;	
+        }
+        default:
+            return false;
+        };
+        return true;
+    };
+
+    // template instantation
+    template bool Operators::OperatorNameParser::createGlobalOperator<double, Operators::Operator<double>>(const std::string&, 
+                                                                std::shared_ptr<Operators::Operator<double>>&, 
+                                                                bool, bool, randomGen*);
+    template bool Operators::OperatorNameParser::createGlobalOperator<cpx, Operators::Operator<cpx>>(const std::string&, 
+                                                                std::shared_ptr<Operators::Operator<cpx>>&, 
+                                                                bool, bool, randomGen*);
+    template bool Operators::OperatorNameParser::createGlobalOperator<double, Operators::OperatorNQS<double>>(const std::string&, 
+                                                                std::shared_ptr<Operators::OperatorNQS<double>>&, 
+                                                                bool, bool, randomGen*);
+    template bool Operators::OperatorNameParser::createGlobalOperator<cpx, Operators::OperatorNQS<cpx>>(const std::string&, 
+                                                                std::shared_ptr<Operators::OperatorNQS<cpx>>&, 
+                                                                bool, bool, randomGen*);
+    // ##########################################################################################################################
+
+    /**
+    * @brief Creates global operators from the input strings.
+    * 
+    * This function parses the input strings to determine the types of operators and the sites they act on.
+    * It then creates the corresponding operators and returns them along with their names.
+    * 
+    * @tparam _T The data type used by the operators.
+    * @tparam _Op The template for the operator type.
+    * @param _inputs The input strings specifying the operators and sites.
+    * @param _usesReal Flag indicating if real operators are allowed.
+    * @param _usesHilbert Flag indicating if Hilbert space operators are allowed.
+    * @param _rgen Pointer to a random number generator, used for creating random operators.
+    * @return A pair containing a vector of shared pointers to the created operators and a vector of their names.
+    * @requires _Op is a subclass of GeneralOperator.
+    */
+    template <typename _T, typename _Op>
+    std::pair<v_sp_t<_Op>, strVec> OperatorNameParser::createGlobalOperators(const strVec& _inputs,
+                                                                                        bool _usesReal,
+                                                                                        bool _usesHilbert,
+                                                                                        randomGen* _rgen)
+        requires std::is_base_of_v<Operators::GeneralOperator<_T, typename _Op::repType, typename _Op::repTypeV>, _Op> &&
+            std::is_same_v<typename _Op::innerType, _T>
+    {
+        v_sp_t<_Op> ops;
+        strVec _outStr = this->parse(_inputs);                  // parse the input strings
+
+        // create the operators
+        LOGINFO("Using operators: ", LOG_TYPES::INFO, 4);
+        strVec _msgs = {};
+        for (int i = 0; i < _outStr.size(); i++)
+            _msgs.push_back(STR(i) + ")" + _outStr[i]);
+        LOGINFO(_msgs, LOG_TYPES::INFO, 4);
+        
+        strVec _outOperators = {};								// try to parse the operators
+        for (auto& op : _outStr)
+        {
+            std::shared_ptr<_Op> _opin;
+
+            // check if the operator is valid
+            if (this->createGlobalOperator<_T>(op, _opin, _usesReal, _usesHilbert, _rgen))
+            {
+                if (!_opin->getFun())
+                    throw std::runtime_error("The operator: " + op + " is not valid.");
+
+                LOGINFO("Correctly parsed operator: " + op, LOG_TYPES::INFO, 4);
+                ops.push_back(_opin);
+                _outOperators.push_back(op);
+            }
+        }
+        return std::make_pair(ops, _outOperators);
+    }
+
+    // template instantation
+    template std::pair<v_sp_t<Operators::Operator<double>>, strVec> Operators::OperatorNameParser::createGlobalOperators<double, Operators::Operator<double>>(const strVec&, bool, bool, randomGen*);
+    template std::pair<v_sp_t<Operators::Operator<cpx>>, strVec> Operators::OperatorNameParser::createGlobalOperators<cpx, Operators::Operator<cpx>>(const strVec&, bool, bool, randomGen*);
+    template std::pair<v_sp_t<Operators::OperatorNQS<double>>, strVec> Operators::OperatorNameParser::createGlobalOperators<double, Operators::OperatorNQS<double>>(const strVec&, bool, bool, randomGen*);
+    template std::pair<v_sp_t<Operators::OperatorNQS<cpx>>, strVec> Operators::OperatorNameParser::createGlobalOperators<cpx, Operators::OperatorNQS<cpx>>(const strVec&, bool, bool, randomGen*);
+    // ##########################################################################################################################
+};
 
 // ##############################################################################################################################
 
-// ------------------------------------------------------------------------------------------------------------------------------
+/**
+* @brief Initializes the operator map with available operator names and their corresponding enum values.
+* 
+* This function iterates over the range of operator types defined in the OperatorsAvailable enum,
+* excluding the boundary values E and E2. For each valid operator type, it retrieves the string 
+* representation of the operator and maps it to its corresponding enum value in the operator_map_.
+*/
+void Operators::OperatorNameParser::initMap()
+{
+    for(int fooInt = static_cast<int>(OperatorTypes::OperatorsAvailable::E); fooInt != static_cast<int>(OperatorTypes::OperatorsAvailable::E2); fooInt++ )
+    {
+        if(fooInt == static_cast<int>(OperatorTypes::OperatorsAvailable::E2) || fooInt == static_cast<int>(OperatorTypes::OperatorsAvailable::E)) 
+            continue;
+        
+        // setup the name 
+        std::string fooStr 		= OperatorTypes::getSTR_OperatorsAvailable(static_cast<OperatorTypes::OperatorsAvailable>(fooInt));
+        operator_map_[fooStr] 	= static_cast<OperatorTypes::OperatorsAvailable>(fooInt);
+    }
+}
 
-/*
+// ##############################################################################################################################
+
+/**
 * @brief Create a parser for the operator names. It allows to parse the names of the operators and return the corresponding operator.
 * @param _inputs the input strings
 */
@@ -39,7 +255,7 @@ strVec Operators::OperatorNameParser::parse(const strVec& _inputs)
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Parse the operator name and return the corresponding operator.
 * @param _input the input string
 * @returns the operator names as strings
@@ -72,7 +288,7 @@ strVec Operators::OperatorNameParser::parse(const std::string& _input)
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Parse the site given as a string and return the corresponding site.
 * The format is {site} or {site}/{div} where div is the divisor of the site.
 * @param _input the input string
@@ -119,7 +335,7 @@ long double Operators::OperatorNameParser::resolveSite(const std::string &_site,
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Given single site ranges (something that occurs after /) resolve the sites.
 * @note The format is {site1}_{site2}_{site3}..._{siteN}
 * @param _sites the sites to resolve
@@ -157,7 +373,7 @@ strVec Operators::OperatorNameParser::resolveSitesMultiple(const std::string &_s
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Parse the list of string sites and change them to the integer sites.
 * @param _sites the sites to resolve
 */
@@ -174,7 +390,7 @@ std::vector<long double> Operators::OperatorNameParser::resolveSites(const strVe
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Resolve the correlation operator. For a given depth in the list of all combinations, resolve the correlation.
 * It can be {{1, 2}, {3, 4}, {5, 6}} and then the depth is recursively resolved.
 * @param _list the list of the lists of all the sites
@@ -209,7 +425,7 @@ void Operators::OperatorNameParser::resolveCorrelation(const std::vector<strVec>
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Checks whether the operator name is correctly formatted and returns the operator name and the index.
 * The format is {operator}/{index} where the index is the index of the operator (site) or multiple sites (operators).
 * @param _input the input string
@@ -232,7 +448,7 @@ std::pair<std::string, std::string> Operators::OperatorNameParser::resolveOperat
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Parse the operator name and return the corresponding operator for a single operator.
 * The format is {operator}/{index} where the index is the index of the operator (site).
 * @param _input the input string
@@ -261,7 +477,7 @@ std::string Operators::OperatorNameParser::parseSingleOperator(const std::string
 
 // ------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Parse the operator name and return the corresponding operator for a default operator.
 * The format is {operator} and it assumes that we have {operator}/1.L.1.
 */
@@ -272,7 +488,7 @@ strVec Operators::OperatorNameParser::parseDefault(const std::string & _input)
 
 // #############################################################################################################################
 
-/*
+/**
 * @brief Parse the operator name and return the corresponding operator for correlation operators.
 * The format is {operator}/{index1}_{index2}_..._{indexN} where the index is the index of the operator (site).
 */
@@ -315,9 +531,9 @@ strVec Operators::OperatorNameParser::parseCorrelationOperator(const std::string
 
 // #############################################################################################################################
 
-/*
-* @brief Multiple operators of the form 
-* {operator}/{index1},{index2},...{indexN} where the index is the index of the operator (site).
+/**
+* @brief Parse the operator name and return the corresponding operator for multiple operators.
+* The format is {operator}/{index1},{index2},...{indexN} where the index is the index of the operator (site).
 */
 strVec Operators::OperatorNameParser::parseMultipleOperators(const std::string &_input)
 {
@@ -343,9 +559,15 @@ strVec Operators::OperatorNameParser::parseMultipleOperators(const std::string &
 
 // #############################################################################################################################
 
-/*
-* @brief Parse the operator name and return the corresponding operator for range operators.
-* The format is {operator}/{start}.{stop}_{step}
+
+/**
+* @brief Parses a string representing an operator with potential range indices and returns a vector of strings with fully qualified operator names.
+*
+* This function takes an input string representing an operator and its indices, resolves the operator name and indices,
+* and returns a vector of strings where each string is a fully qualified operator name with its corresponding index.
+*
+* @param _input The input string representing the operator and its indices.
+* @return strVec A vector of strings containing the fully qualified operator names with their indices.
 */
 strVec Operators::OperatorNameParser::parseRangeOperators(const std::string &_input)
 {

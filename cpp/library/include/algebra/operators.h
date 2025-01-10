@@ -89,7 +89,7 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Applies the overlap between all the states in the matrix.
 	* @param _eigvecs the eigenvectors matrix
 	* @param _mat the many body matrix
@@ -101,6 +101,18 @@ namespace Operators
 		return _eigvecs.t() * (_mat * _eigvecs);
 	}
 
+	/**
+	* @brief Applies the overlap matrix to the eigenvectors.
+	*
+	* This function multiplies the transpose of the eigenvector matrix with the 
+	* overlap matrix (either sparse or dense) and then with the eigenvector matrix.
+	*
+	* @tparam _T The type of the elements in the eigenvector matrix.
+	* @tparam _T2 The type of the elements in the generalized matrix.
+	* @param _eigvecs The matrix of eigenvectors.
+	* @param _mat The generalized matrix which can be either sparse or dense.
+	* @return The resulting matrix after applying the overlap matrix to the eigenvectors.
+	*/
 	template<typename _T, typename _T2>
 	inline arma::Mat<_T> applyOverlapMat(const arma::Mat<_T>& _eigvecs, const GeneralizedMatrix<_T2>& _mat)
 	{
@@ -112,13 +124,24 @@ namespace Operators
 
 	// _____________________________________________________________________________________________________________________________
 
+	/**
+	* @brief Applies the overlap operation on a given column vector and matrix.
+	*
+	* This function computes the dot product of a column vector `_C` and the product of a matrix `_mat` with the same column vector `_C`.
+	*
+	* @tparam _M Type of the matrix.
+	* @tparam _Ct Type of the elements in the column vector.
+	* @param _C A column vector of type `arma::subview_col<_Ct>`.
+	* @param _mat A matrix of type `_M`.
+	* @return The result of the overlap operation as a value of type `_Ct`.
+	*/
 	template<typename _M, typename _Ct>
 	inline _Ct applyOverlap(const arma::subview_col<_Ct>& _C, const _M& _mat)
 	{
 		return arma::cdot(_C, _mat * _C);
 	}
 
-	/*
+	/**
 	* @brief Applies the many body matrix to a given state and saves the overlap <\Psi|O|\Psi>
 	* @param _Cleft many body state
 	* @param _Cright many body state
@@ -131,6 +154,18 @@ namespace Operators
 		return arma::cdot(_Cleft, _mat * _Cright);
 	}
 
+	/**
+	* @brief Applies the overlap operator to two column subvectors.
+	*
+	* This function computes the dot product of the left subvector with the product of the matrix and the right subvector.
+	*
+	* @tparam _Ct The type of the elements in the column subvectors.
+	* @tparam _M The type of the matrix.
+	* @param _Cleft The left column subvector.
+	* @param _Cright The right column subvector.
+	* @param _mat The matrix to be applied to the right subvector.
+	* @return The result of the dot product of the left subvector and the matrix-applied right subvector.
+	*/
 	template <typename _Ct, typename _M>
 	inline _Ct applyOverlap(const arma::subview_col<_Ct>& _Cleft, const arma::subview_col<_Ct>& _Cright, const _M& _mat)
 	{
@@ -367,8 +402,6 @@ namespace Operators
 
 	// ##########################################################################################################################################
 };
-
-#include "operators/operator_parser.hpp"
 
 #endif
 

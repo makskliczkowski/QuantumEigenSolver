@@ -11,6 +11,6 @@
 #ifndef OPERATORS_FINAL_HPP
 #define OPERATORS_FINAL_HPP
 
-#include "./operator_quadratic.hpp"
+#include "./operator_parser.hpp"
 
 #endif // OPERATORS_FINAL_HPP
