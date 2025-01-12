@@ -7,6 +7,7 @@
 #include "source/src/common.h"
 #include "source/src/lin_alg.h"
 #include <complex>
+#include <iostream>
 #include <string>
 
 namespace Operators
@@ -86,7 +87,7 @@ namespace Operators
 		* @return A pair containing the modified vector and the resulting value.
 		*/
 		template <typename _T>
-		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		_T sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
 		{
 			_T _val = 1.0;
 			if (_ref.size() != base_vec.size())
@@ -97,13 +98,14 @@ namespace Operators
 				flip(_ref, site, 0, Operators::_SPIN);
 				_val *= Operators::_SPIN;
 			}
-			return std::make_pair(_ref, _val);
+			return _val;
 		}
 
 		// template instantiation
 		OP_TMPLT_INST_PAIR(sig_x,, (u64, size_t, const v_1d<uint>&), u64);
 		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
-		OP_TMPLT_INST_PAIR(sig_x,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+		template double sig_x<double>(_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&);
+		template std::complex<double> sig_x<std::complex<double>>(_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&);
 
 		// #####################################
 
@@ -132,6 +134,7 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
+			_op.setNameS("Sx/" + std::to_string(_part));
 			return _op;
 		}
 
@@ -158,7 +161,14 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
-			_op.setNameS("Sx");
+
+			// set the name
+			std::string _name = "Sx/";
+			for (auto _part : sites)
+				_name += std::to_string(_part) + "-";
+			_name.pop_back(); // remove the last comma
+			_op.setNameS(_name);
+			
 			return _op;
 		}
 
@@ -189,7 +199,11 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
-			_op.setNameS("Sx");
+
+			// set the name
+			std::string _name = "Sx/1.L.1";
+			_op.setNameS(_name);
+
 			return _op;
 		}
 
@@ -294,31 +308,32 @@ namespace Operators
 
 
 		/**
-		 * @brief Applies the sigma_z operator to a given base vector.
-		 *
-		 * This function calculates the product of the sigma_z operator applied to the specified sites
-		 * of the base vector. The result is a pair consisting of the original base vector and the 
-		 * calculated value.
-		 *
-		 * @tparam _T The type of the value to be returned.
-		 * @param base_vec The base vector to which the sigma_z operator is applied.
-		 * @param _Ns The size of the system (number of sites).
-		 * @param sites A vector containing the indices of the sites where the sigma_z operator is applied.
-		 * @param _ref A reference vector used to check the binary state of each site (unnecessary parameter).
-		 * @return A pair consisting of the original base vector and the calculated value after applying the sigma_z operator.
-		 */
+		* @brief Applies the sigma_z operator to a given base vector.
+		*
+		* This function calculates the product of the sigma_z operator applied to the specified sites
+		* of the base vector. The result is a pair consisting of the original base vector and the 
+		* calculated value.
+		*
+		* @tparam _T The type of the value to be returned.
+		* @param base_vec The base vector to which the sigma_z operator is applied.
+		* @param _Ns The size of the system (number of sites).
+		* @param sites A vector containing the indices of the sites where the sigma_z operator is applied.
+		* @param _ref A reference vector used to check the binary state of each site (unnecessary parameter).
+		* @return A pair consisting of the original base vector and the calculated value after applying the sigma_z operator.
+		*/
 		template <typename _T>
-		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+		_T sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
 		{
 			_T _val = 1.0;
 			for (auto const& site : sites)
 				_val *= Binary::check(_ref, site) ? Operators::_SPIN : -Operators::_SPIN;
-			return std::make_pair(base_vec, _val);
+			return _val;
 		}
 
 		OP_TMPLT_INST_PAIR(sig_z,, (u64, size_t, const v_1d<uint>&), u64);
 		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&), _OP_V_T);
-		OP_TMPLT_INST_PAIR(sig_z,, (_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&), _OP_V_T);
+		template double sig_z(_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&);
+		template cpx sig_z(_OP_V_T_CR, size_t, const v_1d<uint>&, _OP_V_T&);
 
 		/**
 		* @brief Creates a sigma-z (Pauli-Z) operator for a quantum system.
@@ -362,7 +377,7 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
-			_op.setNameS("Sz");
+			_op.setNameS("Sz/" + STR(_part));
 			_op.setModifiesState(false);
 			return _op;
 		}
@@ -395,7 +410,13 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
 			_op.setActOn(_acts);
-			_op.setNameS("Sz_m");
+
+			std::string _name = "Sz/";
+			for (auto _part : sites)
+				_name += STR(_part) + "-";
+			_name.pop_back();
+
+			_op.setNameS(_name);
 			_op.setModifiesState(false);
 			return _op;
 		}
@@ -435,6 +456,9 @@ namespace Operators
 
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
+
+			std::string _name = "Sz/1.L.1";
+			_op.setNameS(_name);
 			_op.setActOn(_acts);
 			_op.setModifiesState(false);
 			return _op;
@@ -987,6 +1011,10 @@ namespace Operators
 		*/
 		namespace Flux
 		{
+			static constexpr int _X_BOND_NEI [[maybe_unused]] = 0;
+			static constexpr int _Y_BOND_NEI = 2;
+			static constexpr int _Z_BOND_NEI = 1;					// Z bond represents the diagonal bond
+
 			/**
 			* @brief Applies a series of quantum spin operations (X and Z) on a base vector.
 			*
@@ -1007,13 +1035,13 @@ namespace Operators
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
 					// Y bond
-					if (i % 3 == 1)
+					if (i % 3 == _Y_BOND_NEI)
 					{
 						_val 		*= Binary::check(base_vec, static_cast<int>(_Ns - 1 - sites[i])) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 						base_vec 	= flip(base_vec, static_cast<int>(_Ns - 1 - sites[i]));
 					}
 					// Z bond
-					if (i % 3 == 2)
+					else if (i % 3 == _Z_BOND_NEI)
 					{
 						_val 		*= Binary::check(base_vec, static_cast<int>(_Ns - 1 - sites[i])) ? Operators::_SPIN : -Operators::_SPIN;
 					}
@@ -1048,13 +1076,13 @@ namespace Operators
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
 					// Y bond 
-					if (i % 3 == 1)
+					if (i % 3 == _Y_BOND_NEI)
 					{
 						_val 		*= Binary::check(_base_vec, static_cast<int>(sites[i])) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 						flip(_base_vec, sites[i], 0, Operators::_SPIN);
 					}
 					// Z bond
-					if (i % 3 == 2)
+					if (i % 3 == _Z_BOND_NEI)
 					{
 						_val 		*= Binary::check(base_vec, static_cast<int>(sites[i])) ? Operators::_SPIN : -Operators::_SPIN;
 					}
@@ -1093,13 +1121,13 @@ namespace Operators
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
 					// Y bond 
-					if (i % 3 == 1)
+					if (i % 3 == _Y_BOND_NEI)
 					{
 						_val 		*= Binary::check(_ref, sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 						flip(_ref, sites[i], 0, Operators::_SPIN);
 					}
 					// Z bond 
-					if (i % 3 == 2)
+					if (i % 3 == _Z_BOND_NEI)
 					{
 						_val 		*= Binary::check(base_vec, sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
 					}
@@ -1773,7 +1801,7 @@ std::pair<u64, cpx> Operators::sigma_y(u64 base_vec, int L, const v_1d<uint>& si
 	auto tmp = base_vec;
 	cpx val = 1.0;
 	for (auto const& site : sites) {
-		val *= 
+		val *= Binary::check(base_vec, L - site - 1) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 		tmp = flip(tmp, L - 1 - site);
 	}
 	return std::make_pair(tmp, val);

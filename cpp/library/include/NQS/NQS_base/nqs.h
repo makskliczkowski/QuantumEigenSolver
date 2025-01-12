@@ -305,6 +305,11 @@ public:																	// --------------------- C O L L E C T I N G -----------
 	bool collectStep(size_t i, const MCS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr);
 	template <typename _CT>
 	void collect(const MonteCarlo::MCS_train_t& _par, Operators::OperatorNQS<_T>& _opG, _CT* _opvals, _CT* _energies = nullptr, bool reset = false);
+	// more 
+	template <typename _CT>
+	bool collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, const v_1d<Operators::OperatorNQS<_T>>& _opG, v_1d<_CT>& _opvals, _CT* _energies = nullptr);
+	template <typename _CT>
+	void collect(const MonteCarlo::MCS_train_t& _par, const v_1d<Operators::OperatorNQS<_T>>& _opG, v_1d<_CT>& _opvals, _CT* _energies = nullptr, bool reset = false); 
 	// measurement
 	virtual bool collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, 
 							NQSAv::MeasurementNQS<_T>& _meas,

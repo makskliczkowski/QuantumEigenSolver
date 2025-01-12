@@ -9,7 +9,7 @@
 
 #define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
 // --- NQS
-constexpr int UI_LIMITS_NQS_ED									= ULLPOW(26);
+constexpr int UI_LIMITS_NQS_ED									= ULLPOW(13);
 constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
 constexpr int UI_LIMITS_LANCZOS 								= ULLPOW(24);
 constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;

@@ -56,7 +56,7 @@ namespace Operators
 		template <typename _T = double>
 		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
 		template <typename _T = double>
-		std::pair<_OP_V_T, _T> sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		_T sig_x(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
 	
 		// ---
 		template <typename _T = double>
@@ -77,7 +77,7 @@ namespace Operators
 		template <typename _T = double>
 		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
 		template <typename _T = double>
-		std::pair<_OP_V_T, _T> sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		_T sig_z(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
 		// --- 
 		template <typename _T = double>
 		Operators::Operator<_T> sig_z(size_t _Ns, size_t _part);

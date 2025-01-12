@@ -772,3 +772,145 @@ NQS_INST_CMB(std::complex<double>, double, collect, void, (const MonteCarlo::MCS
 NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, Operators::OperatorNQS<std::complex<double>>&, arma::Col<std::complex<double>>*, arma::Col<std::complex<double>>*, bool));
 
 // ##########################################################################################################################################
+
+// MULTIPLE
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+template<typename _CT>
+bool NQS<_spinModes, _Ht, _T, _stateType>::collectStep(size_t i, const MonteCarlo::MCS_train_t& _par, const v_1d<Operators::OperatorNQS<_T>>& _opG, v_1d<_CT>& _opvals, _CT* _energies)
+{	
+	try
+    {
+        const size_t _startElem = (_par.nblck_ * (i - 1));          // start element for the containers
+#ifdef _DEBUG
+        if (_energies) 
+		{
+			if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+				assert(_energies->size() >= _startElem + _par.nblck_);
+			else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+				assert(_energies->n_elem >= _startElem + _par.nblck_);
+		}
+
+		if (true)
+		{
+			if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+			{
+				for (int xx = 0; xx < _opvals.size(); ++xx)
+					assert(_opvals[xx].size() >= _startElem + _par.nblck_);
+			}
+			else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+			{
+				for (int xx = 0; xx < _opvals.size(); ++xx)
+					assert(_opvals[xx].n_elem >= _startElem + _par.nblck_);
+			}
+		}
+#endif
+
+        this->blockSample<false>(_par.MC_th_, NQS_STATE);			// thermalize the system - burn-in - does not need to set the state at the beginning
+        for (uint _taken = 0; _taken < _par.nblck_; ++_taken)       // iterate blocks - allows to collect samples outside of the block
+        {
+            this->blockSample<false>(_par.bsize_, NQS_STATE);       // sample them using the local Metropolis sampling - sample the states
+
+            if (_energies) {
+				if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+					(*_energies)[_startElem + _taken] = this->locEnKernel();   // local energy - stored at each point within the estimation of the gradient (stochastic)
+				else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+					(*_energies)(_startElem + _taken) = this->locEnKernel();   // local energy - stored at each point within the estimation of the gradient (stochastic)
+			}
+
+			for (int xx = 0; xx < _opG.size(); ++xx)
+			{
+				const auto _val = _opG[xx](NQS_STATE, this->pRatioFunc_);	// calculate the operator value
+				if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+					_opvals[xx][_startElem + _taken] = _val;				// calculate the operator value
+				else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+					_opvals[xx](_startElem + _taken) = _val;				// calculate the operator value
+			}
+		}
+	}
+    catch (const std::exception& e) {
+        LOGINFO("Error in the NQS collection step: " + std::string(e.what()), LOG_TYPES::ERROR, 1);
+        return false;
+    }
+    return true;
+}
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+// v_1d
+template bool NQS<2u, double, double, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_2d<double>&, v_1d<double>*);
+template bool NQS<2u, double, std::complex<double>, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_2d<std::complex<double>>&, v_1d<std::complex<double>>*);
+template bool NQS<2u, std::complex<double>, double, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_2d<double>&, v_1d<double>*);
+template bool NQS<2u, std::complex<double>, std::complex<double>, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_2d<std::complex<double>>&, v_1d<std::complex<double>>*);
+// arma::Col
+template bool NQS<2u, double, double, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<arma::Col<double>>&, arma::Col<double>*);
+template bool NQS<2u, double, std::complex<double>, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<arma::Col<std::complex<double>>>&, arma::Col<std::complex<double>>*);
+template bool NQS<2u, std::complex<double>, double, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<arma::Col<double>>&, arma::Col<double>*);
+template bool NQS<2u, std::complex<double>, std::complex<double>, double>::collectStep(size_t, const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<arma::Col<std::complex<double>>>&, arma::Col<std::complex<double>>*);
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+template<typename _CT>
+void NQS<_spinModes, _Ht, _T, _stateType>::collect(const MonteCarlo::MCS_train_t& _par, const v_1d<Operators::OperatorNQS<_T>>& _opG, v_1d<_CT>& _opvals, _CT* _energies, bool reset)
+{
+	if (reset) {
+		this->setRandomFlipNum(_par.nFlip);                        	// set the random state at the begining
+		this->setRandomState();										// set the random state at the begining and the number of flips
+	}
+
+#ifdef _DEBUG
+	if (_energies) 
+	{
+		if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+		{
+			if (_energies->size() != _par.MC_sam_ * _par.nblck_)
+				_energies->resize(_par.MC_sam_ * _par.nblck_);
+		}
+		else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+		{
+			if (_energies->n_elem != _par.MC_sam_)
+				_energies->resize(_par.MC_sam_);
+		}
+	}
+	if (true) 
+	{
+		if constexpr (std::is_same_v<_CT, v_1d<_T>>)
+		{
+			for (int xx = 0; xx < _opvals.size(); ++xx)
+			{
+				if (_opvals[xx].size() != _par.MC_sam_ * _par.nblck_)
+					_opvals[xx].resize(_par.MC_sam_ * _par.nblck_);
+			}
+		}
+		else if constexpr (std::is_same_v<_CT, arma::Col<_T>>)
+		{
+			for (int xx = 0; xx < _opvals.size(); ++xx)
+			{
+				if (_opvals[xx].n_elem != _par.MC_sam_ * _par.nblck_)
+					_opvals[xx].resize(_par.MC_sam_ * _par.nblck_);
+			}
+		}
+	}
+#endif
+
+	for (uint i = 1; i <= _par.MC_sam_; ++i)
+	{
+		if (!this->collectStep(i, _par, _opG, _opvals, _energies))
+			break;
+	}
+}
+
+// template instantiation of function above for <spins, double and complex, double and complex, double>
+// v_1d
+NQS_INST_CMB(double, double, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<v_1d<double>>&, v_1d<double>*, bool));
+NQS_INST_CMB(double, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<v_1d<std::complex<double>>>&, v_1d<std::complex<double>>*, bool));
+NQS_INST_CMB(std::complex<double>, double, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<v_1d<double>>&, v_1d<double>*, bool));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<v_1d<std::complex<double>>>&, v_1d<std::complex<double>>*, bool));
+// arma::Col
+NQS_INST_CMB(double, double, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<arma::Col<double>>&, arma::Col<double>*, bool));
+NQS_INST_CMB(double, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<arma::Col<std::complex<double>>>&, arma::Col<std::complex<double>>*, bool));
+NQS_INST_CMB(std::complex<double>, double, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<double>>&, v_1d<arma::Col<double>>&, arma::Col<double>*, bool));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, collect, void, (const MonteCarlo::MCS_train_t&, const v_1d<Operators::OperatorNQS<std::complex<double>>>&, v_1d<arma::Col<std::complex<double>>>&, arma::Col<std::complex<double>>*, bool));
+
+// ##########################################################################################################################################
