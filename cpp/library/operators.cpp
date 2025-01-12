@@ -3,6 +3,7 @@
 #include "include/algebra/operator_algebra.h"
 #include "include/algebra/operators/operators_generic.hpp"
 #include "source/src/Include/str.h"
+#include "source/src/binary.h"
 #include "source/src/common.h"
 #include "source/src/lin_alg.h"
 #include <complex>
@@ -1005,19 +1006,18 @@ namespace Operators
 				cpx _val = 1.0;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					// Y bond goes as firts 
-					if (i % 3 == 0)
-					{
-						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
-						base_vec 	= flip(base_vec, _Ns - 1 - sites[i]);
-					}
-					// Z bond goes as next
+					// Y bond
 					if (i % 3 == 1)
 					{
-						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
-
+						_val 		*= Binary::check(base_vec, static_cast<int>(_Ns - 1 - sites[i])) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						base_vec 	= flip(base_vec, static_cast<int>(_Ns - 1 - sites[i]));
 					}
-					// X bond goes last
+					// Z bond
+					if (i % 3 == 2)
+					{
+						_val 		*= Binary::check(base_vec, static_cast<int>(_Ns - 1 - sites[i])) ? Operators::_SPIN : -Operators::_SPIN;
+					}
+					// X bond
 					else
 					{
 						base_vec 	= flip(base_vec, _Ns - 1 - sites[i]);
@@ -1047,19 +1047,18 @@ namespace Operators
 				_OP_V_T _base_vec 	= base_vec;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					// Y bond goes as firts 
-					if (i % 3 == 0)
-					{
-						_val 		*= checkBit(_base_vec, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
-						flip(_base_vec, sites[i], 0, Operators::_SPIN);
-					}
-					// Z bond goes as next
+					// Y bond 
 					if (i % 3 == 1)
 					{
-						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
-
+						_val 		*= Binary::check(_base_vec, static_cast<int>(sites[i])) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						flip(_base_vec, sites[i], 0, Operators::_SPIN);
 					}
-					// X bond goes last
+					// Z bond
+					if (i % 3 == 2)
+					{
+						_val 		*= Binary::check(base_vec, static_cast<int>(sites[i])) ? Operators::_SPIN : -Operators::_SPIN;
+					}
+					// X bond
 					else
 					{
 						_val 		*= Operators::_SPIN;
@@ -1085,7 +1084,7 @@ namespace Operators
 			* @return A pair consisting of the modified reference vector and the resulting value.
 			*/
 			template <typename _T>
-			std::pair<_OP_V_T, _T> sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
+			_T sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
 			{
 				cpx _val = 1.0;
 				if (_ref.size() != base_vec.size())
@@ -1093,26 +1092,25 @@ namespace Operators
 
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					// Y bond goes as firts 
-					if (i % 3 == 0)
-					{
-						_val 		*= checkBit(_ref, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
-						flip(_ref, sites[i], 0, Operators::_SPIN);
-					}
-					// Z bond goes as next
+					// Y bond 
 					if (i % 3 == 1)
 					{
-						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
-
+						_val 		*= Binary::check(_ref, sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						flip(_ref, sites[i], 0, Operators::_SPIN);
 					}
-					// X bond goes last
+					// Z bond 
+					if (i % 3 == 2)
+					{
+						_val 		*= Binary::check(base_vec, sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
+					}
+					// X bond 
 					else
 					{
 						_val 		*= Operators::_SPIN;
 						flip(_ref, sites[i], 0, Operators::_SPIN);
 					}
 				}
-				return std::make_pair(base_vec, algebra::cast<_T>(_val));
+				return algebra::cast<_T>(_val);
 			}
 
 			// template instantiation
@@ -1120,8 +1118,8 @@ namespace Operators
 			template std::pair<u64, std::complex<double>> sig_f<std::complex<double>>(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
 			template std::pair<_OP_V_T, double> sig_f<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
 			template std::pair<_OP_V_T, std::complex<double>> sig_f<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
-			template std::pair<_OP_V_T, double> sig_f<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
-			template std::pair<_OP_V_T, std::complex<double>> sig_f<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+			template double sig_f<double>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+			template cpx sig_f<std::complex<double>>(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
 
 			// operator 
 			template <typename _T>
@@ -1141,7 +1139,13 @@ namespace Operators
 				// set the operator
 				Operators::Operator<_T> _op(_Ns, 1.0, fun_, funV_);
 				_op.setActOn(_acts);
-				_op.setNameS("Flux");
+
+				std::string _sitesname = "";
+				for (auto& s : sites)
+					_sitesname +=  STR(s) + ",";
+				_sitesname.pop_back();
+
+				_op.setNameS("flux_" + _sitesname);
 				return _op;
 			}
 
