@@ -391,12 +391,13 @@ namespace NQSAv
         _nameLocal  = _nameLocal.size() == 0 ? "op_local" : _nameLocal;
         _nameCorr   = _nameCorr.size() == 0 ? "op_corr" : _nameCorr;
         _appName    = _appName.size() == 0 ? "NQS/" : _appName;
-
+        bool _ctd   = false;
         BEGIN_CATCH_HANDLER
         {
             // save global
             for (int i = 0; i < this->opG_.size(); ++i)
             {
+                _ctd            |= true;
                 auto& _cont     = this->containersG_[i];
                 auto& _op       = this->opG_[i];
                 auto _name      = _op->getNameS();
@@ -406,7 +407,7 @@ namespace NQSAv
 					const auto M = _cont.template mean<cpx>();
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameGlobal + ext, M, _appName + "/glob/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameGlobal + ext, M, _appName + "/glob/" + _name, i > 0 || app || _ctd);
 				}
             }
         }
@@ -417,6 +418,7 @@ namespace NQSAv
             // save local
             for (int i = 0; i < this->opL_.size(); ++i)
             {
+                _ctd        |= true;
                 auto& _cont = this->containersL_[i];
                 auto& _op   = this->opL_[i];
                 auto _name  = _op->getNameS();
@@ -427,7 +429,7 @@ namespace NQSAv
 					// save!
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || app || _ctd);
 				}
             }
         }
@@ -438,6 +440,7 @@ namespace NQSAv
             // save correlation
             for (int i = 0; i < this->opC_.size(); ++i)
             {
+                _ctd            |= true;
                 auto& _cont     = this->containersC_[i];
                 auto& _op       = this->opC_[i];
                 auto _name      = _op->getNameS();
@@ -448,7 +451,7 @@ namespace NQSAv
 					// save!
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || app || _ctd);
 				}
             }
         }

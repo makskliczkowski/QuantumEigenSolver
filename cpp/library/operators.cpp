@@ -188,7 +188,7 @@ namespace Operators
 			// set the operator
 			Operator<_T> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
 			_op.setActOn(_acts);
-			_op.setNameS("Sx/L");
+			_op.setNameS("Sx");
 			return _op;
 		}
 
@@ -211,7 +211,7 @@ namespace Operators
 
 			// set the operator
 			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
-			_op.setNameS("Sx/C");
+			_op.setNameS("Sx/L");
 			return _op;
 		}
 
@@ -233,7 +233,7 @@ namespace Operators
 			_COR_V<_T> funV_ 	= [_Ns](_OP_V_T_CR state, uint _s1, uint _s2) { return sig_x<_T>(state, _Ns, {_s1, _s2}); };
 
 			Operator<_T, uint, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SX);
-			_op.setNameS("Sx");
+			_op.setNameS("Sx/C");
 			return _op;
 		}
 
@@ -468,7 +468,7 @@ namespace Operators
 
 			// set the operator
 			Operator<_T, uint> _op(_Ns, 1.0, fun_, funV_, SymGenerators::SZ);
-			_op.setNameS("Sz/C");
+			_op.setNameS("Sz/L");
 			_op.setModifiesState(false);
 			return _op;
 		}
@@ -1002,26 +1002,29 @@ namespace Operators
 			template <typename _T>
 			std::pair<u64, _T> sig_f(u64 base_vec, size_t _Ns, const v_1d<uint>& sites)
 			{
-				_T _val = 1.0;
+				cpx _val = 1.0;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 1)
+					// Y bond goes as firts 
+					if (i % 3 == 0)
 					{
-						for (auto const& site : sites)
-						{
-							base_vec = flip(base_vec, _Ns - 1 - site);
-							_val *= Operators::_SPIN;
-						}
+						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						base_vec 	= flip(base_vec, _Ns - 1 - sites[i]);
 					}
+					// Z bond goes as next
+					if (i % 3 == 1)
+					{
+						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
+
+					}
+					// X bond goes last
 					else
 					{
-						for (auto const& site : sites)
-						{
-							_val *= checkBit(base_vec, _Ns - 1 - site) ? Operators::_SPIN : -Operators::_SPIN;
-						}
+						base_vec 	= flip(base_vec, _Ns - 1 - sites[i]);
+						_val 		*= Operators::_SPIN;
 					}
 				}
-				return std::make_pair(base_vec, _val);
+				return std::make_pair(base_vec, algebra::cast<_T>(_val));
 			}
 
 			/**
@@ -1040,25 +1043,30 @@ namespace Operators
 			template <typename _T>
 			std::pair<_OP_V_T, _T> sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites)
 			{
-				_T _val = 1.0;
-				_OP_V_T _base_vec = base_vec;
+				cpx _val 			= 1.0;
+				_OP_V_T _base_vec 	= base_vec;
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 1)
+					// Y bond goes as firts 
+					if (i % 3 == 0)
 					{
-						for (auto const& site : sites)
-						{
-							flip(_base_vec, site, 0, _SPIN);
-							_val *= Operators::_SPIN;
-						}
+						_val 		*= checkBit(_base_vec, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						flip(_base_vec, sites[i], 0, Operators::_SPIN);
 					}
+					// Z bond goes as next
+					if (i % 3 == 1)
+					{
+						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
+
+					}
+					// X bond goes last
 					else
 					{
-						for (auto const& site : sites)
-							_val *= checkBit(_base_vec, site) ? Operators::_SPIN : -Operators::_SPIN;
+						_val 		*= Operators::_SPIN;
+						flip(_base_vec, sites[i], 0, Operators::_SPIN);
 					}
 				}
-				return std::make_pair(_base_vec, _val);
+				return std::make_pair(base_vec, algebra::cast<_T>(_val));
 			}
 
 			/**
@@ -1079,25 +1087,32 @@ namespace Operators
 			template <typename _T>
 			std::pair<_OP_V_T, _T> sig_f(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref)
 			{
-				_T _val = 1.0;
+				cpx _val = 1.0;
 				if (_ref.size() != base_vec.size())
 					_ref = base_vec;
 
 				for (size_t i = 0; i < sites.size(); ++i)
 				{
-					if (i % 2 == 1)
+					// Y bond goes as firts 
+					if (i % 3 == 0)
 					{
-						for (auto const& site : sites)
-						{
-							flip(_ref, site, 0, _SPIN);
-							_val *= Operators::_SPIN;
-						}
+						_val 		*= checkBit(_ref, _Ns - 1 - sites[i]) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+						flip(_ref, sites[i], 0, Operators::_SPIN);
 					}
+					// Z bond goes as next
+					if (i % 3 == 1)
+					{
+						_val 		*= checkBit(base_vec, _Ns - 1 - sites[i]) ? Operators::_SPIN : -Operators::_SPIN;
+
+					}
+					// X bond goes last
 					else
-						for (auto const& site : sites)
-							_val *= checkBit(_ref, site) ? Operators::_SPIN : -Operators::_SPIN;
+					{
+						_val 		*= Operators::_SPIN;
+						flip(_ref, sites[i], 0, Operators::_SPIN);
+					}
 				}
-				return std::make_pair(_ref, _val);
+				return std::make_pair(base_vec, algebra::cast<_T>(_val));
 			}
 
 			// template instantiation
@@ -1724,7 +1739,7 @@ namespace Operators
 // ##############################################################################################################################
 
 /*
-* @brief multiplication of sigma_xi | state >
+* @brief multiplication of sigma_xi | state >checkBit(tmp, L - 1 - site) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 * @param L lattice dimensionality (base vector length)
 * @param sites the sites to meassure correlation at
 */
@@ -1754,7 +1769,7 @@ std::pair<u64, cpx> Operators::sigma_y(u64 base_vec, int L, const v_1d<uint>& si
 	auto tmp = base_vec;
 	cpx val = 1.0;
 	for (auto const& site : sites) {
-		val *= checkBit(tmp, L - 1 - site) ? I * Operators::_SPIN : -I * Operators::_SPIN;
+		val *= 
 		tmp = flip(tmp, L - 1 - site);
 	}
 	return std::make_pair(tmp, val);

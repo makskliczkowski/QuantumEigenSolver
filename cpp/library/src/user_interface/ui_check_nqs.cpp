@@ -157,6 +157,8 @@ void UI::nqsExcited()
 		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SxL)));
 		Operators::Operator<_T, uint, uint> _SzC 	= Operators::SpinOperators::sig_z_c<_T>(Nvis);
 		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SzC)));
+		Operators::Operator<_T, uint, uint> _SxC 	= Operators::SpinOperators::sig_x_c<_T>(Nvis);
+		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SxC)));
 		// special flux operator
 		Operators::Operator<_T> _flux 				= Operators::SpinOperators::Flux::sig_f<_T>(Nvis, this->latP.lat->get_flux_sites(0, 0));
 		_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
@@ -186,6 +188,27 @@ void UI::nqsExcited()
 		saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
 	}
 
+	// save lattice information
+	bool _saved = false;
+	if (this->latP.lat && this->latP.typ_ == LatticeTypes::HON)
+	{
+		arma::Mat<double> bonds_ = -arma::Mat<double>(Nvis, 3, arma::fill::ones);
+		for (int i = 0; i < Nvis; ++i)
+		{
+			uint NUM_OF_NN = (uint)this->latP.lat->get_nn_ForwardNum(i);
+			for (uint nn = 0; nn < NUM_OF_NN; nn++)
+			{
+				if (int nei = this->latP.lat->get_nnf(i, nn); nei >= 0) 
+				{
+					bonds_(i, nn) = nei;
+				}
+			}
+		}
+		saveAlgebraic(dir, "history.h5", bonds_, "lattice", false); 				// save the results to HDF5 file
+		_saved = true;
+	}
+
+	// check ED
 	if (lanED || fullED)
 	{
 		_H->buildHamiltonian();
@@ -229,10 +252,10 @@ void UI::nqsExcited()
 					}
 
 					for (int j = 0; j < _QOMat.size(); ++j)
-						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("ED/{}/time_evo", _quenchOpNames[j]), true);
+						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("ED/time_evo/{}", _quenchOpNames[j]), true);
 				}
 			}
-			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", false); 				// save the results to HDF5 file
+			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", _saved); 				// save the results to HDF5 file
 		}
 		// ---------------
 		_H->clearEigVal();
@@ -277,7 +300,7 @@ void UI::nqsExcited()
 							_vals(j + 1, k) 			= algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
 					}
 					for (int j = 0; j < _QOMat.size(); ++j)
-						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("LAN/{}/time_evo", _quenchOpNames[j]), true);
+						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("LAN/time_evo/{}", _quenchOpNames[j]), true);
 				}
 			}
 			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);				// save the results to HDF5 file
