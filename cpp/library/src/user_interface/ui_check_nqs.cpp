@@ -160,8 +160,11 @@ void UI::nqsExcited()
 		Operators::Operator<_T, uint, uint> _SxC 	= Operators::SpinOperators::sig_x_c<_T>(Nvis);
 		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SxC)));
 		// special flux operator
-		Operators::Operator<_T> _flux 				= Operators::SpinOperators::Flux::sig_f<_T>(Nvis, this->latP.lat->get_flux_sites(1, 0));
-		_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
+		if (this->latP.lat->get_Type() == LatticeTypes::HON && Nvis > 16)
+		{
+			Operators::Operator<_T> _flux 			= Operators::SpinOperators::Flux::sig_f<_T>(Nvis, this->latP.lat->get_flux_sites(1, 0));
+			_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
+		}
 	}
 	// ---------------
 	v_1d<NQSAv::MeasurementNQS<_T> > _meas_ED, _meas_LAN, _meas_NQS;
@@ -366,7 +369,7 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
 			v_1d<arma::Col<_T>> _vals(_quenchOpMeasure.size(), arma::Col<_T>(_parC.MC_sam_ * _parC.nblck_));
 			arma::Col<_T> _En(_parTime.nblck_);											// set up the containers for the time evolution
-			arma::Mat<double> _vals_mean(_timespace.size() + 1, 2, arma::fill::zeros);	// set up the container for the mean values
+			arma::Mat<double> _vals_mean(_timespace.size() + 1, _quenchOpMeasure.size(), arma::fill::zeros); // set up the container for the mean values
 
 			// set up the operators for the time evolution
 			v_1d<Operators::OperatorNQS<_T>> _QOpM_v;
