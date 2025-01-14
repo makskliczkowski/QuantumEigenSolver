@@ -540,7 +540,9 @@ void UI::nqsExcited()
 	arma::Col<_T> _meansED(stateNum, arma::fill::zeros), _meansLAN(stateNum, arma::fill::zeros);
 	if (lanED || fullED)
 	{ 	
-		std::tie(_meansED, _meansLAN) = nqs_perform_diag<_T, _spinModes>(stateNum, this->nqsP.nqs_te_, fullED, _saved, _H.get(), _meas_ED, _meas_LAN, _hilbert, _quenchOp, _quenchOpMeasure, _timespace, dir, this->threadNum);
+		std::tie(_meansED, _meansLAN) = nqs_perform_diag<_T, _spinModes>(stateNum, this->nqsP.nqs_te_, 
+					fullED, _saved, 
+					_H.get(), _meas_ED, _meas_LAN, _hilbert, _quenchOp, _quenchOpMeasure, _timespace, dir, this->threadNum);
 		LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
 		LOGINFO(2);
 	}
@@ -569,7 +571,7 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 		}
 
 		{
-			const bool _append = lanED || fullED || i > 0;
+			const bool _append = lanED || fullED || i > 0 || _saved;
 			_NQS[i]->save_history(dir, _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD, 
 										this->nqsP.nqs_ex_beta_, 
 										_meansNQS, _stdsNQS, i, _append);
@@ -580,10 +582,11 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	}
 	
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) {
-		LOGINFO("True energies: EED_" + STR(i) + " = " + STRP(_meansED[i], UI_NQS_PRECISION) + 
-				", ELAN_" + STR(i) + " = " + STRP(_meansLAN[i], UI_NQS_PRECISION) + 
-				", ENQS_" + STR(i) + " = " + STRP(_meansNQS[i], UI_NQS_PRECISION) + 
-				" +- " + STRPS(_stdsNQS(i) / 2.0, UI_NQS_PRECISION), LOG_TYPES::TRACE, 2);
+		LOGINFO(std::format("True energies: EED_{} = {}, ELAN_{} = {}, ENQS_{} = {} +- {}", 
+				i, STRP(_meansED[i], UI_NQS_PRECISION), 
+				i, STRP(_meansLAN[i], UI_NQS_PRECISION), 
+				i, STRP(_meansNQS[i], UI_NQS_PRECISION), 
+				STRPS(_stdsNQS(i) / 2.0, UI_NQS_PRECISION)), LOG_TYPES::TRACE, 2);
 	}
 
 	// try time evolution 
