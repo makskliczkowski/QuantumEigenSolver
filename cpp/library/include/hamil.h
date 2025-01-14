@@ -243,7 +243,7 @@ public:
 	auto calcEnIdx(double _E)							-> u64;										// calculate the index of the energy closest to the given energy
 
 public:
-	virtual auto buildHamiltonian(bool = false)			-> void;
+	virtual auto buildHamiltonian(bool = true)			-> void;
 	virtual auto diagH(bool = false, bool = true)		-> void;									// diagonalize the Hamiltonian
 	auto diagHs(bool woEigVec = false)					-> void;									// diagonalize the Hamiltonian sparse
 	auto diagH(bool woEigVec, 

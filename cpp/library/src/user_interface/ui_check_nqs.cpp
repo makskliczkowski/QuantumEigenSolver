@@ -35,6 +35,366 @@ void UI::makeSimNQSExcited()
 	this->nqsExcited<cpx, 2>();
 }
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template <typename _T>
+using v_sp_t_NQS_g = v_sp_t<Operators::OperatorNQS<_T>>;
+template <typename _T>
+using v_sp_t_NQS_l = v_sp_t<Operators::OperatorNQS<_T, uint>>;
+template <typename _T>
+using v_sp_t_NQS_c = v_sp_t<Operators::OperatorNQS<_T, uint, uint>>;
+
+template <typename _T>
+static void get_NQS_operators_test(	v_sp_t<Operators::OperatorNQS<_T>>& _opsG, 
+									v_sp_t<Operators::OperatorNQS<_T, uint>>& _opsL, 
+									v_sp_t<Operators::OperatorNQS<_T, uint, uint>>& _opsC,
+									uint _Nvis,
+									std::shared_ptr<Lattice>& _lat)
+{
+	// clear the operators
+	_opsC.clear();
+	_opsL.clear();
+	_opsG.clear();
+	// set up the operators to save - local	
+	Operators::Operator<_T, uint> _SzL 			= Operators::SpinOperators::sig_z_l<_T>(_Nvis);
+	_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
+	Operators::Operator<_T, uint> _SxL 			= Operators::SpinOperators::sig_x_l<_T>(_Nvis);
+	_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SxL)));
+	// set up the operators to save - correlation
+	Operators::Operator<_T, uint, uint> _SzC 	= Operators::SpinOperators::sig_z_c<_T>(_Nvis);
+	_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SzC)));
+	Operators::Operator<_T, uint, uint> _SyC 	= Operators::SpinOperators::sig_y_c<_T>(_Nvis);
+	_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SyC)));
+	Operators::Operator<_T, uint, uint> _SxC 	= Operators::SpinOperators::sig_x_c<_T>(_Nvis);
+	_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SxC)));
+	// special flux operator - as global
+	if (_lat && (_lat->get_Type() == LatticeTypes::HON ||  _lat->get_Type() == LatticeTypes::HEX) && _Nvis >= 10)
+	{
+		Operators::Operator<_T> _flux 			= Operators::SpinOperators::Flux::sig_f<_T>(_Nvis, _lat->get_flux_sites(1, 0));
+		_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
+	}
+}
+// template instantiation
+template void get_NQS_operators_test<double>(v_sp_t<Operators::OperatorNQS<double>>& _opsG, 
+										v_sp_t<Operators::OperatorNQS<double, uint>>& _opsL, 
+										v_sp_t<Operators::OperatorNQS<double, uint, uint>>& _opsC,
+										uint _Nvis,
+										std::shared_ptr<Lattice>& _lat);
+template void get_NQS_operators_test<cpx>(v_sp_t<Operators::OperatorNQS<cpx>>& _opsG,
+										v_sp_t<Operators::OperatorNQS<cpx, uint>>& _opsL,
+										v_sp_t<Operators::OperatorNQS<cpx, uint, uint>>& _opsC,
+										uint _Nvis,
+										std::shared_ptr<Lattice>& _lat);	
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/**
+* @brief Perform time evolution using exact diagonalization (ED) for a given state.
+* 
+* This function applies a quench operator to an initial state, normalizes it, and then
+* performs time evolution using the eigenvectors and eigenvalues of the Hamiltonian.
+* The time evolution of the operator is measured at each time step and the results
+* are saved to a file.
+* 
+* @tparam _T Type of the elements in the state vector and Hamiltonian.
+* @tparam _spinModes Number of spin modes (default is 2).
+* @param _mbs Initial state vector.
+* @param _H Pointer to the Hamiltonian object.
+* @param _QMat Sparse matrix representing the quench operator.
+* @param _QOMat Vector of sparse matrices representing the operators to measure.
+* @param _timespace Vector of time points at which to measure the evolution.
+* @param dir Directory where the results will be saved.
+* @param stateIndex Index of the state being evolved.
+* @param _quenchOpMeasure Vector of quench operators to measure.
+* @param method String representing the method used for the evolution.
+* @param threadNum Number of threads to use for parallel computation.
+*/
+template<typename _T, uint _spinModes = 2>
+void nqs_perform_time_evo_ed(const arma::Col<_T>& _mbs,
+						Hamiltonian<_T, _spinModes>* _H, 
+						arma::SpMat<_T>& _QMat, v_1d<arma::SpMat<_T>>& _QOMat, 
+						const arma::vec& _timespace, 
+						const std::string& dir, 
+						int stateIndex, 
+						const v_sp_t<Operators::OperatorComb<_T>>& _quenchOpMeasure, 
+						const std::string& method, 
+						int threadNum) 
+{
+	arma::Mat<double> _vals(_timespace.size() + 1, _QOMat.size(), arma::fill::zeros);
+
+	arma::Col<_T> _mbsIn 		= _QMat * _H->getEigVec(stateIndex); 	// apply the quench operator to the state (i'th)
+	_mbsIn 						= _mbsIn / arma::norm(_mbsIn); 	 		// normalize the state - be sure
+	const arma::Mat<_T>& _eigv 	= _H->getEigVec();  					// get the eigenvectors
+	arma::Col<_T> _ovrl 		= _eigv.t() * _mbsIn; 	 				// overlap with the initial state
+
+	// measure the time evolution of the operator - first time step
+	for (int j = 0; j < _QOMat.size(); ++j)
+		_vals(0, j) = algebra::cast<double>(Operators::applyOverlap(_mbsIn, _QOMat[j]));
+	
+	// measure the time evolution of the operator - other time steps
+#pragma omp parallel for num_threads(threadNum)
+	for (int j = 0; j < _timespace.size(); ++j) {
+		arma::Col<cpx> _mb_te = SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
+		for (int k = 0; k < _QOMat.size(); ++k)
+			_vals(j + 1, k) = algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
+	}
+
+	// save the results
+	for (int j = 0; j < _QOMat.size(); ++j)
+		saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("{}/{}/time_evo/{}", method, stateIndex, _quenchOpMeasure[j]->getNameS()), true);
+}
+// template instantiation
+template void nqs_perform_time_evo_ed<double>(const arma::Col<double>& _mbs,
+										Hamiltonian<double, 2>* _H,
+										arma::SpMat<double>& _QMat, v_1d<arma::SpMat<double>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										int stateIndex,
+										const v_sp_t<Operators::OperatorComb<double>>& _quenchOpMeasure,
+										const std::string& method,
+										int threadNum);
+template void nqs_perform_time_evo_ed<cpx>(const arma::Col<cpx>& _mbs,
+										Hamiltonian<cpx, 2>* _H,
+										arma::SpMat<cpx>& _QMat, v_1d<arma::SpMat<cpx>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										int stateIndex,
+										const v_sp_t<Operators::OperatorComb<cpx>>& _quenchOpMeasure,
+										const std::string& method,
+										int threadNum);
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/**
+* @brief Perform full exact diagonalization (ED) on a given Hamiltonian and measure the results.
+* 
+* @tparam _T The data type used for the Hamiltonian and other matrices (e.g., double, complex).
+* @tparam _spinModes The number of spin modes (default is 2).
+* @param stateNum The number of states to be considered for diagonalization.
+* @param _H Pointer to the Hamiltonian object.
+* @param _hilbert The Hilbert space associated with the Hamiltonian.
+* @param _quenchOp Shared pointer to the quench operator.
+* @param _quenchOpMeasure Vector of shared pointers to the quench operators for measurement.
+* @param _QMat Sparse matrix for quench operations.
+* @param _QOMat Vector of sparse matrices for quench operations.
+* @param _timespace Vector of time points for time evolution.
+* @param dir Directory path for saving results.
+* @param _meas_ED Vector of measurement objects for ED.
+* @param _meansED Column vector to store the mean values of the ED results.
+* @param time_evo Boolean flag indicating whether to perform time evolution.
+* @param _saved Boolean reference indicating whether the results have been saved.
+* @param threadNum The number of threads to be used for parallel processing.
+*/
+template<typename _T, uint _spinModes = 2>
+void nqs_perform_full_ed(int stateNum, Hamiltonian<_T, _spinModes>* _H, 
+						const Hilbert::HilbertSpace<_T, _spinModes>& _hilbert,
+                        const std::shared_ptr<Operators::OperatorComb<_T>>& _quenchOp,
+                        const std::vector<std::shared_ptr<Operators::OperatorComb<_T>>>& _quenchOpMeasure,
+                        arma::SpMat<_T>& _QMat, v_1d<arma::SpMat<_T>>& _QOMat, 
+                        const arma::vec& _timespace, 
+						const std::string& dir,
+                        v_1d<NQSAv::MeasurementNQS<_T>>& _meas_ED,
+                        arma::Col<_T>& _meansED, 
+						bool time_evo, 
+						bool& _saved, 
+						int threadNum) 
+{
+    LOGINFO("Started full diagonalization", LOG_TYPES::TRACE, 3);
+    _H->diagH(false);
+    for (int i = 0; i < stateNum; ++i) {
+        const arma::Col<_T>& _mbs = _H->getEigVec(i);
+        _meansED(i) = _H->getEigVal(i);
+        LOGINFO(std::format("Found ED (full) state({}) with E={}", i, STRPS(_meansED[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
+
+        // Measure and save
+        _meas_ED[i].measure(_mbs, _hilbert);
+        _meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0 || time_evo);
+
+        if (time_evo) 
+			nqs_perform_time_evo_ed(_mbs, _H, _QMat, _QOMat, _timespace, dir, i, _quenchOpMeasure, "ED", threadNum);
+	}
+	saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", _saved);
+	_saved = true;
+}
+// template instantiation
+template void nqs_perform_full_ed<double, 2>(int stateNum, Hamiltonian<double, 2>* _H, 
+										const Hilbert::HilbertSpace<double, 2>& _hilbert,
+										const std::shared_ptr<Operators::OperatorComb<double>>& _quenchOp,
+										const std::vector<std::shared_ptr<Operators::OperatorComb<double>>>& _quenchOpMeasure,
+										arma::SpMat<double>& _QMat, v_1d<arma::SpMat<double>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										v_1d<NQSAv::MeasurementNQS<double>>& _meas_ED,
+										arma::Col<double>& _meansED,
+										bool time_evo,
+										bool& _saved,
+										int threadNum);
+template void nqs_perform_full_ed<cpx, 2>(int stateNum, Hamiltonian<cpx, 2>* _H,
+										const Hilbert::HilbertSpace<cpx, 2>& _hilbert,
+										const std::shared_ptr<Operators::OperatorComb<cpx>>& _quenchOp,
+										const std::vector<std::shared_ptr<Operators::OperatorComb<cpx>>>& _quenchOpMeasure,
+										arma::SpMat<cpx>& _QMat, v_1d<arma::SpMat<cpx>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										v_1d<NQSAv::MeasurementNQS<cpx>>& _meas_ED,
+										arma::Col<cpx>& _meansED,
+										bool time_evo,
+										bool& _saved,
+										int threadNum);
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/**
+* @brief Perform Lanczos exact diagonalization (ED) and optionally time evolution.
+* 
+* This function performs Lanczos diagonalization on the given Hamiltonian to find the eigenvalues and eigenvectors.
+* It then measures and saves the results, and optionally performs time evolution.
+* 
+* @tparam _T The data type for the Hamiltonian and operators.
+* @tparam _spinModes The number of spin modes (default is 2).
+* @param stateNum The number of states to compute.
+* @param _H Pointer to the Hamiltonian object.
+* @param _hilbert The Hilbert space object.
+* @param _quenchOp Shared pointer to the quench operator.
+* @param _quenchOpMeasure Vector of shared pointers to the quench operators for measurement.
+* @param _QMat Sparse matrix for the quench operator.
+* @param _QOMat Vector of sparse matrices for the quench operators.
+* @param _timespace Vector of time points for time evolution.
+* @param dir Directory to save the results.
+* @param _meas_LAN Vector of measurement objects for the Lanczos method.
+* @param _meansLAN Column vector to store the mean values of the Lanczos method.
+* @param time_evo Boolean flag to indicate if time evolution should be performed.
+* @param _saved Boolean reference to indicate if the results have been saved.
+* @param threadNum The number of threads to use for parallel processing.
+*/
+template<typename _T, uint _spinModes = 2>
+void nqs_perform_lanczos_ed(int stateNum, Hamiltonian<_T, _spinModes>* _H, 
+							const Hilbert::HilbertSpace<_T, _spinModes>& _hilbert,
+							const std::shared_ptr<Operators::OperatorComb<_T>>& _quenchOp,
+							const std::vector<std::shared_ptr<Operators::OperatorComb<_T>>>& _quenchOpMeasure,
+							arma::SpMat<_T>& _QMat, v_1d<arma::SpMat<_T>>& _QOMat, 
+							const arma::vec& _timespace, 
+							const std::string& dir,
+							v_1d<NQSAv::MeasurementNQS<_T>>& _meas_LAN,
+							arma::Col<_T>& _meansLAN, 
+							bool time_evo, 
+							bool& _saved, 
+							int threadNum) 
+{
+	LOGINFO("Started Lanczos diagonalization", LOG_TYPES::TRACE, 3);
+	_H->diagH(false, 128, 0, 1000, 1e-12, "lanczos");
+	const auto& _eigvec			= _H->getEigVec();
+	const auto& _krylov_mb 		= _H->getKrylov();
+
+	if (time_evo) {
+		_QMat = algebra::change_basis_matrix(_krylov_mb, _QMat, true);
+		for (auto& _QOMat_ : _QOMat)
+			_QOMat_ = algebra::change_basis_matrix(_krylov_mb, _QOMat_, true);
+	}
+
+	// Measure and save
+	for (int i = 0; i < stateNum; ++i) 
+	{
+		const arma::Col<_T> _mbs 				= LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
+		_meansLAN(i)							= _H->getEigVal(i);
+		LOGINFO(std::format("Found ED (Lanczos) state({}) with E={}", i, STRPS(_meansLAN[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
+		_meas_LAN[i].measure(_mbs, _hilbert);
+		_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", std::format("LAN/{}", i), i > 0 || time_evo);
+		if (time_evo) 
+		{
+			nqs_perform_time_evo_ed(_mbs, _H, _QMat, _QOMat, _timespace, dir, i, _quenchOpMeasure, "LAN", threadNum);
+		}
+	}
+	saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", _saved);
+	_saved = true;
+}
+// template instantiation
+template void nqs_perform_lanczos_ed<double, 2>(int stateNum, Hamiltonian<double, 2>* _H,
+										const Hilbert::HilbertSpace<double, 2>& _hilbert,
+										const std::shared_ptr<Operators::OperatorComb<double>>& _quenchOp,
+										const std::vector<std::shared_ptr<Operators::OperatorComb<double>>>& _quenchOpMeasure,
+										arma::SpMat<double>& _QMat, v_1d<arma::SpMat<double>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										v_1d<NQSAv::MeasurementNQS<double>>& _meas_LAN,
+										arma::Col<double>& _meansLAN,
+										bool time_evo,
+										bool& _saved,
+										int threadNum);
+template void nqs_perform_lanczos_ed<cpx, 2>(int stateNum, Hamiltonian<cpx, 2>* _H,
+										const Hilbert::HilbertSpace<cpx, 2>& _hilbert,
+										const std::shared_ptr<Operators::OperatorComb<cpx>>& _quenchOp,
+										const std::vector<std::shared_ptr<Operators::OperatorComb<cpx>>>& _quenchOpMeasure,
+										arma::SpMat<cpx>& _QMat, v_1d<arma::SpMat<cpx>>& _QOMat,
+										const arma::vec& _timespace,
+										const std::string& dir,
+										v_1d<NQSAv::MeasurementNQS<cpx>>& _meas_LAN,
+										arma::Col<cpx>& _meansLAN,
+										bool time_evo,
+										bool& _saved,
+										int threadNum);
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template<typename _T, uint _spinModes = 2>
+static std::pair<arma::Col<_T>, arma::Col<_T>> 
+nqs_perform_diag(int stateNum,
+                bool time_evo,
+                bool fullED,
+                bool& _saved,
+                Hamiltonian<_T, _spinModes>* _H,
+                v_1d<NQSAv::MeasurementNQS<_T>>& _meas_ED,
+                v_1d<NQSAv::MeasurementNQS<_T>>& _meas_LAN,
+                const Hilbert::HilbertSpace<_T, _spinModes>& _hilbert,
+                const std::shared_ptr<Operators::OperatorComb<_T>>& _quenchOp,
+                const std::vector<std::shared_ptr<Operators::OperatorComb<_T>>>& _quenchOpMeasure,
+                const arma::vec& _timespace,
+                const std::string& dir,
+                int threadNum) 
+{
+    // Validate inputs
+    if (!_H) throw std::invalid_argument("Hamiltonian is not defined");
+    if (_meas_ED.size() != stateNum || _meas_LAN.size() != stateNum)
+        throw std::invalid_argument("Measurement vectors have incorrect size");
+
+	// Hilbert
+	const size_t Nh = _H->getHilbertSize();
+
+    // Initialize results and build Hamiltonian
+    arma::Col<_T> _meansED(stateNum, arma::fill::zeros), _meansLAN(stateNum, arma::fill::zeros);
+    _H->buildHamiltonian();
+
+    // Generate quench operators if time evolution is enabled
+    arma::SpMat<_T> _QMat;
+    v_1d<arma::SpMat<_T>> _QOMat;
+    if (time_evo) 
+	{
+		_QMat = _quenchOp->template generateMat<false, _T, arma::SpMat>(Nh);
+		for (auto& _quenchOpMeasure_ : _quenchOpMeasure)
+			_QOMat.push_back(_quenchOpMeasure_->template generateMat<false, _T, arma::SpMat>(Nh));
+    }
+
+    // Full diagonalization
+    if (fullED) {
+        nqs_perform_full_ed(stateNum, _H, _hilbert, _quenchOp, _quenchOpMeasure, 
+                                _QMat, _QOMat, _timespace, dir, _meas_ED, _meansED, time_evo, _saved, threadNum);
+		// ---------------
+		_H->clearEigVal();
+		_H->clearEigVec();
+		// ---------------
+    }
+
+    // Lanczos diagonalization
+    nqs_perform_lanczos_ed(stateNum, _H, _hilbert, _quenchOp, _quenchOpMeasure, 
+                                _QMat, _QOMat, _timespace, dir, _meas_LAN, _meansLAN, time_evo, _saved, threadNum);
+	// ---------------
+	_H->clear();
+	// ---------------
+    return std::make_pair(_meansED, _meansLAN);
+}
+// template instantiation
+template std::pair<arma::Col<double>, arma::Col<double>> nqs_perform_diag<double, 2>(int stateNum, bool time_evo, bool fullED, bool& _saved, Hamiltonian<double, 2>* _H, v_1d<NQSAv::MeasurementNQS<double>>& _meas_ED, v_1d<NQSAv::MeasurementNQS<double>>& _meas_LAN, const Hilbert::HilbertSpace<double, 2>& _hilbert, const std::shared_ptr<Operators::OperatorComb<double>>& _quenchOp, const std::vector<std::shared_ptr<Operators::OperatorComb<double>>>& _quenchOpMeasure, const arma::vec& _timespace, const std::string& dir, int threadNum);
+template std::pair<arma::Col<cpx>, arma::Col<cpx>> nqs_perform_diag<cpx, 2>(int stateNum, bool time_evo, bool fullED, bool& _saved, Hamiltonian<cpx, 2>* _H, v_1d<NQSAv::MeasurementNQS<cpx>>& _meas_ED, v_1d<NQSAv::MeasurementNQS<cpx>>& _meas_LAN, const Hilbert::HilbertSpace<cpx, 2>& _hilbert, const std::shared_ptr<Operators::OperatorComb<cpx>>& _quenchOp, const std::vector<std::shared_ptr<Operators::OperatorComb<cpx>>>& _quenchOpMeasure, const arma::vec& _timespace, const std::string& dir, int threadNum);
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -115,14 +475,13 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 template<typename _T, uint _spinModes>
 void UI::nqsExcited()
 {
-	const int stateNum 	= this->nqsP.nqs_ex_beta_.size() + 1;
+	const int stateNum 	= static_cast<int>(this->nqsP.nqs_ex_beta_.size()) + 1;
 	std::shared_ptr<Hamiltonian<_T, _spinModes>> _H;
 	Hilbert::HilbertSpace<_T> _hilbert;
 	this->defineModel<_T>(_hilbert, _H);
 	
 	// define the NQS states for the excited states
-	arma::Col<_T> _meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _meansED(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros),
-				_meansLAN(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
+	arma::Col<_T>	_meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 	
 	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);	// define the NQS states
 	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);											// define the first one already here for the ground state
@@ -146,28 +505,13 @@ void UI::nqsExcited()
 	auto Nvis 				= _NQS[0]->getNvis();											// get the number of visible units
 	const bool fullED 		= Nh <= UI_LIMITS_NQS_ED;										// use the full diagonalization
 	const bool lanED 		= this->nqsP.nqs_ed_ && Nh <= ULLPOW(24);						// use the Lanczos method for the ED
-	v_1d<std::shared_ptr<Operators::OperatorNQS<_T>>> _opsG = {};							// set up the operators to save - global
-	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint>>> _opsL = {};						// set up the operators to save - local
-	v_1d<std::shared_ptr<Operators::OperatorNQS<_T, uint, uint>>> _opsC = {};				// set up the operators to save - correlation
-	
-	{
-		Operators::Operator<_T, uint> _SzL 			= Operators::SpinOperators::sig_z_l<_T>(Nvis);
-		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SzL)));
-		Operators::Operator<_T, uint> _SxL 			= Operators::SpinOperators::sig_x_l<_T>(Nvis);
-		_opsL.push_back(std::make_shared<Operators::OperatorNQS<_T, uint>>(std::move(_SxL)));
-		Operators::Operator<_T, uint, uint> _SzC 	= Operators::SpinOperators::sig_z_c<_T>(Nvis);
-		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SzC)));
-		Operators::Operator<_T, uint, uint> _SxC 	= Operators::SpinOperators::sig_x_c<_T>(Nvis);
-		_opsC.push_back(std::make_shared<Operators::OperatorNQS<_T, uint, uint>>(std::move(_SxC)));
-		// special flux operator
-		if (this->latP.lat->get_Type() == LatticeTypes::HON && Nvis > 16)
-		{
-			Operators::Operator<_T> _flux 			= Operators::SpinOperators::Flux::sig_f<_T>(Nvis, this->latP.lat->get_flux_sites(1, 0));
-			_opsG.push_back(std::make_shared<Operators::OperatorNQS<_T>>(std::move(_flux)));
-		}
-	}
+	v_sp_t<Operators::OperatorNQS<_T>> _opsG;												// set up the operators to save - global
+	v_sp_t<Operators::OperatorNQS<_T, uint>> _opsL;											// set up the operators to save - local
+	v_sp_t<Operators::OperatorNQS<_T, uint, uint>> _opsC;									// set up the operators to save - correlation
+	get_NQS_operators_test(_opsG, _opsL, _opsC, Nvis, this->latP.lat);						// get the operators for the NQS
+
 	// ---------------
-	v_1d<NQSAv::MeasurementNQS<_T> > _meas_ED, _meas_LAN, _meas_NQS;
+	v_1d<NQSAv::MeasurementNQS<_T>> _meas_ED, _meas_LAN, _meas_NQS;
 	for (int i = 0; i < stateNum; ++i) 
 	{
 		_meas_ED.push_back(NQSAv::MeasurementNQS<_T>(this->latP.lat, dir, _opsG, _opsL, _opsC, this->threadNum));
@@ -190,126 +534,13 @@ void UI::nqsExcited()
 	}
 
 	// save lattice information
-	bool _saved = false;
-	if (this->latP.lat && this->latP.typ_ == LatticeTypes::HON)
-	{
-		arma::Mat<double> bonds_ = -arma::Mat<double>(Nvis, 3, arma::fill::ones);
-		for (int i = 0; i < Nvis; ++i)
-		{
-			uint NUM_OF_NN = (uint)this->latP.lat->get_nn_ForwardNum(i);
-			for (uint nn = 0; nn < NUM_OF_NN; nn++)
-			{
-				if (int nei = this->latP.lat->get_nnf(i, nn); nei >= 0) 
-				{
-					bonds_(i, nn) = nei;
-				}
-			}
-		}
-		saveAlgebraic(dir, "history.h5", bonds_, "lattice", false); 				// save the results to HDF5 file
-		_saved = true;
-	}
+	bool _saved = Lattice::save_bonds(this->latP.lat, dir, "history.h5");
 
 	// check ED
+	arma::Col<_T> _meansED(stateNum, arma::fill::zeros), _meansLAN(stateNum, arma::fill::zeros);
 	if (lanED || fullED)
-	{
-		_H->buildHamiltonian();
-		LOGINFO("Built the Hamiltonian finished", LOG_TYPES::TRACE, 3);
-		
-		arma::SpMat<_T> _QMat;
-		v_1d<arma::SpMat<_T>> _QOMat;
-		if (this->nqsP.nqs_te_)
-		{
-			_QMat 	= _quenchOp->template generateMat<false, _T, arma::SpMat>(Nh);
-			for (auto& _quenchOpMeasure_ : _quenchOpMeasure)
-				_QOMat.push_back(_quenchOpMeasure_->template generateMat<false, _T, arma::SpMat>(Nh));
-		}
-
-		if (fullED)
-		{																					// try with the full diagonalization
-			LOGINFO("Started the full diagonalization", LOG_TYPES::TRACE, 3);
-			_H->diagH(false);																// diagonalize the Hamiltonian
-			for (int i = 0; i < stateNum; ++i) 												// save the energies
-			{
-				const arma::Col<_T>& _mbs = _H->getEigVec(i);
-				_meas_ED[i].measure(_mbs, _hilbert);										// save the measured quantities
-				_meansED(i) = _H->getEigVal(i);
-				_meas_ED[i].saveMB({".h5"}, "measurement", "measurement", "measurement", "ED/" + STR(i), i > 0 || this->nqsP.nqs_te_);	
-				LOGINFO(std::format("Found the ED (full) state({}) to be E={}", i, STRPS(_meansED[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
-
-				if (this->nqsP.nqs_te_)
-				{
-					arma::Col<_T> _mbsIn 				= _QMat * _mbs;						// apply the quench operator to the state (i'th)
-					_mbsIn 								= _mbsIn / arma::norm(_mbsIn);		// normalize the state - be sure
-					arma::Mat<double> _vals(_timespace.size() + 1, _QOMat.size(), arma::fill::zeros); // measure the time evolution of the operator
-					const arma::Mat<_T>& _eigv 			= _H->getEigVec();					
-					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
-					for (int j = 0; j < _QOMat.size(); ++j)
-						_vals(0, j) 					= algebra::cast<double>(Operators::applyOverlap(_mbsIn, _QOMat[j]));
-
-#pragma omp parallel for num_threads(this->threadNum)
-					for (int j = 0; j < _timespace.size(); ++j)
-					{
-						arma::Col<cpx> _mbs_te 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
-						for (int k = 0; k < _QOMat.size(); ++k)
-							_vals(j + 1, k) 			= algebra::cast<double>(Operators::applyOverlap(_mbs_te, _QOMat[k]));
-					}
-
-					for (int j = 0; j < _QOMat.size(); ++j)
-						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("ED/time_evo/{}", _quenchOpMeasure[j]->getNameS()), true);
-				}
-			}
-			saveAlgebraic(dir, "history.h5", _meansED, "ED/energy", _saved); 				// save the results to HDF5 file
-		}
-		// ---------------
-		_H->clearEigVal();
-		_H->clearEigVec();
-		// ---------------
-		{
-			_H->diagH(false, 50, 0, 1000, 1e-12, "lanczos");									// get LANCZOS diagonalization
-			const auto& _eigvec 	= _H->getEigVec();											// get the eigenvectors in Krylov basis
-			const auto& _krylov_mb 	= _H->getKrylov();											// get the Krylov basis
-			if (this->nqsP.nqs_te_)
-			{
-				_QMat 				= algebra::change_basis_matrix(_krylov_mb, _QMat, true);	// change the basis of the quench operator
-				for (auto& _QOMat_ : _QOMat)
-					_QOMat_ 		= algebra::change_basis_matrix(_krylov_mb, _QOMat_, true);	// change the basis of the quench operator
-			}
-			
-			for (int i = 0; i < stateNum; ++i) 													// save the energies
-			{
-				const arma::Col<_T> _mbs = LanczosMethod<_T>::trueState(_eigvec, _krylov_mb, i);
-				_meas_LAN[i].measure(_mbs, _hilbert);											// save the measured quantities
-				_meansLAN(i) = _H->getEigVal(i);												// save the energies to the container
-				LOGINFO(std::format("Found the ED (Lanczos) state({}) to be E={}", i, STRPS(_meansLAN[i], UI_NQS_PRECISION)), LOG_TYPES::INFO, 2);
-				_meas_LAN[i].saveMB({".h5"}, "measurement", "measurement", "measurement", std::format("LAN/{}", i), fullED || i > 0 || this->nqsP.nqs_te_);
-				// ---------------
-				if (this->nqsP.nqs_te_)
-				{
-					arma::Col<_T> _mbsIn 				= _QMat * _H->getEigVec(i);				// apply the quench operator to the state (i'th)
-					_mbsIn 								= _mbsIn / arma::norm(_mbsIn);			// normalize the state - be sure
-					arma::Mat<double> _vals(_timespace.size() + 1, _QOMat.size(), arma::fill::zeros);
-					const arma::Mat<_T>& _eigv 			= _H->getEigVec();
-					arma::Col<_T> _ovrl 				= _eigv.t() * _mbsIn;
-					for (int j = 0; j < _QOMat.size(); ++j)
-						_vals(0, j) 					= algebra::cast<double>(Operators::applyOverlap(_mbsIn, _QOMat[j]));
-
-#pragma omp parallel for num_threads(this->threadNum)
-					for (int j = 0; j < _timespace.size(); ++j)
-					{
-						arma::Col<cpx> _mb_te 			= SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
-						for (int k = 0; k < _QOMat.size(); ++k)
-							_vals(j + 1, k) 			= algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
-					}
-					for (int j = 0; j < _QOMat.size(); ++j) {
-						saveAlgebraic(dir, "measurement.h5", _vals.col(j), std::format("LAN/time_evo/{}", _quenchOpMeasure[j]->getNameS()), true);
-					}
-				}
-			}
-			saveAlgebraic(dir, "history.h5", _meansLAN, "Lanczos/energy", fullED);				// save the results to HDF5 file
-		}
-		// ---------------
-		_H->clear();
-		// ---------------
+	{ 	
+		std::tie(_meansED, _meansLAN) = nqs_perform_diag<_T, _spinModes>(stateNum, this->nqsP.nqs_te_, fullED, _saved, _H.get(), _meas_ED, _meas_LAN, _hilbert, _quenchOp, _quenchOpMeasure, _timespace, dir, this->threadNum);
 		LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
 		LOGINFO(2);
 	}
@@ -363,6 +594,7 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 		// _H->quenchHamiltonian();
 		_parC.MC_sam_ 	= 1;
 		auto _RKsolver 	= algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
+		const int _order= _RKsolver->getOrder();																			// get the order of the solver
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
@@ -386,23 +618,26 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 			LOGINFO("TE(" + STR(0) + "/" + STR(_timespace.size()) + ") Time = 0", LOG_TYPES::TRACE, 2);
 			for (int xx = 0; xx < _quenchOpMeasure.size(); ++xx)
 				LOGINFO(_quenchOpMeasure[xx]->getNameS() + STRPS(_vals_mean(0, xx), 3), LOG_TYPES::TRACE, 3);
-
-			for (int i = 0; i < _timespace.size() - 1; ++i)
+			
+			double _dt = 0;
+			for (int i = 0; i < _timespace.size(); ++i)
 			{
-				double _dt = _timespace(i + 1) - _timespace(i);								// set the time step for the evolution
-				_NQS[j]->evolveStepSet(i, _dt, _RKsolver);									// evolve the NQS
+				if (i < _timespace.size() - 1)
+				 	_dt = _timespace(i + 1) - _timespace(i);								// set the time step for the evolution
+				_NQS[j]->evolveStepSet(i, _dt, _RKsolver);							// evolve the NQS
 				_NQS[j]->template collect<arma::Col<_T>>(_parC, _QOpM_v, _vals);			// collect the data using ratio method
 				for (int xx = 0; xx < _quenchOpMeasure.size(); ++xx)						
 					_vals_mean(i + 1, xx) = algebra::cast<double>(arma::mean(_vals[xx]));	// save the mean value
+				
 				if (i % 10 == 0)
 				{
-					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i + 1), 3), LOG_TYPES::TRACE, 2);
+					LOGINFO("TE(" + STR(i + 1) + "/" + STR(_timespace.size()) + ") Time = " + STRPS(_timespace(i), 3), LOG_TYPES::TRACE, 2);
 					for (int xx = 0; xx < _quenchOpMeasure.size(); ++xx)
-						LOGINFO(_quenchOpMeasure[xx]->getNameS() + STRPS(_vals_mean(i + 1, xx), 3), LOG_TYPES::TRACE, 3);
+						LOGINFO(_quenchOpMeasure[xx]->getNameS() + " : " + STRPS(_vals_mean(i + 1, xx), 3), LOG_TYPES::TRACE, 3);
 				}
-			}
+			}			
 			for (int xx = 0; xx < _quenchOpMeasure.size(); ++xx)
-				saveAlgebraic(dir, "measurement.h5", _vals[xx], "NQS/" + STR(j) + std::format("/time_evo/{}", _quenchOpMeasure[xx]->getNameS()), true);
+				saveAlgebraic(dir, "measurement.h5", _vals_mean.col(xx), std::format("NQS/{}/time_evo/{}", j, _quenchOpMeasure[xx]->getNameS()), true);
 		}
 
 		if (_RKsolver) {

@@ -90,6 +90,28 @@ namespace Operators
 		template <typename _T = double>
 		Operators::Operator<_T, uint, uint> sig_z_c(size_t _Ns);
 
+		// --------------------------------------------------------------------------------
+
+		template <typename _T = double>
+		std::pair<u64, _T> sig_y(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		std::pair<_OP_V_T, _T> sig_y(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		_T sig_y(_OP_V_T_CR base_vec, size_t _Ns, const v_1d<uint>& sites, _OP_V_T& _ref);
+		// --- 
+		template <typename _T = double>
+		Operators::Operator<_T> sig_y(size_t _Ns, size_t _part);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_y(size_t _Ns, const v_1d<uint>& sites);
+		template <typename _T = double>
+		Operators::Operator<_T> sig_y(size_t _Ns);
+		template <typename _T = double>
+		Operators::Operator<_T, uint> sig_y_l(size_t _Ns);
+		template <typename _T = double>
+		Operators::Operator<_T, uint, uint> sig_y_c(size_t _Ns);
+
+		// --------------------------------------------------------------------------------
+
 		// raising operator
 		template <typename _T = double>
 		std::pair<u64, _T> sig_p(u64 base_vec, size_t _Ns, const v_1d<uint>& sites);
