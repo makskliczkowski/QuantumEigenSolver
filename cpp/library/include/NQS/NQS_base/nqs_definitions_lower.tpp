@@ -101,9 +101,9 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns,
                         NQSLS_p _f_lower, std::vector<double> _f_lower_b, NQS<_spinModes, _Ht, _T, _stateType>* _nqs_exc)
     : nqs_exc_(_nqs_exc), Ns_(_Ns), isSet_(!_f_lower.empty()), f_lower_size_(_f_lower.size()), f_lower_b_(_f_lower_b), f_lower(_f_lower)
 {
-    LOGINFO("NQS_lower_t: Initializing with Ns = " + std::to_string(_Ns), LOG_TYPES::DEBUG, 1);
-    LOGINFO("NQS_lower_t: Penalties for lower states set.", LOG_TYPES::DEBUG, 1);
-    LOGINFO("NQS_lower_t: Number of lower states = " + std::to_string(f_lower_size_), LOG_TYPES::INFO, 3);
+    LOGINFO("NQS_lower_t: Initializing with Ns = " + std::to_string(_Ns), LOG_TYPES::DEBUG, 3);
+    LOGINFO("NQS_lower_t: Penalties for lower states set.", LOG_TYPES::DEBUG, 3);
+    LOGINFO("NQS_lower_t: Number of lower states = " + std::to_string(f_lower_size_), LOG_TYPES::INFO, 4);
 
     if (!_nqs_exc)
     {
@@ -112,7 +112,7 @@ inline NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQS_lower_t(size_t _Ns,
     }
 
     this->containerP_ = v_2d<_T>(this->f_lower_size_, v_1d<_T>(this->train_lower_.nblck_ * this->train_lower_.MC_sam_, _T(0.0)));
-    LOGINFO("NQS_lower_t: Container for projectors initialized.", LOG_TYPES::DEBUG, 1);
+    LOGINFO("NQS_lower_t: Container for projectors initialized.", LOG_TYPES::DEBUG, 3);
 }
 
 // ##########################################################################################################################################

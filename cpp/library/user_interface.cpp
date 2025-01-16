@@ -121,6 +121,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 			SETOPTION(nqsP,	nqs_tr_rst);
 			SETOPTION(nqsP,	nqs_tr_pinv);
 			SETOPTION(nqsP,	nqs_tr_pc);
+			SETOPTION(nqsP, nqs_tr_pt);
 			// scheduler for the regularization
 			SETOPTION(nqsP,	nqs_tr_reg);
 			SETOPTION(nqsP,	nqs_tr_regs);

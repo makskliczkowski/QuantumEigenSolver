@@ -69,9 +69,15 @@ protected:													// ------------------------- T R A I N ------------------
 	virtual void grad(Config_cr_t _v, uint _plc)			override;
 public:
 	virtual ~RBM()											{ DESTRUCTOR_CALL; };
+	RBM(const RBM<_spinModes, _Ht, _T, _stateType>& _other);
+	RBM(RBM<_spinModes, _Ht, _T, _stateType>&& _other);
 	RBM(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1,
 													const NQSLS_p& _lower = {}, 
 													const std::vector<double>& _beta = {});
+
+	// ------------------- O P E R A T O R S -------------------
+	auto operator=(RBM<_spinModes, _Ht, _T, _stateType>& _other) 	-> RBM<_spinModes, _Ht, _T, _stateType>&;
+	auto operator=(RBM<_spinModes, _Ht, _T, _stateType>&& _other) 	-> RBM<_spinModes, _Ht, _T, _stateType>&;
 
 	// --------------------- S E T T E R S ---------------------
 	virtual void init()										override;
@@ -88,6 +94,7 @@ public:
 	virtual auto ansatz_ratiolog(Config_cr_t _in, 
 		NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T override;
 	virtual auto clone() 			const -> MC_t_p 		override = 0;
+	virtual auto clone(MC_t_p _n)   -> void 				override;
 	////////////////////////////////////////////////////////////
 };	
 

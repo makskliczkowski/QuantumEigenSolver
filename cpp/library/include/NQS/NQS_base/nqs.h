@@ -276,6 +276,8 @@ public:																	// ------------------------ G E T T E R S --------------
 	virtual auto swapConfig(MC_t_p _other) 	-> void override;
 	virtual auto reset(size_t _n) 			-> void override;
 	virtual auto clone() 					const -> MC_t_p override 	= 0;
+	virtual auto clone(MC_t_p _other) 		-> void override;
+	// ***********************************************************************************************************************************
 	// weights
 	auto getWeights() 						const -> NQSB				{ return this->Weights_;				};
 	auto getWeights_ref() 					-> const NQSB&				{ return this->Weights_;				};

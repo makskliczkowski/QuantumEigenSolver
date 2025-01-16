@@ -17,6 +17,60 @@ template class RBM_PP<2u, cpx, double, double>;
 
 // ##########################################################################################################################################
 
+/**
+* @brief Clones the current RBM_PP object from another instance.
+*
+* This function attempts to clone the current RBM_PP object by copying the 
+* internal state from another instance of the same type. If the dynamic cast 
+* to the appropriate type fails, an error message is printed to the standard 
+* error stream.
+*
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type used for computations.
+* @tparam _stateType The type representing the state.
+* @param _other A shared pointer to another Monte Carlo object to clone from.
+*
+* @throws std::exception If an error occurs during the cloning process.
+* @throws std::bad_cast If the dynamic cast to the appropriate type fails.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void RBM_PP<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
+{
+	try
+	{
+		auto _n = std::dynamic_pointer_cast<RBM_PP<_spinModes, _Ht, _T, _stateType>>(_other);
+		if (_n)
+		{
+			this->X_			= _n->X_;
+			this->Xinv_			= _n->Xinv_;
+			this->XinvSkew_		= _n->XinvSkew_;
+			this->Xnew_			= _n->Xnew_;
+			this->pfaffian_		= _n->pfaffian_;
+			this->pfaffianNew_	= _n->pfaffianNew_;
+			this->rbmPPSize_	= _n->rbmPPSize_;
+			this->nPP_			= _n->nPP_;
+			this->nParticles2_	= _n->nParticles2_;
+			this->spinSectors_	= _n->spinSectors_;
+		}
+	}
+	catch (std::bad_cast & e)
+	{
+		std::cerr << "Error in cloning the RBM PP object: " << e.what() << std::endl;
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "Error in cloning the RBM PP object: " << e.what() << std::endl;
+	}
+
+	// clone the base class
+	RBM<_spinModes, _Ht, _T, _stateType>::clone(_other);
+}
+// template instantiation of the function above
+RBM_PP_INST_CMB_ALL(clone, void, (MC_t_p), );
+
+// ##########################################################################################################################################
+
 // ############################################################ G R A D I E N T #############################################################
 
 // ##########################################################################################################################################

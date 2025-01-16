@@ -22,6 +22,193 @@ template class RBM<4u, double, cpx, double>;
 
 // ##########################################################################################################################################
 
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>::RBM(const RBM<_spinModes, _Ht, _T, _stateType>& _n)
+	: NQS_S<_spinModes, _Ht, _T, _stateType>(_n)
+{
+	this->W_ 				= _n.W_;
+	this->bV_ 				= _n.bV_;
+	this->bH_ 				= _n.bH_;
+	this->theta_ 			= _n.theta_;
+	this->thetaCOSH_ 		= _n.thetaCOSH_;
+	this->thetaTmpCol_ 		= _n.thetaTmpCol_;
+	this->thetaCOSH_log_	= _n.thetaCOSH_log_;
+	this->nHid_ 			= _n.nHid_;
+	this->beta_ 			= _n.beta_;
+	// sizes
+	this->rbmSize_ 			= _n.rbmSize_;
+	this->info_p_.fullSize_ = _n.info_p_.fullSize_;
+}
+// template instantiation of the function above
+template RBM<2u, double, double, double>::RBM(const RBM<2u, double, double, double>&);
+template RBM<3u, double, double, double>::RBM(const RBM<3u, double, double, double>&);
+template RBM<4u, double, double, double>::RBM(const RBM<4u, double, double, double>&);
+template RBM<2u, cpx, cpx, double>::RBM(const RBM<2u, cpx, cpx, double>&);
+template RBM<3u, cpx, cpx, double>::RBM(const RBM<3u, cpx, cpx, double>&);
+template RBM<4u, cpx, cpx, double>::RBM(const RBM<4u, cpx, cpx, double>&);
+template RBM<2u, cpx, double, double>::RBM(const RBM<2u, cpx, double, double>&);
+template RBM<3u, cpx, double, double>::RBM(const RBM<3u, cpx, double, double>&);
+template RBM<4u, cpx, double, double>::RBM(const RBM<4u, cpx, double, double>&);
+template RBM<2u, double, cpx, double>::RBM(const RBM<2u, double, cpx, double>&);
+template RBM<3u, double, cpx, double>::RBM(const RBM<3u, double, cpx, double>&);
+template RBM<4u, double, cpx, double>::RBM(const RBM<4u, double, cpx, double>&);
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>::RBM(RBM<_spinModes, _Ht, _T, _stateType>&& _n)
+	: NQS_S<_spinModes, _Ht, _T, _stateType>(std::move(_n))
+{
+	this->W_ 				= std::move(_n.W_);
+	this->bV_ 				= std::move(_n.bV_);
+	this->bH_ 				= std::move(_n.bH_);
+	this->theta_ 			= std::move(_n.theta_);
+	this->thetaCOSH_ 		= std::move(_n.thetaCOSH_);
+	this->thetaTmpCol_ 		= std::move(_n.thetaTmpCol_);
+	this->thetaCOSH_log_	= std::move(_n.thetaCOSH_log_);
+	this->nHid_ 			= _n.nHid_;
+	this->beta_ 			= std::move(_n.beta_);
+	// sizes
+	this->rbmSize_ 			= _n.rbmSize_;
+	this->info_p_.fullSize_ = _n.info_p_.fullSize_;
+}
+// template instantiation of the function above
+template RBM<2u, double, double, double>::RBM(RBM<2u, double, double, double>&&);
+template RBM<3u, double, double, double>::RBM(RBM<3u, double, double, double>&&);
+template RBM<4u, double, double, double>::RBM(RBM<4u, double, double, double>&&);
+template RBM<2u, cpx, cpx, double>::RBM(RBM<2u, cpx, cpx, double>&&);
+template RBM<3u, cpx, cpx, double>::RBM(RBM<3u, cpx, cpx, double>&&);
+template RBM<4u, cpx, cpx, double>::RBM(RBM<4u, cpx, cpx, double>&&);
+template RBM<2u, cpx, double, double>::RBM(RBM<2u, cpx, double, double>&&);
+template RBM<3u, cpx, double, double>::RBM(RBM<3u, cpx, double, double>&&);
+template RBM<4u, cpx, double, double>::RBM(RBM<4u, cpx, double, double>&&);
+template RBM<2u, double, cpx, double>::RBM(RBM<2u, double, cpx, double>&&);
+template RBM<3u, double, cpx, double>::RBM(RBM<3u, double, cpx, double>&&);
+template RBM<4u, double, cpx, double>::RBM(RBM<4u, double, cpx, double>&&);
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>& RBM<_spinModes, _Ht, _T, _stateType>::operator=(RBM<_spinModes, _Ht, _T, _stateType>& _other)
+{
+	if (this != &_other)
+	{
+		NQS_S<_spinModes, _Ht, _T, _stateType>::operator=(_other);
+		this->W_ = _other.W_;
+		this->bV_ = _other.bV_;
+		this->bH_ = _other.bH_;
+		this->theta_ = _other.theta_;
+		this->thetaCOSH_ = _other.thetaCOSH_;
+		this->thetaTmpCol_ = _other.thetaTmpCol_;
+		this->thetaCOSH_log_ = _other.thetaCOSH_log_;
+		this->nHid_ = _other.nHid_;
+		this->beta_ = _other.beta_;
+			// sizes
+		this->rbmSize_ 			= _other.rbmSize_;
+		this->info_p_.fullSize_ = _other.info_p_.fullSize_;
+	}
+	return *this;
+}
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>& RBM<_spinModes, _Ht, _T, _stateType>::operator=(RBM<_spinModes, _Ht, _T, _stateType>&& _other)
+{
+	if (this != &_other)
+	{
+		NQS_S<_spinModes, _Ht, _T, _stateType>::operator=(std::move(_other));
+		this->W_ = std::move(_other.W_);
+		this->bV_ = std::move(_other.bV_);
+		this->bH_ = std::move(_other.bH_);
+		this->theta_ = std::move(_other.theta_);
+		this->thetaCOSH_ = std::move(_other.thetaCOSH_);
+		this->thetaTmpCol_ = std::move(_other.thetaTmpCol_);
+		this->thetaCOSH_log_ = std::move(_other.thetaCOSH_log_);
+		this->nHid_ = _other.nHid_;
+		this->beta_ = std::move(_other.beta_);
+		// sizes
+		this->rbmSize_ 			= _other.rbmSize_;
+		this->info_p_.fullSize_ = _other.info_p_.fullSize_;
+	}
+	return *this;
+}
+
+// template instantiation of the functions above
+template RBM<2u, double, double, double>& RBM<2u, double, double, double>::operator=(RBM<2u, double, double, double>&);
+template RBM<3u, double, double, double>& RBM<3u, double, double, double>::operator=(RBM<3u, double, double, double>&);
+template RBM<4u, double, double, double>& RBM<4u, double, double, double>::operator=(RBM<4u, double, double, double>&);
+template RBM<2u, cpx, cpx, double>& RBM<2u, cpx, cpx, double>::operator=(RBM<2u, cpx, cpx, double>&);
+template RBM<3u, cpx, cpx, double>& RBM<3u, cpx, cpx, double>::operator=(RBM<3u, cpx, cpx, double>&);
+template RBM<4u, cpx, cpx, double>& RBM<4u, cpx, cpx, double>::operator=(RBM<4u, cpx, cpx, double>&);
+template RBM<2u, cpx, double, double>& RBM<2u, cpx, double, double>::operator=(RBM<2u, cpx, double, double>&);
+template RBM<3u, cpx, double, double>& RBM<3u, cpx, double, double>::operator=(RBM<3u, cpx, double, double>&);
+template RBM<4u, cpx, double, double>& RBM<4u, cpx, double, double>::operator=(RBM<4u, cpx, double, double>&);
+template RBM<2u, double, cpx, double>& RBM<2u, double, cpx, double>::operator=(RBM<2u, double, cpx, double>&);
+template RBM<3u, double, cpx, double>& RBM<3u, double, cpx, double>::operator=(RBM<3u, double, cpx, double>&);
+template RBM<4u, double, cpx, double>& RBM<4u, double, cpx, double>::operator=(RBM<4u, double, cpx, double>&);
+
+template RBM<2u, double, double, double>& RBM<2u, double, double, double>::operator=(RBM<2u, double, double, double>&&);
+template RBM<3u, double, double, double>& RBM<3u, double, double, double>::operator=(RBM<3u, double, double, double>&&);
+template RBM<4u, double, double, double>& RBM<4u, double, double, double>::operator=(RBM<4u, double, double, double>&&);
+template RBM<2u, cpx, cpx, double>& RBM<2u, cpx, cpx, double>::operator=(RBM<2u, cpx, cpx, double>&&);
+template RBM<3u, cpx, cpx, double>& RBM<3u, cpx, cpx, double>::operator=(RBM<3u, cpx, cpx, double>&&);
+template RBM<4u, cpx, cpx, double>& RBM<4u, cpx, cpx, double>::operator=(RBM<4u, cpx, cpx, double>&&);
+template RBM<2u, cpx, double, double>& RBM<2u, cpx, double, double>::operator=(RBM<2u, cpx, double, double>&&);
+template RBM<3u, cpx, double, double>& RBM<3u, cpx, double, double>::operator=(RBM<3u, cpx, double, double>&&);
+template RBM<4u, cpx, double, double>& RBM<4u, cpx, double, double>::operator=(RBM<4u, cpx, double, double>&&);
+template RBM<2u, double, cpx, double>& RBM<2u, double, cpx, double>::operator=(RBM<2u, double, cpx, double>&&);
+template RBM<3u, double, cpx, double>& RBM<3u, double, cpx, double>::operator=(RBM<3u, double, cpx, double>&&);
+template RBM<4u, double, cpx, double>& RBM<4u, double, cpx, double>::operator=(RBM<4u, double, cpx, double>&&);
+
+// ##########################################################################################################################################
+
+/**
+* @brief Clones the properties of another RBM object into this one.
+*
+* This function attempts to dynamically cast the provided object to an RBM object
+* with the same template parameters. If successful, it copies the internal properties
+* from the other RBM object to this one.
+*
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The type of the parameters.
+* @tparam _stateType The type of the state.
+* @param _other A shared pointer to another Monte Carlo object to clone from.
+*
+* @throws std::exception If there is an error during the cloning process.
+* @throws std::bad_cast If the dynamic cast fails.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void RBM<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
+{
+	try
+	{
+		auto _n = std::dynamic_pointer_cast<RBM<_spinModes, _Ht, _T, _stateType>>(_other);
+		if (_n)
+		{
+			this->W_ 			= _n->W_;
+			this->bV_ 			= _n->bV_;
+			this->bH_ 			= _n->bH_;
+			this->theta_ 		= _n->theta_;
+			this->thetaCOSH_ 	= _n->thetaCOSH_;
+			this->thetaTmpCol_ 	= _n->thetaTmpCol_;
+			this->thetaCOSH_log_= _n->thetaCOSH_log_;
+			this->nHid_ 		= _n->nHid_;
+			this->beta_ 		= _n->beta_;
+		}
+	}
+	catch (std::bad_cast & e)
+	{
+		std::cerr << "Error in cloning the RBM object: " << e.what() << std::endl;
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "Error in cloning the RBM object: " << e.what() << std::endl;
+	}
+
+	// clone the base class
+	NQS<_spinModes, _Ht, _T, _stateType>::clone(_other);
+}
+// template instantiation of the function above
+RBM_INST_CMB_ALL(clone, void, (MC_t_p), );
+
+// ##########################################################################################################################################
+
 // ############################################################## A N S A T Z ###############################################################
 
 // ##########################################################################################################################################

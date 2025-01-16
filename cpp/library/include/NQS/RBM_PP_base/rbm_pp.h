@@ -210,6 +210,7 @@ public:
 	// ---------------------------------------------------------
 public:
 	virtual auto clone() 					const -> MC_t_p		override = 0;
+	virtual auto clone(MC_t_p _n) 			-> void				override;
 
 };
 

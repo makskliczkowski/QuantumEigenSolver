@@ -353,9 +353,12 @@ nqs_perform_diag(int stateNum,
                 int threadNum) 
 {
     // Validate inputs
-    if (!_H) throw std::invalid_argument("Hamiltonian is not defined");
-    if (_meas_ED.size() != stateNum || _meas_LAN.size() != stateNum)
+    if (!_H) {
+		throw std::invalid_argument("Hamiltonian is not defined");
+	}
+    if (_meas_ED.size() != stateNum || _meas_LAN.size() != stateNum) {
         throw std::invalid_argument("Measurement vectors have incorrect size");
+	}
 
 	// Hilbert
 	const size_t Nh = _H->getHilbertSize();
@@ -432,7 +435,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		}
 	};
 
-	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->threadNum, 1, _NQSl, _beta);
+	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->nqsP.nqs_tr_pt_ ? this->threadNum : 1, 1, _NQSl, _beta);
 
 	// Set the hyperparameters
 #ifdef NQS_USESR_MAT_USED
@@ -483,7 +486,7 @@ void UI::nqsExcited()
 	// define the NQS states for the excited states
 	arma::Col<_T>	_meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 	
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);	// define the NQS states
+	v_sp_t<NQS<_spinModes, _T>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);					// define the NQS states
 	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);											// define the first one already here for the ground state
 	
 	{
@@ -555,14 +558,49 @@ void UI::nqsExcited()
 		_timer.checkpoint(VEQ(i));
 		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD;								// set up the energies container for NQS
 
-		if (!_NQS[i])
-			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, { this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });
-		
-		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
+		// define the NQS states for the excited states
+		if (!_NQS[i]) 
 		{
-			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
-			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, 
+				{ this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });	
+		}
+		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
+
+		if (this->nqsP.nqs_tr_pt_)
+		{
+			LOGINFO("Using parallel tempering for training", LOG_TYPES::TRACE, 2);
 			LOGINFO(1);
+			
+			typename MonteCarlo::ParallelTempering<_T>::Solver_p _mcs = _NQS[i];
+			v_1d<double> _inv_T;
+			for (int j = 0; j < this->threadNum; ++j) {
+				_inv_T.push_back((j + 1) * 1.0 / this->threadNum);
+			}
+			// create the solver
+			std::shared_ptr<MonteCarlo::ParallelTempering<_T>> _pt = std::make_shared<MonteCarlo::ParallelTempering<_T>>(_mcs, _inv_T, _inv_T.size());
+			
+			// train the NQS
+			_pt->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
+			auto [_best_idx, _best_acc_idx] = _pt->getBestInfo();
+
+			// get the best loss
+			_EN_TRAIN 	= _pt->getMeanLosses(_best_idx);
+			_EN_STD 	= _pt->getStdLosses(_best_idx);
+
+			// get the best solver
+			std::shared_ptr<MonteCarlo::MonteCarloSolver<_T>> _bmcs = _pt->getBestSolver_move();
+			// release the solver
+			_NQS[i].reset();
+			_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_bmcs);
+		}
+		else {
+			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
+		}
+		LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+		LOGINFO(1);
+
+		// collect the data
+		{
 			// -------------------------------------
 			_NQS[i]->collect(_parC, _meas_NQS[i], &_EN_TESTS, &_EN_TESTS_STD, this->quiet, this->nqsP.nqs_col_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);			
 			// -------------------------------------
@@ -597,7 +635,6 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 		// _H->quenchHamiltonian();
 		_parC.MC_sam_ 	= 1;
 		auto _RKsolver 	= algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
-		const int _order= _RKsolver->getOrder();																			// get the order of the solver
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{

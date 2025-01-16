@@ -123,6 +123,7 @@ struct NQS_info_t
     using u64                       			=       uint64_t;
 
     // simulation specific
+	int ptype_									=		-1;
 	MachineLearning::Parameters* p_				=		nullptr;
 
 	// regarding the iterative solvers
@@ -155,7 +156,9 @@ struct NQS_info_t
 
 	// regularization related
 	MachineLearning::Parameters* s_ =		nullptr;							// regularization scheduler
+	int sregs_						=		-1;									// scheduler for the regularization
 	double sreg_					=		1e-7;								// regularization for the covariance matrix
+	double sregd_					=		0.0;								// regularization decay
 	double sreg(size_t epoch, double _metric) const								{ return this->s_ ? (*this->s_)(epoch, _metric) : this->sreg_; };
 
 	// ---------------------------------------------------------------

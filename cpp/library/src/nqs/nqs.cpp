@@ -73,6 +73,13 @@ void NQS_info_t::saveInfo(const std::string& _dir, const std::string& _name, int
 
 // ##########################################################################################################################################
 
+/**
+* @brief Destructor for the NQS_info_t class.
+*
+* This destructor is responsible for cleaning up the dynamically allocated
+* memory for the pointers p_ and s_. If these pointers are not null, they
+* will be deleted and set to nullptr to prevent dangling pointers.
+*/
 NQS_info_t::~NQS_info_t()
 {
     if (this->p_) {
@@ -202,27 +209,84 @@ NQS_INST_CMB_ALL(derivativesReset, void, (size_t));
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 NQS<_spinModes, _Ht, _T, _stateType>::NQS(const NQS<_spinModes, _Ht, _T, _stateType>& _n)
-    : info_p_(_n.info_p_), H_(_n.H_), nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
+    : MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>(_n),
+    info_p_(_n.info_p_), H_(_n.H_),
+    nFlip_(_n.nFlip_), flipPlaces_(_n.flipPlaces_), flipVals_(_n.flipVals_)
 {
-    this->accepted_ 			= _n.accepted_;
-    this->total_ 				= _n.total_;
-    this->info_ 				= _n.info_;
-    this->ran_					= _n.ran_;
-    this->pBar_					= _n.pBar_;
+    const int _Ns               =           _n.info_p_.nSites_;                 // get the number of sites
+    // Ns and functions
+	this->pRatioFunc_			= 			[this](const Config_t& _v)         { return this->pRatio(_v); };
+	this->pKernelFunc_			= 			[this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
+	this->logPKernelFunc_		= 			[this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+    this->logPRatioFuncFlips_   =           [this](uint nFlips)                { return this->logPRatio(nFlips); };
+
+    // copy the lower states info
+    this->lower_states_			= 			NQS_lower_t<_spinModes, _Ht, _T, _stateType>(_Ns, _n.lower_states_.f_lower, _n.lower_states_.f_lower_b_, this);
+this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { return this->pRatio(_v); };
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatzlog(_v); };
+#else
+	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
+#endif
+	this->info_p_.lr_			= 			_n.info_p_.lr_;                // set the learning rate
+
+	// set the number of particles
+	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
+    this->info_p_.nVis_ 		= 			static_cast<uint>(_Ns * (this->spinModes_ / 2));
+	this->info_p_.nSites_		=			static_cast<uint>(_Ns);
+
+	// make it half filling if necessary
+	this->info_p_.nParticles_	=			(_n.info_p_.nParticles_ < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_n.info_p_.nParticles_;
+	this->info_p_.Nh_			=			this->H_->getHilbertSize();     // check the Hilbert space
+
     // initialize the information 
-    this->info_p_  				= _n.info_p_;
-    this->lower_states_ 		= _n.lower_states_;
+    this->info_p_  				=           _n.info_p_;
     // copy the weights
-    this->derivatives_ 			= _n.derivatives_;
-    this->derivativesMean_ 		= _n.derivativesMean_;
-    this->derivativesCentered_ 	= _n.derivativesCentered_;
-    this->derivativesCenteredH_ = _n.derivativesCenteredH_;
-    this->dF_ 					= _n.dF_;
-    this->F_ 					= _n.F_;
+    this->derivatives_ 			=           _n.derivatives_;
+    this->derivativesMean_ 		=           _n.derivativesMean_;
+    this->derivativesCentered_ 	=           _n.derivativesCentered_;
+    this->derivativesCenteredH_ =           _n.derivativesCenteredH_;
+    this->dF_ 					=           _n.dF_;
+    this->F_ 					=           _n.F_;
+    this->Weights_ 				=           _n.Weights_;
     // this->init();
 #ifdef NQS_NOT_OMP_MT
     this->initThreads(_n.threads_.threadNum_);
 #endif
+    {
+        // reset the solver and preconditioner
+        double _reg                 =           0.0;
+        if (_n.solver_ != nullptr) 
+        {
+            _reg                    =           _n.solver_->getReg();
+            this->setSolver(_n.info_p_.solver_, _n.info_p_.tol_, _n.info_p_.maxIter_, _reg);
+        }
+        // reset the preconditioner
+        if (_n.precond_ != nullptr) 
+        {
+            this->setPreconditioner(_n.precond_->type());
+        }
+        // reset the sreg scheduler
+        if (_n.info_p_.s_ != nullptr) 
+        {
+            int _sch        = _n.info_p_.s_->get_type();
+            double _sreg    = _n.info_p_.sreg_;
+            double _sregd   = _n.info_p_.sregd_;
+            size_t _mepo    = _n.info_p_.s_->get_max_epochs();
+            double _regp    = _n.info_p_.s_->get_patience();     
+            this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+        }
+        // reset the scheduler
+        if (_n.info_p_.p_ != nullptr) 
+        {
+            int _sch        = _n.info_p_.p_->get_type();
+            double _lr      = _n.info_p_.lr_;
+            double _lrp     = _n.info_p_.p_->get_patience();
+            size_t _mepo    = _n.info_p_.p_->get_max_epochs();
+            double _regp    = _n.info_p_.p_->get_patience();
+            this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+        }
+    }
 }
 
 // template instantiation of the function above
@@ -243,16 +307,16 @@ template NQS<4u, double, cpx, double>::NQS(const NQS<4u, double, cpx, double>&);
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&& _n)
-    : info_p_(std::move(_n.info_p_)), H_(std::move(_n.H_)), nFlip_(_n.nFlip_), flipPlaces_(std::move(_n.flipPlaces_)), flipVals_(std::move(_n.flipVals_))
+    : MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>(std::move(_n)),
+    info_p_(std::move(_n.info_p_)),
+    H_(std::move(_n.H_)), nFlip_(_n.nFlip_), 
+    flipPlaces_(std::move(_n.flipPlaces_)), flipVals_(std::move(_n.flipVals_))
 {
-    this->accepted_ 			= _n.accepted_;
+    this->accepted_             = _n.accepted_;
     this->total_ 				= _n.total_;
     this->info_ 				= _n.info_;
-    this->pBar_					= _n.pBar_;
-    this->ran_					= _n.ran_;
     // initialize the information
     this->info_p_ 				= std::move(_n.info_p_);
-    this->lower_states_ 		= std::move(_n.lower_states_);
     // copy the weights
     this->derivatives_ 			= std::move(_n.derivatives_);
     this->derivativesMean_ 		= std::move(_n.derivativesMean_);
@@ -260,10 +324,62 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&&
     this->derivativesCenteredH_ = std::move(_n.derivativesCenteredH_);
     this->dF_ 					= std::move(_n.dF_);
     this->F_ 					= std::move(_n.F_);
+    this->Weights_ 				= std::move(_n.Weights_);
+    // setup the functions as in the constructor
+    const int _Ns               = _n.info_p_.nSites_;                 // get the number of sites
+    this->pRatioFunc_			= [this](const Config_t& _v)         { return this->pRatio(_v); };
+    this->pKernelFunc_			= [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
+    this->logPKernelFunc_		= [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+    this->logPRatioFuncFlips_   = [this](uint nFlips)                { return this->logPRatio(nFlips); };
+
+    // copy the lower states info
+    this->lower_states_			    = std::move(_n.lower_states_);
+    this->lower_states_.exc_ratio_  = [this](const Config_t& _v)     { return this->pRatio(_v); };
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+    this->lower_states_.exc_ansatz_ = [&](const Config_t& _v)        { return this->ansatzlog(_v); };
+#else
+    this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
+#endif
+    this->info_p_.lr_			= _n.info_p_.lr_;                // set the learning rate
+
+    // set the number of particles
+    // set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
+    this->info_p_.nVis_ 		= static_cast<uint>(_Ns * (this->spinModes_ / 2));
+    this->info_p_.nSites_		= static_cast<uint>(_Ns);
+
+    // make it half filling if necessary
+    this->info_p_.nParticles_	= (_n.info_p_.nParticles_ < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_n.info_p_.nParticles_;
+    this->info_p_.Nh_			= this->H_->getHilbertSize();     // check the Hilbert space
+
     // this->init();
 #ifdef NQS_NOT_OMP_MT
     this->initThreads(_n.threads_.threadNum_);
 #endif
+    // move the preconditioners and solvers
+    {
+        this->solver_           = std::move(_n.solver_);
+        this->precond_          = std::move(_n.precond_);
+        // schedulers - create new
+        if (_n.info_p_.s_ != nullptr) 
+        {
+            int _sch        = _n.info_p_.s_->get_type();
+            double _sreg    = _n.info_p_.sreg_;
+            double _sregd   = _n.info_p_.sregd_;
+            size_t _mepo    = _n.info_p_.s_->get_max_epochs();
+            double _regp    = _n.info_p_.s_->get_patience();     
+            this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+        }
+        // reset the scheduler
+        if (_n.info_p_.p_ != nullptr) 
+        {
+            int _sch        = _n.info_p_.p_->get_type();
+            double _lr      = _n.info_p_.lr_;
+            double _lrp     = _n.info_p_.p_->get_patience();
+            size_t _mepo    = _n.info_p_.p_->get_max_epochs();
+            double _regp    = _n.info_p_.p_->get_patience();
+            this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+        }
+    }
 }
 
 // template instantiation of the function above
@@ -300,30 +416,78 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
 {
     if (this != &_n) 
     {
-        this->H_ 					= _n.H_;
-        this->info_ 				= _n.info_;
-        this->pBar_ 				= _n.pBar_;
-        this->ran_ 				= _n.ran_;
-        this->nFlip_ 				= _n.nFlip_;
-        this->flipPlaces_ 			= _n.flipPlaces_;
-        this->flipVals_ 			= _n.flipVals_;
-        // initialize the information
-        this->info_p_ 				= _n.info_p_;
-        this->lower_states_ 		= _n.lower_states_;
-        // copy the weights
-        this->derivatives_ 			= _n.derivatives_;
-        this->derivativesMean_ 		= _n.derivativesMean_;
-        this->derivativesCentered_ 	= _n.derivativesCentered_;
+        this->H_                    = _n.H_;
+        this->info_p_               = _n.info_p_;
+        this->nFlip_                = _n.nFlip_;
+        this->flipPlaces_           = _n.flipPlaces_;
+        this->flipVals_             = _n.flipVals_;
+        this->accepted_             = _n.accepted_;
+        this->total_                = _n.total_;
+        this->info_                 = _n.info_;
+        this->lower_states_         = _n.lower_states_;
+        this->derivatives_          = _n.derivatives_;
+        this->derivativesMean_      = _n.derivativesMean_;
+        this->derivativesCentered_  = _n.derivativesCentered_;
         this->derivativesCenteredH_ = _n.derivativesCenteredH_;
-        this->dF_ 					= _n.dF_;
-        this->F_ 					= _n.F_;
-        // this->init();
+        this->dF_                   = _n.dF_;
+        this->F_                    = _n.F_;
+        this->Weights_              = _n.Weights_;
+        // setup the functions as in the constructor
+        this->info_p_.lr_           = _n.info_p_.lr_;
+        this->info_p_.nVis_         = _n.info_p_.nVis_;
+        this->info_p_.nSites_       = _n.info_p_.nSites_;
+        this->info_p_.nParticles_   = _n.info_p_.nParticles_;
+        this->info_p_.Nh_           = _n.info_p_.Nh_;
+        this->pRatioFunc_           = [this](const Config_t& _v)         { return this->pRatio(_v); };
+        this->pKernelFunc_          = [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
+        this->logPKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+        this->logPRatioFuncFlips_   = [this](uint nFlips)                { return this->logPRatio(nFlips); };
+        this->lower_states_.exc_ratio_ = [this](const Config_t& _v)      { return this->pRatio(_v); };
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+        this->lower_states_.exc_ansatz_ = [&](const Config_t& _v)        { return this->ansatzlog(_v); };
+#else
+        this->lower_states_.exc_ansatz_ = [&](const Config_t& _v)        { return this->ansatz(_v); };
+#endif
 #ifdef NQS_NOT_OMP_MT
         this->initThreads(_n.threads_.threadNum_);
 #endif
+        // reset the solver and preconditioner
+        {
+            double _reg = 0.0;
+            if (_n.solver_ != nullptr) 
+            {
+                _reg = _n.solver_->getReg();
+                this->setSolver(_n.info_p_.solver_, _n.info_p_.tol_, _n.info_p_.maxIter_, _reg);
+            }
+            // reset the preconditioner
+            if (_n.precond_ != nullptr) 
+            {
+                this->setPreconditioner(_n.precond_->type());
+            }
+            // reset the sreg scheduler
+            if (_n.info_p_.s_ != nullptr) 
+            {
+                int _sch = _n.info_p_.s_->get_type();
+                double _sreg = _n.info_p_.sreg_;
+                double _sregd = _n.info_p_.sregd_;
+                size_t _mepo = _n.info_p_.s_->get_max_epochs();
+                double _regp = _n.info_p_.s_->get_patience();     
+                this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+            }
+            // reset the scheduler
+            if (_n.info_p_.p_ != nullptr) 
+            {
+                int _sch = _n.info_p_.p_->get_type();
+                double _lr = _n.info_p_.lr_;
+                double _lrp = _n.info_p_.p_->get_patience();
+                size_t _mepo = _n.info_p_.p_->get_max_epochs();
+                double _regp = _n.info_p_.p_->get_patience();
+                this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+            }
+        }
     }
     return *this;
-}    
+}
 
 // template instantiation of the function above
 template NQS<2u, double, double, double>& NQS<2u, double, double, double>::operator=(const NQS<2u, double, double, double>&);
@@ -338,6 +502,105 @@ template NQS<4u, cpx, double, double>& NQS<4u, cpx, double, double>::operator=(c
 template NQS<2u, double, cpx, double>& NQS<2u, double, cpx, double>::operator=(const NQS<2u, double, cpx, double>&);
 template NQS<3u, double, cpx, double>& NQS<3u, double, cpx, double>::operator=(const NQS<3u, double, cpx, double>&);
 template NQS<4u, double, cpx, double>& NQS<4u, double, cpx, double>::operator=(const NQS<4u, double, cpx, double>&);
+
+// ##########################################################################################################################################
+
+/**
+* @brief Clones the state of another NQS object into this one.
+*
+* This function attempts to cast the provided object to an NQS object of the same template parameters.
+* If the cast is successful, it copies the internal state of the other NQS object into this one.
+* If the cast fails, it logs an error message.
+*
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type.
+* @tparam _stateType The state type.
+* @param _other A shared pointer to the Monte Carlo object to clone from.
+*
+* @throws std::bad_cast If the dynamic cast fails.
+* @throws std::exception If any other exception occurs during the cloning process.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
+{
+    try 
+    {
+        // cast the other object to the NQS type
+        auto _n = std::dynamic_pointer_cast<NQS<_spinModes, _Ht, _T, _stateType>>(_other);
+
+        // check if the cast was successful
+        if (_n) 
+        {
+            this->info_p_               = _n->info_p_;
+            this->H_                    = _n->H_;
+            this->nFlip_                = _n->nFlip_;
+            this->flipPlaces_           = _n->flipPlaces_;
+            this->flipVals_             = _n->flipVals_;
+            this->accepted_             = _n->accepted_;
+            this->total_                = _n->total_;
+            this->info_                 = _n->info_;
+            this->lower_states_         = _n->lower_states_;
+            this->derivatives_          = _n->derivatives_;
+            this->derivativesMean_      = _n->derivativesMean_;
+            this->derivativesCentered_  = _n->derivativesCentered_;
+            this->derivativesCenteredH_ = _n->derivativesCenteredH_;
+            this->dF_                   = _n->dF_;
+            this->F_                    = _n->F_;
+            this->Weights_              = _n->Weights_;
+            this->info_p_.lr_           = _n->info_p_.lr_;
+            this->info_p_.nVis_         = _n->info_p_.nVis_;
+            this->info_p_.nSites_       = _n->info_p_.nSites_;
+            this->info_p_.nParticles_   = _n->info_p_.nParticles_;
+            this->info_p_.Nh_           = _n->info_p_.Nh_;
+            this->pRatioFunc_           = [this](const Config_t& _v)         { return this->pRatio(_v); };
+            this->pKernelFunc_          = [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
+            this->logPKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
+            this->logPRatioFuncFlips_   = [this](uint nFlips)                { return this->logPRatio(nFlips); };
+            this->lower_states_.exc_ratio_ = [this](const Config_t& _v)      { return this->pRatio(_v); };
+#ifdef NQS_LOWER_RATIO_LOGDIFF
+            this->lower_states_.exc_ansatz_ = [&](const Config_t& _v)        { return this->ansatzlog(_v); };
+#else
+            this->lower_states_.exc_ansatz_ = [&](const Config_t& _v)        { return this->ansatz(_v); };
+#endif
+#ifdef NQS_NOT_OMP_MT
+            this->initThreads(_n->threads_.threadNum_);
+#endif
+            // additonal information
+            this->solver_               = _n->solver_;
+            this->precond_              = _n->precond_;
+            // schedulers - create new
+            if (_n->info_p_.s_ != nullptr) 
+            {
+                int _sch = _n->info_p_.s_->get_type();
+                double _sreg = _n->info_p_.sreg_;
+                double _sregd = _n->info_p_.sregd_;
+                size_t _mepo = _n->info_p_.s_->get_max_epochs();
+                double _regp = _n->info_p_.s_->get_patience();     
+                this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+            }
+            // reset the scheduler
+            if (_n->info_p_.p_ != nullptr) 
+            {
+                int _sch = _n->info_p_.p_->get_type();
+                double _lr = _n->info_p_.lr_;
+                double _lrp = _n->info_p_.p_->get_patience();
+                size_t _mepo = _n->info_p_.p_->get_max_epochs();
+                double _regp = _n->info_p_.p_->get_patience();
+                this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+            }
+        }
+    }
+    catch (const std::bad_cast& e) 
+    {
+        LOGINFO("Error in cloning the NQS object: " + std::string(e.what()), LOG_TYPES::ERROR, 2);
+    }
+    catch (const std::exception& e) 
+    {
+        LOGINFO("Error in cloning the NQS object: " + std::string(e.what()), LOG_TYPES::ERROR, 2);
+    }
+}
+NQS_INST_CMB_ALL(clone, void, (MC_t_p)); 
 
 // ##########################################################################################################################################
 
@@ -361,10 +624,11 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
 {
     if (this != &_n) 
     {
+        // reset the current object
         this->H_ 					= _n.H_;
-        this->info_ 				= _n.info_;
-        this->pBar_ 				= _n.pBar_;
-        this->ran_ 				    = _n.ran_;
+        _n.H_ 						= 0;
+
+        // copy the information
         this->nFlip_ 				= _n.nFlip_;
         this->flipPlaces_ 			= _n.flipPlaces_;
         this->flipVals_ 			= _n.flipVals_;
@@ -378,10 +642,38 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
         this->derivativesCenteredH_ = std::move(_n.derivativesCenteredH_);
         this->dF_ 					= std::move(_n.dF_);
         this->F_ 					= std::move(_n.F_);
+        this->Weights_ 				= std::move(_n.Weights_);
         // this->init();
 #ifdef NQS_NOT_OMP_MT
         this->initThreads(_n.threads_.threadNum_);
 #endif
+        {
+            // move the preconditioners and solvers
+            {
+                this->solver_           = std::move(_n.solver_);
+                this->precond_          = std::move(_n.precond_);
+                // schedulers - create new
+                if (_n.info_p_.s_ != nullptr) 
+                {
+                    int _sch        = _n.info_p_.s_->get_type();
+                    double _sreg    = _n.info_p_.sreg_;
+                    double _sregd   = _n.info_p_.sregd_;
+                    size_t _mepo    = _n.info_p_.s_->get_max_epochs();
+                    double _regp    = _n.info_p_.s_->get_patience();     
+                    this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+                }
+                // reset the scheduler
+                if (_n.info_p_.p_ != nullptr) 
+                {
+                    int _sch        = _n.info_p_.p_->get_type();
+                    double _lr      = _n.info_p_.lr_;
+                    double _lrp     = _n.info_p_.p_->get_patience();
+                    size_t _mepo    = _n.info_p_.p_->get_max_epochs();
+                    double _regp    = _n.info_p_.p_->get_patience();
+                    this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+                }
+            }
+        }
     }
     return *this;
 }
@@ -428,7 +720,7 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 													int _nParticles,
 													const NQSLS_p& _lower, 
 													const std::vector<double>& _beta)
-	: H_(_H)
+	: MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>(), H_(_H)
 {	
 	const size_t _Ns			= 			_H->getNs();	
 	this->pRatioFunc_			= 			[this](const Config_t& _v)         { return this->pRatio(_v); };
@@ -453,7 +745,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 	// make it half filling if necessary
 	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_nParticles;
 	this->info_p_.Nh_			=			_H->getHilbertSize();           // check the Hilbert space
-	this->ran_					=			&_H->ran_;                      // set the random number generator
 #ifdef NQS_NOT_OMP_MT
 	this->initThreads(_threadNum);
 #endif
@@ -499,17 +790,7 @@ NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
     for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
         if (this->threads_.threads_[_thread].joinable())
             this->threads_.threads_[_thread].join();
-#endif
-    // ######################################################################################################################################
-
-    // don't delete the random number generator as it is shared with the Hamiltonian
-    
-    // ######################################################################################################################################
-    if (this->pBar_ != nullptr) {
-        delete this->pBar_;
-        this->pBar_ = nullptr;
-    }
-
+#endif    
     // ######################################################################################################################################
     if (this->precond_ != nullptr) {
         delete this->precond_;
@@ -884,12 +1165,38 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::initThreads(uint _threadNum)
 #if defined NQS_USE_MULTITHREADING      // Use threads for all consecutive parallel regions
     try 
     {
+        // reset the threads if they are already initialized
+        {
+            // wait for the threads to finish their work
+            for (int _thread = 0; _thread < this->threads_.kernels_.size(); _thread++)
+            {
+                std::unique_lock<std::mutex> lock(this->threads_.kernels_[_thread].mutex);
+                this->threads_.kernels_[_thread].flagThreadKill_    = true;
+                this->threads_.kernels_[_thread].end_               = true;
+                this->threads_.kernels_[_thread].flagThreadRun_     = 1;
+                this->threads_.kernels_[_thread].cv.notify_all();
+            }
+            {
+                std::unique_lock<std::mutex> lock(this->threads_.mutex);
+                this->threads_.threads_.clear();
+                this->threads_.kernels_.clear();
+            }
+            {
+                std::unique_lock<std::mutex> lock(this->threads_.mutex);
+                this->threads_.threads_.reserve(this->threads_.threadNum_);
+                this->threads_.kernels_	        =   v_1d<CondVarKernel<_T>>(this->threads_.threadNum_);
+                // set the flags back to false
+                for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
+                {
+                    this->threads_.kernels_[_thread].flagThreadKill_    = false;
+                    this->threads_.kernels_[_thread].end_               = false;
+                    this->threads_.kernels_[_thread].flagThreadRun_     = 0;
+                }
+            }
+        }
 #ifdef NQS_USE_OMP
 		omp_set_num_threads(this->threadNum_);   
 #else
-		this->threads_.threads_.reserve(this->threads_.threadNum_);
-		this->threads_.kernels_	        =   v_1d<CondVarKernel<_T>>(this->threads_.threadNum_);
-		
 		// calculate how many sites goes to one thread
 		uint _siteStep                  =   std::ceil(this->info_p_.nSites_ / 1.0 / this->threads_.threadNum_);
 

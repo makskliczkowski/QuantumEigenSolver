@@ -247,15 +247,15 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 	const auto best			= this->info_p_.best();
 	const double acceptance = (double)this->accepted_ / this->total_ * 100.0;
 
-	double coolingRate 		= 1.001; 	// Cooling rate (how fast to decrease beta)
+	// double coolingRate 		= 1.001; 	// Cooling rate (how fast to decrease beta)
 
 	// If acceptance rate is too low, adjust beta
-	if (acceptance < 5e-2) 
-	{
+	// if (acceptance < 5e-2) 
+	// {
 		// this->setRandomState(); 		// Reset the state
-		this->beta_ *= coolingRate;
-		LOGINFO("Acceptance rate is too low: " + STR(acceptance) + "%. Changing beta: " + STRP(this->beta_, 3), LOG_TYPES::DEBUG, 3);
-	}
+		// this->beta_ *= coolingRate;
+		// LOGINFO("Acceptance rate is too low: " + STR(acceptance) + "%. Changing beta: " + STRP(this->beta_, 3), LOG_TYPES::DEBUG, 3);
+	// }
 
 	const std::string _prog = "Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
 								", Loss: " + STRPS(_currLoss, 4) + " ± " + STRPS(_currstd / 2.0, 3) +
@@ -264,12 +264,12 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 								", LR: " + STRPS(this->info_p_.lr_, 4) +
 								", Reg: " + STRPS(this->info_p_.sreg_, 4) + 
 								", Beta: " + STRPS(this->beta_, 4);
-
-	PROGRESS_UPD_Q(i, (*this->pBar_), _prog, !_quiet);
+	if (this->pBar_)
+		PROGRESS_UPD_Q(i, (*this->pBar_), _prog, !_quiet);
 	
 	this->updateWeights_ 	= !this->info_p_.stop(i, _currLoss) && this->updateWeights_;
 #ifdef NQS_SAVE_WEIGHTS
-	if ((i % this->pBar_->percentageSteps == 0) || !this->updateWeights_) 
+	if ((!this->pBar_ && (i % int(_par.MC_sam_ / 10) == 0)) || (this->pBar_ && i % this->pBar_->percentageSteps == 0) || !this->updateWeights_) 
 		this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
 #endif
 
@@ -356,7 +356,9 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 	}
 	
 	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 					// save the mean energy
-	TIMER_START_MEASURE(this->gradFinal(En, i, meanEn(i - 1)), (i % this->pBar_->percentageSteps == 0), _timer, STR(i)); 	// calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
+	TIMER_START_MEASURE(
+		this->gradFinal(En, i, meanEn(i - 1)), this->pBar_ && (i % this->pBar_->percentageSteps == 0), _timer, STR(i)
+	); 
 
 	if (this->updateWeights_)
 		this->updateWeights(); 									// finally, update the weights with the calculated gradient (force) [can be done with the stochastic reconfiguration or the standard gradient descent] - implementation specific!!!

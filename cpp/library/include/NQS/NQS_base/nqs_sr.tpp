@@ -16,6 +16,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const MonteCarl
 {
 	this->lower_states_.train_lower_ = _par;
 	LOGINFO("Training parameters for lower states set.", LOG_TYPES::INFO, 2);
+	LOGINFO("", LOG_TYPES::TRACE, 40, 2);
 }
 
 /**
@@ -30,9 +31,15 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const MonteCarl
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double _lr, double _lrd, size_t _epo, size_t _pat)
 {
-	this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); 
-	LOGINFO("Scheduler set with type: " + STR(_sch) + ", initial learning rate: " + VEQPS(_lr, 3) + 
-			", learning rate decay: " + VEQPS(_lrd, 3) + ", epochs: " + STR(_epo) + ", patience: " + STR(_pat), LOG_TYPES::INFO, 2);
+	if (this->info_p_.p_ != nullptr)
+		delete this->info_p_.p_;
+	// set the new scheduler
+	if (_sch != 0)
+	{
+		this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); 
+		LOGINFO("Scheduler set with type: " + STR(_sch) + ", initial learning rate: " + VEQPS(_lr, 3) + 
+				", learning rate decay: " + VEQPS(_lrd, 3) + ", epochs: " + STR(_epo) + ", patience: " + STR(_pat), LOG_TYPES::INFO, 2);
+	}
 }
 
 /**
@@ -63,7 +70,13 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, double _sreg, double _sregd, size_t _epo, size_t _pat)
 {
-	this->info_p_.sreg_ = _sreg; 
+	this->info_p_.sreg_ 	= _sreg; 
+	this->info_p_.sregd_ 	= _sregd;
+	this->info_p_.sregs_	= _sch;
+
+	// set the new scheduler
+	if (this->info_p_.s_ != nullptr)
+		delete this->info_p_.s_;
 	if (_sreg > 0) 
 	{ 
 		LOGINFO("Regularization set with initial factor: " + VEQPS(_sreg, 3) + ", scheduler type: " + STR(_sch) + 
