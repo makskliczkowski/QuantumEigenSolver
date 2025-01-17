@@ -1,4 +1,5 @@
 #include "../../include/NQS/nqs_final.hpp"
+#include <limits>
 
 // ##########################################################################################################################################
 
@@ -24,7 +25,6 @@
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, int _step,  _T _currLoss)
 {
-	this->info_p_.lr_ = this->info_p_.lr(_step, algebra::real(_currLoss));										// calculate current learning rate based on the scheduler
 	const _T _samples = static_cast<_T>(_energies.n_elem);
 	{
 		// calculate the covariance derivatives <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}> 
@@ -134,7 +134,7 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							this->F_, 														// b
 							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
-							this->precond_);												// preconditioner
+							this->precond_.get());											// preconditioner
 		_inversionSuccess = this->solver_->isConverged();
 		this->dF_ = this->info_p_.lr_ * this->solver_->moveSolution();						// get the solution
 	} 
@@ -145,8 +145,8 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
 										this->derivativesCentered_,     										// Ensure this matches the type expected by _gramMatrix
 										this->derivativesCenteredH_,											// This should also match arma::Col<_T>
 										this->F_,               												// This should be of type arma::Col<_T>
-										nullptr, //step <= 1 ? nullptr : &this->dF_,										// This should also match arma::Col<_T>
-										this->precond_ ? this->precond_ : nullptr, 								// Preconditioner
+										nullptr, //step <= 1 ? nullptr : &this->dF_,							// This should also match arma::Col<_T>
+										this->precond_ ? this->precond_.get() : nullptr, 						// Preconditioner
 										this->info_p_.tol_,                  		 							// Tolerance
 										std::min(size_t(5 * this->F_.n_elem), size_t(this->info_p_.maxIter_)),	// Max iterations,
 										&_inversionSuccess,														// Convergence flag						
@@ -185,8 +185,9 @@ NQS_INST_CMB(double, std::complex<double>, gradSR, void, (uint, std::complex<dou
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::gradFinal(const Container_t& _energies, int _step, _T _currLoss)
 {
-	this->gradF(_energies, _step, _currLoss);					// calculate the gradient of the loss function
-#ifdef NQS_USESR_MAT_USED										// ---- STOCHASTIC RECONFIGURATION WITH MATRIX CALCULATION ----
+	this->info_p_.lr_ = this->info_p_.lr(_step, algebra::real(_currLoss)); 	// calculate current learning rate based on the scheduler
+	this->gradF(_energies, _step, _currLoss);								// calculate the gradient of the loss function
+#ifdef NQS_USESR_MAT_USED													// ---- STOCHASTIC RECONFIGURATION WITH MATRIX CALCULATION ----
 	// update model by recalculating the gradient (applying the stochastic reconfiguration)
 	// this->S_ = arma::cov(this->derivativesC_, this->derivatives_, 1);
 	this->S_ = this->derivativesCenteredH_ * this->derivativesCentered_ / _samples;
@@ -244,8 +245,9 @@ template void NQS<4u, double, std::complex<double>, double>::gradFinal(const arm
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo::MCS_train_t& _par, _T _currLoss, _T _currstd, bool _quiet)
 {
-	const auto best			= this->info_p_.best();
+	const double best		= this->info_p_.best();
 	const double acceptance = (double)this->accepted_ / this->total_ * 100.0;
+	this->lastLoss_ 		= _currLoss;
 
 	// double coolingRate 		= 1.001; 	// Cooling rate (how fast to decrease beta)
 
@@ -257,9 +259,9 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 		// LOGINFO("Acceptance rate is too low: " + STR(acceptance) + "%. Changing beta: " + STRP(this->beta_, 3), LOG_TYPES::DEBUG, 3);
 	// }
 
-	const std::string _prog = "Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
+	const std::string _prog = std::format("[{}]", this->replica_) + " Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
 								", Loss: " + STRPS(_currLoss, 4) + " ± " + STRPS(_currstd / 2.0, 3) +
-								", Best: " + VEQPS(best, 4) + 
+								(best < 1e12 ? (", Best: " + VEQPS(best, 4)) : "") + 
 								", Acceptance: " + STR(this->accepted_) + "/" + STR(this->total_) + " (" + STRP(acceptance, 2) + "%)" +
 								", LR: " + STRPS(this->info_p_.lr_, 4) +
 								", Reg: " + STRPS(this->info_p_.sreg_, 4) + 
@@ -269,12 +271,12 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 	
 	this->updateWeights_ 	= !this->info_p_.stop(i, _currLoss) && this->updateWeights_;
 #ifdef NQS_SAVE_WEIGHTS
-	if ((!this->pBar_ && (i % int(_par.MC_sam_ / 10) == 0)) || (this->pBar_ && i % this->pBar_->percentageSteps == 0) || !this->updateWeights_) 
-		this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights_" + STR(this->lower_states_.f_lower_size_) + ".h5");
+	if (!_quiet && ((!this->pBar_ && (i % int(_par.MC_sam_ / 10) == 0)) || (this->pBar_ && i % this->pBar_->percentageSteps == 0) || !this->updateWeights_)) 
+		this->saveWeights(_par.dir + NQS_SAVE_DIR, "weights.h5");
 #endif
 
 	if (!this->updateWeights_) {
-		LOGINFO("Stopping at iteration " + STR(i) + " with last loss value: " + STRPS(_currLoss, 4) + "+-" + STRPS(_currstd/2.0, 4), LOG_TYPES::WARNING, 1);
+		LOGINFO(std::format("[{}] Stopping at iteration {} with last loss value: {} +- {}", this->replica_, STR(i), STRPS(_currLoss, 4), STRPS(_currstd/2.0, 4)), LOG_TYPES::WARNING, 3);
 		return true;
 	}
 	return false;
@@ -308,7 +310,9 @@ NQS_INST_CMB(std::complex<double>, std::complex<double>, trainStop, bool, (size_
 * @param quiet Flag to suppress output if true.
 * @param randomStart Flag to initialize with a random state if true.
 * @param _timer Timer object for measuring execution time.
-* 
+* @note The configuration needs not to be reset at the beginning of each iteration but it may be. Nevertheless,
+* the state should be set at the beginning of the training - whatever the configuration is. This also means that
+* the thermalization should be done at the beginning of the training.
 * @return True if the training should stop based on the stopping criteria, false otherwise.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -319,11 +323,12 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 													const MonteCarlo::MCS_train_t& _par, 
                                                     const bool quiet, 
                                                     const bool randomStart,
-                                                    Timer& _timer)
+                                                    Timer* _timer)
 {
 	this->total_ 	= 0;										// reset the total number of flips
 	this->accepted_ = 0;										// reset the number of accepted flips
-	if (randomStart && _par.MC_th_ > 0) {
+	if (randomStart && _par.MC_th_ > 0)
+	{
 		this->setRandomState();									// set the random state at the begining
 		this->blockSample<false>(_par.MC_th_, NQS_STATE);		// thermalize the system - burn-in
 	} else {
@@ -354,8 +359,9 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 		for (int _low = 0; _low < this->lower_states_.f_lower_size_; _low++)  											// collect the average for the lower states and collect the same for the lower states with this ansatz - for the gradient calculation
 			this->lower_states_.collectLowerRatios(_low);
 	}
-	
-	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 					// save the mean energy
+	// !TODO Consider an autocorrelation analysis for the local energies and the gradient
+	// MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_ / 4, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 			// save the mean energy
+	MonteCarlo::mean(En, &meanEn(i - 1), &stdEn(i - 1)); 															// save the mean energy
 	TIMER_START_MEASURE(
 		this->gradFinal(En, i, meanEn(i - 1)), this->pBar_ && (i % this->pBar_->percentageSteps == 0), _timer, STR(i)
 	); 
@@ -369,10 +375,10 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 }
 
 // template instantiation of function above for <spins, double and complex, double and complex, double>
-NQS_INST_CMB(double, double, trainStep, bool, (size_t, arma::Col<double>&, arma::Col<double>&, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(double, std::complex<double>, trainStep, bool, (size_t, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, double, trainStep, bool, (size_t, arma::Col<double>&, arma::Col<double>&, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
-NQS_INST_CMB(std::complex<double>, std::complex<double>, trainStep, bool, (size_t, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer&));
+NQS_INST_CMB(double, double, trainStep, bool, (size_t, arma::Col<double>&, arma::Col<double>&, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer*));
+NQS_INST_CMB(double, std::complex<double>, trainStep, bool, (size_t, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer*));
+NQS_INST_CMB(std::complex<double>, double, trainStep, bool, (size_t, arma::Col<double>&, arma::Col<double>&, arma::Col<double>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer*));
+NQS_INST_CMB(std::complex<double>, std::complex<double>, trainStep, bool, (size_t, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, arma::Col<std::complex<double>>&, const MonteCarlo::MCS_train_t&, const bool, const bool, Timer*));
 
 // ##########################################################################################################################################
 
@@ -425,7 +431,7 @@ typename NQS<_spinModes, _Ht, _T, _stateType>::Container_pair_t NQS<_spinModes, 
 
 	uint i = 1;
 	for (i = 1; i <= _par.MC_sam_; ++i) {									// go through the Monte Carlo steps
-		if (this->trainStep(i, this->E_ , meanEn, stdEn, _par, quiet, randomStart, _timer)) // perform the training step
+		if (this->trainStep(i, this->E_ , meanEn, stdEn, _par, quiet, randomStart, &_timer)) // perform the training step
 			break;
 	}
 

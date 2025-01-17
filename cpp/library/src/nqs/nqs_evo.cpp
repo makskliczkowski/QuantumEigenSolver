@@ -63,7 +63,7 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							_multiplier * this->F_, 										// b
 							nullptr, //step <= 1 ? nullptr : &this->dF_, 					// x0
-							this->precond_);												// preconditioner
+							this->precond_.get());											// preconditioner
         if (!this->solver_->isConverged())
             throw std::runtime_error("Solver did not converge.");                           // check if the solver converged
 		if (_dF != nullptr)

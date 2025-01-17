@@ -97,7 +97,7 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
 		UI_PARAM_CREATE_DEFAULT(nqs_tr_rst, bool, 0);		// should I reset the state before each step?
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_pt, bool, 0);		// should I use the parallel tempering?
+		UI_PARAM_CREATE_DEFAULT(nqs_tr_pt, int, 0);			// should I use the parallel tempering - this is the number of replicas - 0 - no, > 0 - yes
 		// timeevolution
 		UI_PARAM_CREATE_DEFAULT(nqs_te, bool, 0);			// time evolution - do or do not? - 0 - no, 1 - yes
 		UI_PARAM_CREATE_DEFAULT(nqs_te_mc, uint, 1);		// number of samples - outer loop for time evolution

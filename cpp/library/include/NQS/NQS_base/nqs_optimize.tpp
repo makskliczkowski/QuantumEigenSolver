@@ -17,15 +17,30 @@
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setPreconditioner(int _pre) 									
 { 
-	if (this->precond_)
-		delete this->precond_;
+    if (_pre >= 0) 
+    {
+        // Retrieve a standard pointer to the chosen preconditioner
+        auto rawPreconditioner = algebra::Solvers::Preconditioners::choose<_T, true>(_pre);
 
-	if (_pre >= 0) 
-	{ 
-		// set the new preconditioner
-		this->precond_ = algebra::Solvers::Preconditioners::choose<_T>(_pre);
-		LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3);
-	}
+        if constexpr (std::is_same_v<decltype(this->precond_), std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_T, true>>>)
+        {
+            this->precond_ = rawPreconditioner->move();
+        }
+        else if constexpr (std::is_same_v<decltype(this->precond_), std::unique_ptr<algebra::Solvers::Preconditioners::Preconditioner<_T, true>>>)
+        {
+            this->precond_ = rawPreconditioner->move();
+        }
+        else if constexpr (std::is_same_v<decltype(this->precond_), algebra::Solvers::Preconditioners::Preconditioner<_T, true>*>)
+        {
+            this->precond_ = rawPreconditioner; // Direct assignment for raw pointer
+        }
+        else
+        {
+            static_assert(always_false<decltype(this->precond_)>, 
+                        "Unsupported pointer type for precond_. Use std::shared_ptr, std::unique_ptr, or raw pointer.");
+        }
+        LOGINFO("Using preconditioner: " + algebra::Solvers::Preconditioners::name(_pre), LOG_TYPES::CHOICE, 3);
+    }
 };
 
 /**
@@ -49,11 +64,29 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setSolver(int _sol, double _tol, int _maxiter, double _reg)						
 { 
 	this->info_p_.setSolver(_sol, _maxiter, _tol); 
-	// delete the old solver
-	if (this->solver_)
-		delete this->solver_;	
-	// set the new solver
-	this->solver_ = algebra::Solvers::General::choose<_T, true>(_sol, this->info_p_.fullSize_, _tol, _maxiter, _reg);
+
+	if (_sol < 0) return; // no solver set
+
+	// choose the solver based on the provided integer value
+	auto _raw_solver = algebra::Solvers::General::choose<_T, true>(_sol, this->info_p_.fullSize_, _tol, _maxiter, _reg);
+
+    if constexpr (std::is_same_v<decltype(this->solver_), std::shared_ptr<algebra::Solvers::General::Solver<_T, true>>>)
+    {
+        this->solver_ = _raw_solver->move();
+    }
+    else if constexpr (std::is_same_v<decltype(this->solver_), std::unique_ptr<algebra::Solvers::General::Solver<_T, true>>>)
+    {
+        this->solver_ = _raw_solver->move();
+    }
+    else if constexpr (std::is_same_v<decltype(this->solver_), algebra::Solvers::General::Solver<_T, true>*>)
+    {
+        this->solver_ = _raw_solver; // Direct assignment for raw pointer
+    }
+    else
+    {
+        static_assert(always_false<decltype(this->solver_)>, 
+                    "Unsupported pointer type for solver_. Use std::shared_ptr, std::unique_ptr, or raw pointer.");
+    }
 	LOGINFO("Using solver: " + algebra::Solvers::General::name(_sol) + " with tolerance: " + VEQPS(_tol, 3) + " and iterations: " + STR(_maxiter), LOG_TYPES::CHOICE, 3); 
 };
 

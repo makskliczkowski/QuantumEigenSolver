@@ -68,12 +68,12 @@ enum NQSTYPES					// #
 // ##########################################################################################################################################
 
 // all the types that are to be used in each NQS implementation
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;											\
-											using NQSB = arma::Col<_type>; 														\
-											using NQSW = arma::Mat<_type>;			 											\
-											using Solver_t_p = algebra::Solvers::General::Solver<_T, true>*;					\
-											using Precond_t_p = algebra::Solvers::Preconditioners::Preconditioner<_T, true>*;	\
-											using int_ini_t = std::initializer_list<int>;										\
+#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;															\
+											using NQSB = arma::Col<_type>; 																		\
+											using NQSW = arma::Mat<_type>;			 															\
+											using Solver_t_p = std::shared_ptr<algebra::Solvers::General::Solver<_T, true>>;					\
+											using Precond_t_p = std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_T, true>>;	\
+											using int_ini_t = std::initializer_list<int>;														\
 											using dbl_ini_t = std::initializer_list<double>;									
 											
 
@@ -123,8 +123,7 @@ struct NQS_info_t
     using u64                       			=       uint64_t;
 
     // simulation specific
-	int ptype_									=		-1;
-	MachineLearning::Parameters* p_				=		nullptr;
+	std::unique_ptr<MachineLearning::Parameters> p_;							// scheduler for the learning rate
 
 	// regarding the iterative solvers
 	int solver_									=		1;						// solver for the NQS with SR
@@ -132,6 +131,7 @@ struct NQS_info_t
 	double tol_									=		1e-5;					// tolerance for iterative solvers
 	void setSolver(int _s, int i, double _tol)									{ this->solver_ = _s; this->maxIter_ = i; this->tol_ = _tol; };
 
+	// pseudoinverse
 	double pinv_ 								= 		-1;						// pseudoinverse for the NQS
 
     // architecture specific			
@@ -146,19 +146,16 @@ struct NQS_info_t
 
 	// training related
 	double lr_									=		1e-3;					// learning rate
-	double lr(size_t epoch, double _metric) const								{ return this->p_ ? (*this->p_)(epoch, _metric) : this->lr_; };
+	double lr(size_t epoch, double _metric) const								{ return this->p_ ? (this->p_)->operator()(epoch, _metric) : this->lr_; 				};
 
 	// early stopping
-	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)					{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); };	
-	bool stop(size_t epoch, double _metric = 0.0)								{ if (this->p_) return this->p_->stop(epoch, _metric); else return false; };
-	bool stop(size_t epoch, std::complex<double> _metric)						{ if (this->p_) return this->p_->stop(epoch, std::real(_metric)); else return false; };
+	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)					{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); 							};	
+	template <typename _T> bool stop(size_t epoch, _T _metric);
 	double best() const															{ return this->p_ ? this->p_->best() : 0.0; };
 
 	// regularization related
-	MachineLearning::Parameters* s_ =		nullptr;							// regularization scheduler
-	int sregs_						=		-1;									// scheduler for the regularization
+	std::unique_ptr<MachineLearning::Parameters> s_;							// regularization scheduler
 	double sreg_					=		1e-7;								// regularization for the covariance matrix
-	double sregd_					=		0.0;								// regularization decay
 	double sreg(size_t epoch, double _metric) const								{ return this->s_ ? (*this->s_)(epoch, _metric) : this->sreg_; };
 
 	// ---------------------------------------------------------------
@@ -169,6 +166,18 @@ struct NQS_info_t
 	// ---------------------------------------------------------------
 
 	void saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const;
+
+	// ---------------------------------------------------------------
+
+	NQS_info_t(const NQS_info_t& other);
+    NQS_info_t(NQS_info_t&& other) noexcept;
+
+	// ---------------------------------------------------------------
+
+    NQS_info_t& operator=(const NQS_info_t& other);
+    NQS_info_t& operator=(NQS_info_t&& other) noexcept;
+
+	// ---------------------------------------------------------------
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////

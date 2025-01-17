@@ -26,6 +26,8 @@
 #include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
 
+// #################################################################################################################################
+
 /**
 * @brief Generates a time space vector using either logarithmic or regular spacing.
 *
@@ -222,8 +224,8 @@ public:
 	virtual void updateWeights(double _dt)								{ this->dF_ *= _dt; this->updateWeights(); 				};
 	virtual void updateWeights(const NQSB& _dF)							{ this->dF_ = _dF; this->updateWeights(); 				};
 	virtual void updateWeights(NQSB&& _dF)								{ this->dF_ = std::move(_dF); this->updateWeights(); 	};
-	virtual bool saveWeights(std::string _path, std::string _file);		// save the weights to the file 
-	virtual bool setWeights(std::string _path, std::string _file);		// set the weights from the file
+	virtual bool saveWeights(std::string _path, std::string _file) override;	// save the weights to the file 
+	virtual bool setWeights(std::string _path, std::string _file) override;		// set the weights from the file
 	// ***********************************************************************************************************************************
 protected:																// --------------------- T R A I N   E T C -----------------------
 	virtual void gradF(const Container_t& _energies, int step = 0, _T _cL = 0.0);
@@ -272,7 +274,8 @@ public:																	// ------------------------ G E T T E R S --------------
 	// overriden MonteCarloSolver methods - get the state
 	auto getLastConfig() 					const -> Config_t override	{ return NQS_STATE; 					};
 	// overriden MonteCarloSolver methods - set the state
-	virtual auto setConfig(Config_cr_t _s) 	-> void override 			{ this->setState(_s); 					};
+	virtual auto setConfig(Config_cr_t _s) 	-> void override 			{ this->setState(_s, true); 			};
+	virtual auto swapWeights(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _othe) -> void;
 	virtual auto swapConfig(MC_t_p _other) 	-> void override;
 	virtual auto reset(size_t _n) 			-> void override;
 	virtual auto clone() 					const -> MC_t_p override 	= 0;
@@ -294,7 +297,7 @@ public:																	// ------------------------ T R A I N I N G ------------
 									const MCS_train_t& _par, 
 									const bool quiet, 
 									const bool randomStart,
-									Timer& _timer) override;
+									Timer* _timer) override;
 	virtual Container_pair_t train(	const MCS_train_t& _par,
 									bool quiet			= false,		// shall talk? (default is false)
 								  	bool randomStart 	= false,		// random start (default is false)

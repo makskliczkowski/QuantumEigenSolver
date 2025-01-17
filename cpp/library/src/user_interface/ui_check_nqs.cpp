@@ -133,7 +133,11 @@ void nqs_perform_time_evo_ed(const arma::Col<_T>& _mbs,
 	
 	// measure the time evolution of the operator - other time steps
 #pragma omp parallel for num_threads(threadNum)
-	for (int j = 0; j < _timespace.size(); ++j) {
+	for (int j = 0; j < _timespace.size(); ++j) 
+	{
+		if (j % int(_timespace.size() / 10) == 0)
+			LOGINFO(std::format("Time evolution step: {} of {}", j, _timespace.size()), LOG_TYPES::INFO, 3);
+
 		arma::Col<cpx> _mb_te = SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
 		for (int k = 0; k < _QOMat.size(); ++k)
 			_vals(j + 1, k) = algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
@@ -282,7 +286,7 @@ void nqs_perform_lanczos_ed(int stateNum, Hamiltonian<_T, _spinModes>* _H,
 							int threadNum) 
 {
 	LOGINFO("Started Lanczos diagonalization", LOG_TYPES::TRACE, 3);
-	_H->diagH(false, 128, 0, 1000, 1e-12, "lanczos");
+	_H->diagH(false, std::min(128, (int)(_hilbert.getFullHilbertSize() / 2)), 0, 1000, 1e-13, "lanczos");
 	const auto& _eigvec			= _H->getEigVec();
 	const auto& _krylov_mb 		= _H->getKrylov();
 
@@ -435,7 +439,7 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		}
 	};
 
-	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->nqsP.nqs_tr_pt_ ? this->threadNum : 1, 1, _NQSl, _beta);
+	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->threadNum, 1, _NQSl, _beta);
 
 	// Set the hyperparameters
 #ifdef NQS_USESR_MAT_USED
@@ -506,7 +510,7 @@ void UI::nqsExcited()
 
 	u64 Nh					= _NQS[0]->getHilbertSize();									// get the size of the Hilbert space						
 	auto Nvis 				= _NQS[0]->getNvis();											// get the number of visible units
-	const bool fullED 		= Nh <= UI_LIMITS_NQS_ED;										// use the full diagonalization
+	const bool fullED 		= this->nqsP.nqs_ed_ && Nh <= UI_LIMITS_NQS_ED;					// use the full diagonalization
 	const bool lanED 		= this->nqsP.nqs_ed_ && Nh <= ULLPOW(24);						// use the Lanczos method for the ED
 	v_sp_t<Operators::OperatorNQS<_T>> _opsG;												// set up the operators to save - global
 	v_sp_t<Operators::OperatorNQS<_T, uint>> _opsL;											// set up the operators to save - local
@@ -566,16 +570,14 @@ void UI::nqsExcited()
 		}
 		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
 
-		if (this->nqsP.nqs_tr_pt_)
+		if (this->nqsP.nqs_tr_pt_ > 0)
 		{
 			LOGINFO("Using parallel tempering for training", LOG_TYPES::TRACE, 2);
 			LOGINFO(1);
 			
 			typename MonteCarlo::ParallelTempering<_T>::Solver_p _mcs = _NQS[i];
-			v_1d<double> _inv_T;
-			for (int j = 0; j < this->threadNum; ++j) {
-				_inv_T.push_back((j + 1) * 1.0 / this->threadNum);
-			}
+			v_1d<double> _inv_T = MonteCarlo::ParallelTempering<_T>::generateBetas(this->nqsP.nqs_tr_pt_, MonteCarlo::BetaSpacing::LOGARITHMIC, 0.1, 1.0);
+			std::cout << "Betas: " << _inv_T << std::endl;
 			// create the solver
 			std::shared_ptr<MonteCarlo::ParallelTempering<_T>> _pt = std::make_shared<MonteCarlo::ParallelTempering<_T>>(_mcs, _inv_T, _inv_T.size());
 			
@@ -584,14 +586,11 @@ void UI::nqsExcited()
 			auto [_best_idx, _best_acc_idx] = _pt->getBestInfo();
 
 			// get the best loss
-			_EN_TRAIN 	= _pt->getMeanLosses(_best_idx);
+			_EN_TRAIN 	= _pt->getBestLosses();
 			_EN_STD 	= _pt->getStdLosses(_best_idx);
 
 			// get the best solver
-			std::shared_ptr<MonteCarlo::MonteCarloSolver<_T>> _bmcs = _pt->getBestSolver_move();
-			// release the solver
-			_NQS[i].reset();
-			_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_bmcs);
+			_NQS[i] 	= std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_pt->getBestSolver());
 		}
 		else {
 			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
@@ -630,6 +629,7 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	// try time evolution 
 	if (this->nqsP.nqs_te_)
 	{
+
 		LOGINFO(3);
 		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
 		// _H->quenchHamiltonian();
@@ -638,6 +638,19 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
+			// Set the hyperparameters
+			{
+	#ifdef NQS_USESR_MAT_USED
+				_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
+	#endif
+				_NQS[j]->setSolver(this->nqsP.nqs_tr_sol_, this->nqsP.nqs_tr_tol_, this->nqsP.nqs_tr_iter_, this->nqsP.nqs_tr_reg_);
+				_NQS[j]->setPreconditioner(this->nqsP.nqs_tr_prec_);
+	#ifdef NQS_USESR
+				_NQS[j]->setSregScheduler(this->nqsP.nqs_tr_regs_, this->nqsP.nqs_tr_reg_, this->nqsP.nqs_tr_regd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_regp_);
+	#endif
+				_NQS[j]->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
+				_NQS[j]->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
+			}
 			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
 			v_1d<arma::Col<_T>> _vals(_quenchOpMeasure.size(), arma::Col<_T>(_parC.MC_sam_ * _parC.nblck_));
 			arma::Col<_T> _En(_parTime.nblck_);											// set up the containers for the time evolution

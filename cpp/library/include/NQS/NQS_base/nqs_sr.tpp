@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------------------------------------------------------------
 #include "./nqs_fermions.tpp"
+#include <memory>
 // -----------------------------------------------------------------------------------------------------------------------------------
 
 #ifdef NQS_USESR
@@ -31,14 +32,12 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setTrainParExc(const MonteCarl
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double _lr, double _lrd, size_t _epo, size_t _pat)
 {
-	if (this->info_p_.p_ != nullptr)
-		delete this->info_p_.p_;
-	// set the new scheduler
-	if (_sch != 0)
+	if (_sch >= 0)
 	{
-		this->info_p_.p_ = MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat); 
-		LOGINFO("Scheduler set with type: " + STR(_sch) + ", initial learning rate: " + VEQPS(_lr, 3) + 
-				", learning rate decay: " + VEQPS(_lrd, 3) + ", epochs: " + STR(_epo) + ", patience: " + STR(_pat), LOG_TYPES::INFO, 2);
+		auto _raw			= MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat);
+		this->info_p_.p_ 	= _raw->move(); 	
+		LOGINFO(std::format("Scheduler set: type={}, lr={}, decay={}, epochs={}, patience={}", 
+				_sch, _lr, _lrd, _epo, _pat), LOG_TYPES::INFO, 2);
 	}
 }
 
@@ -51,7 +50,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, double _minDlt)
 {
-	if (_pat != 0)
+	if (_pat > 0)
 	{ 
 		this->info_p_.setEarlyStopping(_pat, _minDlt); 
 		LOGINFO("Early stopping set with patience: " + STR(_pat) + ", minimum delta: " + VEQPS(_minDlt, 3), LOG_TYPES::CHOICE, 3);
@@ -71,23 +70,20 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, double _sreg, double _sregd, size_t _epo, size_t _pat)
 {
 	this->info_p_.sreg_ 	= _sreg; 
-	this->info_p_.sregd_ 	= _sregd;
-	this->info_p_.sregs_	= _sch;
-
-	// set the new scheduler
-	if (this->info_p_.s_ != nullptr)
-		delete this->info_p_.s_;
 	if (_sreg > 0) 
 	{ 
 		LOGINFO("Regularization set with initial factor: " + VEQPS(_sreg, 3) + ", scheduler type: " + STR(_sch) + 
 				", decay: " + VEQPS(_sregd, 3) + ", epochs: " + STR(_epo) + ", patience: " + STR(_pat), LOG_TYPES::CHOICE, 3); 
-		this->info_p_.s_ = MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat); 
+		
+		// set the new scheduler
+		auto _raw 			= MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat);
+		this->info_p_.s_ 	= _raw->move();
 	}
 }
 
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 ! TODO 
 * @brief The inverse of the covariance matrix is poorly defined at the begining of training. 
 * Use regularization to fix that issue.

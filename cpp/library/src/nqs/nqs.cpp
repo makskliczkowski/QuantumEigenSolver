@@ -74,6 +74,158 @@ void NQS_info_t::saveInfo(const std::string& _dir, const std::string& _name, int
 // ##########################################################################################################################################
 
 /**
+* @brief Copy constructor for NQS_info_t.
+*
+* This constructor creates a new instance of NQS_info_t by copying the data
+* from another instance.
+*
+* @param other The instance of NQS_info_t to copy from.
+*/
+NQS_info_t::NQS_info_t(const NQS_info_t& other)
+        : solver_(other.solver_),
+        maxIter_(other.maxIter_),
+        tol_(other.tol_),
+        pinv_(other.pinv_),
+        nVis_(other.nVis_),
+        nSites_(other.nSites_),
+        fullSize_(other.fullSize_),
+        Nh_(other.Nh_),
+        nParticles_(other.nParticles_),
+        conservesParticles_(other.conservesParticles_),
+        lr_(other.lr_),
+        sreg_(other.sreg_)
+{
+    if (other.p_) p_ = other.p_->clone();
+    if (other.s_) s_ = other.s_->clone();
+}
+
+/**
+* @brief Move constructor for NQS_info_t.
+*
+* This constructor initializes an NQS_info_t object by moving data from another NQS_info_t object.
+* It uses std::exchange to transfer ownership of resources and reset the original object's members.
+*
+* @param other The NQS_info_t object to move from.
+*/
+NQS_info_t::NQS_info_t(NQS_info_t&& other) noexcept
+        : p_(std::move(other.p_)),
+        solver_(std::exchange(other.solver_, 1)),
+        maxIter_(std::exchange(other.maxIter_, 5000)),
+        tol_(std::exchange(other.tol_, 1e-5)),
+        pinv_(std::exchange(other.pinv_, -1)),
+        nVis_(std::exchange(other.nVis_, 1)),
+        nSites_(std::exchange(other.nSites_, 1)),
+        fullSize_(std::exchange(other.fullSize_, 1)),
+        Nh_(std::exchange(other.Nh_, 1)),
+        nParticles_(std::exchange(other.nParticles_, 1)),
+        conservesParticles_(std::exchange(other.conservesParticles_, true)),
+        lr_(std::exchange(other.lr_, 1e-3)),
+        s_(std::move(other.s_)),
+        sreg_(std::exchange(other.sreg_, -1))
+{
+
+}
+
+/**
+* @brief Assignment operator for NQS_info_t.
+*
+* This operator performs a deep copy of the given NQS_info_t object into the current object.
+* It checks for self-assignment and then copies each member variable from the source object.
+* If the source object contains pointers to schedulers, it clones these schedulers to ensure
+* that the current object has its own copies.
+*
+* @param other The NQS_info_t object to be copied.
+* @return A reference to the current NQS_info_t object.
+*/
+NQS_info_t& NQS_info_t::operator=(const NQS_info_t& other) 
+{
+    if (this != &other) 
+    {
+        solver_             = other.solver_;
+        maxIter_            = other.maxIter_;
+        tol_                = other.tol_;
+        pinv_               = other.pinv_;
+        nVis_               = other.nVis_;
+        nSites_             = other.nSites_;
+        fullSize_           = other.fullSize_;
+        Nh_                 = other.Nh_;
+        nParticles_         = other.nParticles_;
+        conservesParticles_ = other.conservesParticles_;
+        lr_                 = other.lr_;
+        sreg_               = other.sreg_;
+
+        // clone the scheduler
+        if (other.p_)
+            p_ = other.p_->clone();
+        else
+            p_.reset();
+        
+        // clone the scheduler
+        if (other.s_)
+            s_ = other.s_->clone();
+        else
+            s_.reset();
+    }
+    return *this;
+}
+
+/**
+* @brief Move assignment operator for NQS_info_t.
+*
+* This operator moves the contents of another NQS_info_t object to this object.
+* It uses std::exchange to transfer the values of the member variables from the
+* source object to the destination object, ensuring that the source object is left
+* in a valid but unspecified state.
+*
+* @param other The NQS_info_t object to move from.
+* @return A reference to this NQS_info_t object.
+*/
+NQS_info_t& NQS_info_t::operator=(NQS_info_t&& other) noexcept
+{
+    if (this != &other) 
+    {
+        p_ = std::move(other.p_);
+        solver_ = std::exchange(other.solver_, 1);
+        maxIter_ = std::exchange(other.maxIter_, 5000);
+        tol_ = std::exchange(other.tol_, 1e-5);
+        pinv_ = std::exchange(other.pinv_, -1);
+        nVis_ = std::exchange(other.nVis_, 1);
+        nSites_ = std::exchange(other.nSites_, 1);
+        fullSize_ = std::exchange(other.fullSize_, 1);
+        Nh_ = std::exchange(other.Nh_, 1);
+        nParticles_ = std::exchange(other.nParticles_, 1);
+        conservesParticles_ = std::exchange(other.conservesParticles_, true);
+        lr_ = std::exchange(other.lr_, 1e-3);
+        s_ = std::move(other.s_);
+        sreg_ = std::exchange(other.sreg_, 1e-7);
+    }
+    return *this;
+}
+
+// ##########################################################################################################################################
+
+/**
+* @brief Determines whether the training process should stop based on the given epoch and metric.
+* 
+* @tparam _T The type of the metric.
+* @param epoch The current epoch of the training process.
+* @param _metric The metric value used to decide whether to stop the training.
+* @return true if the training process should stop, false otherwise.
+*/
+template <typename _T>
+bool NQS_info_t::stop(size_t epoch, _T _metric)
+{
+	if (this->p_)
+        return this->p_->stop(epoch, algebra::real(_metric)); 
+    return false;
+}
+// template instantiation of the function above
+template bool NQS_info_t::stop(size_t, double);
+template bool NQS_info_t::stop(size_t, cpx);
+
+// ##########################################################################################################################################
+
+/**
 * @brief Destructor for the NQS_info_t class.
 *
 * This destructor is responsible for cleaning up the dynamically allocated
@@ -82,15 +234,6 @@ void NQS_info_t::saveInfo(const std::string& _dir, const std::string& _name, int
 */
 NQS_info_t::~NQS_info_t()
 {
-    if (this->p_) {
-        delete p_;
-        this->p_ = nullptr;
-    }
-
-    if (this->s_) {
-        delete s_;
-        this->s_ = nullptr;
-    }
 }       
 
 // ##########################################################################################################################################
@@ -157,10 +300,30 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::swapConfig(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _other)
 {
     auto _st_other = _other->getLastConfig();           // get the last configuration of the other solver
+    // swap the weights
+    
+
     _other->setConfig(NQS_STATE);                       // swap the configurations
     this->setConfig(_st_other);                         // swap the configurations
 }
 NQS_INST_CMB_ALL(swapConfig, void, (MC_t_p));
+
+// ##########################################################################################################################################
+
+/**
+* @brief Swaps the weights between the current NQS instance and another instance.
+* 
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The Hamiltonian type.
+* @tparam _T The data type for weights.
+* @tparam _stateType The state type.
+* @param _other A pointer to another NQS instance with which to swap weights.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void NQS<_spinModes, _Ht, _T, _stateType>::swapWeights(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _other)
+{
+    // pass
+}
 
 // ##########################################################################################################################################
 
@@ -255,36 +418,24 @@ this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { ret
 #endif
     {
         // reset the solver and preconditioner
-        double _reg                 =           0.0;
         if (_n.solver_ != nullptr) 
         {
-            _reg                    =           _n.solver_->getReg();
-            this->setSolver(_n.info_p_.solver_, _n.info_p_.tol_, _n.info_p_.maxIter_, _reg);
+            this->solver_ = _n.solver_->clone();
         }
         // reset the preconditioner
         if (_n.precond_ != nullptr) 
         {
-            this->setPreconditioner(_n.precond_->type());
+            this->precond_ = _n.precond_->clone();
         }
         // reset the sreg scheduler
         if (_n.info_p_.s_ != nullptr) 
         {
-            int _sch        = _n.info_p_.s_->get_type();
-            double _sreg    = _n.info_p_.sreg_;
-            double _sregd   = _n.info_p_.sregd_;
-            size_t _mepo    = _n.info_p_.s_->get_max_epochs();
-            double _regp    = _n.info_p_.s_->get_patience();     
-            this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+            this->info_p_.s_ = _n.info_p_.s_->clone();
         }
         // reset the scheduler
         if (_n.info_p_.p_ != nullptr) 
         {
-            int _sch        = _n.info_p_.p_->get_type();
-            double _lr      = _n.info_p_.lr_;
-            double _lrp     = _n.info_p_.p_->get_patience();
-            size_t _mepo    = _n.info_p_.p_->get_max_epochs();
-            double _regp    = _n.info_p_.p_->get_patience();
-            this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+            this->info_p_.p_ = _n.info_p_.p_->clone();
         }
     }
 }
@@ -357,27 +508,25 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&&
 #endif
     // move the preconditioners and solvers
     {
-        this->solver_           = std::move(_n.solver_);
-        this->precond_          = std::move(_n.precond_);
-        // schedulers - create new
+        // reset the solver and preconditioner
+        if (_n.solver_ != nullptr) 
+        {
+            this->solver_ = _n.solver_->move();
+        }
+        // reset the preconditioner
+        if (_n.precond_ != nullptr) 
+        {
+            this->precond_ = _n.precond_->move();
+        }
+        // reset the sreg scheduler
         if (_n.info_p_.s_ != nullptr) 
         {
-            int _sch        = _n.info_p_.s_->get_type();
-            double _sreg    = _n.info_p_.sreg_;
-            double _sregd   = _n.info_p_.sregd_;
-            size_t _mepo    = _n.info_p_.s_->get_max_epochs();
-            double _regp    = _n.info_p_.s_->get_patience();     
-            this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+            this->info_p_.s_ = _n.info_p_.s_->clone();
         }
         // reset the scheduler
         if (_n.info_p_.p_ != nullptr) 
         {
-            int _sch        = _n.info_p_.p_->get_type();
-            double _lr      = _n.info_p_.lr_;
-            double _lrp     = _n.info_p_.p_->get_patience();
-            size_t _mepo    = _n.info_p_.p_->get_max_epochs();
-            double _regp    = _n.info_p_.p_->get_patience();
-            this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+            this->info_p_.p_ = _n.info_p_.p_->clone();
         }
     }
 }
@@ -451,38 +600,26 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
 #ifdef NQS_NOT_OMP_MT
         this->initThreads(_n.threads_.threadNum_);
 #endif
-        // reset the solver and preconditioner
         {
-            double _reg = 0.0;
+            // reset the solver and preconditioner
             if (_n.solver_ != nullptr) 
             {
-                _reg = _n.solver_->getReg();
-                this->setSolver(_n.info_p_.solver_, _n.info_p_.tol_, _n.info_p_.maxIter_, _reg);
+                this->solver_ = _n.solver_->clone();
             }
             // reset the preconditioner
             if (_n.precond_ != nullptr) 
             {
-                this->setPreconditioner(_n.precond_->type());
+                this->precond_ = _n.precond_->clone();
             }
             // reset the sreg scheduler
             if (_n.info_p_.s_ != nullptr) 
             {
-                int _sch = _n.info_p_.s_->get_type();
-                double _sreg = _n.info_p_.sreg_;
-                double _sregd = _n.info_p_.sregd_;
-                size_t _mepo = _n.info_p_.s_->get_max_epochs();
-                double _regp = _n.info_p_.s_->get_patience();     
-                this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
+                this->info_p_.s_ = _n.info_p_.s_->clone();
             }
             // reset the scheduler
             if (_n.info_p_.p_ != nullptr) 
             {
-                int _sch = _n.info_p_.p_->get_type();
-                double _lr = _n.info_p_.lr_;
-                double _lrp = _n.info_p_.p_->get_patience();
-                size_t _mepo = _n.info_p_.p_->get_max_epochs();
-                double _regp = _n.info_p_.p_->get_patience();
-                this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+                this->info_p_.p_ = _n.info_p_.p_->clone();
             }
         }
     }
@@ -566,28 +703,27 @@ void NQS<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
 #ifdef NQS_NOT_OMP_MT
             this->initThreads(_n->threads_.threadNum_);
 #endif
-            // additonal information
-            this->solver_               = _n->solver_;
-            this->precond_              = _n->precond_;
-            // schedulers - create new
-            if (_n->info_p_.s_ != nullptr) 
             {
-                int _sch = _n->info_p_.s_->get_type();
-                double _sreg = _n->info_p_.sreg_;
-                double _sregd = _n->info_p_.sregd_;
-                size_t _mepo = _n->info_p_.s_->get_max_epochs();
-                double _regp = _n->info_p_.s_->get_patience();     
-                this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
-            }
-            // reset the scheduler
-            if (_n->info_p_.p_ != nullptr) 
-            {
-                int _sch = _n->info_p_.p_->get_type();
-                double _lr = _n->info_p_.lr_;
-                double _lrp = _n->info_p_.p_->get_patience();
-                size_t _mepo = _n->info_p_.p_->get_max_epochs();
-                double _regp = _n->info_p_.p_->get_patience();
-                this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
+                // reset the solver and preconditioner
+                if (_n->solver_ != nullptr) 
+                {
+                    this->solver_ = _n->solver_->clone();
+                }
+                // reset the preconditioner
+                if (_n->precond_ != nullptr) 
+                {
+                    this->precond_ = _n->precond_->clone();
+                }
+                // reset the sreg scheduler
+                if (_n->info_p_.s_ != nullptr) 
+                {
+                    this->info_p_.s_ = _n->info_p_.s_->clone();
+                }
+                // reset the scheduler
+                if (_n->info_p_.p_ != nullptr) 
+                {
+                    this->info_p_.p_ = _n->info_p_.p_->clone();
+                }
             }
         }
     }
@@ -648,30 +784,25 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
         this->initThreads(_n.threads_.threadNum_);
 #endif
         {
-            // move the preconditioners and solvers
+            // reset the solver and preconditioner
+            if (_n.solver_ != nullptr) 
             {
-                this->solver_           = std::move(_n.solver_);
-                this->precond_          = std::move(_n.precond_);
-                // schedulers - create new
-                if (_n.info_p_.s_ != nullptr) 
-                {
-                    int _sch        = _n.info_p_.s_->get_type();
-                    double _sreg    = _n.info_p_.sreg_;
-                    double _sregd   = _n.info_p_.sregd_;
-                    size_t _mepo    = _n.info_p_.s_->get_max_epochs();
-                    double _regp    = _n.info_p_.s_->get_patience();     
-                    this->setSregScheduler(_sch, _sreg, _sregd, _mepo, _regp);
-                }
-                // reset the scheduler
-                if (_n.info_p_.p_ != nullptr) 
-                {
-                    int _sch        = _n.info_p_.p_->get_type();
-                    double _lr      = _n.info_p_.lr_;
-                    double _lrp     = _n.info_p_.p_->get_patience();
-                    size_t _mepo    = _n.info_p_.p_->get_max_epochs();
-                    double _regp    = _n.info_p_.p_->get_patience();
-                    this->setScheduler(_sch, _lr, _lrp, _mepo, _regp);
-                }
+                this->solver_ = _n.solver_->move();
+            }
+            // reset the preconditioner
+            if (_n.precond_ != nullptr) 
+            {
+                this->precond_ = _n.precond_->move();
+            }
+            // reset the sreg scheduler
+            if (_n.info_p_.s_ != nullptr) 
+            {
+                this->info_p_.s_ = _n.info_p_.s_->clone();
+            }
+            // reset the scheduler
+            if (_n.info_p_.p_ != nullptr) 
+            {
+                this->info_p_.p_ = _n.info_p_.p_->clone();
             }
         }
     }
@@ -792,16 +923,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::~NQS()
             this->threads_.threads_[_thread].join();
 #endif    
     // ######################################################################################################################################
-    if (this->precond_ != nullptr) {
-        delete this->precond_;
-        this->precond_ = nullptr;
-    }
-
-    if (this->solver_ != nullptr) {
-        delete this->solver_;
-        this->solver_ = nullptr;
-    }
-    // ######################################################################################################################################
 }
 NQS_INST_CMB_ALL(~NQS, void, ());
 
@@ -903,12 +1024,12 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 bool NQS<_spinModes, _Ht, _T, _stateType>::saveWeights(std::string _path, std::string _file)
 {
 	LOGINFO("Saving the checkpoint configuration.", LOG_TYPES::INFO, 2, '#');
-	auto _isSaved = saveAlgebraic(_path, _file, this->Weights_, "weights/" + STRP(this->beta_, 5));	// save the weights to a given path
+	auto _isSaved = saveAlgebraic(_path, STR(this->lower_states_.f_lower_size_) + _file, this->Weights_, "weights/" + STRP(this->beta_, 5));	// save the weights to a given path
 	if (!_isSaved && (_file != "weights.h5"))													    // if not saved properly
 	{
 		LOGINFO("Couldn't save the weights to the given path.", LOG_TYPES::ERROR, 3);
 		LOGINFO("Saving to default... ", LOG_TYPES::ERROR, 3);
-		return this->saveWeights(_path, "weights.h5");
+		return this->saveWeights(_path, STR(this->lower_states_.f_lower_size_) + "_weights.h5");
 	}
 	return _isSaved;
 }
@@ -936,7 +1057,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline bool NQS<_spinModes, _Ht, _T, _stateType>::setWeights(std::string _path, std::string _file)
 {
 	LOGINFO("Loading the checkpoint weights:", LOG_TYPES::INFO, 2);
-	return loadAlgebraic(_path, _file, this->Weights_, "weights/" + STRP(this->beta_, 5));
+	return loadAlgebraic(_path, STR(this->lower_states_.f_lower_size_) + _file, this->Weights_, "weights/" + STRP(this->beta_, 5));
 }
 NQS_INST_CMB_ALL(setWeights, bool, (std::string, std::string));
 
