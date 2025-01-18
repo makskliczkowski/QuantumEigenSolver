@@ -576,12 +576,8 @@ void UI::nqsExcited()
 			LOGINFO(1);
 			
 			typename MonteCarlo::ParallelTempering<_T>::Solver_p _mcs = _NQS[i];
-			v_1d<double> _inv_T = MonteCarlo::ParallelTempering<_T>::generateBetas(this->nqsP.nqs_tr_pt_, MonteCarlo::BetaSpacing::LOGARITHMIC, 0.1, 1.0);
-			std::cout << "Betas: " << _inv_T << std::endl;
-			// create the solver
-			std::shared_ptr<MonteCarlo::ParallelTempering<_T>> _pt = std::make_shared<MonteCarlo::ParallelTempering<_T>>(_mcs, _inv_T, _inv_T.size());
+			auto _pt = std::make_shared<MonteCarlo::ParallelTempering<_T>>(_mcs, this->nqsP.nqs_tr_pt_, MonteCarlo::BetaSpacing::LOGARITHMIC, 0.1, 1.0);
 			
-			// train the NQS
 			_pt->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
 			auto [_best_idx, _best_acc_idx] = _pt->getBestInfo();
 
@@ -590,7 +586,9 @@ void UI::nqsExcited()
 			_EN_STD 	= _pt->getStdLosses(_best_idx);
 
 			// get the best solver
-			_NQS[i] 	= std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_pt->getBestSolver());
+			if (_best_idx > 0)
+				_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_pt->getBestSolver());	
+			
 		}
 		else {
 			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);

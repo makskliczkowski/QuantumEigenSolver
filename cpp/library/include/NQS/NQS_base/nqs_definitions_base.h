@@ -37,6 +37,7 @@
 	#define NQS_STATE this->curVec_
 	#define NQS_STATE_T Config_cr_t
 	#define NQS_ROW_T arma::Row<_T>
+	#define NQS_COL_T arma::Col<_T>
 #else 
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 

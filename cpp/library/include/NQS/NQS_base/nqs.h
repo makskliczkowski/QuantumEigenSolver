@@ -111,6 +111,7 @@ protected:																// ----------------------- T R A I N I N G -----------
 	// ------------------------ W E I G H T S -----------------------
 	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
 	NQS_ROW_T derivativesMean_;											// store the mean of the derivatives (F_k) - for the SR (fullSize)
+	NQS_COL_T energiesCentered_;										// store the centered energies (E_k - <E_k>) - for the SR (nBlocks)
 	NQSW derivativesCentered_;											// store the centered derivatives (F_k - <F_k>) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
 	NQSW derivativesCenteredH_;											// store the centered derivatives (F_k - <F_k>) - for the SR (fullSize x nBlocks), where nBlocks is the number of consecutive observations	
 	void derivativesReset(size_t nBlocks = 1);							// reset the derivatives (F_k) - for the SR		
@@ -272,6 +273,7 @@ public:																	// ------------------------ G E T T E R S --------------
 	auto getHamiltonianEigVal(u64 _idx)		const -> double				{ return this->H_->getEigVal(_idx);		};
 	auto getHamiltonian() 					const -> Hamil_t_p			{ return this->H_;						};
 	// overriden MonteCarloSolver methods - get the state
+	auto getConfigSize() 					const -> size_t override	{ return this->getNvis();				};
 	auto getLastConfig() 					const -> Config_t override	{ return NQS_STATE; 					};
 	// overriden MonteCarloSolver methods - set the state
 	virtual auto setConfig(Config_cr_t _s) 	-> void override 			{ this->setState(_s, true); 			};

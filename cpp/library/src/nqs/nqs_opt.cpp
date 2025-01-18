@@ -23,7 +23,7 @@
 * @param _currLoss Current loss value.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, int _step,  _T _currLoss)
+void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, int _step,  _T _meanLoss)
 {
 	const _T _samples = static_cast<_T>(_energies.n_elem);
 	{
@@ -31,10 +31,13 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, i
 		// [+ sum_i ^{n-1} \beta _i <(Psi_W(i) / Psi_W - <Psi_W(i)/Psi>) \Delta _k*> <Psi _W/Psi_W(i)>] 
 		// - for the excited states, the derivatives are appe	
 		// calculate the centered derivatives
-		this->derivativesMean_ 			= arma::mean(this->derivatives_, 0);									// calculate the mean of the derivatives
-		this->derivativesCentered_ 		= this->derivatives_.each_row() - this->derivativesMean_;				// calculate the centered derivatives
-		this->derivativesCenteredH_		= arma::trans(this->derivativesCentered_);								// calculate the transposed centered derivatives
-		this->F_						= this->derivativesCenteredH_ * ((_energies - _currLoss) / _samples);	// calculate the covariance vector for the gradient 
+		this->derivativesMean_ 			= arma::mean(this->derivatives_, 0);						// calculate the mean of the derivatives <\Delta _k*>
+		this->derivativesCentered_ 		= this->derivatives_.each_row() - this->derivativesMean_;	// calculate the centered derivatives (\Delta _k* - <\Delta _k*>)	
+		this->derivativesCenteredH_		= arma::trans(this->derivativesCentered_);					// calculate the transposed centered derivatives (\bar O ^+)
+		this->energiesCentered_			= (_energies - _meanLoss) / _samples;						// calculate the centered energies (E_k - <E_k>)
+#ifndef NQS_USE_MINSR
+		this->F_						= this->derivativesCenteredH_ * this->energiesCentered_;	// calculate the covariance vector for the gradient F = <\Delta _k* E_{loc}> - <\Delta _k*><E_{loc}>
+#endif
 
 #ifndef _DEBUG
 #pragma omp parallel for num_threads(this->threads_.threadNum_)
@@ -47,7 +50,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradF(const Container_t& _energies, i
 			const auto& f_lower_b 		= this->lower_states_.f_lower_b_[_low];			// penalty for the lower states 
 			const _T _meanLower 		= arma::mean(ratios_lower);						// mean of the ratios in the lower state
 			const _T _meanExcited 		= arma::mean(ratios_excited);					// mean of the ratios in the excited state
+#ifndef NQS_USE_MINSR 
 			this->F_ 					+= this->derivativesCenteredH_ * ((ratios_excited - _meanExcited) * (f_lower_b * _meanLower / _samples));
+#else
+			this->energiesCentered_		+= (ratios_excited - _meanExcited) * (f_lower_b * _meanLower / _samples);
+#endif
 		}
 	}
 }
@@ -126,17 +133,32 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradSR(uint step, _T _currLoss)
 	}
 #else
 	if (this->precond_ != nullptr)
+#ifndef NQS_USE_MINSR
 		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, -1.0);
+#else
+		this->precond_->set(this->derivativesCentered_, this->derivativesCenteredH_, -1.0);
+#endif
 	
 	if (this->solver_ != nullptr) 
 	{
-		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
+		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization		
+#ifndef NQS_USE_MINSR				
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							this->F_, 														// b
-							nullptr, //step <= 1 ? nullptr : &this->dF_, 								// x0
+							step <= 1 ? nullptr : &this->dF_, 								// x0 - if the step is the first, the initial guess is nullptr
 							this->precond_.get());											// preconditioner
 		_inversionSuccess = this->solver_->isConverged();
-		this->dF_ = this->info_p_.lr_ * this->solver_->moveSolution();						// get the solution
+		// this->dF_ = this->info_p_.lr_ * this->solver_->moveSolution();					// get the solution
+		this->dF_ = this->info_p_.lr_ * this->solver_->solution();							// get the solution
+#else 
+		this->solver_->solve(this->derivativesCenteredH_, this->derivativesCentered_, 		// S and S+ matrices
+							this->energiesCentered_, 										// b
+							nullptr, 														// x0 - if the step is the first, the initial guess is nullptr
+							this->precond_.get());											// preconditioner
+		_inversionSuccess = this->solver_->isConverged();
+		// this->dF_ = this->info_p_.lr_ * this->solver_->moveSolution();					// get the solution
+		this->dF_ = this->info_p_.lr_ * (this->derivativesCenteredH_ * this->solver_->solution());
+#endif
 	} 
 	else {
 		// !DEPRECATED - use solver class instead
@@ -247,27 +269,20 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 {
 	const double best		= this->info_p_.best();
 	const double acceptance = (double)this->accepted_ / this->total_ * 100.0;
+	// ---------------------------------
 	this->lastLoss_ 		= _currLoss;
+	this->lastStdLoss_ 		= _currstd;
+	// ---------------------------------
 
-	// double coolingRate 		= 1.001; 	// Cooling rate (how fast to decrease beta)
-
-	// If acceptance rate is too low, adjust beta
-	// if (acceptance < 5e-2) 
-	// {
-		// this->setRandomState(); 		// Reset the state
-		// this->beta_ *= coolingRate;
-		// LOGINFO("Acceptance rate is too low: " + STR(acceptance) + "%. Changing beta: " + STRP(this->beta_, 3), LOG_TYPES::DEBUG, 3);
-	// }
-
-	const std::string _prog = std::format("[{}]", this->replica_) + " Iteration " + STR(i) + "/" + STR(_par.MC_sam_) +
-								", Loss: " + STRPS(_currLoss, 4) + " ± " + STRPS(_currstd / 2.0, 3) +
-								(best < 1e12 ? (", Best: " + VEQPS(best, 4)) : "") + 
-								", Acceptance: " + STR(this->accepted_) + "/" + STR(this->total_) + " (" + STRP(acceptance, 2) + "%)" +
-								", LR: " + STRPS(this->info_p_.lr_, 4) +
-								", Reg: " + STRPS(this->info_p_.sreg_, 4) + 
-								", Beta: " + STRPS(this->beta_, 4);
-	if (this->pBar_)
+	if (this->pBar_) 
+	{
+		const std::string _prog = std::format("[{}] Iteration {}/{}, Loss: ({:.3e},{}) ± {:.3e}, Best: {:.3e}, Acceptance: {}/{} ({:.2f}%), LR: {:.2e}, Reg: {:.2e}, Beta: {:.2e}",
+			this->replica_, i, _par.MC_sam_,
+			algebra::real(_currLoss), algebra::imag(_currLoss), std::abs(_currstd) / 2.0,
+			(best < 1e12 ? best : 0.0), this->accepted_, this->total_, acceptance, this->info_p_.lr_, this->info_p_.sreg_, this->beta_);
+		// update the progress bar
 		PROGRESS_UPD_Q(i, (*this->pBar_), _prog, !_quiet);
+	}
 	
 	this->updateWeights_ 	= !this->info_p_.stop(i, _currLoss) && this->updateWeights_;
 #ifdef NQS_SAVE_WEIGHTS
@@ -276,7 +291,7 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo:
 #endif
 
 	if (!this->updateWeights_) {
-		LOGINFO(std::format("[{}] Stopping at iteration {} with last loss value: {} +- {}", this->replica_, STR(i), STRPS(_currLoss, 4), STRPS(_currstd/2.0, 4)), LOG_TYPES::WARNING, 3);
+		LOGINFO(std::format("[{}] Stopping at iteration {} with last loss value: {} +- {}", this->replica_, STR(i), STRPS(_currLoss, 4), STRPS(std::abs(_currstd)/2.0, 4)), LOG_TYPES::WARNING, 3);
 		return true;
 	}
 	return false;
@@ -360,8 +375,8 @@ bool NQS<_spinModes, _Ht, _T, _stateType>::trainStep(size_t i,
 			this->lower_states_.collectLowerRatios(_low);
 	}
 	// !TODO Consider an autocorrelation analysis for the local energies and the gradient
-	// MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_ / 4, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 			// save the mean energy
-	MonteCarlo::mean(En, &meanEn(i - 1), &stdEn(i - 1)); 															// save the mean energy
+	MonteCarlo::blockmean(En, std::max((size_t)_par.bsize_ / 4, (size_t)8), &meanEn(i - 1), &stdEn(i - 1)); 			// save the mean energy
+	// MonteCarlo::mean(En, &meanEn(i - 1), &stdEn(i - 1)); 															// save the mean energy
 	TIMER_START_MEASURE(
 		this->gradFinal(En, i, meanEn(i - 1)), this->pBar_ && (i % this->pBar_->percentageSteps == 0), _timer, STR(i)
 	); 

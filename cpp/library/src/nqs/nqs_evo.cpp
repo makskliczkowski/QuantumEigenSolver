@@ -44,7 +44,11 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 #else
 	assert(this->derivativesCentered_.empty() == false && this->derivativesCenteredH_.empty() == false && "Centered derivatives F_k and F_k^T must be set before the inversion.");
 	if (this->precond_ != nullptr)
+#ifndef NQS_USE_MINSR
 		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, -1.0);
+#else
+		this->precond_->set(this->derivativesCentered_, this->derivativesCenteredH_, -1.0);
+#endif
 	
 	if (this->solver_ != nullptr) 
 	{
@@ -59,17 +63,39 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 			// this->derivativesCenteredH_ = (_V * arma::diagmat(_sigma)) * _U.t();
 		}
 
-		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization						
+		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization
+
+#ifndef NQS_USE_MINSR				
 		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
 							_multiplier * this->F_, 										// b
-							nullptr, //step <= 1 ? nullptr : &this->dF_, 					// x0
+							_step <= 1 ? nullptr : &this->dF_, 								// x0
 							this->precond_.get());											// preconditioner
         if (!this->solver_->isConverged())
             throw std::runtime_error("Solver did not converge.");                           // check if the solver converged
-		if (_dF != nullptr)
-			*_dF = this->solver_->moveSolution();											// get the solution
-		else
-			this->dF_ = this->solver_->moveSolution();										// get the solution
+		if (_dF != nullptr) {
+			// *_dF = this->solver_->moveSolution();										// get the solution
+			*_dF = this->solver_->solution();												// get the solution
+		}
+		else {
+			// this->dF_ = this->solver_->moveSolution();									// get the solution
+			this->dF_ = this->solver_->solution();											// get the solution
+		}	
+#else
+		this->solver_->solve(this->derivativesCenteredH_, this->derivativesCentered_, 		// S and S+ matrices
+							_multiplier * this->energiesCentered_, 							// b
+							nullptr,
+							this->precond_.get());											// preconditioner
+		if (!this->solver_->isConverged())
+			throw std::runtime_error("Solver did not converge.");							// check if the solver converged
+		if (_dF != nullptr) {
+			// *_dF = this->solver_->moveSolution();										// get the solution
+			*_dF = this->derivativesCenteredH_ * this->solver_->solution();					// get the solution
+		}
+		else {
+			// this->dF_ = this->solver_->moveSolution();									// get the solution
+			this->dF_ = this->derivativesCenteredH_ * this->solver_->solution();			// get the solution
+		}
+#endif
 	} else {
 		LOGINFO("Solver is not set. Cannot perform the inversion.", LOG_TYPES::ERROR, 1);
 		throw std::runtime_error("Solver is not set. Cannot perform the inversion.");
