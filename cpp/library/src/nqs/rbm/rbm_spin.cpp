@@ -141,7 +141,6 @@ _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(uint nFlips)
 	// use value as the change already
 #ifdef NQS_ANGLES_UPD
 #	ifdef NQS_NOT_OMP_MT
-	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
 	return val + RBM_ACCU_ARMA(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
 #	else
 	// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
@@ -257,7 +256,7 @@ _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(std::initializer_list<int> fP, std::
 	_T val			= 0.0;
 	double currVal	= 0.0;
 #if defined NQS_NOT_OMP_MT
-	arma::Col<_T>& thetaTMP	= this->thetaTMP_;					// thread local storage
+	auto& thetaTMP	= this->thetaTMP_;							// thread local storage
 #else
 	arma::Col<_T>& thetaTMP	= this->thetaTmpCol_;
 #endif

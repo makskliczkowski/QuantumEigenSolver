@@ -257,7 +257,7 @@ public:																	// ------------------------ G E T T E R S --------------
 	auto getLastConfig() 					const -> Config_t override	{ return NQS_STATE; 					};
 	// overriden MonteCarloSolver methods - set the state
 	virtual auto setConfig(Config_cr_t _s) 	-> void override 			{ this->setState(_s, true); 			};
-	virtual auto swapWeights(MC_t_p _other) -> void override;
+	virtual auto swapWeights(MC_t_p _other) -> void;
 	virtual auto swapConfig(MC_t_p _other) 	-> void override;
 	virtual auto reset(size_t _n) 			-> void override;
 	virtual auto clone() 					const -> MC_t_p override 	= 0;
@@ -275,14 +275,13 @@ public:																	// ------------------------ T R A I N I N G ------------
 	virtual bool trainStop(size_t i, const MCS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false) override;
 	virtual bool trainStep(size_t i, Container_t& En, Container_t& meanEn, Container_t& stdEn, 
 									const MCS_train_t& _par, 
-									const bool quiet, 
-									const bool randomStart,
-									Timer* _timer) override;
+									const bool quiet, const bool randomStart,
+									Timer* _timer) 						override;
 	virtual Container_pair_t train(	const MCS_train_t& _par,
 									bool quiet			= false,		// shall talk? (default is false)
 								  	bool randomStart 	= false,		// random start (default is false)
 								  	clk::time_point _t	= NOW,			// time! (default is NOW)
-									uint progPrc		= 25) override;	// progress percentage (default is 25)
+									uint progPrc		= 25) 			override;	
 	// ***********************************************************************************************************************************
 public:																	// --------------------- C O L L E C T I N G ---------------------
 	// single 
@@ -332,8 +331,8 @@ public:																	// ----------------------- E V O L V E -----------------
 protected:
 	NQS_evo_f_t evolveFunc_;											// function for the time evolution - used with the ODE solver
 	NQS_evo_fr_t evolveFuncR_;											// function for the time evolution - used with the ODE solver
-	// ***********************************************************************************************************************************	
 public:																	// ----------------------- F I N A L E -----------------------
+	// ***********************************************************************************************************************************	
 	virtual auto ansatzlog(Config_cr_t _in)															const -> _T 	= 0;
 	virtual auto ansatz(Config_cr_t _in)															const -> _T 	= 0;
 	virtual auto ansatz_ratiolog(Config_cr_t _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) 	const -> _T 	= 0;
@@ -349,7 +348,6 @@ public:																	// -------------------- C O N S T R U C T --------------
 	NQS &operator=(NQS &&_n);
 	NQS(Hamil_t_p _H, double _lr = 1e-2, uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const v_1d<double>& _beta = {});
 	// ***********************************************************************************************************************************
-
 	static void save_history(const std::string& _dir, 	
 							const arma::Col<_T>& _EN_TRAIN,				// training
 							const arma::Col<_T>& _EN_TESTS,				// test

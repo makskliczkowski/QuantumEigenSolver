@@ -18,6 +18,108 @@ template class RBM_PP<2u, cpx, double, double>;
 // ##########################################################################################################################################
 
 /**
+* @brief Constructor for the RBM_PP class.
+* 
+* This constructor initializes an instance of the RBM_PP class, which is a derived class of RBM_S. 
+* It sets up the spin sectors, calculates various sizes related to the problem, and allocates necessary resources.
+* 
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Type of the Hamiltonian.
+* @tparam _T Data type used in the calculations.
+* @tparam _stateType Type of the state.
+* 
+* @param _H Shared pointer to the Hamiltonian object.
+* @param _nHid Number of hidden units.
+* @param _lr Learning rate.
+* @param _threadNum Number of threads to be used.
+* @param _nPart Number of particles.
+* @param _lower Lower bound for the NQSLS_p object.
+* @param _beta Vector of beta values.
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, 
+							double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta)
+	: RBM_S<_spinModes, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nPart, _lower, _beta)
+{
+	// create the spin sectors
+	spinSectors_.push_back({ 1, 1 });
+	spinSectors_.push_back({ 1, 0 });
+	spinSectors_.push_back({ 0, 1 });
+	spinSectors_.push_back({ 0, 0 });
+
+	// !TODO make this changable
+	this->nSites2_				= this->info_p_.nSites_ * this->info_p_.nSites_;
+	this->nParticles2_			= this->info_p_.nParticles_ * this->info_p_.nParticles_;
+	this->nPP_					= this->spinSectors_.size() * this->nSites2_; // for both spin channels
+	this->rbmPPSize_			= this->rbmSize_ + this->nPP_;
+	this->info_p_.fullSize_		= this->rbmPPSize_;
+	this->allocate();
+	this->setInfo();
+}
+// template instantiation of the function above
+template RBM_PP<2u, double, double, double>::RBM_PP(std::shared_ptr<Hamiltonian<double, 2u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<2u, cpx, cpx, double>::RBM_PP(std::shared_ptr<Hamiltonian<cpx, 2u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<2u, double, cpx, double>::RBM_PP(std::shared_ptr<Hamiltonian<double, 2u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<2u, cpx, double, double>::RBM_PP(std::shared_ptr<Hamiltonian<cpx, 2u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<4u, double, double, double>::RBM_PP(std::shared_ptr<Hamiltonian<double, 4u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<4u, cpx, cpx, double>::RBM_PP(std::shared_ptr<Hamiltonian<cpx, 4u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<4u, double, cpx, double>::RBM_PP(std::shared_ptr<Hamiltonian<double, 4u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+template RBM_PP<4u, cpx, double, double>::RBM_PP(std::shared_ptr<Hamiltonian<cpx, 4u>> _H, uint _nHid, double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta);
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(const RBM_PP<_spinModes, _Ht, _T, _stateType>& _other)
+	: RBM_S<_spinModes, _Ht, _T, _stateType>(_other) 
+{
+	this->X_			= _other.X_;
+	this->Xinv_			= _other.Xinv_;
+	this->XinvSkew_		= _other.XinvSkew_;
+	this->Xnew_			= _other.Xnew_;
+	this->pfaffian_		= _other.pfaffian_;
+	this->pfaffianNew_	= _other.pfaffianNew_;
+	this->rbmPPSize_	= _other.rbmPPSize_;
+	this->nPP_			= _other.nPP_;
+	this->nParticles2_	= _other.nParticles2_;
+	this->spinSectors_	= _other.spinSectors_;
+}
+// template instantiation of the function above
+template RBM_PP<2u, double, double, double>::RBM_PP(const RBM_PP<2u, double, double, double>&);
+template RBM_PP<2u, cpx, cpx, double>::RBM_PP(const RBM_PP<2u, cpx, cpx, double>&);
+template RBM_PP<2u, double, cpx, double>::RBM_PP(const RBM_PP<2u, double, cpx, double>&);
+template RBM_PP<2u, cpx, double, double>::RBM_PP(const RBM_PP<2u, cpx, double, double>&);
+template RBM_PP<4u, double, double, double>::RBM_PP(const RBM_PP<4u, double, double, double>&);
+template RBM_PP<4u, cpx, cpx, double>::RBM_PP(const RBM_PP<4u, cpx, cpx, double>&);
+template RBM_PP<4u, double, cpx, double>::RBM_PP(const RBM_PP<4u, double, cpx, double>&);
+template RBM_PP<4u, cpx, double, double>::RBM_PP(const RBM_PP<4u, cpx, double, double>&);
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(RBM_PP<_spinModes, _Ht, _T, _stateType>&& _other)
+	: RBM_S<_spinModes, _Ht, _T, _stateType>(std::move(_other))
+{
+	this->X_			= std::move(_other.X_);
+	this->Xinv_			= std::move(_other.Xinv_);
+	this->XinvSkew_		= std::move(_other.XinvSkew_);
+	this->Xnew_			= std::move(_other.Xnew_);
+	this->pfaffian_		= std::move(_other.pfaffian_);
+	this->pfaffianNew_	= std::move(_other.pfaffianNew_);
+	this->rbmPPSize_	= _other.rbmPPSize_;
+	this->nPP_			= _other.nPP_;
+	this->nParticles2_	= _other.nParticles2_;
+	this->spinSectors_	= std::move(_other.spinSectors_);
+}
+// template instantiation of the function above
+template RBM_PP<2u, double, double, double>::RBM_PP(RBM_PP<2u, double, double, double>&&);
+template RBM_PP<2u, cpx, cpx, double>::RBM_PP(RBM_PP<2u, cpx, cpx, double>&&);
+template RBM_PP<2u, double, cpx, double>::RBM_PP(RBM_PP<2u, double, cpx, double>&&);
+template RBM_PP<2u, cpx, double, double>::RBM_PP(RBM_PP<2u, cpx, double, double>&&);
+template RBM_PP<4u, double, double, double>::RBM_PP(RBM_PP<4u, double, double, double>&&);
+template RBM_PP<4u, cpx, cpx, double>::RBM_PP(RBM_PP<4u, cpx, cpx, double>&&);
+template RBM_PP<4u, double, cpx, double>::RBM_PP(RBM_PP<4u, double, cpx, double>&&);
+template RBM_PP<4u, cpx, double, double>::RBM_PP(RBM_PP<4u, cpx, double, double>&&);
+// ##########################################################################################################################################
+
+/**
 * @brief Clones the current RBM_PP object from another instance.
 *
 * This function attempts to clone the current RBM_PP object by copying the 

@@ -58,18 +58,18 @@
 template < 	uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
 class RBM_PP : public RBM_S<_spinModes, _Ht, _T, _stateType>
 {
+	// **********************************************************************************************************************
 	NQS_PUBLIC_TYPES(_T, _stateType);
 	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
-	
 	using NQSLS_p = typename RBM_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	// **********************************************************************************************************************
 protected:
 	// architecture parameters
 	uint nPP_					= 1;
 	uint nSites2_				= 1;
 	uint nParticles2_			= 1;
 	u64 rbmPPSize_				= 1;
-
-	/* ------------------------------------------------------------ */
+	// **********************************************************************************************************************
 	// ------------------------ W E I G H T S ------------------------
 	NQSB Fpp_;													// for storing the additional variational parameters from the PP
 	v_2d<bool> spinSectors_;									// go through the quarters (spin sectors)
@@ -80,82 +80,63 @@ protected:
 	NQSW Xinv_;													// for stroing the matrix inverse for Pfaffian calculation at each step
 	NQSW XinvSkew_;												// for stroing the matrix inverse for Pfaffian calculation at each step
 	NQSW Xnew_;													// for stroing the matrix for Pfaffian calculation at each step - new candidate
-	
-// for calculating the Pfaffian probabilities from the Hamiltonian
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP 
-	// create the map for thetas for a given thread
-	std::map<std::thread::id, NQSW> XTmp_;
+	// ***************************************************************************************************************************
+#ifdef NQS_NOT_OMP_MT
+	thread_local static inline NQSW XTmp_;						// for calculating the Pfaffian probabilities from the Hamiltonian
+	// std::map<std::thread::id, NQSW> XTmp_;
 #else
 	NQSW XTmp_;
 #endif
-
-	/* ------------------------------------------------------------ */
-	
+	// ***************************************************************************************************************************
 	u64 getFPPIndex(bool _spini, bool _spinj, uint ri, uint rj)	const;
-
-	/* ------------------------------------------------------------ */
-protected:
-	// ----------------------- S T A R T E R S -----------------------
+protected:														// ----------------------- S T A R T E R S -----------------------
 	void setInfo()												override final;
 	void allocate()												override final;
-
-	// ------------------------ S E T T E R S ------------------------
+public:															// ------------------------ S E T T E R S ------------------------
 	virtual void setState(const Config_t& _st, bool _set)		override final;
 	virtual void setState(u64 _st, bool _set)					override final;
-
-	/* ------------------------------------------------------------ */
-	// -------------------- P R O B A B I L I T Y --------------------
+protected:														// -------------------- P R O B A B I L I T Y --------------------
 	auto logPRatio(uint fP, float fV)							-> _T override final;
 	auto logPRatio(uint nFlips)									-> _T override final;
-	auto logPRatio(Config_cr_t _v1,
-					Config_cr_t _v2)							-> _T override final;
-	auto logPRatio(std::initializer_list<int> fP,
-				std::initializer_list<double> fV)				-> _T override final;
-
-	// ------------------------ W E I G H T S ------------------------
-public:
+	auto logPRatio(Config_cr_t _v1, Config_cr_t _v2)			-> _T override final;
+	auto logPRatio(int_ini_t fP, dbl_ini_t fV)					-> _T override final;
+	// ***************************************************************************************************************************
+public:															// ------------------------ W E I G H T S ------------------------
 	bool setWeights(std::string _path, std::string _file)		override final;
 	bool saveWeights(std::string _path, std::string _file)		override final;
 	void setWeights()											override final;
 protected:
 	void updateWeights()										override final;
-	// updates
+	// ***************************************************************************************************************************
 #ifdef NQS_ANGLES_UPD
 	void update(uint nFlips)									override final;
 	void update(Config_cr_t v, uint nFlips)						override final;
 	void unupdate(uint nFlips)									override final;
 #endif
-
-	// ---------------------------- T R A I N ----------------------------	
+	// ***************************************************************************************************************************
+protected:														// -------------------------- T R A I N --------------------------
 	void grad(Config_cr_t _v, uint _plc)						override final;
-
-	// --------------------------- A N S A T Z ---------------------------
+protected:														// ------------------------- A N S A T Z -------------------------
 	virtual void updFPP_C(uint fP, float fV)					= 0;
-	virtual void updFPP_C(std::initializer_list<int> fP,
-						std::initializer_list<double> fV)		= 0;
+	virtual void updFPP_C(int_ini_t fP, dbl_ini_t fV)			= 0;
 	virtual void updFPP(uint fP, float fV)						= 0;
-	virtual void updFPP(std::initializer_list<int> fP,
-						std::initializer_list<double> fV)		= 0;
-	virtual void updFPP_F(std::initializer_list<int> fP, 
-						std::initializer_list<double> fV,
-						arma::Mat<_T>& _Xtmp)					= 0;
+	virtual void updFPP(int_ini_t fP, dbl_ini_t fV)				= 0;
+	virtual void updFPP_F(int_ini_t, dbl_ini_t, NQSW&) 			= 0;
+	// ***************************************************************************************************************************
 public: 				  
 	~RBM_PP() override											{ DESTRUCTOR_CALL;												};
-	RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, double _lr, uint _threadNum = 1, 
-													int _nPart = -1, 
-													const NQSLS_p& _lower = {}, 
-													std::vector<double> _beta = {});
-
-	// --------------------- S E T T E R S ---------------------
+	RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1, 
+													const NQSLS_p& _lower = {}, std::vector<double> _beta = {});
+	RBM_PP(const RBM_PP<_spinModes, _Ht, _T, _stateType>& _other);
+	RBM_PP(RBM_PP<_spinModes, _Ht, _T, _stateType>&& _other);
+public:															// --------------------- S E T T E R S ---------------------
 	void init()													override final;
 	// for the PP matrix
 	void setFPP()												{ this->X_ = this->getPPMat();									};
 	void setFPP(Config_cr_t _n)									{ this->X_ = this->getPPMat(_n);								};
-	// void setFPP(u64 _n)											{ this->X_ = this->getPPMat(_n);								};
 	// for the new PP matrix
 	void setFPP_C()												{ this->Xnew_ = this->getPPMat();								};
 	void setFPP_C(Config_cr_t _n)								{ this->Xnew_ = this->getPPMat(_n);								};
-	// void setFPP_C(u64 _n)										{ this->Xnew_ = this->getPPMat(_n);								};
 	// for the pfaffian value
 	void setPfaffian()											{ this->pfaffian_ = this->getPfaffian();						};
 	void setPfaffian(Config_cr_t _n)							{ this->setFPP(_n); this->setPfaffian();						};
@@ -164,9 +145,8 @@ public:
 	void setPfaffian_C()										{ this->pfaffianNew_ = this->getPfaffian_C();					};
 	void setPfaffian_C(Config_cr_t _n)							{ this->setFPP_C(_n); this->setPfaffian_C();					};
 	void setPfaffian_C(const NQSW& _M)							{ this->pfaffianNew_ = this->getPfaffian(_M);					};
-
-	// -------------------- U P D A T E R S --------------------
-
+public:															// -------------------- U P D A T E R S --------------------
+	// ***************************************************************************************************************************
 #ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
 	void updateXInv(uint _row);
 	void updateXInv_C(uint _row);
@@ -175,9 +155,8 @@ public:
 	void updatePfaffian(uint _row, _T& _pfaffian, const arma::Mat<_T>& _X);
 	void updatePfaffian_C(uint _row);
 #endif
-
-	// --------------------- G E T T E R S ---------------------
-	
+	// ***************************************************************************************************************************
+public:															// --------------------- G E T T E R S ---------------------
 	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW		= 0;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW		= 0;
@@ -209,50 +188,11 @@ public:
 
 	// ---------------------------------------------------------
 public:
+	// **********************************************************************************************************************
 	virtual auto clone() 					const -> MC_t_p		override = 0;
 	virtual auto clone(MC_t_p _n) 			-> void				override;
-
+	// **********************************************************************************************************************
 };
-
-/**
-* @brief Constructor for the RBM_PP class.
-* 
-* This constructor initializes an instance of the RBM_PP class, which is a derived class of RBM_S. 
-* It sets up the spin sectors, calculates various sizes related to the problem, and allocates necessary resources.
-* 
-* @tparam _spinModes Number of spin modes.
-* @tparam _Ht Type of the Hamiltonian.
-* @tparam _T Data type used in the calculations.
-* @tparam _stateType Type of the state.
-* 
-* @param _H Shared pointer to the Hamiltonian object.
-* @param _nHid Number of hidden units.
-* @param _lr Learning rate.
-* @param _threadNum Number of threads to be used.
-* @param _nPart Number of particles.
-* @param _lower Lower bound for the NQSLS_p object.
-* @param _beta Vector of beta values.
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline RBM_PP<_spinModes, _Ht, _T, _stateType>::RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, 
-							double _lr, uint _threadNum, int _nPart, const NQSLS_p& _lower, std::vector<double> _beta)
-	: RBM_S<_spinModes, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nPart, _lower, _beta)
-{
-	// create the spin sectors
-	spinSectors_.push_back({ 1, 1 });
-	spinSectors_.push_back({ 1, 0 });
-	spinSectors_.push_back({ 0, 1 });
-	spinSectors_.push_back({ 0, 0 });
-
-	// !TODO make this changable
-	this->nSites2_		= this->info_p_.nSites_ * this->info_p_.nSites_;
-	this->nParticles2_	= this->info_p_.nParticles_ * this->info_p_.nParticles_;
-	this->nPP_			= this->spinSectors_.size() * this->nSites2_; // for both spin channels
-	this->rbmPPSize_	= this->rbmSize_ + this->nPP_;
-	this->info_p_.fullSize_		= this->rbmPPSize_;
-	this->allocate();
-	this->setInfo();
-}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

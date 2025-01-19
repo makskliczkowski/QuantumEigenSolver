@@ -87,9 +87,10 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::allocate()
 	RBM_S<_spinModes, _Ht, _T, _stateType>::allocate();
 	this->X_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 	this->Xinv_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP	// allocate the vector for using it in the RBM
-	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
-		this->XTmp_[this->threads_.threads_[_thread].get_id()] = NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
+#ifdef NQS_NOT_OMP_MT
+	this->XTmp_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
+	// for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
+		// this->XTmp_(this->threads_.threads_[_thread].get_id()) = NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 #endif
 
 	// allocate the weights themselves !TODO - make this symmetric? 

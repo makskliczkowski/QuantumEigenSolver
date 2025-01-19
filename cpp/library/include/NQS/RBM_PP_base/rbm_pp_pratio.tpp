@@ -83,19 +83,17 @@ inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1, Co
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline _T RBM_PP<_spinModes, _Ht, _T, _stateType>::logPRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
-	auto thId			= std::this_thread::get_id();
-	this->XTmp_[thId]	= this->X_;
-
+#ifdef NQS_NOT_OMP_MT
+	auto& Xtmp			= this->XTmp_;
 	// update
-	this->updFPP_F(fP, fV, this->XTmp_[thId]);
+	this->updFPP_F(fP, fV, Xtmp);
 #ifdef NQS_RBM_PP_USE_PFAFFIAN_UPDATE
 	auto _pfaffian		= this->pfaffian_;
 	if (fP.size() == 1)
 		for(const auto& _row: fP)
-			this->updatePfaffian(_row, _pfaffian, this->XTmp_[thId]);
+			this->updatePfaffian(_row, _pfaffian, Xtmp);
 	else
-		_pfaffian		= this->getPfaffian(this->XTmp_[thId]);
+		_pfaffian		= this->getPfaffian(Xtmp);
 #else
 	auto _pfaffian		= this->getPfaffian(this->XTmp_[thId]);
 #endif

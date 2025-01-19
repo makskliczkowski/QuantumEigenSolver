@@ -49,11 +49,11 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	if (this->thetaCOSH_.is_empty()) 	this->thetaCOSH_.resize(this->nHid_);
 	if (this->W_.is_empty()) 			this->W_.resize(this->nHid_, this->info_p_.nVis_);
 
-#if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP	
-	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)	// allocate the vector for using it in the RBM
-		this->thetaTMP_ = NQSB(this->nHid_);
+#ifdef NQS_NOT_OMP_MT
+// 	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)	// allocate the vector for using it in the RBM
+	this->thetaTMP_ 	= NQSB(this->nHid_);
 #endif
-	this->thetaTmpCol_ = NQSB(this->nHid_);
+	this->thetaTmpCol_ 	= NQSB(this->nHid_);
 	NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();						// allocate the rest
 }
 
