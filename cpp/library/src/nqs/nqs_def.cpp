@@ -23,6 +23,20 @@ const double NQS_reg_t::reg(size_t epoch, double _metric) const
     return this->p_ ? (*this->p_)(epoch, _metric) : this->reg_;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+* @brief Saves the NQS regularization data to a file.
+* 
+* This function saves the regularization data of the NQS (Neural Quantum State) to a specified file.
+* The file can be in HDF5 format if the filename ends with ".h5".
+* 
+* @param _dir The directory where the file will be saved.
+* @param _name The name of the file to save the data to.
+* @param i An integer parameter (purpose not specified in the provided code).
+* @param _namepar A string parameter to be appended to the regularization data name.
+* @param _append A boolean flag indicating whether to append to the file if it exists.
+*/
 void NQS_reg_t::save(const std::string& _dir, 
                     const std::string& _name, 
                     int i, 
@@ -34,24 +48,24 @@ void NQS_reg_t::save(const std::string& _dir,
                 arma::vec(this->p_ ? this->p_->hist() : v_1d<double>({ this->reg_ })), 
                 _namepar + "regularization", _append);
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NQS_reg_t::NQS_reg_t(const NQS_reg_t& other)
         : reg_(other.reg_),
         p_(other.p_ ? other.p_->clone() : nullptr)
 {}
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NQS_reg_t::NQS_reg_t(NQS_reg_t&& other) noexcept
     : reg_(std::exchange(other.reg_, 1e-7)),
     p_(std::move(other.p_))
 {}
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NQS_reg_t& NQS_reg_t::operator=(NQS_reg_t&& other) noexcept
 {
     this->reg_ = std::exchange(other.reg_, 1e-7);
     this->p_ = std::move(other.p_);
     return *this;
 }
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 NQS_reg_t& NQS_reg_t::operator=(const NQS_reg_t& other) 
 {
     this->reg_ = other.reg_;
@@ -314,13 +328,135 @@ NQS_deriv<_stateType, _type>::NQS_deriv(size_t _fullSize, size_t _nBlocks)
     this->energiesCentered.set_size(_nBlocks);
 }
 // template instantiation of the function above
-template NQS_deriv<double, double>::NQS_deriv(size_t, size_t);
-template NQS_deriv<cpx, double>::NQS_deriv(size_t, size_t);
-template NQS_deriv<double, cpx>::NQS_deriv(size_t, size_t);
-template NQS_deriv<cpx, cpx>::NQS_deriv(size_t, size_t);
+NQS_DERIV_INST_TYPES(, NQS_deriv, (size_t, size_t));
+// ##########################################################################################################################################
+
+/**
+* @brief Copy constructor for the NQS_deriv class.
+*
+* This constructor creates a new instance of the NQS_deriv class by copying the
+* data from another instance.
+*
+* @param other The instance of NQS_deriv to copy from.
+*/
+template <typename _stateType, typename _type>
+NQS_deriv<_stateType, _type>::NQS_deriv(const NQS_deriv& other)
+    : derivativesMean(other.derivativesMean),
+    energiesCentered(other.energiesCentered),
+    derivatives(other.derivatives),
+    derivativesCentered(other.derivativesCentered),
+    derivativesCenteredH(other.derivativesCenteredH)
+{}
+// template instantiation of the function above
+template NQS_deriv<double, double>::NQS_deriv(const NQS_deriv<double, double>&);
+template NQS_deriv<cpx, double>::NQS_deriv(const NQS_deriv<cpx, double>&);
+template NQS_deriv<double, cpx>::NQS_deriv(const NQS_deriv<double, cpx>&);
+template NQS_deriv<cpx, cpx>::NQS_deriv(const NQS_deriv<cpx, cpx>&);
+
+/**
+* @brief Move constructor for the NQS_deriv class.
+* 
+* This constructor initializes a new NQS_deriv object by transferring the resources
+* from another NQS_deriv object using move semantics. This is useful for efficiently
+* transferring ownership of resources without copying.
+* 
+* @tparam _stateType The type representing the state.
+* @tparam _type The type representing the value.
+* @param other The NQS_deriv object to move from.
+*/
+template <typename _stateType, typename _type>
+NQS_deriv<_stateType, _type>::NQS_deriv(NQS_deriv&& other) noexcept
+    : derivativesMean(std::move(other.derivativesMean)),
+    energiesCentered(std::move(other.energiesCentered)),
+    derivatives(std::move(other.derivatives)),
+    derivativesCentered(std::move(other.derivativesCentered)),
+    derivativesCenteredH(std::move(other.derivativesCenteredH))
+{}
+// template instantiation of the functions above
+template NQS_deriv<double, double>::NQS_deriv(NQS_deriv<double, double>&&);
+template NQS_deriv<cpx, double>::NQS_deriv(NQS_deriv<cpx, double>&&);
+template NQS_deriv<double, cpx>::NQS_deriv(NQS_deriv<double, cpx>&&);
+template NQS_deriv<cpx, cpx>::NQS_deriv(NQS_deriv<cpx, cpx>&&);
+
+/**
+* @brief Assignment operator for the NQS_deriv class.
+* 
+* This operator assigns the values from another NQS_deriv object to the current object.
+* It performs a deep copy of the member variables to ensure that the current object
+* has the same state as the other object.
+* 
+* @tparam _stateType The type representing the state.
+* @tparam _type The type representing the values in the derivatives.
+* @param other The other NQS_deriv object to copy from.
+* @return A reference to the current NQS_deriv object.
+*/
+template <typename _stateType, typename _type>
+NQS_deriv<_stateType, _type>& NQS_deriv<_stateType, _type>::operator=(const NQS_deriv& other)
+{
+    if (this != &other)
+    {
+        this->derivatives           = other.derivatives;
+        this->derivativesMean       = other.derivativesMean;
+        this->energiesCentered      = other.energiesCentered;
+        this->derivativesCentered   = other.derivativesCentered;
+        this->derivativesCenteredH  = other.derivativesCenteredH;
+    }
+    return *this;
+}
+// template instantiation of the function above
+template NQS_deriv<double, double>& NQS_deriv<double, double>::operator=(const NQS_deriv<double, double>&);
+template NQS_deriv<cpx, double>& NQS_deriv<cpx, double>::operator=(const NQS_deriv<cpx, double>&);
+template NQS_deriv<double, cpx>& NQS_deriv<double, cpx>::operator=(const NQS_deriv<double, cpx>&);
+template NQS_deriv<cpx, cpx>& NQS_deriv<cpx, cpx>::operator=(const NQS_deriv<cpx, cpx>&);
+
+/**
+* @brief Move assignment operator for NQS_deriv class.
+*
+* This operator moves the contents of the given NQS_deriv object to the current object.
+* It ensures that the current object is not the same as the given object before performing the move.
+*
+* @tparam _stateType The type representing the state.
+* @tparam _type The type representing the value.
+* @param other The NQS_deriv object to move from.
+* @return A reference to the current NQS_deriv object.
+*/
+template <typename _stateType, typename _type>
+NQS_deriv<_stateType, _type>& NQS_deriv<_stateType, _type>::operator=(NQS_deriv&& other) noexcept
+{
+    if (this != &other)
+    {
+        this->derivatives           = std::move(other.derivatives);
+        this->derivativesMean       = std::move(other.derivativesMean);
+        this->energiesCentered      = std::move(other.energiesCentered);
+        this->derivativesCentered   = std::move(other.derivativesCentered);
+        this->derivativesCenteredH  = std::move(other.derivativesCenteredH);
+    }
+    return *this;
+}
+// template instantiation of the function above
+template NQS_deriv<double, double>& NQS_deriv<double, double>::operator=(NQS_deriv<double, double>&&);
+template NQS_deriv<cpx, double>& NQS_deriv<cpx, double>::operator=(NQS_deriv<cpx, double>&&);
+template NQS_deriv<double, cpx>& NQS_deriv<double, cpx>::operator=(NQS_deriv<double, cpx>&&);
+template NQS_deriv<cpx, cpx>& NQS_deriv<cpx, cpx>::operator=(NQS_deriv<cpx, cpx>&&);
 
 // ##########################################################################################################################################
 
+/**
+* @brief Sets the centered derivatives and energies for the NQS_deriv object.
+* 
+* This function calculates the centered derivatives and energies based on the provided
+* energies, mean loss, and number of samples. The centered derivatives are computed
+* - using armadillo if NQS_USE_ARMA is defined
+* - using std::vector if NQS_USE_STDVEC is defined
+* 
+* @tparam _stateType The type representing the state.
+* @tparam _type The type representing the numerical values.
+* @tparam _CT The type of the energies container.
+* 
+* @param _energies A container holding the energy values.
+* @param _meanLoss The mean loss value.
+* @param _samples The number of samples.
+*/
 template <typename _stateType, typename _type>
 template <typename _CT>
 void NQS_deriv<_stateType, _type>::set_centered(const _CT& _energies, _type _meanLoss, const _type _samples)
@@ -436,14 +572,20 @@ void NQS_deriv<_stateType, _type>::reset(size_t fullSize, size_t nBlocks)
     }
 }
 // template instantiation of the function above
-template void NQS_deriv<double, double>::reset(size_t, size_t);
-template void NQS_deriv<cpx, double>::reset(size_t, size_t);
-template void NQS_deriv<double, cpx>::reset(size_t, size_t);
-template void NQS_deriv<cpx, cpx>::reset(size_t, size_t);
-
+NQS_DERIV_INST_TYPES(void, reset, (size_t, size_t));
 
 // ##########################################################################################################################################
 
+/**
+* @brief Prints the shapes of various matrices and vectors used in the NQS_deriv class.
+* 
+* This function outputs the dimensions of the following members to the standard output:
+* - derivatives: The number of rows and columns.
+* - derivativesMean: The number of elements.
+* - energiesCentered: The number of elements.
+* - derivativesCentered: The number of rows and columns.
+* - derivativesCenteredH (Transposed): The number of rows and columns.
+*/
 template <typename _stateType, typename _type>
 void NQS_deriv<_stateType, _type>::printState() const
 {
@@ -454,9 +596,5 @@ void NQS_deriv<_stateType, _type>::printState() const
     std::cout << "Derivatives Centered (Transposed) shape: " << derivativesCenteredH.n_rows << " x " << derivativesCenteredH.n_cols << std::endl;
 }
 // template instantiation of the function above
-template void NQS_deriv<double, double>::printState() const;
-template void NQS_deriv<cpx, double>::printState() const;
-template void NQS_deriv<double, cpx>::printState() const;
-template void NQS_deriv<cpx, cpx>::printState() const;
-
+NQS_DERIV_INST_TYPES(void, printState, () const);
 // ##########################################################################################################################################

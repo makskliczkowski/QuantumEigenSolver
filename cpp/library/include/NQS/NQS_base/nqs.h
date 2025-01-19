@@ -18,29 +18,7 @@
 
 // include all the definions
 #include "../nqs_operator.h"
-#include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
-
-// #################################################################################################################################
-
-/**
-* @brief Generates a time space vector using either logarithmic or regular spacing.
-*
-* This function creates a vector of time points between 0 and _tmax, with spacing
-* determined by _dt. If _log is greater than 0, the spacing will be logarithmic,
-* otherwise it will be regular.
-*
-* @param _log Determines the type of spacing. If greater than 0, logarithmic spacing is used.
-* @param _dt The time step size for regular spacing or the base for logarithmic spacing.
-* @param _tmax The maximum time value.
-* @return arma::vec A vector of time points.
-*/
-inline arma::vec time_space_nqs(int _log = 0, double _dt = 0.01, double _tmax = 1.0)
-{
-	if (_log > 0)
-		return arma::logspace(_dt, _tmax, _log);
-	return arma::regspace(_dt, _dt, _tmax);
-}
 
 // #################################################################################################################################
 
@@ -62,7 +40,7 @@ template <uint _spinModes,
 		typename _Ht,
 		typename _T			= _Ht, 
 		class _stateType	= double>
-class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>
+class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, NQS_STATE_R_T<_stateType>>
 {	
 public:
 	// **********************************************************************************************************************************
@@ -208,24 +186,28 @@ protected:
 	std::function<_T(Config_cr_t)> pRatioFunc_;							// function for the probability ratio
 	// ***********************************************************************************************************************************
 protected:																// ----------------------- W E I G H T S -------------------------
+	// ***********************************************************************************************************************************
 #ifdef NQS_ANGLES_UPD
 	virtual void update(uint nFlips = 1); 								// update the weights after one flip (if needed and possible)
 	virtual void update(Config_cr_t v, uint nFlips = 1);		 		// update the weights after state change (if needed and possible)
 	virtual void unupdate(uint nFlips = 1)								{}; // unupdate the weights after one flip (if needed and possible)
 #endif
+	// ***********************************************************************************************************************************
 public:
 	virtual void setWeights()											= 0; // set the weights of the NQS
 	virtual void setWeights(const NQSB& _w);
 	virtual void setWeights(NQSB&& _w);
-	virtual void setWeights(std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>> _rbm);
+	virtual void setWeights(std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>> _nqs); 
 protected:
 	virtual void updateWeights();
 public:
 	virtual void updateWeights(double _dt)								{ this->dF_ *= _dt; this->updateWeights(); 				};
 	virtual void updateWeights(const NQSB& _dF)							{ this->dF_ = _dF; this->updateWeights(); 				};
 	virtual void updateWeights(NQSB&& _dF)								{ this->dF_ = std::move(_dF); this->updateWeights(); 	};
+	// ***********************************************************************************************************************************
 	virtual bool saveWeights(std::string _path, std::string _file) override;	// save the weights to the file 
 	virtual bool setWeights(std::string _path, std::string _file) override;		// set the weights from the file
+	virtual auto saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const -> void { this->info_p_.saveInfo(_dir, _name, i); };
 	// ***********************************************************************************************************************************
 protected:																// --------------------- T R A I N   E T C -----------------------
 	virtual void gradF(const Container_t& _energies, int step = 0, _T _cL = 0.0);
@@ -233,8 +215,8 @@ protected:																// --------------------- T R A I N   E T C -----------
 	virtual void gradSR(uint step = 0, _T _cL = 0.0);					// stochastic reconfiguration
 	virtual void covMatrixReg(int _step = 0, _T _cL = 0.0);
 #endif
+	virtual void grad(Config_cr_t _v, uint _plc)						= 0;
 	virtual void gradFinal(const Container_t& _energies, int step = 0, _T _cL = 0.0);
-	virtual void grad(Config_cr_t _v, uint _plc)					= 0;
 	// ***********************************************************************************************************************************
 protected:																// ------------------------ T I M E E V O-------------------------
 	virtual void gradEvoFinal(const Container_t& _energies, int step = 0, _T _cL = 0.0, NQSB* _dF = nullptr);
@@ -258,7 +240,6 @@ public:																	// ------------------------ S E T T E R S --------------
 	void setScheduler(int _sch = 0, double _lr = 1e-3, double _lrd = 0.96, size_t _epo = 10, size_t _pat = 5);									
 	// ***********************************************************************************************************************************
 public:																	// ------------------------ G E T T E R S ------------------------
-	auto saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const -> void { this->info_p_.saveInfo(_dir, _name, i); };
 	auto getNvis()							const -> uint				{ return this->info_p_.nVis_;			};
 	auto getF()								const -> NQSB				{ return this->F_;						};
 #ifdef NQS_USESR_MAT_USED	
@@ -276,7 +257,7 @@ public:																	// ------------------------ G E T T E R S --------------
 	auto getLastConfig() 					const -> Config_t override	{ return NQS_STATE; 					};
 	// overriden MonteCarloSolver methods - set the state
 	virtual auto setConfig(Config_cr_t _s) 	-> void override 			{ this->setState(_s, true); 			};
-	virtual auto swapWeights(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _othe) -> void;
+	virtual auto swapWeights(MC_t_p _other) -> void override;
 	virtual auto swapConfig(MC_t_p _other) 	-> void override;
 	virtual auto reset(size_t _n) 			-> void override;
 	virtual auto clone() 					const -> MC_t_p override 	= 0;
@@ -292,9 +273,7 @@ public:																	// ----------------------- S A M P L I N G -------------
 	// !TODO - change this to template to make it more efficient
 public:																	// ------------------------ T R A I N I N G ----------------------
 	virtual bool trainStop(size_t i, const MCS_train_t& _par, _T _currLoss, _T _currstd = 0.0, bool _quiet = false) override;
-	virtual bool trainStep(size_t i,Container_t& En,
-									Container_t& meanEn, 
-									Container_t& stdEn, 
+	virtual bool trainStep(size_t i, Container_t& En, Container_t& meanEn, Container_t& stdEn, 
 									const MCS_train_t& _par, 
 									const bool quiet, 
 									const bool randomStart,

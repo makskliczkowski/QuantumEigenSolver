@@ -60,8 +60,8 @@ template class NQS<4u, double, cpx, double>;
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::reset(size_t _n)
 {
-    this->derivatives_.reset(this->info_p_.fullSize_, _n);
-	this->lower_states_.setDerivContSize(_n);	// set the size of the containers for the lower states
+    this->derivatives_.reset(this->info_p_.fullSize_, _n);  // reset the derivatives - set the size of the containers
+	this->lower_states_.setDerivContSize(_n);	            // set the size of the containers for the lower states
 }
 // template instantiation of the function above
 NQS_INST_CMB_ALL(reset, void, (size_t));

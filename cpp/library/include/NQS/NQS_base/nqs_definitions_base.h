@@ -8,7 +8,6 @@
 #define NQS_DEFINITIONS_H
 
 #include "../../algebra/general_operator.h"
-#include "armadillo"
 #include <cstddef>
 #include <memory>
 // ----------------------------------------------------------
@@ -54,11 +53,15 @@
 // ----------------------------------------------------------
 #define NQS_USE_VEC_ONLY					// use vector only? - if not, use the integer representation		
 #ifdef NQS_USE_VEC_ONLY
+	#define NQS_STATE_R_T arma::Col
 	#define NQS_STATE this->curVec_			// current state
 	#define NQS_STATE_T Config_cr_t			// current state type 
-#else 
+#elif defined NQS_USE_STDVEC
+	#define NQS_STATE_R_T std::vector
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 
+#else
+
 #endif
 // ----------------------------------------------------------
 
@@ -66,6 +69,7 @@
 
 // ----------------------------------------------------------
 #ifdef NQS_USE_ARMA
+#	include <armadillo>
 #	define NQS_ROW_T arma::Row<_type>		// row type for weights etc representation
 #	define NQS_COL_T arma::Col<_type>		// column type for weights etc representation
 #else		
@@ -104,7 +108,6 @@ enum NQSTYPES					// #
 // ##########################################################################################################################################
 // all the types that are to be used in each NQS implementation
 #ifdef NQS_USE_ARMA
-#	include <armadillo>
 #	define NQS_PUBLIC_TYPES(_type, _stateType) public:																\
 				using NQSS = arma::Col<_stateType>;																	\
 				using NQSB = arma::Col<_type>; 																		\
@@ -169,6 +172,27 @@ struct CondVarKernel
 #	include "../../../source/src/Include/ml.h"
 #endif // !ML_H					// #
 // #################################
+
+// #################################################################################################################################
+
+/**
+* @brief Generates a time space vector using either logarithmic or regular spacing.
+*
+* This function creates a vector of time points between 0 and _tmax, with spacing
+* determined by _dt. If _log is greater than 0, the spacing will be logarithmic,
+* otherwise it will be regular.
+*
+* @param _log Determines the type of spacing. If greater than 0, logarithmic spacing is used.
+* @param _dt The time step size for regular spacing or the base for logarithmic spacing.
+* @param _tmax The maximum time value.
+* @return arma::vec A vector of time points.
+*/
+inline arma::vec time_space_nqs(int _log = 0, double _dt = 0.01, double _tmax = 1.0)
+{
+	if (_log > 0)
+		return arma::logspace(_dt, _tmax, _log);
+	return arma::regspace(_dt, _dt, _tmax);
+}
 
 // #######################################################################################
 enum class NQS_init_st_t
@@ -305,63 +329,35 @@ struct NQS_thread_t
 	~NQS_thread_t()					{ this->threads_.clear(); };
 };
 //////////////////////////////////////////////////////////////////////////////////////////
-
+#define NQS_DERIV_INST_TYPES(ret, fun, args) 									\
+					template ret NQS_deriv<double, double>::fun args; 			\
+					template ret NQS_deriv<cpx, double>::fun args; 				\
+					template ret NQS_deriv<double, cpx>::fun args; 				\
+					template ret NQS_deriv<cpx, cpx>::fun args;
+//////////////////////////////////////////////////////////////////////////////////////////
 template <typename _stateType = double, typename _type = double>
 struct NQS_deriv
 {
+	//************************************************************************************
 	NQS_PUBLIC_TYPES(_type, _stateType);
+	//************************************************************************************
 
     // Member variables (fullSize is the number of parameters in the NQS, nBlocks is the number of consecutive observations)
-    NQSW derivatives;                  // Variational derivatives O_k 			(nBlocks x fullSize) 
     NQS_ROW_T derivativesMean;         // Mean of the derivatives \bar O_k 		(fullSize)
     NQS_COL_T energiesCentered;        // Centered energies (E_k - <E_k>) 		(nBlocks)
+    NQSW derivatives;                  // Variational derivatives O_k 			(nBlocks x fullSize) 
     NQSW derivativesCentered;          // Centered derivatives (O_k - <O_k>) 	(nBlocks x fullSize)
     NQSW derivativesCenteredH;         // Centered derivatives transposed 		(fullSize x nBlocks) 
 
 	/////////////////////////////////////////////////////////////////////////////////////
 	~NQS_deriv() 						= default;
     NQS_deriv(size_t fullSize = 1, size_t nBlocks = 1);
-	/////////////////////////////////////////////////////////////////////////////////////
-	NQS_deriv(const NQS_deriv& other) 
-		: derivatives(other.derivatives), derivativesMean(other.derivativesMean), energiesCentered(other.energiesCentered), 
-		derivativesCentered(other.derivativesCentered), derivativesCenteredH(other.derivativesCenteredH)
-	{ 
-		
-	}
-	/////////////////////////////////////////////////////////////////////////////////////
-	NQS_deriv(NQS_deriv&& other) noexcept
-		: derivatives(std::move(other.derivatives)), derivativesMean(std::move(other.derivativesMean)), 
-		energiesCentered(std::move(other.energiesCentered)), derivativesCentered(std::move(other.derivativesCentered)), 
-		derivativesCenteredH(std::move(other.derivativesCenteredH)) 
-	{ 
-
-	}
+	NQS_deriv(const NQS_deriv& other);
+	NQS_deriv(NQS_deriv&& other) noexcept;
 	/////////////////////////////////////////////////////////////////////////////////////
 	// operators
-	NQS_deriv& operator=(const NQS_deriv& other)
-	{
-		if (this != &other)
-		{
-			this->derivatives          = other.derivatives;
-			this->derivativesMean      = other.derivativesMean;
-			this->energiesCentered     = other.energiesCentered;
-			this->derivativesCentered  = other.derivativesCentered;
-			this->derivativesCenteredH = other.derivativesCenteredH;
-		}
-		return *this;
-	}
-	NQS_deriv& operator=(NQS_deriv&& other) noexcept
-	{
-		if (this != &other)
-		{
-			this->derivatives          = std::move(other.derivatives);
-			this->derivativesMean      = std::move(other.derivativesMean);
-			this->energiesCentered     = std::move(other.energiesCentered);
-			this->derivativesCentered  = std::move(other.derivativesCentered);
-			this->derivativesCenteredH = std::move(other.derivativesCenteredH);
-		}
-		return *this;
-	}
+	NQS_deriv& operator=(const NQS_deriv& other);
+	NQS_deriv& operator=(NQS_deriv&& other) noexcept;
 	/////////////////////////////////////////////////////////////////////////////////////
     void reset(size_t fullSize, size_t nBlocks = 1);
 	/////////////////////////////////////////////////////////////////////////////////////
@@ -393,8 +389,6 @@ struct NQS_deriv
 	void printState() const;
 	/////////////////////////////////////////////////////////////////////////////////////
 };
-
-
 // ##########################################################################################################################################
 namespace Operators
 {
