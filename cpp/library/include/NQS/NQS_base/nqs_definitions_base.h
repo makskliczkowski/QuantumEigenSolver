@@ -10,10 +10,7 @@
 #include "../../algebra/general_operator.h"
 #include "armadillo"
 #include <cstddef>
-#include <functional>
 #include <memory>
-
-
 // ----------------------------------------------------------
 
 // Directories
@@ -377,19 +374,21 @@ struct NQS_deriv
 	// SPECIFIC
 	/////////////////////////////////////////////////////////////////////////////////////
 #ifdef NQS_USE_ARMA
-	arma::subview_row<_type> row(size_t i) 				{ return this->derivatives.row(i); }
-	arma::subview_col<_type> col(size_t i) 				{ return this->derivatives.col(i); }
-	NQS_COL_T mean_t() 									{ return this->derivativesMean.t(); }
-	NQS_ROW_T mean() 									{ return this->derivativesMean; }
-	arma::subview_col<_type> colCentered(size_t i) 		{ return this->derivativesCentered.col(i); }
-	arma::subview_row<_type> rowCentered(size_t i) 		{ return this->derivativesCentered.row(i); }
+	arma::subview_row<_type> row(size_t i) 				{ return this->derivatives.row(i); 			}
+	arma::subview_col<_type> col(size_t i) 				{ return this->derivatives.col(i); 			}
+	arma::subview_col<_type> colCentered(size_t i) 		{ return this->derivativesCentered.col(i); 	}
+	arma::subview_row<_type> rowCentered(size_t i) 		{ return this->derivativesCentered.row(i); 	}
 	arma::subview_col<_type> colCenteredH(size_t i) 	{ return this->derivativesCenteredH.col(i); }
 	arma::subview_row<_type> rowCenteredH(size_t i) 	{ return this->derivativesCenteredH.row(i); }
 #elif NQS_USE_STDVEC
-	_type& operator()(size_t i, size_t j) 				{ return this->derivatives[i][j]; }
-	const _type& operator()(size_t i, size_t j) const 	{ return this->derivatives[i][j]; }
+	NQS_COL_T row(size_t i) 							{ return this->derivatives[i]; 				}
+	NQS_COL_T rowCentered(size_t i) 					{ return this->derivativesCentered[i]; 		}
+	NQS_COL_T rowCenteredH(size_t i) 					{ return this->derivativesCenteredH[i]; 	}
+	// columns can be taken by transposing the rows only
 #else 
 #endif
+	NQS_COL_T mean_t() 									{ return this->derivativesMean.t(); 		}
+	NQS_ROW_T mean() 									{ return this->derivativesMean; 			}
 	/////////////////////////////////////////////////////////////////////////////////////
 	void printState() const;
 	/////////////////////////////////////////////////////////////////////////////////////
@@ -397,14 +396,12 @@ struct NQS_deriv
 
 
 // ##########################################################################################################################################
-
-// forward declaration
 namespace Operators
 {
 	template <typename _T, typename ..._Ts>
 	class OperatorComb;
 };
-
+// ##########################################################################################################################################
 /**
 * @brief Struct to modify the ansatz.
 * 
@@ -424,9 +421,7 @@ struct AnsatzModifier
 	_T logAMod_ 			= 0.0;
 	_T logTmpAMod_			= 0.0;
 };
-
 // ##########################################################################################################################################
-
 #define NQS_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS) 									\
 					template FUNRET  NQS<2u, _Ht, _T, double>::FUN ARGS; 			\
 					template FUNRET  NQS<3u, _Ht, _T, double>::FUN ARGS; 			\
@@ -436,7 +431,6 @@ struct AnsatzModifier
 					NQS_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS)	\
 					NQS_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS)	\
 					NQS_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS)
-
 // ##########################################################################################################################################
 
 #endif // !NQS_DEFINITIONS_H
