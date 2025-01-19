@@ -32,7 +32,7 @@ template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 {
 	const _T _multiplier 		= algebra::cast<_T>(I);
-	if (this->info_p_.sreg_ > 0) 
+	if (this->info_p_.reg() > 0) 
 		this->covMatrixReg(_step);
 
 #ifdef NQS_USESR_MAT_USED
@@ -42,10 +42,10 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 		// !TODO: Implement the inversion of the matrix S using the Cholesky decomposition
 	}
 #else
-	assert(this->derivativesCentered_.empty() == false && this->derivativesCenteredH_.empty() == false && "Centered derivatives F_k and F_k^T must be set before the inversion.");
+	assert(this->derivatives_.derivativesCentered.empty() == false && this->derivatives_.derivativesCenteredH.empty() == false && "Centered derivatives F_k and F_k^T must be set before the inversion.");
 	if (this->precond_ != nullptr)
 #ifndef NQS_USE_MINSR
-		this->precond_->set(this->derivativesCenteredH_, this->derivativesCentered_, -1.0);
+		this->precond_->set(this->derivatives_.derivativesCenteredH, this->derivatives_.derivativesCentered, -1.0);
 #else
 		this->precond_->set(this->derivativesCentered_, this->derivativesCenteredH_, -1.0);
 #endif
@@ -63,25 +63,27 @@ void NQS<_spinModes, _Ht, _T, _stateType>::gradTime(size_t _step, NQSB* _dF)
 			// this->derivativesCenteredH_ = (_V * arma::diagmat(_sigma)) * _U.t();
 		}
 
-		this->solver_->setReg(this->info_p_.sreg_);											// set the regularization
+		this->solver_->setReg(this->info_p_.reg());											// set the regularization
 
 #ifndef NQS_USE_MINSR				
-		this->solver_->solve(this->derivativesCentered_, this->derivativesCenteredH_, 		// S and S+ matrices
+		this->solver_->solve(this->derivatives_.derivativesCentered,
+							 this->derivatives_.derivativesCenteredH, 						// S and S+ matrices
 							_multiplier * this->F_, 										// b
-							_step <= 1 ? nullptr : &this->dF_, 								// x0
+							nullptr, 														// x0 - !IMPORTANT - needs to be nullptr for the first step in the optimization
 							this->precond_.get());											// preconditioner
         if (!this->solver_->isConverged())
             throw std::runtime_error("Solver did not converge.");                           // check if the solver converged
 		if (_dF != nullptr) {
-			// *_dF = this->solver_->moveSolution();										// get the solution
+			// *_dF = this->solver_->moveSolution();											// get the solution
 			*_dF = this->solver_->solution();												// get the solution
 		}
 		else {
-			// this->dF_ = this->solver_->moveSolution();									// get the solution
+			// this->dF_ = this->solver_->moveSolution();										// get the solution
 			this->dF_ = this->solver_->solution();											// get the solution
 		}	
 #else
-		this->solver_->solve(this->derivativesCenteredH_, this->derivativesCentered_, 		// S and S+ matrices
+		this->solver_->solve(this->derivatives_.derivativesCenteredH, 
+							 this->derivatives_.derivativesCentered, 		// S and S+ matrices
 							_multiplier * this->energiesCentered_, 							// b
 							nullptr,
 							this->precond_.get());											// preconditioner
@@ -183,7 +185,7 @@ void NQS<_spinModes, _Ht, _T, _stateType>::evolveStep(size_t _step,
 		this->E_ (_taken) = this->locEnKernel();				// local energy - stored at each point within the estimation of the gradient (stochastic)
 	}
 
-	MonteCarlo::blockmean(this->E_ , std::max((size_t)_par.bsize_, (size_t)8), &_meanEn, &_stdEn); 	// save the mean energy
+	MonteCarlo::blockmean(this->E_ , std::max((size_t)_par.bsize_ / 4, (size_t)8), &_meanEn, &_stdEn); 	// save the mean energy
 	this->gradEvoFinal(this->E_ , _step, _meanEn, _dF);	        // calculate the final update vector - either use the stochastic reconfiguration or the standard gradient descent
 
 	if (updateWeights)

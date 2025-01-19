@@ -63,7 +63,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setPreconditioner(int _pre)
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setSolver(int _sol, double _tol, int _maxiter, double _reg)						
 { 
-	this->info_p_.setSolver(_sol, _maxiter, _tol); 
+	this->info_p_.solver_.set(_sol, _maxiter, _tol); 
 
 	if (_sol < 0) return; // no solver set
 

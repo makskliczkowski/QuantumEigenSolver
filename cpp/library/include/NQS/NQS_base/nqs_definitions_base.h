@@ -1,54 +1,91 @@
-/*
-* NQS Definitions - all the definitions for the NQS class
+/**
+* @brief NQS Definitions - all the definitions for the NQS class
 * @file nqs_definitions.h
 */
+// ##########################################################################################################################################
 
-#pragma once
-// ######################### NQS ############################
+#ifndef NQS_DEFINITIONS_H
+#define NQS_DEFINITIONS_H
 
-// saving the weights and the directory
+#include "../../algebra/general_operator.h"
+#include "armadillo"
+#include <cstddef>
+#include <functional>
+#include <memory>
+
+
+// ----------------------------------------------------------
+
+// Directories
+
+// ----------------------------------------------------------
 #define NQS_SAVE_WEIGHTS					
 #ifdef NQS_SAVE_WEIGHTS						
 #	define NQS_SAVE_DIR ( "WEIGHTS" + kPS )		
 #endif										
 
-// ----------------------------------------------------------		
+// ----------------------------------------------------------
 
+// MULTITHREADING
+
+// ----------------------------------------------------------
+//#define NQS_USE_OMP
 //#define NQS_USE_GPU						
 #define NQS_USE_CPU							
 											
+// !CPU
 #ifdef NQS_USE_CPU							
 #	define NQS_USE_MULTITHREADING			
-//#	define NQS_USE_OMP						
 # 	if defined NQS_USE_MULTITHREADING && not defined NQS_USE_OMP
 #		define NQS_NOT_OMP_MT 
 #	endif
 # 	if defined NQS_USE_GPU
 #		undef NQS_USE_GPU
 #	endif
-#elif defined NQS_USE_GPU					
+#elif defined NQS_USE_GPU		
 #	include <cuda_runtime.h>						
 #endif		
+//!GPU: TODO			
 
 // ----------------------------------------------------------					
 #define NQS_ANGLES_UPD						// shall one update the angles or calculate them from scratch			
-#define NQS_USE_VEC_ONLY					// use vector only?							
-#if defined NQS_USE_VEC_ONLY
-	#define NQS_STATE this->curVec_
-	#define NQS_STATE_T Config_cr_t
-	#define NQS_ROW_T arma::Row<_T>
-	#define NQS_COL_T arma::Col<_T>
+#define NQS_USE_ARMA						// use Armadillo for the matrix operations (if not, use the custom implementation)
+// ----------------------------------------------------------
+
+// STATES REPRESENTATION
+
+// ----------------------------------------------------------
+#define NQS_USE_VEC_ONLY					// use vector only? - if not, use the integer representation		
+#ifdef NQS_USE_VEC_ONLY
+	#define NQS_STATE this->curVec_			// current state
+	#define NQS_STATE_T Config_cr_t			// current state type 
 #else 
 	#define NQS_STATE this->curState_
 	#define NQS_STATE_T u64 
 #endif
 // ----------------------------------------------------------
+
+// REPRESENTATION
+
+// ----------------------------------------------------------
+#ifdef NQS_USE_ARMA
+#	define NQS_ROW_T arma::Row<_type>		// row type for weights etc representation
+#	define NQS_COL_T arma::Col<_type>		// column type for weights etc representation
+#else		
+#	define NQS_ROW_T std::vector<_type>		// row type for weights etc representation
+#	define NQS_COL_T std::vector<_type>		// column type for weights etc representation
+#endif
+// ----------------------------------------------------------
+
+// OPTIMIZATIONS
+
+// ----------------------------------------------------------
 #define NQS_USESR							// optimize the gradient descent with Stochastic Reconfiguration (SR)
-#define NQS_LOWER_RATIO_LOGDIFF 			// use the logarithm of the ratio of the probabilities
+#define NQS_LOWER_RATIO_LOGDIFF 			// use the logarithm of the ratio of the probabilities (instead of the ratio itself) for the lower states
 // --------------- STOCHASTIC RECONFIGURATION ---------------
 #ifdef NQS_USESR							// if we use the SR
 #	define NQS_USESR_NOMAT					// skip the matrix construction for the SR - use iterative solvers
-#	if defined NQS_USESR_NOMAT				// if we do not use the matrix
+#	ifdef NQS_USESR_NOMAT					// if we do not use the matrix
 #		define NQS_USESR_NOMAT_USED			
 # 	else
 #		define NQS_USESR_MAT_USED
@@ -62,34 +99,55 @@
 enum NQSTYPES					// #
 {								// #
 	RBM_T,						// #
-	RBMPP_T						// #
+	RBMPP_T,					// #
+	CONV_T						// #
 };								// #
 // #################################
 
 // ##########################################################################################################################################
-
 // all the types that are to be used in each NQS implementation
-#define NQS_PUBLIC_TYPES(_type, _stateType) public:	using NQSS = arma::Col<_stateType>;															\
-											using NQSB = arma::Col<_type>; 																		\
-											using NQSW = arma::Mat<_type>;			 															\
-											using Solver_t_p = std::shared_ptr<algebra::Solvers::General::Solver<_T, true>>;					\
-											using Precond_t_p = std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_T, true>>;	\
-											using int_ini_t = std::initializer_list<int>;														\
-											using dbl_ini_t = std::initializer_list<double>;									
+#ifdef NQS_USE_ARMA
+#	include <armadillo>
+#	define NQS_PUBLIC_TYPES(_type, _stateType) public:																\
+				using NQSS = arma::Col<_stateType>;																	\
+				using NQSB = arma::Col<_type>; 																		\
+				using NQSW = arma::Mat<_type>;			 															\
+				using Solver_t_p = std::shared_ptr<algebra::Solvers::General::Solver<_type, true>>;					\
+				using Precond_t_p = std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_type, true>>;\
+				using int_ini_t = std::initializer_list<int>;														\
+				using dbl_ini_t = std::initializer_list<double>;									
 											
-
-
+#elif defined NQS_USE_STDVEC
+#	define NQS_PUBLIC_TYPES(_type, _stateType) public:																							\	
+				using NQSS = std::vector<_stateType>;																\
+				using NQSB = std::vector<_type>; 																	\
+				using NQSW = std::vector<std::vector<_type>>;														\
+				using Solver_t_p = std::shared_ptr<algebra::Solvers::General::Solver<_type, false>>;					\
+				using Precond_t_p = std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_type, false>>;	\
+				using int_ini_t = std::initializer_list<int>;														\
+				using dbl_ini_t = std::initializer_list<double>;
+# else
+# 	define NQS_PUBLIC_TYPES 
+#endif
+// ##########################################################################################################################################
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
+// ##########################################################################################################################################
 
 //////////////////////////////////////////////////////////////////////////////////////////
-
-// Kernel for multithreading
+// Kernel for multithreading without OpenMP
 #ifdef NQS_NOT_OMP_MT
 	#include <functional>
 	#include <condition_variable>
 	#include <future>
+
 /**
-* @brief structure with condition variables for the NQS to perfom multithread operations
+* @brief A structure that encapsulates a condition variable kernel.
+* 
+* This structure is designed to manage synchronization between threads using
+* a condition variable and a mutex. It also includes atomic and non-atomic 
+* flags to control thread execution and a kernel value of a templated type.
+* 
+* @tparam _T The type of the kernel value.
 */
 template <typename _T>
 struct CondVarKernel
@@ -104,8 +162,6 @@ struct CondVarKernel
 #endif 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-// ##########################################################################################################################################
-
 #include <vector>
 #include <string>
 
@@ -118,22 +174,82 @@ struct CondVarKernel
 // #################################
 
 // #######################################################################################
-
+enum class NQS_init_st_t
+{
+	NO_INIT,			// no initialization
+	RANDOM,				// random initialization
+	FERRO,				// ferromagnetic initialization
+	ANTI_FERRO			// anti ferromagnetic initialization
+};
+//////////////////////////////////////////////////////////////////////////////////////////
+struct NQS_reg_t
+{
+	double reg_		= 1e-7;														// regularization for the covariance matrix
+	std::unique_ptr<MachineLearning::Parameters> p_;							// scheduler for the regularization
+	// getters
+	const double reg(size_t epoch, double _metric) const;	
+	// save
+	void save(const std::string& _dir, const std::string& _name, int i, const std::string& _namepar, bool _append) const;							
+	// default constructor
+	NQS_reg_t()		= default;
+	// copy constructor
+	NQS_reg_t(const NQS_reg_t& other);
+	// move constructor
+	NQS_reg_t(NQS_reg_t&& other) noexcept;
+	// copy assignment
+	NQS_reg_t& operator=(const NQS_reg_t& other);
+	// move assignment
+	NQS_reg_t& operator=(NQS_reg_t&& other) noexcept;
+};
+//////////////////////////////////////////////////////////////////////////////////////////
+struct NQS_scheduler_t
+{
+	double best_								=		0.0;					// best value of the metric
+	double lr_									=		1e-3;					// learning rate
+	std::unique_ptr<MachineLearning::Parameters> p_;							// scheduler for the learning rate
+	// setters
+	void set_early_stopping(size_t _pat, double _minDlt = 1e-3)					{ if (!this->p_) this->p_->set_early_stopping(_pat, _minDlt);	};
+	// getters
+	void lr_update(size_t epoch, double _metric)								{ this->lr_ = this->lr(epoch, _metric);							};
+	const double lr(size_t epoch, double _metric) const							{ return this->p_ ? (*this->p_)(epoch, _metric) : this->lr_;	};
+	const double best() const													{ return this->p_ ? this->p_->best() : this->best_;				};
+	const double best(double _currLoss)											{ if (this->p_) return this->p_->best(); this->best_ = _currLoss; return best_; };
+	template <typename _T> bool stop(size_t epoch, _T _metric);
+	// save
+	void save(const std::string& _dir, const std::string& _name, int i, const std::string& _namepar, bool _append) const;
+	// default constructor
+	NQS_scheduler_t()							=		default;
+	// copy constructor
+	NQS_scheduler_t(const NQS_scheduler_t& other);
+	// move constructor
+	NQS_scheduler_t(NQS_scheduler_t&& other) noexcept;
+	// copy assignment
+	NQS_scheduler_t& operator=(const NQS_scheduler_t& other);
+	// move assignment
+	NQS_scheduler_t& operator=(NQS_scheduler_t&& other) noexcept;
+};
+//////////////////////////////////////////////////////////////////////////////////////////
+struct NQS_solver_t
+{
+	int solver_		= 1;														// solver for the NQS with SR
+	int maxIter_	= 5000;														// maximum number of iterations
+	double tol_		= 1e-5;														// tolerance for iterative solvers
+	void set(int _s, int i, double _tol)										{ this->solver_ = _s; this->maxIter_ = i; this->tol_ = _tol; };
+	NQS_solver_t()	= default;
+};
+//////////////////////////////////////////////////////////////////////////////////////////
 struct NQS_info_t
 {
     using u64                       			=       uint64_t;
 
-    // simulation specific
-	std::unique_ptr<MachineLearning::Parameters> p_;							// scheduler for the learning rate
-
-	// regarding the iterative solvers
-	int solver_									=		1;						// solver for the NQS with SR
-	int maxIter_								= 		5000;					// maximum number of iterations
-	double tol_									=		1e-5;					// tolerance for iterative solvers
-	void setSolver(int _s, int i, double _tol)									{ this->solver_ = _s; this->maxIter_ = i; this->tol_ = _tol; };
-
-	// pseudoinverse
-	double pinv_ 								= 		-1;						// pseudoinverse for the NQS
+	// solver
+	NQS_solver_t solver_;														// solver for the NQS with SR
+	
+	// regularization for the matrix
+	NQS_reg_t reg_;																// regularization for the covariance matrix
+	
+	// scheduler
+	NQS_scheduler_t sched_;														// scheduler for the learning rate
 
     // architecture specific			
     uint nVis_									=		1;						// number of visible neurons (input variables)
@@ -145,25 +261,11 @@ struct NQS_info_t
     uint nParticles_							=		1;						// number of particles in the system (if applicable)
     bool conservesParticles_					=		true;					// whether the system conserves the number of particles
 
-	// training related
-	double lr_									=		1e-3;					// learning rate
-	double lr(size_t epoch, double _metric) const								{ return this->p_ ? (this->p_)->operator()(epoch, _metric) : this->lr_; 				};
-
 	// early stopping
-	void setEarlyStopping(size_t _pat, double _minDlt = 1e-3)					{ if (this->p_) this->p_->set_early_stopping(_pat, _minDlt); 							};	
-	template <typename _T> bool stop(size_t epoch, _T _metric);
-	double best() const															{ return this->p_ ? this->p_->best() : 0.0; };
-
-	// regularization related
-	std::unique_ptr<MachineLearning::Parameters> s_;							// regularization scheduler
-	double sreg_					=		1e-7;								// regularization for the covariance matrix
-	double sreg(size_t epoch, double _metric) const								{ return this->s_ ? (*this->s_)(epoch, _metric) : this->sreg_; };
 
 	// ---------------------------------------------------------------
-
-	NQS_info_t() 					= 		default;
-	~NQS_info_t();
-
+	NQS_info_t()								=		default;
+	~NQS_info_t()								=		default;
 	// ---------------------------------------------------------------
 
 	void saveInfo(const std::string& _dir, const std::string& _name, int i = 0) const;
@@ -179,10 +281,17 @@ struct NQS_info_t
     NQS_info_t& operator=(NQS_info_t&& other) noexcept;
 
 	// ---------------------------------------------------------------
+	const int solver() const 					{ return this->solver_.solver_; 		};
+	const double tol() const 					{ return this->solver_.tol_; 			};
+	const size_t maxIter() const 				{ return this->solver_.maxIter_;		};
+	// ---------------------------------------------------------------
+	const double reg() const 					{ return this->reg_.reg_; 				};
+	// ---------------------------------------------------------------
+	const double lr() const 					{ return this->sched_.lr_; 				};
+	const double best(double _currLoss) 		{ return this->sched_.best(_currLoss); 	};
+	const double best() const 					{ return this->sched_.best(); 			};
 };
-
 //////////////////////////////////////////////////////////////////////////////////////////
-
 template <typename _T = double>
 struct NQS_thread_t
 {
@@ -198,6 +307,94 @@ struct NQS_thread_t
 	NQS_thread_t()					=	default;
 	~NQS_thread_t()					{ this->threads_.clear(); };
 };
+//////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename _stateType = double, typename _type = double>
+struct NQS_deriv
+{
+	NQS_PUBLIC_TYPES(_type, _stateType);
+
+    // Member variables (fullSize is the number of parameters in the NQS, nBlocks is the number of consecutive observations)
+    NQSW derivatives;                  // Variational derivatives O_k 			(nBlocks x fullSize) 
+    NQS_ROW_T derivativesMean;         // Mean of the derivatives \bar O_k 		(fullSize)
+    NQS_COL_T energiesCentered;        // Centered energies (E_k - <E_k>) 		(nBlocks)
+    NQSW derivativesCentered;          // Centered derivatives (O_k - <O_k>) 	(nBlocks x fullSize)
+    NQSW derivativesCenteredH;         // Centered derivatives transposed 		(fullSize x nBlocks) 
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	~NQS_deriv() 						= default;
+    NQS_deriv(size_t fullSize = 1, size_t nBlocks = 1);
+	/////////////////////////////////////////////////////////////////////////////////////
+	NQS_deriv(const NQS_deriv& other) 
+		: derivatives(other.derivatives), derivativesMean(other.derivativesMean), energiesCentered(other.energiesCentered), 
+		derivativesCentered(other.derivativesCentered), derivativesCenteredH(other.derivativesCenteredH)
+	{ 
+		
+	}
+	/////////////////////////////////////////////////////////////////////////////////////
+	NQS_deriv(NQS_deriv&& other) noexcept
+		: derivatives(std::move(other.derivatives)), derivativesMean(std::move(other.derivativesMean)), 
+		energiesCentered(std::move(other.energiesCentered)), derivativesCentered(std::move(other.derivativesCentered)), 
+		derivativesCenteredH(std::move(other.derivativesCenteredH)) 
+	{ 
+
+	}
+	/////////////////////////////////////////////////////////////////////////////////////
+	// operators
+	NQS_deriv& operator=(const NQS_deriv& other)
+	{
+		if (this != &other)
+		{
+			this->derivatives          = other.derivatives;
+			this->derivativesMean      = other.derivativesMean;
+			this->energiesCentered     = other.energiesCentered;
+			this->derivativesCentered  = other.derivativesCentered;
+			this->derivativesCenteredH = other.derivativesCenteredH;
+		}
+		return *this;
+	}
+	NQS_deriv& operator=(NQS_deriv&& other) noexcept
+	{
+		if (this != &other)
+		{
+			this->derivatives          = std::move(other.derivatives);
+			this->derivativesMean      = std::move(other.derivativesMean);
+			this->energiesCentered     = std::move(other.energiesCentered);
+			this->derivativesCentered  = std::move(other.derivativesCentered);
+			this->derivativesCenteredH = std::move(other.derivativesCenteredH);
+		}
+		return *this;
+	}
+	/////////////////////////////////////////////////////////////////////////////////////
+    void reset(size_t fullSize, size_t nBlocks = 1);
+	/////////////////////////////////////////////////////////////////////////////////////
+	template <typename _CT> void set_centered(const _CT& _energies, _type _meanLoss, const _type _samples);
+	/////////////////////////////////////////////////////////////////////////////////////
+	NQSB getF() const;
+	/////////////////////////////////////////////////////////////////////////////////////
+	template <typename _CT> void finalF(const _CT& _energies, int _step, _type _meanLoss, const _type _samples);
+	/////////////////////////////////////////////////////////////////////////////////////
+	// SPECIFIC
+	/////////////////////////////////////////////////////////////////////////////////////
+#ifdef NQS_USE_ARMA
+	arma::subview_row<_type> row(size_t i) 				{ return this->derivatives.row(i); }
+	arma::subview_col<_type> col(size_t i) 				{ return this->derivatives.col(i); }
+	NQS_COL_T mean_t() 									{ return this->derivativesMean.t(); }
+	NQS_ROW_T mean() 									{ return this->derivativesMean; }
+	arma::subview_col<_type> colCentered(size_t i) 		{ return this->derivativesCentered.col(i); }
+	arma::subview_row<_type> rowCentered(size_t i) 		{ return this->derivativesCentered.row(i); }
+	arma::subview_col<_type> colCenteredH(size_t i) 	{ return this->derivativesCenteredH.col(i); }
+	arma::subview_row<_type> rowCenteredH(size_t i) 	{ return this->derivativesCenteredH.row(i); }
+#elif NQS_USE_STDVEC
+	_type& operator()(size_t i, size_t j) 				{ return this->derivatives[i][j]; }
+	const _type& operator()(size_t i, size_t j) const 	{ return this->derivatives[i][j]; }
+#else 
+#endif
+	/////////////////////////////////////////////////////////////////////////////////////
+	void printState() const;
+	/////////////////////////////////////////////////////////////////////////////////////
+};
+
 
 // ##########################################################################################################################################
 
@@ -241,3 +438,5 @@ struct AnsatzModifier
 					NQS_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS)
 
 // ##########################################################################################################################################
+
+#endif // !NQS_DEFINITIONS_H

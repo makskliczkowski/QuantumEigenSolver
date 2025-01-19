@@ -24,220 +24,6 @@
 #include <string>
 #include <string_view>
 
-// ##########################################################################################################################################
-
-/**
-* @brief Saves the NQS (Neural Quantum State) information to a specified file.
-* 
-* This function saves various parameters and histories related to the NQS to an HDF5 file.
-* The file can be appended to if it already exists.
-* 
-* @param _dir The directory where the file will be saved.
-* @param _name The name of the file to save the information to. Must end with ".h5".
-* @param i An integer used to index the parameters in the file.
-* 
-* The following information is saved:
-* - Pseudoinverse (if NQS_USESR_MAT_USED is defined)
-* - Regularization history
-* - Number of visible units
-* - Full size of the NQS
-* - Learning rates history
-*/
-void NQS_info_t::saveInfo(const std::string& _dir, const std::string& _name, int i) const
-{
-    if (_name.ends_with(".h5")) {
-        LOGINFO("Saving the NQS information to the file: " + _name, LOG_TYPES::INFO, 2);
-        const bool _append          = std::filesystem::exists(_dir + _name);
-        const std::string _namePar  = std::format("parameters/{}/", STR(i));
-
-        // Save pseudoinverse information
-#ifdef NQS_USESR_MAT_USED
-        saveAlgebraic(_dir, _name, arma::vec({ this->pinv_ }), _namePar + "pinv", _append);
-#else 
-        saveAlgebraic(_dir, _name, arma::vec({ 0.0 }), _namePar + "pinv", _append);
-#endif
-
-        // Save regularization history
-        saveAlgebraic(_dir, _name, arma::vec(this->s_ ? this->s_->hist() : v_1d<double>({ this->sreg_ })), _namePar + "regularization", true);
-
-        // Save the number of visible units
-        saveAlgebraic(_dir, _name, arma::vec({ double(this->nVis_) }), _namePar + "visible_units", true);
-
-        // Save the full size of the NQS
-        saveAlgebraic(_dir, _name, arma::vec({ double(this->fullSize_) }), _namePar + "full_size", true);
-
-        // Save learning rates history
-        saveAlgebraic(_dir, _name, arma::vec(this->p_ ? this->p_->hist() : v_1d<double>({ this->lr_ })), _namePar + "learning_rate_history", true);
-    }
-}
-
-// ##########################################################################################################################################
-
-/**
-* @brief Copy constructor for NQS_info_t.
-*
-* This constructor creates a new instance of NQS_info_t by copying the data
-* from another instance.
-*
-* @param other The instance of NQS_info_t to copy from.
-*/
-NQS_info_t::NQS_info_t(const NQS_info_t& other)
-        : solver_(other.solver_),
-        maxIter_(other.maxIter_),
-        tol_(other.tol_),
-        pinv_(other.pinv_),
-        nVis_(other.nVis_),
-        nSites_(other.nSites_),
-        fullSize_(other.fullSize_),
-        Nh_(other.Nh_),
-        nParticles_(other.nParticles_),
-        conservesParticles_(other.conservesParticles_),
-        lr_(other.lr_),
-        sreg_(other.sreg_)
-{
-    if (other.p_) p_ = other.p_->clone();
-    if (other.s_) s_ = other.s_->clone();
-}
-
-/**
-* @brief Move constructor for NQS_info_t.
-*
-* This constructor initializes an NQS_info_t object by moving data from another NQS_info_t object.
-* It uses std::exchange to transfer ownership of resources and reset the original object's members.
-*
-* @param other The NQS_info_t object to move from.
-*/
-NQS_info_t::NQS_info_t(NQS_info_t&& other) noexcept
-        : p_(std::move(other.p_)),
-        solver_(std::exchange(other.solver_, 1)),
-        maxIter_(std::exchange(other.maxIter_, 5000)),
-        tol_(std::exchange(other.tol_, 1e-5)),
-        pinv_(std::exchange(other.pinv_, -1)),
-        nVis_(std::exchange(other.nVis_, 1)),
-        nSites_(std::exchange(other.nSites_, 1)),
-        fullSize_(std::exchange(other.fullSize_, 1)),
-        Nh_(std::exchange(other.Nh_, 1)),
-        nParticles_(std::exchange(other.nParticles_, 1)),
-        conservesParticles_(std::exchange(other.conservesParticles_, true)),
-        lr_(std::exchange(other.lr_, 1e-3)),
-        s_(std::move(other.s_)),
-        sreg_(std::exchange(other.sreg_, -1))
-{
-
-}
-
-/**
-* @brief Assignment operator for NQS_info_t.
-*
-* This operator performs a deep copy of the given NQS_info_t object into the current object.
-* It checks for self-assignment and then copies each member variable from the source object.
-* If the source object contains pointers to schedulers, it clones these schedulers to ensure
-* that the current object has its own copies.
-*
-* @param other The NQS_info_t object to be copied.
-* @return A reference to the current NQS_info_t object.
-*/
-NQS_info_t& NQS_info_t::operator=(const NQS_info_t& other) 
-{
-    if (this != &other) 
-    {
-        solver_             = other.solver_;
-        maxIter_            = other.maxIter_;
-        tol_                = other.tol_;
-        pinv_               = other.pinv_;
-        nVis_               = other.nVis_;
-        nSites_             = other.nSites_;
-        fullSize_           = other.fullSize_;
-        Nh_                 = other.Nh_;
-        nParticles_         = other.nParticles_;
-        conservesParticles_ = other.conservesParticles_;
-        lr_                 = other.lr_;
-        sreg_               = other.sreg_;
-
-        // clone the scheduler
-        if (other.p_)
-            p_ = other.p_->clone();
-        else
-            p_.reset();
-        
-        // clone the scheduler
-        if (other.s_)
-            s_ = other.s_->clone();
-        else
-            s_.reset();
-    }
-    return *this;
-}
-
-/**
-* @brief Move assignment operator for NQS_info_t.
-*
-* This operator moves the contents of another NQS_info_t object to this object.
-* It uses std::exchange to transfer the values of the member variables from the
-* source object to the destination object, ensuring that the source object is left
-* in a valid but unspecified state.
-*
-* @param other The NQS_info_t object to move from.
-* @return A reference to this NQS_info_t object.
-*/
-NQS_info_t& NQS_info_t::operator=(NQS_info_t&& other) noexcept
-{
-    if (this != &other) 
-    {
-        p_ = std::move(other.p_);
-        solver_ = std::exchange(other.solver_, 1);
-        maxIter_ = std::exchange(other.maxIter_, 5000);
-        tol_ = std::exchange(other.tol_, 1e-5);
-        pinv_ = std::exchange(other.pinv_, -1);
-        nVis_ = std::exchange(other.nVis_, 1);
-        nSites_ = std::exchange(other.nSites_, 1);
-        fullSize_ = std::exchange(other.fullSize_, 1);
-        Nh_ = std::exchange(other.Nh_, 1);
-        nParticles_ = std::exchange(other.nParticles_, 1);
-        conservesParticles_ = std::exchange(other.conservesParticles_, true);
-        lr_ = std::exchange(other.lr_, 1e-3);
-        s_ = std::move(other.s_);
-        sreg_ = std::exchange(other.sreg_, 1e-7);
-    }
-    return *this;
-}
-
-// ##########################################################################################################################################
-
-/**
-* @brief Determines whether the training process should stop based on the given epoch and metric.
-* 
-* @tparam _T The type of the metric.
-* @param epoch The current epoch of the training process.
-* @param _metric The metric value used to decide whether to stop the training.
-* @return true if the training process should stop, false otherwise.
-*/
-template <typename _T>
-bool NQS_info_t::stop(size_t epoch, _T _metric)
-{
-	if (this->p_)
-        return this->p_->stop(epoch, algebra::real(_metric)); 
-    return false;
-}
-// template instantiation of the function above
-template bool NQS_info_t::stop(size_t, double);
-template bool NQS_info_t::stop(size_t, cpx);
-
-// ##########################################################################################################################################
-
-/**
-* @brief Destructor for the NQS_info_t class.
-*
-* This destructor is responsible for cleaning up the dynamically allocated
-* memory for the pointers p_ and s_. If these pointers are not null, they
-* will be deleted and set to nullptr to prevent dangling pointers.
-*/
-NQS_info_t::~NQS_info_t()
-{
-}       
-
-// ##########################################################################################################################################
-
 //! specialize the NQS class for all the types <HAMILTONIAN, NQS PARAMS, STATE VALUES>
 
 // 1) all real types - double up to 4 spin modes
@@ -274,11 +60,82 @@ template class NQS<4u, double, cpx, double>;
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::reset(size_t _n)
 {
-    this->derivativesReset(_n); 				// reset the derivatives
+    this->derivatives_.reset(this->info_p_.fullSize_, _n);
 	this->lower_states_.setDerivContSize(_n);	// set the size of the containers for the lower states
 }
 // template instantiation of the function above
 NQS_INST_CMB_ALL(reset, void, (size_t));
+
+// ##########################################################################################################################################
+
+/**
+* @brief Sets the state of the Neural Quantum State (NQS) based on the initialization type.
+* 
+* @tparam _spinModes Number of spin modes.
+* @tparam _Ht Hamiltonian type.
+* @tparam _T Data type.
+* @tparam _stateType State type.
+* @param _st Initialization state type.
+* 
+* This function sets the state of the NQS object based on the provided initialization state type.
+* The possible initialization states are:
+* - RANDOM: Sets the state to a random configuration.
+* - NO_INIT: Does not initialize the state.
+* - FERRO: Sets the state to a ferromagnetic configuration if the appropriate preprocessor directives are defined.
+* - ANTI_FERRO: Sets the state to an antiferromagnetic configuration if the appropriate preprocessor directives are defined.
+* 
+* If the initialization state type is not recognized, the state is set to a random configuration.
+*/
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+void  NQS<_spinModes, _Ht, _T, _stateType>::setState(NQS_init_st_t _st)
+{
+    switch (_st)
+    {
+    case NQS_init_st_t::RANDOM:
+        return this->setRandomState();
+        break;
+    case NQS_init_st_t::NO_INIT:
+        break;
+    case NQS_init_st_t::FERRO:
+    {
+#ifdef NQS_USE_ARMA
+#   ifdef SPIN
+#       ifdef NQS_USE_VEC_ONLY
+        this->curVec_ = arma::ones<Config_t>(this->info_p_.nVis_) * Operators::_SPIN;
+#       else
+        // !TODO
+#       endif
+#   else
+    // !TODO
+#   endif 
+#else
+#endif
+        break;
+    }
+    case NQS_init_st_t::ANTI_FERRO:
+    {
+#ifdef NQS_USE_ARMA
+#   ifdef SPIN
+#       ifdef NQS_USE_VEC_ONLY
+        this->curVec_ = arma::ones<Config_t>(this->info_p_.nVis_) * Operators::_SPIN;
+        this->curVec_(arma::span(1, this->info_p_.nVis_ - 1)) *= -1;
+#       else
+        // !TODO 
+#       endif
+#   else
+    // !TODO
+#   endif
+#else
+#endif
+        break;
+    }
+    default:
+        return this->setRandomState(true);
+    } 
+    this->setState(this->curVec_, true);
+}
+// template instantiation of the function above
+NQS_INST_CMB_ALL(setState, void, (NQS_init_st_t));
 
 // ##########################################################################################################################################
 
@@ -300,9 +157,6 @@ template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 void NQS<_spinModes, _Ht, _T, _stateType>::swapConfig(NQS<_spinModes, _Ht, _T, _stateType>::MC_t_p _other)
 {
     auto _st_other = _other->getLastConfig();           // get the last configuration of the other solver
-    // swap the weights
-    
-
     _other->setConfig(NQS_STATE);                       // swap the configurations
     this->setConfig(_st_other);                         // swap the configurations
 }
@@ -324,33 +178,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::swapWeights(NQS<_spinModes, _Ht, _T, 
 {
     // pass
 }
-
-// ##########################################################################################################################################
-
-/**
-* @brief Resets the derivatives for the Neural Quantum State (NQS) object.
-*
-* This function initializes the derivatives, centered derivatives, and 
-* centered Hamiltonian derivatives to zero matrices with the specified 
-* number of blocks.
-*
-* @tparam _spinModes The number of spin modes.
-* @tparam _Ht The Hamiltonian type.
-* @tparam _T The data type used for calculations.
-* @tparam _stateType The type of the state.
-* @param nBlocks The number of blocks to initialize the derivatives with.
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-void NQS<_spinModes, _Ht, _T, _stateType>::derivativesReset(size_t nBlocks)
-{
-    if (nBlocks != this->derivatives_.n_rows)
-    {
-        this->derivatives_          = NQSW(nBlocks, this->info_p_.fullSize_, arma::fill::zeros);
-        this->derivativesCentered_  = this->derivatives_; 
-        this->derivativesCenteredH_ = this->derivatives_.t();  
-    }
-}
-NQS_INST_CMB_ALL(derivativesReset, void, (size_t));
 
 // ##########################################################################################################################################
 
@@ -391,7 +218,7 @@ this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { ret
 #else
 	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
 #endif
-	this->info_p_.lr_			= 			_n.info_p_.lr_;                // set the learning rate
+    // no assignment needed as lr_ does not exist in NQS_info_t
 
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
@@ -406,9 +233,6 @@ this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { ret
     this->info_p_  				=           _n.info_p_;
     // copy the weights
     this->derivatives_ 			=           _n.derivatives_;
-    this->derivativesMean_ 		=           _n.derivativesMean_;
-    this->derivativesCentered_ 	=           _n.derivativesCentered_;
-    this->derivativesCenteredH_ =           _n.derivativesCenteredH_;
     this->dF_ 					=           _n.dF_;
     this->F_ 					=           _n.F_;
     this->Weights_ 				=           _n.Weights_;
@@ -426,16 +250,6 @@ this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { ret
         if (_n.precond_ != nullptr) 
         {
             this->precond_ = _n.precond_->clone();
-        }
-        // reset the sreg scheduler
-        if (_n.info_p_.s_ != nullptr) 
-        {
-            this->info_p_.s_ = _n.info_p_.s_->clone();
-        }
-        // reset the scheduler
-        if (_n.info_p_.p_ != nullptr) 
-        {
-            this->info_p_.p_ = _n.info_p_.p_->clone();
         }
     }
 }
@@ -466,18 +280,12 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&&
     this->accepted_             = _n.accepted_;
     this->total_ 				= _n.total_;
     this->info_ 				= _n.info_;
-    // initialize the information
-    this->info_p_ 				= std::move(_n.info_p_);
     // copy the weights
     this->derivatives_ 			= std::move(_n.derivatives_);
-    this->derivativesMean_ 		= std::move(_n.derivativesMean_);
-    this->derivativesCentered_ 	= std::move(_n.derivativesCentered_);
-    this->derivativesCenteredH_ = std::move(_n.derivativesCenteredH_);
     this->dF_ 					= std::move(_n.dF_);
     this->F_ 					= std::move(_n.F_);
     this->Weights_ 				= std::move(_n.Weights_);
     // setup the functions as in the constructor
-    const int _Ns               = _n.info_p_.nSites_;                 // get the number of sites
     this->pRatioFunc_			= [this](const Config_t& _v)         { return this->pRatio(_v); };
     this->pKernelFunc_			= [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
     this->logPKernelFunc_		= [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
@@ -491,18 +299,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&&
 #else
     this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
 #endif
-    this->info_p_.lr_			= _n.info_p_.lr_;                // set the learning rate
-
-    // set the number of particles
-    // set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
-    this->info_p_.nVis_ 		= static_cast<uint>(_Ns * (this->spinModes_ / 2));
-    this->info_p_.nSites_		= static_cast<uint>(_Ns);
-
-    // make it half filling if necessary
-    this->info_p_.nParticles_	= (_n.info_p_.nParticles_ < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_n.info_p_.nParticles_;
-    this->info_p_.Nh_			= this->H_->getHilbertSize();     // check the Hilbert space
-
-    // this->init();
 #ifdef NQS_NOT_OMP_MT
     this->initThreads(_n.threads_.threadNum_);
 #endif
@@ -517,16 +313,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>&&
         if (_n.precond_ != nullptr) 
         {
             this->precond_ = _n.precond_->move();
-        }
-        // reset the sreg scheduler
-        if (_n.info_p_.s_ != nullptr) 
-        {
-            this->info_p_.s_ = _n.info_p_.s_->clone();
-        }
-        // reset the scheduler
-        if (_n.info_p_.p_ != nullptr) 
-        {
-            this->info_p_.p_ = _n.info_p_.p_->clone();
         }
     }
 }
@@ -575,18 +361,10 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
         this->info_                 = _n.info_;
         this->lower_states_         = _n.lower_states_;
         this->derivatives_          = _n.derivatives_;
-        this->derivativesMean_      = _n.derivativesMean_;
-        this->derivativesCentered_  = _n.derivativesCentered_;
-        this->derivativesCenteredH_ = _n.derivativesCenteredH_;
         this->dF_                   = _n.dF_;
         this->F_                    = _n.F_;
         this->Weights_              = _n.Weights_;
         // setup the functions as in the constructor
-        this->info_p_.lr_           = _n.info_p_.lr_;
-        this->info_p_.nVis_         = _n.info_p_.nVis_;
-        this->info_p_.nSites_       = _n.info_p_.nSites_;
-        this->info_p_.nParticles_   = _n.info_p_.nParticles_;
-        this->info_p_.Nh_           = _n.info_p_.Nh_;
         this->pRatioFunc_           = [this](const Config_t& _v)         { return this->pRatio(_v); };
         this->pKernelFunc_          = [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
         this->logPKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
@@ -610,16 +388,6 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
             if (_n.precond_ != nullptr) 
             {
                 this->precond_ = _n.precond_->clone();
-            }
-            // reset the sreg scheduler
-            if (_n.info_p_.s_ != nullptr) 
-            {
-                this->info_p_.s_ = _n.info_p_.s_->clone();
-            }
-            // reset the scheduler
-            if (_n.info_p_.p_ != nullptr) 
-            {
-                this->info_p_.p_ = _n.info_p_.p_->clone();
             }
         }
     }
@@ -679,17 +447,9 @@ void NQS<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
             this->info_                 = _n->info_;
             this->lower_states_         = _n->lower_states_;
             this->derivatives_          = _n->derivatives_;
-            this->derivativesMean_      = _n->derivativesMean_;
-            this->derivativesCentered_  = _n->derivativesCentered_;
-            this->derivativesCenteredH_ = _n->derivativesCenteredH_;
             this->dF_                   = _n->dF_;
             this->F_                    = _n->F_;
             this->Weights_              = _n->Weights_;
-            this->info_p_.lr_           = _n->info_p_.lr_;
-            this->info_p_.nVis_         = _n->info_p_.nVis_;
-            this->info_p_.nSites_       = _n->info_p_.nSites_;
-            this->info_p_.nParticles_   = _n->info_p_.nParticles_;
-            this->info_p_.Nh_           = _n->info_p_.Nh_;
             this->pRatioFunc_           = [this](const Config_t& _v)         { return this->pRatio(_v); };
             this->pKernelFunc_          = [this](int_ini_t fP, dbl_ini_t fV) { return this->pRatio(fP, fV); };
             this->logPKernelFunc_       = [this](int_ini_t fP, dbl_ini_t fV) { return this->logPRatio(fP, fV); };
@@ -713,16 +473,6 @@ void NQS<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
                 if (_n->precond_ != nullptr) 
                 {
                     this->precond_ = _n->precond_->clone();
-                }
-                // reset the sreg scheduler
-                if (_n->info_p_.s_ != nullptr) 
-                {
-                    this->info_p_.s_ = _n->info_p_.s_->clone();
-                }
-                // reset the scheduler
-                if (_n->info_p_.p_ != nullptr) 
-                {
-                    this->info_p_.p_ = _n->info_p_.p_->clone();
                 }
             }
         }
@@ -760,50 +510,24 @@ NQS<_spinModes, _Ht, _T, _stateType>& NQS<_spinModes, _Ht, _T, _stateType>::oper
 {
     if (this != &_n) 
     {
-        // reset the current object
-        this->H_ 					= _n.H_;
-        _n.H_ 						= 0;
-
-        // copy the information
+        // move the information
+        this->H_ 					= std::move(_n.H_);
         this->nFlip_ 				= _n.nFlip_;
-        this->flipPlaces_ 			= _n.flipPlaces_;
-        this->flipVals_ 			= _n.flipVals_;
-        // initialize the information
+        this->flipPlaces_ 			= std::move(_n.flipPlaces_);
+        this->flipVals_ 			= std::move(_n.flipVals_);
         this->info_p_ 				= std::move(_n.info_p_);
         this->lower_states_ 		= std::move(_n.lower_states_);
-        // copy the weights
         this->derivatives_ 			= std::move(_n.derivatives_);
-        this->derivativesMean_ 		= std::move(_n.derivativesMean_);
-        this->derivativesCentered_ 	= std::move(_n.derivativesCentered_);
-        this->derivativesCenteredH_ = std::move(_n.derivativesCenteredH_);
         this->dF_ 					= std::move(_n.dF_);
         this->F_ 					= std::move(_n.F_);
         this->Weights_ 				= std::move(_n.Weights_);
-        // this->init();
 #ifdef NQS_NOT_OMP_MT
         this->initThreads(_n.threads_.threadNum_);
 #endif
         {
-            // reset the solver and preconditioner
-            if (_n.solver_ != nullptr) 
-            {
-                this->solver_ = _n.solver_->move();
-            }
-            // reset the preconditioner
-            if (_n.precond_ != nullptr) 
-            {
-                this->precond_ = _n.precond_->move();
-            }
-            // reset the sreg scheduler
-            if (_n.info_p_.s_ != nullptr) 
-            {
-                this->info_p_.s_ = _n.info_p_.s_->clone();
-            }
-            // reset the scheduler
-            if (_n.info_p_.p_ != nullptr) 
-            {
-                this->info_p_.p_ = _n.info_p_.p_->clone();
-            }
+            // move the solver and preconditioner
+            this->solver_ = std::move(_n.solver_);
+            this->precond_ = std::move(_n.precond_);
         }
     }
     return *this;
@@ -866,8 +590,6 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 #else
 	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
 #endif
-	this->info_p_.lr_			= 			_lr;
-
 	// set the number of particles
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
     this->info_p_.nVis_ 		= 			static_cast<uint>(_Ns * (this->spinModes_ / 2));

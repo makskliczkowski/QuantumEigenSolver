@@ -587,7 +587,11 @@ void UI::nqsExcited()
 
 			// get the best solver
 			if (_best_idx > 0)
-				_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(_pt->getBestSolver());	
+			{
+				auto bestSolver = _pt->getBestSolver();
+				if (bestSolver)
+					_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(bestSolver);
+			}
 			
 		}
 		else {

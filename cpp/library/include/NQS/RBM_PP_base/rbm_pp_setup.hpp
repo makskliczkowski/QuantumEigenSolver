@@ -145,7 +145,7 @@ inline void RBM_PP<_spinModes, _Ht, _T, _stateType>::setInfo()
 					VEQV(nh, this->nHid_), 
 					VEQV(npp, this->nPP_),
 					VEQV(nS, this->spinModes_),
-					VEQVS(lr, this->info_p_.lr_));
+					VEQVS(lr, this->info_p_.lr()));
 }
 
 // ##########################################################################################################################################

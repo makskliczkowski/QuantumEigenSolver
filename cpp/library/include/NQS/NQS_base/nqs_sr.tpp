@@ -35,8 +35,8 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setScheduler(int _sch, double 
 {
 	if (_sch >= 0)
 	{
-		auto _raw			= MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat);
-		this->info_p_.p_ 	= _raw->move(); 	
+		auto _raw					= MachineLearning::Schedulers::get_scheduler(_sch, _lr, _epo, _lrd, _pat);
+		this->info_p_.sched_.p_ 	= _raw->move(); 	
 		LOGINFO(std::format("Scheduler set: type={}, lr={}, decay={}, epochs={}, patience={}", 
 				_sch, _lr, _lrd, _epo, _pat), LOG_TYPES::INFO, 2);
 	}
@@ -53,7 +53,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, 
 {
 	if (_pat > 0)
 	{ 
-		this->info_p_.setEarlyStopping(_pat, _minDlt); 
+		this->info_p_.sched_.set_early_stopping(_pat, _minDlt); 
 		LOGINFO("Early stopping set with patience: " + STR(_pat) + ", minimum delta: " + VEQPS(_minDlt, 3), LOG_TYPES::CHOICE, 3);
 	}
 }
@@ -70,15 +70,15 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setEarlyStopping(size_t _pat, 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, double _sreg, double _sregd, size_t _epo, size_t _pat)
 {
-	this->info_p_.sreg_ 	= _sreg; 
+	this->info_p_.reg_.reg_ 		= _sreg; 
 	if (_sreg > 0) 
 	{ 
 		LOGINFO("Regularization set with initial factor: " + VEQPS(_sreg, 3) + ", scheduler type: " + STR(_sch) + 
 				", decay: " + VEQPS(_sregd, 3) + ", epochs: " + STR(_epo) + ", patience: " + STR(_pat), LOG_TYPES::CHOICE, 3); 
 		
 		// set the new scheduler
-		auto _raw 			= MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat);
-		this->info_p_.s_ 	= _raw->move();
+		auto _raw 					= MachineLearning::Schedulers::get_scheduler(_sch, _sreg, _epo, _sregd, _pat);
+		this->info_p_.sched_.p_ 	= _raw->move();
 	}
 }
 
@@ -92,7 +92,7 @@ inline void NQS<_spinModes, _Ht, _T, _stateType>::setSregScheduler(int _sch, dou
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 inline void NQS<_spinModes, _Ht, _T, _stateType>::covMatrixReg(int step, _T _currLoss)
 {
-	this->info_p_.sreg_ = this->info_p_.sreg(step, algebra::real(_currLoss));
+	this->info_p_.reg_.reg_ = this->info_p_.reg_.reg(step, algebra::real(_currLoss));
 #ifndef NQS_USESR_NOMAT_USED
 	this->S_.diag() += this->info_p_.sreg_ / (step + 1);
 #endif

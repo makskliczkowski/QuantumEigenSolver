@@ -7,22 +7,17 @@
 * The class supports multiple spin modes and Hamiltonians, 
 * and is designed for efficient sampling and optimization using Monte Carlo-based methods.
 * 
-* @date December 2024
-* @version 1.1
+* @date January 2025
+* @version 1.12
 * @note This code is under constant development.
 * @author Maksymilian Kliczkowski
 * @institution WUST, Poland
 ***************************************/
-#include "../nqs_operator.h"
-#include "../../algebra/general_operator.h"
-#include "armadillo"
-#include <cstddef>
-#include <functional>
-#include <memory>
 #ifndef NQS_H
 #define NQS_H
 
 // include all the definions
+#include "../nqs_operator.h"
 #include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
 
@@ -70,13 +65,17 @@ template <uint _spinModes,
 class NQS : public MonteCarlo::MonteCarloSolver<_T, _stateType, arma::Col<_stateType>>
 {	
 public:
+	// **********************************************************************************************************************************
 	NQS_PUBLIC_TYPES(_T, _stateType);									// type definitions 
 	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
+	// **********************************************************************************************************************************
 	using Hamil_t 						= Hamiltonian<_Ht, _spinModes>;	// Hamiltonian type
 	using Hamil_t_p 					= std::shared_ptr<Hamil_t>;		// shared pointer to the Hamiltonian type
 	using Hilbert_t 					= Hilbert::HilbertSpace<_Ht, _spinModes>;		
 	using Hilbert_cr_t 					= const Hilbert_t&;				// constant reference to the Hilbert space type
+	// **********************************************************************************************************************************
 	using NQSLS_p 						= typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	// **********************************************************************************************************************************
 	using NQS_evo_f_t 					= std::function<NQSB(double, double, const NQSB&)>;			// function for the evolution - returns the new state
 	using NQS_evo_fr_t 					= std::function<void(double, double, const NQSB&, NQSB*)>;	// instead of the return value, the function modifies the input
 	// **********************************************************************************************************************************
@@ -84,12 +83,13 @@ public:
 	NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
 	// **********************************************************************************************************************************
 protected:
-	const double discVal_				=		Operators::_SPIN_RBM;   // discrete value for the numbers in vector representation
+	const double discVal_				=		Operators::_SPIN;   	// discrete value for the numbers in vector representation
 	const uint spinModes_				=		_spinModes;				// number of spin modes -> e.g. 2 for hardcore bosons, 4 for fermions
 	bool updateWeights_ 				= 		true;					// shall update the weights in current step? (default is true)
 	Container_t E_;														// container for the energies (during the training or the sampling)
+	// **********************************************************************************************************************************
 	Hamil_t_p H_;														// pointer to the Hamiltonian instance (for the energy calculation)
-
+	// **********************************************************************************************************************************
 protected:																// ---------------------- T H R E A D I N G ---------------------
 #ifdef NQS_NOT_OMP_MT
 	bool initThreads(uint _threadNum = 0);
@@ -97,33 +97,29 @@ protected:																// ---------------------- T H R E A D I N G ----------
 #endif
 
 protected:																// ----------------------- T R A I N I N G ----------------------
+	// **********************************************************************************************************************************
 	uint nFlip_							=		1;						// number of flips to be done in one step (each flip is a change in the state)
 	v_1d<uint> flipPlaces_;												// stores flip spots to be flipped during one sampling step
 	v_1d<_stateType> flipVals_;											// stores values before (!!!) the flip to be used for the gradients
-	
+	// **********************************************************************************************************************************
 	Config_t curVec_;													// currently processed state vector for convenience
 	u64 curState_						=		0;						// currently processed state - may or may not be used
-	
+	// **********************************************************************************************************************************
 	v_1d<Config_t> tmpVecs_;											// temporary vectors for the flips
 	Config_t tmpVec_;													// temporary vector for the flips (for the current state)
 	u64 tmpState_						=		0;						// temporary state for the flips
-	
+	// **********************************************************************************************************************************
 	// ------------------------ W E I G H T S -----------------------
-	NQSW derivatives_;													// store the variational derivatives F_k (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	NQS_ROW_T derivativesMean_;											// store the mean of the derivatives (F_k) - for the SR (fullSize)
-	NQS_COL_T energiesCentered_;										// store the centered energies (E_k - <E_k>) - for the SR (nBlocks)
-	NQSW derivativesCentered_;											// store the centered derivatives (F_k - <F_k>) - for the SR (nBlocks x fullSize), where nBlocks is the number of consecutive observations
-	NQSW derivativesCenteredH_;											// store the centered derivatives (F_k - <F_k>) - for the SR (fullSize x nBlocks), where nBlocks is the number of consecutive observations	
-	void derivativesReset(size_t nBlocks = 1);							// reset the derivatives (F_k) - for the SR		
+	NQS_deriv<_stateType, _T> derivatives_;								// derivatives of the NQS (contains the gradients and the parameters)
 #ifdef NQS_USESR_MAT_USED
 	NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
 #else 
 	Precond_t_p precond_ 				= 		nullptr;				// preconditioner for the conjugate gradient
 	Solver_t_p solver_ 					= 		nullptr;				// solver for the Fisher matrix inversion
-#endif
 public:
 	void setSolver(int _s, double _t, int _mi = 1000, double _r = -1.0);// solving method with the tolerance						
 	void setPreconditioner(int _pre);									// set the preconditioner						
+#endif
 protected:
 	NQSB Weights_;														// weights of the NQS - column of all the weights
 	NQSB dF_;															// forces acting on the weights (F_k) - final gradient (dF) - used to update the weights
@@ -131,17 +127,20 @@ protected:
 protected:																// ----------------------- S T A R T E R S ----------------------
 	virtual void allocate();											// allocate the memory for the NQS (e.g., vectors, matrices, etc.)
 public:																	// ------------------------ S E T T E R S -----------------------
+	// **********************************************************************************************************************************
+	virtual void setState(NQS_init_st_t _st = NQS_init_st_t::RANDOM);	// set the state of the NQS
 	virtual void setState(Config_cr_t _st, bool _set)	=		0;		// column vector state
 	virtual void setState(Config_cr_t _st);								// column vector state (set the current state)
-	virtual void setState(u64 _st, bool _set)				=		0; 	// set the state (integer)
+	virtual void setState(u64 _st, bool _set)			=		0; 		// set the state (integer)
 	virtual void setState(u64 _st);
+	// **********************************************************************************************************************************
 protected:																// -------------------------- F L I P S --------------------------
 	virtual void chooseRandomFlips()					=			0;	// important for the flipPlaces_ and flipVals_ to be set! - choose random flips
 	virtual void applyFlipsT()							=			0;	// apply flips to the temporary vector (tmpVec_)
 	virtual void applyFlipsC()							=			0;	// apply flips to the current vector (curVec_)	
 	virtual void unapplyFlipsT()						{ this->applyFlipsT(); }; // unapply flips of the temporary vector according the template 
 	virtual void unapplyFlipsC()						{ this->applyFlipsC(); }; // unapply flips of the current vector according the template
-
+	// **********************************************************************************************************************************
 public:
 	virtual void setRandomFlipNum(uint _nFlips) 		override	{};	// set the number of flips to be done
 
