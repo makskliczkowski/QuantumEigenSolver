@@ -15,14 +15,24 @@
 template <  typename _Ht, typename _T, class _stateType>
 class NQS_S<4, _Ht, _T, _stateType> : public NQS<4, _Ht, _T, _stateType>
 {
-	NQS_PUBLIC_TYPES(_T, _stateType);
+	// **********************************************************************************************************************************
 	MCS_PUBLIC_TYPES(_T, _stateType, MCS_CONTAINER);				// type definitions for the Monte Carlo solver
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	NQS_HAMIL_TYPES(_Ht, 4);										// type definitions for the Hamiltonian
 	using NQSLS_p =	typename NQS<4, _Ht, _T, _stateType>::NQSLS_p;
+	// **********************************************************************************************************************************
 public:
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht, 4>>& _H, double _lr, uint _threadNum, int _nParticles, 
-									const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
-		: NQS<4, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nParticles, _lower, _beta) {};
-	
+	NQS_S(const NQS_Const_par_t<4, _Ht, _T, _stateType>& _p)
+		: NQS<4, _Ht, _T, _stateType>(_p) 
+	{ 
+		this->init();
+	};
+	NQS_S(const NQS_Const_par_t<4, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+		: NQS<4, _Ht, _T, _stateType>(_p, _lower, _beta) 
+	{ 
+		this->init(); 
+	};
+	// **********************************************************************************************************************************
 protected:
 	// --------------------------- F L I P S ---------------------------
 	virtual void chooseRandomFlips() override;

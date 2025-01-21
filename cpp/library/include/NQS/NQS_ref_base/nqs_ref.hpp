@@ -36,6 +36,7 @@ class NQS_ref : public _CorrState
     // **********************************************************************************************************************
     NQS_PUBLIC_TYPES(_T, _stateType);
     MCS_PUBLIC_TYPES(_T, _stateType, arma::Col);                                // type definitions for the Monte Carlo solver
+    NQS_HAMIL_TYPES(_Ht, _spinModes);                                           // type definitions for the Hamiltonian
     using NQSLS_p = typename NQS_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
     // **********************************************************************************************************************
 public:
@@ -43,6 +44,18 @@ public:
     virtual auto clone(MC_t_p _n)           -> void override;
     // **********************************************************************************************************************
     virtual ~NQS_ref()                      { DESTRUCTOR_CALL; };
+    // **********************************************************************************************************************
+    NQS_ref(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
+        : _CorrState(_p)                    { this->setInfo(); };
+    // **********************************************************************************************************************
+    NQS_ref(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const v_1d<double>& _beta)
+        : _CorrState(_p, _lower, _beta)     { this->setInfo(); };
+    // **********************************************************************************************************************
+    NQS_ref(const NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>& _n)
+        : _CorrState(_n)                    { };
+    // **********************************************************************************************************************
+    NQS_ref(NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>&& _other)
+        : _CorrState(std::move(_other))     { };
     // **********************************************************************************************************************
 };
 

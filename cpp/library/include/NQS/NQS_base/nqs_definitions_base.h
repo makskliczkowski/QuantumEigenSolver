@@ -300,6 +300,20 @@ struct NQS_info_t
 
 	// ---------------------------------------------------------------
 
+	NQS_info_t(	int _nVis,
+				int _nSites,
+				int _nParticles,
+				size_t _Nh)
+		: nVis_(_nVis), nSites_(_nSites), 
+		nSitesSquared_(static_cast<size_t>(_nSites) * static_cast<size_t>(_nSites)),
+		Nh_(_Nh), nParticles_(_nParticles),  
+		nParticlesSquared_(static_cast<size_t>(_nParticles) * static_cast<size_t>(_nParticles))
+	{
+
+	}
+
+	// ---------------------------------------------------------------
+
 	NQS_info_t(const NQS_info_t& other);
     NQS_info_t(NQS_info_t&& other) noexcept;
 
@@ -445,13 +459,50 @@ struct NQS_Const_par_t
 	NQS_PUBLIC_TYPES(_T, _stateType);
 	NQS_HAMIL_TYPES(_Ht, _spinModes);
 	// **********************************************************************************************************************
-	Hamil_t_p H_;										// Hamiltonian
-	std::vector<uint> nHid_;								// number of hidden units 
+	Hamil_t_p H_;											// Hamiltonian
+	std::vector<double> nHid_;								// number of hidden units 
 	double lr_			= 1e-1;								// learning rate
 	uint threadNum_		= 1;								// number of threads
 	int nPart_			= -1;								// number of particles
 	// **********************************************************************************************************************
+	NQS_Const_par_t()										= default;
+	~NQS_Const_par_t()										= default;
+	// **********************************************************************************************************************
+	NQS_Const_par_t(const NQS_Const_par_t& other)
+		: H_(other.H_), nHid_(other.nHid_), lr_(other.lr_), threadNum_(other.threadNum_), nPart_(other.nPart_) { }
+	// **********************************************************************************************************************
+	NQS_Const_par_t(NQS_Const_par_t&& other) noexcept
+		: H_(std::move(other.H_)), nHid_(std::move(other.nHid_)), lr_(other.lr_), threadNum_(other.threadNum_), nPart_(other.nPart_) { }
+	// **********************************************************************************************************************
+	NQS_Const_par_t& operator=(const NQS_Const_par_t& other)
+	{
+		if (this != &other)
+		{
+			this->H_ 			= other.H_;
+			this->nHid_	 		= other.nHid_;
+			this->lr_ 			= other.lr_;
+			this->threadNum_ 	= other.threadNum_;
+			this->nPart_ 		= other.nPart_;
+		}
+		return *this;
+	}
+	// **********************************************************************************************************************
+	NQS_Const_par_t& operator=(NQS_Const_par_t&& other) noexcept
+	{
+		if (this != &other)
+		{
+			this->H_ = std::move(other.H_);
+			this->nHid_ = std::move(other.nHid_);
+			this->lr_ = other.lr_;
+			this->threadNum_ = other.threadNum_;
+			this->nPart_ = other.nPart_;
+		}
+		return *this;
+	}
+	// **********************************************************************************************************************
 };
+// ##########################################################################################################################################
+
 
 // ##########################################################################################################################################
 

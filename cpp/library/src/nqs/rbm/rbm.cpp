@@ -188,8 +188,7 @@ void RBM<_spinModes, _Ht, _T, _stateType>::clone(MC_t_p _other)
 			this->thetaCOSH_ 	= _n->thetaCOSH_;
 			this->thetaTmpCol_ 	= _n->thetaTmpCol_;
 			this->thetaCOSH_log_= _n->thetaCOSH_log_;
-			this->nHid_ 		= _n->nHid_;
-			this->beta_ 		= _n->beta_;
+			this->nHid_			= _n->nHid_;
 		}
 	}
 	catch (std::bad_cast & e)
@@ -209,10 +208,71 @@ RBM_INST_CMB_ALL(clone, void, (MC_t_p), );
 
 // ##########################################################################################################################################
 
-// ############################################################## A N S A T Z ###############################################################
+/**
+* @brief Initializes the RBM (Restricted Boltzmann Machine) object.
+* 
+* This function is responsible for setting up the initial state of the RBM object.
+* It is a template function with the following parameters:
+* 
+* @tparam _spinModes The number of spin modes.
+* @tparam _Ht The type representing the Hamiltonian.
+* @tparam _T The type representing the parameters of the RBM.
+* @tparam _stateType The type representing the state of the system.
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
+{
+	// initialize biases visible
+// #ifndef _DEBUG
+// #pragma omp parallel for num_threads(this->threads_.threadNum_)
+// #endif
+	NQS_S<_spinModes, _Ht, _T, _stateType>::init();
+	const double stddev = std::max(std::sqrt(2.0 / (this->info_p_.nVis_ + this->nHid_)), 0.01);
+
+	// Initialize visible biases
+	for (int i = 0; i < this->info_p_.nVis_; i++) {
+		this->bV_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
+	}
+
+	// Initialize hidden biases
+	for (int i = 0; i < this->nHid_; i++) {
+		this->bH_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
+	}
+
+	// Initialize weights matrix using Xavier Initialization
+	for (int i = 0; i < this->W_.n_rows; i++) {
+		for (uint j = 0; j < this->W_.n_cols; j++) {
+			// this->W_(i, j) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
+			this->W_(i, j) = algebra::cast<_T>(this->ran_->template random<double>(-0.01, 0.01) + I * this->ran_->template random<double>(-0.01, 0.01));
+		}
+	}
+	this->Weights_.subvec(0, this->info_p_.nVis_ - 1) 									= this->bV_;
+	this->Weights_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1) 	= this->bH_;
+	this->Weights_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1) 		= this->W_.as_col();
+}
+// template instantiation of the function above
+RBM_INST_CMB_ALL(init, void, (), );
 
 // ##########################################################################################################################################
 
+/**
+* @brief sets the current angles vector according to arXiv:1606.02318v1
+* @param v replaces current vector
+*/
+template<uint _spinModes, typename _Ht, typename _T, class _stateType>
+inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(Config_cr_t v)
+{
+	this->theta_		= this->bH_ + this->W_ * v;
+	this->thetaCOSH_	= this->coshF();
+	this->thetaCOSH_log_= arma::log(this->thetaCOSH_);
+}
+// template instantiation of the function above
+RBM_INST_CMB_ALL(setTheta, void, (Config_cr_t), );
+// ##########################################################################################################################################
+
+// ############################################################## A N S A T Z ###############################################################
+
+// ##########################################################################################################################################
 
 /**
 * @brief Computes the ansatz function for the given input state.

@@ -15,15 +15,24 @@
 template <typename _Ht, typename _T, class _stateType>
 class NQS_S<2, _Ht, _T, _stateType> : public NQS<2, _Ht, _T, _stateType>
 {
-	NQS_PUBLIC_TYPES(_T, _stateType);
+	// #################################################################
 	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	NQS_HAMIL_TYPES(_Ht, 2);
 	using NQSLS_p =	typename NQS<2, _Ht, _T, _stateType>::NQSLS_p;
 	// #################################################################
 public:
-	NQS_S(std::shared_ptr<Hamiltonian<_Ht, 2>>& _H, double _lr, uint _threadNum = 1, int _nParticles = 1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
-		: NQS<2, _Ht, _T, _stateType>(_H, _lr, _threadNum, _H->getNs(), _lower, _beta) 
-	{	};
+	NQS_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p)
+		: NQS<2, _Ht, _T, _stateType>(_p) 
+	{ 
 
+	};
+	NQS_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+		: NQS<2, _Ht, _T, _stateType>(_p, _lower, _beta) 
+	{ 
+
+	};
+	// #################################################################
 protected:
 	// --------------------------- F L I P S ---------------------------
 	virtual void chooseRandomFlips()			override;
@@ -33,49 +42,55 @@ protected:
 	virtual void applyFlipsC()					override { for (auto& i : this->flipPlaces_) flip(this->curVec_, i, 0, this->discVal_);	};
 	virtual void setRandomFlipNum(uint _nFlips) override;
 
-	////////////////////////////////////////////////////////////////////
-
+	// **********************************************************************************************************************
 	virtual auto clone() 						const -> MC_t_p override = 0;
-
-	////////////////////////////////////////////////////////////////////
+	// **********************************************************************************************************************
 };
 
 // !!!!!!!!!!!!!!!!!! F L I P S !!!!!!!!!!!!!!!!!!
 
 #include <unordered_set>
 
-/*
-* @brief Randomly flip the discrete variables at chosen flip places without repetition. Sets the random flips to the vector already saved.
+/**
+* @brief Chooses random positions in a vector to flip and stores the positions and their values.
+*
+* This function selects a specified number of unique random positions (flips) within a vector.
+* It ensures that each chosen position is unique by using an unordered set to track the positions
+* that have already been selected. For each chosen position, it stores the position and the value
+* of the vector at that position before the flip.
+*
+* @tparam _Ht Type of the Hamiltonian.
+* @tparam _T Type of the elements in the vector.
+* @tparam _stateType Type of the state.
 */
 template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<2, _Ht, _T, _stateType>::chooseRandomFlips()
 {
-	
-	this->flipPlaces_[0] 	= this->ran_->template randomInt<uint>(0, this->info_p_.nVis_);
-	this->flipVals_[0] 		= this->tmpVec_(this->flipPlaces_[0]);
-	if (this->nFlip_ == 1)
-		return;
+	std::unordered_set<uint> chosenPlaces;
+	chosenPlaces.reserve(this->nFlip_);
 
-	// choose the flip places
-	std::unordered_set<uint> chosenPlaces = { this->flipPlaces_[0] };
-	for (auto i = 1; i < this->flipPlaces_.size(); ++i)
+	for (auto i = 0; i < this->nFlip_; ++i)
 	{
 		uint fP;
 		do {
 			fP = this->ran_->template randomInt<uint>(0, this->info_p_.nVis_);
 		} while (chosenPlaces.find(fP) != chosenPlaces.end());
 		chosenPlaces.insert(fP);
-		
-		this->flipPlaces_[i] 	= fP;						// choose the flip place of the vector
-		this->flipVals_[i] 		= this->tmpVec_(fP);		// save the element of a vector before the flip
+
+		this->flipPlaces_[i] = fP;						// choose the flip place of the vector
+		this->flipVals_[i] = this->tmpVec_(fP);			// save the element of a vector before the flip
 	}
 }
 
-//////////////////////////////////////////////////
+// ##########################################################################################################################################
 
-/*
-* @brief Set the number of random flips.
-* @param _nFlips number of flips to be used
+/**
+* @brief Sets the number of random flips and resizes the flipPlaces_ and flipVals_ vectors accordingly.
+* 
+* @tparam _Ht Template parameter for Hamiltonian type.
+* @tparam _T Template parameter for data type.
+* @tparam _stateType Template parameter for state type.
+* @param _nFlips The number of random flips to set.
 */
 template<typename _Ht, typename _T, class _stateType>
 inline void NQS_S<2, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
@@ -86,5 +101,7 @@ inline void NQS_S<2, _Ht, _T, _stateType>::setRandomFlipNum(uint _nFlips)
 	if (this->flipVals_.size() != this->nFlip_)
 		this->flipVals_.resize(this->nFlip_);
 }
+
+// ##########################################################################################################################################
 
 #endif

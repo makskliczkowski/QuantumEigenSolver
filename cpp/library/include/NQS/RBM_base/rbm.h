@@ -75,9 +75,8 @@ public:
 	virtual ~RBM()											{ DESTRUCTOR_CALL; };
 	RBM(const RBM<_spinModes, _Ht, _T, _stateType>& _other);
 	RBM(RBM<_spinModes, _Ht, _T, _stateType>&& _other);
-	RBM(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1,
-													const NQSLS_p& _lower = {}, 
-													const std::vector<double>& _beta = {});
+	RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p);
+	RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta);
 
 	// ------------------- O P E R A T O R S -------------------
 	auto operator=(RBM<_spinModes, _Ht, _T, _stateType>& _other) 	-> RBM<_spinModes, _Ht, _T, _stateType>&;
@@ -115,20 +114,6 @@ public:
 					RBM_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS, ADD) \
 					RBM_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS, ADD) \
 					RBM_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS, ADD)
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
-* @brief sets the current angles vector according to arXiv:1606.02318v1
-* @param v replaces current vector
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::setTheta(Config_cr_t v)
-{
-	this->theta_		= this->bH_ + this->W_ * v;
-	this->thetaCOSH_	= this->coshF();
-	this->thetaCOSH_log_= arma::log(this->thetaCOSH_);
-}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #endif

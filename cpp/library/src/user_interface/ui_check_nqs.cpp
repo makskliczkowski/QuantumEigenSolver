@@ -433,14 +433,18 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<
 		case NQSTYPES::RBM_T:
 			return std::make_shared<RBM_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
 		case NQSTYPES::RBMPP_T:
-			return std::make_shared<RBM_PP_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
+			return std::make_shared<NQS_PP_S<_spinModes, _T, _T, double, RBM_S<_spinModes, _T>>>(std::forward<decltype(args)>(args)...);
 		default:
 			throw std::invalid_argument("Unknown NQS type");
 		}
 	};
-
-	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->threadNum, 1, _NQSl, _beta);
-
+	NQS_Const_par_t<_spinModes, _T> _parNQS;
+	_parNQS.nHid_ 		= { this->nqsP.nqs_nh_ };
+	_parNQS.lr_ 		= { this->nqsP.nqs_lr_ };
+	_parNQS.threadNum_ 	= this->threadNum;
+	_parNQS.H_ 			= _H;
+	// create the NQS
+	_NQS 				= createNQS(_parNQS, _NQSl, _beta);
 	// Set the hyperparameters
 #ifdef NQS_USESR_MAT_USED
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);

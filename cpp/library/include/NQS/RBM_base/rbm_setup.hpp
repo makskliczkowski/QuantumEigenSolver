@@ -6,15 +6,26 @@
 
 // ##########################################################################################################################################
 
-#include <memory>
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-RBM<_spinModes, _Ht, _T, _stateType>::RBM(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, uint _nHid, 
-										double _lr, uint _threadNum, int _nPart,
-										const NQSLS_p& _lower, 
-										const std::vector<double>& _beta)
-	: NQS_S<_spinModes, _Ht, _T, _stateType>(_H, _lr, _threadNum, _nPart, _lower, _beta)
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>::RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
+										// const NQSLS_p& _lower, 
+										// const std::vector<double>& _beta)
+	: NQS_S<_spinModes, _Ht, _T, _stateType>(_p)
 {
-	this->nHid_ 			= _nHid;
+	this->nHid_ 			= _p.nHid_[0];
+	this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
+	this->info_p_.fullSize_ = this->rbmSize_;
+	this->allocate();
+	this->setInfo();
+}
+
+// ##########################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T, class _stateType>
+RBM<_spinModes, _Ht, _T, _stateType>::RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+	: NQS_S<_spinModes, _Ht, _T, _stateType>(_p, _lower, _beta)
+{
+	this->nHid_ 			= _p.nHid_[0];
 	this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
 	this->info_p_.fullSize_ = this->rbmSize_;
 	this->allocate();
@@ -57,46 +68,9 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();						// allocate the rest
 }
 
-////////////////////////////////////////////////////////////////////////////
+// ##########################################################################################################################################
 
 /**
-* @brief Initializes the weights and biases for the RBM NQS model
-*/
-template<uint _spinModes, typename _Ht, typename _T, class _stateType>
-inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
-{
-	// initialize biases visible
-// #ifndef _DEBUG
-// #pragma omp parallel for num_threads(this->threads_.threadNum_)
-// #endif
-	NQS_S<_spinModes, _Ht, _T, _stateType>::init();
-	const double stddev = std::max(std::sqrt(2.0 / (this->info_p_.nVis_ + this->nHid_)), 0.01);
-
-	// Initialize visible biases
-	for (int i = 0; i < this->info_p_.nVis_; i++) {
-		this->bV_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
-	}
-
-	// Initialize hidden biases
-	for (int i = 0; i < this->nHid_; i++) {
-		this->bH_(i) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
-	}
-
-	// Initialize weights matrix using Xavier Initialization
-	for (int i = 0; i < this->W_.n_rows; i++) {
-		for (uint j = 0; j < this->W_.n_cols; j++) {
-			// this->W_(i, j) = algebra::cast<_T>(this->ran_->template randomNormal<double>(0.0, stddev) + I * this->ran_->template randomNormal<double>(0.0, stddev));
-			this->W_(i, j) = algebra::cast<_T>(this->ran_->template random<double>(-0.01, 0.01) + I * this->ran_->template random<double>(-0.01, 0.01));
-		}
-	}
-	this->Weights_.subvec(0, this->info_p_.nVis_ - 1) 									= this->bV_;
-	this->Weights_.subvec(this->info_p_.nVis_, this->info_p_.nVis_ + this->nHid_ - 1) 	= this->bH_;
-	this->Weights_.subvec(this->info_p_.nVis_ + this->nHid_, this->rbmSize_ - 1) 		= this->W_.as_col();
-}
-
-////////////////////////////////////////////////////////////////////////////
-
-/*
 * @brief Sets the info about the RBM model NQS.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -152,15 +126,7 @@ inline void RBM<_spinModes, _Ht, _T, _stateType>::setState(u64 _st, bool _set)
 
 // ##########################################################################################################################################
 
-// template <uint _spinModes, typename _Ht, typename _T, class _stateType>
-// inline void RBM<_spinModes, _Ht, _T, _stateType>::setWeights(const NQSW& _W, const NQSB& _bV, const NQSB& _bH)
-// {
-// 	this->W_	= _W;
-// 	this->bV_	= _bV;
-// 	this->bH_	= _bH;
-// }
-
-/*
+/**
 * @brief After reading the weights from the path specified by the user, it sets the inner vectors from them.
 * @param _path folder for the weights to be saved onto
 * @param _file name of the file to save the weights onto

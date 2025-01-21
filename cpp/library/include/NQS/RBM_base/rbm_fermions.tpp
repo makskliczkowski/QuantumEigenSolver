@@ -1,10 +1,5 @@
 #include "rbm_spins.tpp"
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FERMIONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+// ##########################################################################################################################################
 #ifndef RBM_4_H
 #define RBM_4_H
 
@@ -14,19 +9,24 @@
 template <typename _Ht, typename _T, class _stateType>
 class RBM_S<4, _Ht, _T, _stateType> : public RBM<4, _Ht, _T, _stateType>
 {
-	NQS_PUBLIC_TYPES(_T, _stateType);
+	// **********************************************************************************************************************
 	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	NQS_HAMIL_TYPES(_Ht, 4);
 	using NQSLS_p =	typename RBM<4, _Ht, _T, _stateType>::NQSLS_p;
+	// **********************************************************************************************************************
 public:
-	RBM_S(std::shared_ptr<Hamiltonian<_Ht, 4>>& _H, uint _nHid, double _lr,
-		uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const std::vector<double>& _beta = {})
-		: RBM<4, _Ht, _T, _stateType>(_H, _nHid, _lr, _threadNum, _nParticles, _lower, _beta) 
+	RBM_S(const NQS_Const_par_t<4, _Ht, _T, _stateType>& _p)
+		: RBM<4, _Ht, _T, _stateType>(_p) 
 	{ 
 		this->init();
-		this->setRandomState(true);
 	};
-
-	/* ----------------------------------------------------------- */
+	RBM_S(const NQS_Const_par_t<4, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+		: RBM<4, _Ht, _T, _stateType>(_p, _lower, _beta) 
+	{ 
+		this->init(); 
+	};
+	// **********************************************************************************************************************
 protected:
 	// -------------------- P R O B A B I L I T Y -------------------
 	virtual auto logPRatio(uint fP, float fV)		-> _T	override { return _T(1.0); }

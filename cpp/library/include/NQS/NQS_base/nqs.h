@@ -345,7 +345,9 @@ public:																	// -------------------- C O N S T R U C T --------------
 	// -------------------- O P E R A T O R S --------------------
 	NQS &operator=(const NQS & _n);
 	NQS &operator=(NQS &&_n);
-	NQS(Hamil_t_p _H, double _lr = 1e-2, uint _threadNum = 1, int _nParticles = -1, const NQSLS_p& _lower = {}, const v_1d<double>& _beta = {});
+	// ***********************************************************************************************************************************
+	NQS(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p);
+	NQS(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const v_1d<double>& _beta);
 	// ***********************************************************************************************************************************
 	static void save_history(const std::string& _dir, 	
 							const arma::Col<_T>& _EN_TRAIN,				// training

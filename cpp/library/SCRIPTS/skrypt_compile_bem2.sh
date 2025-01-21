@@ -46,6 +46,7 @@ icpx ./main.cpp                                                 \
         ./user_interface.cpp                                    \
         ./src/nqs/nqs_def.cpp                                   \
         ./src/nqs/nqs.cpp                                       \
+        ./src/nqs/nqs_quench.cpp                                \
         ./src/nqs/nqs_opt.cpp                                   \
         ./src/nqs/nqs_lower.cpp                                 \
         ./src/nqs/nqs_sampling.cpp                              \
