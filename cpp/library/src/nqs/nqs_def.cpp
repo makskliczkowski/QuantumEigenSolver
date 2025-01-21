@@ -216,9 +216,11 @@ NQS_info_t::NQS_info_t(const NQS_info_t& other)
         sched_(other.sched_),
         nVis_(other.nVis_),
         nSites_(other.nSites_),
+        nSitesSquared_(other.nSitesSquared_),
         fullSize_(other.fullSize_),
         Nh_(other.Nh_),
         nParticles_(other.nParticles_),
+        nParticlesSquared_(other.nParticlesSquared_),
         conservesParticles_(other.conservesParticles_)
 {}
 
@@ -238,9 +240,11 @@ NQS_info_t::NQS_info_t(NQS_info_t&& other) noexcept
     sched_(std::move(other.sched_)),
     nVis_(std::exchange(other.nVis_, 1)),
     nSites_(std::exchange(other.nSites_, 1)),
+    nSitesSquared_(std::exchange(other.nSitesSquared_, 1)),
     fullSize_(std::exchange(other.fullSize_, 1)),
     Nh_(std::exchange(other.Nh_, 1)),
     nParticles_(std::exchange(other.nParticles_, 1)),
+    nParticlesSquared_(std::exchange(other.nParticlesSquared_, 1)),
     conservesParticles_(std::exchange(other.conservesParticles_, true))
 {
 }
@@ -267,9 +271,11 @@ NQS_info_t& NQS_info_t::operator=(const NQS_info_t& other)
         sched_              = other.sched_;
         nVis_               = other.nVis_;
         nSites_             = other.nSites_;
+        nSitesSquared_      = other.nSitesSquared_;
         fullSize_           = other.fullSize_;
         Nh_                 = other.Nh_;
         nParticles_         = other.nParticles_;
+        nParticlesSquared_  = other.nParticlesSquared_;
         conservesParticles_ = other.conservesParticles_;
     }
     return *this;
@@ -297,9 +303,11 @@ NQS_info_t& NQS_info_t::operator=(NQS_info_t&& other) noexcept
         sched_              = std::move(other.sched_);
         nVis_               = std::exchange(other.nVis_, 1);
         nSites_             = std::exchange(other.nSites_, 1);
+        nSitesSquared_      = std::exchange(other.nSitesSquared_, 1);
         fullSize_           = std::exchange(other.fullSize_, 1);
         Nh_                 = std::exchange(other.Nh_, 1);
         nParticles_         = std::exchange(other.nParticles_, 1);
+        nParticlesSquared_  = std::exchange(other.nParticlesSquared_, 1);
         conservesParticles_ = std::exchange(other.conservesParticles_, true);
     }
     return *this;

@@ -218,17 +218,6 @@ this->lower_states_.exc_ratio_  = 		    [this](const Config_t& _v)         { ret
 #else
 	this->lower_states_.exc_ansatz_ = 		[&](const Config_t& _v)         { return this->ansatz(_v); };
 #endif
-    // no assignment needed as lr_ does not exist in NQS_info_t
-
-	// set the number of particles
-	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
-    this->info_p_.nVis_ 		= 			static_cast<uint>(_Ns * (this->spinModes_ / 2));
-	this->info_p_.nSites_		=			static_cast<uint>(_Ns);
-
-	// make it half filling if necessary
-	this->info_p_.nParticles_	=			(_n.info_p_.nParticles_ < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_n.info_p_.nParticles_;
-	this->info_p_.Nh_			=			this->H_->getHilbertSize();     // check the Hilbert space
-
     // initialize the information 
     this->info_p_  				=           _n.info_p_;
     // copy the weights
@@ -594,10 +583,12 @@ NQS<_spinModes, _Ht, _T, _stateType>::NQS(NQS<_spinModes, _Ht, _T, _stateType>::
 	// set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
     this->info_p_.nVis_ 		= 			static_cast<uint>(_Ns * (this->spinModes_ / 2));
 	this->info_p_.nSites_		=			static_cast<uint>(_Ns);
+    this->info_p_.nSitesSquared_=           static_cast<size_t>(_Ns) * static_cast<size_t>(_Ns);
 
 	// make it half filling if necessary
-	this->info_p_.nParticles_	=			(_nParticles < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_nParticles;
-	this->info_p_.Nh_			=			_H->getHilbertSize();           // check the Hilbert space
+	this->info_p_.nParticles_	        =   (_nParticles < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_nParticles;
+    this->info_p_.nParticlesSquared_    =   static_cast<size_t>(this->info_p_.nParticles_) * static_cast<size_t>(this->info_p_.nParticles_);
+	this->info_p_.Nh_			        =	_H->getHilbertSize();           // check the Hilbert space
 #ifdef NQS_NOT_OMP_MT
 	this->initThreads(_threadNum);
 #endif

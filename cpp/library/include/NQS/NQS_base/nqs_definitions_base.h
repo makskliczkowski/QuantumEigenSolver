@@ -115,8 +115,7 @@ enum NQSTYPES					// #
 				using Solver_t_p = std::shared_ptr<algebra::Solvers::General::Solver<_type, true>>;					\
 				using Precond_t_p = std::shared_ptr<algebra::Solvers::Preconditioners::Preconditioner<_type, true>>;\
 				using int_ini_t = std::initializer_list<int>;														\
-				using dbl_ini_t = std::initializer_list<double>;									
-											
+				using dbl_ini_t = std::initializer_list<double>;		
 #elif defined NQS_USE_STDVEC
 #	define NQS_PUBLIC_TYPES(_type, _stateType) public:																							\	
 				using NQSS = std::vector<_stateType>;																\
@@ -129,6 +128,12 @@ enum NQSTYPES					// #
 # else
 # 	define NQS_PUBLIC_TYPES 
 #endif
+// ##########################################################################################################################################
+#define NQS_HAMIL_TYPES(_Ht, _spinModes) public:									\
+	using Hamil_t 						= Hamiltonian<_Ht, _spinModes>;				\
+	using Hamil_t_p 					= std::shared_ptr<Hamil_t>;					\
+	using Hilbert_t 					= Hilbert::HilbertSpace<_Ht, _spinModes>;	\
+	using Hilbert_cr_t 					= const Hilbert_t&;											
 // ##########################################################################################################################################
 #define NQS_LOG_ERROR_SPIN_MODES LOG_ERROR("IMPLEMENT ME FOR THIS NUMBER OF SPIN MODES")
 // ##########################################################################################################################################
@@ -275,11 +280,13 @@ struct NQS_info_t
     // architecture specific			
     uint nVis_									=		1;						// number of visible neurons (input variables)
     uint nSites_								=		1;						// number of lattice sites or fermionic modes
+	size_t nSitesSquared_						=		1;						// number of lattice sites squared
     uint fullSize_								=		1;						// full number of the parameters (for memory purpose)
 
     // Hilbert space info			
     u64 Nh_										=		1;						// Hilbert space size (number of basis states)
     uint nParticles_							=		1;						// number of particles in the system (if applicable)
+	size_t nParticlesSquared_					=		1;						// number of particles squared
     bool conservesParticles_					=		true;					// whether the system conserves the number of particles
 
 	// early stopping
@@ -425,6 +432,27 @@ struct AnsatzModifier
 					NQS_INST_CMB(double, std::complex<double>, FUN, FUNRET, ARGS)	\
 					NQS_INST_CMB(std::complex<double>, double, FUN, FUNRET, ARGS)	\
 					NQS_INST_CMB(std::complex<double>, std::complex<double>, FUN, FUNRET, ARGS)
+// ##########################################################################################################################################
+
+template <typename _T, uint _spinModes>
+class Hamiltonian;
+
+template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
+struct NQS_Const_par_t 
+{
+	// **********************************************************************************************************************
+	MCS_PUBLIC_TYPES(_T, _stateType, NQS_STATE_R_T);
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	NQS_HAMIL_TYPES(_Ht, _spinModes);
+	// **********************************************************************************************************************
+	Hamil_t_p H_;										// Hamiltonian
+	std::vector<uint> nHid_;								// number of hidden units 
+	double lr_			= 1e-1;								// learning rate
+	uint threadNum_		= 1;								// number of threads
+	int nPart_			= -1;								// number of particles
+	// **********************************************************************************************************************
+};
+
 // ##########################################################################################################################################
 
 #endif // !NQS_DEFINITIONS_H

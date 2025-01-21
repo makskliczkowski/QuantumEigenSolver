@@ -18,6 +18,7 @@
 
 // include all the definions
 #include "../nqs_operator.h"
+#include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
 
 // #################################################################################################################################
@@ -46,11 +47,7 @@ public:
 	// **********************************************************************************************************************************
 	NQS_PUBLIC_TYPES(_T, _stateType);									// type definitions 
 	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
-	// **********************************************************************************************************************************
-	using Hamil_t 						= Hamiltonian<_Ht, _spinModes>;	// Hamiltonian type
-	using Hamil_t_p 					= std::shared_ptr<Hamil_t>;		// shared pointer to the Hamiltonian type
-	using Hilbert_t 					= Hilbert::HilbertSpace<_Ht, _spinModes>;		
-	using Hilbert_cr_t 					= const Hilbert_t&;				// constant reference to the Hilbert space type
+	NQS_HAMIL_TYPES(_Ht, _spinModes);									// type definitions for the Hamiltonian
 	// **********************************************************************************************************************************
 	using NQSLS_p 						= typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
 	// **********************************************************************************************************************************
@@ -242,6 +239,8 @@ public:																	// ------------------------ S E T T E R S --------------
 public:																	// ------------------------ G E T T E R S ------------------------
 	auto getNvis()							const -> uint				{ return this->info_p_.nVis_;			};
 	auto getF()								const -> NQSB				{ return this->F_;						};
+	auto full_size()						const -> size_t				{ return this->info_p_.fullSize_;		};
+	virtual auto size()						const -> size_t				= 0;
 #ifdef NQS_USESR_MAT_USED	
 	auto getCovarianceMat()					const -> NQSW				{ return this->S_;						};	
 #endif	

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #ifndef RBM_H
 #define RBM_H
 
@@ -86,11 +87,11 @@ public:
 	virtual void init()										override;
 	
 	// --------------------- G E T T E R S ---------------------
-	auto getNhid()					const -> uint			{ return this->nHid_; 		};
-	auto getWeightsMat()			const -> NQSW			{ return this->W_; 			};
-	auto getVisibleBias()			const -> NQSB			{ return this->bV_; 		};
-	auto getHiddenBias()			const -> NQSB			{ return this->bH_; 		};
-	
+	virtual auto size()				const -> size_t override		{ return this->rbmSize_; 	};
+	auto getNhid()					const -> uint					{ return this->nHid_; 		};
+	auto getWeightsMat()			const -> NQSW					{ return this->W_; 			};
+	auto getVisibleBias()			const -> NQSB					{ return this->bV_; 		};
+	auto getHiddenBias()			const -> NQSB					{ return this->bH_; 		};
 	// --------------------- F I N A L E -----------------------
 	virtual auto ansatz(Config_cr_t _in) 					const -> _T override;
 	virtual auto ansatzlog(Config_cr_t _in) 				const -> _T override;

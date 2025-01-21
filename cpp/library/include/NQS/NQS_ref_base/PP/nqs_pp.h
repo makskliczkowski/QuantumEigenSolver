@@ -18,19 +18,41 @@
 * @tparam _T Data type for the wave function (default is the same as Hamiltonian type).
 * @tparam _stateType Data type for the state (default is double).
 */
-#pragma once
 #ifndef RBMPP_H
-#	define RBMPP_H
-#	ifndef RBM_H
-#		include "../rbm_final.hpp"
-#	endif // !NQS_H
-#	define NQS_RBM_PP_USE_PFAFFIAN_UPDATE
+#define RBMPP_H
+#ifndef RBM_H
+#	include "../nqs_ref.hpp"
+#endif
+// ***************************************************************************************
+#define NQS_REF_PP_USE_PFAFFIAN_UPDATE
+// ***************************************************************************************
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 //////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename _Ht, typename _T, class _stateType>
+struct NQS_PP_weights
+{
+	// **********************************************************************************************************************
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, NQS_STATE_R_T); 			// type definitions for the Monte Carlo solver
+	// **********************************************************************************************************************
+	NQSB F_r1r2_s1s2_;											// for storing the additional variational parameters from the PP
+	NQSW X_, X_inv;												// for stroing the X matrix of the variational parameter X = X(x), where X is the configuration. X is skew-symmetric
+#ifndef NQS_REF_PP_USE_PFAFFIAN_UPDATE
+	static inline thread_local NQSW XTmp_;						// for calculating the Pfaffian probabilities from the Hamiltonian
+	static inline thread_local NQSW XTmpInv_;					// for calculating the Pfaffian probabilities from the Hamiltonian
+#endif
+	// **********************************************************************************************************************
+	_T pfaffian_				= 0.0;							// store the last pfaffian value
+	_T pfaffianNew_				= 0.0;							// store the last pfaffian value for the candidate - can be updated with the Cayley's idendity
+	// **********************************************************************************************************************
+};
+
+// ##########################################################################################################################
 
 /**
 * @brief Restricted Boltzmann Machine with Pair Product (RBM-PP) State Ansatz
@@ -54,39 +76,25 @@
 * - Supports multithreading for performance optimization
 * - Provides methods for state manipulation, weight updates, and gradient calculations
 * - Implements efficient Pfaffian updates for Monte Carlo sampling
+* @important The class will be designed as for the reference state |\psi > = \sum _x F(x) <x|phi>_{ref} |x>,
+* where F(x) is the variational part taking into account the correlations between the particles and <x|phi>_{ref} is 
+* overlap with a reference state. For simplicity, the reference state will be taken as the product of the single-particle states.
 */
-template < 	uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double>
-class RBM_PP : public RBM_S<_spinModes, _Ht, _T, _stateType>
+template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double, class _CorrState = NQS_S<_spinModes, _Ht, _T, _stateType>>
+class NQS_PP : public NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>
 {
 	// **********************************************************************************************************************
-	NQS_PUBLIC_TYPES(_T, _stateType);
-	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
-	using NQSLS_p = typename RBM_S<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
+	MCS_PUBLIC_TYPES(_T, _stateType, NQS_STATE_R_T); 			// type definitions for the Monte Carlo solver
+	NQS_PUBLIC_TYPES(_T, _stateType);							// type definitions for the NQS
+	NQS_HAMIL_TYPES(_Ht, _spinModes);							// type definitions for the Hamiltonian
+	using NQSLS_p = typename NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::NQSLS_p;
 	// **********************************************************************************************************************
 protected:
-	// architecture parameters
-	uint nPP_					= 1;
-	uint nSites2_				= 1;
-	uint nParticles2_			= 1;
-	u64 rbmPPSize_				= 1;
-	// **********************************************************************************************************************
-	// ------------------------ W E I G H T S ------------------------
-	NQSB Fpp_;													// for storing the additional variational parameters from the PP
-	v_2d<bool> spinSectors_;									// go through the quarters (spin sectors)
-
-	_T pfaffian_				= 0.0;							// store the last pfaffian value
-	_T pfaffianNew_				= 0.0;							// store the last pfaffian value for the candidate
-	NQSW X_;													// for stroing the matrix for Pfaffian calculation at each step
-	NQSW Xinv_;													// for stroing the matrix inverse for Pfaffian calculation at each step
-	NQSW XinvSkew_;												// for stroing the matrix inverse for Pfaffian calculation at each step
-	NQSW Xnew_;													// for stroing the matrix for Pfaffian calculation at each step - new candidate
-	// ***************************************************************************************************************************
-#ifdef NQS_NOT_OMP_MT
-	thread_local static inline NQSW XTmp_;						// for calculating the Pfaffian probabilities from the Hamiltonian
-	// std::map<std::thread::id, NQSW> XTmp_;
-#else
-	NQSW XTmp_;
-#endif
+	uint nPP_					= 1;							// number of PP variational parameters (connected to the number of particles)
+	u64 PPsize_					= 1;							// size of the PP part of the wave function
+	// **********************************************************************************************************************	
+	NQS_PP_weights<_Ht, _T, _stateType> pp_weights_;			// for storing the weights and the Pfaffian
+	v_2d<int> spinSectors_		= {{1,1},{1,0},{0,1},{0,0}};	// go through the quarters (spin sectors) of the matrix F to interpret it !TODO: implement the spin sectors 
 	// ***************************************************************************************************************************
 	u64 getFPPIndex(bool _spini, bool _spinj, uint ri, uint rj)	const;
 protected:														// ----------------------- S T A R T E R S -----------------------
@@ -124,11 +132,11 @@ protected:														// ------------------------- A N S A T Z ---------------
 	virtual void updFPP_F(int_ini_t, dbl_ini_t, NQSW&) 			= 0;
 	// ***************************************************************************************************************************
 public: 				  
-	~RBM_PP() override											{ DESTRUCTOR_CALL;												};
-	RBM_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1, 
+	~NQS_PP() override											{ DESTRUCTOR_CALL;												};
+	NQS_PP(std::shared_ptr<Hamiltonian<_Ht, _spinModes>> _H, uint _nHid, double _lr, uint _threadNum = 1, int _nPart = -1, 
 													const NQSLS_p& _lower = {}, std::vector<double> _beta = {});
-	RBM_PP(const RBM_PP<_spinModes, _Ht, _T, _stateType>& _other);
-	RBM_PP(RBM_PP<_spinModes, _Ht, _T, _stateType>&& _other);
+	NQS_PP(const NQS_PP<_spinModes, _Ht, _T, _stateType>& _other);
+	NQS_PP(NQS_PP<_spinModes, _Ht, _T, _stateType>&& _other);
 public:															// --------------------- S E T T E R S ---------------------
 	void init()													override final;
 	// for the PP matrix
@@ -157,6 +165,7 @@ public:															// -------------------- U P D A T E R S ------------------
 #endif
 	// ***************************************************************************************************************************
 public:															// --------------------- G E T T E R S ---------------------
+	virtual auto size()						const -> size_t		override final	{ return this->rbmSize_ + this->PPsize_;					};
 	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW		= 0;
 #ifndef NQS_USE_VEC_ONLY
 	virtual auto getPPMat(u64 _n)			const -> NQSW		= 0;
@@ -210,3 +219,54 @@ public:
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 #endif
+
+// ##########################################################################################################################
+
+#ifndef NQS_PP_GEN_H
+#define NQS_PP_GEN_H
+template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double, class _CorrState = NQS_S<_spinModes, _Ht, _T, _stateType>>
+class NQS_PP_S : public NQS_PP<_spinModes, _Ht, _T, _stateType>
+{
+	// **********************************************************************************************************************
+	NQS_PUBLIC_TYPES(_T, _stateType);
+	MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
+	using NQSLS_p =	typename NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQSLS_p;
+	// **********************************************************************************************************************
+	NQS_PP_S(std::shared_ptr<Hamiltonian<_Ht, _spinModes>>& _H, 
+			uint _nHid, 
+			double _lr, 
+			uint _threadNum = 1, 
+			int _nParticles = -1,
+			const NQSLS_p& _lower = {}, 
+			const std::vector<double>& _beta = {})
+		: NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>(_H, _nHid, _lr, _threadNum, _nParticles, _lower, _beta)
+			{ NQS_LOG_ERROR_SPIN_MODES; };
+	// **********************************************************************************************************************
+	// --------------------- G E T T E R S ---------------------
+	virtual auto getPPMat(Config_cr_t _n)	const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+#ifndef NQS_USE_VEC_ONLY
+	virtual auto getPPMat(u64 _n)			const -> NQSW	override { NQS_LOG_ERROR_SPIN_MODES; return NQSW(); };
+#endif
+protected:
+	// --------------------------- A N S A T Z ---------------------------
+	void updFPP_C(uint fP, float fV)						override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP_C(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)			override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP(uint fP, float fV)							override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP(std::initializer_list<int> fP,
+				std::initializer_list<double> fV)			override { NQS_LOG_ERROR_SPIN_MODES; };
+	void updFPP_F(std::initializer_list<int> fP,
+				std::initializer_list<double> fV,
+				arma::Mat<_T>& _Xtmp)						override { NQS_LOG_ERROR_SPIN_MODES; };
+
+	// -------------------------------------------------------------------
+public:
+	virtual auto clone() 									const -> MC_t_p override
+	{
+		return std::make_shared<MC_t>(*this);
+	}
+
+	// -------------------------------------------------------------------
+};
+#endif //! NQS_PP_GEN_H
+// ##########################################################################################################################
