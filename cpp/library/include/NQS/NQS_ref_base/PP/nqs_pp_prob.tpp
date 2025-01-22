@@ -1,4 +1,4 @@
-#include "../../../../include/NQS/NQS_ref_base/PP/nqs_pp.h"
+#include "./nqs_pp_update.tpp"
 
 // ##########################################################################################################################################
 
@@ -24,7 +24,8 @@
 * @return The logarithm of the probability ratio after the state update.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-_T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint fP, float fV)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint fP, float fV)
 {
     // use the columns of the matrix to seek for the updated values - this enables to calculate the Pfaffian and others
     this->setX_changed(fP, fV);                                 // update pfaffian candidate matrix and its corresponding value
@@ -65,7 +66,8 @@ template double NQS_PP<4, std::complex<double>, double, double>::logPRatio(uint,
 * @returns probability ratio for a given ansatz based on the current state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-_T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint nFlips)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint nFlips)
 {
     if (nFlips == 1)
         return this->logPRatio(this->flipPlaces_[0], this->flipVals_[0]);
@@ -128,7 +130,8 @@ template double NQS_PP<4, std::complex<double>, double, double>::logPRatio(uint)
 * @return The logarithm of the probability ratio after the state update.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-_T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
 {
     auto left   = NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(_v1, _v2);
     auto right  = this->getPfaffianLog(_v2) - this->getPfaffianLog(_v1);
@@ -159,7 +162,8 @@ template double NQS_PP<4, std::complex<double>, double, double>::logPRatio(Confi
 * @returns probability ratio for a given ansatz based on the current state
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-_T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(std::initializer_list<int> fP, std::initializer_list<double> fV)
 {
 #ifdef NQS_NOT_OMP_MT
 	this->setX_changed(fP, fV, this->pp_weights_.X_upd_);   // update the X matrix (obviously just elements of the X_upd_ matrix)
@@ -212,7 +216,8 @@ template double NQS_PP<4, std::complex<double>, double, double>::logPRatio(std::
 // %%%%%% DOUBLE SPINS %%%%%%
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-_T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint fP1, uint fP2, float fV1, float fV2)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::logPRatio(uint fP1, uint fP2, float fV1, float fV2)
 {
     // update the Pfaffian candidate matrix and its corresponding value
     this->setX_changed(fP1, fV1);

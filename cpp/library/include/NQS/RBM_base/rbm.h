@@ -73,6 +73,7 @@ protected:													// ------------------------- T R A I N ------------------
 	virtual void grad(Config_cr_t _v, uint _plc)			override;
 public:
 	virtual ~RBM()											{ DESTRUCTOR_CALL; };
+	RBM()													= default;
 	RBM(const RBM<_spinModes, _Ht, _T, _stateType>& _other);
 	RBM(RBM<_spinModes, _Ht, _T, _stateType>&& _other);
 	RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p);

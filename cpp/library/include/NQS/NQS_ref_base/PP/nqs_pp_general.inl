@@ -1,10 +1,11 @@
-#include "./nqs_pp.h"
+#include "./nqs_pp_pffafian.tpp"
 
 // ##########################################################################################################################
 #ifndef NQS_PP_GEN_H
 #define NQS_PP_GEN_H
 
 template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double, class _CorrState = NQS_S<_spinModes, _Ht, _T, _stateType>>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 class NQS_PP_S : public NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>
 {
 	// **********************************************************************************************************************

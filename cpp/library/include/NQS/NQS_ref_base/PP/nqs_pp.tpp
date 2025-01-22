@@ -1,116 +1,5 @@
-#include "../../../../include/NQS/NQS_ref_base/PP/nqs_pp.h"
-#include "../../../../include/NQS/rbm_final.hpp"
+#include "./nqs_pp.h"
 
-// ##########################################################################################################################################
-template class NQS_PP<2u, double, double, double, NQS_S<2u, double, double, double>>;
-template class NQS_PP<4u, double, double, double, NQS_S<4u, double, double, double>>;
-
-template class NQS_PP<2u, std::complex<double>, std::complex<double>, double, NQS_S<2u, std::complex<double>, std::complex<double>, double>>;
-template class NQS_PP<4u, std::complex<double>, std::complex<double>, double, NQS_S<4u, std::complex<double>, std::complex<double>, double>>;
-
-template class NQS_PP<2u, double, std::complex<double>, double, NQS_S<2u, double, std::complex<double>, double>>;
-template class NQS_PP<4u, double, std::complex<double>, double, NQS_S<4u, double, std::complex<double>, double>>;
-
-template class NQS_PP<2u, std::complex<double>, double, double, NQS_S<2u, std::complex<double>, double, double>>;
-template class NQS_PP<4u, std::complex<double>, double, double, NQS_S<4u, std::complex<double>, double, double>>;
-
-template class NQS_PP<2u, double, double, double, RBM_S<2u, double, double, double>>;
-template class NQS_PP<4u, double, double, double, RBM_S<4u, double, double, double>>;
-
-template class NQS_PP<2u, std::complex<double>, std::complex<double>, double, RBM_S<2u, std::complex<double>, std::complex<double>, double>>;
-template class NQS_PP<4u, std::complex<double>, std::complex<double>, double, RBM_S<4u, std::complex<double>, std::complex<double>, double>>;
-
-template class NQS_PP<2u, double, std::complex<double>, double, RBM_S<2u, double, std::complex<double>, double>>;
-template class NQS_PP<4u, double, std::complex<double>, double, RBM_S<4u, double, std::complex<double>, double>>;
-
-template class NQS_PP<2u, std::complex<double>, double, double, RBM_S<2u, std::complex<double>, double, double>>;
-template class NQS_PP<4u, std::complex<double>, double, double, RBM_S<4u, std::complex<double>, double, double>>;
-// ##########################################################################################################################################
-
-/**
-* @brief Constructor for the RBM_PP class.
-* 
-* This constructor initializes an instance of the RBM_PP class, which is a derived class of RBM_S. 
-* It sets up the spin sectors, calculates various sizes related to the problem, and allocates necessary resources.
-* 
-* @tparam _spinModes Number of spin modes.
-* @tparam _Ht Type of the Hamiltonian.
-* @tparam _T Data type used in the calculations.
-* @tparam _stateType Type of the state.
-* 
-* @param _H Shared pointer to the Hamiltonian object.
-* @param _nHid Number of hidden units.
-* @param _lr Learning rate.
-* @param _threadNum Number of threads to be used.
-* @param _nPart Number of particles.
-* @param _lower Lower bound for the NQSLS_p object.
-* @param _beta Vector of beta values.
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
-	: NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>(_p)
-{
-	this->init();
-	this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
-	this->PPsize_			    = this->nPP_;
-	this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_; // full size of the NQS
-	this->allocate();
-	this->setInfo();
-}
-template NQS_PP<2u, double, double, double>::NQS_PP(const NQS_Const_par_t<2u, double, double, double>& _p);
-template NQS_PP<2u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<2u, std::complex<double>, std::complex<double>, double>& _p);
-template NQS_PP<2u, double, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<2u, double, std::complex<double>, double>& _p);
-template NQS_PP<2u, std::complex<double>, double, double>::NQS_PP(const NQS_Const_par_t<2u, std::complex<double>, double, double>& _p);
-template NQS_PP<3u, double, double, double>::NQS_PP(const NQS_Const_par_t<3u, double, double, double>& _p);
-template NQS_PP<3u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<3u, std::complex<double>, std::complex<double>, double>& _p);
-template NQS_PP<3u, double, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<3u, double, std::complex<double>, double>& _p);
-template NQS_PP<3u, std::complex<double>, double, double>::NQS_PP(const NQS_Const_par_t<3u, std::complex<double>, double, double>& _p);
-template NQS_PP<4u, double, double, double>::NQS_PP(const NQS_Const_par_t<4u, double, double, double>& _p);
-template NQS_PP<4u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<4u, std::complex<double>, std::complex<double>, double>& _p);
-template NQS_PP<4u, double, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<4u, double, std::complex<double>, double>& _p);
-template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(const NQS_Const_par_t<4u, std::complex<double>, double, double>& _p);
-// ##########################################################################################################################################
-
-/**
-* @brief Constructor for the NQS_PP class.
-*
-* This constructor initializes an instance of the NQS_PP class with the given parameters.
-*
-* @tparam _spinModes The number of spin modes.
-* @tparam _Ht The Hamiltonian type.
-* @tparam _T The type of the parameters.
-* @tparam _stateType The type of the state.
-* @tparam _CorrState The type of the correlated state.
-* 
-* @param _p A constant reference to an NQS_Const_par_t object containing the parameters.
-* @param _lower A constant reference to an NQSLS_p object representing the lower states.
-* @param _beta A constant reference to a 1D vector of doubles representing the beta values.
-*
-* This constructor performs the following actions:
-* - Initializes the base class NQS_ref with the provided parameters.
-* - Calculates the number of PP (nPP_) and the size of PP (PPsize_).
-* - Updates the full size of the NQS (info_p_.fullSize_).
-* - Allocates necessary resources.
-* - Sets additional information.
-*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const v_1d<double>& _beta)
-	: NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>(_p, _lower, _beta)
-{
-	this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
-	this->PPsize_			    = this->nPP_;
-	this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType>::size() + this->PPsize_; // full size of the NQS
-	this->allocate();
-	this->setInfo();
-}
-template NQS_PP<2u, double, double, double>::NQS_PP(const NQS_Const_par_t<2u, double, double, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<2u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<2u, std::complex<double>, std::complex<double>, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<2u, double, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<2u, double, std::complex<double>, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<2u, std::complex<double>, double, double>::NQS_PP(const NQS_Const_par_t<2u, std::complex<double>, double, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<4u, double, double, double>::NQS_PP(const NQS_Const_par_t<4u, double, double, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<4u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<4u, std::complex<double>, std::complex<double>, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<4u, double, std::complex<double>, double>::NQS_PP(const NQS_Const_par_t<4u, double, std::complex<double>, double>&, const NQSLS_p&, const v_1d<double>&);
-template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(const NQS_Const_par_t<4u, std::complex<double>, double, double>&, const NQSLS_p&, const v_1d<double>&);
 // ##########################################################################################################################################
 
 /**
@@ -127,7 +16,8 @@ template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(const NQS_Cons
 * @param _n The instance of NQS_PP to copy from.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>& _n)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>& _n)
 	: NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>(_n)
 {
 	this->pp_weights_	= _n.pp_weights_;
@@ -135,14 +25,7 @@ NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_PP<_spinMo
 	this->nPP_			= _n.nPP_;
 	this->spinSectors_	= _n.spinSectors_;
 }
-template NQS_PP<2u, double, double, double>::NQS_PP(const NQS_PP<2u, double, double, double>&);
-template NQS_PP<2u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_PP<2u, std::complex<double>, std::complex<double>, double>&);
-template NQS_PP<2u, double, std::complex<double>, double>::NQS_PP(const NQS_PP<2u, double, std::complex<double>, double>&);
-template NQS_PP<2u, std::complex<double>, double, double>::NQS_PP(const NQS_PP<2u, std::complex<double>, double, double>&);
-template NQS_PP<4u, double, double, double>::NQS_PP(const NQS_PP<4u, double, double, double>&);
-template NQS_PP<4u, std::complex<double>, std::complex<double>, double>::NQS_PP(const NQS_PP<4u, std::complex<double>, std::complex<double>, double>&);
-template NQS_PP<4u, double, std::complex<double>, double>::NQS_PP(const NQS_PP<4u, double, std::complex<double>, double>&);
-template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(const NQS_PP<4u, std::complex<double>, double, double>&);
+
 // ##########################################################################################################################################
 
 /**
@@ -161,7 +44,8 @@ template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(const NQS_PP<4
 * @param _other The NQS_PP object to move from.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>&& _other)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>&& _other)
 	: NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>(std::move(_other))
 {
 	this->pp_weights_	= std::move(_other.pp_weights_);
@@ -169,14 +53,7 @@ NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(NQS_PP<_spinModes, _
 	this->nPP_			= _other.nPP_;
 	this->spinSectors_	= std::move(_other.spinSectors_);
 }
-template NQS_PP<2u, double, double, double>::NQS_PP(NQS_PP<2u, double, double, double>&&);
-template NQS_PP<2u, std::complex<double>, std::complex<double>, double>::NQS_PP(NQS_PP<2u, std::complex<double>, std::complex<double>, double>&&);
-template NQS_PP<2u, double, std::complex<double>, double>::NQS_PP(NQS_PP<2u, double, std::complex<double>, double>&&);
-template NQS_PP<2u, std::complex<double>, double, double>::NQS_PP(NQS_PP<2u, std::complex<double>, double, double>&&);
-template NQS_PP<4u, double, double, double>::NQS_PP(NQS_PP<4u, double, double, double>&&);
-template NQS_PP<4u, std::complex<double>, std::complex<double>, double>::NQS_PP(NQS_PP<4u, std::complex<double>, std::complex<double>, double>&&);
-template NQS_PP<4u, double, std::complex<double>, double>::NQS_PP(NQS_PP<4u, double, std::complex<double>, double>&&);
-template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(NQS_PP<4u, std::complex<double>, double, double>&&);
+
 // ##########################################################################################################################################
 
 /**
@@ -197,7 +74,8 @@ template NQS_PP<4u, std::complex<double>, double, double>::NQS_PP(NQS_PP<4u, std
 * @param _other A shared pointer to the other instance to clone from.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::clone(MC_t_p _other)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::clone(MC_t_p _other)
 {
 	try
 	{
@@ -218,12 +96,8 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::clone(MC_t_p _other)
 	{
 		std::cerr << "Error in cloning the NQS PP object: " << e.what() << std::endl;
 	}
-
-	// clone the base class
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::clone(_other);
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(clone, void, (MC_t_p),);
 
 // ##########################################################################################################################################
 
@@ -241,12 +115,12 @@ NQS_PP_INST_CMB_ALL(clone, void, (MC_t_p),);
 * @tparam _CorrState The correlated state type.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setInfo()
 {
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::setInfo();
 	this->info_ += std::format("nPP={}", this->nPP_);	
 }
-NQS_PP_INST_CMB_ALL(setInfo, void, (),);
 
 // ##########################################################################################################################################
 
@@ -265,7 +139,8 @@ NQS_PP_INST_CMB_ALL(setInfo, void, (),);
 * @tparam _CorrState Correlation state type.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate()
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate()
 {
 	// !TODO implement changable number of fermions
 	// allocate weights
@@ -284,8 +159,6 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate()
 		// this->XTmp_(this->threads_.threads_[_thread].get_id()) = NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 // #endif
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(allocate, void, (),);
 
 // ##########################################################################################################################################
 
@@ -301,7 +174,8 @@ NQS_PP_INST_CMB_ALL(allocate, void, (),);
 * @param () The parameter list of the function.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::init()
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::init()
 {
 	// ######################################################################################################################################
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::init();
@@ -347,7 +221,6 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::init()
 	// this->pp_weights_.states_upd_		= {};
 	this->setX();
 }
-NQS_PP_INST_CMB_ALL(init, void, (),);
 
 // ##########################################################################################################################################
 
@@ -370,24 +243,14 @@ NQS_PP_INST_CMB_ALL(init, void, (),);
 * @return The computed ansatz as the product of the correlation part and the Pfaffian.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz(Config_cr_t _in) const
 {
 	const auto _FX = NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz(_in); // get the ansatz from the base class - correlation part
 	const auto _R  = this->getPfaffian(_in); 											// get the Pfaffian
 	return _FX * _R; 																	// return the product of the two
 };
-template double NQS_PP<2u, double, double, double>::ansatz(Config_cr_t) const;
-template double NQS_PP<3u, double, double, double>::ansatz(Config_cr_t) const;
-template double NQS_PP<4u, double, double, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, std::complex<double>, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, std::complex<double>, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, std::complex<double>, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, double, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, double, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::ansatz(Config_cr_t) const;
-template double NQS_PP<2u, std::complex<double>, double, double>::ansatz(Config_cr_t) const;
-template double NQS_PP<3u, std::complex<double>, double, double>::ansatz(Config_cr_t) const;
-template double NQS_PP<4u, std::complex<double>, double, double>::ansatz(Config_cr_t) const;
+
 // ##########################################################################################################################################
 
 /**
@@ -405,25 +268,14 @@ template double NQS_PP<4u, std::complex<double>, double, double>::ansatz(Config_
 * @return The logarithm of the ansatz for the given configuration.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatzlog(Config_cr_t _in) const
 {
 	const auto _FX = NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatzlog(_in); 	// get the ansatz from the base class - correlation part
 	const auto _R  = this->getPfaffianLog(_in); 									 		// get the Pfaffian logarithm
 	return _FX + _R; 																		// return the sum of the two
 }
-// template instantiation of the function above
-template double NQS_PP<2u, double, double, double>::ansatzlog(Config_cr_t) const;
-template double NQS_PP<3u, double, double, double>::ansatzlog(Config_cr_t) const;
-template double NQS_PP<4u, double, double, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, std::complex<double>, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, std::complex<double>, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, std::complex<double>, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, double, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, double, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::ansatzlog(Config_cr_t) const;
-template double NQS_PP<2u, std::complex<double>, double, double>::ansatzlog(Config_cr_t) const;
-template double NQS_PP<3u, std::complex<double>, double, double>::ansatzlog(Config_cr_t) const;
-template double NQS_PP<4u, std::complex<double>, double, double>::ansatzlog(Config_cr_t) const;
+
 // ##########################################################################################################################################
 
 /**
@@ -434,6 +286,7 @@ template double NQS_PP<4u, std::complex<double>, double, double>::ansatzlog(Conf
 * @note The ratio is calculated as: _other->ansatz / this->ansatz * _other->getPfaffian(_in) / this->getPfaffian(_in)
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz_ratiolog(Config_cr_t _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) const
 {
 	auto _nqs_pp_other 	= dynamic_cast<NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>*>(_other);
@@ -441,18 +294,7 @@ inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz_ratiolog(C
 	auto _R_ratio 		= _nqs_pp_other->getPfaffianLog(_in) - this->getPfaffianLog(_in); 						// get the ratio of the Pfaffian
 	return _FX_ratio + _R_ratio; 																				// return the sum of the two
 }
-template double NQS_PP<2u, double, double, double>::ansatz_ratiolog(Config_cr_t, NQS<2u, double, double, double>*) const;
-template double NQS_PP<3u, double, double, double>::ansatz_ratiolog(Config_cr_t, NQS<3u, double, double, double>*) const;
-template double NQS_PP<4u, double, double, double>::ansatz_ratiolog(Config_cr_t, NQS<4u, double, double, double>*) const;
-template std::complex<double> NQS_PP<2u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<2u, std::complex<double>, std::complex<double>, double>*) const;
-template std::complex<double> NQS_PP<3u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<3u, std::complex<double>, std::complex<double>, double>*) const;
-template std::complex<double> NQS_PP<4u, std::complex<double>, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<4u, std::complex<double>, std::complex<double>, double>*) const;
-template std::complex<double> NQS_PP<2u, double, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<2u, double, std::complex<double>, double>*) const;
-template std::complex<double> NQS_PP<3u, double, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<3u, double, std::complex<double>, double>*) const;
-template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::ansatz_ratiolog(Config_cr_t, NQS<4u, double, std::complex<double>, double>*) const;
-template double NQS_PP<2u, std::complex<double>, double, double>::ansatz_ratiolog(Config_cr_t, NQS<2u, std::complex<double>, double, double>*) const;
-template double NQS_PP<3u, std::complex<double>, double, double>::ansatz_ratiolog(Config_cr_t, NQS<3u, std::complex<double>, double, double>*) const;
-template double NQS_PP<4u, std::complex<double>, double, double>::ansatz_ratiolog(Config_cr_t, NQS<4u, std::complex<double>, double, double>*) const;
+
 // ##########################################################################################################################################
 
 /**
@@ -477,6 +319,7 @@ template double NQS_PP<4u, std::complex<double>, double, double>::ansatz_ratiolo
 *       returns 0 and needs to be implemented.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 u64 NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::getFPPIndex(int _spini, int _spinj, uint ri, uint rj) const
 {
 	if constexpr (_spinModes == 2)
@@ -499,7 +342,6 @@ u64 NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::getFPPIndex(int _spini,
 	else	// !TODO: implement for 4 spin modes
 		return 0;
 }
-NQS_PP_INST_CMB_ALL(getFPPIndex, u64, (int, int, uint, uint), const);
 
 // ##########################################################################################################################################
 
@@ -514,7 +356,8 @@ NQS_PP_INST_CMB_ALL(getFPPIndex, u64, (int, int, uint, uint), const);
 * @param _set set the matrices?
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(const Config_t& _st, bool _set)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(const Config_t& _st, bool _set)
 {
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(_st, _set);
 	if (_set)
@@ -524,7 +367,7 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(const Config_
 		this->setPfaffian();					// set Pfaffian value for newly set matrix given the 
 	}
 }
-NQS_PP_INST_CMB_ALL(setState, void, (const Config_t&, bool),);
+
 // ##########################################################################################################################################
 
 /**
@@ -534,7 +377,8 @@ NQS_PP_INST_CMB_ALL(setState, void, (const Config_t&, bool),);
 * @param _set set the matrices?
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(u64 _st, bool _set)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(u64 _st, bool _set)
 {
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(_st, _set);
 	if (_set)
@@ -544,7 +388,7 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setState(u64 _st, bool
 		this->setPfaffian();					// set Pfaffian value for newly set matrix
 	}
 }
-NQS_PP_INST_CMB_ALL(setState, void, (u64, bool),);
+
 // ##########################################################################################################################################
 
 /**
@@ -560,6 +404,7 @@ NQS_PP_INST_CMB_ALL(setState, void, (u64, bool),);
 * parameters, allowing for flexibility and reusability of the code.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setX(Config_cr_t _st)
 {
 	this->pp_weights_.X_	= this->calculateX(_st);											// first it calculates the X matrix
@@ -569,7 +414,6 @@ inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setX(Config_cr_
 #else
 #endif
 }
-NQS_PP_INST_CMB_ALL(setX, void, (Config_cr_t),);
 
 // ##########################################################################################################################################
 
@@ -589,12 +433,13 @@ NQS_PP_INST_CMB_ALL(setX, void, (Config_cr_t),);
 * @param _st The configuration state for which the Pfaffian is to be set.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setPfaffian()
 {
 	this->pp_weights_.pfaffian_ 	= this->getPfaffian(); 	// get the Pfaffian for the current state
 	this->pp_weights_.pfaffianLog_ 	= std::log(this->pp_weights_.pfaffian_);
 }
-NQS_PP_INST_CMB_ALL(setPfaffian, void, (),);
+
 // ##########################################################################################################################################
 
 /**
@@ -605,46 +450,25 @@ NQS_PP_INST_CMB_ALL(setPfaffian, void, (),);
 * for various types and configurations used in the codebase.
 * 
 * @param setPfaffian The name of the function template to instantiate.
-* @param void The return type of the function template.
+* @param inline void The return type of the function template.
 * @param () The parameter list of the function template.
 */
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::getPfaffian(Config_cr_t _st) const
 {
 	return algebra::Pfaffian::pfaffian(this->calculateX(_st), this->info_p_.nParticles_);
 }
-template double NQS_PP<2u, double, double, double>::getPfaffian(Config_cr_t) const;
-template double NQS_PP<3u, double, double, double>::getPfaffian(Config_cr_t) const;
-template double NQS_PP<4u, double, double, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, std::complex<double>, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, std::complex<double>, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, std::complex<double>, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
-template double NQS_PP<2u, cpx, double, double>::getPfaffian(Config_cr_t) const;
-template double NQS_PP<3u, cpx, double, double>::getPfaffian(Config_cr_t) const;
-template double NQS_PP<4u, cpx, double, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<2u, double, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<3u, double, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
-template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::getPfaffian(Config_cr_t) const;
+
 // ##########################################################################################################################################
 
 template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::getPfaffian() const 
 {
 	return algebra::Pfaffian::pfaffian(this->pp_weights_.X_, this->info_p_.nParticles_);
 }
-// template instantiation of the function above
-template double NQS_PP<2u, double, double, double>::getPfaffian() const;
-template double NQS_PP<3u, double, double, double>::getPfaffian() const;
-template double NQS_PP<4u, double, double, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<2u, std::complex<double>, std::complex<double>, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<3u, std::complex<double>, std::complex<double>, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<4u, std::complex<double>, std::complex<double>, double>::getPfaffian() const;
-template double NQS_PP<2u, cpx, double, double>::getPfaffian() const;
-template double NQS_PP<3u, cpx, double, double>::getPfaffian() const;
-template double NQS_PP<4u, cpx, double, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<2u, double, std::complex<double>, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<3u, double, std::complex<double>, double>::getPfaffian() const;
-template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::getPfaffian() const;
+
 // ##########################################################################################################################################
 
 /**
@@ -654,6 +478,7 @@ template std::complex<double> NQS_PP<4u, double, std::complex<double>, double>::
 * @returns whether the load has been successful
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 bool NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setWeights(std::string _path, std::string _file)
 {
 	if(!NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::setWeights(_path, _file))
@@ -667,7 +492,7 @@ bool NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setWeights(std::string
 	END_CATCH_HANDLER("Couldn't set the weights for the RBM PP NQS...", return false);
 	return true;
 }
-NQS_PP_INST_CMB_ALL(setWeights, bool, (std::string, std::string),);
+
 // ##########################################################################################################################################
 
 /**
@@ -679,6 +504,7 @@ NQS_PP_INST_CMB_ALL(setWeights, bool, (std::string, std::string),);
 * @returns whether the load has been successful
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 bool NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::saveWeights(std::string _path, std::string _file)
 {
 	BEGIN_CATCH_HANDLER
@@ -691,7 +517,7 @@ bool NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::saveWeights(std::strin
 	END_CATCH_HANDLER("Couldn't save the weights for the RBM NQS...", return false);
 	return true;
 }
-NQS_PP_INST_CMB_ALL(saveWeights, bool, (std::string, std::string),);
+
 // ##########################################################################################################################################
 
 /**
@@ -700,12 +526,12 @@ NQS_PP_INST_CMB_ALL(saveWeights, bool, (std::string, std::string),);
 * @note the function is called after the gradient is calculated and inlined to the optimization process
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::updateWeights()
 {
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::updateWeights();
 	this->setWeights();
 }
-NQS_PP_INST_CMB_ALL(updateWeights, void, (),);
 
 // ##########################################################################################################################################
 
@@ -717,11 +543,11 @@ NQS_PP_INST_CMB_ALL(updateWeights, void, (),);
 * The post-processing weights are used for additional transformations after the main NQS computation.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setWeights()
 {
 	const auto _prevsize = NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size();
 	this->pp_weights_.F_r1r2_s1s2_ = this->Weights_.subvec(_prevsize, this->PPsize_ - 1);
 }
-NQS_PP_INST_CMB_ALL(setWeights, void, (),);
 
 // ##########################################################################################################################################

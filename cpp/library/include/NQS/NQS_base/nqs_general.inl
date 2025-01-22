@@ -30,9 +30,19 @@ protected:
 	virtual void applyFlipsC()					override { NQS_LOG_ERROR_SPIN_MODES; };
 	virtual void setRandomFlipNum(uint _nFlips)	override { NQS_LOG_ERROR_SPIN_MODES; };
 
-	//////////////////////////////////////////////////////////////////////////////////////
-
+	// ***********************************************************************************
 	virtual auto clone() 						const -> MC_t_p override = 0;
-
-	//////////////////////////////////////////////////////////////////////////////////////
+	// ***********************************************************************************
 };
+
+// #######################################################################################################################################
+
+// create a concept that it needs to derive from the NQS_S
+
+// #######################################################################################################################################
+
+template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double, class _CorrState>
+// concept NQS_S_concept = std::is_base_of<NQS<_spinModes, _Ht, _T, _stateType>, _CorrState>::value;
+concept NQS_S_concept = std::is_convertible<_CorrState*, NQS_S<_spinModes, _Ht, _T, _stateType>*>::value;
+
+// #######################################################################################################################################

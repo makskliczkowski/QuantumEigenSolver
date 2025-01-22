@@ -1,6 +1,6 @@
 /**
-* @file rbm_pp.h
-* @brief Header file for the RBM_PP class, which implements the Restricted Boltzmann Machines (RBM) ansatz with Pair Product (PP) reference state for Neural Quantum States (NQS).
+* @file nqs_pp.h
+* @brief Header file for the NQS_PP class, which implements the Pair Product (PP) reference state for Neural Quantum States (NQS).
 * 
 * This class provides the implementation of the RBM ansatz with an additional Pair Product reference state, which is used to model quantum states. The class includes methods for setting and updating the state, calculating probabilities, managing weights, and computing the Pfaffian for the PP matrix.
 * 
@@ -25,13 +25,7 @@
 #endif
 // ***************************************************************************************
 #define NQS_REF_PP_USE_PFAFFIAN_UPDATE
-// ***************************************************************************************
-
-//////////////////////////////////////////////////////////////////////////////////////////
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! B A S E !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////
+// ***************************************************************************************`w
 
 template <typename _Ht, typename _T, class _stateType>
 struct NQS_PP_weights
@@ -93,14 +87,16 @@ struct NQS_PP_weights
 * overlap with a reference state. For simplicity, the reference state will be taken as the product of the single-particle states.
 */
 template <uint _spinModes, typename _Ht, typename _type = _Ht, class _stateType = double, class _CorrState = NQS_S<_spinModes, _Ht, _type, _stateType>>
+requires NQS_S_concept<_spinModes, _Ht, _type, _stateType, _CorrState>
 class NQS_PP : public NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>
 {
-	friend class MonteCarlo::MonteCarloSolver<_type, _stateType, NQS_STATE_R_T<_stateType>>;
 	// **********************************************************************************************************************
-	MCS_PUBLIC_TYPES(_type, _stateType, NQS_STATE_R_T); 			// type definitions for the Monte Carlo solver
-	NQS_PUBLIC_TYPES(_type, _stateType);							// type definitions for the NQS
+	MCS_PUBLIC_TYPES(_type, _stateType, NQS_STATE_R_T); 		// type definitions for the Monte Carlo solver
+	NQS_PUBLIC_TYPES(_type, _stateType);						// type definitions for the NQS
 	NQS_HAMIL_TYPES(_Ht, _spinModes);							// type definitions for the Hamiltonian
-	using NQSLS_p = typename NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>::NQSLS_p;
+	using NQSLS_p 	= typename NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>::NQSLS_p;
+	using NQS_t 	= NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>::NQS_t;
+	using NQS_t_p	= typename std::shared_ptr<NQS_t>;
 	// **********************************************************************************************************************
 protected:
 	uint nPP_					= 1;							// number of PP variational parameters (connected to the number of particles)
@@ -178,8 +174,26 @@ protected:														// -------------------------- T R A I N ----------------
 	// ***************************************************************************************************************************
 public: 				  
 	~NQS_PP() override											{ DESTRUCTOR_CALL;												};
-	NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _type, _stateType>& _p);
-	NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _type, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta);
+	NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _type, _stateType>& _p)
+		: NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>(_p)	
+	{
+		this->init();
+		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
+		this->PPsize_			    = this->nPP_;
+		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>::size() + this->PPsize_;
+		this->allocate();
+		this->setInfo();
+	}
+	NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _type, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+		: NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>(_p, _lower, _beta)	
+	{ 
+		this->init();
+		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
+		this->PPsize_			    = this->nPP_;
+		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _type, _stateType, _CorrState>::size() + this->PPsize_;
+		this->allocate();
+		this->setInfo();
+	};
 	NQS_PP(const NQS_PP<_spinModes, _Ht, _type, _stateType, _CorrState>& _other);
 	NQS_PP(NQS_PP<_spinModes, _Ht, _type, _stateType, _CorrState>&& _other);
 	// **********************************************************************************************************************
@@ -203,10 +217,11 @@ public:
 	// **********************************************************************************************************************
 };
 
+// ##########################################################################################################################
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #define NQS_PP_INST_CMB(_Ht, _T, FUN, FUNRET, ARGS, ADD) 									\
 					template FUNRET  NQS_PP<2u, _Ht, _T, double>::FUN ARGS ADD; 			\
-					template FUNRET  NQS_PP<3u, _Ht, _T, double>::FUN ARGS ADD; 			\
 					template FUNRET  NQS_PP<4u, _Ht, _T, double>::FUN ARGS ADD;
 
 #define NQS_PP_INST_CMB_ALL(FUN, FUNRET, ARGS, ADD) 										\

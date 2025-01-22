@@ -1,4 +1,4 @@
-#include "../../../../include/NQS/NQS_ref_base/PP/nqs_pp_spins.hpp"
+#include "./nqs_pp_spins.hpp"
 
 // ##########################################################################################################################################
 
@@ -21,8 +21,9 @@
 * @returns The Pfaffian matrix.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
 typename NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::NQSW
-NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::calculateX(Config_cr_t _n) const
+inline NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::calculateX(Config_cr_t _n) const
 {
 	// remember that FF is such that is starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN})
 	NQSW _out(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
@@ -55,11 +56,6 @@ NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::calculateX(Config_cr_t _n) const
 	}
 	return _out;
 }
-// template instantiation
-template class NQS_PP_S<2, double, double, double>;
-template class NQS_PP_S<2, std::complex<double>, std::complex<double>, double>;
-template class NQS_PP_S<2, double, std::complex<double>, double>;
-template class NQS_PP_S<2, std::complex<double>, double, double>;
 // ##########################################################################################################################################
 
 #ifndef NQS_USE_VEC_ONLY
@@ -116,7 +112,8 @@ template class NQS_PP_S<2, std::complex<double>, double, double>;
 * @param fV The value before the flip.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int fP, float fV)
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int fP, float fV)
 {
 	// remember that FF is such that it starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN} = {I, II} , {III, IV})
 	// if the fP is known, only the column and row containing it shall be updated
@@ -153,11 +150,6 @@ void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int fP, float fV
 		this->pp_weights_.X_upd_[0](i, fP) = -value;
 	}
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::setX_changed(int, float);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::setX_changed(int, float);
-template void NQS_PP_S<2, double, std::complex<double>, double>::setX_changed(int, float);
-template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(int, float);
 // ##########################################################################################################################################
 
 /**
@@ -174,7 +166,8 @@ template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(in
 * @param X_t Matrix to be updated.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, dbl_ini_t _fV, NQSW& X_t) 
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, dbl_ini_t _fV, NQSW& X_t) 
 {
     const auto nParticles = this->info_p_.nParticles_;
     const auto nVis = this->info_p_.nVis_;
@@ -221,11 +214,6 @@ void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, d
         }
     }
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::setX_changed(int_ini_t, dbl_ini_t, NQSW&);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t, NQSW&);
-template void NQS_PP_S<2, double, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t, NQSW&);
-template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(int_ini_t, dbl_ini_t, NQSW&);
 // ##########################################################################################################################################
 
 /**
@@ -245,7 +233,8 @@ template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(in
 * @param X_t Matrix to be updated based on the new particle states.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, dbl_ini_t _fV, v_1d<NQSB>& X_t)
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, dbl_ini_t _fV, v_1d<NQSB>& X_t)
 {
 	const auto nParticles 	= this->info_p_.nParticles_;
 	const auto nVis	 		= this->info_p_.nVis_;
@@ -295,11 +284,6 @@ void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, d
 		}
 	}
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::setX_changed(int_ini_t, dbl_ini_t, v_1d<NQSB>&);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t, v_1d<NQSB>&);
-template void NQS_PP_S<2, double, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t, v_1d<NQSB>&);
-template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(int_ini_t, dbl_ini_t, v_1d<NQSB>&);
 // ##########################################################################################################################################
 
 /**
@@ -317,15 +301,11 @@ template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(in
 * @param _fV Initial value for the value.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int_ini_t _fP, dbl_ini_t _fV)
 {
 	this->setX_changed(_fP, _fV, this->pp_weights_.X_upd_);
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::setX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, double, std::complex<double>, double>::setX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(int_ini_t, dbl_ini_t);
 // ##########################################################################################################################################
 
 /**
@@ -342,6 +322,7 @@ template void NQS_PP_S<2, std::complex<double>, double, double>::setX_changed(in
 * @param _fV The value used to update X_changed.
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::updX_changed(int_ini_t _fP, dbl_ini_t _fV)
 {
 	// check if the _fP.size() is the same as the _X_upd_.size() and resize if necessary by updating the X matrix
@@ -355,12 +336,6 @@ inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::updX_changed(int_ini_t
 		this->pp_weights_.X_.col(_fPin) = -this->pp_weights_.X_upd_[i];
 	}
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::updX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::updX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, double, std::complex<double>, double>::updX_changed(int_ini_t, dbl_ini_t);
-template void NQS_PP_S<2, std::complex<double>, double, double>::updX_changed(int_ini_t, dbl_ini_t);
-
 // ##########################################################################################################################################
 
 /**
@@ -378,16 +353,12 @@ template void NQS_PP_S<2, std::complex<double>, double, double>::updX_changed(in
 * @see NQS_PP_S::setX_changed for the calculation of the updated matrix !
 */
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<2u, _Ht, _T, _stateType, _CorrState>
 inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::updX_changed(int fP)
 {
 	this->pp_weights_.X_.row(fP) = 	this->pp_weights_.X_upd_[0];
 	this->pp_weights_.X_.col(fP) = -this->pp_weights_.X_upd_[0];
 }
-// template instantiation
-template void NQS_PP_S<2, double, double, double>::updX_changed(int);
-template void NQS_PP_S<2, std::complex<double>, std::complex<double>, double>::updX_changed(int);
-template void NQS_PP_S<2, double, std::complex<double>, double>::updX_changed(int);
-template void NQS_PP_S<2, std::complex<double>, double, double>::updX_changed(int);
 // ##########################################################################################################################################
 
 

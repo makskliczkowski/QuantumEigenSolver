@@ -1,5 +1,4 @@
-#include "../../../../include/NQS/NQS_ref_base/PP/nqs_pp.h"
-#include "armadillo"
+#include "./nqs_pp.tpp"
 
 // ##########################################################################################################################################
 
@@ -23,7 +22,8 @@
 * @param _plc The index of the parameter to be updated.
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::grad(Config_cr_t _v, uint _plc)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::grad(Config_cr_t _v, uint _plc)
 {
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::grad(_v, _plc);       // calculate the derivative of the previous part (correlated part)
 	
@@ -69,8 +69,6 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::grad(Config_cr_t _v, u
 		_spinIter += this->info_p_.nParticlesSquared_;
 	}
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(grad, void, (Config_cr_t, uint), );
 
 // ##########################################################################################################################################
 
@@ -87,7 +85,8 @@ NQS_PP_INST_CMB_ALL(grad, void, (Config_cr_t, uint), );
 * @warning values are stored in flipVals_ before the flip, hence "-" is taken
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(uint nFlips)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(uint nFlips)
 {
 	// update the angles in the RBM
 	NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::update(nFlips);
@@ -101,8 +100,7 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(uint nFlips)
     this->pp_weights_.pfaffian_     = this->pp_weights_.pfaffianNew_;
     this->pp_weights_.pfaffianLog_  = this->pp_weights_.pfaffianNewLog_;
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(update, void, (uint), );
+
 // ##########################################################################################################################################
 
 /**
@@ -110,7 +108,8 @@ NQS_PP_INST_CMB_ALL(update, void, (uint), );
 * @param nFlips number of flips to be used
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::unupdate(uint nFlips)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::unupdate(uint nFlips)
 {
     NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::unupdate(nFlips);
 	// unupdate the Pffafian matrix
@@ -119,8 +118,7 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::unupdate(uint nFlips)
 	// this->Xnew_			= this->X_;
 	// this->pfaffianNew_	= this->pfaffian_;
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(unupdate, void, (uint), );
+
 // ##########################################################################################################################################
 
 /**
@@ -130,7 +128,8 @@ NQS_PP_INST_CMB_ALL(unupdate, void, (uint), );
 * @warning values are stored in flipVals_ before the flip, hence "-" is taken
 */
 template<uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(Config_cr_t v, uint nFlips)
+requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(Config_cr_t v, uint nFlips)
 {
     NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::update(v, nFlips);
 #ifdef NQS_REF_PP_USE_PFAFFIAN_UPDATE
@@ -141,8 +140,7 @@ void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::update(Config_cr_t v, 
     this->pp_weights_.pfaffian_     = this->pp_weights_.pfaffianNew_;
     this->pp_weights_.pfaffianLog_  = this->pp_weights_.pfaffianNewLog_;
 }
-// template instantiation of the function above
-NQS_PP_INST_CMB_ALL(update, void, (Config_cr_t, uint), );
+
 // ##########################################################################################################################################
 #endif
 

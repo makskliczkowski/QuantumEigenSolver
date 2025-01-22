@@ -1,7 +1,9 @@
-#include "./nqs_pp_spins.hpp"
+#include "./nqs_pp_spins.tpp"
+
 // ##########################################################################################################################################
 
 template <typename _Ht, typename _T, class _stateType, class _CorrState>
+requires NQS_S_concept<4u, _Ht, _T, _stateType, _CorrState>
 class NQS_PP_S<4u, _Ht, _T, _stateType, _CorrState> : public NQS_PP<4, _Ht, _T, _stateType, _CorrState>
 {
     // **********************************************************************************************************************
