@@ -423,22 +423,24 @@ template std::pair<arma::Col<cpx>, arma::Col<cpx>> nqs_perform_diag<cpx, 2>(int 
 * 
 * @throws std::invalid_argument If an unknown NQS type is specified.
 */
-template<typename _T, uint _spinModes>
-inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl, const v_1d<double>& _beta)
+template <typename _T, uint _spinModes, typename  _Ht, typename _stateType>
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+		std::shared_ptr<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQS, 
+		const v_sp_t<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQSl, 
+		const v_1d<double>& _beta)
 {
-	auto createNQS = [&](auto&&... args) -> std::shared_ptr<NQS<_spinModes, _T>> {
+	auto createNQS = [&](auto&&... args) -> std::shared_ptr<NQS_NS::NQS<_spinModes, _T>> {
 		switch (this->nqsP.type_)
 		{
-		case NQSTYPES::RBM_T:
-			return std::make_shared<RBM_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
-		case NQSTYPES::RBMPP_T:
-			return std::make_shared<NQS_PP_S<_spinModes, _T, _T, double, RBM_S<_spinModes, _T>>>(std::forward<decltype(args)>(args)...);
+		case NQS_NS::NQSTYPES::RBM_T:
+			return std::make_shared<NQS_NS::RBM_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
+		case NQS_NS::NQSTYPES::RBMPP_T:
+			return std::make_shared<NQS_NS::NQS_PP_S<_spinModes, _T, _T, double, NQS_NS::RBM_S<_spinModes, _T>>>(std::forward<decltype(args)>(args)...);
 		default:
 			throw std::invalid_argument("Unknown NQS type");
 		}
 	};
-	NQS_Const_par_t<_spinModes, _T> _parNQS;
+	NQS_NS::NQS_Const_par_t<_spinModes, _T> _parNQS;
 	_parNQS.nHid_ 		= { this->nqsP.nqs_nh_ };
 	_parNQS.lr_ 		= { this->nqsP.nqs_lr_ };
 	_parNQS.threadNum_ 	= this->threadNum;
@@ -494,8 +496,8 @@ void UI::nqsExcited()
 	// define the NQS states for the excited states
 	arma::Col<_T>	_meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 	
-	v_sp_t<NQS<_spinModes, _T>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);					// define the NQS states
-	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);											// define the first one already here for the ground state
+	v_sp_t<NQS_NS::NQS<_spinModes, _T, _T, double>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);				// define the NQS states
+	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);															// define the first one already here for the ground state
 	
 	{
 		LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
@@ -540,7 +542,7 @@ void UI::nqsExcited()
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0)));
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, Nvis - 1)));
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, {1, Nvis - 1})));
-		_timespace 			= time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
+		_timespace 			= NQS_NS::time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
 		saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
 	}
 
@@ -560,7 +562,7 @@ void UI::nqsExcited()
 	LOGINFO(nqsInfo, LOG_TYPES::TRACE, 2);
 	LOGINFO(1);
 
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};									// define the NQS states for the excited states
+	v_sp_t<NQS_NS::NQS<_spinModes, _T, _T, double>> _NQS_lower = {};							// define the NQS states for the excited states
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 
 	{
 		_timer.checkpoint(VEQ(i));
@@ -569,7 +571,7 @@ void UI::nqsExcited()
 		// define the NQS states for the excited states
 		if (!_NQS[i]) 
 		{
-			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, 
+			this->defineNQS<_T, _spinModes, _T, double>(_H, _NQS[i], _NQS_lower, 
 				{ this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });	
 		}
 		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
@@ -594,7 +596,7 @@ void UI::nqsExcited()
 			{
 				auto bestSolver = _pt->getBestSolver();
 				if (bestSolver)
-					_NQS[i] = std::dynamic_pointer_cast<NQS<_spinModes, _T>>(bestSolver);
+					_NQS[i] = std::dynamic_pointer_cast<NQS_NS::NQS<_spinModes, _T>>(bestSolver);
 			}
 			
 		}
@@ -708,10 +710,10 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS<2, double>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<2, double>>>& _NQSl, const v_1d<double>& _beta);
-template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, std::shared_ptr<NQS<2, cpx>>& _NQS,
-		const v_1d<std::shared_ptr<NQS<2, cpx>>>& _NQSl, const v_1d<double>& _beta);	 	
+template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS_NS::NQS<2, double>>& _NQS, 
+		const v_1d<std::shared_ptr<NQS_NS::NQS<2, double>>>& _NQSl, const v_1d<double>& _beta);
+template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, std::shared_ptr<NQS_NS::NQS<2, cpx>>& _NQS,
+		const v_1d<std::shared_ptr<NQS_NS::NQS<2, cpx>>>& _NQSl, const v_1d<double>& _beta);	 	
 
 // %%%%%%%%%%%%%%%%%%%%% DEFINE THE TEMPLATES %%%%%%%%%%%%%%%%%%%%%
 template void UI::nqsExcited<double, 2>();

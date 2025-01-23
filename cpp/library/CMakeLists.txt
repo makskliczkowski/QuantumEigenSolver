@@ -217,6 +217,7 @@ set(SOURCES
     src/nqs/nqs_evo.cpp
     src/nqs/rbm/rbm.cpp
     src/nqs/rbm/rbm_spin.cpp
+    src/nqs/nqs_inst.cpp
     src/nqs/operators/nqs_operator.cpp
     src/user_interface/ui_check_eth.cpp
     src/user_interface/ui_check_nqs.cpp

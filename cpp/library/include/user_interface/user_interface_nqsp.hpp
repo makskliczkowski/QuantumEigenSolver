@@ -83,7 +83,7 @@ namespace UI_PARAMS
 	struct NqsP 
 	{
 		v_1d<u64> layersDim;
-		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM_T);
+		UI_PARAM_CREATE_DEFAULT(type, NQS_NS::NQSTYPES, NQS_NS::NQSTYPES::RBM_T);
 		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
 		UI_PARAM_CREATE_DEFAULTD(nqs_nh, double, 1);
 		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
