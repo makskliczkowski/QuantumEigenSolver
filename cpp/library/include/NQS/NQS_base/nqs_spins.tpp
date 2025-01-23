@@ -22,10 +22,12 @@ namespace NQS_NS
 		virtual ~NQS_S() 	= default;
 		NQS_S() 			= default;
 		NQS_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p)
+			: NQS<2, _Ht, _T, _stateType>(_p)
 		{ 
 
 		};
 		NQS_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const ::std::vector<double>& _beta)
+			: NQS<2, _Ht, _T, _stateType>(_p, _lower, _beta)
 		{ 
 
 		};

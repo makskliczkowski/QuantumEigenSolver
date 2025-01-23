@@ -33,7 +33,7 @@ namespace NQS_NS
 	#ifdef NQS_ANGLES_UPD
 		//val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_));
 		// val				=	std::exp(val * this->bV_(fP)) * arma::prod(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_);
-		return val * this->bV_(fP) + RBM_ACCU_ARMA(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP))) - this->thetaCOSH_log_);
+		return val * this->bV_(fP) + RBM_ACCU(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP))) - this->thetaCOSH_log_);
 	#else
 		// flip the temporary vector
 		this->tmpVec_	=	this->curVec_;
@@ -74,7 +74,7 @@ namespace NQS_NS
 	#ifdef NQS_ANGLES_UPD
 		//val				=	val * this->bV_(fP) + arma::sum(arma::log(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_));
 		// val				=	std::exp(val * this->bV_(fP)) * arma::prod(arma::cosh(this->theta_ + val * this->W_.col(fP)) / this->thetaCOSH_);
-		return val1 * this->bV_(f1) + val2 * this->bV_(f2) + RBM_ACCU_ARMA(arma::log(arma::cosh(this->theta_ + val1 * this->W_.col(f1) + val2 * this->W_.col(f2))) - this->thetaCOSH_log_);
+		return val1 * this->bV_(f1) + val2 * this->bV_(f2) + RBM_ACCU(arma::log(arma::cosh(this->theta_ + val1 * this->W_.col(f1) + val2 * this->W_.col(f2))) - this->thetaCOSH_log_);
 	#else
 		// flip the temporary vector
 		this->tmpVec_	=	this->curVec_;
@@ -116,7 +116,7 @@ namespace NQS_NS
 		_T val				=	0;									// set the starting point
 	#if defined NQS_NOT_OMP_MT
 		// const auto _thId	=	std::this_thread::get_id();
-		arma::Col<_T>& thetaTMP	= this->thetaTMP_;					// thread local storage
+		auto& thetaTMP		= this->thetaTMP();						// thread local storage
 	#else
 		arma::Col<_T>& thetaTMP	= this->thetaTmpCol_;
 	#endif
@@ -133,7 +133,7 @@ namespace NQS_NS
 		// use value as the change already
 	#ifdef NQS_ANGLES_UPD
 	#	ifdef NQS_NOT_OMP_MT
-		return val + RBM_ACCU_ARMA(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
+		return val + RBM_ACCU(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
 	#	else
 		// val				=	std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_) / this->thetaCOSH_);
 		return val + RBM_ACCU_ARMA(arma::log(arma::cosh(this->thetaTmp_)) - this->thetaCOSH_log_);
@@ -171,7 +171,7 @@ namespace NQS_NS
 	template<typename _Ht, typename _T, class _stateType>
 	inline _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1, Config_cr_t _v2)
 	{
-		return arma::dot(this->bV_, arma::Col<_stateType>(_v2 - _v1)) + RBM_ACCU_ARMA(arma::log(this->coshF(_v2)) - arma::log(this->coshF(_v1)));
+		return arma::dot(this->bV_, arma::Col<_stateType>(_v2 - _v1)) + RBM_ACCU(arma::log(this->coshF(_v2)) - arma::log(this->coshF(_v1)));
 	}
 
 	// function instantiations
@@ -201,7 +201,7 @@ namespace NQS_NS
 	inline _T RBM_S<2, _Ht, _T, _stateType>::logPRatio(Config_cr_t _v1)
 	{
 	#ifdef NQS_ANGLES_UPD
-		return arma::dot(this->bV_, _v1 - this->curVec_) + RBM_ACCU_ARMA(arma::log(this->coshF(_v1)) - this->thetaCOSH_log_);
+		return arma::dot(this->bV_, _v1 - this->curVec_) + RBM_ACCU(arma::log(this->coshF(_v1)) - this->thetaCOSH_log_);
 	#else
 		return arma::dot(this->bV_, _v1 - this->curVec_) + RBM_ACCU_ARMA(arma::log(this->coshF(_v1)) - arma::log(this->coshF(this->curVec_)));
 	#endif
@@ -248,7 +248,7 @@ namespace NQS_NS
 		_T val			= 0.0;
 		double currVal	= 0.0;
 	#if defined NQS_NOT_OMP_MT
-		auto& thetaTMP	= this->thetaTMP_;							// thread local storage
+		auto& thetaTMP	= this->thetaTMP();
 	#else
 		arma::Col<_T>& thetaTMP	= this->thetaTmpCol_;
 	#endif
@@ -263,7 +263,7 @@ namespace NQS_NS
 		}
 	#ifdef NQS_ANGLES_UPD
 		// val = std::exp(val) * arma::prod(arma::cosh(this->thetaTmp_[thId]) / this->thetaCOSH_);
-		return val + RBM_ACCU_ARMA(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
+		return val + RBM_ACCU(arma::log(arma::cosh(thetaTMP)) - this->thetaCOSH_log_);
 	#else
 		// val = val * arma::prod(this->coshF(this->tmpVec) / this->coshF(this->curVec));
 		return val * this->bV_(fP) + RBM_ACCU_ARMA(arma::log(this->coshF(this->tmpVec_)) - arma::log(this->coshF(this->curVec_)));

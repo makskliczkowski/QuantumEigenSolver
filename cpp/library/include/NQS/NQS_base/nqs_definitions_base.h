@@ -367,6 +367,11 @@ namespace NQS_NS
 		NQS_thread_t()					=	default;
 		~NQS_thread_t()					{ this->threads_.clear(); };
 	};
+
+	// map for the threads
+	template <typename _T, class _Class>
+	using NQS_PAR_MAP_t = std::unordered_map<std::thread::id, _Class>;
+
 	//////////////////////////////////////////////////////////////////////////////////////////
 	#define NQS_DERIV_INST_TYPES(ret, fun, args) 									\
 						template ret NQS_deriv<double, double>::fun args; 			\

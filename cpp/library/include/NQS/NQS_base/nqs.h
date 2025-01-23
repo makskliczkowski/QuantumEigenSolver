@@ -66,10 +66,10 @@ namespace NQS_NS
 		Hamil_t_p H_;														// pointer to the Hamiltonian instance (for the energy calculation)
 		// **********************************************************************************************************************************
 	protected:																// ---------------------- T H R E A D I N G ---------------------
-	#ifdef NQS_NOT_OMP_MT
+#ifdef NQS_NOT_OMP_MT
 		bool initThreads(uint _threadNum = 0);
 		NQS_thread_t<_T> threads_;											// thread information
-	#endif
+#endif
 
 	protected:																// ----------------------- T R A I N I N G ----------------------
 		// **********************************************************************************************************************************
@@ -86,9 +86,9 @@ namespace NQS_NS
 		// **********************************************************************************************************************************
 		// ------------------------ W E I G H T S -----------------------
 		NQS_deriv<_stateType, _T> derivatives_;								// derivatives of the NQS (contains the gradients and the parameters)
-	#ifdef NQS_USESR_MAT_USED
+#ifdef NQS_USESR_MAT_USED
 		NQSW S_;															// positive semi-definite covariance matrix - to be optimized (inverse of the Fisher information matrix)
-	#else 
+#else 
 		Precond_t_p precond_ 				= 		nullptr;				// preconditioner for the conjugate gradient
 		Solver_t_p solver_ 					= 		nullptr;				// solver for the Fisher matrix inversion
 	public:
@@ -184,11 +184,11 @@ namespace NQS_NS
 		// ***********************************************************************************************************************************
 	protected:																// ----------------------- W E I G H T S -------------------------
 		// ***********************************************************************************************************************************
-	#ifdef NQS_ANGLES_UPD
+#ifdef NQS_ANGLES_UPD
 		virtual void update(uint nFlips = 1); 								// update the weights after one flip (if needed and possible)
 		virtual void update(Config_cr_t v, uint nFlips = 1);		 		// update the weights after state change (if needed and possible)
 		virtual void unupdate(uint nFlips = 1)								{}; // unupdate the weights after one flip (if needed and possible)
-	#endif
+#endif
 		// ***********************************************************************************************************************************
 	public:
 		virtual void setWeights()											= 0; // set the weights of the NQS
@@ -208,10 +208,10 @@ namespace NQS_NS
 		// ***********************************************************************************************************************************
 	protected:																// --------------------- T R A I N   E T C -----------------------
 		virtual void gradF(const Container_t& _energies, int step = 0, _T _cL = 0.0);
-	#ifdef NQS_USESR
+#ifdef NQS_USESR
 		virtual void gradSR(uint step = 0, _T _cL = 0.0);					// stochastic reconfiguration
 		virtual void covMatrixReg(int _step = 0, _T _cL = 0.0);
-	#endif
+#endif
 		virtual void grad(Config_cr_t _v, uint _plc)						= 0;
 		virtual void gradFinal(const Container_t& _energies, int step = 0, _T _cL = 0.0);
 		// ***********************************************************************************************************************************
@@ -223,9 +223,9 @@ namespace NQS_NS
 		std::function<_T(int_ini_t, dbl_ini_t)> pKernelFunc_;				// function for the probability ratio - for the kernel
 		std::function<_T(int_ini_t, dbl_ini_t)> logPKernelFunc_;			// function for the probability ratio - for the log
 		auto locEnKernel()									-> _T;			// local energy kernel - for the energy calculation										
-	#ifdef NQS_NOT_OMP_MT
+#ifdef NQS_NOT_OMP_MT
 		virtual void locEnKernel(uint _start, uint _end, uint _threadNum);
-	#endif
+#endif
 		// ***********************************************************************************************************************************
 	public:																	// ------------------------ S E T T E R S ------------------------
 		virtual void setRandomState(bool _upd = true) override;				// set the random state of the NQS	
@@ -241,9 +241,9 @@ namespace NQS_NS
 		auto getF()								const -> NQSB				{ return this->F_;						};
 		auto full_size()						const -> size_t				{ return this->info_p_.fullSize_;		};
 		virtual auto size()						const -> size_t				= 0;
-	#ifdef NQS_USESR_MAT_USED	
+#ifdef NQS_USESR_MAT_USED	
 		auto getCovarianceMat()					const -> NQSW				{ return this->S_;						};	
-	#endif	
+#endif
 		// Hilbert	
 		auto getHilbertSize()					const -> u64				{ return this->info_p_.Nh_;				};
 		auto getHilbertSpace() 					const -> Hilbert_cr_t		{ return this->H_->getHilbertSpace();	};
@@ -338,6 +338,7 @@ namespace NQS_NS
 		virtual auto ansatz_ratio(Config_cr_t _in, NQS<_spinModes, _Ht, _T, _stateType>* _other) 		const -> _T 	{ return std::exp(this->ansatz_ratiolog(_in, _other)); };
 		// ***********************************************************************************************************************************
 	public:																	// -------------------- C O N S T R U C T --------------------
+		// ***********************************************************************************************************************************
 		virtual ~NQS() override;
 		NQS() = default;
 		NQS(const NQS& _n);

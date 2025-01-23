@@ -551,6 +551,9 @@ namespace NQS_NS
     template NQS<2u, cpx, double, double>::NQS(const NQS_Const_par_t<2u, cpx, double, double>&);
     template NQS<3u, cpx, double, double>::NQS(const NQS_Const_par_t<3u, cpx, double, double>&);
     template NQS<4u, cpx, double, double>::NQS(const NQS_Const_par_t<4u, cpx, double, double>&);
+    template NQS<2u, double, cpx, double>::NQS(const NQS_Const_par_t<2u, double, cpx, double>&);
+    template NQS<3u, double, cpx, double>::NQS(const NQS_Const_par_t<3u, double, cpx, double>&);
+    template NQS<4u, double, cpx, double>::NQS(const NQS_Const_par_t<4u, double, cpx, double>&);
     // ##########################################################################################################################################
 
     template <uint _spinModes, typename _Ht, typename _T, class _stateType>
@@ -577,6 +580,9 @@ namespace NQS_NS
     template NQS<2u, cpx, double, double>::NQS(const NQS_Const_par_t<2u, cpx, double, double>&, const NQSLS_p&, const std::vector<double>&);
     template NQS<3u, cpx, double, double>::NQS(const NQS_Const_par_t<3u, cpx, double, double>&, const NQSLS_p&, const std::vector<double>&);
     template NQS<4u, cpx, double, double>::NQS(const NQS_Const_par_t<4u, cpx, double, double>&, const NQSLS_p&, const std::vector<double>&);
+    template NQS<2u, double, cpx, double>::NQS(const NQS_Const_par_t<2u, double, cpx, double>&, const NQSLS_p&, const std::vector<double>&);
+    template NQS<3u, double, cpx, double>::NQS(const NQS_Const_par_t<3u, double, cpx, double>&, const NQSLS_p&, const std::vector<double>&);
+    template NQS<4u, double, cpx, double>::NQS(const NQS_Const_par_t<4u, double, cpx, double>&, const NQSLS_p&, const std::vector<double>&);
     // ##########################################################################################################################################
 
     /**

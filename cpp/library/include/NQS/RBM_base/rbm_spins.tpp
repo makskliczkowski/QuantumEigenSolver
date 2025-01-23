@@ -10,8 +10,8 @@
 #	define RBM_SPIN_UPD(_val) 1.0 - 2.0 * _val
 #endif
 
-#define RBM_ACCU_ARMA arma::accu
-// #define RBM_ACCU_ARMA arma::sum
+#define RBM_ACCU arma::accu
+// #define RBM_ACCU arma::sum
 namespace NQS_NS
 {
 	/**

@@ -62,11 +62,6 @@ namespace NQS_NS
 		if (this->theta_.is_empty()) 		this->theta_.resize(this->nHid_);
 		if (this->thetaCOSH_.is_empty()) 	this->thetaCOSH_.resize(this->nHid_);
 		if (this->W_.is_empty()) 			this->W_.resize(this->nHid_, this->info_p_.nVis_);
-
-	#ifdef NQS_NOT_OMP_MT
-	// 	for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)	// allocate the vector for using it in the RBM
-		this->thetaTMP_ 	= NQSB(this->nHid_);
-	#endif
 		this->thetaTmpCol_ 	= NQSB(this->nHid_);
 		NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();						// allocate the rest
 	}

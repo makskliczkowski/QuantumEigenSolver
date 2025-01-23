@@ -46,7 +46,15 @@ namespace NQS_NS
 	protected:													// ---------------------- T H R E A D I N G ---------------------
 		// !TODO - implement the threading for the RBM with better handling of the threads
 	#ifdef NQS_NOT_OMP_MT
-		thread_local static inline NQSB thetaTMP_;				// Thread-local storage for thetaTMP
+		thread_local static inline NQS_PAR_MAP_t<_T, NQSB> thetaTMP_;
+		NQSB& thetaTMP()
+		{
+			const auto _id = Threading::id();
+			if (!this->thetaTMP_.contains(_id))
+				this->thetaTMP_[_id] = NQSB();
+			return this->thetaTMP_.at(_id);
+		}
+		// **********************************************************************************************************************
 	#endif
 		// **********************************************************************************************************************
 	protected:													// ----------------------- S T A R T E R S -----------------------
