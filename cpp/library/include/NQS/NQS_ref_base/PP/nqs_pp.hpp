@@ -8,24 +8,22 @@ namespace NQS_NS
 	inline NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
 		: NQS_ref_t(_p)	
 	{
-		this->init();
 		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
 		this->PPsize_			    = this->nPP_;
 		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_;
-		this->allocate();
+		this->init();
 		this->setInfo();
 	}
 
 	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
 		: NQS_ref_t(_p, _lower, _beta)	
 	{ 
-		this->init();
 		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
-		this->PPsize_			    = this->nPP_;
+		this->PPsize_			    = NQS_ref_t::size() + this->nPP_;
 		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_;
-		this->allocate();
+		this->init();
 		this->setInfo();
 	};
 
@@ -202,12 +200,12 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	* @param void The return type of the function.
 	* @param () The parameter list of the function.
 	*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::init()
 	{
 		// ######################################################################################################################################
-		NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::init();
+		NQS_ref_t::init();
 		// ######################################################################################################################################
 		const double std_dev = 1.0 / std::sqrt(this->nPP_);
 		// ######################################################################################################################################
@@ -239,16 +237,8 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 		}
 		// !TODO: Implement this in a more general way - set the weights in the Weights_ vector to the PP weights
 		// set the weights in the Weights_ vector to the PP weights 
-		this->Weights_.subvec(NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size(), this->PPsize_ - 1) = this->pp_weights_.F_r1r2_s1s2_;
-
-		// initialize local variables
-		this->pp_weights_.pfaffian_ 		= this->getPfaffian();
-		// this->pp_weights_.pfaffianNew_		= this->pp_weights_.pfaffian_;
-		// this->pp_weights_.pfaffianNewLog_ 	= this->pp_weights_.pfaffianLog_;
-		// other static variables
-		// this->pp_weights_.X_upd_			= {};
-		// this->pp_weights_.states_upd_		= {};
-		this->setX();
+		this->Weights_.subvec(NQS_ref_t::size(), this->PPsize_ - 1) = this->pp_weights_.F_r1r2_s1s2_;
+		// ######################################################################################################################################
 	}
 
 	// ##########################################################################################################################################
@@ -358,7 +348,7 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 				if (_spinj)
 					return ri * this->info_p_.nSites_ + rj;
 				else
-					return this->info_p_.nSitesSquared_ + ri * this->info_p_.nSitesSquared_ + rj;
+					return this->info_p_.nSitesSquared_ + ri * this->info_p_.nSites_ + rj;
 			}
 			else
 			{

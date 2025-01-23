@@ -18,7 +18,6 @@ namespace NQS_NS
 		this->nHid_ 			= _p.nHid_[0];
 		this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
 		this->info_p_.fullSize_ = this->rbmSize_;
-		this->allocate();
 		this->setInfo();
 	}
 
@@ -31,7 +30,6 @@ namespace NQS_NS
 		this->nHid_ 			= _p.nHid_[0];
 		this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
 		this->info_p_.fullSize_ = this->rbmSize_;
-		this->allocate();
 		this->setInfo();
 	}
 

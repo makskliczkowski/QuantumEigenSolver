@@ -433,9 +433,9 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H,
 		switch (this->nqsP.type_)
 		{
 		case NQS_NS::NQSTYPES::RBM_T:
-			return std::make_shared<NQS_NS::RBM_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
+			return std::make_shared<NQS_NS::RBM_S<_spinModes, _Ht, _T, _stateType>>(std::forward<decltype(args)>(args)...);
 		case NQS_NS::NQSTYPES::RBMPP_T:
-			return std::make_shared<NQS_NS::NQS_PP_S<_spinModes, _T, _T, double, NQS_NS::RBM_S<_spinModes, _T>>>(std::forward<decltype(args)>(args)...);
+			return std::make_shared<NQS_NS::NQS_PP_S<_spinModes, _Ht, _T, _stateType, NQS_NS::RBM_S<_spinModes, _Ht, _T, _stateType>>>(std::forward<decltype(args)>(args)...);
 		default:
 			throw std::invalid_argument("Unknown NQS type");
 		}

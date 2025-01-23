@@ -18,7 +18,7 @@ namespace NQS_NS
 	* @brief Template NQS for Spins (hardcore bosons)
 	*/
 	template <typename _Ht, typename _T, class _stateType>
-	class RBM_S<2, _Ht, _T, _stateType> : public RBM<2, _Ht, _T, _stateType>
+	class RBM_S<2u, _Ht, _T, _stateType> : public RBM<2u, _Ht, _T, _stateType>
 	{
 		// **********************************************************************************************************************
 		MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
@@ -30,25 +30,25 @@ namespace NQS_NS
 		// **********************************************************************************************************************
 		RBM_S()															= default;
 		// **********************************************************************************************************************
-		RBM_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p)
-			: RBM<2, _Ht, _T, _stateType>(_p) 
+		RBM_S(const NQS_Const_par_t<2u, _Ht, _T, _stateType>& _p)
+			: RBM<2u, _Ht, _T, _stateType>(_p) 
 		{ 
 			this->init();
 		};
 		// **********************************************************************************************************************
-		RBM_S(const NQS_Const_par_t<2, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
-			: RBM<2, _Ht, _T, _stateType>(_p, _lower, _beta) 
+		RBM_S(const NQS_Const_par_t<2u, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
+			: RBM<2u, _Ht, _T, _stateType>(_p, _lower, _beta) 
 		{ 
 			this->init(); 
 		};
 		// **********************************************************************************************************************
-		RBM_S(const RBM_S<2, _Ht, _T, _stateType>& _other)
-			: RBM<2, _Ht, _T, _stateType>(_other)
+		RBM_S(const RBM_S<2u, _Ht, _T, _stateType>& _other)
+			: RBM<2u, _Ht, _T, _stateType>(_other)
 		{
 		};
 		// **********************************************************************************************************************
-		RBM_S(RBM_S<2, _Ht, _T, _stateType>&& _other)
-			: RBM<2, _Ht, _T, _stateType>(std::move(_other))
+		RBM_S(RBM_S<2u, _Ht, _T, _stateType>&& _other)
+			: RBM<2u, _Ht, _T, _stateType>(std::move(_other))
 		{
 		};
 		// **********************************************************************************************************************

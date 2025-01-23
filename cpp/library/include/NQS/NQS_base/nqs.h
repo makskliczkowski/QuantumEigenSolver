@@ -18,7 +18,6 @@
 
 // include all the definions
 #include "../nqs_operator.h"
-#include "nqs_definitions_base.h"
 #include "nqs_definitions_lower.tpp"
 // ######################################################################################################################################
 namespace NQS_NS
@@ -46,7 +45,7 @@ namespace NQS_NS
 	public:
 		// **********************************************************************************************************************************
 		NQS_PUBLIC_TYPES(_T, _stateType);									// type definitions 
-		MCS_PUBLIC_TYPES(_T, _stateType, arma::Col); 						// type definitions for the Monte Carlo solver
+		MCS_PUBLIC_TYPES(_T, _stateType, NQS_STATE_R_T); 					// type definitions for the Monte Carlo solver
 		NQS_HAMIL_TYPES(_Ht, _spinModes);									// type definitions for the Hamiltonian
 		// **********************************************************************************************************************************
 		using NQSLS_p 						= typename NQS_lower_t<_spinModes, _Ht, _T, _stateType>::NQSLS_p;
@@ -56,7 +55,7 @@ namespace NQS_NS
 		// **********************************************************************************************************************************
 		NQS_info_t info_p_;													// information about the NQS
 		NQS_lower_t<_spinModes, _Ht, _T, _stateType> lower_states_;			// information about the training
-		// **********************************************************************************************************************************
+		// ******************************************clear****************************************************************************************
 	protected:
 		const double discVal_				=		::Operators::_SPIN;   	// discrete value for the numbers in vector representation
 		const uint spinModes_				=		_spinModes;				// number of spin modes -> e.g. 2 for hardcore bosons, 4 for fermions

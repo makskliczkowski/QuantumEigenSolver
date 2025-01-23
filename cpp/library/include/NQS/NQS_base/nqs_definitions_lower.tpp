@@ -49,14 +49,14 @@ namespace NQS_NS
     template <uint _spinModes, typename _Ht, typename _T, class _stateType>
     struct NQS_lower_t
     {
-        using NQSLS_p					= 		std::vector<std::shared_ptr<NQS<_spinModes, _Ht, _T, _stateType>>>;
-        using Container_t               =       arma::Col<_T>;
-        using Config_t                  =       arma::Col<_stateType>;
+        using NQSLS_p					= 		v_sp_t<NQS<_spinModes, _Ht, _T, _stateType>>;
+        using Container_t               =       MCS_CONTAINER<_T>;
+        using Config_t                  =       NQS_STATE_R_T<_stateType>;
         using Config_cr_t               =       const Config_t&;
         using MCS_train_t               =       MonteCarlo::MCS_train_t;
         using NQS_t                     =       NQS<_spinModes, _Ht, _T, _stateType>;
         using NQS_p_t                   =       NQS_t*;
-
+        // ##########################################################################################################################################
         MCS_train_t train_lower_;                                       // training information for the lower states                       
         NQS_p_t nqs_exc_;			    	                            // pointer to the excited state NQS instance
         size_t Ns_                      =       0;                      // number of the states in the basis

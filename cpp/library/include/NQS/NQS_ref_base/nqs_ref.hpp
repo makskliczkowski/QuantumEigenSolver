@@ -27,7 +27,7 @@ namespace NQS_NS
     */
     template <uint _spinModes, typename _Ht, typename _T = _Ht, class _stateType = double, class _CorrState = NQS_S<_spinModes, _Ht, _T, _stateType>>
     requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
-    class NQS_ref : public virtual _CorrState
+    class NQS_ref : public _CorrState
     {
         // **********************************************************************************************************************   
         NQS_PUBLIC_TYPES(_T, _stateType);

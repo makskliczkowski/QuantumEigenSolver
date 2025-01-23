@@ -534,8 +534,18 @@ namespace NQS_NS
         this->logPRatioFuncFlips_   =           [this](uint nFlips)                { return this->logPRatio(nFlips); };
 
         // set the visible layer (for hardcore-bosons we have the same number as sites but fermions introduce twice the complication)
-        this->info_p_               =           NQS_info_t(_Ns, _Ns, 
-                                                (_p.nPart_ < 0 || this->spinModes_ == 2) ? this->info_p_.nSites_ : (uint)_p.nPart_, _Nh);
+        size_t _npart               =           1;
+        if (_p.nPart_ > 0) 
+            _npart                  =           _p.nPart_;
+        else 
+        {
+            if constexpr (_spinModes == 2)
+                _npart              =           _Ns;
+            else if constexpr (_spinModes == 4)
+                _npart              =           _Ns * 2;
+        }
+
+        this->info_p_               =           NQS_info_t(_Ns, _Ns, _npart, _Nh);
     #ifdef NQS_NOT_OMP_MT
         this->initThreads(_p.threadNum_);
     #endif

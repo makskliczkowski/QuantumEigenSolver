@@ -67,7 +67,7 @@
 // ----------------------------------------------------------
 #define NQS_USE_VEC_ONLY					// use vector only? - if not, use the integer representation		
 #ifdef NQS_USE_VEC_ONLY
-	#define NQS_STATE_R_T arma::Col
+	#define NQS_STATE_R_T ::arma::Col
 	#define NQS_STATE this->curVec_			// current state
 	#define NQS_STATE_T Config_cr_t			// current state type 
 #elif defined NQS_USE_STDVEC
@@ -84,8 +84,8 @@
 // ----------------------------------------------------------
 #ifdef NQS_USE_ARMA
 #	include <armadillo>
-#	define NQS_ROW_T arma::Row<_type>		// row type for weights etc representation
-#	define NQS_COL_T arma::Col<_type>		// column type for weights etc representation
+#	define NQS_ROW_T ::arma::Row<_type>		// row type for weights etc representation
+#	define NQS_COL_T ::arma::Col<_type>		// column type for weights etc representation
 #else		
 #	define NQS_ROW_T std::vector<_type>		// row type for weights etc representation
 #	define NQS_COL_T std::vector<_type>		// column type for weights etc representation
