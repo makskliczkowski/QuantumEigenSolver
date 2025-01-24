@@ -441,12 +441,13 @@ inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H,
 		}
 	};
 	NQS_NS::NQS_Const_par_t<_spinModes, _T> _parNQS;
-	_parNQS.nHid_ 		= { this->nqsP.nqs_nh_ };
+	_parNQS.nHid_ 		= { (size_t)this->nqsP.nqs_nh_ };
 	_parNQS.lr_ 		= { this->nqsP.nqs_lr_ };
 	_parNQS.threadNum_ 	= this->threadNum;
 	_parNQS.H_ 			= _H;
 	// create the NQS
 	_NQS 				= createNQS(_parNQS, _NQSl, _beta);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 3);
 	// Set the hyperparameters
 #ifdef NQS_USESR_MAT_USED
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);

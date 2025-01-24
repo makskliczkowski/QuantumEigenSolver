@@ -131,8 +131,6 @@ namespace NQS_NS
 
     // ##########################################################################################################################################
 
-    // ##########################################################################################################################################
-
     /**
     * @brief Determines whether the training process should stop based on the given epoch and metric.
     * 
@@ -219,6 +217,7 @@ namespace NQS_NS
             sched_(other.sched_),
             nVis_(other.nVis_),
             nSites_(other.nSites_),
+            nHid_(other.nHid_),
             nSitesSquared_(other.nSitesSquared_),
             fullSize_(other.fullSize_),
             Nh_(other.Nh_),
@@ -243,6 +242,7 @@ namespace NQS_NS
         sched_(std::move(other.sched_)),
         nVis_(std::exchange(other.nVis_, 1)),
         nSites_(std::exchange(other.nSites_, 1)),
+        nHid_(std::move(other.nHid_)),
         nSitesSquared_(std::exchange(other.nSitesSquared_, 1)),
         fullSize_(std::exchange(other.fullSize_, 1)),
         Nh_(std::exchange(other.Nh_, 1)),
@@ -274,6 +274,7 @@ namespace NQS_NS
             sched_              = other.sched_;
             nVis_               = other.nVis_;
             nSites_             = other.nSites_;
+            nHid_               = other.nHid_;
             nSitesSquared_      = other.nSitesSquared_;
             fullSize_           = other.fullSize_;
             Nh_                 = other.Nh_;
@@ -306,6 +307,7 @@ namespace NQS_NS
             sched_              = std::move(other.sched_);
             nVis_               = std::exchange(other.nVis_, 1);
             nSites_             = std::exchange(other.nSites_, 1);
+            nHid_               = std::move(other.nHid_);
             nSitesSquared_      = std::exchange(other.nSitesSquared_, 1);
             fullSize_           = std::exchange(other.fullSize_, 1);
             Nh_                 = std::exchange(other.Nh_, 1);

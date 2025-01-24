@@ -298,6 +298,7 @@ namespace NQS_NS
 		// architecture specific			
 		uint nVis_									=		1;						// number of visible neurons (input variables)
 		uint nSites_								=		1;						// number of lattice sites or fermionic modes
+		v_1d<size_t> nHid_;															// number of hidden neurons
 		size_t nSitesSquared_						=		1;						// number of lattice sites squared
 		uint fullSize_								=		1;						// full number of the parameters (for memory purpose)
 
@@ -474,7 +475,7 @@ namespace NQS_NS
 		NQS_HAMIL_TYPES(_Ht, _spinModes);
 		// **********************************************************************************************************************
 		Hamil_t_p H_;											// Hamiltonian
-		std::vector<double> nHid_;								// number of hidden units 
+		std::vector<size_t> nHid_;								// number of hidden units 
 		double lr_			= 1e-1;								// learning rate
 		uint threadNum_		= 1;								// number of threads
 		int nPart_			= -1;								// number of particles

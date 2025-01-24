@@ -11,13 +11,8 @@ namespace NQS_NS
 
 	template <uint _spinModes, typename _Ht, typename _T, class _stateType>
 	RBM<_spinModes, _Ht, _T, _stateType>::RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
-											// const NQSLS_p& _lower, 
-											// const std::vector<double>& _beta)
 		: NQS_S<_spinModes, _Ht, _T, _stateType>(_p)
 	{
-		this->nHid_ 			= _p.nHid_[0];
-		this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
-		this->info_p_.fullSize_ = this->rbmSize_;
 		this->setInfo();
 	}
 
@@ -27,9 +22,6 @@ namespace NQS_NS
 	RBM<_spinModes, _Ht, _T, _stateType>::RBM(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
 		: NQS_S<_spinModes, _Ht, _T, _stateType>(_p, _lower, _beta)
 	{
-		this->nHid_ 			= _p.nHid_[0];
-		this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
-		this->info_p_.fullSize_ = this->rbmSize_;
 		this->setInfo();
 	}
 
@@ -54,14 +46,18 @@ namespace NQS_NS
 	template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 	inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	{
+		// **************************************************************************************************************************************
+		LOGINFO("Allocating the Restricted Boltzmann Machine object.", LOG_TYPES::DEBUG, 3, '#');
+		// **************************************************************************************************************************************
 		// allocate weights
 		if (this->bV_.is_empty()) 			this->bV_.resize(this->info_p_.nVis_);
 		if (this->bH_.is_empty()) 			this->bH_.resize(this->nHid_);
 		if (this->theta_.is_empty()) 		this->theta_.resize(this->nHid_);
 		if (this->thetaCOSH_.is_empty()) 	this->thetaCOSH_.resize(this->nHid_);
 		if (this->W_.is_empty()) 			this->W_.resize(this->nHid_, this->info_p_.nVis_);
-		this->thetaTmpCol_ 	= NQSB(this->nHid_);
-		NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();						// allocate the rest
+		this->thetaTmpCol_ 					= NQSB(this->nHid_);
+		// reallocate the derivatives if necessary
+		NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();
 	}
 
 	// ##########################################################################################################################################

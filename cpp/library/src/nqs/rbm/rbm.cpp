@@ -206,11 +206,21 @@ namespace NQS_NS
 	template<uint _spinModes, typename _Ht, typename _T, class _stateType>
 	inline void RBM<_spinModes, _Ht, _T, _stateType>::init()
 	{
+		// initialize the base class
+		// ****************************************************************************************************************************
+		this->nHid_ 			= this->info_p_.nHid_[0];
+		this->rbmSize_  		= this->nHid_ + this->info_p_.nVis_ + this->nHid_ * this->info_p_.nVis_;
+		this->info_p_.fullSize_ = this->rbmSize_;
+		// ****************************************************************************************************************************
+		NQS_S<_spinModes, _Ht, _T, _stateType>::init();
+		RBM<_spinModes, _Ht, _T, _stateType>::allocate();
+		// ****************************************************************************************************************************
+		LOGINFO("Initializing the Restricted Boltzmann Machine object.", LOG_TYPES::DEBUG, 3);
+
 		// initialize biases visible
 	// #ifndef _DEBUG
 	// #pragma omp parallel for num_threads(this->threads_.threadNum_)
 	// #endif
-		NQS_S<_spinModes, _Ht, _T, _stateType>::init();
 		const double stddev = std::max(std::sqrt(2.0 / (this->info_p_.nVis_ + this->nHid_)), 0.01);
 
 		// Initialize visible biases

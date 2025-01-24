@@ -224,6 +224,8 @@ namespace NQS_NS
                 this->precond_ = _n.precond_->clone();
             }
         }
+        this->allocate();
+        this->init();
     }
 
     // template instantiation of the function above
@@ -544,8 +546,9 @@ namespace NQS_NS
             else if constexpr (_spinModes == 4)
                 _npart              =           _Ns * 2;
         }
-
+        // set the information
         this->info_p_               =           NQS_info_t(_Ns, _Ns, _npart, _Nh);
+        this->info_p_.nHid_         =           _p.nHid_;
     #ifdef NQS_NOT_OMP_MT
         this->initThreads(_p.threadNum_);
     #endif
@@ -681,11 +684,18 @@ namespace NQS_NS
     template<uint _spinModes, typename _Ht, typename _T, class _stateType>
     void NQS<_spinModes, _Ht, _T, _stateType>::allocate()
     {
+        LOGINFO(std::format("Allocating the {} object.", this->info_), LOG_TYPES::DEBUG, 3);
         // allocate gradients
         this->F_.resize(this->info_p_.fullSize_);
         this->dF_.resize(this->info_p_.fullSize_);
         if (this->Weights_.size() != this->info_p_.fullSize_)
             this->Weights_.resize(this->info_p_.fullSize_);
+
+        // ######################################################################################################################################
+        LOGINFO(std::format("Allocated the gradient parameters: dF={},W={}", 
+            this->dF_.size(), this->Weights_.size()), LOG_TYPES::DEBUG, 4);
+        // ######################################################################################################################################
+
     #ifdef NQS_USESR
     #	ifndef NQS_USESR_NOMAT
         this->S_.resize(this->info_p_.fullSize_, this->info_p_.fullSize_);
@@ -859,6 +869,19 @@ namespace NQS_NS
     template void NQS<4u, double, cpx, double>::setWeights(const arma::Col<cpx>&);
     // ##########################################################################################################################################
 
+    /**
+    * @brief Sets the weights for the Neural Quantum State (NQS) object.
+    * 
+    * This function sets the weights of the NQS object by moving the provided 
+    * weights into the internal storage and then calls the internal setWeights 
+    * function to finalize the setup.
+    * 
+    * @tparam _spinModes The number of spin modes.
+    * @tparam _Ht The Hamiltonian type.
+    * @tparam _T The data type for the weights.
+    * @tparam _stateType The state type.
+    * @param _w The weights to be set, provided as an rvalue reference.
+    */
     template <uint _spinModes, typename _Ht, typename _T, class _stateType>
     inline void NQS<_spinModes, _Ht, _T, _stateType>::setWeights(NQSB&& _w)
     {
@@ -1061,8 +1084,8 @@ namespace NQS_NS
     template <uint _spinModes, typename _Ht, typename _T, class _stateType>
     void NQS<_spinModes, _Ht, _T, _stateType>::init()
     {
-        this->allocate();
-        // this->setRandomState();
+        NQS<_spinModes, _Ht, _T, _stateType>::allocate();
+        LOGINFO("Initializing the Neural Quantum State (NQS) object.", LOG_TYPES::DEBUG, 3);
     }
     NQS_INST_CMB_ALL(init, void, ());
 

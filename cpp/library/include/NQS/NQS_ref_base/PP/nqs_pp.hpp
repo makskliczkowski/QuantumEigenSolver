@@ -8,10 +8,6 @@ namespace NQS_NS
 	inline NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p)
 		: NQS_ref_t(_p)	
 	{
-		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
-		this->PPsize_			    = this->nPP_;
-		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_;
-		this->init();
 		this->setInfo();
 	}
 
@@ -19,11 +15,7 @@ namespace NQS_NS
 	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(const NQS_Const_par_t<_spinModes, _Ht, _T, _stateType>& _p, const NQSLS_p& _lower, const std::vector<double>& _beta)
 		: NQS_ref_t(_p, _lower, _beta)	
-	{ 
-		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
-		this->PPsize_			    = NQS_ref_t::size() + this->nPP_;
-		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_;
-		this->init();
+	{
 		this->setInfo();
 	};
 
@@ -71,7 +63,7 @@ namespace NQS_NS
 	* @param _other The NQS_PP object to move from.
 	*/
 	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::NQS_PP(NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>&& _other)
 		: NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>(std::move(_other))
 	{
@@ -101,7 +93,7 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	* @param _other A shared pointer to the other instance to clone from.
 	*/
 	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::clone(MC_t_p _other)
 	{
 		try
@@ -141,12 +133,12 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	* @tparam _stateType The state type.
 	* @tparam _CorrState The correlated state type.
 	*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::setInfo()
 	{
 		NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::setInfo();
-		this->info_ += std::format("nPP={}", this->nPP_);	
+		this->info_ += std::format(",nPP={}", this->nPP_);	
 	}
 
 	// ##########################################################################################################################################
@@ -165,21 +157,25 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	* @tparam _stateType State type.
 	* @tparam _CorrState Correlation state type.
 	*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate()
 	{
 		// !TODO implement changable number of fermions
-		// allocate weights
-		// matrix for each step
-		NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate();
+		// do not allocate the base class weights as they are already allocated in the constructor
+		// NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate();
 
+		LOGINFO("Allocating the Particle Pair reference function object.", LOG_TYPES::DEBUG, 3, '#');
+		// ######################################################################################################################################
 		// allocate the X matices
 		this->pp_weights_.X_			= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 		this->pp_weights_.X_inv			= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 		// !TODO get rid of zeros? 
 		// !TODO make this matrix symmetric?
 		this->pp_weights_.F_r1r2_s1s2_ 	= NQSB(this->nPP_, arma::fill::zeros);
+		// reallocate the derivatives if necessary
+		NQS_S<_spinModes, _Ht, _T, _stateType>::allocate();
+		// ######################################################################################################################################
 	// #ifdef NQS_NOT_OMP_MT
 		// this->XTmp_		= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);
 		// for (int _thread = 0; _thread < this->threads_.threadNum_; _thread++)
@@ -204,11 +200,17 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline void NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::init()
 	{
+
 		// ######################################################################################################################################
-		NQS_ref_t::init();
+		this->nPP_					= this->spinSectors_.size() * this->info_p_.nSitesSquared_;
+		this->PPsize_			    = NQS_ref_t::size() + this->nPP_;
+		this->info_p_.fullSize_		= NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::size() + this->PPsize_;
+		// ######################################################################################################################################
+		// don't run init from the other class as it is already done in the constructor of the base class!
+		this->allocate();
+		LOGINFO("Initializing the Particle Pair reference function object.", LOG_TYPES::DEBUG, 3);
 		// ######################################################################################################################################
 		const double std_dev = 1.0 / std::sqrt(this->nPP_);
-		// ######################################################################################################################################
 		
 		// matrix for the PP wave function - contains all the necessary weights
 		// is initialized according to the distance between the sites
@@ -261,8 +263,8 @@ requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	* @param _in The input configuration.
 	* @return The computed ansatz as the product of the correlation part and the Pfaffian.
 	*/
-template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
-requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
+	template <uint _spinModes, typename _Ht, typename _T, class _stateType, class _CorrState>
+	requires NQS_S_concept<_spinModes, _Ht, _T, _stateType, _CorrState>
 	inline _T NQS_PP<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz(Config_cr_t _in) const
 	{
 		const auto _FX = NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::ansatz(_in); // get the ansatz from the base class - correlation part
