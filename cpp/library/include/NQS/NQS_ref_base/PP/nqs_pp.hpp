@@ -165,7 +165,7 @@ namespace NQS_NS
 		// do not allocate the base class weights as they are already allocated in the constructor
 		// NQS_ref<_spinModes, _Ht, _T, _stateType, _CorrState>::allocate();
 
-		LOGINFO("Allocating the Particle Pair reference function object.", LOG_TYPES::DEBUG, 3, '#');
+		LOGINFO("Allocating the Particle Pair reference function object.", LOG_TYPES::DEBUG, 3);
 		// ######################################################################################################################################
 		// allocate the X matices
 		this->pp_weights_.X_			= NQSW(this->info_p_.nParticles_, this->info_p_.nParticles_, arma::fill::zeros);

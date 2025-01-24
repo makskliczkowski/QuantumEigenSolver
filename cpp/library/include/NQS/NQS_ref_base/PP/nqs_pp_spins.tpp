@@ -115,16 +115,9 @@ namespace NQS_NS
 	template <typename _Ht, typename _T, class _stateType, class _CorrState>
 	inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int fP, float fV)
 	{
-		// remember that FF is such that it starts with an up spin ({UP^UP, UP^DOWN}, {DOWN^UP, DOWN^DOWN} = {I, II} , {III, IV})
-		// if the fP is known, only the column and row containing it shall be updated
-		// we will use current state as well to see where the other places are
-		// remember, fV is the other way around (so it's before the flip)
-		// new k, when particle on fP has been set for F_{ki}^{\sigma_k', \sigma _i}
-		// run over the columns
-
 		// check if the column is already set to a given size and resize if not
 		if (this->pp_weights_.X_upd_.empty())
-			this->pp_weights_.X_upd_.emplace_back(NQSB(this->info_p_.nParticles_));
+			this->pp_weights_.X_upd_.emplace_back(NQSW(this->info_p_.nParticles_));
 		else if (this->pp_weights_.X_upd_[0].n_rows != this->info_p_.nParticles_)
 			this->pp_weights_.X_upd_[0].resize(this->info_p_.nParticles_);
 
@@ -147,7 +140,7 @@ namespace NQS_NS
 			// update the matrix column and row (remember, the column is then - the row)
 			auto value = this->pp_weights_.F_r1r2_s1s2_(posLeft) - this->pp_weights_.F_r1r2_s1s2_(posRight);
 			this->pp_weights_.X_upd_[0](fP, i) = value;
-			this->pp_weights_.X_upd_[0](i, fP) = -value;
+			// this->pp_weights_.X_upd_[0](i, fP) = -value;
 		}
 	}
 	// ##########################################################################################################################################
@@ -209,7 +202,7 @@ namespace NQS_NS
 				// Update matrix values using symmetry
 				const auto value = this->pp_weights_.F_r1r2_s1s2_(posLeft) - this->pp_weights_.F_r1r2_s1s2_(posRight);
 				X_t(_fPin, i) = value;
-				X_t(i, _fPin) = -value; // Enforce skew-symmetric property
+				// X_t(i, _fPin) = -value; // Enforce skew-symmetric property
 			}
 		}
 	}
