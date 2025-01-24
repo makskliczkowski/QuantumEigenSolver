@@ -47,7 +47,7 @@ namespace NQS_NS
 	inline void RBM<_spinModes, _Ht, _T, _stateType>::allocate()
 	{
 		// **************************************************************************************************************************************
-		LOGINFO("Allocating the Restricted Boltzmann Machine object.", LOG_TYPES::DEBUG, 3, '#');
+		LOGINFO("Allocating the Restricted Boltzmann Machine object.", LOG_TYPES::DEBUG, 3);
 		// **************************************************************************************************************************************
 		// allocate weights
 		if (this->bV_.is_empty()) 			this->bV_.resize(this->info_p_.nVis_);
