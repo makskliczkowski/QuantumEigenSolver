@@ -133,7 +133,11 @@ void nqs_perform_time_evo_ed(const arma::Col<_T>& _mbs,
 	
 	// measure the time evolution of the operator - other time steps
 #pragma omp parallel for num_threads(threadNum)
-	for (int j = 0; j < _timespace.size(); ++j) {
+	for (int j = 0; j < _timespace.size(); ++j) 
+	{
+		if (j % int(_timespace.size() / 10) == 0)
+			LOGINFO(std::format("Time evolution step: {} of {}", j, _timespace.size()), LOG_TYPES::INFO, 3);
+
 		arma::Col<cpx> _mb_te = SystemProperties::TimeEvolution::time_evo(_eigv, _H->getEigVal(), _ovrl, _timespace(j));
 		for (int k = 0; k < _QOMat.size(); ++k)
 			_vals(j + 1, k) = algebra::cast<double>(Operators::applyOverlap(_mb_te, _QOMat[k]));
@@ -282,7 +286,7 @@ void nqs_perform_lanczos_ed(int stateNum, Hamiltonian<_T, _spinModes>* _H,
 							int threadNum) 
 {
 	LOGINFO("Started Lanczos diagonalization", LOG_TYPES::TRACE, 3);
-	_H->diagH(false, 128, 0, 1000, 1e-12, "lanczos");
+	_H->diagH(false, std::min(128, (int)(_hilbert.getFullHilbertSize() / 2)), 0, 1000, 1e-13, "lanczos");
 	const auto& _eigvec			= _H->getEigVec();
 	const auto& _krylov_mb 		= _H->getKrylov();
 
@@ -353,9 +357,12 @@ nqs_perform_diag(int stateNum,
                 int threadNum) 
 {
     // Validate inputs
-    if (!_H) throw std::invalid_argument("Hamiltonian is not defined");
-    if (_meas_ED.size() != stateNum || _meas_LAN.size() != stateNum)
+    if (!_H) {
+		throw std::invalid_argument("Hamiltonian is not defined");
+	}
+    if (_meas_ED.size() != stateNum || _meas_LAN.size() != stateNum) {
         throw std::invalid_argument("Measurement vectors have incorrect size");
+	}
 
 	// Hilbert
 	const size_t Nh = _H->getHilbertSize();
@@ -416,24 +423,31 @@ template std::pair<arma::Col<cpx>, arma::Col<cpx>> nqs_perform_diag<cpx, 2>(int 
 * 
 * @throws std::invalid_argument If an unknown NQS type is specified.
 */
-template<typename _T, uint _spinModes>
-inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl, const v_1d<double>& _beta)
+template <typename _T, uint _spinModes, typename  _Ht, typename _stateType>
+inline void UI::defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+		std::shared_ptr<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQS, 
+		const v_sp_t<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQSl, 
+		const v_1d<double>& _beta)
 {
-	auto createNQS = [&](auto&&... args) -> std::shared_ptr<NQS<_spinModes, _T>> {
+	auto createNQS = [&](auto&&... args) -> std::shared_ptr<NQS_NS::NQS<_spinModes, _T>> {
 		switch (this->nqsP.type_)
 		{
-		case NQSTYPES::RBM_T:
-			return std::make_shared<RBM_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
-		case NQSTYPES::RBMPP_T:
-			return std::make_shared<RBM_PP_S<_spinModes, _T>>(std::forward<decltype(args)>(args)...);
+		case NQS_NS::NQSTYPES::RBM_T:
+			return std::make_shared<NQS_NS::RBM_S<_spinModes, _Ht, _T, _stateType>>(std::forward<decltype(args)>(args)...);
+		case NQS_NS::NQSTYPES::RBMPP_T:
+			return std::make_shared<NQS_NS::NQS_PP_S<_spinModes, _Ht, _T, _stateType, NQS_NS::RBM_S<_spinModes, _Ht, _T, _stateType>>>(std::forward<decltype(args)>(args)...);
 		default:
 			throw std::invalid_argument("Unknown NQS type");
 		}
 	};
-
-	_NQS = createNQS(_H, this->nqsP.nqs_nh_, this->nqsP.nqs_lr_, this->threadNum, 1, _NQSl, _beta);
-
+	NQS_NS::NQS_Const_par_t<_spinModes, _T> _parNQS;
+	_parNQS.nHid_ 		= { (size_t)this->nqsP.nqs_nh_ };
+	_parNQS.lr_ 		= { this->nqsP.nqs_lr_ };
+	_parNQS.threadNum_ 	= this->threadNum;
+	_parNQS.H_ 			= _H;
+	// create the NQS
+	_NQS 				= createNQS(_parNQS, _NQSl, _beta);
+	LOGINFO("", LOG_TYPES::TRACE, 40, '#', 3);
 	// Set the hyperparameters
 #ifdef NQS_USESR_MAT_USED
 	_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
@@ -483,8 +497,8 @@ void UI::nqsExcited()
 	// define the NQS states for the excited states
 	arma::Col<_T>	_meansNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros), _stdsNQS(this->nqsP.nqs_ex_beta_.size() + 1, arma::fill::zeros);
 	
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);	// define the NQS states
-	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);											// define the first one already here for the ground state
+	v_sp_t<NQS_NS::NQS<_spinModes, _T, _T, double>> _NQS(this->nqsP.nqs_ex_beta_.size() + 1);				// define the NQS states
+	this->defineNQS<_T, _spinModes>(_H, _NQS[0]);															// define the first one already here for the ground state
 	
 	{
 		LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
@@ -503,7 +517,7 @@ void UI::nqsExcited()
 
 	u64 Nh					= _NQS[0]->getHilbertSize();									// get the size of the Hilbert space						
 	auto Nvis 				= _NQS[0]->getNvis();											// get the number of visible units
-	const bool fullED 		= Nh <= UI_LIMITS_NQS_ED;										// use the full diagonalization
+	const bool fullED 		= this->nqsP.nqs_ed_ && Nh <= UI_LIMITS_NQS_ED;					// use the full diagonalization
 	const bool lanED 		= this->nqsP.nqs_ed_ && Nh <= ULLPOW(24);						// use the Lanczos method for the ED
 	v_sp_t<Operators::OperatorNQS<_T>> _opsG;												// set up the operators to save - global
 	v_sp_t<Operators::OperatorNQS<_T, uint>> _opsL;											// set up the operators to save - local
@@ -529,7 +543,7 @@ void UI::nqsExcited()
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, 0)));
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, Nvis - 1)));
 		_quenchOpMeasure.push_back(std::make_shared<Operators::OperatorComb<_T>>(Operators::SpinOperators::sig_z<_T>(Nvis, {1, Nvis - 1})));
-		_timespace 			= time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
+		_timespace 			= NQS_NS::time_space_nqs(this->nqsP.nqs_te_tlog_, this->nqsP.nqs_te_dt_, this->nqsP.nqs_te_tf_);
 		saveAlgebraic(dir, "measurement.h5", _timespace, "time_evo/time", false);
 	}
 
@@ -549,20 +563,52 @@ void UI::nqsExcited()
 	LOGINFO(nqsInfo, LOG_TYPES::TRACE, 2);
 	LOGINFO(1);
 
-	v_1d<std::shared_ptr<NQS<_spinModes, _T>>> _NQS_lower = {};									// define the NQS states for the excited states
+	v_sp_t<NQS_NS::NQS<_spinModes, _T, _T, double>> _NQS_lower = {};							// define the NQS states for the excited states
 	for (int i = 0; i < this->nqsP.nqs_ex_beta_.size() + 1; ++i) 
 	{
 		_timer.checkpoint(VEQ(i));
 		arma::Col<_T> _EN_TRAIN, _EN_TESTS, _EN_STD, _EN_TESTS_STD;								// set up the energies container for NQS
 
-		if (!_NQS[i])
-			this->defineNQS<_T, _spinModes>(_H, _NQS[i], _NQS_lower, { this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });
-		
-		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
+		// define the NQS states for the excited states
+		if (!_NQS[i]) 
 		{
-			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
-			LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+			this->defineNQS<_T, _spinModes, _T, double>(_H, _NQS[i], _NQS_lower, 
+				{ this->nqsP.nqs_ex_beta_.begin(), this->nqsP.nqs_ex_beta_.begin() + i });	
+		}
+		_NQS[i]->setTrainParExc(_parE);															// set the parameters in the excited states
+
+		if (this->nqsP.nqs_tr_pt_ > 0)
+		{
+			LOGINFO("Using parallel tempering for training", LOG_TYPES::TRACE, 2);
 			LOGINFO(1);
+			
+			typename MonteCarlo::ParallelTempering<_T>::Solver_p _mcs = _NQS[i];
+			auto _pt = std::make_shared<MonteCarlo::ParallelTempering<_T>>(_mcs, this->nqsP.nqs_tr_pt_, MonteCarlo::BetaSpacing::LOGARITHMIC, 0.1, 1.0);
+			
+			_pt->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
+			auto [_best_idx, _best_acc_idx] = _pt->getBestInfo();
+
+			// get the best loss
+			_EN_TRAIN 	= _pt->getBestLosses();
+			_EN_STD 	= _pt->getStdLosses(_best_idx);
+
+			// get the best solver
+			if (_best_idx > 0)
+			{
+				auto bestSolver = _pt->getBestSolver();
+				if (bestSolver)
+					_NQS[i] = std::dynamic_pointer_cast<NQS_NS::NQS<_spinModes, _T>>(bestSolver);
+			}
+			
+		}
+		else {
+			std::tie(_EN_TRAIN, _EN_STD) = _NQS[i]->train(_parT, this->quiet, this->nqsP.nqs_tr_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);
+		}
+		LOGINFO("", LOG_TYPES::TRACE, 20, '#', 1);
+		LOGINFO(1);
+
+		// collect the data
+		{
 			// -------------------------------------
 			_NQS[i]->collect(_parC, _meas_NQS[i], &_EN_TESTS, &_EN_TESTS_STD, this->quiet, this->nqsP.nqs_col_rst_, _timer.point(VEQ(i)), nqsP.nqs_tr_pc_);			
 			// -------------------------------------
@@ -592,15 +638,28 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 	// try time evolution 
 	if (this->nqsP.nqs_te_)
 	{
+
 		LOGINFO(3);
 		MonteCarlo::MCS_train_t _parTime(this->nqsP.nqs_te_mc_, this->nqsP.nqs_te_th_, this->nqsP.nqs_te_bn_, this->nqsP.nqs_te_bs_, this->nqsP.nFlips_, dir); 
 		// _H->quenchHamiltonian();
 		_parC.MC_sam_ 	= 1;
 		auto _RKsolver 	= algebra::ODE::createRKsolver<_T>(static_cast<algebra::ODE::ODE_Solvers>(this->nqsP.nqs_te_rk_));	// create the Runge-Kutta solver
-		const int _order= _RKsolver->getOrder();																			// get the order of the solver
 
 		for (int j = 0; j < this->nqsP.nqs_ex_beta_.size() + 1; ++j)
 		{
+			// Set the hyperparameters
+			{
+	#ifdef NQS_USESR_MAT_USED
+				_NQS->setPinv(this->nqsP.nqs_tr_pinv_);
+	#endif
+				_NQS[j]->setSolver(this->nqsP.nqs_tr_sol_, this->nqsP.nqs_tr_tol_, this->nqsP.nqs_tr_iter_, this->nqsP.nqs_tr_reg_);
+				_NQS[j]->setPreconditioner(this->nqsP.nqs_tr_prec_);
+	#ifdef NQS_USESR
+				_NQS[j]->setSregScheduler(this->nqsP.nqs_tr_regs_, this->nqsP.nqs_tr_reg_, this->nqsP.nqs_tr_regd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_tr_regp_);
+	#endif
+				_NQS[j]->setScheduler(this->nqsP.nqs_sch_, this->nqsP.nqs_lr_, this->nqsP.nqs_lrd_, this->nqsP.nqs_tr_epo_, this->nqsP.nqs_lr_pat_);
+				_NQS[j]->setEarlyStopping(this->nqsP.nqs_es_pat_, this->nqsP.nqs_es_del_);
+			}
 			LOGINFO("Starting the time evolution for NQS state(" + STR(j) + ")", LOG_TYPES::TRACE, 1);
 			v_1d<arma::Col<_T>> _vals(_quenchOpMeasure.size(), arma::Col<_T>(_parC.MC_sam_ * _parC.nblck_));
 			arma::Col<_T> _En(_parTime.nblck_);											// set up the containers for the time evolution
@@ -652,10 +711,10 @@ LOGINFO("", LOG_TYPES::TRACE, 40, '#', 1);
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS<2, double>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<2, double>>>& _NQSl, const v_1d<double>& _beta);
-template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, std::shared_ptr<NQS<2, cpx>>& _NQS,
-		const v_1d<std::shared_ptr<NQS<2, cpx>>>& _NQSl, const v_1d<double>& _beta);	 	
+template void UI::defineNQS<double, 2>(std::shared_ptr<Hamiltonian<double, 2>>& _H, std::shared_ptr<NQS_NS::NQS<2, double>>& _NQS, 
+		const v_1d<std::shared_ptr<NQS_NS::NQS<2, double>>>& _NQSl, const v_1d<double>& _beta);
+template void UI::defineNQS<cpx, 2>(std::shared_ptr<Hamiltonian<cpx, 2>>& _H, std::shared_ptr<NQS_NS::NQS<2, cpx>>& _NQS,
+		const v_1d<std::shared_ptr<NQS_NS::NQS<2, cpx>>>& _NQSl, const v_1d<double>& _beta);	 	
 
 // %%%%%%%%%%%%%%%%%%%%% DEFINE THE TEMPLATES %%%%%%%%%%%%%%%%%%%%%
 template void UI::nqsExcited<double, 2>();

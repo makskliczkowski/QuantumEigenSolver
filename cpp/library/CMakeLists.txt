@@ -1,7 +1,17 @@
 cmake_minimum_required(VERSION 3.23.0)
 # set version number
 set (QuantumEigenSolver_VERSION_MAJOR 1)
-project(QuantumEigenSolver VERSION ${QuantumEigenSolver_VERSION_MAJOR}.0.1)
+project(QuantumEigenSolver VERSION ${QuantumEigenSolver_VERSION_MAJOR}.0.1 LANGUAGES CXX)
+
+# Require C++20
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Compilation flags
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
 # Detect platform
 if (WIN32)
@@ -198,14 +208,16 @@ set(SOURCES
     ${CPPSOURCE}/LinearAlgebra/ode.cpp
     operators.cpp 
     user_interface.cpp 
+    src/nqs/nqs_def.cpp
     src/nqs/nqs.cpp
+    src/nqs/nqs_quench.cpp
     src/nqs/nqs_opt.cpp
     src/nqs/nqs_lower.cpp
     src/nqs/nqs_sampling.cpp
     src/nqs/nqs_evo.cpp
     src/nqs/rbm/rbm.cpp
     src/nqs/rbm/rbm_spin.cpp
-    src/nqs/rbmpp/rbmpp.cpp
+    src/nqs/nqs_inst.cpp
     src/nqs/operators/nqs_operator.cpp
     src/user_interface/ui_check_eth.cpp
     src/user_interface/ui_check_nqs.cpp

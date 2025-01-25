@@ -37,8 +37,8 @@ protected:
 	//std::shared_ptr<QuadraticHamiltonian<cpx>>			qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
-	std::shared_ptr<NQS<2, cpx>>						nqsCpx;
-	std::shared_ptr<NQS<2, double>>						nqsDouble;
+	std::shared_ptr<NQS_NS::NQS<2, cpx>>				nqsCpx;
+	std::shared_ptr<NQS_NS::NQS<2, double>>				nqsDouble;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	void setDefaultMap()								final override;
@@ -142,9 +142,11 @@ private:
 	bool defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<Lattice>& _lat);
 
 	// NQS
-	template<typename _T, uint _spinModes = 2>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl = {}, const v_1d<double>& _beta = {});
+	template<typename _T, uint _spinModes = 2, typename _Ht = _T, typename _stateType = double>
+	void defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+		std::shared_ptr<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQS, 
+		const v_sp_t<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQSl = {}, 
+		const v_1d<double>& _beta = {});
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	

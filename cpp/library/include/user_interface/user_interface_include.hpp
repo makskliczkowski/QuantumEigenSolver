@@ -23,12 +23,7 @@
 #endif
 
 // ######################### NQS ############################
-#ifndef RBMPP_H											 // #
-#	include "../NQS/rbm_pp_final.hpp"					 // #
-#endif													 // #
-#ifndef RBM_H											 // #
-#	include "../NQS/rbm_final.hpp"						 // #
-#endif													 // #
+#include "../NQS/nqs_all.hpp"
 // ##########################################################
 
 
