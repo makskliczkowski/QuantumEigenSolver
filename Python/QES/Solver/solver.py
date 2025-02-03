@@ -2,26 +2,39 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Union
-import jax.numpy as jnp
 import numpy as np
+
+# JAX imports
+import jax
+import jax.numpy as jnp
+import jax.random as random
+from jax import vmap
 
 ###################################
 
-class Solver_init_state(Enum):
+class SolverInitState(Enum):
     """Enum for potential initial states """
     RND         = auto()    # random configuration
     F_UP        = auto()    # ferromagnetic up
     F_DN        = auto()    # ferromagnetic down
     AF          = auto()    # antiferromagnetic  
     
+    # -----------------------
+    
     def __str__(self):
         """Return the name of the enum member."""
         return self.name
+
+    # -----------------------
 
     @classmethod
     def from_str(cls, state_str: str):
         """
         Create an enum member from a string, ignoring case.
+        Parameters:
+        state_str (str)     : The string representation of the enum member.
+        Returns:
+        SolverInitState     : The enum member corresponding to the input string.
         """
         # Normalize input (upper-case) to match enum member names
         normalized = state_str.upper()
@@ -29,10 +42,14 @@ class Solver_init_state(Enum):
             return cls.__members__[normalized]
         raise ValueError(f"Unknown initial state: {state_str}")
 
+    # -----------------------
+    
 #######################################
 
 class Solver(ABC):
-    """Abstract base class for the solvers in many body physics."""
+    """
+    Abstract base class for the solvers in many body physics. This class is used to define the basic structure of the solvers.
+    """
     
     ###################################
     _epsilon    = jnp.finfo(jnp.float64).eps        # machine epsilon for float64

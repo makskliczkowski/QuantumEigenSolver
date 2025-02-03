@@ -434,7 +434,7 @@ namespace Hilbert
 	inline void HilbertSpace<_T, _spinModes>::generateSymGroup(const v_1d<std::pair<Operators::SymGenerators, int>>& g)
 	{
 		// no symmetries! - there are no global and local symmetries to be used, therefore return
-		if (g.empty() && !this->checkGSym())
+		if (g.empty() && !this->cheeckGSym())
 			return;
 
 		// copy the generators to modify them

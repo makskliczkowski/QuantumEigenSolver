@@ -17,12 +17,12 @@ class MCS_train:
     methods for performing Monte Carlo training (or simulation).
 
     Attributes:
-        epochs (int): Number of epochs. Default is 1.
-        MC_sam (int): Number of Monte Carlo steps. Default is 10.
-        MC_th (int): Number of Monte Carlo steps to thermalize. Default is 0.
-        bsize (int): Size of a single block. Default is 4.
-        dir (str): Directory for saving the data. Default is an empty string.
-        nFlip (int): Number of flips for a single Monte Carlo step. Default is 1.
+        epochs (int)    : Number of epochs. Default is 1 - only relevan when the parameters are variated.
+        MC_sam (int)    : Number of Monte Carlo steps. Default is 10                - this is for samplers.
+        MC_th (int)     : Number of Monte Carlo steps to thermalize. Default is 0   - this is for samplers.
+        bsize (int)     : Size of a single block. Default is 4                      - this is for samplers - autocorrelation.
+        dir (str)       : Directory for saving the data. Default is an empty string - this is for saving the data.
+        nFlip (int)     : Number of flips for a single Monte Carlo step. Default is 1.
     """
     epochs      : int = 1       # number of epochs - when the training is performed
     MC_sam      : int = 10      # number of Monte Carlo Steps
@@ -32,6 +32,8 @@ class MCS_train:
     nflip       : int = 1       # number of flips for a single MC step
     nrepl       : int = 1       # number of replicas #!TODO : how to handle this?
 
+    # ----------------
+    
     def hi(self, prefix: str = "Train: ") -> None:
         """
         Prints a formatted string containing Monte Carlo simulation parameters.
@@ -42,10 +44,10 @@ class MCS_train:
         Returns:
             None
         """
-        outstr = f"Monte Carlo Samples={self.MC_sam}, Thermalization Steps={self.MC_th}, " \
-                f"Size of the single block={self.bsize}, "      \
-                f"Number of epochs={self.epochs}, "             \
-                f"Number of flips taken at each step={self.nFlip}"
+        outstr =    f"Monte Carlo Samples={self.MC_sam}, Thermalization Steps={self.MC_th}, "   \
+                    f"Size of the single block={self.bsize}, "                                  \
+                    f"Number of epochs={self.epochs}, "                                         \
+                    f"Number of flips taken at each step={self.nflip}"
         print(f"{prefix}{outstr}")
 
 ###################################
