@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Union
-import numpy as np
 
 # JAX imports
 import jax
@@ -10,10 +9,13 @@ import jax.numpy as jnp
 import jax.random as random
 from jax import vmap
 
-###################################
+#######################################
 
 class SolverInitState(Enum):
     """Enum for potential initial states """
+    
+    # -----------------------
+    
     RND         = auto()    # random configuration
     F_UP        = auto()    # ferromagnetic up
     F_DN        = auto()    # ferromagnetic down
@@ -52,19 +54,28 @@ class Solver(ABC):
     """
     
     ###################################
-    _epsilon    = jnp.finfo(jnp.float64).eps        # machine epsilon for float64
-    _prec       = jnp.float32                       # precision of the calculations
-    _defdir     = "data"                            # default directory for saving the data
+    epsilon    = jnp.finfo(jnp.float64).eps         # machine epsilon for float64 - might be changed to float32
+    prec       = jnp.float32                        # precision of the calculations - might be changed to float64
+    defdir     = "data"                             # default directory for saving the data
 
     ###################################
-    _not_implemented_error      = "The state is not implemented for the given modes."
-    _not_implemented_error_save = "The saving is not implemented for the given modes."
+    NOT_IMPLEMENTED_ERROR       = "The state is not implemented for the given modes."
+    NOT_IMPLEMENTED_ERROR_SAVE  = "The saving is not implemented for the given modes."
     ###################################
     
-    def __init__(self, *args, **kwargs):
-        self.size               = args[0] if len(args) > 0 else kwargs.get("size", 1)               # size of the configuration (like lattice sites etc.)
-        self.modes              = args[1] if len(args) > 1 else kwargs.get("modes", 2)              # number of modes for the binary representation 
-        self.currstate          = jnp.array([0.0 for i in range(self.size)], dtype = Solver._prec)  # current state of the system
+    def __init__(self, **kwargs):
+        '''
+        Initialize the solver.
+        
+        Parameters:
+        - size          : size of the configuration (like lattice sites etc.)
+        - modes         : number of modes for the binary representation
+        '''
+        self.size               = kwargs.get("size", 1)                                             # size of the configuration (like lattice sites etc.)
+        self.modes              = kwargs.get("modes", 2)                                            # number of modes for the binary representation 
+        self.currstate          = jnp.array([0.0 for _ in range(self.size)], dtype = Solver.prec)   # current state of the system
+        if "hilbert" in kwargs:
+            self.hilbert        = kwargs.get("hilbert", None)                                       # Hilbert space for the system
     
     ###################################
     
@@ -73,12 +84,13 @@ class Solver(ABC):
     ###################################
     
     @abstractmethod
-    def set_state_tens(self, state : jnp.ndarray):
+    def set_state_tens(self, state : jnp.ndarray, _mode_repr : float = 0.5):
         '''
         Set the state configuration from the tensor.
         - state         : state configuration
         - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
         '''
+        pass
         
     #! TODO: implement the set_state_int and set_state_rand for the fermions
     def set_state_int(self, state : int, _mode_repr : float = 0.5):
@@ -99,75 +111,95 @@ class Solver(ABC):
                     need 2 * _size to represent the state and we have 0 and ones for the
                     presence of the fermions.
         '''
-        if self.modes == 2:
-            self.set_state_tens(jnp.array([1 if (state & (1 << i)) else -1 for i in range(self.size)], dtype = Solver._prec) * _mode_repr)
-        elif self.modes == 4:
-            # first half is up and the second half is down
-            int_left    = state >> (self.size) # the left part     - the last _size bits   - move the bits to the right by _size
-            int_right   = state % self.size    # the right part    - the first _size bits  - get the modulo of the state by _size
-            self.set_state_tens(jnp.array(
-                        [1 if (int_right & (1 << i)) else 0 for i in range(self.size)] +
-                        [1 if (int_left & (1 << i)) else 0 for i in range(self.size)],
-                        dtype = Solver._prec) * _mode_repr)
-            raise NotImplementedError(Solver._not_implemented_error)
-            
+        if self.hilbert is None:
+            if self.modes == 2:
+                self.set_state_tens(jnp.array([1 if (state & (1 << i)) else -1 for i in range(self.size)], dtype = Solver.prec) * _mode_repr)
+            elif self.modes == 4:
+                # first half is up and the second half is down
+                int_left    = state >> (self.size)              # the left part     - the last _size bits   - move the bits to the right by _size
+                # int_right   = state % self.size               # the right part    - the first _size bits  - get the modulo of the state by _size
+                int_right   = state & ((1 << self.size) - 1)    # the right part    - the first _size bits  - get the modulo of the state by _size 
+                                                                # for size not power of 2
+                self.set_state_tens(jnp.array(
+                            [1 if (int_right & (1 << i)) else 0 for i in range(self.size)] +
+                            [1 if (int_left & (1 << i)) else 0 for i in range(self.size)],
+                            dtype = Solver.prec) * _mode_repr)
+                raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+        else:
+            # ! TODO : implement the Hilbert space representation
+            raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+        
     def set_state_rand(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration randomly.
         - _mode_repr : mode representation (default is 0.5 - for binary spins +-1)
         '''
-        if self.modes == 2:
-            self.set_state_tens(jnp.array(jnp.random.choice([-1, 1], self.size),
-                                        dtype = Solver._prec) * _mode_repr)
-        elif self.modes == 4:
-            self.set_state_tens(jnp.array(jnp.random.choice([0, 1], 2 * self.size),
-                                        dtype = Solver._prec) * _mode_repr)
-            # ! TODO : this is a specific implementation for the fermions 
-            # ! TODO : create a specific basis so that symmetries can be implemented
+        if self.hilbert is None:
+            if self.modes == 2:
+                self.set_state_tens(jnp.array(jnp.random.choice([-1, 1], self.size),
+                                            dtype = Solver.prec) * _mode_repr)
+            elif self.modes == 4:
+                self.set_state_tens(jnp.array(jnp.random.choice([0, 1], 2 * self.size),
+                                            dtype = Solver.prec) * _mode_repr)
+                # ! TODO : this is a specific implementation for the fermions 
+                # ! TODO : create a specific basis so that symmetries can be implemented
+            else:
+                raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         else:
-            raise NotImplementedError(Solver._not_implemented_error)
-        
+            # ! TODO : implement the Hilbert space representation
+            raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+            
     def set_state_up(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration to all up.
         '''
-        if self.modes == 2:
-            self.set_state_tens(jnp.ones(self.size, dtype = Solver._prec) * _mode_repr)
-        elif self.modes == 4:
-            self.set_state_tens(jnp.array([1 for i in range(self.size)] +
-                                        [0 for i in range(self.size)],
-                                        dtype = Solver._prec) * _mode_repr)
+        if self.hilbert is None:
+            if self.modes == 2:
+                self.set_state_tens(jnp.ones(self.size, dtype = Solver.prec) * _mode_repr)
+            elif self.modes == 4:
+                self.set_state_tens(jnp.array([1 for _ in range(self.size)] +
+                                            [0 for _ in range(self.size)],
+                                            dtype = Solver.prec) * _mode_repr)
+            else:
+                raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         else:
-            raise NotImplementedError("The state is not implemented for the given modes.")
+            # ! TODO : implement the Hilbert space representation
+            raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         
     def set_state_down(self, _mode_repr : float = 0.5):
         '''
-        Set the state configuration to all down.
+        Set the state configuration to all down. 
         '''
-        if self.modes == 2:
-            self.set_state_tens(-jnp.ones(self.size, dtype = jnp.float32))
-        elif self.modes == 4:
-            self.set_state_tens(jnp.array([0 for i in range(self.size)] 
-                                        + [1 for i in range(self.size)]
-                                        , dtype = jnp.float32))
+        if self.hilbert is None:
+            if self.modes == 2:
+                self.set_state_tens(-jnp.ones(self.size, dtype = Solver.prec) * _mode_repr)
+            elif self.modes == 4:
+                self.set_state_tens(jnp.array([0 for _ in range(self.size)] 
+                                            + [1 for _ in range(self.size)]
+                                            , dtype = Solver.prec) * _mode_repr)
         else:
+            # ! TODO : implement the Hilbert space representation
             raise NotImplementedError("The state is not implemented for the given modes.")
     
     def set_state_af(self):
         '''
         Set the state configuration to antiferromagnetic.
         '''
-        if self.modes == 2:
-            self.set_state_tens(jnp.array([1 if i % 2 == 0 else -1 for i in range(self.size)], dtype = jnp.float32))
-        elif self.modes == 4:
-            self.set_state_tens(jnp.array([1 if i % 2 == 0 else 0 for i in range(self.size)] 
-                                + [0 if i % 2 == 0 else 1 for i in range(self.size)]
-                                , dtype = jnp.float32))
+        if self.hilbert is None:
+            if self.modes == 2:
+                self.set_state_tens(jnp.array([1 if i % 2 == 0 else -1 for i in range(self.size)], dtype = jnp.float32))
+            elif self.modes == 4:
+                self.set_state_tens(jnp.array([1 if i % 2 == 0 else 0 for i in range(self.size)] 
+                                    + [0 if i % 2 == 0 else 1 for i in range(self.size)]
+                                    , dtype = jnp.float32))
+            else:
+                raise NotImplementedError("The state is not implemented for the given modes.")
         else:
+            # ! TODO : implement the Hilbert space representation
             raise NotImplementedError("The state is not implemented for the given modes.")
-
+        
     # create a distinguish function
-    def _state_distinguish(self, statetype):
+    def _state_distinguish(self, statetype, mode_repr = 0.5):
         """
         Distinguishes the type of the given state and sets the state accordingly.
 
@@ -190,31 +222,31 @@ class Solver(ABC):
         ValueError: If the state is not an integer, jnp.ndarray, np.ndarray, or a valid string representing an initial state.
         """
         if isinstance(statetype, int):
-            self.set_state_int(statetype)
-        elif isinstance(statetype, jnp.ndarray or np.ndarray):
-            self.set_state_tens(statetype)
-        elif isinstance(statetype, 'str'):
+            self.set_state_int(statetype, mode_repr)
+        elif isinstance(statetype, jnp.ndarray):
+            self.set_state_tens(statetype, mode_repr)
+        elif isinstance(statetype, str):
             return self._state_distinguish(statetype)
-        elif isinstance(statetype, Solver_init_state): 
-            if statetype == Solver_init_state.RND:
-                self.set_state_rand()
-            elif statetype == Solver_init_state.F_UP:
-                self.set_state_up()
-            elif statetype == Solver_init_state.F_DN:
-                self.set_state_down()
-            elif statetype == Solver_init_state.AF:
-                self.set_state_af()
+        elif isinstance(statetype, SolverInitState): 
+            if statetype == SolverInitState.RND:
+                self.set_state_rand(mode_repr)
+            elif statetype == SolverInitState.F_UP:
+                self.set_state_up(mode_repr)
+            elif statetype == SolverInitState.F_DN:
+                self.set_state_down(mode_repr)
+            elif statetype == SolverInitState.AF:
+                self.set_state_af(mode_repr)
         else:
             raise ValueError("The state must be an integer, a jnp.ndarray, or a valid string representing an initial state.")
             
-    def set_state(self, *args, **kwargs):
+    def set_state(self, state, mode_repr = 0.5, update = True):
         '''
         Set the state (either integer or vector) of the Monte Carlo solver.
+        - state : state of the system
+        - mode_repr : mode representation (default is 0.5 - for binary spins +-1)
+        - update : update the current state of the system
         '''    
-        if len(args) == 1:
-            self._state_distinguish(args[0])
-        elif "state" in kwargs:
-            self._state_distinguish(kwargs['state'])
-        else:
-            raise(ValueError("The state has to be passed as an argument or as a keyword argument."))
+        self._state_distinguish(state, mode_repr)
+    
+    ###################################
     

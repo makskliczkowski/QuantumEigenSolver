@@ -6,14 +6,14 @@ import jax.numpy as jnp
 import numpy as np
 
 # import solver specific libraries
-from ..solver import Solver_init_state, Solver
+from ..solver import SolverInitState, Solver
 
 ###################################
 
 @dataclass
-class MCS_train:
+class McsTrain:
     """
-    MCS_train is a class that encapsulates the parameters and
+    McsTrain is a class that encapsulates the parameters and
     methods for performing Monte Carlo training (or simulation).
 
     Attributes:
@@ -25,9 +25,9 @@ class MCS_train:
         nFlip (int)     : Number of flips for a single Monte Carlo step. Default is 1.
     """
     epochs      : int = 1       # number of epochs - when the training is performed
-    MC_sam      : int = 10      # number of Monte Carlo Steps
-    MC_th       : int = 0       # number of mcSteps to thermalize
-    bsize       : int = 4       # single block size (for autocorrelation)
+    mcsam       : int = 10      # number of Monte Carlo Steps - for samplers
+    mcth        : int = 0       # number of mcSteps to thermalize - for samplers 
+    bsize       : int = 4       # single block size (for autocorrelation) - for samplers
     dir         : str = ""      # saving directory for the data
     nflip       : int = 1       # number of flips for a single MC step
     nrepl       : int = 1       # number of replicas #!TODO : how to handle this?
@@ -44,34 +44,30 @@ class MCS_train:
         Returns:
             None
         """
-        outstr =    f"Monte Carlo Samples={self.MC_sam}, Thermalization Steps={self.MC_th}, "   \
+        outstr =    f"Monte Carlo Samples={self.mcsam}, Thermalization Steps={self.mcth}, "     \
                     f"Size of the single block={self.bsize}, "                                  \
                     f"Number of epochs={self.epochs}, "                                         \
                     f"Number of flips taken at each step={self.nflip}"
         print(f"{prefix}{outstr}")
 
+    # ----------------
+    
 ###################################
 
-
-
-class MonteCarloSolver(ABC):
-
+class MonteCarloSolver(Solver, ABC):
+    '''
+    Monte Carlo Solver is an abstract class that defines the basic structure of the Monte Carlo solver.
+    The class is inherited by the specific Monte Carlo solvers.
+    '''
     
     # define the static variables
     # ----------------
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initializes the Monte Carlo solver with default parameters.
         Parameters:
-        *args: Variable length argument list:
-        args:
-            - args[0] (int)     : Replica index (default is 1).
-            - args[1] (float)   : Inverse temperature beta = 1/T.
-            - args[2] (int)     : Random number generator key
-            - args[3] (int)     : Configuration size (like lattice sites etc.) 
-            - args[4] (int)     : Number of spin modes (in MB systems 2 for spins etc.)
-        or kwargs:
+        kwargs:
             - {replica} (int)   : Replica index (default is 1).
             - {beta}    (float) : Inverse temperature beta = 1/T.
             - {rng}     (int)   : Random number generator key
@@ -91,7 +87,10 @@ class MonteCarloSolver(ABC):
         _rng_key [_rng]         : Random number generator key.
         _info (str)             : Information about the solver.
         """
-                
+        
+        # call the parent class constructor with the arguments and keyword arguments passed
+        super().__init__(size = kwargs.get("size", 1), modes = kwargs.get("modes", 2))
+        
         # define the instance variables
         self._accepted          = 0            # number of accepted steps
         self._total             = 0            # total number of steps          
@@ -104,13 +103,13 @@ class MonteCarloSolver(ABC):
         self._best_loss         = 1e10         # best loss value
         
         # temperature related variables
-        self._replica           = args[0] if len(args) > 0 else kwargs.get("replica", 1)  # replica index
-        self._beta              = args[1] if len(args) > 1 else kwargs.get("beta", 1.0)   # inverse temperature beta = 1/T
+        self._replica           = kwargs.get("replica", 1)  # replica index
+        self._beta              = kwargs.get("beta", 1.0)   # inverse temperature beta = 1/T
         
         # define the random number generator
-        self._rng_key           = args[2] if len(args) > 2 else kwargs.get("rng", jnp.random.PRNGKey(0))
+        self._rng_key           = kwargs.get("rng", jnp.random.PRNGKey(0))
         
-        # information 
+        # information
         self._info              = "Monte Carlo Solver"
         
         # container for the losses - this will be used throughout the training and may be a tensor eventually
@@ -160,7 +159,7 @@ class MonteCarloSolver(ABC):
         Parameters:
         value : The information to be stored in the _info attribute.
         """
-        self._info = value    
+        self._info = value   
             
     # ----------------
     
@@ -201,16 +200,6 @@ class MonteCarloSolver(ABC):
         - If the acceptance rate is not set, then it is calculated as the ratio of accepted to total steps.
         '''
         return self._acceptance_rate if self._acceptance_rate is not None else (self._accepted / self._total)
-    
-    # SETTERS #############################################################
-    
-    @abstractmethod
-    def set_state_tens(self, state : jnp.ndarray):
-        '''
-        Set the state configuration from the tensor.
-        - state         : state configuration
-        - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
-        '''
 
     # ----------------
     
@@ -232,11 +221,42 @@ class MonteCarloSolver(ABC):
         
     # TRAINING ############################################################
     
+    def _train_step_impl(self, start_st : SolverInitState | int | jnp.ndarray | None = None, 
+                        par         : McsTrain | dict | None = None, 
+                        update      : bool = True, **kwargs):
+        '''
+        Prepare the training step.
+
+        '''
+        # check whether correct parameters are passed
+        self._total             = 0
+        self._accepted          = 0
+        self._acceptance_rate   = 0
+        is_mcs_train            = (par is not None and isinstance(par, McsTrain))
+        # set the parameters - if they are passed as a dictionary or as a class or as kwargs
+        mcs                     = par.MC_sam    if is_mcs_train else kwargs.get("mcsam", par.get("mcsam", 1))                     
+        mct                     = par.MC_th     if is_mcs_train else kwargs.get("mcth", par.get("mcth", 0))
+        bsize                   = par.bsize     if is_mcs_train else kwargs.get("bsize", par.get("bsize", 4))
+        nflip                   = par.nflip     if is_mcs_train else kwargs.get("nflip", par.get("nflip", 1))
+        epochs                  = par.epochs    if is_mcs_train else kwargs.get("epochs", par.get("epochs", 1))
+        directory               = par.dir       if is_mcs_train else kwargs.get("dir", par.get("dir", 1))
+        
+        # set the state
+        self.set_state(start_st)
+        
+        # set the parameters
+        return McsTrain(epochs  = epochs,
+                        mcsam   = mcs,
+                        mcth    = mct,
+                        bsize   = bsize,
+                        nflip   = nflip,
+                        dir     = directory)
+        
     @abstractmethod 
     def train_step(self, i      : int = 0,
                     verbose     : bool = False,
-                    start_st    : Solver_init_state | int | jnp.ndarray | None = None,
-                    par         : MCS_train | dict | None = None,
+                    start_st    : SolverInitState | int | jnp.ndarray | None = None,
+                    par         : McsTrain | dict | None = None,
                     update      : bool = True,
                     **kwargs):
         '''
@@ -245,33 +265,14 @@ class MonteCarloSolver(ABC):
         - par           : Monte Carlo training parameters - those can be also included in kwargs (may be None)
         - verbose       : flag to print the information
         - rand_start    : flag to start from a random configuration
-        - update        : flag to update the parameters (if the model needs this
+        - update        : flag to update the parameters (if the model needs this)
         '''
-        # check whether correct parameters are passed
-        self._total             = 0
-        self._accepted          = 0
-        self._acceptance_rate   = 0
-        isMCS_train             = (par is not None and isinstance(par, MCS_train))
-        # set the parameters - if they are passed as a dictionary or as a class or as kwargs
-        mcs                     = par.MC_sam    if isMCS_train else kwargs.get("MC_sam", par.get("MC_sam", 1))                     
-        mct                     = par.MC_th     if isMCS_train else kwargs.get("MC_th", par.get("MC_th", 0))
-        bsize                   = par.bsize     if isMCS_train else kwargs.get("bsize", par.get("bsize", 4))
-        nflip                   = par.nflip     if isMCS_train else kwargs.get("nflip", par.get("nflip", 1))
-        epochs                  = par.epochs    if isMCS_train else kwargs.get("epochs", par.get("epochs", 1))
-        directory               = par.dir       if isMCS_train else kwargs.get("dir", par.get("dir", 1))
-        # set the parameters
-        par                     = MCS_train(epochs  = epochs,
-                                            MC_sam  = mcs, 
-                                            MC_th   = mct, 
-                                            bsize   = bsize, 
-                                            nflip   = nflip,
-                                            dir     = directory)
-        
-        # implementation specific - deriving classes should implement this        
-        
+        pass
+            
     @abstractmethod
-    def train(self, par : MCS_train, verbose : bool, rand_start : bool, **kwargs):
+    def train(self, par : McsTrain, verbose : bool, rand_start : bool, **kwargs):
         '''
         Perform the training.
         
         '''
+        
