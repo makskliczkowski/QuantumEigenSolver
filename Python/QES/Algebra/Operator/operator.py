@@ -1,5 +1,5 @@
 """
-This module defines a set of classes and functions for handling general operators in quantum mechanics, 
+This module defines a set of classes and functions for handling general operators in quantum mechanics,
 particularly in the context of Hilbert spaces.
 
 Main components of this module include:
@@ -22,10 +22,11 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 import numpy as np
 import jax.numpy as jnp
-from jax import jit
+from jax import jit, vmap
 from jax.experimental import sparse
-from typing import Union, Callable, Tuple, List
-import copy
+from typing import Union, Callable, Tuple, List     # type hints for the functions and methods
+from functools import partial                       # partial function application for operator composition
+import copy                                         # copy module for copying the operator object 
 
 # Hilbert space
 from ..hilbert import HilbertSpace
@@ -67,6 +68,8 @@ class OperatorFunction:
     the user to define any operator that can be applied to the state. The function shall return a list of pairs (state, value). 
     """
     
+    # -----------
+    
     def __init__(self, fun : Callable, modifies_state : bool = True, necessary_args : int = 0):
         """
         Initialize the OperatorFunction object.
@@ -77,12 +80,13 @@ class OperatorFunction:
             represented as integers or numpy arrays or JAX arrays. This enables the user to define
             any operator that can be applied to the state. The function shall return a list of pairs (state, value).
         """
-        self._fun               = fun
-        self._modifies_state    = modifies_state
-        self._necessary_args    = int(necessary_args)
+        self._fun               = jit(fun)                  # the function that defines the operator
+        self._modifies_state    = modifies_state            # flag for the operator that modifies the state
+        self._necessary_args    = int(necessary_args)       # number of necessary arguments for the operator function
 
     # -----------
     
+    @partial(jit, static_argnums=(0,))                      # JIT compilation for the operator function - static arguments are the number of necessary arguments
     def __call__(self, s : Union[int, jnp.array], *args) -> List[Tuple[Union[int, jnp.array], Union[float, complex]]]:
         """
         Apply the operator to the state. It returns the transformed state with the corresponding value. The 
@@ -97,13 +101,10 @@ class OperatorFunction:
         result = self._fun(s, *args)
         
         if isinstance(result, tuple) and isinstance(result[0], (int, jnp.ndarray)):
-            if self._modifies_state:
-                return [None, result[1]]
-            else:
-                return [result]
+            return [result] if self._modifies_state else [(None, result[1])]
         elif isinstance(result, list):
             return result
-        raise ValueError("Invalid return type from the operator function.")           
+        raise ValueError("Invalid return type from the operator function.")
 
     # -----------
     
@@ -144,27 +145,30 @@ class OperatorFunction:
     
     # -----------
         
-    def __mul__(self, other):
+    def __mul__(self, other : Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
         """
         Composition of two operator functions.
         Implements the operator composition: f * g ≡ f(g(n,...),...) for two operator functions f and g,
         where f is the current operator function and g is the other operator function.
-        
+        Notes:
+        - If the operator functions have different number of arguments, the maximum number of arguments is taken.
+        - If the operator functions modify the state, the result is a list of pairs (state, value).
+        - The multiplication is performed as f * g.
+        - JIT compilation is used for the multiplication operation when the state is a JAX array.
+        - if other is a scalar, the operator function is multiplied by the scalar. 
         Params:
         - other (OperatorFunction) : The operator function to be composed with the current operator function - those 
         may have different number of arguments so it is important to combine them properly. 
         """
-        other_modifies  = True
-        args_needed     = 0
-        if isinstance(other, OperatorFunction):
-            other_modifies = other.modifies_state
-            args_needed    = other.necessary_args
-        elif isinstance(other, Callable):
-            # check the number of arguments for the function
-            args_needed = other.__code__.co_argcount - 1
-        else:
-            raise ValueError("Invalid type for operator function composition.")
+        if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
+            return OperatorFunction(jit(lambda s, *args: [(s, v * other) for s, v in self(s, *args)]),
+                modifies_state=self._modifies_state,
+                necessary_args=self._necessary_args)
         
+        other_modifies  = other.modifies_state if isinstance(other, OperatorFunction) else True
+        args_needed     = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        
+        @jit
         def composed_fun(s: Union[int, jnp.ndarray], *args):
             """
             Composed function for the operator function.
@@ -179,26 +183,21 @@ class OperatorFunction:
             """
             # First apply the right-side operator
             intermediate = other(s, *args)
+            final_result = []
 
-            if other_modifies:
-                next_result = self(s, *args)
+            for s1, v1 in intermediate:
+                next_result = self(s1, *args)
                 if self._modifies_state:
-                    return [(None, intermediate[0][1] * next_result[0][1])]
-                return [(si, intermediate[0][1] * next_result_i[1]) for si, next_result_i in next_result]
-            else:
-                final_result = []
-                for s1, v1 in intermediate:
-                    # Apply the left operator function
-                    next_result = self(s1, *args)
-                    if self._modifies_state:
-                        final_result.append((s1, v1 * next_result[0][1]))
-                    else:
-                        final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
-                return final_result
+                    final_result.append((s1, v1 * next_result[0][1]))
+                else:
+                    final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
 
-        # return the composed operator function
-        return OperatorFunction(composed_fun, modifies_state = self._modifies_state or other_modifies, necessary_args = max(self._necessary_args, args_needed))
-        
+            return final_result
+
+        return OperatorFunction(composed_fun,
+            modifies_state=self._modifies_state or other_modifies,
+            necessary_args=args_needed)
+
     # -----------
     
     def __rmul__(self, other):
@@ -209,27 +208,42 @@ class OperatorFunction:
         :param other: The operator function to compose with `self` in reversed order.
         :return: A new composed operator function.
         """
-        other_modifies  = isinstance(other, OperatorFunction) and other.modifies_state
-        args_needed     = other.necessary_args if isinstance(other, OperatorFunction) else other.__code__.co_argcount - 1
-
+        if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
+            return OperatorFunction(jit(lambda s, *args: [(s, v * other) for s, v in self(s, *args)]),
+                modifies_state=self._modifies_state,
+                necessary_args=self._necessary_args)
+            
+        other_modifies  = other.modifies_state if isinstance(other, OperatorFunction) else True
+        args_needed     = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        
+        @jit
         def composed_fun(s: Union[int, jnp.ndarray], *args):
-            intermediate = self(s, *args)
-            if self.modifies_state:
-                next_result = other(s, *args)
-                if other_modifies:
-                    return [(None, intermediate[0][1] * next_result[0][1])]
-                return [(si, intermediate[0][1] * next_result_i[1]) for si, next_result_i in next_result]
-            else:
-                final_result = []
-                for s1, v1 in intermediate:
-                    next_result = other(s1, *args)
-                    if other_modifies:
-                        final_result.append((s1, v1 * next_result[0][1]))
-                    else:
-                        final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
-                return final_result
+            """
+            Composed function for the operator function.
+            First, apply the function on the right side (other), then apply the function on the left side (self).
 
-        return OperatorFunction(composed_fun, modifies_state=self._modifies_state or other_modifies, necessary_args=max(self._necessary_args, args_needed))
+            Params:
+            - s (int, jnp.ndarray): The state to which the operator is applied.
+            - args: Additional arguments for the operator.
+
+            Returns:
+            - List of (state, value) pairs after applying the composed operator function.
+            """
+            # First apply the right-side operator
+            intermediate = self(s, *args)
+            final_result = []
+
+            for s1, v1 in intermediate:
+                next_result = other(s1, *args)
+                if other_modifies:
+                    final_result.append((s1, v1 * next_result[0][1]))
+                else:
+                    final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
+            return final_result
+
+        return OperatorFunction(composed_fun,
+            modifies_state=self._modifies_state or other_modifies,
+            necessary_args=args_needed)
 
     # -----------
     
@@ -237,8 +251,7 @@ class OperatorFunction:
     
     # -----------
 
-    @jit
-    def __add__(self, other):
+    def __add__(self, other : 'OperatorFunction'):
         """
         Add two operator functions. The operator takes a maximum of two arguments. 
         The operator function is defined as f'(s, *args) = f(s, *args[:max_F]) + g(s, *args[:max_g]).
@@ -252,6 +265,7 @@ class OperatorFunction:
         - other (OperatorFunction) : The operator function to be added to the current operator function.
         """
 
+        @jit
         def adding(s : Union[int, jnp.ndarray], *args):
             """
             Add the operator functions.
@@ -260,56 +274,25 @@ class OperatorFunction:
             - s (int, jnp.ndarray)  : The state to which the operator is applied.
             - args                  : Additional arguments for the operator.
             """
-            if isinstance(s, jnp.ndarray):
-                result_f = jnp.array(self(s, *args))
-                result_g = jnp.array(other(s, *args))
+            # if isinstance(s, jnp.ndarray):
+            result_f = jnp.array(self(s, *args))
+            result_g = jnp.array(other(s, *args))
 
-                # Extract states and values
-                states_f, values_f = result_f[:, 0], result_f[:, 1]
-                states_g, values_g = result_g[:, 0], result_g[:, 1]
-                
-                # Combine both results
-                combined_states = jnp.concatenate([states_f, states_g])
-                combined_values = jnp.concatenate([values_f, values_g])
+            # Extract states and values
+            states_f, values_f = result_f[:, 0], result_f[:, 1]
+            states_g, values_g = result_g[:, 0], result_g[:, 1]
+            
+            # Combine both results
+            combined_states = jnp.concatenate([states_f, states_g])
+            combined_values = jnp.concatenate([values_f, values_g])
 
-                # Get unique states and sum corresponding values
-                unique_states, indices = jnp.unique(combined_states, return_inverse=True)
-                summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
+            # Get unique states and sum corresponding values
+            unique_states, indices = jnp.unique(combined_states, return_inverse=True)
+            summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
 
-                return list(zip(unique_states, summed_values))
-            
-            # otherwise - apply the operator to the state
-            
-            result_f    = self(s, *args)
-            result_g    = other(s, *args)
-            combinded   = {}
-            
-            # combine the results
-            if self._modifies_state:
-                for state, value in result_f:
-                    if state not in combinded:
-                        combinded[state] = value
-                    else:
-                        combinded[state] += value
-            else:
-                combinded[None] = result_f[0][1]
-            
-            if other.modifies_state:
-                for state, value in result_g:
-                    if state not in combinded:
-                        combinded[state] = value
-                    else:
-                        combinded[state] += value
-            else:
-                combinded[None] += result_g[0][1]
-            
-            if len(combinded) == 1 and None in combinded:
-                return [(None, combinded[None])]
-            elif None in combinded:
-                return [(state, value) for state, value in combinded.items() if state is not None] + [(s, combinded[None])]
-            return list(combinded.items())
-        return OperatorFunction(adding, modifies_state = self._modifies_state or other._modifies_state, necessary_args = max(self._necessary_args, other._necessary_args))    
+            return list(zip(unique_states, summed_values))
         
+        return OperatorFunction(adding, modifies_state = self._modifies_state or other._modifies_state, necessary_args = max(self._necessary_args, other._necessary_args))    
         
     # -----------
     
@@ -318,7 +301,7 @@ class OperatorFunction:
     # -----------
     
     @jit
-    def __sub__(self, other):
+    def __sub__(self, other : 'OperatorFunction'):
         """
         Substract two operator functions. The operator takes a maximum of two arguments. 
         The operator function is defined as f'(s, *args) = f(s, *args[:max_F]) - g(s, *args[:max_g]).
@@ -332,6 +315,7 @@ class OperatorFunction:
         - other (OperatorFunction) : The operator function to be added to the current operator function.
         """
 
+        @jit
         def substract(s : Union[int, jnp.ndarray], *args):
             """
             Substract the operator functions. When the operator is applied to a state, the function returns the
@@ -345,56 +329,29 @@ class OperatorFunction:
             - s (int, jnp.ndarray)  : The state to which the operator is applied.
             - args                  : Additional arguments for the operator.
             """
-            if isinstance(s, jnp.ndarray):
-                # Get results from both operators
-                result_f = jnp.array(self(s, *args))
-                result_g = jnp.array(other(s, *args))
 
-                # Extract states and values
-                states_f, values_f = result_f[:, 0], result_f[:, 1]
-                states_g, values_g = result_g[:, 0], result_g[:, 1]
+            # Get results from both operators
+            result_f = jnp.array(self(s, *args))
+            result_g = jnp.array(other(s, *args))
 
-                # Combine results with signs for subtraction
-                combined_states = jnp.concatenate([states_f, states_g])
-                combined_values = jnp.concatenate([values_f, -values_g])  # Negate `g` values for subtraction
+            # Extract states and values
+            states_f, values_f = result_f[:, 0], result_f[:, 1]
+            states_g, values_g = result_g[:, 0], result_g[:, 1]
 
-                # Get unique states and sum corresponding values
-                unique_states, indices = jnp.unique(combined_states, return_inverse=True)
-                summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
+            # Combine results with signs for subtraction
+            combined_states = jnp.concatenate([states_f, states_g])
+            combined_values = jnp.concatenate([values_f, -values_g])  # Negate `g` values for subtraction
 
-                return list(zip(unique_states, summed_values))
-            
-            result_f    = self(s, *args)
-            result_g    = other(s, *args)
-            combinded   = {}
-            
-            # combine the results
-            if self._modifies_state:
-                for state, value in result_f:
-                    if state not in combinded:
-                        combinded[state] = value
-                    else:
-                        combinded[state] += value
-            else:
-                combinded[None] = result_f[0][1]
-            
-            if other.modifies_state:
-                for state, value in result_g:
-                    if state not in combinded:
-                        combinded[state] = -value
-                    else:
-                        combinded[state] -= value
-            else:
-                combinded[None] -= result_g[0][1]
-            
-            if len(combinded) == 1 and None in combinded:
-                return [(None, combinded[None])]
-            elif None in combinded:
-                return [(state, value) for state, value in combinded.items() if state is not None] + [(s, combinded[None])]
-            return [(state, value) for state, value in combinded.items()]
+            # Get unique states and sum corresponding values
+            unique_states, indices = jnp.unique(combined_states, return_inverse=True)
+            summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
+
+            return list(zip(unique_states, summed_values))
         
-        return OperatorFunction(substract, modifies_state = self._modifies_state or other._modifies_state, necessary_args = max(self._necessary_args, other._necessary_args))    
-
+        return OperatorFunction(substract, modifies_state = self._modifies_state or other.modifies_state, necessary_args = max(self._necessary_args, other.necessary_args))    
+    
+    # -----------
+    
 ####################################################################################################
 
 class Operator(ABC):

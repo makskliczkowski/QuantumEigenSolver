@@ -7,13 +7,12 @@ High-level Hilbert space class for quantum many-body systems.
 """
 
 from abc import ABC, abstractmethod
-
-# import Lattice class
-from ..general_python.lattices import Lattice
-
-''' Other imports '''
+from typing import Union, Callable, Tuple, List     # type hints for the functions and methods
 import numpy as np
 
+# import Lattice class
+from .. import Lattice
+from . import Operator
 
 class HilbertSpace(ABC):
     """
@@ -22,36 +21,48 @@ class HilbertSpace(ABC):
     
     """
     
+    ####################################################################################################
+    
     def __init__(self,
-                sym_gen     : dict | None   = None,
-                global_syms : list | None   = None,
-                gen_mapping : bool          = False,
-                state_type  : str           = "integer",
+                sym_gen     : Union[dict, None]             = None,
+                global_syms : Union[List[Operator], None]   = None,
+                gen_mapping : bool                          = False,
+                state_type  : str                           = "integer",
                 **kwargs):
         """
-        Initialize the Hilbert space.
+        Initialize the Hilbert space. 
         
         Args:
             sym_gen (dict)      : A dictionary of symmetry generators {operator : value}.
             global_syms (list)  : A list of global symmetries {operator : value}.
-            gen_mapping (bool)  : A flag to generate the mapping of the representatives to the original states.
-            Ns (int)            : The number of sites in the system.
-            Nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
+            gen_mapping (bool)  : A flag to generate the mapping of the representatives to the original states - this 
+                                means that a map between a current index (state) and a representative index is created.
+            ns (int)            : The number of sites in the system.
+            nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
         """
         
-        # handle the system phyisical size dimension
-        if "Ns" in kwargs and "lattice" not in kwargs:
-            self._Ns        = kwargs.get('Ns', 1)       # number of sites in the system
+        # check if the arguments match the requirements
+        if not isinstance(sym_gen, dict) and sym_gen is not None:
+            raise ValueError("The symmetry generators must be provided as a dictionary.")
+        if not isinstance(global_syms, list) and global_syms is not None:
+            raise ValueError("The global symmetries must be provided as a list.")
+        if not isinstance(gen_mapping, bool):
+            raise ValueError("The flag for generating the mapping must be a boolean.")            
+        
+        # handle the system phyisical size dimension - distinguish between the number of sites and the lattice object
+        # if the lattice object is provided, the number of sites is calculated from the lattice object
+        if "ns" in kwargs and "lattice" not in kwargs:
+            self._ns        = kwargs.get('Ns', 1)       # number of sites in the system
             self._lattice   = None                      # lattice object
         elif "lattice" in kwargs:
             self._lattice   = kwargs.get('lattice')     # lattice object
-            self._Ns        = self.lattice.get_Ns()     # number of sites in the system
+            self._ns        = self.lattice.get_Ns()     # number of sites in the system
         else:
-            raise ValueError("Either 'Ns' or 'lattice' must be provided.")
+            raise ValueError("Either 'ns' or 'lattice' must be provided.")
         
         # handle local Hilbert space properties
-        self._Nhl   = kwargs.get('Nhl', 2)              # local Hilbert space dimension
-        self._Nhint = kwargs.get('Nhint', 0)            # number of modes (fermions, bosons, etc. on each site)
+        self._nhl   = kwargs.get('nhl', 2)              # local Hilbert space dimension
+        self._nhint = kwargs.get('nhint', 0)            # number of modes (fermions, bosons, etc. on each site)
         
         # initialize the Hilbert space etc.
         if state_type.lower() == "integer" or state_type.lower() == "int":
@@ -59,37 +70,22 @@ class HilbertSpace(ABC):
         else:
             self._state_type = np.ndarray
         
-        self._NhFull        = self._Nhl ** (self._Nhint * self._Ns) # full Hilbert space dimension
+        # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
+        self._nhfull        = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
         self._normalization = []                                    # normalization of the states
         self._sym_group     = []                                    # symmetry group
         self._mapping       = []                                    # mapping of the states
         self._reprmap       = []                                    # mapping of the representatives (vector of tuples (state, representative value))
         
-        # handle symmetries
+        # handle symmetries - save the global symmetries and initialize the mapping 
         self._global_syms   = global_syms               # global symmetries
         self._init_mapping(sym_gen, gen_mapping)        # initialize the mapping
     
     ####################################################################################################
     
-    def _init_mapping(self, gen : list, gen_mapping : bool = False):
-        """
-        Initialize the mapping of the states.
-        
-        Args:
-            gen (list)         : A list of symmetry generators.
-            gen_mapping (bool) : A flag to generate the mapping of the representatives to the original states.
-        """
-        self._gen_sym_group(gen)    # generate the symmetry group
-        
-        if len(gen) > 0:
-            print(f"Symmetry group generator: {self.get_sym_info()}") # print the symmetry group
-        
-        # generate the mapping of the states
-        
-        
-            
-            
-    # --------------------------------------------------------------------------------------------------
+    # Generate the symmetry group and all properties of the generation
+    
+    ####################################################################################################
     
     def _gen_sym_group(self, gen : list):
         """
@@ -104,24 +100,52 @@ class HilbertSpace(ABC):
             return
         
         # copy the generators to modify them if needed
-        sym_gen = gen.copy()
+        sym_gen                     = gen.copy()
         
         contains_translation        = False
         contains_cpx_translation    = False
         
-        # GLOBALS
-        contains_U1                 = False
+        # globals
+        contains_u1                 = False
         
-        # go through the local symmetries
-        for (generator, sec) in sym_gen:
-            
-            # proceed if this is a translation
-            if generator == "T":
-                contains_translation = True
-                if sec == "C":
-                    contains_cpx_translation = True
-                continue
+        # go through the local symmetries by going through the generators
+        if sym_gen is not None:
+            # go through the generators and check the symmetries
+            for gen in sym_gen:
+                # get the generator
+                generator   = gen[0]
+                # get the symmetry value
+                sec         = gen[1]
+                
+                # proceed if this is a translation
+                if generator == "T":
+                    contains_translation = True
+                    if sec == "C":
+                        contains_cpx_translation = True
+                    continue
     
+    # --------------------------------------------------------------------------------------------------
+    
+    def _init_mapping(self, gen : list, gen_mapping : bool = False):
+        """
+        Initialize the mapping of the states. This function is used to generate the mapping of the states to the representatives.
+        It uses a list of symmetry generators to generate the mapping.
+        
+        Args:
+            gen (list)         : A list of symmetry generators.
+            gen_mapping (bool) : A flag to generate the mapping of the representatives to the original states.
+        """
+        self._gen_sym_group(gen)                                    # generate the symmetry group
+        
+        if len(gen) > 0:
+            print(f"Symmetry group generator: {self.get_sym_info()}") # print the symmetry group
+        
+        # generate the mapping of the states
+        
+        
+            
+            
+
     ####################################################################################################
     
     # Getters and checkers for the Hilbert space
@@ -159,6 +183,58 @@ class HilbertSpace(ABC):
         
         return tmp
     
+    # --------------------------------------------------------------------------------------------------
+    
+    def get_lattice(self):
+        """
+        Return the lattice object.
+        
+        Returns:
+            Lattice: The lattice object.
+        """
+        return self._lattice
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def get_Ns(self):
+        """
+        Return the number of sites in the system.
+        
+        Returns:
+            int: The number of sites in the system.
+        """
+        return self._Ns
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def get_Nhl(self):
+        """
+        Return the local Hilbert space dimension.
+        
+        Returns:
+            int: The local Hilbert space dimension.
+        """
+        return self._Nhl
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def get_Nhint(self):
+        """
+        Return the number of modes (fermions, bosons, etc. on each site).
+        
+        Returns:
+            int: The number of modes.
+        """
+        return self._Nhint
+    
+    def get_Nh(self):
+        """
+        Return the full Hilbert space dimension.
+        
+        Returns:
+            int: The full Hilbert space dimension.
+        """
+        return self._NhFull
     
     ####################################################################################################
     
