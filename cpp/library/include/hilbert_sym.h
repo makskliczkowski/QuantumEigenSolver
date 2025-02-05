@@ -231,7 +231,7 @@ namespace Operators
 	// ##########################################################################################################################################
 
 	template <typename _T>
-	inline Operator<_T> secsymChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice> _lat) {
+	inline Operator<_T> symChoice(std::pair<SymGenerators, int> _g, std::shared_ptr<Lattice> _lat) {
 		auto [gen, eig] = _g;
 		switch (gen) {
 		case SymGenerators::T:

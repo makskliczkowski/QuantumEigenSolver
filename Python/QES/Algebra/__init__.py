@@ -1,4 +1,4 @@
-from .Operator.operator import Operator
+from .Operator.operator import Operator, SymmetryGenerators
 from .hilbert import HilbertSpace
 
 """

@@ -1,5 +1,6 @@
 """
-This module defines a set of classes and functions for handling general operators in quantum mechanics,
+This module defines a set of classes and functions for
+handling general operators in quantum mechanics,
 particularly in the context of Hilbert spaces.
 
 Main components of this module include:
@@ -37,20 +38,24 @@ class SymmetryGenerators(Enum):
     """
     Available symmetry generators for symmetry analysis. 
     - E                 : Identity symmetry. 
-    - Translation (Tx)  : Translation symmetry in the x-direction.
+    - Translation-x (Tx): Translation symmetry in the x-direction.
+    - Translation-y (Ty): Translation symmetry in the y-direction.
+    - Translation-z (Tz): Translation symmetry in the z-direction.
     - Reflecition (R)   : Reflection symmetry.
     - Parity (Px)       : Parity symmetry in the x-direction.
     - Parity (Py)       : Parity symmetry in the y-direction.
     - Parity (Pz)       : Parity symmetry in the z-direction. 
     """
     
-    E           = auto()
-    Translation = auto()
-    Reflection  = auto()
-    ParityX     = auto()
-    ParityY     = auto()
-    ParityZ     = auto()
-    Other       = auto()
+    E               = auto()
+    Translation_x   = auto()
+    Translation_y   = auto()
+    Translation_z   = auto()
+    Reflection      = auto()
+    ParityX         = auto()
+    ParityY         = auto()
+    ParityZ         = auto()
+    Other           = auto()
     
     # -----------
     

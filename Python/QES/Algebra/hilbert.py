@@ -12,7 +12,7 @@ import numpy as np
 
 # import Lattice class
 from .. import Lattice
-from . import Operator
+from . import Operator, SymmetryGenerators
 
 class HilbertSpace(ABC):
     """
@@ -112,14 +112,12 @@ class HilbertSpace(ABC):
         if sym_gen is not None:
             # go through the generators and check the symmetries
             for gen in sym_gen:
-                # get the generator
-                generator   = gen[0]
-                # get the symmetry value
-                sec         = gen[1]
+                # get the generator and the value
+                generator, sec = gen
                 
                 # proceed if this is a translation
-                if generator == "T":
-                    contains_translation = True
+                if isinstance(generator, (SymmetryGenerators.Translation_x, SymmetryGenerators.Translation_y, SymmetryGenerators.Translation_z)):
+                    contains_translation == True if (self._lattice is not None and self._lattice.get_bc() == PBC) else False
                     if sec == "C":
                         contains_cpx_translation = True
                     continue
