@@ -28,6 +28,7 @@ class HilbertSpace(ABC):
                 global_syms : Union[List[Operator], None]   = None,
                 gen_mapping : bool                          = False,
                 state_type  : str                           = "integer",
+                single_part : bool                          = False,
                 **kwargs):
         """
         Initialize the Hilbert space. 
@@ -39,6 +40,7 @@ class HilbertSpace(ABC):
                                 means that a map between a current index (state) and a representative index is created.
             ns (int)            : The number of sites in the system.
             nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
+            single_particle     : A flag to indicate if the system is a single-particle system (default is False).
         """
         
         # check if the arguments match the requirements
@@ -52,17 +54,17 @@ class HilbertSpace(ABC):
         # handle the system phyisical size dimension - distinguish between the number of sites and the lattice object
         # if the lattice object is provided, the number of sites is calculated from the lattice object
         if "ns" in kwargs and "lattice" not in kwargs:
-            self._ns        = kwargs.get('Ns', 1)       # number of sites in the system
+            self._ns        = kwargs.get('ns', 1)       # number of sites in the system
             self._lattice   = None                      # lattice object
         elif "lattice" in kwargs:
-            self._lattice   = kwargs.get('lattice')     # lattice object
-            self._ns        = self.lattice.get_Ns()     # number of sites in the system
+            self._lattice   = kwargs.get('lattice')     # lattice object provided
+            self._ns        = self._lattice.get_Ns()    # number of sites in the system
         else:
             raise ValueError("Either 'ns' or 'lattice' must be provided.")
         
         # handle local Hilbert space properties
         self._nhl   = kwargs.get('nhl', 2)              # local Hilbert space dimension
-        self._nhint = kwargs.get('nhint', 0)            # number of modes (fermions, bosons, etc. on each site)
+        self._nhint = kwargs.get('nhint', 1)            # number of modes (fermions, bosons, etc. on each site)
         
         # initialize the Hilbert space etc.
         if state_type.lower() == "integer" or state_type.lower() == "int":
@@ -71,7 +73,16 @@ class HilbertSpace(ABC):
             self._state_type = np.ndarray
         
         # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
-        self._nhfull        = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
+        self._single_part   = single_part                           # single particle system flag
+        if self._single_part:
+            self._nhfull    = self._ns * self._nhl                  # single particle system Hilbert space dimension (each site has its own Hilbert space)
+        else:
+            self._nhfull        = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
+            
+        # may be eddited later by modifying the symmetry group
+        self._nh            = self._nhfull                          # Hilbert space dimension
+        
+        # initialize the properties of the Hilbert space
         self._normalization = []                                    # normalization of the states
         self._sym_group     = []                                    # symmetry group
         self._mapping       = []                                    # mapping of the states
@@ -194,6 +205,26 @@ class HilbertSpace(ABC):
     
     # --------------------------------------------------------------------------------------------------
     
+    @property
+    def sites(self):
+        """
+        Return the number of sites in the system.
+        
+        Returns:
+            int: The number of sites in the system.
+        """
+        return self._ns
+    
+    @property
+    def Ns(self):
+        """
+        Return the number of sites in the system.
+        
+        Returns:
+            int: The number of sites in the system.
+        """
+        return self._ns
+    
     def get_Ns(self):
         """
         Return the number of sites in the system.
@@ -201,9 +232,29 @@ class HilbertSpace(ABC):
         Returns:
             int: The number of sites in the system.
         """
-        return self._Ns
+        return self._ns
     
     # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def local(self):
+        """
+        Return the local Hilbert space dimension.
+        
+        Returns:
+            int: The local Hilbert space dimension.
+        """
+        return self._nhl
+    
+    @property
+    def Nhl(self):
+        """
+        Return the local Hilbert space dimension.
+        
+        Returns:
+            int: The local Hilbert space dimension.
+        """
+        return self._nhl
     
     def get_Nhl(self):
         """
@@ -212,9 +263,29 @@ class HilbertSpace(ABC):
         Returns:
             int: The local Hilbert space dimension.
         """
-        return self._Nhl
+        return self._nhl
     
     # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def modes(self):
+        """
+        Return the number of modes (fermions, bosons, etc. on each site).
+        
+        Returns:
+            int: The number of modes.
+        """
+        return self._nhint
+    
+    @property
+    def Nhint(self):
+        """
+        Return the number of modes (fermions, bosons, etc. on each site).
+        
+        Returns:
+            int: The number of modes.
+        """
+        return self._nhint
     
     def get_Nhint(self):
         """
@@ -223,16 +294,69 @@ class HilbertSpace(ABC):
         Returns:
             int: The number of modes.
         """
-        return self._Nhint
+        return self._nhint
     
-    def get_Nh(self):
+    # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def full(self):
         """
         Return the full Hilbert space dimension.
         
         Returns:
             int: The full Hilbert space dimension.
         """
-        return self._NhFull
+        return self._nhfull
+    
+    @property
+    def Nhfull(self):
+        """
+        Return the full Hilbert space dimension.
+        
+        Returns:
+            int: The full Hilbert space dimension.
+        """
+        return self._nhfull
+
+    def get_Nh_full(self):
+        """
+        Return the full Hilbert space dimension.
+        
+        Returns:
+            int: The full Hilbert space dimension.
+        """
+        return self._nhfull
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def dimension(self):
+        """
+        Return the dimension of the Hilbert space.
+        
+        Returns:
+            int: The dimension of the Hilbert space.
+        """
+        return self._nh
+    
+    @property
+    def Nh(self):
+        """
+        Return the dimension of the Hilbert space.
+        
+        Returns:
+            int: The dimension of the Hilbert space.
+        """
+        return self._nh
+    
+    def get_Nh(self):
+        """
+        Return the dimension of the Hilbert space.
+        
+        Returns:
+            int: The dimension of the Hilbert space.
+        """
+        return self._nh
     
     ####################################################################################################
     
@@ -247,21 +371,21 @@ class HilbertSpace(ABC):
         Returns:
             str: A string representation of the Hilbert space.
         """
-        if self._NhFull == self._Nhl ** (self._Nhint * self._Ns):
+        if self._nhfull == self._nhl ** (self._nhint * self._ns):
             return (
-            f"Produced the full Hilbert space - no symmetries are used. Spin modes = {self._Nhl}\n"
-            f"Number of lattice sites (Ns) = {self._Ns}\n"
-            f"Hilbert space size (Nh) = {self._NhFull}\n"
+                f"Produced the full Hilbert space - no symmetries are used. Spin modes = {self._nhl}\n"
+                f"Number of lattice sites (Ns) = {self._ns}\n"
+                f"Hilbert space size (Nh) = {self._nhfull}\n"
             )
-        elif self._NhFull <= 0:
+        elif self._nhfull <= 0:
             return "No states in the Hilbert space"
         else:
             sym_info = (
                 f"Reduced Hilbert space produced using symmetries.\n"
-                f"Spin modes = {self._Nhl}\n"
-                f"Number of lattice sites (Ns) = {self._Ns}\n"
-                f"Number of fermionic modes (Nhint) = {self._Nhint}\n"
-                f"Full Hilbert space size (NhFull) = {self._NhFull}\n"
+                f"Spin modes = {self._nhl}\n"
+                f"Number of lattice sites (Ns) = {self._ns}\n"
+                f"Number of fermionic modes (Nhint) = {self._nhint}\n"
+                f"Full Hilbert space size (NhFull) = {self._nhfull}\n"
                 f"Reduced Hilbert space size (Nh) = {len(self._mapping)}\n"
                 f"Number of symmetry sectors = {len(self._sym_group)}\n"
             )
@@ -279,6 +403,18 @@ class HilbertSpace(ABC):
 
             return sym_info
     
+    def __repr__(self):
+        """
+        Return a string representation of the Hilbert space.
+        
+        Returns:
+            str: A string representation of the Hilbert space.
+        """
+        symmetries = self.get_sym_info()
+        return f"{'Many body' if not self._single_part else 'Single particle'} Hilbert space with {self._nh}" +    \
+            f" states and {self._ns} sites : {self._nhl} modes on each site." +                                    \
+            f" Symmetries: {symmetries}" if symmetries else ""
+    
     ####################################################################################################
     
     @abstractmethod
@@ -289,7 +425,7 @@ class HilbertSpace(ABC):
         Returns:
             int: The dimension of the Hilbert space.
         """
-        pass
+        return self._nh
     
     ####################################################################################################
     
@@ -321,3 +457,4 @@ class HilbertSpace(ABC):
         """
         pass
     
+    ####################################################################################################
