@@ -1,9 +1,12 @@
 
 """
 High-level Hilbert space class for quantum many-body systems.
-@Author: Maksymilian Kliczkowski
-@Email: maksymilian.kliczkowski@pwr.edu.pl
-@Date: 2025-02-01
+Author  : Maksymilian Kliczkowski
+Email   : maksymilian.kliczkowski@pwr.edu.pl
+Date    : 2025-02-01
+Version : 1.0.0
+Changes : 
+    - 2025.02.01 : 1.0.0 - Initial version of the Hilbert space class. - MK
 """
 
 from abc import ABC, abstractmethod
