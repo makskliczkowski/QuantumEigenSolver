@@ -32,11 +32,11 @@ class GlobalSymmetry(ABC):
     """
     
     def __init__(self,
-                lat : Optional[Lattice]     = None,
-                ns  : Optional[int]         = None,
-                val : float                 = 0.0,
-                name: GlobalSymmetries      = GlobalSymmetries.Other,
-                backend : str               = 'default'):
+                lat     : Optional[Lattice]     = None,
+                ns      : Optional[int]         = None,
+                val     : float                 = 0.0,
+                name    : GlobalSymmetries      = GlobalSymmetries.Other,
+                backend : str                   = 'default'):
         '''
         Initialize the GlobalSymmetry object.
         Parameters:
@@ -95,7 +95,7 @@ class GlobalSymmetry(ABC):
     @property
     def ns(self) -> int:
         """Return the number of states."""
-        return
+        return self._ns
     
     @ns.setter
     def ns(self, ns: int) -> None:
@@ -122,18 +122,17 @@ class GlobalSymmetry(ABC):
             raise ValueError("No symmetry check function has been set!")
         return self.check(state, self.val)
 
-    def check_state(self, state: Union[int, np.ndarray], outCond: bool) -> bool:
+    def check_state(self, state: Union[int, np.ndarray], out_cond: bool) -> bool:
         """
         Returns True if the state satisfies the symmetry and the additional condition outCond.
         """
-        return self(state) and outCond
-
+        return self(state) and out_cond
 
 # ---------------------------
 # Global U(1) Symmetry
 # ---------------------------
 
-def U1_sym(state: Union[int, np.ndarray], val: float) -> bool:
+def u1_sym(state: Union[int, np.ndarray], val: float) -> bool:
     """
     Global U(1) symmetry check.
     
@@ -142,7 +141,7 @@ def U1_sym(state: Union[int, np.ndarray], val: float) -> bool:
     """
     return popcount(state) == val
 
-def get_U1_sym(lat: Lattice, val: float) -> GlobalSymmetry:
+def get_u1_sym(lat: Lattice, val: float) -> GlobalSymmetry:
     """
     Factory function that creates a U(1) global symmetry object.
     
@@ -154,5 +153,5 @@ def get_U1_sym(lat: Lattice, val: float) -> GlobalSymmetry:
         An instance of GlobalSymmetry with name U1, value val, and the checking function set to U1_sym.
     """
     sym = GlobalSymmetry(lat, val, GlobalSymmetries.U1)
-    sym.set_fun(U1_sym)
+    sym.set_fun(u1_sym)
     return sym

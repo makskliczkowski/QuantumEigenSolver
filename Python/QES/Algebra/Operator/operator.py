@@ -86,7 +86,6 @@ class SymmetryGenerators(Enum):
     
     # -----------
 
-
 class GlobalSymmetries(Enum):
     """
     Global symmetries for representing different symmetry groups.
@@ -94,8 +93,6 @@ class GlobalSymmetries(Enum):
     
     U1      = auto()
     Other   = auto()
-
-
 
 ####################################################################################################
 

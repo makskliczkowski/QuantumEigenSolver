@@ -268,7 +268,7 @@ class HilbertSpace(ABC):
             self.__log("U(1) global symmetry is present.", lvl = 2, color = 'blue')
         return has_u1, u1_val
 
-    # Removers for the symmetry generators
+    #! Removers for the symmetry generators
 
     def __gen_sym_remove_reflection(self, sym_gen : list, has_cpx_translation : bool):
         """
@@ -300,15 +300,6 @@ class HilbertSpace(ABC):
                 else:
                     new_sym_gen.append((gen, sec))
             sym_gen = new_sym_gen
-        return sym_gen
-
-            
-        for gen, sec in sym_gen:
-            
-            if gen is not None and isinstance(gen, (SymmetryGenerators.ParityX, SymmetryGenerators.ParityY)) and \
-                                                (has_u1_sec != self._ns // 2 or self._ns % 2 != 0):
-                sym_gen.remove(gen)
-                self._logger.say("Removed parity X/Y symmetry from the symmetry generators.", log = 0, lvl = 2)    
         return sym_gen
     
     #! Printer
@@ -649,6 +640,35 @@ class HilbertSpace(ABC):
         """
         return self._nh
     
+    # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def logger(self):
+        """
+        Return the logger instance.
+        
+        Returns:
+            Logger: The logger instance.
+        """
+        return self._logger
+
+    # --------------------------------------------------------------------------------------------------
+    
+    def norm(self, state):
+        """
+        Return the normalization of a given state.
+        
+        Args:
+            state (int): The state to get the normalization for.
+        
+        Returns:
+            float: The normalization of the state.
+        """
+        return self._normalization[state]
+
+
+    # --------------------------------------------------------------------------------------------------
+    
     ####################################################################################################
     #! Representation of the Hilbert space
     ####################################################################################################
@@ -784,7 +804,7 @@ class HilbertSpace(ABC):
     
     # --------------------------------------------------------------------------------------------------
     
-    def _find_representative_base(self, state, normalization_beta):
+    def find_representative_base(self, state, normalization_beta):
         """
         Find the representative of a given state.
         
@@ -797,7 +817,7 @@ class HilbertSpace(ABC):
         """
         pass
     
-    def _find_representative_int(self, state, normalization_beta):
+    def find_representative_int(self, state, normalization_beta):
         """
         Find the representative of a given state.
         """
@@ -849,8 +869,8 @@ class HilbertSpace(ABC):
             derived from the symmetry operations.
         """
         if isinstance(state, int):
-            return self._find_representative_int(state, normalization_beta)
-        return self._find_representative_base(state, normalization_beta)
+            return self.find_representative_int(state, normalization_beta)
+        return self.find_representative_base(state, normalization_beta)
     
     # --------------------------------------------------------------------------------------------------
     
