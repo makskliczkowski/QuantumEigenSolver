@@ -19,10 +19,11 @@ matrix operations, eigenvalue solvers, and advanced Hamiltonian manipulation rou
 '''
 
 try:
-    import jax
+    import jax 
     import jax.numpy as jnp
-    from jax import jit, random
-    from jax.experimental.sparse import BCOO
+    from jax.scipy.sparse import BCOO
+    import jax.lax as lax
+    from jax import jit
     
     # -----------------------------------------------------------------
     

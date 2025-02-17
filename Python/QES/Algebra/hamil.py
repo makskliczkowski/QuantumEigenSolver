@@ -8,46 +8,32 @@ instantiated. It is meant to be inherited by other classes.
 @Email: maksymilian.kliczkowski@pwr.edu.pl
 @Date: 2025-02-01
 """
+
+import numpy as np
 from typing import List, Tuple, Union, Callable
 from abc import ABC, abstractmethod
-import scipy.sparse as sp
-import time
 from functools import partial
+import time
 
 # Import the necessary modules from the package
 from .hilbert import HilbertSpace
 
-try:
-    import jax
-    import jax.numpy as jnp
-    from jax import jit, random
-    from jax.experimental.sparse import BCOO
-    __JAX_AVAILABLE = True
-    Backend         = jnp
-    
-    # Import the JAX-optimized methods
-    import hamil_jit_methods as hjm
-    
-except ImportError:
-    print("JAX is not available. Using NumPy instead.")
-    __JAX_AVAILABLE = False
-
-# import to set default backend
-import numpy as np
-
-def maybe_jit(f):
-    '''
-    Decorator to conditionally apply jax.jit to a function.
-    '''
-    return jit(f) if __JAX_AVAILABLE else f
+from general_python.algebra.utils import __JAX_AVAILABLE, get_backend as __backend, maybe_jit
 
 ###################################################################################################
 # Pure (functional) Hamiltonian update functions.
 ###################################################################################################
 
 if __JAX_AVAILABLE:
+    import hamil_jit_methods as hjm
+    import jax 
+    import jax.numpy as jnp
+    from jax.scipy.sparse import BCOO
+    import jax.lax as lax
+    from jax import jit
+        
     @partial(jit, static_argnums=(3, 4))
-    def hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy):
+    def __hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy):
         """
         JAX version: Functional "in-place" update via jax.lax.fori_loop.
         The arguments `hilbert_space` and `loc_energy` are treated as static.
@@ -62,10 +48,10 @@ if __JAX_AVAILABLE:
             k_map = hilbert_space.get_mapping(k)
             def body_i(i, ham):
                 return loc_energy(ham, k, k_map, i)
-            return jax.lax.fori_loop(0, ns, body_i, ham)
-        return jax.lax.fori_loop(0, nh, body_k, ham)
+            return lax.fori_loop(0, ns, body_i, ham)
+        return lax.fori_loop(0, nh, body_k, ham)
 else:
-    def hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space, loc_energy):
+    def __hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space, loc_energy):
         """
         NumPy version: Updates the Hamiltonian array in place.
         Parameters:
@@ -96,7 +82,7 @@ class Hamiltonian(ABC):
     inherited by other classes.
     '''
     
-    def __init__(self, hilbert_space : HilbertSpace, is_sparse : bool = True, dtype = None, backend = None, **kwargs):
+    def __init__(self, hilbert_space : HilbertSpace, is_sparse : bool = True, dtype = None, backend = 'default', **kwargs):
         '''
         Initialize the Hamiltonian class.
         
@@ -106,9 +92,10 @@ class Hamiltonian(ABC):
             dtype (data-type)               : The data type of the Hamiltonian matrix.
             **kwargs                        : Additional arguments.
         '''
-        
-        self._backend       = backend if backend is not None else Backend
-        self._dtype         = dtype if dtype is not None else Backend.float64
+        self._backendstr    = backend
+        # get the backend, scipy, and random number generator for the backend
+        self._backend, self._backend_sp, (self._rng, self._rng_k) = __backend(backend, scipy=True, random=True)
+        self._dtype         = dtype if dtype is not None else self._backend.float64
         self._hilbert_space = hilbert_space
         self._is_sparse     = is_sparse
         
@@ -138,13 +125,11 @@ class Hamiltonian(ABC):
         '''
         For random Hamiltonians, this method is used to generate a random Hamiltonian matrix from 
         scratch to capture new statistics. For non-random Hamiltonians, this method does nothing.
-        '''        
+        '''   
         pass 
     
     # ----------------------------------------------------------------------------------------------
-    
     # Getter methods
-    
     # ----------------------------------------------------------------------------------------------
     
     @property
@@ -162,6 +147,12 @@ class Hamiltonian(ABC):
         '''
         return False
     
+    def is_quadratic(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is quadratic or not.
+        '''
+        return self.quadratic
+    
     @property
     def manybody(self):
         '''
@@ -169,12 +160,24 @@ class Hamiltonian(ABC):
         '''
         return not self.quadratic
     
+    def is_manybody(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is many-body or not.
+        '''
+        return self.manybody
+    
     @property
     def sparse(self):
         '''
         Returns a flag indicating whether the Hamiltonian is sparse or not.
         '''
         return self._is_sparse
+    
+    def is_sparse(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is sparse or not.
+        '''
+        return self.sparse
 
     # ----------------------------------------------------------------------------------------------
     
@@ -205,13 +208,6 @@ class Hamiltonian(ABC):
         Returns the number of sites in the Hilbert space.
         '''
         return self._nh
-    
-    @property
-    def is_sparse(self):
-        '''
-        Returns a flag indicating whether the Hamiltonian is sparse or not.
-        '''
-        return self._is_sparse
     
     @property
     def hamil(self):
@@ -276,7 +272,7 @@ class Hamiltonian(ABC):
         '''
         return self._hamil.diagonal()
     
-    @property 
+    @property
     def h_memory(self):
         '''
         Returns the memory used by the Hamiltonian matrix.
@@ -284,9 +280,7 @@ class Hamiltonian(ABC):
         return self._hamil.nbytes
     
     # ----------------------------------------------------------------------------------------------
-    
     # Standard getters
-    
     # ----------------------------------------------------------------------------------------------
     
     def get_mean_lvl_spacing(self):
@@ -476,7 +470,7 @@ class Hamiltonian(ABC):
         pass
     
     @abstractmethod
-    def local_energy(self, k : Union[int, np.ndarray, jnp.ndarray], i : int):
+    def local_energy(self, k : Union[int, np.ndarray], i : int):
         '''
         Calculates the local energy of the Hamiltonian. This method is meant to be overridden by 
         subclasses to provide a specific implementation.
