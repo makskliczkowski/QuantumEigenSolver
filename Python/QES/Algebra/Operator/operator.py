@@ -19,18 +19,26 @@ Date    : April 2023
 Author  : Maksymilian Kliczkowski, WUST, Poland
 """
 
+import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-import numpy as np
+from typing import Optional, Callable, Union
+from typing import Union, Tuple, List               # type hints for the functions and methods
+from functools import partial                       # partial function application for operator composition
+import copy                  
+####################################################################################################
+from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend
+from general_python.lattices import Lattice
+####################################################################################################
+
+
 import jax.numpy as jnp
 from jax import jit, vmap
 from jax.experimental import sparse
-from typing import Union, Callable, Tuple, List     # type hints for the functions and methods
-from functools import partial                       # partial function application for operator composition
-import copy                                         # copy module for copying the operator object 
+                       # copy module for copying the operator object 
 
 # Hilbert space
-from ..hilbert import HilbertSpace
+from Algebra.hilbert import HilbertSpace
 
 ####################################################################################################
 
@@ -47,6 +55,7 @@ class SymmetryGenerators(Enum):
     - Parity (Pz)       : Parity symmetry in the z-direction. 
     """
     
+    # standard symmetries
     E               = auto()
     Translation_x   = auto()
     Translation_y   = auto()
@@ -55,14 +64,38 @@ class SymmetryGenerators(Enum):
     ParityX         = auto()
     ParityY         = auto()
     ParityZ         = auto()
+    
+    # other symmetries - fallback
     Other           = auto()
-    
+
     # -----------
     
-    def __str__(self):
-        return self.name
+    def has_translation(self):
+        """
+        Check if the symmetry is a translation symmetry.
+        """
+        return self in [SymmetryGenerators.Translation_x, SymmetryGenerators.Translation_y, SymmetryGenerators.Translation_z]
     
     # -----------
+
+    def has_reflection(self):
+        """
+        Check if the symmetry is a reflection symmetry.
+        """
+        return self in [SymmetryGenerators.Reflection]
+    
+    # -----------
+
+
+class GlobalSymmetries(Enum):
+    """
+    Global symmetries for representing different symmetry groups.
+    """
+    
+    U1      = auto()
+    Other   = auto()
+
+
 
 ####################################################################################################
 
@@ -359,6 +392,8 @@ class OperatorFunction:
     
 ####################################################################################################
 
+__INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
+__INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
 class Operator(ABC):
     """
     A class to represent a general operator acting on a Hilbert space.
@@ -368,7 +403,17 @@ class Operator(ABC):
     
     #################################
     
-    def __init__(self, **kwargs):
+    def __init__(self,
+                fun         : Callable,
+                eigval      = 1.0,
+                lattice     : Optional[Lattice]             = None,
+                ns          : Optional[int]                 = None,
+                typek       : Optional[SymmetryGenerators]  = SymmetryGenerators.Other,
+                name        : str                           = 'Operator',
+                modifies    : bool                          = True,
+                quadratic   : bool                          = False,
+                backend     : str                           = 'default',
+                **kwargs):
         """
         Initialize the GeneralOperator object.
         
@@ -383,6 +428,7 @@ class Operator(ABC):
             quadratic (bool)    : Flag for the quadratic operator.
             acton (bool)        : Flag for the action of the operator on the local physical space.
             modifies (bool)     : Flag for the operator that modifies the state.
+            backend (str)       : The backend for the operator - for using linear algebra libraries, not integer representation.
             
             Important arguments:
             - fun (Callable | OperatorFunction) : The function that defines the operator - it shall take a state 
@@ -392,34 +438,37 @@ class Operator(ABC):
         """
         
         # handle the system phyisical size dimension and the lattice
-        if "Ns" in kwargs and "lattice" not in kwargs:
-            self._Ns        = kwargs.get('Ns', 1)
-            self._lattice   = None
-        elif "lattice" in kwargs:
-            self._lattice   = kwargs.get('lattice')
-            self._Ns        = self.lattice.get_Ns()
+        if lattice is None and ns is not None:
+            self._ns        = ns
+            self._lattice   = lattice
+        elif lattice is not None:
+            self._lattice   = lattice
+            self._ns        = self._lattice.ns()
         else:
-            raise ValueError("Either 'Ns' or 'lattice' must be provided.")            
+            raise ValueError(__INVALID_SYSTEM_SIZE_PROVIDED)
+        
+        # set the backend for the operator
+        self._backend_str   = backend
+        self._backend, self._backend_sp = __backend(backend, scipy=True)
         
         # property of the operator itself
-        self._eigval        = kwargs.get('eigval', 1.0)
-        self._name          = kwargs.get('name', 'Operator')
-        self._type          = SymmetryGenerators(kwargs.get('type', 'E'))
-        if self._type != SymmetryGenerators.Other:
+        self._eigval        = eigval
+        self._name          = name
+        self._type          = typek
+        if self._type != SymmetryGenerators.Other and self._name == 'Operator':
             self._name      = self._type.name
         
-        
         # property for the behavior of the operator - e.g., quadratic, action, etc.
-        self._quadratic     = kwargs.get('quadratic', False)        # flag for the quadratic operator - this enables different matrix representation
+        self._quadratic     = quadratic                             # flag for the quadratic operator - this enables different matrix representation
         self._acton         = kwargs.get('acton', False)            # flag for the action of the operator on the local physical space
-        self._modifies      = kwargs.get('modifies', True)          # flag for the operator that modifies the state
+        self._modifies      = modifies                              # flag for the operator that modifies the state
         
-        if isinstance(kwargs.get('fun'), OperatorFunction):
-            self._fun       = kwargs.get('fun')                     # the function that defines the operator already through the OperatorFunction object
-        elif isinstance(kwargs.get('fun'), Callable):
-            self._fun       = OperatorFunction(kwargs.get('fun'), modifies_state = self._modifies)
+        if isinstance(fun, OperatorFunction):
+            self._fun       = fun                                   # the function that defines the operator already through the OperatorFunction object
+        elif isinstance(fun, Callable):
+            self._fun       = OperatorFunction(fun, modifies_state = self._modifies)  # Change kwargs.get('fun') to fun
         else:
-            raise ValueError("Invalid operator function type.")
+            raise ValueError(__INVALID_OPERATION_TYPE_ERROR)
         self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
     
     #################################
@@ -723,3 +772,20 @@ class Operator(ABC):
         Standardizes the given matrix if the _standarize flag is set to true.
         """
         pass
+    
+    #################################
+    
+####################################################################################################
+
+def operator_identity(backend : str = 'default') -> Operator:
+    """
+    Generate the identity operator.
+    Parameters:
+    - backend (str)     : The backend for the operator - for using linear algebra libraries, not integer representation.
+    Returns:
+    - Operator          : The identity operator.
+    """
+    def identity_fun(state):
+        return state, 1.0
+    
+    return Operator(fun = identity_fun, eigval = 1.0, ns = 1, backend = backend, name = SymmetryGenerators.E, modifies=False, quadratic=False)

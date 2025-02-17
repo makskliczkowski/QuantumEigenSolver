@@ -18,6 +18,7 @@ import time
 # Import the necessary modules from the package
 from .hilbert import HilbertSpace
 
+# from general python
 from general_python.algebra.utils import __JAX_AVAILABLE, get_backend as __backend, maybe_jit
 
 ###################################################################################################
@@ -25,7 +26,7 @@ from general_python.algebra.utils import __JAX_AVAILABLE, get_backend as __backe
 ###################################################################################################
 
 if __JAX_AVAILABLE:
-    import hamil_jit_methods as hjm
+    from Algebra.hamil_jit_methods import *
     import jax 
     import jax.numpy as jnp
     from jax.scipy.sparse import BCOO

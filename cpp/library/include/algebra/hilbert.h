@@ -480,6 +480,7 @@ namespace Hilbert
 				break;
 			}
 		}
+		
 		if (containsT_) {
 			LOGINFOG("Using translation!", LOG_TYPES::INFO, 1);
 			if(containsTCpx_)

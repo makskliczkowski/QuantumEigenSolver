@@ -7,28 +7,42 @@ High-level Hilbert space class for quantum many-body systems.
 """
 
 from abc import ABC, abstractmethod
-from typing import Union, Callable, Tuple, List     # type hints for the functions and methods
+from itertools import combinations
+from typing import Union, Optional, Callable, Tuple, List     # type hints for the functions and methods
 import numpy as np
+import math
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# import Lattice class
-from .. import Lattice
-from . import Operator, SymmetryGenerators
+####################################################################################################
+from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
+from general_python.common.flog import get_global_logger
+from general_python.algebra.utils import get_backend as __backend, maybe_jit
+from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
+####################################################################################################
+from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity
+from Algebra.globals import GlobalSymmetry
+from Algebra.symmetries import choose, translation
+####################################################################################################
+
+__INT_BINARY_REPR       = 2**6
+__SYM_NORM_THRESHOLD    = 1e-12
 
 class HilbertSpace(ABC):
     """
     A class to represent a Hilbert space either in Many-Body Quantum Mechanics or Quantum Information Theory and non-interacting systems.
-    
-    
     """
     
     ####################################################################################################
     
     def __init__(self,
-                sym_gen     : Union[dict, None]             = None,
-                global_syms : Union[List[Operator], None]   = None,
-                gen_mapping : bool                          = False,
-                state_type  : str                           = "integer",
-                single_part : bool                          = False,
+                sym_gen     : Union[dict, None]                 = None,
+                global_syms : Union[List[GlobalSymmetry], None] = None,
+                gen_mapping : bool                              = False,
+                state_type  : str                               = "integer",
+                single_part : bool                              = False,
+                backend     : str                               = 'default',
+                dtype                                           = np.float64,
                 **kwargs):
         """
         Initialize the Hilbert space. 
@@ -41,7 +55,11 @@ class HilbertSpace(ABC):
             ns (int)            : The number of sites in the system.
             nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
             single_particle     : A flag to indicate if the system is a single-particle system (default is False).
+            state_type (str)    : The type of the state representation - integer or numpy.ndarray (default is 'integer').
+            backend (str)       : The backend to use for the Hilbert space (default is 'default').
+            lattice (Lattice)   : The lattice object to use for the Hilbert space.
         """
+        
         
         # check if the arguments match the requirements
         if not isinstance(sym_gen, dict) and sym_gen is not None:
@@ -63,14 +81,11 @@ class HilbertSpace(ABC):
             raise ValueError("Either 'ns' or 'lattice' must be provided.")
         
         # handle local Hilbert space properties
-        self._nhl   = kwargs.get('nhl', 2)              # local Hilbert space dimension
-        self._nhint = kwargs.get('nhint', 1)            # number of modes (fermions, bosons, etc. on each site)
+        self._nhl   = kwargs.get('nhl', 2)                          # local Hilbert space dimension
+        self._nhint = kwargs.get('nhint', 1)                        # number of modes (fermions, bosons, etc. on each site)
         
-        # initialize the Hilbert space etc.
-        if state_type.lower() == "integer" or state_type.lower() == "int":
-            self._state_type = int
-        else:
-            self._state_type = np.ndarray
+        # initialize the backend for the vectors and matrices
+        self.reset_backend(backend, state_type)                     # reset the backend
         
         # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
         self._single_part   = single_part                           # single particle system flag
@@ -79,18 +94,86 @@ class HilbertSpace(ABC):
         else:
             self._nhfull        = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
             
-        # may be eddited later by modifying the symmetry group
+        # may be edited later by modifying the symmetry group
         self._nh            = self._nhfull                          # Hilbert space dimension
         
         # initialize the properties of the Hilbert space
         self._normalization = []                                    # normalization of the states
-        self._sym_group     = []                                    # symmetry group
+        self._sym_group     = []                                    # symmetry group - stores the operators themselves
+        self._sym_group_sec = []                                    # symmetry group - stores the names and the values of the operators
         self._mapping       = []                                    # mapping of the states
         self._reprmap       = []                                    # mapping of the representatives (vector of tuples (state, representative value))
+        self._fullmap       = []                                    # mapping of the full Hilbert space
+        # setup the logger instance for the Hilbert space
+        self._logger        = get_global_logger()                   # logger instance
+        self._threadnum     = kwargs.get('threadnum', 1)            # number of threads to use
         
-        # handle symmetries - save the global symmetries and initialize the mapping 
-        self._global_syms   = global_syms               # global symmetries
-        self._init_mapping(sym_gen, gen_mapping)        # initialize the mapping
+        # handle the data type of the Hilbert space
+        self._dtype         = dtype if dtype is not None else np.float64 # data type of the Hilbert space
+
+                
+        # handle symmetries - save the global symmetries and initialize the mapping
+        self._global_syms   = global_syms                           # global symmetries
+        self._init_mapping(sym_gen, gen_mapping)                    # initialize the mapping
+    
+    # --------------------------------------------------------------------------------------------------
+    #! Resets 
+    # --------------------------------------------------------------------------------------------------
+    
+    def reset_backend(self, backend : str, state_type : str):
+        """
+        Reset the backend for the Hilbert space.
+        
+        Args:
+            backend (str): The backend to use for the Hilbert space.
+        """
+        if isinstance(backend, str):
+            self._backend_str   = backend
+            self._backend       = __backend(backend)
+        else:
+            self._backend_str   = 'np' if backend == np else 'jax'
+            self._backend       = backend
+        
+        self.reset_statetype(state_type)
+        
+    # --------------------------------------------------------------------------------------------------
+    
+    def reset_statetype(self, state_type : str):
+        """
+        Reset the state type for the Hilbert space.
+        
+        Args:
+            state_type (str): The state type to use for the Hilbert space.
+        """
+        if state_type.lower() == "integer" or state_type.lower() == "int":
+            self._state_type = int
+        else:
+            self._state_type = self._backend.array
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def reset_local_symmetries(self):
+        """
+        Reset the local symmetries of the Hilbert space.
+        """
+        self._sym_group = []
+        self._sym_group_sec = []
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def __log(self, msg : str, log : int = 0, lvl : int = 0, color : str = "white"):
+        """
+        Log the message.
+        
+        Args:
+            msg (str) : The message to log.
+            log (int) : The flag to log the message.
+            lvl (int) : The level of the message.
+        """
+        if log > 0:
+            msg = f"[HilbertSpace] {msg}"
+            msg = self._logger.colorize(msg, color)
+            self._logger.say(msg, log = log, lvl = lvl)
     
     ####################################################################################################
     
@@ -98,40 +181,220 @@ class HilbertSpace(ABC):
     
     ####################################################################################################
     
+    #! Translation related
+        
+    def __gen_sym_group_check_t(self, sym_gen : list) -> (list, Tuple[bool, bool], Tuple[Operator, LatticeDirection]):
+        '''
+        Helper function to check the translation symmetry. This function is used to check the translation symmetry.
+        It gets the translation generator and checks if it satisfies the symmetry conditions. If the translation
+        is not possible with the boundary conditions provided, the function returns.
+        
+        Args:
+            sym_gen (list) : A list of symmetry generators.
+        Returns:
+            list, tuple : A list of symmetry generators and a tuple of flags (has_translation, has_cpx_translation).
+        '''
+        has_cpx_translation = False
+        has_translation     = False
+        t                   = None  
+        direction           = LatticeDirection.X
+        for idx, (gen, sec) in enumerate(sym_gen):
+            
+            # proceed if this is a translation
+            if gen.has_translation():
+                
+                # Check if the lattice has periodic boundary conditions
+                has_translation = (self._lattice.get_BC() == LatticeBC.PBC)
+                
+                if has_translation:
+                    self._sym_group_sec.append((gen, sec))
+                    
+                # Remove the translation generator from the list
+                sym_gen.pop(idx)
+                
+                # create the operator
+                
+                direction   = LatticeDirection.X
+                direction   = LatticeDirection.Y if gen == SymmetryGenerators.TranslationY else direction
+                direction   = LatticeDirection.Z if gen == SymmetryGenerators.TranslationZ else direction 
+                kx          = sec if direction == LatticeDirection.X else 0.0
+                ky          = sec if direction == LatticeDirection.Y else 0.0
+                kz          = sec if direction == LatticeDirection.Z else 0.0
+                t           = translation(self._lattice, kx = kx, ky = ky, kz = kz, direction = direction, backend = self._backend)
+                
+                # Check for complex sector: nonzero momentum (unless at half filling with even Ns)
+                if sec != 0 and not (sec == self.Ns // 2 and self.Ns % 2 == 0):
+                    has_cpx_translation = True
+                break
+            
+        if has_translation:
+            self.__log("Translation symmetry is present.", lvl = 1)
+            if has_cpx_translation:
+                self.__log("Translation in complex sector...", lvl = 2, color = 'blue')
+        return sym_gen, (has_translation, has_cpx_translation), (t, direction)
+
+    def __gen_sym_apply_t(self, sym_gen_op : list, t : Optional[Operator] = None, direction : LatticeDirection = LatticeDirection.X):
+        """
+        Apply the translation symmetry.
+        """
+        if t is not None:
+            self.__log("Adding translation to symmetry group combinations.", lvl = 2, color = 'yellow')
+            
+            # check the direction
+            size = self._lattice.lx if direction == LatticeDirection.X else 1
+            size = self._lattice.ly if direction == LatticeDirection.Y else size
+            size = self._lattice.lz if direction == LatticeDirection.Z else size
+            sym_get_out = sym_gen_op.copy()
+            sym_gen_in  = sym_gen_op.copy()
+            t_in        = t
+            for _ in range(1, size):
+                # this is the number of translations to apply
+                for op_local in sym_gen_in:
+                    sym_get_out.append(t % op_local)
+                # move the translation to the next cell
+                t_in = t_in % t
+            return sym_get_out
+        return sym_gen_op
+
+    #! Global symmetries related
+    
+    def __gen_sym_group_check_u1(self) -> (bool, float):
+        """
+        Check if a U(1) global symmetry is present.
+        Returns (has_U1, U1_value).
+        """
+        has_u1, u1_val = self.check_u1()
+        if has_u1:
+            self.__log("U(1) global symmetry is present.", lvl = 2, color = 'blue')
+        return has_u1, u1_val
+
+    # Removers for the symmetry generators
+
+    def __gen_sym_remove_reflection(self, sym_gen : list, has_cpx_translation : bool):
+        """
+        Helper function to remove reflections from the symmetry generators if the complex translation is present.
+        
+        Args:
+            sym_gen (list)         : A list of symmetry generators.
+            has_cpx_translation (bool) : A flag for complex translation - momentum is different than 0 or pi.
+        """
+        if has_cpx_translation and sym_gen is not None and hasattr(sym_gen, "__iter__"):
+            sym_gen = [gen for gen in sym_gen if not isinstance(gen[0], SymmetryGenerators.Reflection)]
+            self.__log("Removed reflection symmetry from the symmetry generators.", lvl = 2, color = 'blue')
+        return sym_gen
+    
+    def __gen_sym_remove_parity(self, sym_gen : list, has_u1 : bool, has_u1_sec : float):
+        """
+        If U(1) is present but the system is not at half-filling (or has odd size),
+        remove parity generators in the X and/or Y directions.
+        """
+        if has_u1:
+            
+            self.__log("U(1) symmetry detected. Checking parity generators...", log = 1, lvl = 1, color = 'yellow')
+            
+            new_sym_gen = []
+            for (gen, sec) in sym_gen:
+                if gen in (SymmetryGenerators.ParityX, SymmetryGenerators.ParityY) and \
+                   ((int(has_u1_sec) != self._ns // 2) or (self._ns % 2 != 0)):
+                    self.__log(f"Removing parity {gen} due to U(1) constraint.", log = 1, lvl = 2, color = 'blue')
+                else:
+                    new_sym_gen.append((gen, sec))
+            sym_gen = new_sym_gen
+        return sym_gen
+
+            
+        for gen, sec in sym_gen:
+            
+            if gen is not None and isinstance(gen, (SymmetryGenerators.ParityX, SymmetryGenerators.ParityY)) and \
+                                                (has_u1_sec != self._ns // 2 or self._ns % 2 != 0):
+                sym_gen.remove(gen)
+                self._logger.say("Removed parity X/Y symmetry from the symmetry generators.", log = 0, lvl = 2)    
+        return sym_gen
+    
+    #! Printer
+    def __gen_sym_print(self, t: Optional[Operator] = None) -> None:
+        """
+        Print the symmetry group.
+
+        Parameters
+        ----------
+        has_t : bool
+            Flag for the translation symmetry.
+        t : Operator
+            The translation operator.        
+        """
+        
+        self.__log("Using local symmetries:", lvl = 1, color = 'green')
+        for (g, sec) in self._sym_group_sec:
+            self.__log(f"{g}: {sec}", lvl = 2, color = 'blue')
+        if t is not None:
+            self.__log(f"{t}: {t.eigval}", lvl = 2, color = 'blue')
+        self.__log("Using global symmetries:", lvl = 1, color = 'green')
+        for g in self._global_syms:
+            self.__log(f"{g}: {g.get_val()}", lvl = 2, color = 'blue')
+    
+    #! Final symmetry group generation
+    
     def _gen_sym_group(self, gen : list):
         """
-        Generate the symmetry group.
+        Generate the symmetry group of the Hilbert space. 
+        This is done by going through the symmetry generators and checking the symmetries.
         
         Args:
             gen (list) : A list of symmetry generators.
         """
 		
-        # no symmetries! - there are no global and local symmetries to be used, therefore return
-        if (gen is None or (gen is not None and len(gen) == 0)) and not self.check_global_symmetry():
+        if (not gen or len(gen) == 0) and not self.check_global_symmetry():
+            self.__log("No local or global symmetries provided; symmetry group is empty.", lvl = 1, color = 'green')
             return
         
         # copy the generators to modify them if needed
-        sym_gen                     = gen.copy()
+        sym_gen                     = gen.copy() if gen is not None and hasattr(gen, "__iter__") else []
         
-        contains_translation        = False
-        contains_cpx_translation    = False
-        
-        # globals
-        contains_u1                 = False
-        
-        # go through the local symmetries by going through the generators
-        if sym_gen is not None:
-            # go through the generators and check the symmetries
-            for gen in sym_gen:
-                # get the generator and the value
-                generator, sec = gen
+        # Reset symmetry groups.
+        self.reset_local_symmetries()
                 
-                # proceed if this is a translation
-                if isinstance(generator, (SymmetryGenerators.Translation_x, SymmetryGenerators.Translation_y, SymmetryGenerators.Translation_z)):
-                    contains_translation == True if (self._lattice is not None and self._lattice.get_bc() == PBC) else False
-                    if sec == "C":
-                        contains_cpx_translation = True
-                    continue
+        #! globals - check the global symmetries
+        
+        # Check global U(1) symmetry.
+        has_u1, u1_val              = self.__gen_sym_group_check_u1()
+        
+        # process translation symmetries
+        sym_gen, (_, has_cpx_t), (t, direction) = self.__gen_sym_group_check_t(sym_gen)
+        
+        # remove reflections from the symmetry generators if the complex translation is present
+        sym_gen                     = self.__gen_sym_remove_reflection(sym_gen, has_cpx_t)
+
+        # check the existence of the parity when U(1) is present
+        sym_gen                     = self.__gen_sym_remove_parity(sym_gen, has_u1, u1_val)
+        
+        # save all again for convenience
+        for gen, sec in sym_gen:
+            self._sym_group_sec.append(sec)
+        
+        # ------------------------------
+        # Generate all combinations of the local generators.
+        # For each subset of indices from sym_gen, combine their operators.
+        _size_gen = len(sym_gen)
+        for r in range(_size_gen + 1):
+            # r = 0, 1, ..., _size_gen - goes through subsets of sym_gen
+            
+            for indices in combinations(range(_size_gen), r):
+                # combine the operators from the subset of sym_gen
+                
+                # Start with a neutral (identity) operator.
+                operator_in = operator_identity()
+                
+                # Combine the operators from the subset of sym_gen.
+                for idx in indices:
+                    op_i = choose(sym_gen[idx], ns = self._ns, lat = self._lattice, backend = self._backend)
+                    operator_in = operator_in % op_i # use composition of operators 
+                self._sym_group.append(operator_in)
+        
+        # apply the translation symmetry
+        self._sym_group = self.__gen_sym_apply_t(self._sym_group, t, direction)
+
+        self.__gen_sym_print(t)
     
     # --------------------------------------------------------------------------------------------------
     
@@ -144,28 +407,45 @@ class HilbertSpace(ABC):
             gen (list)         : A list of symmetry generators.
             gen_mapping (bool) : A flag to generate the mapping of the representatives to the original states.
         """
-        self._gen_sym_group(gen)                                    # generate the symmetry group
+        t0 = time.time()
+        
+        self._gen_sym_group(gen)    # generate the symmetry group
         
         if len(gen) > 0:
-            print(f"Symmetry group generator: {self.get_sym_info()}") # print the symmetry group
-        
+            self.__log("Generating the mapping of the states...", lvl = 1, color = 'green')
+
         # generate the mapping of the states
+        if self._state_type == int:
+            self._generate_mapping_int(gen_mapping)
+        else:
+            self._generate_mapping_base(gen_mapping)
+        t1 = time.time()
         
+        if len(gen) > 0:
+            self.__log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 1, color = 'green')
         
-            
-            
 
     ####################################################################################################
-    
-    # Getters and checkers for the Hilbert space
-    
+    #! Getters and checkers for the Hilbert space
     ####################################################################################################
+    
+    # GLOBAL SYMMETRIES
     
     def check_global_symmetry(self):
         """
         Check if there are any global symmetries.
         """
-        return self._global_syms is not None and (self._global_syms is not None and len(self._global_syms) > 0)
+        return len(self._global_syms) > 0 if self._global_syms is not None else False
+    
+    def check_u1(self):
+        """
+        Check if there is a U(1) symmetry.
+        """
+        if self._global_syms is not None:
+            for sym in self._global_syms:
+                if sym.get_name() == GlobalSymmetries.U1:
+                    return True, sym.get_val()
+        return False, None
     
     #---------------------------------------------------------------------------------------------------
     
@@ -177,14 +457,14 @@ class HilbertSpace(ABC):
             str: A string containing the information about all the symmetries.
         """
         tmp = ""
-        if self._sym_group:
+        if self._sym_group_sec:
             # start with local symmetries
-            for gen, val in self._sym_group:
+            for gen, val in self._sym_group_sec:
                 tmp += f"{gen}={val},"
         if self.check_global_symmetry():
             # start with global symmetries
-            for sym in self._global_syms:
-                tmp += f"{sym[0]}={sym[1]:.2f},"
+            for g in self._global_syms:
+                tmp += f"{g.get_name()}={g.get_val():.2f},"
         
         # remove last ","
         if tmp:
@@ -224,6 +504,17 @@ class HilbertSpace(ABC):
             int: The number of sites in the system.
         """
         return self._ns
+    
+    @property
+    def ns(self):
+        """
+        Return the number of sites in the system.
+        
+        Returns:
+            int: The number of sites in the system.
+        """
+        return self._ns
+    
     
     def get_Ns(self):
         """
@@ -359,9 +650,7 @@ class HilbertSpace(ABC):
         return self._nh
     
     ####################################################################################################
-    
-    # Representation of the Hilbert space
-    
+    #! Representation of the Hilbert space
     ####################################################################################################
     
     def __str__(self):
@@ -380,44 +669,396 @@ class HilbertSpace(ABC):
         elif self._nhfull <= 0:
             return "No states in the Hilbert space"
         else:
-            sym_info = (
-                f"Reduced Hilbert space produced using symmetries.\n"
-                f"Spin modes = {self._nhl}\n"
-                f"Number of lattice sites (Ns) = {self._ns}\n"
-                f"Number of fermionic modes (Nhint) = {self._nhint}\n"
-                f"Full Hilbert space size (NhFull) = {self._nhfull}\n"
-                f"Reduced Hilbert space size (Nh) = {len(self._mapping)}\n"
-                f"Number of symmetry sectors = {len(self._sym_group)}\n"
-            )
+            info = (f"Reduced Hilbert space using symmetries.\n"
+                    f"Spin modes = {self._nhl}\n"
+                    f"Number of sites (Ns) = {self._ns}\n"
+                    f"Local Hilbert space dimension = {self._nhl}\n"
+                    f"Full Hilbert space size (NhFull) = {self._nhfull}\n"
+                    f"Reduced Hilbert space size (Nh) = {len(self._mapping)}\n"
+                    f"Number of symmetry sectors = {len(self._sym_group)}\n")
             if self.check_global_symmetry():
-                sym_info += "Global symmetries used:\n"
+                info += "Global symmetries used:\n"
                 for sym in self._global_syms:
-                    sym_info += f" - {sym[0]} with value {sym[1]}\n"
+                    info += f" - {sym.get_name_str()} with value {sym.get_val()}\n"
             else:
-                sym_info += "No global symmetries applied.\n"
-
-            if self._sym_group:
-                sym_info += "Local symmetry group operators applied.\n"
-            else:
-                sym_info += "No local symmetry group operators applied.\n"
-
-            return sym_info
+                info += "No global symmetries applied.\n"
+            info += "Local symmetry operators applied.\n" if self._sym_group else "No local symmetry operators applied.\n"
+            return info
     
     def __repr__(self):
-        """
-        Return a string representation of the Hilbert space.
-        
-        Returns:
-            str: A string representation of the Hilbert space.
-        """
-        symmetries = self.get_sym_info()
-        return f"{'Many body' if not self._single_part else 'Single particle'} Hilbert space with {self._nh}" +    \
-            f" states and {self._ns} sites : {self._nhl} modes on each site." +                                    \
-            f" Symmetries: {symmetries}" if symmetries else ""
+        sym_info = self.get_sym_info()
+        base = "Single particle" if self._single_part else "Many body"
+        return f"{base} Hilbert space with {self._nh} states and {self._ns} sites; {self._nhl} modes per site. Symmetries: {sym_info}" if sym_info else ""
     
     ####################################################################################################
+    #! Find the representative of a state
+    ####################################################################################################
     
-    @abstractmethod
+    def _find_sym_norm_base(self, state):
+        """
+        Finds the normalization for a given state (baseIdx) by summing the eigenvalues
+        over all symmetry operators that return the same state.
+        
+        Returns sqrt(sum of eigenvalues).
+        """
+        pass
+    
+    def _find_sym_norm_int(self, state):
+        """
+        Find the symmetry normalization of a given state.
+        
+        Args:
+            state (int): The state to find the symmetry normalization for.
+        
+        Returns:
+            float: The symmetry normalization of the state.
+        """
+        norm = 0.0
+        for g in self._sym_group:
+            new_idx, val = g(state)
+            if new_idx == state:
+                norm += val
+        return math.sqrt(norm)
+    
+    def find_sym_norm(self, state) -> Union[float, complex]:
+        """
+        Finds the normalization for a given state (baseIdx) by summing the eigenvalues
+        over all symmetry operators that return the same state.
+        
+        Returns sqrt(sum of eigenvalues).
+        """
+        if isinstance(state, int):
+            return self._find_sym_norm_int(state)
+        return self._find_sym_norm_base(state)
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def _find_repr_base(self, state):
+        pass
+    
+    def _find_repr_int(self, state):
+        """
+        Find the representative of a given state.
+        
+        Args:
+            state (int): The state to find the representative for.
+        
+        Returns:
+            int: The representative of the state.
+        """
+                
+        # If mapping exists, return saved representative.
+        if hasattr(self, "_reprmap") and self._reprmap:
+            base = self._reprmap.index(state)
+            return base
+        
+        _sec = (1 << __INT_BINARY_REPR) - 1 # by default, using 64-bit integers
+        _val = 1.0
+        
+        # loop over all states in symmetry sectors
+        for g in self._sym_group:
+            _st, _retval = g(state)
+            
+            if _st < _sec:
+                _sec = _st
+                _val = _retval
+        return __BAD_BINARY_SEARCH_STATE, _val
+    
+    def find_repr(self, state):
+        """
+        Find representatives of another state using various combinations of symmetry generators.
+
+        This method computes the smallest representative possible by applying different combinations of symmetry 
+        generators. It also determines the symmetry eigenvalue associated with returning to the original state.
+
+        Args:
+            state (int or state type): The state representation. If an integer is provided, an integer-based approach 
+                                    is used; otherwise, a base state representation is assumed.
+
+        Returns:
+            tuple: A pair containing the representative index and the corresponding symmetry eigenvalue.
+        """
+        if isinstance(state, int):
+            return self._find_repr_int(state)
+        return self._find_repr_base(state)
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def _find_representative_base(self, state, normalization_beta):
+        """
+        Find the representative of a given state.
+        
+        Args:
+            state (np.ndarray): The state to find the representative for.
+            normalization_beta (float): The normalization in sector beta.
+        
+        Returns:
+            np.ndarray: The representative of the state.
+        """
+        pass
+    
+    def _find_representative_int(self, state, normalization_beta):
+        """
+        Find the representative of a given state.
+        """
+        if self._mapping is None or len(self._mapping) == 0:
+            return (state, 1.0)
+        
+        
+        # if the map exists, use it!
+        if self._reprmap is not None and len(self._reprmap) > 0:
+            idx, sym_eig    = self._reprmap[state]
+            sym_eigc        = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
+            return (idx, self._normalization[idx] / normalization_beta * sym_eigc)
+        
+        mapping_size = len(self._mapping)
+        
+        # find the representative already in the mapping (can be that the matrix element already 
+        # represents the representative state)
+        idx = binary_search(self._mapping, 0, mapping_size - 1, state)
+        
+        if idx != __BAD_BINARY_SEARCH_STATE: 
+            return (idx, self._normalization[idx] / normalization_beta)
+        
+        # otherwise, we need to find the representative by acting on the state with the symmetry operators
+        # and finding the one that gives the smallest value - standard procedure
+        idx, sym_eig = self._find_repr_int(state)
+        if idx != __BAD_BINARY_SEARCH_STATE:
+            sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
+            return (idx, self._normalization[idx] / normalization_beta * sym_eigc)
+        
+        # didn't find the representative - this may be different sector
+        return (state, 0.0)
+    
+    def find_representative(self, state, normalization_beta):
+        """
+        Finds the representative for a given base index in the "sector alfa".
+
+        This procedure is handy when acting with a matrix on a representative |¯n>,
+        which is transformed to a state |m> by the matrix. The representative |¯m> for
+        this new state is then found, and the normalization in sector beta is applied.
+
+        It means that we have a base index in sector alfa and we look for the representative
+        after acting on it. Then, the normalization in sector beta is taken into account.
+
+        Args:
+            state: The state for which to find the representative.
+
+        Returns:
+            A tuple containing the representative binary number and the corresponding eigenvalue
+            derived from the symmetry operations.
+        """
+        if isinstance(state, int):
+            return self._find_representative_int(state, normalization_beta)
+        return self._find_representative_base(state, normalization_beta)
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def _mapping_kernel_int(self, start: int, stop: int, t: int):
+        """
+        For a given range of states in the full Hilbert space, find those states
+        that are representatives (i.e. the smallest state under symmetry operations)
+        and record their normalization.
+        Parameters:
+            start (int)             : The starting index of the range.
+            stop (int)              : The stopping index of the range.
+            t (int)                 : The thread number.
+        """
+        map_threaded = []
+        norm_threaded = []
+        
+        for j in range(start, stop):
+            global_checker = True
+            if self._global_syms:
+                for g in self._global_syms:
+                    global_checker = global_checker and g(j)
+                    
+            # if the global symmetries are not satisfied, skip the state
+            if not global_checker:
+                continue
+            
+            rep, _ = self._find_repr_int(j)
+            if rep == j:
+                n = self._find_sym_norm_int(j)
+                if abs(n) > __SYM_NORM_THRESHOLD:
+                    map_threaded.append(j)
+                    norm_threaded.append(n)
+        return map_threaded, norm_threaded
+    
+    def _mapping_kernel_int_repr(self):
+        """
+        For all states in the full Hilbert space, determine the representative.
+        For each state j, if global symmetries are not conserved, record a bad mapping.
+        Otherwise, if j is already in the mapping, record trivial normalization.
+        Otherwise, find the representative and record its normalization.
+        
+        This function is created whenever one wants to create a full map for the Hilbert space 
+        and store it in the mapping.
+        """
+        
+        # initialize the mapping and normalization if necessary
+        self._reprmap = []
+        
+        for j in range(self._nhfull):
+            global_checker = True
+            
+            if self._global_syms:
+                for g in self._global_syms:
+                    global_checker = global_checker and g(j)
+                    
+            # if the global symmetries are not satisfied, skip the state
+            if not global_checker:
+                self._reprmap.append((__BAD_BINARY_SEARCH_STATE, 0.0))
+                continue
+            
+            mapping_size    = len(self._mapping)
+            idx             = binary_search(self._mapping, 0, mapping_size - 1, j)
+            if idx != __BAD_BINARY_SEARCH_STATE and idx < mapping_size:
+                self._reprmap.append((idx, 1.0))
+                continue
+            
+            # find the representative
+            rep, sym_eig    = self.find_repr(j)
+            idx             = binary_search(self._mapping, 0, mapping_size - 1, rep)
+            if idx != __BAD_BINARY_SEARCH_STATE and idx < mapping_size:
+                sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
+                self._reprmap.append((idx, np.conj(sym_eigc)))
+            else:
+                self._reprmap.append((__BAD_BINARY_SEARCH_STATE, 0.0))
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def _mapping_kernel_base(self):
+        """
+        """
+        pass
+    
+    def _mapping_kernel_base_repr(self):
+        """
+        """
+        pass
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    def _generate_mapping_int(self, gen_mapping : bool = False):
+        """
+        Generate the mapping of the states for the Hilbert space.
+        
+        Args:
+            gen_mapping (bool): A flag to generate the mapping of the representatives to the original states.
+        """
+        
+        # no symmetries - no mapping
+        if len(self._sym_group) == 0 and len(self._global_syms) == 0:
+            self._nh = self._nhfull
+            return
+        
+        fuller      = self._nhfull
+        # For demonstration, use self.threadNum if set; otherwise default to 1.
+        if self._threadnum > 1:
+            self._mapping       = []
+            self._normalization = []
+            futures             = []
+            
+            # create the threads
+            with ThreadPoolExecutor(max_workers=self._threadnum) as executor:
+                
+                for t in range(self._threadnum):
+                    start   = int(fuller * t / self._threadnum)
+                    stop    = fuller if (t+1) == self._threadnum else int(fuller * (t+1) / self._threadnum)
+                    futures.append(executor.submit(self._mapping_kernel_int, start, stop, t))
+                for future in as_completed(futures):
+                    m, n    = future.result()
+                    self._mapping.extend(m)
+                    self._normalization.extend(n)
+        else:
+            self._mapping, self._normalization = self._mapping_kernel_int(0, fuller, 0)
+        self._nh = len(self._mapping)
+        
+        if gen_mapping:
+            self._mapping_kernel_int_repr()
+
+    def _generate_mapping_base(self, gen_mapping : bool = False):
+        """
+        Generate the mapping of the states for the Hilbert space.
+        
+        Args:
+            gen_mapping (bool): A flag to generate the mapping of the representatives to the original states.
+        """
+        pass
+    
+    ####################################################################################################
+    #! Full Hilbert space generation
+    ####################################################################################################
+    
+    def generate_full_map_int(self):
+        """
+        Generate the full mapping of the Hilbert space.
+        """
+        self._fullmap = []
+        if self._global_syms:
+            for j in range(self._nhfull):
+                global_checker = True
+                for g in self._global_syms:
+                    global_checker = global_checker and g(j)
+                # if the global symmetries are satisfied, add the state to the full map
+                if global_checker:
+                    self._fullmap.append(j)
+
+    def get_full_map_int(self):
+        """
+        Generate the full mapping of the Hilbert space.
+        """
+        if self._fullmap is not None and len(self._fullmap) > 0:
+            return self._fullmap
+        self.generate_full_map_int()
+        return self._fullmap
+    
+    @maybe_jit
+    def _cast_to_full_jax(self, state, backend : str = "jax"):
+        """
+        Cast the state to the full Hilbert space.
+        
+        Args:
+            state: The state to cast to the full Hilbert space.
+        
+        Returns:
+            int: The state cast to the full Hilbert space.
+        """
+        import jax.numpy as jnp
+        # Create a full state vector of zeros.
+        f_s = jnp.zeros((self._nhfull,), dtype=self._dtype)
+        # Convert self._fullmap to a JAX array if it isn't one already.
+        fullmap = jnp.array(self._fullmap)
+        # Use the vectorized .at[].set() operation to update f_s at indices in fullmap.
+        f_s = f_s.at[fullmap].set(state)
+        return f_s
+    
+    def cast_to_full(self, state):
+        """
+        Cast the state to the full Hilbert space.
+        
+        Args:
+            state: The state to cast to the full Hilbert space.
+        
+        Returns:
+            int: The state cast to the full Hilbert space.
+        """
+        if not self.check_global_symmetry():
+            return state
+        if self._fullmap is None or len(self._fullmap) == 0:
+            self.generate_full_map_int()
+        if isinstance(state, np.ndarray):
+            final_state = self._backend.zeros(self._nhfull, dtype=self._dtype)
+            for i, idx in enumerate(self._fullmap):
+                final_state[idx] = state[i]
+            return final_state
+        return self._cast_to_full_jax(state)
+    
+    ####################################################################################################
+    #! Operators for the Hilbert space
+    ####################################################################################################
+    
     def __len__(self):
         """
         Return the dimension of the Hilbert space.
@@ -427,34 +1068,40 @@ class HilbertSpace(ABC):
         """
         return self._nh
     
-    ####################################################################################################
-    
-    @abstractmethod
-    def __getitem__(self, i : int):
+    def __getitem__(self, i):
         """
         Return the i-th basis state of the Hilbert space.
         
         Args:
-            i (int): The index of the basis state to return.
+            i: The index of the basis state to return or a state to find the representative for.
         
         Returns:
             np.ndarray: The i-th basis state of the Hilbert space.
         """
-        pass
+        if isinstance(i, int):
+            return self._mapping[i]
+        #! TODO: implement the state finding
+        raise NotImplementedError("Only integer indexing is supported.")
     
-    ####################################################################################################
-    
-    @abstractmethod
-    def __contains__(self, state : np.ndarray):
+    def __call__(self, i):
+        """
+        Return the representative of the i-th basis state of the Hilbert space.
+        """
+        return self.find_repr(i)
+        
+    def __contains__(self, state):
         """
         Check if a state is in the Hilbert space.
         
         Args:
-            state (np.ndarray): The state to check.
+            state: The state to check.
         
         Returns:
             bool: True if the state is in the Hilbert space, False otherwise.
         """
-        pass
+        if isinstance(state, int):
+            return state in self._mapping
+        #! TODO: implement the state finding
+        return NotImplementedError("Only integer indexing is supported.")
     
     ####################################################################################################
