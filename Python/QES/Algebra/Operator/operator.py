@@ -142,9 +142,7 @@ class OperatorFunction:
         raise ValueError("Invalid return type from the operator function.")
 
     # -----------
-    
     # Getters and Setters
-    
     # -----------
     
     @property
@@ -391,6 +389,43 @@ class OperatorFunction:
 
 __INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
 __INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
+
+@unique
+class OperatorTypeActing(Enum):
+    """
+    Enumerates the types of operators acting on the system.
+    """
+    
+    Global      = auto()    # Global operator - acts on the whole system (does not need additional arguments).
+    Local       = auto()    # Local operator - acts on the local physical space (needs additional argument - 1).
+    Correlation = auto()    # Correlation operator - acts on the correlation space (needs additional argument - 2).
+    
+    # -----------
+    
+    def is_global(self):
+        """
+        Check if the operator is a global operator.
+        """
+        return self == OperatorTypeActing.Global
+    
+    # -----------
+    
+    def is_local(self):
+        """
+        Check if the operator is a local operator.
+        """
+        return self == OperatorTypeActing.Local
+    
+    # -----------
+    
+    def is_correlation(self):
+        """
+        Check if the operator is a correlation operator.
+        """
+        return self == OperatorTypeActing.Correlation
+    
+    # -----------
+
 class Operator(ABC):
     """
     A class to represent a general operator acting on a Hilbert space.
@@ -466,6 +501,19 @@ class Operator(ABC):
             self._fun       = OperatorFunction(fun, modifies_state = self._modifies)  # Change kwargs.get('fun') to fun
         else:
             raise ValueError(__INVALID_OPERATION_TYPE_ERROR)
+        # set the necessary arguments for the operator function
+        if hasattr(fun, 'necessary_args'):
+            self._necessary_args = fun.necessary_args
+        elif isinstance(fun, Callable):
+            self._necessary_args = fun.__code__.co_argcount - 1
+        if self._necessary_args == 0:
+            self._type_acting = OperatorTypeActing.Global
+        elif self._necessary_args == 1:
+            self._type_acting = OperatorTypeActing.Local
+        elif self._necessary_args == 2:
+            self._type_acting = OperatorTypeActing.Correlation
+        else:
+            raise NotImplementedError("Invalid number of necessary arguments for the operator function.")
         self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
     
     #################################
@@ -487,7 +535,6 @@ class Operator(ABC):
         Identity operator function.
         """
         return 1.0
-    
     
     #################################
     
@@ -673,7 +720,19 @@ class Operator(ABC):
     @modifies.setter
     def modifies(self, val):
         self._modifies = val
-        
+    
+    # -------------------------------
+    
+    @property
+    def type_acting(self):
+        return self._type_acting
+    
+    def get_acting_type(self):
+        """
+        Get the acting type of the operator.
+        """
+        return self._type_acting
+
     # -------------------------------
     
     @property
