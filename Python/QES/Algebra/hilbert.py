@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 ####################################################################################################
 from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger
-from general_python.algebra.utils import get_backend as __backend, maybe_jit
+from general_python.algebra.utils import get_backend, maybe_jit
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
 ####################################################################################################
 from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity
@@ -88,7 +88,7 @@ class HilbertSpace(ABC):
         self._nhint = kwargs.get('nhint', 1)                        # number of modes (fermions, bosons, etc. on each site)
         
         # initialize the backend for the vectors and matrices
-        self.reset_backend(backend, state_type)                     # reset the backend
+        self._backend, self._backend_str, self._state_type = self.reset_backend(backend, state_type)
         
         # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
         self._single_part   = single_part                           # single particle system flag
@@ -120,10 +120,11 @@ class HilbertSpace(ABC):
         self._init_mapping(sym_gen, gen_mapping)                    # initialize the mapping
     
     # --------------------------------------------------------------------------------------------------
-    #! Resets 
+    #! Resets
     # --------------------------------------------------------------------------------------------------
     
-    def reset_backend(self, backend : str, state_type : str):
+    @staticmethod
+    def reset_backend(backend : str, state_type : str):
         """
         Reset the backend for the Hilbert space.
         
@@ -131,17 +132,19 @@ class HilbertSpace(ABC):
             backend (str): The backend to use for the Hilbert space.
         """
         if isinstance(backend, str):
-            self._backend_str   = backend
-            self._backend       = __backend(backend)
+            _backend_str   = backend
+            _backend       = get_backend(backend)
         else:
-            self._backend_str   = 'np' if backend == np else 'jax'
-            self._backend       = backend
+            _backend_str   = 'np' if backend == np else 'jax'
+            _backend       = backend
         
-        self.reset_statetype(state_type)
-        
+        statetype = HilbertSpace.reset_statetype(state_type, _backend)
+        return _backend, _backend_str, statetype
+    
     # --------------------------------------------------------------------------------------------------
     
-    def reset_statetype(self, state_type : str):
+    @staticmethod
+    def reset_statetype(state_type : str, backend):
         """
         Reset the state type for the Hilbert space.
         
@@ -149,10 +152,9 @@ class HilbertSpace(ABC):
             state_type (str): The state type to use for the Hilbert space.
         """
         if state_type.lower() == "integer" or state_type.lower() == "int":
-            self._state_type = int
-        else:
-            self._state_type = self._backend.array
-    
+            return int
+        return backend.array
+        
     # --------------------------------------------------------------------------------------------------
     
     def reset_local_symmetries(self):
@@ -405,7 +407,7 @@ class HilbertSpace(ABC):
         
         self._gen_sym_group(gen)    # generate the symmetry group
         
-        if len(gen) > 0:
+        if gen is None or len(gen) > 0:
             self.__log("Generating the mapping of the states...", lvl = 1, color = 'green')
 
         # generate the mapping of the states
@@ -415,9 +417,8 @@ class HilbertSpace(ABC):
             self._generate_mapping_base(gen_mapping)
         t1 = time.time()
         
-        if len(gen) > 0:
-            self.__log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 1, color = 'green')
-        
+        if gen is None or len(gen) > 0:
+            self.__log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 1, color = 'green')          
 
     ####################################################################################################
     #! Getters and checkers for the Hilbert space
@@ -667,7 +668,7 @@ class HilbertSpace(ABC):
         Returns:
             float: The normalization of the state.
         """
-        return self._normalization[state]
+        return self._normalization[state] if state < len(self._normalization) else 1.0
 
 
     # --------------------------------------------------------------------------------------------------
@@ -972,7 +973,7 @@ class HilbertSpace(ABC):
         """
         
         # no symmetries - no mapping
-        if len(self._sym_group) == 0 and len(self._global_syms) == 0:
+        if  (self._sym_group is None or len(self._sym_group) == 0) and (self._global_syms is None or len(self._global_syms) == 0):
             self._nh = self._nhfull
             return
         
@@ -1102,7 +1103,7 @@ class HilbertSpace(ABC):
             np.ndarray: The i-th basis state of the Hilbert space.
         """
         if isinstance(i, int):
-            return self._mapping[i]
+            return self._mapping[i] if len(self._mapping) > 0 else i
         #! TODO: implement the state finding
         raise NotImplementedError("Only integer indexing is supported.")
     

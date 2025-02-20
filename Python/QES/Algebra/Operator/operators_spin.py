@@ -27,7 +27,7 @@ from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGene
 ################################################################################
 
 ################################################################################
-from general_python.common.tests import GeneralAlgebraicTests
+from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.__lattice__ import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
 from general_python.common.binary import _BACKEND_REPR as _SPIN, _BACKEND_DEF_SPIN, _JAX_AVAILABLE
@@ -38,7 +38,6 @@ _I      = 1j
 if _JAX_AVAILABLE:
     from jax import lax
 
-
 ################################################################################
 #! Standard Pauli matrices
 ################################################################################
@@ -47,7 +46,7 @@ if _JAX_AVAILABLE:
 _SIG_X = np.array([[0, 1],
                 [1, 0]], dtype=float)
 _SIG_Y = np.array([[0, -1j],
-                [1j, 0]], dtype=float)
+                [1j, 0]], dtype=complex)
 _SIG_Z = np.array([[1,  0],
                 [0, -1]], dtype=float)
 _SIG_P = np.array([[0, 1],
@@ -981,7 +980,7 @@ def sig_z( lattice     : Optional[Lattice]     = None,
 # Factory function for sigma-plus (σ⁺)
 # -----------------------------------------------------------------------------
 
-def sig_plus( lattice    : Optional[Lattice]     = None,
+def sig_p( lattice    : Optional[Lattice]     = None,
               ns         : Optional[int]         = None,
               type_act   : OperatorTypeActing    = OperatorTypeActing.Global,
               sites      : Optional[List[int]]   = [0],
@@ -1050,7 +1049,7 @@ def sig_plus( lattice    : Optional[Lattice]     = None,
 # Factory function for sigma-minus (σ⁻)
 # -----------------------------------------------------------------------------
 
-def sig_minus( lattice   : Optional[Lattice]     = None,
+def sig_m( lattice   : Optional[Lattice]     = None,
                ns        : Optional[int]         = None,
                type_act  : OperatorTypeActing    = OperatorTypeActing.Global,
                sites     : Optional[List[int]]   = [0],
@@ -1191,7 +1190,7 @@ def sig_k( lattice     : Optional[Lattice]     = None,
 # Finalize
 # -----------------------------------------------------------------------------
 
-class SpinOperatorTests(GeneralAlgebraicTests):
+class SpinOperatorTests(GeneralAlgebraicTest):
     """
     A class that implements tests for the spin operators.
     """

@@ -1,3 +1,11 @@
+'''
+file: Algebra/hamil_types.py
+This module contains the enumeration of Hamiltonian models and related functions.
+A Hamiltonian model is defined as a class of Hamiltonians that share a common structure.
+
+Date: 2025-02-01
+'''
+
 from enum import Enum, unique
 
 # --- ED limits (using hexadecimal where applicable)
@@ -9,19 +17,23 @@ UI_LIMITS_MIDDLE_SPEC_STATENUM  = 200
 # ############################ EXISTING MODELS ############################
 @unique
 class Hamiltonians(Enum):
+    '''
+    Enumeration for different Hamiltonian models.
+    '''
     NONE            = 0
-    ISING_M         = 1
-    XYZ_M           = 2
-    HEI_KIT_M       = 3
-    QSM_M           = 4
-    RP_M            = 5
-    ULTRAMETRIC_M   = 6
+    # interacting models:
+    ISING_M         = 1                     # Quantum Ising model
+    XYZ_M           = 2                     # XYZ model 
+    HEI_KIT_M       = 3                     # Heisenberg model with Kitaev interaction
+    QSM_M           = 4                     # Quantum Summer Model (QSM)
+    RP_M            = 5                     # Rosenzweig-Porter Model
+    ULTRAMETRIC_M   = 6                     # Ultrametric Model (UM)
     # quadratic (or noninteracting) models:
-    FREE_FERMIONS_M = 100
-    AUBRY_ANDRE_M   = 101
-    SYK2_M          = 102
-    ANDERSON_M      = 103
-    POWER_LAW_RANDOM_BANDED_M = 104
+    FREE_FERMIONS_M = 100                   # Free Fermions Model
+    AUBRY_ANDRE_M   = 101                   # Aubry-André Model
+    SYK2_M          = 102                   # Sachdev-Ye-Kitaev (SYK) Model
+    ANDERSON_M      = 103                   # Anderson Model
+    POWER_LAW_RANDOM_BANDED_M = 104         # Power-law Random Banded Model
 
 MY_MODELS_LIST = [
     Hamiltonians.ISING_M,
@@ -41,6 +53,8 @@ MY_MODELS_LIST = [
 # Maximum interacting model value defined as the value of ULTRAMETRIC_M.
 MY_MODELS_MAX_INTERACTING = Hamiltonians.ULTRAMETRIC_M.value
 
+################################################################################
+#! TODO: Check the implementation of the following functions.
 ################################################################################
 
 def check_noninteracting(model: Hamiltonians) -> bool:

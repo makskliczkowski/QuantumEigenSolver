@@ -28,24 +28,24 @@ from Algebra.hilbert import HilbertSpace
 ###################################################################################################
 
 ###################################################################################################
-from general_python.algebra.utils import __JAX_AVAILABLE, get_backend as __backend, maybe_jit
+from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, maybe_jit
 ###################################################################################################
-if __JAX_AVAILABLE:
+if _JAX_AVAILABLE:
     import jax
-    import jax.numpy as jnp
-    from jax.scipy.sparse import BCOO
+    from jax import jit
     import jax.lax as lax
-    from jax import jit, vmap
+    import jax.numpy as jnp
+    from jax.experimental.sparse import BCOO
 
 ###################################################################################################
 # Pure (functional) Hamiltonian update functions.
 ###################################################################################################
 
-if __JAX_AVAILABLE:
+if _JAX_AVAILABLE:
     import Algebra.hamil_jit_methods as hjm
         
     @partial(jit, static_argnums=(3, 4))
-    def __hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy):
+    def _hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy, start = 0):
         """
         JAX version: Functional "in-place" update via jax.lax.fori_loop.
         The arguments `hilbert_space` and `loc_energy` are treated as static.
@@ -55,29 +55,32 @@ if __JAX_AVAILABLE:
         - nh (int)          : The number of elements in the Hilbert space.
         - hilbert_space     : The Hilbert space.
         - loc_energy        : The local energy function.
+        - start             : The starting index for the update (default is 0).
         """
         def body_k(k, ham):
-            k_map = hilbert_space.get_mapping(k)
+            k_map_jax_array = hilbert_space[k]
+            k_map           = int(k_map_jax_array)
             def body_i(i, ham):
-                return loc_energy(ham, k, k_map, i)
-            return lax.fori_loop(0, ns, body_i, ham)
+                return loc_energy(ham, hilbert_space, k, k_map, i)
+            return lax.fori_loop(start, ns, body_i, ham)
         return lax.fori_loop(0, nh, body_k, ham)
-else:
-    def __hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy):
-        """
-        NumPy version: Updates the Hamiltonian array in place.
-        Parameters:
-        - ham (np.ndarray) : The Hamiltonian matrix.
-        - ns (int)         : The number of sites.
-        - nh (int)         : The number of elements in the Hilbert space.
-        - hilbert_space    : The Hilbert space.
-        - loc_energy       : The local energy function.
-        """
-        for k in range(nh):
-            k_map = hilbert_space.get_mapping(k)
-            for i in range(ns):
-                loc_energy(ham, k, k_map, i)
-        return ham
+
+def _hamiltonian_inplace_np(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy, start = 0):
+    """
+    NumPy version: Updates the Hamiltonian array in place.
+    Parameters:
+    - ham (np.ndarray) : The Hamiltonian matrix.
+    - ns (int)         : The number of sites.
+    - nh (int)         : The number of elements in the Hilbert space.
+    - hilbert_space    : The Hilbert space.
+    - loc_energy       : The local energy function.
+    - start            : The starting index for the update (default is 0).
+    """
+    for k in range(nh):
+        k_map = hilbert_space[k]
+        for i in range(start, ns):
+            loc_energy(ham, hilbert_space, k, k_map, i)
+    return ham
 
 ####################################################################################################
 # Hamiltonian class - abstract class
@@ -98,6 +101,35 @@ class Hamiltonian(ABC):
     _ERR_HAMILTONIAN_BUILD          = "An error occurred during Hamiltonian build."
     _ERR_HILBERT_SPACE_NOT_PROVIDED = "The Hilbert space must be provided."
     
+    # ----------------------------------------------------------------------------------------------
+    
+    @staticmethod
+    def __backend(backend: str):
+        '''
+        Get the backend, scipy, and random number generator for the backend.
+        
+        Args:
+            backend (str) : The backend to use.
+        
+        Returns:
+            tuple : The backend, scipy, and random number generator for the backend.
+        '''
+        if isinstance(backend, str):
+            bck = get_backend(backend, scipy=True, random=True)
+            if isinstance(bck, tuple):
+                _backend, _backend_sp = bck[0], bck[1]
+                if isinstance(bck[2], tuple):
+                    _rng, _rng_k = bck[2][0], bck[2][1]
+                else:
+                    _rng, _rng_k = bck[2], None
+            else:
+                _backend, _backend_sp = bck, None
+                _rng, _rng_k = None, None
+            return backend, _backend, _backend_sp, (_rng, _rng_k)
+        _backendstr = 'np' if backend is None or backend == np else 'jax'
+        return Hamiltonian.__backend(_backendstr)
+    
+    # ----------------------------------------------------------------------------------------------
     
     def __init__(self, hilbert_space: HilbertSpace, is_sparse: bool = True, dtype=None, backend='default', **kwargs):
         '''
@@ -110,13 +142,8 @@ class Hamiltonian(ABC):
             **kwargs                        : Additional arguments.
         '''
         
-        if isinstance(backend, str):
-            self._backendstr = backend
-            self._backend, self._backend_sp, (self._rng, self._rng_k) = __backend(backend, scipy=True, random=True)
-        else:
-            self._backendstr = 'np' if backend is None or backend == np else 'jax'
-            self._backend, self._backend_sp, (self._rng, self._rng_k) = __backend(self._backendstr, scipy=True, random=True)
-            
+        self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian.__backend(backend)
+
         # get the backend, scipy, and random number generator for the backend
         self._dtype         = dtype if dtype is not None else self._backend.float64
         self._hilbert_space = hilbert_space
@@ -129,6 +156,7 @@ class Hamiltonian(ABC):
         self._lattice       = self._hilbert_space.get_lattice()
         self._nh            = self._hilbert_space.get_Nh()
         self._ns            = self._hilbert_space.get_Ns()
+        self._startns       = 0 # for starting hamil calculation
         self._logger        = self._hilbert_space.logger
         
         # for the Hamiltonian matrix properties, and energy properties    
@@ -145,7 +173,7 @@ class Hamiltonian(ABC):
         self._krylov        = self._backend.array([]) # Krylov subspace vectors for the Lanczos algorithm
         self._name          = "Hamiltonian"
     
-    def __log(self, msg : str, log : int = 0, lvl : int = 0, color : str = "white"):
+    def _log(self, msg : str, log : int = 1, lvl : int = 0, color : str = "white"):
         """
         Log the message.
         
@@ -161,7 +189,7 @@ class Hamiltonian(ABC):
     
     # ----------------------------------------------------------------------------------------------
     
-    def randomize(self):
+    def randomize(self, **kwargs):
         '''
         For random Hamiltonians, this method is used to generate a random Hamiltonian matrix from 
         scratch to capture new statistics. For non-random Hamiltonians, this method does nothing.
@@ -172,16 +200,17 @@ class Hamiltonian(ABC):
         '''
         Clears the Hamiltonian matrix.
         '''
-        self._hamil = self._backend.array([])
-        self._eig_vec = self._backend.array([])
-        self._eig_val = self._backend.array([])
-        self._krylov = self._backend.array([])
-        self._av_en = 0.0
-        self._std_en = 0.0
-        self._min_en = 0.0
-        self._max_en = 0.0
-        self._av_en_idx = None
-        
+        self._hamil      = None
+        self._eig_vec    = None
+        self._eig_val    = None
+        self._krylov     = None
+        self._av_en      = None
+        self._std_en     = None
+        self._min_en     = None
+        self._max_en     = None
+        self._av_en_idx  = None
+        self._logger.say("Hamiltonian cleared.", log=1)
+
     
     # ----------------------------------------------------------------------------------------------
     #! Getter methods
@@ -193,14 +222,6 @@ class Hamiltonian(ABC):
         Returns the data type of the Hamiltonian matrix.
         '''
         return self._dtype
-    
-    @property
-    @abstractmethod
-    def quadratic(self):
-        '''
-        Returns a flag indicating whether the Hamiltonian is quadratic or not.
-        '''
-        return False
     
     def is_quadratic(self):
         '''
@@ -237,6 +258,30 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @property
+    def name(self):
+        '''
+        Returns the name of the Hamiltonian.
+        '''
+        return self._name
+    
+    @name.setter
+    def name(self, name : str):
+        '''
+        Sets the name of the Hamiltonian.
+        
+        Args:
+            name (str) : The name of the Hamiltonian.
+        '''
+        self._name = name
+        
+    @property
+    def ns(self):
+        '''
+        Returns the number of sites.
+        '''
+        return self._ns
+    
+    @property
     def modes(self):
         '''
         Returns the modes of the Hamiltonian.
@@ -270,6 +315,16 @@ class Hamiltonian(ABC):
         Returns the Hamiltonian matrix.
         '''
         return self._hamil
+    
+    @hamil.setter
+    def hamil(self, hamil):
+        '''
+        Sets the Hamiltonian matrix.
+        
+        Args:
+            hamil : The Hamiltonian matrix.
+        '''
+        self._hamil = hamil
     
     @property
     def eig_vec(self):
@@ -348,9 +403,9 @@ class Hamiltonian(ABC):
         '''
         if self._eig_val.size == 0:
             raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
-        if __JAX_AVAILABLE:
-            return hjm.mean_level_spacing(self._eig_val)
-        return self._backend.mean(self._backend.diff(self._eig_val))
+        if not _JAX_AVAILABLE or self._backend == np:
+            return self._backend.mean(self._backend.diff(self._eig_val))
+        return hjm.mean_level_spacing(self._eig_val)
     
     def get_bandwidth(self):
         '''
@@ -368,9 +423,9 @@ class Hamiltonian(ABC):
         '''
         if self._hamil.size == 0:
             raise ValueError(Hamiltonian._ERR_HAMILTONIAN_NOT_AVAILABLE)
-        if __JAX_AVAILABLE:
-            return hjm.energy_width(self._hamil)
-        return self._backend.trace(self._backend.dot(self._hamil, self._hamil))
+        if not _JAX_AVAILABLE or self._backend == np:
+            return self._backend.trace(self._backend.dot(self._hamil, self._hamil))
+        return hjm.energy_width(self._hamil)
     
     def get_eigvec(self, *args):
         '''
@@ -411,16 +466,20 @@ class Hamiltonian(ABC):
         used, otherwise uses NumPy arrays. The Hamiltonian matrix is initialized to be a matrix of
         zeros if the Hamiltonian is not sparse, otherwise it is initialized to be an empty sparse
         '''
+        self._log("Initializing the Hamiltonian matrix...", lvl = 2)
         if self.sparse:
-            if __JAX_AVAILABLE:
-                # Create an empty BCOO sparse matrix
-                data        = self._backend.array([],       dtype = self._dtype)
-                indices     = self._backend.empty((0, 2),   dtype = self._backend.int32)
-                self._hamil = BCOO((data, indices), shape = (self._nh, self._nh))
-            else: # Otherwise, assume a NumPy backend (the sparse matrix is a CSR matrix)
-                self._hamil = sp.csr_matrix((self._nh, self._nh), dtype = self._dtype)
+            if not _JAX_AVAILABLE or self._backend == np:
+                self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3)
+                self._hamil = sp.sparse.csr_matrix((self._nh, self._nh), dtype = self._dtype)
+            else:
+                self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3)
+                # Create an empty sparse Hamiltonian matrix using JAX's BCOO format
+                indices     = self._backend.zeros((0, 2), dtype=int)
+                data        = self._backend.zeros((0,), dtype=self._dtype)
+                self._hamil = BCOO((data, indices), shape=(self._nh, self._nh))
         else:
             self._hamil     = self._backend.zeros((self._nh, self._nh), dtype = self._dtype)
+        self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green")
         
     # ----------------------------------------------------------------------------------------------
     #! Single particle Hamiltonian matrix
@@ -448,12 +507,21 @@ class Hamiltonian(ABC):
         if self._hilbert_space is None or self._nh == 0:
             raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
 
+        self._log("Calculating the Hamiltonian matrix...", lvl = 1, color = 'blue')
         # Go through the Hilbert space and calculate the Hamiltonian matrix
-        if not __JAX_AVAILABLE:
-            __hamiltonian_inplace(self._hamil, self._ns, self._nh, self._hilbert_space, self.loc_energy_ham)
+        if not _JAX_AVAILABLE or self._backend == np:
+            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl = 2)
+            self._hamil = _hamiltonian_inplace_np(self._hamil, self._ns, self._nh, 
+                                            self._hilbert_space, self.loc_energy_ham, start = self._startns)
         else:
-            self._hamil = __hamiltonian_inplace(self._hamil, self._ns, self._nh, self._hilbert_space, self.loc_energy_ham)
+            self._log("Calculating the Hamiltonian matrix using JAX...", lvl = 2)
+            self._hamil = _hamiltonian_inplace(self._hamil, self._ns, self._nh, 
+                                            self._hilbert_space, self.loc_energy_ham, start=self._startns)
             self._hamil = self._hamil.block_until_ready()
+        if self._hamil is not None and self._hamil.size > 0:
+            self._log("Hamiltonian matrix calculated.", lvl = 3, color = "green")
+        else:
+            self._log("Hamiltonian matrix not calculated.", lvl = 3, color = "red")
 
     def build(self, verbose: bool = False):
         '''
@@ -463,7 +531,7 @@ class Hamiltonian(ABC):
             verbose (bool) : A flag to indicate whether to print the progress of the build.
         '''
         if verbose:
-            self.__log("Building the Hamiltonian matrix...", log = 2)
+            self._log("Building the Hamiltonian matrix...", lvl = 1)
             
         ################################
         # Initialize the Hamiltonian
@@ -474,12 +542,12 @@ class Hamiltonian(ABC):
         except Exception as e:
             raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_INITIALIZATION} : {e}")
     
-        if __JAX_AVAILABLE and hasattr(self._hamil, "block_until_ready"):
+        if hasattr(self._hamil, "block_until_ready"):
             self._hamil = self._hamil.block_until_ready()
             
         init_duration = time.perf_counter() - init_start
         if verbose:
-            self.__log(f"Initialization completed in {init_duration:.6f} seconds", log = 1)
+            self._log(f"Initialization completed in {init_duration:.6f} seconds", lvl = 2)
         
         ################################
         # Build the Hamiltonian matrix
@@ -488,20 +556,23 @@ class Hamiltonian(ABC):
         try:
             self._hamiltonian()
         except Exception as e:
-            self.__log(f"{Hamiltonian._ERR_HAMILTONIAN_BUILD} : {e}", log = 2, color = "red")
+            self._log(f"{Hamiltonian._ERR_HAMILTONIAN_BUILD} : {e}", lvl = 2, color = "red")
         
-        if __JAX_AVAILABLE and hasattr(self._hamil, "block_until_ready"):
+        if hasattr(self._hamil, "block_until_ready"):
             self._hamil = self._hamil.block_until_ready()
         ham_duration = time.perf_counter() - ham_start
-        if verbose:
-            self.__log(f"Hamiltonian matrix built in {ham_duration:.6f} seconds.", log = 1)
+        if self._hamil is not None and self._hamil.size > 0:
+            if verbose:
+                self._log(f"Hamiltonian matrix built in {ham_duration:.6f} seconds.", lvl = 1)
+        else:
+            raise ValueError(Hamiltonian._ERR_HAMILTONIAN_BUILD)
 
     # ----------------------------------------------------------------------------------------------
     #! Local energy methods - Abstract methods
     # ----------------------------------------------------------------------------------------------
     
     @abstractmethod
-    def loc_energy_ham(self, ham, k : int, k_map : int, i : int):
+    def loc_energy_ham(self, ham, hilbert : HilbertSpace, k : int, k_map : int, i : int):
         '''
         Calculates the local energy of the Hamiltonian. This method is meant to be overridden by 
         subclasses to provide a specific implementation.
@@ -518,7 +589,7 @@ class Hamiltonian(ABC):
         pass
     
     @abstractmethod
-    def local_energy(self, k : Union[int, np.ndarray], i : int):
+    def loc_energy(self, k : Union[int, np.ndarray], i : int):
         '''
         Calculates the local energy of the Hamiltonian. This method is meant to be overridden by 
         subclasses to provide a specific implementation.
@@ -531,6 +602,13 @@ class Hamiltonian(ABC):
         '''
         pass
 
+    @property
+    def quadratic(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is quadratic or not.
+        '''
+        return False
+
     # ----------------------------------------------------------------------------------------------
     #! Calculators
     # ----------------------------------------------------------------------------------------------
@@ -540,8 +618,8 @@ class Hamiltonian(ABC):
         Calculates the properties of the Hamiltonian matrix that are related to the energy.
         '''
         
-        if self._eig_val.size == 0:
-            raise ValueError("The eigenvalues are not available.")
+        if self._eig_val is None or self._eig_val.size == 0:
+            raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
         
         self._av_en     = self._backend.mean(self._eig_val)
         self._min_en    = self._backend.min(self._eig_val)
@@ -563,27 +641,31 @@ class Hamiltonian(ABC):
             int : The index of the energy level closest to the given energy.
         '''
         if self._eig_val.size == 0:
-            raise ValueError("The eigenvalues are not available.")
+            raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
         return self._backend.argmin(self._backend.abs(self._eig_val - en))
     
     # ----------------------------------------------------------------------------------------------
     #! Diagonalization methods
     # ----------------------------------------------------------------------------------------------
     
-    @maybe_jit
-    def _diagonalize_backend(self, backend : str = 'default'):
+    @staticmethod
+    def _diagonalize_backend(hamil, logging : Callable, backend : str = 'default'):
         '''
         Diagonalizes the Hamiltonian matrix using the backend's linear algebra library.
         '''
         try:
-            self._eig_val, self._eig_vec = self._backend.linalg.eigh(self._hamil)
+            backend = get_backend(backend)
+            eig_val, eig_vec = backend.linalg.eigh(hamil)
+            return eig_val, eig_vec
         except Exception as e:
-            self.__log(f"An error occurred during diagonalization: {e}")
+            logging(f"An error occurred during diagonalization: {e}")
+        return None, None
     
-    @maybe_jit
-    def _diagonalize_lanczos_backend(self,
+    @staticmethod
+    def _diagonalize_lanczos_backend(hamil,
                     k       : int = 6,
                     which   : str = "SA",
+                    logging : Callable = None,
                     backend : str = 'default'):
         '''
         Diagonalizes the Hamiltonian matrix using the Lanczos algorithm.
@@ -593,16 +675,21 @@ class Hamiltonian(ABC):
         - sigma (float) : Shift value for shift-invert diagonalization.
         '''
         try:
-            self._eig_val, self._eig_vec = self._backend_sp.sparse.linalg.eigsh(self._hamil, k = k, which = which)
+            backend, backend_sp = get_backend(backend, scipy=True)
+            _eig_val, _eig_vec = backend_sp.sparse.linalg.eigsh(hamil, k=k, which=which)
+            return _eig_val, _eig_vec
         except Exception as e:
-            self.__log(f"An error occurred during Lanczos diagonalization: {e}")
+            if logging is not None:
+                logging(f"An error occurred during Lanczos diagonalization: {e}")
+        return None, None
     
-    @maybe_jit
-    def _diagonalize_shift_invert_backend(self,
+    @staticmethod
+    def _diagonalize_shift_invert_backend(hamil,
                     k       : int = 6,
                     sigma   : float = 0.0,
                     which   : str = "LM",
                     mode    : str = "normal",
+                    logging : Callable = None,
                     backend : str = 'default'):
         '''
         Diagonalizes the Hamiltonian matrix using the shift-invert method.
@@ -614,10 +701,14 @@ class Hamiltonian(ABC):
         - backend (str) : The backend to use. Fallbacks to the default backend.
         '''
         try:
-            self._eig_val, self._eig_vec = self._backend_sp.sparse.linalg.eigsh(self._hamil,
-                                                            k = k, sigma = sigma, which = which, mode = mode)
+            backend, backend_sp = get_backend(backend, scipy=True)
+            eig_val, eig_vec = backend_sp.sparse.linalg.eigsh(hamil,
+                                            k = k, sigma = sigma, which = which, mode = mode)
+            return eig_val, eig_vec
         except Exception as e:
-            self.__log(f"An error occurred during shift-invert diagonalization: {e}")
+            if logging is not None:
+                logging(f"An error occurred during shift-invert diagonalization: {e}")
+        return None, None
         
     def diagonalize(self, verbose: bool = False, **kwargs):
         """
@@ -641,23 +732,26 @@ class Hamiltonian(ABC):
         method      = kwargs.get("method", "eigh")
         
         if method == "eigh":
-            self._diagonalize_backend()
+            self._eig_val, self._eig_vec = Hamiltonian._diagonalize_backend(self._hamil, self._log,
+                                                                self._backendstr)
         elif method == "lanczos":
 
             k       = kwargs.get("k", 6)
             sigma   = kwargs.get("sigma", 0.0)
             which   = kwargs.get("which", "SA")
-            self._diagonalize_lanczos_backend(k = k, which = which, backend=self._backendstr)
+            self._eig_val, self._eig_vec = self._diagonalize_lanczos_backend(self._hamil, k=k, which=which,
+                                                logging=self._log, backend=self._backendstr)
         elif method == "shift-invert":
             k       = kwargs.get("k", 6)
             sigma   = kwargs.get("sigma", 0.0)
             which   = kwargs.get("which", "LM")
             mode    = kwargs.get("mode", "normal")
-            self._diagonalize_shift_invert_backend(k = k, sigma = sigma, which = which, mode = mode, backend=self._backendstr)
+            self._eig_val, self._eig_vec = self._diagonalize_shift_invert_backend(self._hamil, k=k, 
+                                sigma=sigma, which=which, mode=mode, logging=self._log, backend=self._backendstr)
         else:
             raise ValueError(f"Unknown diagonalization method: {method}")
         
-        if __JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             if hasattr(self._eig_val, "block_until_ready"):
                 self._eig_val = self._eig_val.block_until_ready()
             if hasattr(self._eig_vec, "block_until_ready"):
@@ -665,14 +759,15 @@ class Hamiltonian(ABC):
         
         diag_duration = time.perf_counter() - diag_start
         if verbose:
-            self.__log(f"Diagonalization ({method}) completed in {diag_duration:.6f} seconds.")
+            self._log(f"Diagonalization ({method}) completed in {diag_duration:.6f} seconds.")
         self._calculate_av_en()
 
     # ----------------------------------------------------------------------------------------------
     #! Setters
     # ----------------------------------------------------------------------------------------------
     
-    def _set_hamil_elem(self, k, val, newk):
+    @staticmethod
+    def set_hamil_elem(ham, hilbert : HilbertSpace, k : int, val, newk : int):
         '''
         Sets the element of the Hamiltonian matrix.
         
@@ -696,27 +791,53 @@ class Hamiltonian(ABC):
         '''
         
         # check the mapping
-        kmap = self._hilbert_space.get_mapping(k) if self._hilbert_space is not None else k
-        
+        kmap = hilbert[k] if hilbert is not None else k
+                
         # set the element
         try:
             if kmap == newk:
                 # the element k is already the same as new_k and obviously we 
                 # and we add this at k (not kmap as it only checks the representative)
-                if __JAX_AVAILABLE:
-                    self._hamil = self._hamil.at[k, k].add(val)
+                if not _JAX_AVAILABLE or isinstance(ham, (np.ndarray, sp.sparse.spmatrix)):
+                    ham[newk, k] += val
                 else:
-                    self._hamil[k, k] += val
+                    ham = ham.at(newk, k).add(val)
             else:
                 # otherwise we need to check the representative of the new k
-                norm        = self._hilbert_space.norm(k) # get the norm of the k'th element of the Hilbert space
-                idx, symeig = self._hilbert_space.find_representative_int(newk, norm) # find the representative of the new k
-                if __JAX_AVAILABLE:
-                    self._hamil = self._hamil.at[idx, k].add(val * symeig)
+                norm        = hilbert.norm(k) # get the norm of the k'th element of the Hilbert space
+                idx, symeig = hilbert.find_representative_int(newk, norm) # find the representative of the new k
+                if not _JAX_AVAILABLE or isinstance(ham, (np.ndarray, sp.sparse.spmatrix)):
+                    ham[idx, k] += val * symeig
                 else:
-                    self._hamil[idx, k] += val * symeig
+                    ham = ham.at[idx, k].add(val * symeig)
         except Exception as e:
-            print(f"Error in _set_hamil_elem: Failed to set element at row {k} (mapping: {kmap}) and column {newk}; value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
+            print(f"Error in set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},idx={idx},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
 
+    def _set_hamil_elem(self, k, val, newk):
+        '''
+        Sets the element of the Hamiltonian matrix.
+        
+        Args:
+            k (int) : The row index.
+            val     : The value to set.
+            newk    : The column index.
+            
+        We acted on the k'th state with the Hamiltonian which in turn gave us the newk'th state.
+        First, we need to check the mapping of the k'th state as it may be the same as the newk'th state
+        through the symmetries...
+        
+        After that, we check if they are the same and if they are we add the value to the diagonal element
+        (k'th, not kMap as it only checks the representative).
+        For instance, the mapping can be (0, 3, 5, 7) and k = 1, so mapping of 1 is 3 - we don't want to
+        add the value to the 3'rd element of the Hamiltonian matrix but to the 1'st element.
+        
+        Otherwise, we need to find the representative of the newk'th state and add the value to the newk'th
+        element of the Hamiltonian matrix. This is also used with the norm of a given state k as we need to 
+        check in how many ways we can get to the newk'th state.
+        '''
+        
+        self.set_hamil_elem(self._hamil, self._hilbert_space, k, val, newk)
+        
     # ----------------------------------------------------------------------------------------------
         
+# --------------------------------------------------------------------------------------------------

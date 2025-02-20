@@ -21,7 +21,7 @@ Author  : Maksymilian Kliczkowski, WUST, Poland
 
 import numpy as np
 from abc import ABC, abstractmethod
-from enum import Enum, auto
+from enum import Enum, auto, unique
 from typing import Optional, Callable, Union
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
@@ -36,9 +36,6 @@ import jax.numpy as jnp
 from jax import jit, vmap
 from jax.experimental import sparse
                        # copy module for copying the operator object 
-
-# Hilbert space
-from Algebra.hilbert import HilbertSpace
 
 ####################################################################################################
 
