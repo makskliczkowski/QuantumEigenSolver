@@ -21,12 +21,11 @@ from typing import List, Tuple, Union, Optional
 # Assume these are available from the QES package:
 from Algebra.hilbert import HilbertSpace
 from Algebra.hamil import Hamiltonian
-from Algebra.Operator.operators_spin import _sigma_z_int, _sigma_x_int
+from Algebra.Operator.operators_spin import _sigma_z_int, _sigma_x_int, _sigma_z_int_jnp, _sigma_x_int_jnp
 
 ##########################################################################################
 from general_python.algebra.linalg import kron, identity, hilbert_schmidt_norm
 from general_python.algebra.ran_wrapper import choice, randint, RMT, random_matrix, random_vector
-from scipy.sparse import csr_matrix
 ##########################################################################################
 
 _QSM_CHECK_HS_NORM = True
@@ -89,7 +88,7 @@ class QSM(Hamiltonian):
                 raise ValueError(self._ERR_EITHER_HIL_OR_NS)
             hilbert_space = HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
         
-        # Initialize the Hamiltonian            
+        # Initialize the Hamiltonian
         super().__init__(hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
         
         # setup the internal variables
@@ -108,6 +107,8 @@ class QSM(Hamiltonian):
         self._au        = None
         self. _u        = None
         self._name      = "Quantum Sun Model"
+        self._startns   = n
+        self._is_sparse = True
         self.init_particles()
     
     # ----------------------------------------------------------------------------------------------
@@ -218,7 +219,7 @@ class QSM(Hamiltonian):
         
         if _QSM_CHECK_HS_NORM:
             _norm           = hilbert_schmidt_norm(hdot, backend=self._backend)
-            self._log(f"H_dot norm: {_norm}", lvl = 2)
+            self._log(f"H_dot norm: {_norm:.3e}", lvl = 2)
             return hdot / np.sqrt(_norm)
         return hdot
 
@@ -249,11 +250,22 @@ class QSM(Hamiltonian):
         self.__init_a_distances()
 
         # log information
-        self._log(f"alpha={self._a}", lvl = 1)
-        self._log(f"u={self._u}", lvl = 1)
-        self._log(f"alpha^u={self._au}", lvl = 1)
+        self._log("alpha = [{}]".format(", ".join(f"{val:.3f}" for val in self._a)), lvl=1)
+        self._log("u = [{}]".format(", ".join(f"{val:.3f}" for val in self._u)), lvl=2)
+        self._log("alpha^u = [{}]".format(", ".join(f"{val:.3f}" for val in self._au)), lvl=2)
 
         self._hdot      = self.__init_hdot()
+        
+        # based on the backend, convert the Hamiltonian to the appropriate type
+        if self._backend != np:
+            self._hdot      = self._backend.array(self._hdot, dtype = self._dtype)
+            self._au        = self._backend.array(self._au, dtype = self._backend.float32)
+            self._u         = self._backend.array(self._u, dtype = self._backend.float32)
+            self._h         = self._backend.array(self._h, dtype = self._backend.float32)
+            self._a         = self._backend.array(self._a, dtype = self._backend.float32)
+            self._xi        = self._backend.array(self._xi, dtype = self._backend.float32)
+            self._neidot    = self._backend.array(self._neidot, dtype = self._dtypeint)
+            
 
     # ----------------------------------------------------------------------------------------------
 
@@ -364,7 +376,7 @@ class QSM(Hamiltonian):
 
         eye         = identity(self._dimout, backend=self._backend, dtype=self._dtype)
         kron_prod   = kron(self._hdot, eye, backend=self._backend)
-        self._hamil = self._backend.array(self.hamil + kron_prod)
+        self._hamil += self._backend.array(kron_prod)
 
     # ----------------------------------------------------------------------------------------------
     #! ABSTRACT METHODS OVERRIDE
@@ -373,6 +385,9 @@ class QSM(Hamiltonian):
     def loc_energy_ham(self, ham, hilbert : HilbertSpace, k : int, k_map : int, i : int):
         '''
         Compute the local energy Hamiltonian.
+        
+        !IMPORTANT: This method updates the Hamiltonian matrix in place.
+        
         Parameters:
             ham : List[Tuple[int, int, float]]
                 Hamiltonian matrix
@@ -386,27 +401,97 @@ class QSM(Hamiltonian):
         if i < self._n:
             return
         
+        if ham is None:
+            ham     = self._hamil
+
+        if hilbert is None:
+            hilbert = self._hilbert_space
+        
+        #call numpy loc_energy
+        rows, cols, vals = self._loc_energy_int(k, k_map, i)
+        for row, col, val in zip(rows, cols, vals):
+            Hamiltonian.set_hamil_elem(ham, hilbert, row, val, col)
+        
+    # ----------------------------------------------------------------------------------------------
+    
+    def _loc_energy_int_jax(self, k, k_map, i):
+        """
+        Compute the local energy interaction in a JAX-compatible manner.
+        
+        For a given state (represented by k and its mapping k_map) and index i,
+        computes two contributions. The first from σ_z and the second from a
+        sequence of σₓ flips representing the coupling between the dot and the outside world.
+        
+        Args:
+            k: The original state index.
+            k_map: The mapped state (from the Hilbert space) corresponding to k.
+            i: An index parameter (typically i >= self.n).
+        
+        Returns:
+            A tuple (rows, cols, vals) of JAX arrays representing the row indices,
+            column indices, and matrix values for this interaction.
+        """
+        # Compute the part index. (Assumes self.n is a Python int.)
         part_idx    = i - self.n
+
+        # Call the JAX σ_z function.
+        # Use _SPIN as the default spin value.
+        idx, val    = _sigma_z_int_jnp(k_map, self.ns, [i], backend=self._backend)
         
-        # check the spin of the particle
-        idx, val    = _sigma_z_int(k_map, self.ns, [i])
-        # apply the magnetic field of the particle
-        self.set_hamil_elem(ham, hilbert, k, self.h[part_idx] * val, idx)
+        # Create arrays for the first contribution.
+        rows        = self._backend.array([k], dtype=self._dtypeint)
+        cols        = self._backend.array([idx], dtype=self._dtypeint)
+        vals        = self._backend.array([self._h[part_idx] * val], dtype=self._h.dtype)
         
+        # Now apply σₓ operations.
+        n_val       = self._neidot[part_idx]
+
+        # Apply σₓ to flip the bit at site n_val.
+        idx1, sxn   = _sigma_x_int_jnp(k_map, self.ns, [n_val], backend=self._backend)
+        # Then apply σₓ to flip the bit at site i.
+        idx2, sxj   = _sigma_x_int_jnp(idx1, self.ns, [i], backend=self._backend)
+        
+        # Second contribution: coupling between the dot and the outside world.
+        new_row     = self._backend.array([k], dtype=self._dtypeint)
+        new_col     = self._backend.array([idx2], dtype=self._dtypeint)
+        new_val     = self._backend.array([self.g0 * self._au[part_idx] * sxj * sxn], dtype=self._h.dtype)
+        
+        # Concatenate the two contributions.
+        rows        = self._backend.concatenate([rows, new_row], axis=0)
+        cols        = self._backend.concatenate([cols, new_col], axis=0)
+        vals        = self._backend.concatenate([vals, new_val], axis=0)
+        return rows, cols, vals
+    
+    # ----------------------------------------------------------------------------------------------
+    
+    def _loc_energy_int(self, k, k_map, i):
+        ''' Compute the local energy interaction. '''
+        
+        # store here the rows, columns, and values
+        part_idx    = i - self.n
+        idx, val    = _sigma_z_int(k_map, self.ns, [i], backend=self._backend)
+        rows        = [k]
+        cols        = [idx]
+        vals        = [self._h[part_idx] * val]
         # apply the spin flips
         n           = self._neidot[part_idx]
-        idx1, sxn   = _sigma_x_int(k_map, self.ns, [n])
-        idx2, sxj   = _sigma_x_int(idx1, self.ns, [i])
+        idx1, sxn   = _sigma_x_int(k_map, self.ns, [n], backend=self._backend)
+        idx2, sxj   = _sigma_x_int(idx1, self.ns, [i], backend=self._backend)
         
         # apply the coupling between the dot and the outside world
-        self.set_hamil_elem(ham, hilbert, k, self.g0 * self._au[part_idx] * sxj * sxn, idx2)
+        rows.append(k)
+        cols.append(idx2)
+        vals.append(self.g0 * self._au[part_idx] * sxj * sxn)
         
-    def loc_energy(self, *args):
-        """
-        !TODO: Add description and implementation
-        """
-        return 0.0
-    
+        return rows, cols, vals
+
+    # ----------------------------------------------------------------------------------------------
+
+    def _loc_energy_arr(self, k, i):
+        '''!TODO: Implement the local energy interaction for the array case.'''
+        rows, cols, vals = [], [], []
+        return rows, cols, vals
+        
     # ----------------------------------------------------------------------------------------------
 
 

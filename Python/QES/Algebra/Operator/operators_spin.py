@@ -37,6 +37,7 @@ from general_python.common.binary import flip, flip_all, check, base2int, int2ba
 _I      = 1j
 if _JAX_AVAILABLE:
     from jax import lax
+    from jax import numpy as jnp
 
 ################################################################################
 #! Standard Pauli matrices
@@ -57,18 +58,56 @@ _SIG_M = np.array([[0, 0],
 # Sigma-X (σₓ) operator
 # -----------------------------------------------------------------------------
 
+@maybe_jit
+def _sigma_x_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    """
+    Apply the Pauli-X (σₓ) operator on the given sites.
+    For each site, flip the bit at position (ns-1-site) using a JAX-compatible flip function.
+    
+    Args:
+        state: A JAX integer (or traced array) representing the state.
+        ns (int): Number of sites.
+        sites (Union[List[int], None]): A list of site indices.
+        spin_value (float): Spin value (default _SPIN).
+        backend (str): Backend flag (unused in this JAX version).
+    
+    Returns:
+        A tuple (state, coeff) with the updated state and accumulated coefficient.
+    """
+    backend = __backend(backend)
+    sites   = backend.array(sites)
+    
+    def body(i, carry):
+        curr_state, curr_coeff  = carry
+        # sites is static, so extract the site.
+        site                    = sites[i]
+        pos                     = ns - 1 - site
+        # flip is assumed to be a JAX-compatible function that flips the bit at position pos.
+        new_state               = flip(curr_state, pos, spin_value=spin_value, backend=backend)
+        new_coeff               = curr_coeff * spin_value
+        return (new_state, new_coeff)
+
+    num_sites   = len(sites)
+    init        = (state, 1.0)
+    final_state, final_coeff = lax.fori_loop(0, num_sites, body, init)
+    return final_state, final_coeff
+
 def _sigma_x_int(state  : int,
             ns          : int,
             sites       : Union[List[int], None],
-            spin_value  : float     = _SPIN):
+            spin_value  : float     = _SPIN,
+            backend     : str       = DEFAULT_BACKEND):
     """
     Apply the Pauli-X (σₓ) operator on the given sites.
     For each site, flip the bit at position (ns-1-site) using binary.flip.
     """
+    if not isinstance(state, int):
+        return _sigma_x_int_jnp(state, ns, sites, spin_value, backend)
+
     coeff = 1.0
     for site in sites:
         pos     = ns - 1 - site
-        state   = flip(state, pos, spin_value=spin_value)
+        state   = flip(state, pos, spin_value=spin_value, backend=backend)
         coeff   *= spin_value
     return state, coeff
 
@@ -161,10 +200,53 @@ def sigma_x(state,
 # Sigma-Y (σᵧ) operator
 # -----------------------------------------------------------------------------
 
+@maybe_jit
+def _sigma_y_int_jnp(state,
+                    ns          : int,
+                    sites       : Union[List[int], None],
+                    spin_value  : float = _SPIN,
+                    backend     : str   = DEFAULT_BACKEND):
+    """
+    σᵧ on an integer state (JAX version).
+
+    For each site, if the bit at (ns-1-site) is set then multiply the coefficient
+    by (1j*spin_value), otherwise by (-1j*spin_value); then flip the bit.
+    
+    Args:
+        state (int or JAX array): The state to apply the operator to.
+        ns (int): The number of spins in the system.
+        sites (list of int or None): The sites to apply the operator to. If None, apply to all sites.
+        spin_value (float): The value to multiply the state by when flipping the bits.
+        backend (str): Backend flag (unused in this JAX version).
+    
+    Returns:
+        tuple: (new_state, coeff) where new_state is the state after applying the operator,
+            and coeff is the accumulated complex coefficient.
+    """
+    backend = __backend(backend)
+    sites_arr = backend.array(sites)
+
+    def body(i, carry):
+        state_val, coeff    = carry
+        site                = sites_arr[i]
+        pos                 = ns - 1 - site
+        bitmask             = backend.left_shift(1, pos)
+        condition           = (state_val & bitmask) > 0
+        factor = lax.cond(condition,
+                            lambda _: 1j * spin_value,
+                            lambda _: -1j * spin_value,
+                            operand=None)
+        new_state = flip(state_val, pos, spin_value=spin_value, backend=backend)
+        return (new_state, coeff * factor)
+
+    final_state, final_coeff = lax.fori_loop(0, len(sites), body, (state, 1.0 + 0j))
+    return final_state, final_coeff
+
 def _sigma_y_int(state      : int,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin_value  : float = _SPIN):
+                spin_value  : float = _SPIN,
+                backend     : str = DEFAULT_BACKEND):
     """
     σᵧ on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
@@ -184,10 +266,13 @@ def _sigma_y_int(state      : int,
     int
         The state after applying the operator.    
     """
+    if not isinstance(state, int):
+        return _sigma_y_int_jnp(state, ns, sites, spin_value, backend)
+    
     coeff = 1.0 + 0j
     for site in sites:
         pos = ns - 1 - site
-        if check(state, pos):
+        if check(state, pos, backend):
             coeff *= (1j * spin_value)
         else:
             coeff *= (-1j * spin_value)
@@ -293,19 +378,71 @@ def sigma_y(state,
 # Sigma-Z (σ_z) operator
 # -----------------------------------------------------------------------------
 
+@maybe_jit
+def _sigma_z_int_jnp(state,
+                    ns          : int,
+                    sites       : Union[List[int], None],
+                    spin_value  : float     = _SPIN,
+                    backend     : str       = DEFAULT_BACKEND):
+    """
+    σ_z on an integer state.
+    For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
+    The state is unchanged.
+    
+    Args:
+        state: A JAX integer (or traced array of integers) representing the state.
+        ns (int): The number of sites.
+        sites (Union[List[int], None]): A list of site indices.
+        spin_value (float): The spin value (default _SPIN).
+        backend (str): Backend flag (unused in this JAX version).
+    
+    Returns:
+        A tuple (state, coeff) where state is unchanged and coeff is the product
+        of the factors determined by the bits in state.
+    """
+    # Body function for the fori_loop. The loop variable 'i' runs over site indices.
+    
+    backend = __backend(backend)
+    sites   = backend.array(sites)
+    
+    def body(i, coeff):
+        # Since sites is a static Python list, we can extract the site index.
+        site        = sites[i]
+        # Compute the bit position: (ns - 1 - site)
+        pos         = ns - 1 - site
+        # Compute the bit mask using JAX operations.
+        bitmask     = backend.left_shift(1, pos)
+        # Compute the condition: is the bit set? This returns a boolean JAX array.
+        condition   = (state & bitmask) > 0
+        # Use lax.cond to choose the factor:
+        factor      = lax.cond(condition,
+                            lambda _: spin_value,
+                            lambda _: -spin_value,
+                            operand=None)
+        # Multiply the accumulator with the factor.
+        return coeff * factor
+
+    # Use lax.fori_loop to accumulate the coefficient over all sites.
+    coeff = lax.fori_loop(0, len(sites), body, 1.0)
+    return state, coeff
+
 def _sigma_z_int(state      : int,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin_value  : float = _SPIN):
+                spin_value  : float = _SPIN,
+                backend     : str = DEFAULT_BACKEND):
     """
     σ_z on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
     The state is unchanged.
     """
+    if not isinstance(state, int):
+        return _sigma_z_int_jnp(state, ns, sites, spin_value, backend)
+    
     coeff = 1.0
     for site in sites:
         pos     = ns - 1 - site
-        factor  = spin_value if check(state, pos) else -spin_value
+        factor  = spin_value if check(state, pos, backend) else -spin_value
         coeff   *= factor
     return state, coeff
 
@@ -327,9 +464,9 @@ def _sigma_z_np(state: np.ndarray,
 def _sigma_z_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin        : bool = _BACKEND_DEF_SPIN,
+                spin        : bool  = _BACKEND_DEF_SPIN,
                 spin_value  : float = _SPIN,
-                backend     : str = DEFAULT_BACKEND):
+                backend     : str   = DEFAULT_BACKEND):
     """
     σ_z on a JAX array state.
     """
@@ -435,6 +572,28 @@ def sigma_plus(state,
         return _sigma_plus_np(state, ns, sites, spin, spin_value)
     return _sigma_plus_jnp(state, ns, sites, spin, spin_value, backend)
 
+@maybe_jit
+def _sigma_plus_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    backend = __backend(backend)
+    sites = backend.array(sites)
+    def body(i, carry):
+        curr_state, curr_coeff = carry
+        pos = ns - 1 - sites[i]
+        bitmask = backend.left_shift(1, pos)
+        condition = (curr_state & bitmask) > 0
+        new_state = lax.cond(condition,
+                             lambda _: curr_state,
+                             lambda _: flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                             operand=None)
+        new_coeff = lax.cond(condition,
+                             lambda _: 0.0,
+                             lambda _: curr_coeff * spin_value,
+                             operand=None)
+        return (new_state, new_coeff)
+    init = (state, 1.0)
+    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+    return final_state, final_coeff
+
 # -----------------------------------------------------------------------------
 # Sigma-Minus (σ⁻) operator
 # -----------------------------------------------------------------------------
@@ -512,6 +671,28 @@ def sigma_minus(state,
     elif isinstance(state, np.ndarray):
         return _sigma_minus_np(state, ns, sites, spin, spin_value)
     return _sigma_minus_jnp(state, ns, sites, spin, spin_value, backend)
+
+@maybe_jit
+def _sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    backend = __backend(backend)
+    sites = backend.array(sites)
+    def body(i, carry):
+        curr_state, curr_coeff = carry
+        pos = ns - 1 - sites[i]
+        bitmask = backend.left_shift(1, pos)
+        condition = (curr_state & bitmask) > 0
+        new_state = lax.cond(condition,
+                             lambda _: flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                             lambda _: curr_state,
+                             operand=None)
+        new_coeff = lax.cond(condition,
+                             lambda _: curr_coeff * spin_value,
+                             lambda _: 0.0,
+                             operand=None)
+        return (new_state, new_coeff)
+    init = (state, 1.0)
+    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+    return final_state, final_coeff
 
 # -----------------------------------------------------------------------------
 # Sigma_pm (σ⁺ then σ⁻) operator
@@ -604,6 +785,32 @@ def sigma_pm(state,
         return _sigma_pm_np(state, ns, sites, spin, spin_value)
     return _sigma_pm_jnp(state, ns, sites, spin, spin_value, backend)
 
+@maybe_jit
+def _sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    # Alternating operator: even index applies sigma⁺, odd index sigma⁻.
+    backend = __backend(backend)
+    sites = backend.array(sites)
+    def body(i, carry):
+        curr_state, curr_coeff = carry
+        pos = ns - 1 - sites[i]
+        bitmask = backend.left_shift(1, pos)
+        # For even indices (i % 2 == 0): require bit not set; for odd indices: require bit set.
+        even_branch = lax.cond((curr_state & bitmask) == 0,
+                               lambda _: (flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                                          curr_coeff * spin_value),
+                               lambda _: (curr_state, 0.0),
+                               operand=None)
+        odd_branch = lax.cond((curr_state & bitmask) > 0,
+                              lambda _: (flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                                         curr_coeff * spin_value),
+                              lambda _: (curr_state, 0.0),
+                              operand=None)
+        new_state, new_coeff = even_branch if (i % 2 == 0) else odd_branch
+        return (new_state, new_coeff)
+    init = (state, 1.0)
+    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+    return final_state, final_coeff
+
 # -----------------------------------------------------------------------------
 # Sigma_mp (σ⁻ then σ⁺) operator
 # -----------------------------------------------------------------------------
@@ -694,6 +901,31 @@ def sigma_mp(state,
         return _sigma_mp_np(state, ns, sites, spin, spin_value)
     return _sigma_mp_jnp(state, ns, sites, spin, spin_value, backend)
 
+@maybe_jit
+def _sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    # Alternating operator: even index applies sigma⁻, odd index sigma⁺.
+    backend = __backend(backend)
+    sites = backend.array(sites)
+    def body(i, carry):
+        curr_state, curr_coeff = carry
+        pos = ns - 1 - sites[i]
+        bitmask = backend.left_shift(1, pos)
+        even_branch = lax.cond((curr_state & bitmask) > 0,
+                               lambda _: (flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                                          curr_coeff * spin_value),
+                               lambda _: (curr_state, 0.0),
+                               operand=None)
+        odd_branch = lax.cond((curr_state & bitmask) == 0,
+                              lambda _: (flip(curr_state, pos, spin_value=spin_value, backend=backend),
+                                         curr_coeff * spin_value),
+                              lambda _: (curr_state, 0.0),
+                              operand=None)
+        new_state, new_coeff = even_branch if (i % 2 == 0) else odd_branch
+        return (new_state, new_coeff)
+    init = (state, 1.0)
+    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+    return final_state, final_coeff
+
 # -----------------------------------------------------------------------------
 # Sigma-K operator (Fourier-transformed spin operator)
 # -----------------------------------------------------------------------------
@@ -773,9 +1005,30 @@ def sigma_k(state,
         return _sigma_k_np(state, ns, sites, k, spin, spin_value)
     return _sigma_k_jnp(state, ns, sites, k, spin, spin_value, backend)
 
+@maybe_jit
+def _sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+    backend = __backend(backend)
+    sites = backend.array(sites)
+    def body(i, total):
+        site = sites[i]
+        pos = ns - 1 - site
+        bitmask = backend.left_shift(1, pos)
+        factor = lax.cond((state & bitmask) > 0,
+                          lambda _: 1j,
+                          lambda _: -1.0,
+                          operand=None)
+        return total + factor * math.exp(1j * k * int(site))
+    total = lax.fori_loop(0, len(sites), body, 0.0+0j)
+    norm = math.sqrt(len(sites)) if len(sites) > 0 else 1.0
+    return state, total / norm
+
 ################################################################################
 # Factory Functions: Wrap the elementary functions in Operator objects.
 ################################################################################
+
+# -----------------------------------------------------------------------------
+# Factory function for sigma-x (σₓ)
+# -----------------------------------------------------------------------------
 
 def sig_x(  lattice     : Optional[Lattice]     = None,
             ns          : Optional[int]         = None,
@@ -844,6 +1097,10 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
                         typek   =   SymmetryGenerators.Other, modifies=True)
     else:
         raise ValueError("Invalid OperatorTypeActing")
+
+# -----------------------------------------------------------------------------
+# Factory function for sigma-y (σᵧ)
+# -----------------------------------------------------------------------------
 
 def sig_y( lattice     : Optional[Lattice]     = None,
            ns          : Optional[int]         = None,
@@ -1258,7 +1515,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
     def test_sig_x_global_np(self, state: Optional[int] = 0b0101, ns: Optional[int] = 4, sites: Union[int, List[int]] = 2):
         """
         Test Global σₓ on a NumPy array state.
-        Convert an integer state to a binary array, apply the operator,
+        Convert an integer state to a binary vector, apply the operator,
         then convert back to an integer.
         """
         if isinstance(sites, int):

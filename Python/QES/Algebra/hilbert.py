@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ####################################################################################################
 from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
-from general_python.common.flog import get_global_logger
+from general_python.common.flog import get_global_logger, Logger
 from general_python.algebra.utils import get_backend, maybe_jit
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
 ####################################################################################################
@@ -37,6 +37,19 @@ class HilbertSpace(ABC):
     """
     
     ####################################################################################################
+    
+    _ERRORS = {
+        "sym_gen"       : "The symmetry generators must be provided as a dictionary.",
+        "global_syms"   : "The global symmetries must be provided as a list.",
+        "gen_mapping"   : "The flag for generating the mapping must be a boolean.",
+        "ns"            : "Either 'ns' or 'lattice' must be provided.",
+        "lattice"       : "Either 'ns' or 'lattice' must be provided.",
+        "nhl"           : "The local Hilbert space dimension must be an integer.",
+        "nhint"         : "The number of modes must be an integer.",
+        "single_part"   : "The flag for the single particle system must be a boolean.",
+        "state_type"    : "The state type must be a string.",
+        "backend"       : "The backend must be a string or a module.",
+    }
     
     def __init__(self,
                 sym_gen     : Union[dict, None]                 = None,
@@ -66,13 +79,13 @@ class HilbertSpace(ABC):
         
         # check if the arguments match the requirements
         if not isinstance(sym_gen, dict) and sym_gen is not None:
-            raise ValueError("The symmetry generators must be provided as a dictionary.")
+            raise ValueError(HilbertSpace._ERRORS["sym_gen"])
         if not isinstance(global_syms, list) and global_syms is not None:
-            raise ValueError("The global symmetries must be provided as a list.")
+            raise ValueError(HilbertSpace._ERRORS["global_syms"])
         if not isinstance(gen_mapping, bool):
-            raise ValueError("The flag for generating the mapping must be a boolean.")            
+            raise ValueError(HilbertSpace._ERRORS["gen_mapping"])
         
-        # handle the system phyisical size dimension - distinguish between the number of sites and the lattice object
+        # handle the system physical size dimension - distinguish between the number of sites and the lattice object
         # if the lattice object is provided, the number of sites is calculated from the lattice object
         if "ns" in kwargs and "lattice" not in kwargs:
             self._ns        = kwargs.get('ns', 1)       # number of sites in the system
@@ -81,7 +94,7 @@ class HilbertSpace(ABC):
             self._lattice   = kwargs.get('lattice')     # lattice object provided
             self._ns        = self._lattice.get_Ns()    # number of sites in the system
         else:
-            raise ValueError("Either 'ns' or 'lattice' must be provided.")
+            raise ValueError(HilbertSpace._ERRORS["ns"])
         
         # handle local Hilbert space properties
         self._nhl   = kwargs.get('nhl', 2)                          # local Hilbert space dimension
@@ -105,6 +118,7 @@ class HilbertSpace(ABC):
         self._sym_group     = []                                    # symmetry group - stores the operators themselves
         self._sym_group_sec = []                                    # symmetry group - stores the names and the values of the operators
         self._mapping       = []                                    # mapping of the states
+        self._getmapping_fun= None                                  # function to get the mapping of the states
         self._reprmap       = []                                    # mapping of the representatives (vector of tuples (state, representative value))
         self._fullmap       = []                                    # mapping of the full Hilbert space
         # setup the logger instance for the Hilbert space
@@ -166,19 +180,32 @@ class HilbertSpace(ABC):
     
     # --------------------------------------------------------------------------------------------------
     
-    def __log(self, msg : str, log : int = 0, lvl : int = 0, color : str = "white"):
+    def log(self, msg : str, log : Union[int, str] = Logger.LEVELS_R['info'], lvl : int = 0, color : str = "white", append_msg = False):
         """
         Log the message.
         
         Args:
             msg (str) : The message to log.
-            log (int) : The flag to log the message.
+            log (Union[int, str]) : The flag to log the message (default is 'info').
             lvl (int) : The level of the message.
         """
-        if log > 0:
+        if isinstance(log, str):
+            log = Logger.LEVELS_R[log]
+        self._log(msg, log=log, lvl=lvl, color=color, append_msg=append_msg)
+    
+    def _log(self, msg : str, log : Union[int, str] = Logger.LEVELS_R['info'], lvl : int = 0, color : str = "white", append_msg = True):
+        """
+        Log the message.
+        
+        Args:
+            msg (str) : The message to log.
+            log (int) : The flag to log the message (default is 'info').
+            lvl (int) : The level of the message.
+        """
+        if append_msg:
             msg = f"[HilbertSpace] {msg}"
-            msg = self._logger.colorize(msg, color)
-            self._logger.say(msg, log = log, lvl = lvl)
+        msg = self._logger.colorize(msg, color)
+        self._logger.say(msg, log = log, lvl = lvl)
     
     ####################################################################################################
     
@@ -233,9 +260,9 @@ class HilbertSpace(ABC):
                 break
             
         if has_translation:
-            self.__log("Translation symmetry is present.", lvl = 1)
+            self._log("Translation symmetry is present.", lvl = 1)
             if has_cpx_translation:
-                self.__log("Translation in complex sector...", lvl = 2, color = 'blue')
+                self._log("Translation in complex sector...", lvl = 2, color = 'blue')
         return sym_gen, (has_translation, has_cpx_translation), (t, direction)
 
     def __gen_sym_apply_t(self, sym_gen_op : list, t : Optional[Operator] = None, direction : LatticeDirection = LatticeDirection.X):
@@ -243,7 +270,7 @@ class HilbertSpace(ABC):
         Apply the translation symmetry.
         """
         if t is not None:
-            self.__log("Adding translation to symmetry group combinations.", lvl = 2, color = 'yellow')
+            self._log("Adding translation to symmetry group combinations.", lvl = 2, color = 'yellow')
             
             # check the direction
             size = self._lattice.lx if direction == LatticeDirection.X else 1
@@ -270,7 +297,7 @@ class HilbertSpace(ABC):
         """
         has_u1, u1_val = self.check_u1()
         if has_u1:
-            self.__log("U(1) global symmetry is present.", lvl = 2, color = 'blue')
+            self._log("U(1) global symmetry is present.", lvl = 2, color = 'blue')
         return has_u1, u1_val
 
     #! Removers for the symmetry generators
@@ -285,7 +312,7 @@ class HilbertSpace(ABC):
         """
         if has_cpx_translation and sym_gen is not None and hasattr(sym_gen, "__iter__"):
             sym_gen = [gen for gen in sym_gen if not isinstance(gen[0], SymmetryGenerators.Reflection)]
-            self.__log("Removed reflection symmetry from the symmetry generators.", lvl = 2, color = 'blue')
+            self._log("Removed reflection symmetry from the symmetry generators.", lvl = 2, color = 'blue')
         return sym_gen
     
     def __gen_sym_remove_parity(self, sym_gen : list, has_u1 : bool, has_u1_sec : float):
@@ -295,13 +322,13 @@ class HilbertSpace(ABC):
         """
         if has_u1:
             
-            self.__log("U(1) symmetry detected. Checking parity generators...", log = 1, lvl = 1, color = 'yellow')
+            self._log("U(1) symmetry detected. Checking parity generators...", log = 1, lvl = 1, color = 'yellow')
             
             new_sym_gen = []
             for (gen, sec) in sym_gen:
                 if gen in (SymmetryGenerators.ParityX, SymmetryGenerators.ParityY) and \
                    ((int(has_u1_sec) != self._ns // 2) or (self._ns % 2 != 0)):
-                    self.__log(f"Removing parity {gen} due to U(1) constraint.", log = 1, lvl = 2, color = 'blue')
+                    self._log(f"Removing parity {gen} due to U(1) constraint.", log = 1, lvl = 2, color = 'blue')
                 else:
                     new_sym_gen.append((gen, sec))
             sym_gen = new_sym_gen
@@ -320,14 +347,14 @@ class HilbertSpace(ABC):
             The translation operator.        
         """
         
-        self.__log("Using local symmetries:", lvl = 1, color = 'green')
+        self._log("Using local symmetries:", lvl = 1, color = 'green')
         for (g, sec) in self._sym_group_sec:
-            self.__log(f"{g}: {sec}", lvl = 2, color = 'blue')
+            self._log(f"{g}: {sec}", lvl = 2, color = 'blue')
         if t is not None:
-            self.__log(f"{t}: {t.eigval}", lvl = 2, color = 'blue')
-        self.__log("Using global symmetries:", lvl = 1, color = 'green')
+            self._log(f"{t}: {t.eigval}", lvl = 2, color = 'blue')
+        self._log("Using global symmetries:", lvl = 1, color = 'green')
         for g in self._global_syms:
-            self.__log(f"{g}: {g.get_val()}", lvl = 2, color = 'blue')
+            self._log(f"{g}: {g.get_val()}", lvl = 2, color = 'blue')
     
     #! Final symmetry group generation
     
@@ -341,7 +368,7 @@ class HilbertSpace(ABC):
         """
 		
         if (not gen or len(gen) == 0) and not self.check_global_symmetry():
-            self.__log("No local or global symmetries provided; symmetry group is empty.", lvl = 1, color = 'green')
+            self._log("No local or global symmetries provided; symmetry group is empty.", lvl = 1, color = 'green')
             return
         
         # copy the generators to modify them if needed
@@ -407,18 +434,25 @@ class HilbertSpace(ABC):
         
         self._gen_sym_group(gen)    # generate the symmetry group
         
-        if gen is None or len(gen) > 0:
-            self.__log("Generating the mapping of the states...", lvl = 1, color = 'green')
+        if gen is not None and len(gen) > 0:
+            self._log("Generating the mapping of the states...", lvl = 1, color = 'green')
 
         # generate the mapping of the states
         if self._state_type == int:
             self._generate_mapping_int(gen_mapping)
         else:
             self._generate_mapping_base(gen_mapping)
-        t1 = time.time()
         
-        if gen is None or len(gen) > 0:
-            self.__log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 1, color = 'green')          
+        if gen is not None and len(gen) > 0 or len(self._mapping) > 0:
+            t1 = time.time()
+            self._log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 2, color = 'green')
+            self._mapping = self._backend.array(self._mapping, dtype = self._backend.int64)
+            self._getmapping_fun = lambda x: self._mapping[x]
+        else:
+            self._log("No mapping generated.", lvl = 1, color = 'green')
+            self._getmapping_fun = lambda x: x
+            
+    # --------------------------------------------------------------------------------------------------
 
     ####################################################################################################
     #! Getters and checkers for the Hilbert space
@@ -521,6 +555,16 @@ class HilbertSpace(ABC):
         return self._ns
     
     # --------------------------------------------------------------------------------------------------
+    
+    @property
+    def mapping(self):
+        """
+        Return the mapping of the states.
+        
+        Returns:
+            list: The mapping of the states.
+        """
+        return self._mapping
     
     @property
     def local(self):
@@ -1011,6 +1055,47 @@ class HilbertSpace(ABC):
         """
         pass
     
+    # --------------------------------------------------------------------------------------------------
+    
+    def get_matrix_element(self, k, new_k, h_conj = False):
+        """
+        Compute the matrix element between two states in the Hilbert space.
+        This method determines the matrix element corresponding to the transition between a given state |k⟩ and a new state defined by new_k.
+        It accounts for the possibility that the new state may not be in its representative form, in which case it finds the representative state
+        and applies the corresponding normalization factor or symmetry eigenvalue. The ordering of the returned tuple elements may be
+        reversed based on the flag h_conj; if h_conj is False, the result is ((representative, k), factor), otherwise ((k, representative), factor).
+
+        Imagine a situation where an operator acts on a state |k> and gives a new state <new_k|.
+        We use this Hilbert space to find the matrix element between these two states. It may happen
+        that the new state is not the representative of the original state, so we need to find the
+        representative and the normalization factor.
+
+        Args:
+            k: An index or identifier for the original state in the Hilbert space.
+            new_k: An index or identifier representing the new state after the operator action.
+            h_conj (bool, optional): A flag to determine the order of the tuple. If False (default), the tuple is (representative, k), 
+                                    otherwise it is (k, representative).
+        Returns:
+            tuple: A tuple consisting of:
+                - A tuple of two elements representing the indices (or identifiers) of the representative state and the original state,
+                    ordered based on the value of h_conj.
+                - The normalization factor or symmetry eigenvalue associated with the new state. 
+        """
+        
+        # check the mapping
+        kmap = self.__getitem__(k)
+                
+        # try to process the elements
+        if kmap == new_k:
+            # the element k is already the same as new_k and obviously we 
+            # and we add this at k (not kmap as it only checks the representative)
+    
+            return ((new_k, k), 1) if not h_conj else ((k, new_k), 1)
+        # otherwise we need to check the representative of the new k
+        norm        = self.norm(k) # get the norm of the k'th element of the Hilbert space
+        idx, symeig = self.find_representative_int(new_k, norm) # find the representative of the new k
+        return ((idx, k), symeig) if not h_conj else ((k, idx), symeig)
+    
     ####################################################################################################
     #! Full Hilbert space generation
     ####################################################################################################
@@ -1092,6 +1177,15 @@ class HilbertSpace(ABC):
         """
         return self._nh
     
+    def get_mapping(self, i):
+        """
+        Return the mapping of the states.
+        
+        Returns:
+            list: The mapping of the states.
+        """
+        return self._getmapping_fun(i)
+    
     def __getitem__(self, i):
         """
         Return the i-th basis state of the Hilbert space.
@@ -1104,8 +1198,7 @@ class HilbertSpace(ABC):
         """
         if isinstance(i, int):
             return self._mapping[i] if len(self._mapping) > 0 else i
-        #! TODO: implement the state finding
-        raise NotImplementedError("Only integer indexing is supported.")
+        return self._mapping[i]
     
     def __call__(self, i):
         """
@@ -1129,3 +1222,29 @@ class HilbertSpace(ABC):
         return NotImplementedError("Only integer indexing is supported.")
     
     ####################################################################################################
+    
+####################################################################################################
+
+def set_operator_elem(operator, hilbert : HilbertSpace, k : int, val, new_k : int, conj = False):
+    """
+    Set the matrix element of the operator.
+    
+    Args:
+        operator (Operator)     : The operator to set the matrix element for.
+        hilbert (HilbertSpace)  : The Hilbert space object.
+        i                       : The index of the matrix element.
+        val                     : The value of the matrix element.
+        j                       : The index of the matrix element.
+    Returns:
+        Operator: The operator with the matrix element set.
+    """
+    (row, col), sym_eig = hilbert.get_matrix_element(k, new_k, h_conj = conj)
+    
+    # check if operator is numpy array
+    if isinstance(operator, np.ndarray):
+        operator[row, col]  += val * sym_eig
+    else:
+        operator = operator.at[row, col].add(val * sym_eig)
+    return operator # for convenience
+
+####################################################################################################

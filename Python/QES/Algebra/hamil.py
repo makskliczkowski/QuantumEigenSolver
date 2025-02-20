@@ -24,7 +24,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ###################################################################################################
-from Algebra.hilbert import HilbertSpace
+from Algebra.hilbert import HilbertSpace, set_operator_elem
 ###################################################################################################
 
 ###################################################################################################
@@ -35,7 +35,7 @@ if _JAX_AVAILABLE:
     from jax import jit
     import jax.lax as lax
     import jax.numpy as jnp
-    from jax.experimental.sparse import BCOO
+    from jax.experimental.sparse import BCOO, CSR
 
 ###################################################################################################
 # Pure (functional) Hamiltonian update functions.
@@ -43,29 +43,191 @@ if _JAX_AVAILABLE:
 
 if _JAX_AVAILABLE:
     import Algebra.hamil_jit_methods as hjm
-        
-    @partial(jit, static_argnums=(3, 4))
-    def _hamiltonian_inplace(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy, start = 0):
+    
+    # @partial(jax.jit, static_argnums=(0,1,2,3,4))
+    def _hamiltonian_functional_jax_sparse(ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
         """
-        JAX version: Functional "in-place" update via jax.lax.fori_loop.
-        The arguments `hilbert_space` and `loc_energy` are treated as static.
+        JAX version: Functional Hamiltonian construction (SPARSE).
         Parameters:
-        - ham (jnp.ndarray) : The Hamiltonian matrix - can be sparse or dense.
-        - ns (int)          : The number of sites.
-        - nh (int)          : The number of elements in the Hilbert space.
-        - hilbert_space     : The Hilbert space.
-        - loc_energy        : The local energy function.
-        - start             : The starting index for the update (default is 0).
+        - ns (int)         : The number of sites.
+        - hilbert_space    : The Hilbert space. Provides the mapping of the Hilbert space.
+        - loc_energy       : The local energy function. Must be callable with the following signature:
+                            loc_energy(k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
+        - start            : The starting index for the update (default is 0).
         """
-        def body_k(k, ham):
-            k_map_jax_array = hilbert_space[k]
-            k_map           = int(k_map_jax_array)
-            def body_i(i, ham):
-                return loc_energy(ham, hilbert_space, k, k_map, i)
-            return lax.fori_loop(start, ns, body_i, ham)
-        return lax.fori_loop(0, nh, body_k, ham)
+        
+        # get the number of elements in the Hilbert space
+        nh = hilbert_space.Nh
+        _start = int(start)
+        _ns = int(ns)
+        # elems is the range over which the inner loop will run.
+        elems = jnp.arange(_start, _ns, dtype=jnp.int64)
+        jax.debug.print("elems: {}", elems)
+        
+        # Choose a bound for maximum inner contributions.
+        max_inner = ns ** 3  # You can later make this a parameter.
+        # Preallocate an outer buffer with fixed size.
+        max_total = int(nh) * max_inner
 
-def _hamiltonian_inplace_np(ham, ns: int, nh: int, hilbert_space: HilbertSpace, loc_energy, start = 0):
+        # Outer accumulator: fixed-shape buffers for indices and data, plus a counter.
+        outer_indices = jnp.zeros((max_total, 2), dtype=jnp.int64)
+        outer_data = jnp.zeros((max_total,), dtype=dtype)
+        outer_ctr = jnp.int64(0)
+        
+        # k_vals will iterate over all Hilbert space indices.
+        k_vals = jnp.arange(0, nh, dtype=jnp.int64)
+        
+        def outer_loop_body(outer_carry, k):
+            # Unpack outer carry.
+            outer_indices, outer_data, outer_ctr = outer_carry
+            # Get mapping for current k.
+            k_map = hilbert_space.get_mapping(k)
+            
+            # Preallocate inner loop fixed buffers.
+            inner_indices = jnp.zeros((max_inner, 2), dtype=jnp.int64)
+            inner_data = jnp.zeros((max_inner,), dtype=dtype)
+            inner_ctr = jnp.int64(0)
+            
+            # We'll iterate over elems with a fori_loop.
+            def inner_body(i, inner_carry):
+                inner_indices, inner_data, inner_ctr = inner_carry
+                # Call loc_energy; assume it returns one contribution (or none)
+                new_rows, new_cols, new_data = loc_energy(k, k_map, elems[i])
+                # Convert to arrays.
+                new_rows = jnp.array(new_rows, dtype=jnp.int64)
+                new_cols = jnp.array(new_cols, dtype=jnp.int64)
+                new_data = jnp.array(new_data, dtype=dtype)
+                # Assume that if there is a contribution, new_rows/new_cols have length 1.
+                n_new = new_rows.shape[0]
+                # If there is a contribution (n_new == 1), update the inner buffer.
+                def update_fn(carry):
+                    inner_indices, inner_data, inner_ctr = carry
+                    # Prepare the new index row.
+                    new_index = jnp.stack([new_rows, new_cols], axis=1)  # shape (1,2)
+                    # Update one row using dynamic_update_slice.
+                    inner_indices = lax.dynamic_update_slice(inner_indices, new_index, (inner_ctr, 0))
+                    inner_data = lax.dynamic_update_slice(inner_data, new_data, (inner_ctr,))
+                    return (inner_indices, inner_data, inner_ctr + 1)
+                # If no contribution, do nothing.
+                inner_carry = lax.cond(n_new == 1, update_fn, lambda c: c, (inner_indices, inner_data, inner_ctr))
+                return inner_carry
+
+            # Run inner loop over all elems.
+            inner_indices, inner_data, inner_ctr = lax.fori_loop(0, elems.shape[0], inner_body,
+                                                                (inner_indices, inner_data, inner_ctr))
+            # Now, update the outer accumulator with the inner results.
+            # We'll loop over the fixed range [0, max_inner) and for each i less than inner_ctr,
+            # copy that row into the outer buffer.
+            def update_outer_body(i, carry):
+                outer_indices, outer_data, outer_ctr = carry
+                def do_update(c):
+                    # Extract the i-th row from the inner buffers.
+                    row = inner_indices[i:i+1, :]  # shape (1,2)
+                    d = inner_data[i:i+1]           # shape (1,)
+                    outer_indices_updated = lax.dynamic_update_slice(outer_indices, row, (outer_ctr + i, 0))
+                    outer_data_updated = lax.dynamic_update_slice(outer_data, d, (outer_ctr + i,))
+                    return (outer_indices_updated, outer_data_updated, outer_ctr)
+                # Conditionally update if i < inner_ctr.
+                return lax.cond(i < inner_ctr, do_update, lambda c: c, carry)
+            
+            outer_indices, outer_data, outer_ctr = lax.fori_loop(0, max_inner, update_outer_body,
+                                                                (outer_indices, outer_data, outer_ctr))
+            # Increase outer_ctr by the number of inner contributions.
+            new_outer_ctr = outer_ctr + inner_ctr
+            return (outer_indices, outer_data, new_outer_ctr), None
+
+        # Run outer loop over k_vals.
+        outer_carry, _ = lax.scan(outer_loop_body, (outer_indices, outer_data, outer_ctr), k_vals)
+        final_outer_indices, final_outer_data, outer_count = outer_carry
+
+        # Now we need to extract only the valid rows from the outer buffers.
+        # Because Python slicing with a dynamic index is not allowed inside jit,
+        # we use a boolean mask. (max_total is static.)
+        mask = jnp.arange(max_total) < outer_count
+        final_indices = final_outer_indices[mask]
+        final_data = final_outer_data[mask]
+        ham = BCOO((final_data, final_indices), shape=(nh, nh))
+        return ham
+
+
+    @partial(jit, static_argnames=('ns', 'hilbert_space', 'loc_energy', 'start', 'dtype'))
+    def _hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
+        """
+        JAX version: Functional Hamiltonian construction (DENSE).
+        Parameters:
+        - ns (int)         : The number of sites.
+        - hilbert_space    : The Hilbert space.
+        - loc_energy       : The local energy function.
+        - start            : The starting index for the update (default is 0).
+        - dtype            : The data type of the Hamiltonian matrix.
+        """
+        
+        # get the number of elements in the Hilbert space
+        nh      = jnp.int64(hilbert_space.Nh)
+        _start  = jnp.int64(start)
+        
+        def outer_loop_body(ham, k):
+            k_map = hilbert_space[k]
+
+            def inner_loop_body(ham, i):
+                ham = loc_energy(ham, hilbert_space, k, k_map, i)
+                return ham, None
+
+            ham, _  = lax.scan(inner_loop_body, ham, jnp.arange(_start, ns))
+            return ham, None
+
+        init_ham    = jnp.zeros((nh, nh), dtype=dtype)
+        ham, _      = lax.scan(outer_loop_body, init_ham, jnp.arange(0, nh))
+        return ham
+
+    def hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, is_sparse: bool, start=0, dtype=None):
+        """
+        JAX version: Functional Hamiltonian construction.  Dispatcher.
+        """
+        if dtype is None:
+            dtype = hilbert_space.dtype
+        
+        if is_sparse:
+            return _hamiltonian_functional_jax_sparse(ns, hilbert_space, loc_energy, start, dtype)
+        else:
+            return _hamiltonian_functional_jax(ns, hilbert_space, loc_energy, start, dtype)
+    
+    # ----------------------------------------------------------------------------------------------
+
+def _hamiltonian_inplace_np_sparse(ham, ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
+    """
+    NumPy version: Updates the Hamiltonian array in place (SPARSE).
+    Parameters:
+    - ham (np.ndarray) : The Hamiltonian matrix.
+    - ns (int)         : The number of sites.
+    - hilbert_space    : The Hilbert space.
+    - loc_energy       : The local energy function.
+                        Must be callable with the following signature:
+                        loc_energy(k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
+    - start            : The starting index for the update (default is 0).
+    """
+    nh   = hilbert_space.Nh
+    rows = []
+    cols = []
+    data = []
+    
+    for k in range(nh):
+        k_map = hilbert_space[k]
+        for i in range(start, ns):
+            new_rows, new_cols, new_data = loc_energy(k, k_map, i)
+            rows.extend(new_rows)
+            cols.extend(new_cols)
+            data.extend(new_data)
+    # Convert to NumPy arrays (important for efficiency)
+    rows = np.array(rows, dtype=np.int64)
+    cols = np.array(cols, dtype=np.int64)
+    # Use consistent dtype
+    data = np.array(data, dtype=dtype if dtype is not None else hilbert_space.dtype)
+    
+    ham  = sp.sparse.csr_matrix((data, (rows, cols)), shape=(nh, nh))
+    return ham
+
+def _hamiltonian_inplace_np(ham, ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
     """
     NumPy version: Updates the Hamiltonian array in place.
     Parameters:
@@ -76,11 +238,43 @@ def _hamiltonian_inplace_np(ham, ns: int, nh: int, hilbert_space: HilbertSpace, 
     - loc_energy       : The local energy function.
     - start            : The starting index for the update (default is 0).
     """
+    
+    # get the number of elements in the Hilbert space
+    nh = hilbert_space.Nh
+    
     for k in range(nh):
         k_map = hilbert_space[k]
         for i in range(start, ns):
             loc_energy(ham, hilbert_space, k, k_map, i)
     return ham
+
+def hamiltonian_inplace_np(ham, ns: int, hilbert_space: HilbertSpace,
+                        loc_energy, is_sparse: bool, start=0, dtype=None):
+    """
+    NumPy version: Updates the Hamiltonian array in place.
+    Parameters:
+    - ham (np.ndarray) : The Hamiltonian matrix.
+    - ns (int)         : The number of sites.
+    - nh (int)         : The number of elements in the Hilbert space.
+    - hilbert_space    : The Hilbert space.
+    - loc_energy       : The local energy function.
+    - start            : The starting index for the update (default is 0).
+    """
+    if dtype is None:
+        dtype = hilbert_space.dtype
+    
+    if is_sparse:
+        # check the callable signature of the local energy function to match:
+        #   loc_energy(ham, hilbert_space, k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
+        if not callable(loc_energy):
+            raise ValueError("loc_energy must be a callable function.")
+        ham = _hamiltonian_inplace_np_sparse(ham, ns, hilbert_space, loc_energy, start, dtype)
+        return ham
+    # check the callable signature of the local energy function to match:
+    #   loc_energy(ham, hilbert_space, k, k_map, i) -> None - updates the ham in place
+    if not callable(loc_energy):
+        raise ValueError("loc_energy must be a callable function.")
+    return _hamiltonian_inplace_np(ham, ns, hilbert_space, loc_energy, start, dtype)
 
 ####################################################################################################
 # Hamiltonian class - abstract class
@@ -100,6 +294,14 @@ class Hamiltonian(ABC):
     _ERR_HAMILTONIAN_INITIALIZATION = "An error occurred during Hamiltonian initialization."
     _ERR_HAMILTONIAN_BUILD          = "An error occurred during Hamiltonian build."
     _ERR_HILBERT_SPACE_NOT_PROVIDED = "The Hilbert space must be provided."
+    
+    _ERRORS = {
+        "eigenvalues_not_available"  : _ERR_EIGENVALUES_NOT_AVAILABLE,
+        "hamiltonian_not_available"  : _ERR_HAMILTONIAN_NOT_AVAILABLE,
+        "hamiltonian_initialization" : _ERR_HAMILTONIAN_INITIALIZATION,
+        "hamiltonian_build"          : _ERR_HAMILTONIAN_BUILD,
+        "hilbert_space_not_provided" : _ERR_HILBERT_SPACE_NOT_PROVIDED
+    }
     
     # ----------------------------------------------------------------------------------------------
     
@@ -146,6 +348,7 @@ class Hamiltonian(ABC):
 
         # get the backend, scipy, and random number generator for the backend
         self._dtype         = dtype if dtype is not None else self._backend.float64
+        self._dtypeint      = self._backend.int64
         self._hilbert_space = hilbert_space
         if self._hilbert_space is None:
             raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
@@ -167,33 +370,27 @@ class Hamiltonian(ABC):
         self._max_en        = 0.0
         
         # for the matrix representation of the Hamiltonian
-        self._hamil         = self._backend.array([]) # can be either sparse or dense depending on the system
-        self._eig_vec       = self._backend.array([])
-        self._eig_val       = self._backend.array([])
-        self._krylov        = self._backend.array([]) # Krylov subspace vectors for the Lanczos algorithm
+        self._hamil         = None
+        self._eig_vec       = None
+        self._eig_val       = None
+        self._krylov        = None
         self._name          = "Hamiltonian"
     
-    def _log(self, msg : str, log : int = 1, lvl : int = 0, color : str = "white"):
+    def _log(self, msg : str, log = 'info', lvl : int = 0, color : str = "white"):
         """
         Log the message.
         
         Args:
             msg (str) : The message to log.
-            log (int) : The flag to log the message.
+            log (int) : The logging level. Default is 'info'.
             lvl (int) : The level of the message.
         """
-        if log > 0:
-            msg = f"[Hamiltonian:{self._name}] {msg}"
-            msg = self._logger.colorize(msg, color)
-            self._logger.say(msg, log = log, lvl = lvl)
+        msg = f"[{self._name}] {msg}"
+        self._hilbert_space.log(msg, log = log, lvl = lvl, color = color)
     
     # ----------------------------------------------------------------------------------------------
     
     def randomize(self, **kwargs):
-        '''
-        For random Hamiltonians, this method is used to generate a random Hamiltonian matrix from 
-        scratch to capture new statistics. For non-random Hamiltonians, this method does nothing.
-        '''
         pass 
     
     def clear(self):
@@ -209,8 +406,7 @@ class Hamiltonian(ABC):
         self._min_en     = None
         self._max_en     = None
         self._av_en_idx  = None
-        self._logger.say("Hamiltonian cleared.", log=1)
-
+        self._log("Hamiltonian cleared...", lvl = 2, color = 'blue')
     
     # ----------------------------------------------------------------------------------------------
     #! Getter methods
@@ -379,16 +575,126 @@ class Hamiltonian(ABC):
     def diag(self):
         '''
         Returns the diagonal of the Hamiltonian matrix.
+        Distinguish between JAX and NumPy/SciPy. 
         '''
-        return self._hamil.diagonal()
+        
+        if _JAX_AVAILABLE and self._backend != np:
+            if isinstance(self._hamil, BCOO):
+                return self._hamil.diagonal()
+            elif isinstance(self._hamil, jnp.ndarray):
+                return jnp.diag(self._hamil)
+            else:
+                # dunnno what to do here
+                return None
+        else:
+            return self._hamil.diagonal()
+    
+    # ----------------------------------------------------------------------------------------------
+    #! Memory properties
+    # ----------------------------------------------------------------------------------------------
     
     @property
     def h_memory(self):
-        '''
-        Returns the memory used by the Hamiltonian matrix.
-        '''
-        return self._hamil.nbytes
-    
+        """
+        Returns the memory used by the Hamiltonian matrix in bytes.
+        Works for both dense and sparse representations and for NumPy and JAX.
+        """
+        # Dense matrix: use nbytes if available, otherwise compute from shape.
+        self._log(f"Checking the memory used by the Hamiltonian matrix of type {type(self._hamil)}", lvl=1)
+        
+        if not self._is_sparse:
+            if hasattr(self._hamil, "nbytes"):
+                return self._hamil.nbytes
+            else:
+                return int(np.prod(self._hamil.shape)) * self._hamil.dtype.itemsize
+        self._log("It is not a dense matrix...", lvl=2)
+        # Sparse matrix:
+        # For NumPy (or when JAX is unavailable) we assume a scipy sparse matrix (e.g. CSR)
+        if self._backend == np or not _JAX_AVAILABLE:
+            memory = 0
+            for attr in ('data', 'indices', 'indptr'):
+                if hasattr(self._hamil, attr):
+                    arr = getattr(self._hamil, attr)
+                    if hasattr(arr, 'nbytes'):
+                        memory += arr.nbytes
+                    else:
+                        memory += int(np.prod(arr.shape)) * arr.dtype.itemsize
+            return memory
+        # For JAX sparse matrices (e.g. BCOO), we assume they have data and indices attributes.
+        data_arr        = self._hamil.data
+        indices_arr     = self._hamil.indices
+        if hasattr(data_arr, 'nbytes'):
+            data_bytes = data_arr.nbytes
+        else:
+            data_bytes = int(np.prod(data_arr.shape)) * data_arr.dtype.itemsize
+        if hasattr(indices_arr, 'nbytes'):
+            indices_bytes = indices_arr.nbytes
+        else:
+            indices_bytes = int(np.prod(indices_arr.shape)) * indices_arr.dtype.itemsize
+        return data_bytes + indices_bytes
+
+    @property
+    def h_memory_gb(self):
+        """
+        Returns the memory used by the Hamiltonian matrix in gigabytes.
+        """
+        return self.h_memory / (1024.0 ** 3)
+
+    @property
+    def eigenvalues_memory(self):
+        """
+        Returns the memory used by the eigenvalues array in bytes.
+        Assumes the eigenvalues are stored in a dense array.
+        """
+        if self._eig_val is None:
+            return 0
+        if hasattr(self._eig_val, "nbytes"):
+            return self._eig_val.nbytes
+        else:
+            return int(np.prod(self._eig_val.shape)) * self._eig_val.dtype.itemsize
+
+    @property
+    def eigenvalues_memory_gb(self):
+        """
+        Returns the memory used by the eigenvalues array in gigabytes.
+        """
+        return self.eigenvalues_memory / (1024.0 ** 3)
+
+    @property
+    def eigenvectors_memory(self):
+        """
+        Returns the memory used by the eigenvectors array in bytes.
+        Assumes the eigenvectors are stored in a dense array.
+        """
+        # Note: If your eigenvectors are stored in a separate attribute (e.g. self._eig_vec), adjust accordingly.
+        if self._eig_vec is None:
+            return 0
+        if hasattr(self._eig_vec, "nbytes"):
+            return self._eig_vec.nbytes
+        else:
+            return int(np.prod(self._eig_vec.shape)) * self._eig_vec.dtype.itemsize
+
+    @property
+    def eigenvectors_memory_gb(self):
+        """
+        Returns the memory used by the eigenvectors array in gigabytes.
+        """
+        return self.eigenvectors_memory / (1024.0 ** 3)
+
+    @property
+    def memory(self):
+        """
+        Returns the total memory used by the Hamiltonian, eigenvalues, and eigenvectors in bytes.
+        """
+        return self.h_memory + self.eigenvalues_memory + self.eigenvectors_memory
+
+    @property
+    def memory_gb(self):
+        """
+        Returns the total memory used by the Hamiltonian, eigenvalues, and eigenvectors in gigabytes.
+        """
+        return self.memory / (1024.0 ** 3)
+        
     # ----------------------------------------------------------------------------------------------
     #! Standard getters
     # ----------------------------------------------------------------------------------------------
@@ -460,6 +766,22 @@ class Hamiltonian(ABC):
     #! Initialization methods
     # ----------------------------------------------------------------------------------------------
     
+    def to_dense(self):
+        '''
+        Converts the Hamiltonian matrix to a dense matrix.
+        '''
+        self._is_sparse = False
+        self._log("Converting the Hamiltonian matrix to a dense matrix... Run build...", lvl = 1)
+        self.clear()
+        
+    def to_sparse(self):
+        '''
+        Converts the Hamiltonian matrix to a sparse matrix.
+        '''
+        self._is_sparse = True
+        self._log("Converting the Hamiltonian matrix to a sparse matrix... Run build...", lvl = 1)
+        self.clear()
+    
     def init(self):
         '''
         Initializes the Hamiltonian matrix. Uses Batched-coordinate (BCOO) sparse matrices if JAX is
@@ -468,6 +790,7 @@ class Hamiltonian(ABC):
         '''
         self._log("Initializing the Hamiltonian matrix...", lvl = 2)
         if self.sparse:
+            self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3)
             if not _JAX_AVAILABLE or self._backend == np:
                 self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3)
                 self._hamil = sp.sparse.csr_matrix((self._nh, self._nh), dtype = self._dtype)
@@ -478,14 +801,19 @@ class Hamiltonian(ABC):
                 data        = self._backend.zeros((0,), dtype=self._dtype)
                 self._hamil = BCOO((data, indices), shape=(self._nh, self._nh))
         else:
-            self._hamil     = self._backend.zeros((self._nh, self._nh), dtype = self._dtype)
+            self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3)
+            if not _JAX_AVAILABLE or self._backend == np:
+                self._hamil     = self._backend.zeros((self._nh, self._nh), dtype = self._dtype)
+            else:
+                # do not initialize the Hamiltonian matrix
+                self._hamil     = None
         self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green")
         
     # ----------------------------------------------------------------------------------------------
     #! Single particle Hamiltonian matrix
     # ----------------------------------------------------------------------------------------------
     
-    def _hamiltonian_sp(self):
+    def _hamiltonian_single_particle(self):
         '''
         Generates the Hamiltonian matrix whenever the Hamiltonian is single-particle. 
         '''
@@ -507,21 +835,51 @@ class Hamiltonian(ABC):
         if self._hilbert_space is None or self._nh == 0:
             raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
 
-        self._log("Calculating the Hamiltonian matrix...", lvl = 1, color = 'blue')
-        # Go through the Hilbert space and calculate the Hamiltonian matrix
+        matrix_type = "sparse" if self.sparse else "dense"
+        self._log(f"Calculating the {matrix_type} Hamiltonian matrix...", lvl=1, color="blue")
+            
+        # Choose implementation based on backend availability.
         if not _JAX_AVAILABLE or self._backend == np:
-            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl = 2)
-            self._hamil = _hamiltonian_inplace_np(self._hamil, self._ns, self._nh, 
-                                            self._hilbert_space, self.loc_energy_ham, start = self._startns)
+            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2)
+
+            # Choose the correct local energy function for NumPy.
+            local_fun = self._loc_energy_int if self._is_sparse else self.loc_energy_ham
+
+            # Calculate the Hamiltonian matrix using the NumPy implementation.
+            self._hamil = hamiltonian_inplace_np(
+                self._hamil,
+                self._ns,
+                hilbert_space       =   self._hilbert_space,
+                loc_energy          =   local_fun,
+                is_sparse           =   self._is_sparse,
+                start               =   self._startns,
+                dtype               =   self._dtype)
         else:
-            self._log("Calculating the Hamiltonian matrix using JAX...", lvl = 2)
-            self._hamil = _hamiltonian_inplace(self._hamil, self._ns, self._nh, 
-                                            self._hilbert_space, self.loc_energy_ham, start=self._startns)
-            self._hamil = self._hamil.block_until_ready()
+            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2)
+
+            # Choose the correct local energy function for JAX.
+            local_fun = self._loc_energy_int_jax if self._is_sparse else self.loc_energy_ham
+            local_fun = jit(local_fun)  # JIT-compile the local energy function.
+
+            # Calculate the Hamiltonian matrix using the JAX implementation.
+            self._hamil = hamiltonian_functional_jax(
+                self._ns,
+                self._hilbert_space,
+                loc_energy          = local_fun,
+                is_sparse           = self._is_sparse,
+                start               = self._startns,
+                dtype               = self._dtype)
+            # Ensure the computation completes.
+            if not self._is_sparse:
+                self._hamil = self._hamil.block_until_ready()
+
+        # check if the Hamiltonian matrix is not empty and has been calculated - no problems occurred
         if self._hamil is not None and self._hamil.size > 0:
-            self._log("Hamiltonian matrix calculated.", lvl = 3, color = "green")
+            self._log("Hamiltonian matrix calculated.", lvl=3, color="green")
         else:
-            self._log("Hamiltonian matrix not calculated.", lvl = 3, color = "red")
+            self._log("Hamiltonian matrix not calculated.", lvl=3, color="red")
+
+    # ----------------------------------------------------------------------------------------------
 
     def build(self, verbose: bool = False):
         '''
@@ -540,7 +898,7 @@ class Hamiltonian(ABC):
         try:
             self.init()
         except Exception as e:
-            raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_INITIALIZATION} : {e}")
+            raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_INITIALIZATION} : {e}") from e
     
         if hasattr(self._hamil, "block_until_ready"):
             self._hamil = self._hamil.block_until_ready()
@@ -579,16 +937,72 @@ class Hamiltonian(ABC):
         
         Calculates the local energy of the Hamiltonian. This method is meant to be overridden by
         subclasses to provide a specific implementation.
+        
+        This function is made for in-place updates of the Hamiltonian matrix.
                 
         Parameters:
-            ham (jnp.ndarray or BCOO)     : The Hamiltonian matrix.
-            k (int)                       : The k'th element of the Hilbert space.
-            k_map (List)                  : The mapping of the k'th element.
-            i (int)                       : The i'th site.
+            ham (Union[jnp.ndarray, np.ndarray])    : The Hamiltonian matrix.
+            k (int)                                 : The k'th element of the Hilbert space.
+            k_map (int)                             : The mapping of the k'th element obtained from the Hilbert space
+                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
+                    element k in the Hilbert space.
+            i (int)                                 : The i'th site (the site [or local state] where the Hamiltonian acts).
         '''
         pass
     
     @abstractmethod
+    def _loc_energy_int(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
+        '''
+        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
+        Parameters:
+            k (int)     : The k'th element of the Hilbert space.
+            k_map (int) : The mapping of the k'th element obtained from the Hilbert space
+                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
+                    element k in the Hilbert space.
+            i (int)     : The i'th site (the site [or local state] where the Hamiltonian acts).
+        Returns:
+        
+            Tuple[List[int], List[int], List[int]]: Indices and values related to local energy:
+                - List[int] : The row indices - states after modification by the Hamiltonian.
+                - List[int] : The column indices - states before modification by the Hamiltonian.
+                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+        '''
+        pass
+    
+    @abstractmethod
+    def _loc_energy_int_jax(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
+        '''
+        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
+        Uses JAX as a backend.
+        Parameters:
+            k (int)     : The k'th element of the Hilbert space.
+            k_map (int) : The mapping of the k'th element obtained from the Hilbert space
+                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
+                    element k in the Hilbert space.
+            i (int)     : The i'th site (the site [or local state] where the Hamiltonian acts).
+        Returns:
+        
+            Tuple[List[int], List[int], List[int]]: Indices and values related to local energy:
+                - List[int] : The row indices - states after modification by the Hamiltonian.
+                - List[int] : The column indices - states before modification by the Hamiltonian.
+                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+        '''
+        pass
+    
+    @abstractmethod
+    def _loc_energy_arr(self, k : Union[int, np.ndarray], i : int) -> Tuple[List[int], List[int], List[int]]:
+        '''
+        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
+        Uses an array as a state input.
+        Returns:
+            Tuple[List[int], List[int], List[int]]: Indices and values related to local energy.
+                - List[int] : The row indices - states after modification by the Hamiltonian.
+                - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
+                                            there it is not necessary to memorize the column indices.
+                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+        '''
+        pass
+    
     def loc_energy(self, k : Union[int, np.ndarray], i : int):
         '''
         Calculates the local energy of the Hamiltonian. This method is meant to be overridden by 
@@ -597,10 +1011,23 @@ class Hamiltonian(ABC):
         This is meant to check how does the Hamiltonian act on a state at a given site.
         
         Parameters:
-            k (Union[int, Backend.ndarray]) : The k'th element of the Hilbert space.
-            i (int) : The i'th site.
+            k (Union[int, Backend.ndarray])         : The k'th element of the Hilbert space - may use mapping if necessary.
+            i (int)                                 : The i'th site.
         '''
-        pass
+        if isinstance(k, int):
+            return self._loc_energy_int(k, self._hilbert_space[k], i)
+        elif isinstance(k, List):
+            # concatenate the results
+            rows, cols, data = [], [], []
+            for k_i in k:
+                # run the local energy calculation for a single element
+                new_rows, new_cols, new_data = self.loc_energy(k_i, i)
+                rows.extend(new_rows)
+                cols.extend(new_cols)
+                data.extend(new_data)
+            return rows, cols, data
+        # otherwise, it is an array (no matter which backend)        
+        return self._loc_energy_arr(k, i)
 
     @property
     def quadratic(self):
@@ -767,52 +1194,13 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @staticmethod
-    def set_hamil_elem(ham, hilbert : HilbertSpace, k : int, val, newk : int):
-        '''
-        Sets the element of the Hamiltonian matrix.
-        
-        Args:
-            k (int) : The row index.
-            val     : The value to set.
-            newk    : The column index.
-            
-        We acted on the k'th state with the Hamiltonian which in turn gave us the newk'th state.
-        First, we need to check the mapping of the k'th state as it may be the same as the newk'th state
-        through the symmetries...
-        
-        After that, we check if they are the same and if they are we add the value to the diagonal element
-        (k'th, not kMap as it only checks the representative).
-        For instance, the mapping can be (0, 3, 5, 7) and k = 1, so mapping of 1 is 3 - we don't want to
-        add the value to the 3'rd element of the Hamiltonian matrix but to the 1'st element.
-        
-        Otherwise, we need to find the representative of the newk'th state and add the value to the newk'th
-        element of the Hamiltonian matrix. This is also used with the norm of a given state k as we need to 
-        check in how many ways we can get to the newk'th state.
-        '''
-        
-        # check the mapping
-        kmap = hilbert[k] if hilbert is not None else k
-                
-        # set the element
+    def set_hamil_elem(hamil, hilbert_space, k, val, newk):
+        '''Helper function to set the element of the Hamiltonian matrix.'''
         try:
-            if kmap == newk:
-                # the element k is already the same as new_k and obviously we 
-                # and we add this at k (not kmap as it only checks the representative)
-                if not _JAX_AVAILABLE or isinstance(ham, (np.ndarray, sp.sparse.spmatrix)):
-                    ham[newk, k] += val
-                else:
-                    ham = ham.at(newk, k).add(val)
-            else:
-                # otherwise we need to check the representative of the new k
-                norm        = hilbert.norm(k) # get the norm of the k'th element of the Hilbert space
-                idx, symeig = hilbert.find_representative_int(newk, norm) # find the representative of the new k
-                if not _JAX_AVAILABLE or isinstance(ham, (np.ndarray, sp.sparse.spmatrix)):
-                    ham[idx, k] += val * symeig
-                else:
-                    ham = ham.at[idx, k].add(val * symeig)
+            set_operator_elem(hamil, hilbert_space, k, val, newk)
         except Exception as e:
-            print(f"Error in set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},idx={idx},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
-
+            print(f"Error in _set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
+    
     def _set_hamil_elem(self, k, val, newk):
         '''
         Sets the element of the Hamiltonian matrix.
@@ -836,8 +1224,11 @@ class Hamiltonian(ABC):
         check in how many ways we can get to the newk'th state.
         '''
         
-        self.set_hamil_elem(self._hamil, self._hilbert_space, k, val, newk)
-        
+        try:
+            set_operator_elem(self._hamil, self._hilbert_space, k, val, newk)
+        except Exception as e:
+            print(f"Error in _set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
+            
     # ----------------------------------------------------------------------------------------------
         
 # --------------------------------------------------------------------------------------------------
