@@ -100,15 +100,16 @@ class QSM(Hamiltonian):
         self.check_sizes(a, h, xi)      # Check the sizes of the coupling vector, random box distribution vector, and magnetic field vector       
         
         # Initialize the Hamiltonian
-        self._hdot      = None
-        self._dimin     = 0
-        self._dimout    = 0
-        self._neidot    = []
-        self._au        = None
-        self. _u        = None
-        self._name      = "Quantum Sun Model"
-        self._startns   = n
-        self._is_sparse = True
+        self._hdot          = None
+        self._dimin         = 0
+        self._dimout        = 0
+        self._neidot        = []
+        self._au            = None
+        self. _u            = None
+        self._name          = "Quantum Sun Model"
+        self._startns       = n
+        self._is_sparse     = True
+        self._max_local_ch  = 3
         self.init_particles()
     
     # ----------------------------------------------------------------------------------------------
