@@ -17,6 +17,7 @@ Version : 0.1
 import numpy as np
 import math
 from typing import List, Tuple, Union, Optional
+from numba import njit
 
 # Assume these are available from the QES package:
 from Algebra.hilbert import HilbertSpace
@@ -24,7 +25,7 @@ from Algebra.hamil import Hamiltonian
 from Algebra.Operator.operators_spin import _sigma_z_int, _sigma_x_int, _sigma_z_int_jnp, _sigma_x_int_jnp
 
 ##########################################################################################
-from general_python.algebra.linalg import kron, identity, hilbert_schmidt_norm
+import general_python.algebra.linalg as linalg
 from general_python.algebra.ran_wrapper import choice, randint, RMT, random_matrix, random_vector
 ##########################################################################################
 
@@ -109,7 +110,7 @@ class QSM(Hamiltonian):
         self._name          = "Quantum Sun Model"
         self._startns       = n
         self._is_sparse     = True
-        self._max_local_ch  = 3
+        self._max_local_ch  = 2
         self.init_particles()
     
     # ----------------------------------------------------------------------------------------------
@@ -219,7 +220,7 @@ class QSM(Hamiltonian):
         hdot      = self._gamma / np.sqrt(self._dimin + 1) * hdot
         
         if _QSM_CHECK_HS_NORM:
-            _norm           = hilbert_schmidt_norm(hdot, backend=self._backend)
+            _norm           = linalg.hilbert_schmidt_norm(hdot, backend=self._backend)
             self._log(f"H_dot norm: {_norm:.3e}", lvl = 2)
             return hdot / np.sqrt(_norm)
         return hdot
@@ -355,7 +356,7 @@ class QSM(Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def _hamiltonian(self):
+    def _hamiltonian(self, use_numpy : bool = False):
         '''
         Build the Hamiltonian of the QSM model.
         The Hamiltonian is built in the following way:
@@ -373,11 +374,13 @@ class QSM(Hamiltonian):
         for i in range(self.nout):
             self._log(f"QSM: i={i} -> h={self._h[i]:.3e}, a^u={self._au[i]:.3e}", lvl = 3)
 
-        super()._hamiltonian()
-
-        eye         = identity(self._dimout, backend=self._backend, dtype=self._dtype)
-        kron_prod   = kron(self._hdot, eye, backend=self._backend)
-        self._hamil += self._backend.array(kron_prod)
+        super()._hamiltonian(use_numpy)
+        
+        # add the Hamiltonian of the dot particles
+        backend_changed = self._backend if not use_numpy else np
+        eye         = linalg.sparse.identity(self._dimout, backend=backend_changed, dtype=self._dtype)
+        kron_prod   = linalg.sparse.kron(self._hdot, eye, backend=backend_changed)
+        self._hamil += kron_prod
 
     # ----------------------------------------------------------------------------------------------
     #! ABSTRACT METHODS OVERRIDE
@@ -402,20 +405,14 @@ class QSM(Hamiltonian):
         if i < self._n:
             return
         
-        if ham is None:
-            ham     = self._hamil
-
-        if hilbert is None:
-            hilbert = self._hilbert_space
-        
         #call numpy loc_energy
-        rows, cols, vals = self._loc_energy_int(k, k_map, i)
+        rows, cols, vals = self.loc_energy_int(k, k_map, i)
         for row, col, val in zip(rows, cols, vals):
             Hamiltonian.set_hamil_elem(ham, hilbert, row, val, col)
         
     # ----------------------------------------------------------------------------------------------
     
-    def _loc_energy_int_jax(self, k, k_map, i):
+    def loc_energy_int_jax(self, k, k_map, i):
         """
         Compute the local energy interaction in a JAX-compatible manner.
         
@@ -465,7 +462,8 @@ class QSM(Hamiltonian):
     
     # ----------------------------------------------------------------------------------------------
     
-    def _loc_energy_int(self, k, k_map, i):
+    @njit
+    def loc_energy_int(self, k, k_map, i):
         ''' Compute the local energy interaction. '''
         
         # store here the rows, columns, and values
@@ -488,7 +486,7 @@ class QSM(Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def _loc_energy_arr(self, k, i):
+    def loc_energy_arr(self, k, i):
         '''!TODO: Implement the local energy interaction for the array case.'''
         rows, cols, vals = [], [], []
         return rows, cols, vals

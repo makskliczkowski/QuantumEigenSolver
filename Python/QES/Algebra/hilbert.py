@@ -21,6 +21,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
 from general_python.algebra.utils import get_backend, maybe_jit, _JAX_AVAILABLE, DEFAULT_INT_TYPE
+if _JAX_AVAILABLE:
+    from general_python.algebra.utils import pad_array_jax
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
 ####################################################################################################
 from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity
@@ -1261,7 +1263,7 @@ def set_operator_elem(operator, hilbert : HilbertSpace, k : int, val, new_k : in
 if _JAX_AVAILABLE:
     import jax.numpy as jnp
     import jax
-    from jax import jit, vmap, lax
+    from jax import jit, lax
     from functools import partial
     
     # @partial(jit, static_argnames=('funct', 'max_padding'))
@@ -1277,54 +1279,46 @@ if _JAX_AVAILABLE:
             max_padding (int): Maximum number of padding to apply.
         """
         # assume that the function is returning the [rows], [cols], [vals]
-        all_results     = vmap(lambda p: funct(k, k_map, p))(params)
+        all_results     = jax.vmap(lambda p: funct(k, k_map, p))(params)
         _, cols, vals   = all_results
-        jax.debug.print("Shape of cols: {}", cols.shape)  # Debug print
-        jax.debug.print("Type of cols: {}", cols.dtype)   # Debug print
-        jax.debug.print("Shape of vals: {}", vals.shape)  # Debug print
-        jax.debug.print("Type of vals: {}", vals.dtype)   # Debug print
+        
+        # Debug print to check shape and type
+        # jax.debug.print("Shape of cols: {}", cols.shape)
+        # jax.debug.print("Type of cols: {}", cols.dtype) 
+        # jax.debug.print("Shape of vals: {}", vals.shape)
+        # jax.debug.print("Type of vals: {}", vals.dtype) 
+        
+        # Flatten the results
         cols            = cols.reshape(-1)
         vals            = vals.reshape(-1)
         
+        # Sort the columns and values
         sort_idx        = jnp.argsort(cols)
         cols_sorted     = cols[sort_idx]
         vals_sorted     = vals[sort_idx]
+        
         # Debug print to check shape and type
-        jax.debug.print("Shape of cols_sorted: {}", cols_sorted.shape)  # Debug print
-        jax.debug.print("Type of cols_sorted: {}", cols_sorted.dtype)   # Debug print
-
+        # jax.debug.print("Shape of cols_sorted: {}", cols_sorted.shape)
+        # jax.debug.print("Type of cols_sorted: {}", cols_sorted.dtype)  
 
         # Find unique column indices and sum values.
-        unique_cols, inv, counts    = jnp.unique(cols_sorted, return_inverse=True, return_counts=True,size=cols_sorted.shape[0])
+        unique_cols, inv, counts    = jnp.unique(
+            cols_sorted, return_inverse=True, return_counts=True,size=cols_sorted.shape[0]
+        )
         summed_vals                 = jax.ops.segment_sum(vals_sorted, inv, num_segments=unique_cols.shape[0])
 
         # Padding as before.
         pad_width                   = max_padding - unique_cols.shape[0]
-        jax.debug.print("Padding width: {}", pad_width)
-        jax.debug.print("max_padding: {}", max_padding)
+        # jax.debug.print("Padding width: {}", pad_width)
+        # jax.debug.print("max_padding: {}", max_padding)
         
         # Calculate pad_width using JAX, keep it as JAX array
-        num_unique_cols_jax         = unique_cols.shape[0]
-        max_padding_jax             = jnp.array(max_padding, dtype=jnp.int32)
-        pad_width_jax               = max_padding_jax - num_unique_cols_jax
-        pad_width_jax_non_neg       = jnp.maximum(jnp.array(0, dtype=jnp.int32), pad_width_jax)
+        unique_cols_padded = pad_array_jax(unique_cols, max_padding, -1)
+        summed_vals_padded = pad_array_jax(summed_vals, max_padding, 0.0)
 
+        return unique_cols_padded, summed_vals_padded, unique_cols.shape[0]
 
-
-        unique_cols_padded          = jnp.pad(unique_cols, (0, pad_width_jax_non_neg), constant_values=-1)
-        summed_vals_padded          = jnp.pad(summed_vals, (0, pad_width_jax_non_neg), constant_values=0.0)
-
-        return unique_cols_padded, summed_vals_padded, unique_cols.shape[0], counts
-        # PAD?
-        # rows, cols, vals    = funct(*args)
-        # count               = rows.shape[0]
-        # pad_width           = max_local_changes - count
-        # rows                = jnp.pad(rows, (0, pad_width), mode='constant', constant_values=-1)
-        # cols                = jnp.pad(cols, (0, pad_width), mode='constant', constant_values=-1)
-        # vals                = jnp.pad(vals, (0, pad_width), mode='constant', constant_values=0.0)
-        # return rows, cols, vals, count
-
-    @partial(jit, static_argnames=('funct', 'hilbert', 'max_padding', 'batch_start', 'batch_end', 'max_padding'))
+    @partial(jit, static_argnames=('funct', 'hilbert', 'max_padding', 'batch_start', 'batch_end'))
     def process_matrix_batch_jax(funct: Callable, batch_start, batch_end, hilbert : HilbertSpace, params, max_padding: int):
         '''
         Process a batch of matrix elements using JAX.
@@ -1340,7 +1334,9 @@ if _JAX_AVAILABLE:
         ks      = jnp.arange(batch_start, batch_end, dtype=DEFAULT_INT_TYPE)
         k_maps  = jnp.array([hilbert.get_mapping(k) for k in ks], dtype=DEFAULT_INT_TYPE)
         # Vectorize process_matrix_elem_jax over the rows in the batch.
-        cols_, vals_, counts_ = vmap(lambda r, k_map: process_matrix_elem_jax(funct, r, k_map, params, max_padding))(ks, k_maps)
+        cols_, vals_, counts_ = jax.vmap(
+            lambda r, k_map: process_matrix_elem_jax(funct, r, k_map, params, max_padding)
+        )(ks, k_maps)
         return cols_, vals_, counts_
 
 def process_matrix_elem_np(funct : Callable, k, k_map, params):
@@ -1371,7 +1367,7 @@ def process_matrix_batch_np(batch_start, batch_end, hilbert : HilbertSpace, func
         funct (Callable)    : The function to process the matrix batch.
     """
     # create
-    k_maps  = [hilbert.get_mapping(k) for k in range(batch_start, batch_end)] 
+    k_maps  = [hilbert.get_mapping(k) for k in range(batch_start, batch_end)]
     ks      = np.arange(batch_start, batch_end, dtype=np.int64)
     # Vectorize process_row over the rows in the batch.
     unique_cols_batch, summed_vals_batch, counts_batch  = np.vectorize(lambda k, k_map: process_matrix_elem_np(funct, k, k_map, params))(ks, k_maps)
