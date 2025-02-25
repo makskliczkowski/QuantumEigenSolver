@@ -914,7 +914,7 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @abstractmethod
-    def loc_energy_int(self, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
+    def loc_energy_int(self, k_map : int, i : int):
         '''
         Calculates the local energy.  MUST return NumPy arrays.
 
@@ -927,7 +927,14 @@ class Hamiltonian(ABC):
                 - row_indices:  The row indices after the operator acts.
                 - values: The corresponding matrix element values.
         '''
-        pass
+        raise NotImplementedError("loc_energy_int method must be implemented by subclasses.")
+    
+    @abstractmethod
+    def _loc_energy_int(self):
+        '''
+        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
+        '''
+        return lambda k_map, i: np.array([]), np.array([])
     
     @abstractmethod
     def loc_energy_int_jax(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:

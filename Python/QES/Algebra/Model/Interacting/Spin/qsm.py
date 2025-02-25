@@ -22,7 +22,7 @@ from numba import njit
 # Assume these are available from the QES package:
 from Algebra.hilbert import HilbertSpace
 from Algebra.hamil import Hamiltonian
-from Algebra.Operator.operators_spin import _sigma_z_int, _sigma_x_int, _sigma_z_int_jnp, _sigma_x_int_jnp
+from Algebra.Operator.operators_spin import _sigma_z_integer, _sigma_x_integer, _sigma_z_int_jnp, _sigma_x_int_jnp
 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
@@ -30,6 +30,47 @@ from general_python.algebra.ran_wrapper import choice, randint, RMT, random_matr
 ##########################################################################################
 
 _QSM_CHECK_HS_NORM = True
+
+@njit(fastmath=True)
+def _local_energy_int(k_map, i,
+                    n: int, ns: int, neidot,
+                    h, g0, au
+                ) -> Tuple[np.ndarray, np.ndarray]:
+    '''
+    Compute the local energy interaction.
+    Parameters:
+        k : int
+            The state index.
+        k_map : int
+            The mapped state (from the Hilbert space) corresponding to k.
+        i : int
+            An index parameter (typically i >= self.n).
+        kwargs : dict
+            Additional parameters for the interaction.
+    Returns:
+        Tuple of arrays representing the row indices, column indices, and matrix values for this interaction.
+    '''
+
+    # store here the rows, columns, and values
+    part_idx    = i - n
+    this_site   = np.array([i], dtype=np.int64)
+    
+    idx, val    = _sigma_z_integer(k_map, ns, this_site)
+    rows        = idx
+    vals        = h[part_idx] * val.astype(h.dtype)
+    
+    # apply the spin flips
+    n           = neidot[part_idx]
+    next_site   = np.array([n], dtype=np.int64)
+    idx1, sxn   = _sigma_x_integer(k_map, ns, next_site)
+    idx2, sxj   = _sigma_x_integer(idx1[0], ns, this_site)
+    
+    # apply the coupling between the dot and the outside world
+    rows        = np.append(rows, idx2)
+    vals        = np.append(vals, np.array([g0 * au[part_idx] * sxj[0] * sxn[0]]))
+    
+    return rows, vals
+
 
 class QSM(Hamiltonian):
     '''
@@ -260,14 +301,17 @@ class QSM(Hamiltonian):
         
         # based on the backend, convert the Hamiltonian to the appropriate type
         if self._backend != np:
-            self._hdot      = self._backend.array(self._hdot, dtype = self._dtype)
-            self._au        = self._backend.array(self._au, dtype = self._backend.float32)
-            self._u         = self._backend.array(self._u, dtype = self._backend.float32)
-            self._h         = self._backend.array(self._h, dtype = self._backend.float32)
-            self._a         = self._backend.array(self._a, dtype = self._backend.float32)
-            self._xi        = self._backend.array(self._xi, dtype = self._backend.float32)
-            self._neidot    = self._backend.array(self._neidot, dtype = self._dtypeint)
-            
+            self._hdot      = self._backend.array(self._hdot, dtype = self._backend.float64)
+        
+        ######
+        self._au        = np.array(self._au, dtype = np.float64)
+        self._u         = np.array(self._u, dtype = np.float64)
+        self._h         = np.array(self._h, dtype = np.float64)
+        self._a         = np.array(self._a, dtype = np.float64)
+        self._xi        = np.array(self._xi, dtype = np.float64)
+        self._neidot    = np.array(self._neidot, dtype = np.int64)
+        
+        
 
     # ----------------------------------------------------------------------------------------------
 
@@ -436,27 +480,20 @@ class QSM(Hamiltonian):
     
     # ----------------------------------------------------------------------------------------------
     
-    @njit(fastmath=True)
     def loc_energy_int(self, k_map, i):
         ''' Compute the local energy interaction. '''
         
-        # store here the rows, columns, and values
-        part_idx    = i - self.n
-        idx, val    = _sigma_z_int(k_map, self.ns, [i], backend=self._backend)
-        rows        = np.array([idx], dtype=np.int64)
-        vals        = np.array([self._h[part_idx] * val], dtype=self._dtype)
+        return _local_energy_int(k_map, i,
+                n=self._n, ns=self.ns, neidot=self._neidot,
+                h=self._h, g0=self._g0, au=self._au
+            )
     
-        # apply the spin flips
-        n           = self._neidot[part_idx]
-        idx1, sxn   = _sigma_x_int(k_map, self.ns, [n], backend=self._backend)
-        idx2, sxj   = _sigma_x_int(idx1, self.ns, [i], backend=self._backend)
-        
-        # apply the coupling between the dot and the outside world
-        rows        = np.append(rows, idx2)
-        vals        = np.append(vals, self.g0 * self._au[part_idx] * sxj * sxn)
-        
-        return rows, vals
-
+    def _loc_energy_int(self):
+        return lambda k, i: _local_energy_int(k, i,
+                n=self._n, ns=self.ns, neidot=self._neidot,
+                h=self._h, g0=self._g0, au=self._au
+            )
+    
     # ----------------------------------------------------------------------------------------------
 
     def loc_energy_arr(self, k, i):

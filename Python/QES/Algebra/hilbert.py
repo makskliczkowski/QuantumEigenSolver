@@ -12,6 +12,7 @@ Changes :
 import math
 import time
 import numpy as np
+from numba import njit, prange
 import scipy as sp
 from abc import ABC, abstractmethod
 from itertools import combinations
@@ -449,11 +450,11 @@ class HilbertSpace(ABC):
         if gen is not None and len(gen) > 0 or len(self._mapping) > 0:
             t1 = time.time()
             self._log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 2, color = 'green')
-            self._mapping = self._backend.array(self._mapping, dtype = self._backend.int64)
-            self._getmapping_fun = lambda x: self._mapping[x]
+            self._mapping           = self._backend.array(self._mapping, dtype = self._backend.int64)
+            self._getmapping_fun    = njit(lambda x: self._mapping[x])
         else:
             self._log("No mapping generated.", lvl = 1, color = 'green')
-            self._getmapping_fun = lambda x: x
+            self._getmapping_fun    = lambda x: x
             
     # --------------------------------------------------------------------------------------------------
 
@@ -889,6 +890,7 @@ class HilbertSpace(ABC):
         """
         pass
     
+    @njit
     def find_representative_int(self, state, normalization_beta):
         """
         Find the representative of a given state.
@@ -1403,3 +1405,4 @@ def process_matrix_batch_np(batch_start, batch_end, hilbert : HilbertSpace, func
     total_counts                                        = np.sum(counts_batch)
     return unique_cols_batch, summed_vals_batch, counts_batch, total_counts
 
+#####################################################################################################

@@ -20,7 +20,7 @@ Future Work:
 import math
 import numpy as np
 from typing import List, Tuple, Union, Optional, Callable
-
+from numba import njit
 
 ################################################################################
 from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGenerators
@@ -32,6 +32,7 @@ from general_python.lattices.__lattice__ import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
 from general_python.common.binary import _BACKEND_REPR as _SPIN, _BACKEND_DEF_SPIN, _JAX_AVAILABLE
 from general_python.common.binary import flip, flip_all, check, base2int, int2base, int2binstr
+import general_python.common.binary as _binary
 ################################################################################
 
 _I      = 1j
@@ -92,6 +93,19 @@ def _sigma_x_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND
     final_state, final_coeff = lax.fori_loop(0, num_sites, body, init)
     return final_state, final_coeff
 
+@njit(fastmath=True)
+def _sigma_x_integer(state, ns, sites, spin_value=_SPIN):
+    """
+    Apply the Pauli-X (σₓ) operator on the given sites.
+    For each site, flip the bit at position (ns-1-site) using binary.flip.
+    """
+    coeff = 1.0
+    for site in sites:
+        pos     = ns - 1 - site
+        state   = _binary.flip_int(state, pos)
+        coeff   *= spin_value
+    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.float64)
+
 def _sigma_x_int(state  : int,
             ns          : int,
             sites       : Union[List[int], None],
@@ -103,13 +117,7 @@ def _sigma_x_int(state  : int,
     """
     if not isinstance(state, int):
         return _sigma_x_int_jnp(state, ns, sites, spin_value, backend)
-
-    coeff = 1.0
-    for site in sites:
-        pos     = ns - 1 - site
-        state   = flip(state, pos, spin_value=spin_value, backend=backend)
-        coeff   *= spin_value
-    return state, coeff
+    return _sigma_x_integer(state, ns, sites, spin_value)
 
 def _sigma_x_np(state   : np.ndarray,
             ns          : int,
@@ -242,6 +250,23 @@ def _sigma_y_int_jnp(state,
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, (state, 1.0 + 0j))
     return final_state, final_coeff
 
+@njit(fastmath=True)
+def _sigma_y_integer(state, ns, sites, spin_value=_SPIN):
+    """
+    σᵧ on an integer state.
+    For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
+    otherwise by -I*spin_value; then flip the bit.
+    """
+    coeff = 1.0 + 0j
+    for site in sites:
+        pos = ns - 1 - site
+        if _binary.check_int(state, pos):
+            coeff *= (1j * spin_value)
+        else:
+            coeff *= (-1j * spin_value)
+        state = _binary.flip_int(state, pos)
+    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.complex128)
+
 def _sigma_y_int(state      : int,
                 ns          : int,
                 sites       : Union[List[int], None],
@@ -268,16 +293,7 @@ def _sigma_y_int(state      : int,
     """
     if not isinstance(state, int):
         return _sigma_y_int_jnp(state, ns, sites, spin_value, backend)
-    
-    coeff = 1.0 + 0j
-    for site in sites:
-        pos = ns - 1 - site
-        if check(state, pos, backend):
-            coeff *= (1j * spin_value)
-        else:
-            coeff *= (-1j * spin_value)
-        state = flip(state, pos, spin_value=spin_value)
-    return state, coeff
+    return _sigma_y_integer(state, ns, sites, spin_value)
 
 def _sigma_y_np(state: np.ndarray,
                 sites: Union[List[int], None],
@@ -426,6 +442,21 @@ def _sigma_z_int_jnp(state,
     coeff = lax.fori_loop(0, len(sites), body, 1.0)
     return state, coeff
 
+@njit(fastmath=True)
+def _sigma_z_integer(state, ns, sites, spin_value=_SPIN):
+    """
+    σ_z on an integer state.
+    For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
+    The state is unchanged.
+    """
+    
+    coeff = 1.0
+    for site in sites:
+        pos     = ns - 1 - site
+        factor  = spin_value if _binary.check_int(state, pos) else -spin_value
+        coeff   *= factor
+    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.float64)
+
 def _sigma_z_int(state      : int,
                 ns          : int,
                 sites       : Union[List[int], None],
@@ -438,13 +469,7 @@ def _sigma_z_int(state      : int,
     """
     if not isinstance(state, int):
         return _sigma_z_int_jnp(state, ns, sites, spin_value, backend)
-    
-    coeff = 1.0
-    for site in sites:
-        pos     = ns - 1 - site
-        factor  = spin_value if check(state, pos, backend) else -spin_value
-        coeff   *= factor
-    return state, coeff
+    return _sigma_z_integer(state, ns, sites, spin_value)
 
 def _sigma_z_np(state: np.ndarray,
                 ns: int,
@@ -490,7 +515,7 @@ def sigma_z(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, int):
-        return _sigma_z_int(state, ns, sites, spin_value)
+        return _sigma_z_integer(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_z_np(state, ns, sites, spin, spin_value)
     else:
