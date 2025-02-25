@@ -385,33 +385,7 @@ class QSM(Hamiltonian):
     # ----------------------------------------------------------------------------------------------
     #! ABSTRACT METHODS OVERRIDE
     # ----------------------------------------------------------------------------------------------
-    
-    def loc_energy_ham(self, ham, hilbert : HilbertSpace, k : int, k_map : int, i : int):
-        '''
-        Compute the local energy Hamiltonian.
         
-        !IMPORTANT: This method updates the Hamiltonian matrix in place.
-        
-        Parameters:
-            ham : List[Tuple[int, int, float]]
-                Hamiltonian matrix
-            k : int
-                Index of the Hilbert space element
-            k_map : int
-                Index of the Hilbert space element mapped to the Hamiltonian
-            i : int
-                Index of the particle
-        '''
-        if i < self._n:
-            return
-        
-        #call numpy loc_energy
-        rows, cols, vals = self.loc_energy_int(k, k_map, i)
-        for row, col, val in zip(rows, cols, vals):
-            Hamiltonian.set_hamil_elem(ham, hilbert, row, val, col)
-        
-    # ----------------------------------------------------------------------------------------------
-    
     def loc_energy_int_jax(self, k, k_map, i):
         """
         Compute the local energy interaction in a JAX-compatible manner.
@@ -462,27 +436,26 @@ class QSM(Hamiltonian):
     
     # ----------------------------------------------------------------------------------------------
     
-    @njit
-    def loc_energy_int(self, k, k_map, i):
+    @njit(fastmath=True)
+    def loc_energy_int(self, k_map, i):
         ''' Compute the local energy interaction. '''
         
         # store here the rows, columns, and values
         part_idx    = i - self.n
         idx, val    = _sigma_z_int(k_map, self.ns, [i], backend=self._backend)
-        rows        = [k]
-        cols        = [idx]
-        vals        = [self._h[part_idx] * val]
+        rows        = np.array([idx], dtype=np.int64)
+        vals        = np.array([self._h[part_idx] * val], dtype=self._dtype)
+    
         # apply the spin flips
         n           = self._neidot[part_idx]
         idx1, sxn   = _sigma_x_int(k_map, self.ns, [n], backend=self._backend)
         idx2, sxj   = _sigma_x_int(idx1, self.ns, [i], backend=self._backend)
         
         # apply the coupling between the dot and the outside world
-        rows.append(k)
-        cols.append(idx2)
-        vals.append(self.g0 * self._au[part_idx] * sxj * sxn)
+        rows        = np.append(rows, idx2)
+        vals        = np.append(vals, self.g0 * self._au[part_idx] * sxj * sxn)
         
-        return rows, cols, vals
+        return rows, vals
 
     # ----------------------------------------------------------------------------------------------
 

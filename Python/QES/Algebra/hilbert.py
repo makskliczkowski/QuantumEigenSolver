@@ -9,12 +9,13 @@ Changes :
     - 2025.02.01 : 1.0.0 - Initial version of the Hilbert space class. - MK
 """
 
+import math
+import time
+import numpy as np
+import scipy as sp
 from abc import ABC, abstractmethod
 from itertools import combinations
 from typing import Union, Optional, Callable, Tuple, List     # type hints for the functions and methods
-import numpy as np
-import math
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ####################################################################################################
@@ -25,7 +26,7 @@ if _JAX_AVAILABLE:
     from general_python.algebra.utils import pad_array_jax
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
 ####################################################################################################
-from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity
+from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity, OperatorFunction
 from Algebra.globals import GlobalSymmetry
 from Algebra.symmetries import choose, translation
 ####################################################################################################
@@ -525,6 +526,16 @@ class HilbertSpace(ABC):
             type: The data type of the Hilbert space.
         """
         return self._dtype
+    
+    @property
+    def modifies(self):
+        """
+        Return the flag for modifying the Hilbert space.
+        
+        Returns:
+            bool: The flag for modifying the Hilbert space.
+        """
+        return self._nh != self._nhfull
     
         
     @property
@@ -1070,7 +1081,7 @@ class HilbertSpace(ABC):
     
     # --------------------------------------------------------------------------------------------------
     
-    def get_matrix_element(self, k, new_k, h_conj = False):
+    def get_matrix_element(self, k, new_k, kmap = None, h_conj = False):
         """
         Compute the matrix element between two states in the Hilbert space.
         This method determines the matrix element corresponding to the transition between a given state |k⟩ and a new state defined by new_k.
@@ -1096,16 +1107,17 @@ class HilbertSpace(ABC):
         """
         
         # check the mapping
-        kmap = self.__getitem__(k)
-                
+        if kmap is None:
+            kmap = self[k]
+        
         # try to process the elements
         if kmap == new_k:
             # the element k is already the same as new_k and obviously we 
             # and we add this at k (not kmap as it only checks the representative)
-    
-            return ((new_k, k), 1) if not h_conj else ((k, new_k), 1)
+            return (new_k, k), 1
+        
         # otherwise we need to check the representative of the new k
-        norm        = self.norm(k) # get the norm of the k'th element of the Hilbert space
+        norm        = self.norm(k)                              # get the norm of the k'th element of the Hilbert space - how to return to the representative
         idx, symeig = self.find_representative_int(new_k, norm) # find the representative of the new k
         return ((idx, k), symeig) if not h_conj else ((k, idx), symeig)
     
@@ -1234,7 +1246,7 @@ class HilbertSpace(ABC):
         #! TODO: implement the state finding
         return NotImplementedError("Only integer indexing is supported.")
     
-    ####################################################################################################
+    ################################################################################################
     
 ####################################################################################################
 
@@ -1259,6 +1271,23 @@ def set_operator_elem(operator, hilbert : HilbertSpace, k : int, val, new_k : in
     else:
         operator = operator.at[row, col].add(val * sym_eig)
     return operator # for convenience
+
+def get_operator_elem(hilbert : HilbertSpace, k : int, new_k : int, conj = False):
+    """
+    Get the matrix element of the operator.
+    
+    Args:
+        hilbert (HilbertSpace)  : The Hilbert space object.
+        k                       : The index of the matrix element.
+        new_k                   : The new index of the matrix element.
+        conj                    : Whether to take the complex conjugate (default is False).
+    Returns:
+        float: The matrix element of the operator.
+    """
+    (row, col), sym_eig = hilbert.get_matrix_element(k, new_k, h_conj = conj)
+    return (row, col), sym_eig
+
+####################################################################################################
 
 if _JAX_AVAILABLE:
     import jax.numpy as jnp
@@ -1374,4 +1403,3 @@ def process_matrix_batch_np(batch_start, batch_end, hilbert : HilbertSpace, func
     total_counts                                        = np.sum(counts_batch)
     return unique_cols_batch, summed_vals_batch, counts_batch, total_counts
 
-####################################################################################################

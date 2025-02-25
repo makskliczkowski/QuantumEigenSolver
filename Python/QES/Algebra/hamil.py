@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
+from Algebra.Operator.operator_matrix import operator_create_np_sparse, operator_create_np, operator_create_np_dense
 ###################################################################################################
 
 ###################################################################################################
@@ -154,54 +155,58 @@ if _JAX_AVAILABLE:
     
     # ----------------------------------------------------------------------------------------------
 
-def _hamiltonian_inplace_np_sparse(ham, ns: int, hilbert_space: HilbertSpace, max_local_changes: int,
-                                start=0, dtype=None):
+@njit(fastmath=True)
+def _hamiltonian_inplace_np_sparse(hamiltonian: 'Hamiltonian', ns: int, hilbert_space: HilbertSpace, max_local_changes: int,
+                                start: int = 0, dtype=None):
     """
     NumPy version: Updates the Hamiltonian array in place (SPARSE).
+
     Parameters:
-    - ham (np.ndarray) : The Hamiltonian matrix.
-    - ns (int)         : The number of sites.
-    - hilbert_space    : The Hilbert space.
-    - loc_energy       : The local energy function.
-                        Must be callable with the following signature:
-                        loc_energy(ham, hilbert_space, k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
-    - start            : The starting index for the update (default is 0).
+        ham (np.ndarray): The Hamiltonian matrix (will be overwritten).
+        ns (int): The number of sites.
+        hilbert_space (HilbertSpace): The Hilbert space.
+        max_local_changes (int):  The maximum number of local changes.
+        start (int): The starting index for the update (default is 0).
+        dtype: The data type of the Hamiltonian.
     """
     nh          = hilbert_space.Nh
     max_inner   = max_local_changes * (ns - start)
-    max_nnz     = nh * max_inner
+    max_nnz     = nh * max_inner  # Estimated maximum number of non-zero elements
     dtype       = dtype if dtype is not None else hilbert_space.dtype
-    
+
     # Pre-allocate arrays with the estimated size
     rows        = np.empty(max_nnz, dtype=np.int64)
     cols        = np.empty(max_nnz, dtype=np.int64)
     data        = np.empty(max_nnz, dtype=dtype)
     data_idx    = 0
 
+    # Inner loop is now a separate Numba function for clarity and potential reuse
     @njit(fastmath=True)
-    def _inner_loop(hilbert_space_getitem, loc_energy : Callable, start, ns, nh):
-        nonlocal data_idx
-        for k in range(nh):
-            k_map = hilbert_space_getitem(k)  # Call the getitem function
-            for i in range(start, ns):
-                new_rows, new_cols, new_data    = loc_energy(k, k_map, i)
+    def _inner_loop(hilbert_space_getitem, loc_energy, start: int, ns: int, nh: int,
+                    rows: np.ndarray, cols: np.ndarray, data: np.ndarray, data_idx:int):
 
-                # --- Efficiently add data to pre-allocated arrays ---
-                num_new                             = len(new_data)
+        for k in range(nh):
+            k_map = hilbert_space_getitem(k)
+            for i in range(start, ns):
+                new_rows, new_cols, new_data = loc_energy(k, k_map, i)
+
+                num_new = len(new_data)
                 rows[data_idx : data_idx + num_new] = new_rows
                 cols[data_idx : data_idx + num_new] = new_cols
                 data[data_idx : data_idx + num_new] = new_data
-                
-                data_idx += num_new
+
+                data_idx += num_new  # Update the index for next insertion
         return data_idx
-    
-    data_idx = _inner_loop(hilbert_space.__getitem__, ham.loc_energy_int, start, ns, nh)
 
-    # --- Create the sparse matrix ---
-    ham = sp.sparse.csr_matrix((data[:data_idx], (rows[:data_idx], cols[:data_idx])), shape=(nh, nh))
-    return ham
 
-def _hamiltonian_inplace_np(hamiltonian, ns: int, hilbert_space: HilbertSpace, start=0):
+    # Call the Numba-accelerated inner loop
+    data_idx = _inner_loop(hilbert_space.__getitem__, hamiltonian.loc_energy_int, start, ns, nh, rows, cols, data, data_idx)
+
+    # Create the sparse matrix from the collected data (outside the jitted function)
+    ham_matrix = sp.sparse.csr_matrix((data[:data_idx], (rows[:data_idx], cols[:data_idx])), shape=(nh, nh))
+    return ham_matrix
+
+def _hamiltonian_inplace_np(hamiltonian: 'Hamiltonian', ns: int, hilbert_space: HilbertSpace, start=0):
     """
     NumPy version: Updates the Hamiltonian array in place.
     Parameters:
@@ -222,7 +227,7 @@ def _hamiltonian_inplace_np(hamiltonian, ns: int, hilbert_space: HilbertSpace, s
             hamiltonian.loc_energy_ham(hamiltonian.hamil, hilbert_space, k, k_map, i)
     return hamiltonian.hamil
 
-def hamiltonian_inplace_np(ns: int, hilbert_space: HilbertSpace, hamiltonian, max_local_changes: int, is_sparse: bool, start=0, dtype=None):
+def hamiltonian_inplace_np(ns: int, hilbert_space: HilbertSpace, local_fun: Callable, max_local_changes: int, is_sparse: bool, start=0, dtype=None):
     """
     NumPy version: Updates the Hamiltonian array in place.
     Parameters:
@@ -426,6 +431,13 @@ class Hamiltonian(ABC):
         '''
         return self._max_local_ch
 
+    @property
+    def quadratic(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is quadratic or not.
+        '''
+        return False
+    
     # ----------------------------------------------------------------------------------------------
     
     @property
@@ -902,42 +914,18 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @abstractmethod
-    def loc_energy_ham(self, ham, hilbert : HilbertSpace, k : int, k_map : int, i : int):
+    def loc_energy_int(self, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
         '''
-        Calculates the local energy of the Hamiltonian. This method is meant to be overridden by 
-        subclasses to provide a specific implementation.
-        
-        Calculates the local energy of the Hamiltonian. This method is meant to be overridden by
-        subclasses to provide a specific implementation.
-        
-        This function is made for in-place updates of the Hamiltonian matrix.
-                
+        Calculates the local energy.  MUST return NumPy arrays.
+
         Parameters:
-            ham (Union[jnp.ndarray, np.ndarray])    : The Hamiltonian matrix.
-            k (int)                                 : The k'th element of the Hilbert space.
-            k_map (int)                             : The mapping of the k'th element obtained from the Hilbert space
-                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
-                    element k in the Hilbert space.
-            i (int)                                 : The i'th site (the site [or local state] where the Hamiltonian acts).
-        '''
-        pass
-    
-    @abstractmethod
-    def loc_energy_int(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
-        '''
-        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
-        Parameters:
-            k (int)     : The k'th element of the Hilbert space.
-            k_map (int) : The mapping of the k'th element obtained from the Hilbert space
-                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
-                    element k in the Hilbert space.
-            i (int)     : The i'th site (the site [or local state] where the Hamiltonian acts).
+            k_map (int): The mapping of the k'th element.
+            i (int): The i'th site.
+
         Returns:
-        
-            Tuple[List[int], List[int], List[int]]: Indices and values related to local energy:
-                - List[int] : The row indices - states after modification by the Hamiltonian.
-                - List[int] : The column indices - states before modification by the Hamiltonian.
-                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+            Tuple[np.ndarray, np.ndarray]:  (row_indices, values)
+                - row_indices:  The row indices after the operator acts.
+                - values: The corresponding matrix element values.
         '''
         pass
     
@@ -987,7 +975,7 @@ class Hamiltonian(ABC):
             i (int)                                 : The i'th site.
         '''
         if isinstance(k, int):
-            return self.loc_energy_int(k, self._hilbert_space[k], i)
+            return self.loc_energy_int(self._hilbert_space[k], i)
         elif isinstance(k, List):
             # concatenate the results
             rows, cols, data = [], [], []
@@ -998,7 +986,7 @@ class Hamiltonian(ABC):
                 cols.extend(new_cols)
                 data.extend(new_data)
             return rows, cols, data
-        # otherwise, it is an array (no matter which backend)        
+        # otherwise, it is an array (no matter which backend)
         return self.loc_energy_arr(k, i)
 
     # ----------------------------------------------------------------------------------------------
@@ -1029,16 +1017,12 @@ class Hamiltonian(ABC):
         # Choose implementation based on backend availability.
         if not jax_maybe_av or use_numpy:
             self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2)
-
-            # Choose the correct local energy function for NumPy.
-
-            local_fun = self.loc_energy_ham
             
             # Calculate the Hamiltonian matrix using the NumPy implementation.
-            self._hamil = hamiltonian_inplace_np(
-                self._ns,
+            self._hamil = operator_create_np(
+                ns                  =   self._ns,
                 hilbert_space       =   self._hilbert_space,
-                hamiltonian         =   self,
+                local_fun           =   self.loc_energy_int,
                 max_local_changes   =   self._max_local_ch,
                 is_sparse           =   self._is_sparse,
                 start               =   self._startns,
@@ -1065,16 +1049,6 @@ class Hamiltonian(ABC):
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
         self.__hamiltonian_valid()
-
-
-    # ----------------------------------------------------------------------------------------------
-
-    @property
-    def quadratic(self):
-        '''
-        Returns a flag indicating whether the Hamiltonian is quadratic or not.
-        '''
-        return False
 
     # ----------------------------------------------------------------------------------------------
     #! Calculators
@@ -1159,14 +1133,6 @@ class Hamiltonian(ABC):
     #! Setters
     # ----------------------------------------------------------------------------------------------
     
-    @staticmethod
-    def set_hamil_elem(hamil, hilbert_space, k, val, newk):
-        '''Helper function to set the element of the Hamiltonian matrix.'''
-        try:
-            set_operator_elem(hamil, hilbert_space, k, val, newk)
-        except Exception as e:
-            print(f"Error in _set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
-    
     def _set_hamil_elem(self, k, val, newk):
         '''
         Sets the element of the Hamiltonian matrix.
@@ -1194,7 +1160,7 @@ class Hamiltonian(ABC):
             set_operator_elem(self._hamil, self._hilbert_space, k, val, newk)
         except Exception as e:
             print(f"Error in _set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
-            
+
     # ----------------------------------------------------------------------------------------------
         
 # --------------------------------------------------------------------------------------------------

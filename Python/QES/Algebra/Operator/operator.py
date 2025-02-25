@@ -139,7 +139,7 @@ class OperatorFunction:
         raise ValueError("Invalid return type from the operator function.")
 
     # -----------
-    # Getters and Setters
+    #! Getters and Setters
     # -----------
     
     @property
@@ -171,7 +171,7 @@ class OperatorFunction:
     
     # -----------
     
-    # Composition
+    #! Composition
     
     # -----------
         
@@ -277,7 +277,7 @@ class OperatorFunction:
 
     # -----------
     
-    # Addition
+    #! Addition
     
     # -----------
 
@@ -326,7 +326,7 @@ class OperatorFunction:
         
     # -----------
     
-    # Subtraction
+    #! Subtraction
     
     # -----------
     
@@ -842,3 +842,5 @@ def operator_identity(backend : str = 'default') -> Operator:
         return state, 1.0
     
     return Operator(fun = identity_fun, eigval = 1.0, ns = 1, backend = backend, name = SymmetryGenerators.E, modifies=False, quadratic=False)
+
+####################################################################################################
