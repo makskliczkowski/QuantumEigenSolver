@@ -364,7 +364,8 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     def randomize(self, **kwargs):
-        pass
+        ''' Randomize the Hamiltonian matrix.'''
+        raise NotImplementedError("Randomization is not implemented for this Hamiltonian class.")
     
     def clear(self):
         '''
@@ -437,9 +438,7 @@ class Hamiltonian(ABC):
         Returns a flag indicating whether the Hamiltonian is quadratic or not.
         '''
         return False
-    
-    # ----------------------------------------------------------------------------------------------
-    
+        
     @property
     def name(self):
         '''
@@ -928,13 +927,6 @@ class Hamiltonian(ABC):
                 - values: The corresponding matrix element values.
         '''
         raise NotImplementedError("loc_energy_int method must be implemented by subclasses.")
-    
-    @abstractmethod
-    def _loc_energy_int(self):
-        '''
-        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
-        '''
-        return lambda k_map, i: np.array([]), np.array([])
     
     @abstractmethod
     def loc_energy_int_jax(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:

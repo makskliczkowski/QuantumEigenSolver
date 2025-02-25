@@ -27,14 +27,17 @@ from Algebra.Operator.operators_spin import _sigma_z_integer, _sigma_x_integer, 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
 from general_python.algebra.ran_wrapper import choice, randint, RMT, random_matrix, random_vector
+from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE
 ##########################################################################################
 
 _QSM_CHECK_HS_NORM = True
 
-@njit(fastmath=True)
-def _local_energy_int(k_map, i,
-                    n: int, ns: int, neidot,
-                    h, g0, au
+@njit(use_python=False)
+def _local_energy_int(k_map: int, 
+                    i: int,
+                    n: int,
+                    ns: int,
+                    neidot, h: np.ndarray, g0: float, au: np.ndarray
                 ) -> Tuple[np.ndarray, np.ndarray]:
     '''
     Compute the local energy interaction.
@@ -45,15 +48,25 @@ def _local_energy_int(k_map, i,
             The mapped state (from the Hilbert space) corresponding to k.
         i : int
             An index parameter (typically i >= self.n).
-        kwargs : dict
-            Additional parameters for the interaction.
+        n : int
+            Number of particles in the dot.
+        ns : int
+            Number of particles in the system.
+        neidot : np.ndarray
+            Array of random neighbors for the 'free' particles.
+        h : np.ndarray
+            Magnetic field vector for the particles outside the dot.
+        g0 : float
+            Coupling strength between the particles in the dot and the particles outside the dot.
+        au : np.ndarray
+            Array of coupling strengths.
     Returns:
         Tuple of arrays representing the row indices, column indices, and matrix values for this interaction.
     '''
 
     # store here the rows, columns, and values
     part_idx    = i - n
-    this_site   = np.array([i], dtype=np.int64)
+    this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
     
     idx, val    = _sigma_z_integer(k_map, ns, this_site)
     rows        = idx
@@ -61,16 +74,23 @@ def _local_energy_int(k_map, i,
     
     # apply the spin flips
     n           = neidot[part_idx]
-    next_site   = np.array([n], dtype=np.int64)
+    next_site   = np.array([n], dtype=DEFAULT_NP_INT_TYPE)
     idx1, sxn   = _sigma_x_integer(k_map, ns, next_site)
     idx2, sxj   = _sigma_x_integer(idx1[0], ns, this_site)
+    coupling_v  = g0 * au[part_idx] * sxj * sxn
     
-    # apply the coupling between the dot and the outside world
-    rows        = np.append(rows, idx2)
-    vals        = np.append(vals, np.array([g0 * au[part_idx] * sxj[0] * sxn[0]]))
+    # Pre-allocate arrays
+    new_rows    = np.empty(2, dtype=rows.dtype)
+    new_vals    = np.empty(2, dtype=vals.dtype)
     
-    return rows, vals
+    new_rows[:1] = rows
+    new_vals[:1] = vals
+    new_rows[1:] = idx2[0]
+    new_vals[1:] = coupling_v
+    
+    return new_rows, new_vals
 
+##########################################################################################
 
 class QSM(Hamiltonian):
     '''

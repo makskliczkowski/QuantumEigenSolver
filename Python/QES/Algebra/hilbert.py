@@ -35,12 +35,101 @@ from Algebra.symmetries import choose, translation
 __INT_BINARY_REPR       = 2**6
 __SYM_NORM_THRESHOLD    = 1e-12
 
+####################################################################################################
+#! WRAPPER FOR JIT AND NUMBA
+####################################################################################################
+
+@njit(nopython=True)
+def _get_mapping(mapping, state):
+    """
+    Get the mapping of the state.
+    
+    Args:
+        mapping (list): The mapping of the states.
+        state (int): The state to get the mapping for.
+    
+    Returns:
+        int: The mapping of the state.
+    """
+    return mapping[state] if len(mapping) > state else state
+
+@njit(nopython=True)
+def _find_repr_int(state, _mapping: np.ndarray, 
+                _sym_group,
+                _reprmap: np.ndarray = None):
+    """
+    Find the representative of a given state.
+    
+    Args:
+        state (int): The state to find the representative for.
+    
+    Returns:
+        int: The representative of the state.
+    """
+            
+    # If mapping exists, return saved representative.
+    if _reprmap is not None and len(_reprmap) > 0:
+        base = _reprmap.index(state)
+        return base
+    
+    _sec = (1 << __INT_BINARY_REPR) - 1         # by default, using 64-bit integers
+    _val = 1.0
+    
+    # loop over all states in symmetry sectors
+    for g in _sym_group:
+        _st, _retval = g(state)
+        if _st < _sec:
+            _sec = _st
+            _val = _retval
+    return __BAD_BINARY_SEARCH_STATE, _val
+
+@njit(nopython=True)
+def find_representative_int(
+                        _mapping                : np.ndarray,
+                        _state                  : int,
+                        _normalization          : np.ndarray,
+                        _normalization_beta     : float,
+                        _reprmap                : np.ndarray = None
+        ):
+    """
+    Find the representative of a given state.
+    """
+    if _mapping is None or len(_mapping) == 0:
+        return (_state, 1.0)
+    
+    # if the map exists, use it!
+    if _reprmap is not None and len(_reprmap) > 0:
+        idx, sym_eig    = _reprmap[_state]
+        sym_eigc        = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
+        return (idx, _normalization[idx] / _normalization_beta * sym_eigc)
+    
+    mapping_size = len(_mapping)
+    
+    # find the representative already in the mapping (can be that the matrix element already 
+    # represents the representative state)
+    idx = binary_search(_mapping, 0, mapping_size - 1, _state)
+    
+    if idx != __BAD_BINARY_SEARCH_STATE: 
+        return (idx, _normalization[idx] / _normalization_beta)
+    
+    # otherwise, we need to find the representative by acting on the state with the symmetry operators
+    # and finding the one that gives the smallest value - standard procedure
+    idx, sym_eig = _find_repr_int(_state)
+    if idx != __BAD_BINARY_SEARCH_STATE:
+        sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
+        return (idx, _normalization[idx] / _normalization_beta * sym_eigc)
+    
+    # didn't find the representative - this may be different sector
+    return (_state, 0.0)
+
+#####################################################################################################
+
 class HilbertSpace(ABC):
     """
     A class to represent a Hilbert space either in Many-Body Quantum Mechanics or Quantum Information Theory and non-interacting systems.
     """
     
-    ####################################################################################################
+    #################################################################################################
     
     _ERRORS = {
         "sym_gen"       : "The symmetry generators must be provided as a dictionary.",
@@ -451,10 +540,8 @@ class HilbertSpace(ABC):
             t1 = time.time()
             self._log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 2, color = 'green')
             self._mapping           = self._backend.array(self._mapping, dtype = self._backend.int64)
-            self._getmapping_fun    = njit(lambda x: self._mapping[x])
         else:
             self._log("No mapping generated.", lvl = 1, color = 'green')
-            self._getmapping_fun    = lambda x: x
             
     # --------------------------------------------------------------------------------------------------
 
@@ -841,21 +928,7 @@ class HilbertSpace(ABC):
         """
                 
         # If mapping exists, return saved representative.
-        if hasattr(self, "_reprmap") and self._reprmap:
-            base = self._reprmap.index(state)
-            return base
-        
-        _sec = (1 << __INT_BINARY_REPR) - 1 # by default, using 64-bit integers
-        _val = 1.0
-        
-        # loop over all states in symmetry sectors
-        for g in self._sym_group:
-            _st, _retval = g(state)
-            
-            if _st < _sec:
-                _sec = _st
-                _val = _retval
-        return __BAD_BINARY_SEARCH_STATE, _val
+        return _find_repr_int(state, self._mapping, self._sym_group, self._reprmap)
     
     def find_repr(self, state):
         """
@@ -890,39 +963,12 @@ class HilbertSpace(ABC):
         """
         pass
     
-    @njit
     def find_representative_int(self, state, normalization_beta):
         """
         Find the representative of a given state.
         """
-        if self._mapping is None or len(self._mapping) == 0:
-            return (state, 1.0)
-        
-        
-        # if the map exists, use it!
-        if self._reprmap is not None and len(self._reprmap) > 0:
-            idx, sym_eig    = self._reprmap[state]
-            sym_eigc        = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
-            return (idx, self._normalization[idx] / normalization_beta * sym_eigc)
-        
-        mapping_size = len(self._mapping)
-        
-        # find the representative already in the mapping (can be that the matrix element already 
-        # represents the representative state)
-        idx = binary_search(self._mapping, 0, mapping_size - 1, state)
-        
-        if idx != __BAD_BINARY_SEARCH_STATE: 
-            return (idx, self._normalization[idx] / normalization_beta)
-        
-        # otherwise, we need to find the representative by acting on the state with the symmetry operators
-        # and finding the one that gives the smallest value - standard procedure
-        idx, sym_eig = self._find_repr_int(state)
-        if idx != __BAD_BINARY_SEARCH_STATE:
-            sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
-            return (idx, self._normalization[idx] / normalization_beta * sym_eigc)
-        
-        # didn't find the representative - this may be different sector
-        return (state, 0.0)
+        return find_representative_int(self._mapping, state, 
+                self._normalization, normalization_beta, self._reprmap)
     
     def find_representative(self, state, normalization_beta):
         """
@@ -1211,7 +1257,7 @@ class HilbertSpace(ABC):
         Returns:
             list: The mapping of the states.
         """
-        return self._getmapping_fun(i)
+        return _get_mapping(self.mapping, i)
     
     def __getitem__(self, i):
         """
