@@ -5,7 +5,7 @@ This file contains the functions to create the operator matrix based on the Hilb
 
 import numpy as np
 import scipy as sp
-from numba import njit, objmode
+from numba import njit, objmode, jit
 from typing import Callable, Union
 
 ####################################################################################################
@@ -16,29 +16,34 @@ if _JAX_AVAILABLE:
 
 ####################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem, get_mapping, get_matrix_element
+import Algebra.hilbert as Hilbert
 from Algebra.Operator.operator import OperatorFunction
 
 ####################################################################################################
 #! Numpy operator setup
 
-def _operator_create_np_sparse_inner_loop(hilbert : HilbertSpace, local_fun : Callable):
+def _operator_create_np_sparse_inner_loop(hilbert : HilbertSpace):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
-    @njit
-    def _get_matrix_elem(k, new_row, k_map):
-        return get_matrix_element(k, new_row, k_map, False,
-            np.array(hilbert.mapping, dtype=DEFAULT_NP_INT_TYPE),
-            np.array(hilbert.normalization),
-            hilbert.sym_group,
-            np.array(hilbert.reprmap, dtype=DEFAULT_NP_INT_TYPE)
-        )
+    _mapping = np.array(hilbert.mapping, dtype=DEFAULT_NP_INT_TYPE)
+    _norm    = np.array(hilbert.normalization)
+    _sym     = hilbert.sym_group if hilbert.sym_group is not None and len(hilbert.sym_group) > 0 else []
+    _repr    = np.array(hilbert.reprmap, dtype=DEFAULT_NP_INT_TYPE)
+    if _repr.ndim == 1:
+        _repr = _repr.reshape(-1, 2)
     
-    @njit(fastmath=True)
-    def _inner_loop(start               : int,
+    @jit(forceobj=True, fastmath=True)
+    def _get_matrix_elem(k, new_row, k_map):
+        # Apply transformation and get the matrix element directly
+        return Hilbert.jitted_get_matrix_element(k, new_row, k_map, False,
+                _mapping, _norm, _sym, _repr)
+    
+    # @jit(forceobj=True, fastmath=True)
+    def _inner_loop(local_funct,
+                    start               : int,
                     ns                  : int,
                     nh                  : int,
                     hilbert_modifies    : bool,
-                    _mapping            : np.ndarray,   # for get_mapping function
                     cols                : np.ndarray,
                     rows                : np.ndarray,
                     data                : np.ndarray,
@@ -48,14 +53,14 @@ def _operator_create_np_sparse_inner_loop(hilbert : HilbertSpace, local_fun : Ca
             
             # Get the mapping for the current basis state
             if hilbert_modifies:
-                k_map = np.array([get_mapping(_mapping, k)], dtype=DEFAULT_NP_INT_TYPE)
+                k_map = Hilbert.jitted_get_mapping(_mapping, k)
             else:
-                k_map = np.array([k], dtype=DEFAULT_NP_INT_TYPE)
+                k_map = k
                                                 
             # Go through all sites (modes) and update the matrix elements
             for i in range(start, ns):
                 # Get the new rows and data
-                new_rows, new_data  = local_fun(k_map[0], i)
+                new_rows, new_data  = local_funct(k_map, i)
                 num_new             = len(new_rows)
                 
                 # transform the new rows and data
@@ -105,12 +110,12 @@ def operator_create_np_sparse(ns                    : int,
     hilbert_mod = hilbert.modifies
     
     # Inner loop is now a separate Numba function for clarity and potential reuse
-    _inner_loop = _operator_create_np_sparse_inner_loop(hilbert, local_fun)
+    _inner_loop = _operator_create_np_sparse_inner_loop(hilbert)
 
     # Call the Numba-accelerated inner loop
-    data_idx = _inner_loop(
+    data_idx = _inner_loop(local_funct=local_fun,
             start=start, ns=ns, nh=nh, hilbert_modifies=hilbert_mod,
-            _mapping = np.array(hilbert.mapping), cols=cols,  rows=rows, data=data, data_idx=data_idx
+            cols=cols,  rows=rows, data=data, data_idx=data_idx
         )
 
     # Create the sparse matrix from the collected data (outside the jitted function)
@@ -174,7 +179,8 @@ def operator_create_np( ns                  : int,
         is_sparse (bool)            : Whether to create a sparse matrix (True) or dense matrix (False).
         start (int)                 : The starting index for updates (default 0).
         dtype (optional)            : Data type for the matrix (if None, uses Hilbert space dtype).        
-    '''
+    '''    
+    # call the operator_create_np function
     if is_sparse:
         return operator_create_np_sparse(ns=ns,
                 hilbert=hilbert_space, local_fun=local_fun,

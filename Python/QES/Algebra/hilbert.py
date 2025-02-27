@@ -12,7 +12,7 @@ Changes :
 import math
 import time
 import numpy as np
-from numba import njit, prange
+from numba import njit, prange, jit
 import scipy as sp
 from abc import ABC, abstractmethod
 from itertools import combinations
@@ -25,7 +25,7 @@ from general_python.common.flog import get_global_logger, Logger
 from general_python.algebra.utils import get_backend, maybe_jit, _JAX_AVAILABLE, DEFAULT_INT_TYPE
 if _JAX_AVAILABLE:
     from general_python.algebra.utils import pad_array_jax
-from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE
+from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE, binary_search_numpy
 ####################################################################################################
 from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity, OperatorFunction
 from Algebra.globals import GlobalSymmetry
@@ -53,7 +53,7 @@ def get_mapping(mapping, state):
     """
     return mapping[state] if len(mapping) > state else state
 
-@njit
+@jit(nopython=False)
 def find_repr_int(state,
                 _sym_group,
                 _reprmap    : np.ndarray = None):
@@ -87,6 +87,7 @@ def find_repr_int(state,
             _val = _retval
     return _sec, _val
 
+@jit(nopython=False)
 def find_representative_int(
                         _state                  : int,
                         _mapping                : np.ndarray,
@@ -111,7 +112,7 @@ def find_representative_int(
     
     # find the representative already in the mapping (can be that the matrix element already 
     # represents the representative state)
-    idx = binary_search(_mapping, 0, mapping_size - 1, _state)
+    idx = binary_search_numpy(_mapping, 0, mapping_size - 1, _state)
     
     if idx != __BAD_BINARY_SEARCH_STATE:
         return (idx, _normalization[idx] / _normalization_beta)
@@ -126,7 +127,7 @@ def find_representative_int(
     # didn't find the representative - this may be different sector
     return (_state, 0.0)
 
-@njit
+@jit(nopython=False)
 def get_matrix_element(
         k       : int,
         new_k   : int,
@@ -167,7 +168,24 @@ def get_matrix_element(
     # find the representative of the new k
     idx, symeig = find_representative_int(new_k, _mapping, _norm, norm, _sym_group, _reprmap)
     return ((idx, k), symeig) if not h_conj else ((k, idx), symeig)
+
+@jit(nopython=False)
+def jitted_find_repr_int(state, _sym_group, _reprmap = None):
+    return find_repr_int(state, _sym_group, _reprmap)
+
+@jit(nopython=False)
+def jitted_find_representative_int(_state, _mapping, _normalization, _normalization_beta, _sym_group, _reprmap = None):
+    return find_representative_int(_state, _mapping, _normalization, _normalization_beta, _sym_group, _reprmap)
     
+@njit
+def jitted_get_mapping(mapping, state):
+    return get_mapping(mapping, state)
+
+@jit(nopython=False)
+def jitted_get_matrix_element(k, new_k, kmap = None, h_conj = False, _mapping = None, _norm = None, _sym_group = None, _reprmap = None):
+    return get_matrix_element(k, new_k, kmap, h_conj, _mapping, _norm, _sym_group, _reprmap)
+
+
 #####################################################################################################
 #! Hilbert space class
 #####################################################################################################
@@ -273,6 +291,9 @@ class HilbertSpace(ABC):
         # handle symmetries - save the global symmetries and initialize the mapping
         self._global_syms   = global_syms                           # global symmetries
         self._init_mapping(sym_gen, gen_mapping)                    # initialize the mapping
+        
+        if self._sym_group == []:
+            self._sym_group = [operator_identity(self._backend)]
     
     # --------------------------------------------------------------------------------------------------
     #! Resets

@@ -32,7 +32,6 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 
 _QSM_CHECK_HS_NORM = True
 
-@njit
 def _local_energy_int(k_map     : int,
                         i       : int,
                         n       : int,
@@ -87,8 +86,16 @@ def _local_energy_int(k_map     : int,
     new_vals[:1] = vals
     new_rows[1:] = idx2[0]
     new_vals[1:] = coupling_v
-    
     return new_rows, new_vals
+
+_jitted_local_energy_int = njit(_local_energy_int)
+
+def create_local_energy_int_jitted(n, ns, neidot, h, g0, au):
+    ''' Create the local energy interaction. '''
+    @njit
+    def wrapper(k, i):
+        return _jitted_local_energy_int(k, i, n, ns, neidot, h, g0, au)
+    return wrapper
 
 ##########################################################################################
 
@@ -173,9 +180,11 @@ class QSM(Hamiltonian):
         self._is_sparse     = True
         self._max_local_ch  = 2
         self.init_particles()
-        # test the Hamiltonian and allow jit to be built - trigger the jit compilation
-        idx, val            = self.loc_energy_int(0, 0)
+        # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
+        self._loc_energy_int = create_local_energy_int_jitted(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
+        idx, val            = self._loc_energy_int(0, 0)
         self._log(f"QSM test(0,0): idx={idx}, vals={val}", lvl = 2, log = 'debug')
+        
     
     # ----------------------------------------------------------------------------------------------
     
@@ -512,7 +521,7 @@ class QSM(Hamiltonian):
         g0     = self._g0
         au     = self._au
         return _local_energy_int(k_map, i, n, ns, neidot, h, g0, au)
-    
+
     # ----------------------------------------------------------------------------------------------
 
     def loc_energy_arr(self, k, i):

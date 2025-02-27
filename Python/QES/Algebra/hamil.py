@@ -348,6 +348,9 @@ class Hamiltonian(ABC):
         self._krylov        = None
         self._name          = "Hamiltonian"
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
+        
+        # functions for jit
+        self._loc_energy_int = None
     
     def _log(self, msg : str, log = 'info', lvl : int = 0, color : str = "white"):
         """
@@ -1015,18 +1018,16 @@ class Hamiltonian(ABC):
         if not jax_maybe_av or use_numpy:
             self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2)
             
-            def local_fun(k_map, i):
-                return self.loc_energy_int(k_map, i)
-            
             # Calculate the Hamiltonian matrix using the NumPy implementation.
             self._hamil = operator_create_np(
                 ns                  =   self._ns,
                 hilbert_space       =   self._hilbert_space,
-                local_fun           =   local_fun,
+                local_fun           =   self._loc_energy_int,
                 max_local_changes   =   self._max_local_ch,
                 is_sparse           =   self._is_sparse,
                 start               =   self._startns,
-                dtype               =   self._dtype)
+                dtype               =   self._dtype
+            )
         else:
             self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2)
 

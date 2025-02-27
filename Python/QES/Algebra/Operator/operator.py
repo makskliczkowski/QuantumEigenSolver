@@ -27,7 +27,7 @@ from typing import Union, Tuple, List               # type hints for the functio
 from functools import partial                       # partial function application for operator composition
 import copy                  
 ####################################################################################################
-from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend
+from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as get_backend
 from general_python.lattices import Lattice
 ####################################################################################################
 
@@ -478,7 +478,7 @@ class Operator(ABC):
         
         # set the backend for the operator
         self._backend_str   = backend
-        self._backend, self._backend_sp = __backend(backend, scipy=True)
+        self._backend, self._backend_sp = get_backend(backend, scipy=True)
         
         # property of the operator itself
         self._eigval        = eigval
