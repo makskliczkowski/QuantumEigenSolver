@@ -39,8 +39,8 @@ __SYM_NORM_THRESHOLD    = 1e-12
 #! WRAPPER FOR JIT AND NUMBA
 ####################################################################################################
 
-@njit(nopython=True)
-def _get_mapping(mapping, state):
+@njit
+def get_mapping(mapping, state):
     """
     Get the mapping of the state.
     
@@ -53,10 +53,10 @@ def _get_mapping(mapping, state):
     """
     return mapping[state] if len(mapping) > state else state
 
-@njit(nopython=True)
-def _find_repr_int(state, _mapping: np.ndarray, 
+@njit
+def find_repr_int(state,
                 _sym_group,
-                _reprmap: np.ndarray = None):
+                _reprmap    : np.ndarray = None):
     """
     Find the representative of a given state.
     
@@ -69,8 +69,12 @@ def _find_repr_int(state, _mapping: np.ndarray,
             
     # If mapping exists, return saved representative.
     if _reprmap is not None and len(_reprmap) > 0:
-        base = _reprmap.index(state)
-        return base
+        idx     = _reprmap[state, 0]
+        sym_eig = _reprmap[state, 1]
+        return idx, sym_eig
+    
+    if _sym_group is None or len(_sym_group) == 0:
+        return state, 1.0
     
     _sec = (1 << __INT_BINARY_REPR) - 1         # by default, using 64-bit integers
     _val = 1.0
@@ -81,14 +85,14 @@ def _find_repr_int(state, _mapping: np.ndarray,
         if _st < _sec:
             _sec = _st
             _val = _retval
-    return __BAD_BINARY_SEARCH_STATE, _val
+    return _sec, _val
 
-@njit(nopython=True)
 def find_representative_int(
-                        _mapping                : np.ndarray,
                         _state                  : int,
+                        _mapping                : np.ndarray,
                         _normalization          : np.ndarray,
                         _normalization_beta     : float,
+                        _sym_group,
                         _reprmap                : np.ndarray = None
         ):
     """
@@ -99,7 +103,7 @@ def find_representative_int(
     
     # if the map exists, use it!
     if _reprmap is not None and len(_reprmap) > 0:
-        idx, sym_eig    = _reprmap[_state]
+        idx, sym_eig    = _reprmap[_state, 0], _reprmap[_state, 1]
         sym_eigc        = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
         return (idx, _normalization[idx] / _normalization_beta * sym_eigc)
     
@@ -109,12 +113,12 @@ def find_representative_int(
     # represents the representative state)
     idx = binary_search(_mapping, 0, mapping_size - 1, _state)
     
-    if idx != __BAD_BINARY_SEARCH_STATE: 
+    if idx != __BAD_BINARY_SEARCH_STATE:
         return (idx, _normalization[idx] / _normalization_beta)
     
     # otherwise, we need to find the representative by acting on the state with the symmetry operators
     # and finding the one that gives the smallest value - standard procedure
-    idx, sym_eig = _find_repr_int(_state)
+    idx, sym_eig = find_repr_int(_state, _sym_group, _reprmap)
     if idx != __BAD_BINARY_SEARCH_STATE:
         sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
         return (idx, _normalization[idx] / _normalization_beta * sym_eigc)
@@ -122,6 +126,50 @@ def find_representative_int(
     # didn't find the representative - this may be different sector
     return (_state, 0.0)
 
+@njit
+def get_matrix_element(
+        k       : int,
+        new_k   : int,
+        kmap    = None,
+        h_conj  = False,
+        _mapping: np.ndarray = None,
+        _norm   : np.ndarray = None,
+        _sym_group           = None,
+        _reprmap: np.ndarray = None
+    ):
+    '''
+    Get the matrix element of a given state using information provided from the symmetry group and 
+    a given Hilbert space.
+    Args:
+        k (int)       : The state to get the matrix element for.
+        new_k (int)   : The new state to get the matrix element for.
+        kmap (int)    : The mapping of the states.
+        h_conj (bool) : A flag to indicate if the Hamiltonian is conjugated.
+        _mapping (list): The mapping of the states.
+        _norm (list)  : The normalization of the states.
+        _sym_group    : The symmetry group.
+        _reprmap      : The mapping of the representatives.
+    '''
+    
+    # check the mapping
+    if kmap is None:
+        kmap = get_mapping(_mapping, k)
+    
+    # try to process the elements
+    if kmap == new_k:
+        # the element k is already the same as new_k and obviously we 
+        # and we add this at k (not kmap as it only checks the representative)
+        return (new_k, k), 1
+    
+    # otherwise we need to check the representative of the new k
+    # get the norm of the k'th element of the Hilbert space - how to return to the representative
+    norm        = _norm[k] if _norm is not None else 1.0
+    # find the representative of the new k
+    idx, symeig = find_representative_int(new_k, _mapping, _norm, norm, _sym_group, _reprmap)
+    return ((idx, k), symeig) if not h_conj else ((k, idx), symeig)
+    
+#####################################################################################################
+#! Hilbert space class
 #####################################################################################################
 
 class HilbertSpace(ABC):
@@ -542,7 +590,7 @@ class HilbertSpace(ABC):
             self._mapping           = self._backend.array(self._mapping, dtype = self._backend.int64)
         else:
             self._log("No mapping generated.", lvl = 1, color = 'green')
-            
+
     # --------------------------------------------------------------------------------------------------
 
     ####################################################################################################
@@ -625,7 +673,6 @@ class HilbertSpace(ABC):
         """
         return self._nh != self._nhfull
     
-        
     @property
     def sites(self):
         """
@@ -677,6 +724,36 @@ class HilbertSpace(ABC):
             list: The mapping of the states.
         """
         return self._mapping
+    
+    @property
+    def sym_group(self):
+        """
+        Return the symmetry group.
+        
+        Returns:
+            list: The symmetry group.
+        """
+        return self._sym_group
+    
+    @property
+    def reprmap(self):
+        """
+        Return the mapping of the representatives.
+        
+        Returns:
+            list: The mapping of the representatives.
+        """
+        return self._reprmap
+    
+    @property
+    def normalization(self):
+        """
+        Return the normalization of the states.
+        
+        Returns:
+            list: The normalization of the states.
+        """
+        return self._normalization
     
     @property
     def local(self):
@@ -826,7 +903,6 @@ class HilbertSpace(ABC):
         """
         return self._normalization[state] if state < len(self._normalization) else 1.0
 
-
     # --------------------------------------------------------------------------------------------------
     
     ####################################################################################################
@@ -928,7 +1004,7 @@ class HilbertSpace(ABC):
         """
                 
         # If mapping exists, return saved representative.
-        return _find_repr_int(state, self._mapping, self._sym_group, self._reprmap)
+        return find_repr_int(state, self._mapping, self._sym_group, self._reprmap)
     
     def find_repr(self, state):
         """
@@ -967,8 +1043,8 @@ class HilbertSpace(ABC):
         """
         Find the representative of a given state.
         """
-        return find_representative_int(self._mapping, state, 
-                self._normalization, normalization_beta, self._reprmap)
+        return find_representative_int(state, self._mapping,
+                self._normalization, normalization_beta, self._sym_group, self._reprmap)
     
     def find_representative(self, state, normalization_beta):
         """
@@ -1152,22 +1228,11 @@ class HilbertSpace(ABC):
                 - A tuple of two elements representing the indices (or identifiers) of the representative state and the original state,
                     ordered based on the value of h_conj.
                 - The normalization factor or symmetry eigenvalue associated with the new state. 
+        Note:
+            This function uses the find_representative function from this module to find the representative.        
         """
-        
-        # check the mapping
-        if kmap is None:
-            kmap = self[k]
-        
-        # try to process the elements
-        if kmap == new_k:
-            # the element k is already the same as new_k and obviously we 
-            # and we add this at k (not kmap as it only checks the representative)
-            return (new_k, k), 1
-        
-        # otherwise we need to check the representative of the new k
-        norm        = self.norm(k)                              # get the norm of the k'th element of the Hilbert space - how to return to the representative
-        idx, symeig = self.find_representative_int(new_k, norm) # find the representative of the new k
-        return ((idx, k), symeig) if not h_conj else ((k, idx), symeig)
+        return get_matrix_element(k, new_k, kmap, h_conj, self._mapping, 
+                        self._normalization, self._sym_group, self._reprmap)
     
     ####################################################################################################
     #! Full Hilbert space generation
@@ -1256,8 +1321,10 @@ class HilbertSpace(ABC):
         
         Returns:
             list: The mapping of the states.
+        Note:
+            This function uses the get_mapping function from this module to get the mapping.
         """
-        return _get_mapping(self.mapping, i)
+        return get_mapping(self.mapping, i)
     
     def __getitem__(self, i):
         """

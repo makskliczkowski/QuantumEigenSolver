@@ -32,13 +32,13 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 
 _QSM_CHECK_HS_NORM = True
 
-@njit(use_python=False)
-def _local_energy_int(k_map: int, 
-                    i: int,
-                    n: int,
-                    ns: int,
-                    neidot, h: np.ndarray, g0: float, au: np.ndarray
-                ) -> Tuple[np.ndarray, np.ndarray]:
+@njit
+def _local_energy_int(k_map     : int,
+                        i       : int,
+                        n       : int,
+                        ns      : int,
+                        neidot  : np.ndarray, h: np.ndarray, g0: float, au: np.ndarray
+                    ) -> Tuple[np.ndarray, np.ndarray]:
     '''
     Compute the local energy interaction.
     Parameters:
@@ -173,6 +173,9 @@ class QSM(Hamiltonian):
         self._is_sparse     = True
         self._max_local_ch  = 2
         self.init_particles()
+        # test the Hamiltonian and allow jit to be built - trigger the jit compilation
+        idx, val            = self.loc_energy_int(0, 0)
+        self._log(f"QSM test(0,0): idx={idx}, vals={val}", lvl = 2, log = 'debug')
     
     # ----------------------------------------------------------------------------------------------
     
@@ -502,17 +505,13 @@ class QSM(Hamiltonian):
     
     def loc_energy_int(self, k_map, i):
         ''' Compute the local energy interaction. '''
-        
-        return _local_energy_int(k_map, i,
-                n=self._n, ns=self.ns, neidot=self._neidot,
-                h=self._h, g0=self._g0, au=self._au
-            )
-    
-    def _loc_energy_int(self):
-        return lambda k, i: _local_energy_int(k, i,
-                n=self._n, ns=self.ns, neidot=self._neidot,
-                h=self._h, g0=self._g0, au=self._au
-            )
+        n      = self._n
+        ns     = self.ns
+        neidot = self._neidot
+        h      = self._h
+        g0     = self._g0
+        au     = self._au
+        return _local_energy_int(k_map, i, n, ns, neidot, h, g0, au)
     
     # ----------------------------------------------------------------------------------------------
 

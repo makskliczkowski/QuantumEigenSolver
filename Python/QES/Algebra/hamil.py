@@ -989,9 +989,7 @@ class Hamiltonian(ABC):
         return self.loc_energy_arr(k, i)
 
     # ----------------------------------------------------------------------------------------------
-    
     # ! Hamiltonian matrix calculation
-    
     # ----------------------------------------------------------------------------------------------
 
     def _hamiltonian(self, use_numpy : bool = False):
@@ -1013,15 +1011,18 @@ class Hamiltonian(ABC):
         # Check if JAX is available and the backend is not NumPy
         jax_maybe_av = _JAX_AVAILABLE and self._backend != np
         
-        # Choose implementation based on backend availability.
+        # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:
             self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2)
+            
+            def local_fun(k_map, i):
+                return self.loc_energy_int(k_map, i)
             
             # Calculate the Hamiltonian matrix using the NumPy implementation.
             self._hamil = operator_create_np(
                 ns                  =   self._ns,
                 hilbert_space       =   self._hilbert_space,
-                local_fun           =   self.loc_energy_int,
+                local_fun           =   local_fun,
                 max_local_changes   =   self._max_local_ch,
                 is_sparse           =   self._is_sparse,
                 start               =   self._startns,

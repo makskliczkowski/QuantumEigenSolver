@@ -30,6 +30,7 @@ from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGene
 from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.__lattice__ import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
+from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
 from general_python.common.binary import _BACKEND_REPR as _SPIN, _BACKEND_DEF_SPIN, _JAX_AVAILABLE
 from general_python.common.binary import flip, flip_all, check, base2int, int2base, int2binstr
 import general_python.common.binary as _binary
@@ -39,6 +40,7 @@ _I      = 1j
 if _JAX_AVAILABLE:
     from jax import lax
     from jax import numpy as jnp
+    from general_python.algebra.utils import DEFAULT_JP_INT_TYPE, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_CPX_TYPE
 
 ################################################################################
 #! Standard Pauli matrices
@@ -93,7 +95,7 @@ def _sigma_x_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND
     final_state, final_coeff = lax.fori_loop(0, num_sites, body, init)
     return final_state, final_coeff
 
-@njit(fastmath=True)
+@njit
 def _sigma_x_integer(state, ns, sites, spin_value=_SPIN):
     """
     Apply the Pauli-X (σₓ) operator on the given sites.
@@ -104,7 +106,12 @@ def _sigma_x_integer(state, ns, sites, spin_value=_SPIN):
         pos     = ns - 1 - site
         state   = _binary.flip_int(state, pos)
         coeff   *= spin_value
-    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.float64)
+    
+    out_state       = np.empty(1, dtype=np.int64)
+    out_state[0]    = state
+    out_coeff       = np.empty(1, dtype=np.float64)
+    out_coeff[0]    = coeff
+    return out_state, out_coeff
 
 def _sigma_x_int(state  : int,
             ns          : int,
@@ -250,7 +257,7 @@ def _sigma_y_int_jnp(state,
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, (state, 1.0 + 0j))
     return final_state, final_coeff
 
-@njit(fastmath=True)
+@njit
 def _sigma_y_integer(state, ns, sites, spin_value=_SPIN):
     """
     σᵧ on an integer state.
@@ -265,7 +272,11 @@ def _sigma_y_integer(state, ns, sites, spin_value=_SPIN):
         else:
             coeff *= (-1j * spin_value)
         state = _binary.flip_int(state, pos)
-    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.complex128)
+    out_state       = np.empty(1, dtype=np.int64)
+    out_state[0]    = state
+    out_coeff       = np.empty(1, dtype=np.complex128)
+    out_coeff[0]    = coeff
+    return out_state, out_coeff
 
 def _sigma_y_int(state      : int,
                 ns          : int,
@@ -442,7 +453,7 @@ def _sigma_z_int_jnp(state,
     coeff = lax.fori_loop(0, len(sites), body, 1.0)
     return state, coeff
 
-@njit(fastmath=True)
+@njit
 def _sigma_z_integer(state, ns, sites, spin_value=_SPIN):
     """
     σ_z on an integer state.
@@ -455,7 +466,11 @@ def _sigma_z_integer(state, ns, sites, spin_value=_SPIN):
         pos     = ns - 1 - site
         factor  = spin_value if _binary.check_int(state, pos) else -spin_value
         coeff   *= factor
-    return np.array([state], dtype=np.int64), np.array([coeff], dtype=np.float64)
+    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
+    out_state[0]    = state
+    out_coeff       = np.empty(1, dtype=DEFAULT_NP_FLOAT_TYPE)
+    out_coeff[0]    = coeff
+    return out_state, out_coeff
 
 def _sigma_z_int(state      : int,
                 ns          : int,
