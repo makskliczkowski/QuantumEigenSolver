@@ -88,12 +88,15 @@ def _local_energy_int(k_map     : int,
     new_vals[1:] = coupling_v
     return new_rows, new_vals
 
+
+# JIT the local energy interaction function
 _jitted_local_energy_int = njit(_local_energy_int)
 
 def create_local_energy_int_jitted(n, ns, neidot, h, g0, au):
     ''' Create the local energy interaction. '''
     @njit
     def wrapper(k, i):
+        # return _local_energy_int(k, i, n, ns, neidot, h, g0, au)
         return _jitted_local_energy_int(k, i, n, ns, neidot, h, g0, au)
     return wrapper
 

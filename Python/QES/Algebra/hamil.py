@@ -155,99 +155,6 @@ if _JAX_AVAILABLE:
     
     # ----------------------------------------------------------------------------------------------
 
-@njit(fastmath=True)
-def _hamiltonian_inplace_np_sparse(hamiltonian: 'Hamiltonian', ns: int, hilbert_space: HilbertSpace, max_local_changes: int,
-                                start: int = 0, dtype=None):
-    """
-    NumPy version: Updates the Hamiltonian array in place (SPARSE).
-
-    Parameters:
-        ham (np.ndarray): The Hamiltonian matrix (will be overwritten).
-        ns (int): The number of sites.
-        hilbert_space (HilbertSpace): The Hilbert space.
-        max_local_changes (int):  The maximum number of local changes.
-        start (int): The starting index for the update (default is 0).
-        dtype: The data type of the Hamiltonian.
-    """
-    nh          = hilbert_space.Nh
-    max_inner   = max_local_changes * (ns - start)
-    max_nnz     = nh * max_inner  # Estimated maximum number of non-zero elements
-    dtype       = dtype if dtype is not None else hilbert_space.dtype
-
-    # Pre-allocate arrays with the estimated size
-    rows        = np.empty(max_nnz, dtype=np.int64)
-    cols        = np.empty(max_nnz, dtype=np.int64)
-    data        = np.empty(max_nnz, dtype=dtype)
-    data_idx    = 0
-
-    # Inner loop is now a separate Numba function for clarity and potential reuse
-    @njit(fastmath=True)
-    def _inner_loop(hilbert_space_getitem, loc_energy, start: int, ns: int, nh: int,
-                    rows: np.ndarray, cols: np.ndarray, data: np.ndarray, data_idx:int):
-
-        for k in range(nh):
-            k_map = hilbert_space_getitem(k)
-            for i in range(start, ns):
-                new_rows, new_cols, new_data = loc_energy(k, k_map, i)
-
-                num_new = len(new_data)
-                rows[data_idx : data_idx + num_new] = new_rows
-                cols[data_idx : data_idx + num_new] = new_cols
-                data[data_idx : data_idx + num_new] = new_data
-
-                data_idx += num_new  # Update the index for next insertion
-        return data_idx
-
-
-    # Call the Numba-accelerated inner loop
-    data_idx = _inner_loop(hilbert_space.__getitem__, hamiltonian.loc_energy_int, start, ns, nh, rows, cols, data, data_idx)
-
-    # Create the sparse matrix from the collected data (outside the jitted function)
-    ham_matrix = sp.sparse.csr_matrix((data[:data_idx], (rows[:data_idx], cols[:data_idx])), shape=(nh, nh))
-    return ham_matrix
-
-def _hamiltonian_inplace_np(hamiltonian: 'Hamiltonian', ns: int, hilbert_space: HilbertSpace, start=0):
-    """
-    NumPy version: Updates the Hamiltonian array in place.
-    Parameters:
-    - ham (np.ndarray) : The Hamiltonian matrix.
-    - ns (int)         : The number of sites.
-    - nh (int)         : The number of elements in the Hilbert space.
-    - hilbert_space    : The Hilbert space.
-    - loc_energy       : The local energy function.
-    - start            : The starting index for the update (default is 0).
-    """
-    
-    # get the number of elements in the Hilbert space
-    nh = hilbert_space.Nh
-    
-    for k in range(nh):
-        k_map = hilbert_space[k]
-        for i in range(start, ns):
-            hamiltonian.loc_energy_ham(hamiltonian.hamil, hilbert_space, k, k_map, i)
-    return hamiltonian.hamil
-
-def hamiltonian_inplace_np(ns: int, hilbert_space: HilbertSpace, local_fun: Callable, max_local_changes: int, is_sparse: bool, start=0, dtype=None):
-    """
-    NumPy version: Updates the Hamiltonian array in place.
-    Parameters:
-    - hamiltonian      : The Hamiltonian object.
-    - ns (int)         : The number of sites.
-    - nh (int)         : The number of elements in the Hilbert space.
-    - hilbert_space    : The Hilbert space.
-    - loc_energy       : The local energy function.
-    - start            : The starting index for the update (default is 0).
-    """
-    if dtype is None:
-        dtype = hilbert_space.dtype
-    
-    if is_sparse:
-        ham = _hamiltonian_inplace_np_sparse(ham=hamiltonian, ns=ns, hilbert_space=hilbert_space,
-                                    max_local_changes=max_local_changes,
-                                    start=start, dtype=dtype)
-        return ham
-    return _hamiltonian_inplace_np(hamiltonian, ns, hilbert_space, start)
-
 ####################################################################################################
 # Hamiltonian class - abstract class
 ####################################################################################################
@@ -830,7 +737,7 @@ class Hamiltonian(ABC):
     #! Many body Hamiltonian matrix
     # ----------------------------------------------------------------------------------------------
 
-    def __hamiltonian_valid(self):
+    def __hamiltonian_validate(self):
         ''' Check if the Hamiltonian matrix is valid. '''
         if self._hamil is None:
             self._log("Hamiltonian matrix is not initialized.", lvl=3, color="red")
@@ -1049,7 +956,7 @@ class Hamiltonian(ABC):
                 self._hamil = self._hamil.block_until_ready()
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
-        self.__hamiltonian_valid()
+        self.__hamiltonian_validate()
 
     # ----------------------------------------------------------------------------------------------
     #! Calculators
@@ -1115,7 +1022,7 @@ class Hamiltonian(ABC):
             if self._is_sparse or method.lower() in ["lanczos", "shift-invert"]:
                 self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, method, backend, **kwargs)
             else:
-                self._eig_val, self._eig_vec = linalg.eigh(self._hamil, method, backend, **kwargs)
+                self._eig_val, self._eig_vec = linalg.eigh(self._hamil, backend, **kwargs)
         except Exception as e:
             raise ValueError(f"Failed to diagonalize the Hamiltonian using method '{method}' : {e}") from e
         
