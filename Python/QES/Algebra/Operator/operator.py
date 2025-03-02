@@ -22,20 +22,19 @@ Author  : Maksymilian Kliczkowski, WUST, Poland
 import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Iterable
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 import copy                  
 ####################################################################################################
-from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as get_backend
+from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as get_backend, _JAX_AVAILABLE
 from general_python.lattices import Lattice
 ####################################################################################################
 
-
-import jax.numpy as jnp
-from jax import jit, vmap
-from jax.experimental import sparse
-                       # copy module for copying the operator object 
+if _JAX_AVAILABLE:
+    import jax.numpy as jnp
+    from jax import jit, vmap
+    from jax.experimental import sparse
 
 ####################################################################################################
 
@@ -112,31 +111,43 @@ class OperatorFunction:
             represented as integers or numpy arrays or JAX arrays. This enables the user to define
             any operator that can be applied to the state. The function shall return a list of pairs (state, value).
         """
-        self._fun               = jit(fun)                  # the function that defines the operator
+        self._fun               = fun                       # the function that defines the operator
         self._modifies_state    = modifies_state            # flag for the operator that modifies the state
         self._necessary_args    = int(necessary_args)       # number of necessary arguments for the operator function
 
     # -----------
     
-    @partial(jit, static_argnums=(0,))                      # JIT compilation for the operator function - static arguments are the number of necessary arguments
-    def __call__(self, s : Union[int, jnp.array], *args) -> List[Tuple[Union[int, jnp.array], Union[float, complex]]]:
+    def __call__(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
-        Apply the operator to the state. It returns the transformed state with the corresponding value. The 
-        returned value is a list of pairs (state, value). 
-        Params:
-        - s (int, jnp.array) : The state to which the operator is applied.
-        - args               : Additional arguments for the operator - inform how to act on a state.
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or jnp.ndarray): The state to which the operator is applied.
+            args: Additional arguments for the operator. The number of arguments must equal self._necessary_args.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+
+        Raises:
+            ValueError: If the number of provided arguments does not equal self._necessary_args,
+                        or if the return type from the operator function is not recognized.
         """
         if len(args) != self._necessary_args:
-            raise ValueError(f"Invalid number of arguments for the operator function. Expected {self._necessary_args} arguments.")
-        
+            raise ValueError(f"Invalid number of arguments for the operator function. Expected {self._necessary_args}, got {len(args)}.")
+
         result = self._fun(s, *args)
-        
-        if isinstance(result, tuple) and isinstance(result[0], (int, jnp.ndarray)):
-            return [result] if self._modifies_state else [(None, result[1])]
+
+        # If the result is a tuple representing a single (state, value) pair
+        if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
+            return result if self._modifies_state else (None, result[1])
+        # If the result is already a list of (state, value) pairs
         elif isinstance(result, list):
+            return (result[0], result[1]) if self._modifies_state else (None, result[1])
+        elif isinstance(result, tuple) and len(result) == 2:
             return result
-        raise ValueError("Invalid return type from the operator function.")
+
+        raise ValueError("Operator function returned an invalid type. Expected a tuple or a list of (state, value) pairs.")
 
     # -----------
     #! Getters and Setters
@@ -384,9 +395,6 @@ class OperatorFunction:
     
 ####################################################################################################
 
-__INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
-__INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
-
 @unique
 class OperatorTypeActing(Enum):
     """
@@ -430,6 +438,9 @@ class Operator(ABC):
     Attributes:
     """
     
+    _INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
+    _INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
+
     #################################
     
     def __init__(self,
@@ -474,7 +485,7 @@ class Operator(ABC):
             self._lattice   = lattice
             self._ns        = self._lattice.ns()
         else:
-            raise ValueError(__INVALID_SYSTEM_SIZE_PROVIDED)
+            raise ValueError(Operator._INVALID_SYSTEM_SIZE_PROVIDED)
         
         # set the backend for the operator
         self._backend_str   = backend
@@ -497,7 +508,7 @@ class Operator(ABC):
         elif isinstance(fun, Callable):
             self._fun       = OperatorFunction(fun, modifies_state = self._modifies)  # Change kwargs.get('fun') to fun
         else:
-            raise ValueError(__INVALID_OPERATION_TYPE_ERROR)
+            raise ValueError(Operator._INVALID_OPERATION_TYPE_ERROR)
         # set the necessary arguments for the operator function
         if hasattr(fun, 'necessary_args'):
             self._necessary_args = fun.necessary_args
@@ -751,9 +762,7 @@ class Operator(ABC):
         
         
     #################################
-    
-    # Apply the operator
-    
+    #! Apply the operator
     #################################
     
     # def chi(self, state):
@@ -774,11 +783,16 @@ class Operator(ABC):
                                 If there no arguments, the operator acts on the state as a whole - global operator.
                                 If there are arguments, the operator acts on the state locally - local operator (e.g., site-dependent).
         """
-        return self._fun(states, *args)
-    
+        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+            return self._fun(states, *args)
+        
+        results     = [self._fun(s, *args) for s in states]
+        out, val    = zip(*results) if results else ([], [])
+        return list(out), list(val)
+        
     # -------------------------------
     
-    def __call__(self, states : list | np.ndarray | jnp.ndarray, *args):
+    def __call__(self, states: list | np.ndarray | jnp.ndarray, *args):
         """
         Apply the operator to the state. 
         
@@ -788,15 +802,13 @@ class Operator(ABC):
                                 If there no arguments, the operator acts on the state as a whole - global operator.
                                 If there are arguments, the operator acts on the state locally - local operator (e.g., site-dependent).
         """
-        return self.apply(states, *args)    
+        return self.apply(states, *args)
     
     #################################
-    
-    # Generate matrix form of the operator
-    
+    #! Generate matrix form of the operator
     #################################
     
-    def matrix(self, dim : int, matrix_type : str = 'dense', *args) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
+    def matrix(self, dim : int, matrix_type : str = 'dense', use_numpy: bool = False, *args, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
         """
         Generates the matrix representation of the operator.
 
@@ -808,15 +820,21 @@ class Operator(ABC):
         if not isinstance(dim, int) or dim <= 0:
             raise ValueError("Dimension must be a positive integer.")
         
-        # check if the matrix function is provided
+        # check if the matrix function is provided and skips kwargs if unnecessary
         if self._matrix_fun is not None:
             if matrix_type == 'sparse':
                 return self._matrix_fun(dim, matrix_type, *args)
             else:
                 return jnp.asarray(self._matrix_fun(dim, matrix_type, *args))
-        else:
-            # generate the matrix from the function fun
-            pass
+        # check if there are functions from the Hilbert space
+        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
+        is_sparse    = matrix_type == 'sparse'
+        
+        # easiest case - no Hilbert space provided
+        
+        
+        if not jax_maybe_av or use_numpy:
+            matrix  = OpMatrix.operator_create_np()
     
     #################################
     

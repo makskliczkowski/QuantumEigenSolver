@@ -96,7 +96,7 @@ def _sigma_x_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND
     return final_state, final_coeff
 
 @njit
-def _sigma_x_integer(state, ns, sites, spin_value=_SPIN):
+def _sigma_x_int_np(state, ns, sites, spin_value=_SPIN):
     """
     Apply the Pauli-X (σₓ) operator on the given sites.
     For each site, flip the bit at position (ns-1-site) using binary.flip.
@@ -124,7 +124,7 @@ def _sigma_x_int(state  : int,
     """
     if not isinstance(state, int):
         return _sigma_x_int_jnp(state, ns, sites, spin_value, backend)
-    return _sigma_x_integer(state, ns, sites, spin_value)
+    return _sigma_x_int_np(state, ns, sites, spin_value)
 
 def _sigma_x_np(state   : np.ndarray,
             ns          : int,
@@ -156,7 +156,7 @@ def _sigma_x_jnp(state,
     to avoid Python-level loops and enable JIT compilation.
     """
     if sites is None:
-        sites = list(range(ns))
+        sites = jnp.array(list(range(ns)), dtype = DEFAULT_JP_INT_TYPE)
     
     # Pre-calculate the overall coefficient as spin_value raised to the number of flips.
     coeff = spin_value ** len(sites)
@@ -175,7 +175,7 @@ def _sigma_x_jnp(state,
     return new_state, coeff
 
 def sigma_x(state,
-            ns          : int, 
+            ns          : int,
             sites       : Union[List[int], None],
             spin        : bool      = _BACKEND_DEF_SPIN,
             spin_value  : float     = _SPIN,
@@ -258,7 +258,7 @@ def _sigma_y_int_jnp(state,
     return final_state, final_coeff
 
 @njit
-def _sigma_y_integer(state, ns, sites, spin_value=_SPIN):
+def _sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
     """
     σᵧ on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
@@ -304,7 +304,7 @@ def _sigma_y_int(state      : int,
     """
     if not isinstance(state, int):
         return _sigma_y_int_jnp(state, ns, sites, spin_value, backend)
-    return _sigma_y_integer(state, ns, sites, spin_value)
+    return _sigma_y_int_np(state, ns, sites, spin_value)
 
 def _sigma_y_np(state: np.ndarray,
                 sites: Union[List[int], None],
@@ -454,7 +454,7 @@ def _sigma_z_int_jnp(state,
     return state, coeff
 
 @njit
-def _sigma_z_integer(state, ns, sites, spin_value=_SPIN):
+def _sigma_z_int_np(state, ns, sites, spin_value=_SPIN):
     """
     σ_z on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
@@ -484,7 +484,7 @@ def _sigma_z_int(state      : int,
     """
     if not isinstance(state, int):
         return _sigma_z_int_jnp(state, ns, sites, spin_value, backend)
-    return _sigma_z_integer(state, ns, sites, spin_value)
+    return _sigma_z_int_np(state, ns, sites, spin_value)
 
 def _sigma_z_np(state: np.ndarray,
                 ns: int,
@@ -530,7 +530,7 @@ def sigma_z(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, int):
-        return _sigma_z_integer(state, ns, sites, spin_value)
+        return _sigma_z_int_np(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_z_np(state, ns, sites, spin, spin_value)
     else:
@@ -1114,9 +1114,10 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
         for site in sites:
             _name += f"{site}-"
         _name = _name[:-1]
-        return Operator(fun     =   op, 
-                        eigval  =   1.0, 
+        return Operator(fun     =   op,
+                        eigval  =   1.0,
                         lattice =   lattice,
+                        ns      =   ns,
                         name    =   _name,
                         typek   =   SymmetryGenerators.Other, modifies=True)
     elif type_act == OperatorTypeActing.Local:
@@ -1216,7 +1217,8 @@ def sig_z( lattice     : Optional[Lattice]     = None,
            type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
            sites       : Optional[List[int]]   = [0],
            spin        : bool                  = _BACKEND_DEF_SPIN,
-           spin_value  : float                 = _SPIN) -> Operator:
+           spin_value  : float                 = _SPIN,
+           backend     : str                   = DEFAULT_BACKEND) -> Operator:
     """
     Factory function for σ_z.
     Parameters
@@ -1242,6 +1244,7 @@ def sig_z( lattice     : Optional[Lattice]     = None,
         assert ns is not None, "Either lattice or ns must be provided."
     else:
         ns = lattice.ns
+        
     if type_act == OperatorTypeActing.Global:
         def op(state):
             return sigma_z(state, ns, sites, spin, spin_value)
@@ -1249,14 +1252,15 @@ def sig_z( lattice     : Optional[Lattice]     = None,
         for site in sites:
             _name += f"{site}-"
         _name = _name[:-1]
-        return Operator(fun = op,
-                        eigval = 1.0,
+        return Operator(fun     = op,
+                        eigval  = 1.0,
                         lattice = lattice,
-                        name = _name,
-                        typek = SymmetryGenerators.Other, modifies=False)
+                        ns      = ns,
+                        name    = _name,
+                        typek   = SymmetryGenerators.Other, modifies=False, backend=backend)
     elif type_act == OperatorTypeActing.Local:
         def op(state, site):
-            return sigma_z(state, ns, [site], spin, spin_value)
+            return sigma_z(state, ns, [site], spin, spin_value, backend)
         return Operator(fun = op,
                         eigval = 1.0,
                         lattice = lattice,

@@ -303,6 +303,11 @@ class Hamiltonian(ABC):
         '''
         return self._dtype
     
+    @property
+    def backend(self):
+        ''' Returns string backend '''
+        return self._backendstr
+    
     def is_quadratic(self):
         '''
         Returns a flag indicating whether the Hamiltonian is quadratic or not.
@@ -919,7 +924,7 @@ class Hamiltonian(ABC):
         # -----------------------------------------------------------------------------------------
         
         # Check if JAX is available and the backend is not NumPy
-        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
+        jax_maybe_av = _JAX_AVAILABLE and self._backend != np 
         
         # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:

@@ -22,7 +22,7 @@ from numba import njit
 # Assume these are available from the QES package:
 from Algebra.hilbert import HilbertSpace
 from Algebra.hamil import Hamiltonian
-from Algebra.Operator.operators_spin import _sigma_z_integer, _sigma_x_integer, _sigma_z_int_jnp, _sigma_x_int_jnp
+from Algebra.Operator.operators_spin import _sigma_z_int_np, _sigma_x_int_np, _sigma_z_int_jnp, _sigma_x_int_jnp
 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
@@ -67,15 +67,15 @@ def _local_energy_int(k_map     : int,
     part_idx    = i - n
     this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
     
-    idx, val    = _sigma_z_integer(k_map, ns, this_site)
+    idx, val    = _sigma_z_int_np(k_map, ns, this_site)
     rows        = idx
     vals        = h[part_idx] * val.astype(h.dtype)
     
     # apply the spin flips
     n           = neidot[part_idx]
     next_site   = np.array([n], dtype=DEFAULT_NP_INT_TYPE)
-    idx1, sxn   = _sigma_x_integer(k_map, ns, next_site)
-    idx2, sxj   = _sigma_x_integer(idx1[0], ns, this_site)
+    idx1, sxn   = _sigma_x_int_np(k_map, ns, next_site)
+    idx2, sxj   = _sigma_x_int_np(idx1[0], ns, this_site)
     coupling_v  = g0 * au[part_idx] * sxj * sxn
     
     # Pre-allocate arrays
