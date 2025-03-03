@@ -11,9 +11,9 @@ Modules:
 #! Hilbert space and operator classes
 # ----------------------------------------------------------------------------------------------
 
+from Algebra.hilbert import HilbertSpace
 from Algebra.Operator.operator import Operator, SymmetryGenerators
 from Algebra.Operator.operators_spin import sig_x, sig_y, sig_z, sig_p, sig_m, sig_k
-from Algebra.hilbert import HilbertSpace
 
 # ----------------------------------------------------------------------------------------------
 #! Hamiltonian models

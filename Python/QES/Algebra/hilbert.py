@@ -249,28 +249,46 @@ class HilbertSpace(ABC):
         if "ns" in kwargs and "lattice" not in kwargs:
             self._ns        = kwargs.get('ns', 1)       # number of sites in the system
             self._lattice   = None                      # lattice object
+            self._nhfull    = None                      # full Hilbert space dimension
+            self._nh        = None
         elif "lattice" in kwargs:
             self._lattice   = kwargs.get('lattice')     # lattice object provided
             self._ns        = self._lattice.get_Ns()    # number of sites in the system
+            self._nhfull    = None                      # full Hilbert space dimension
+            self._nh        = None
+        elif "nh" in kwargs:
+            self._ns        = None                      # number of sites in the system
+            self._nhfull    = kwargs.get('nh')          # full Hilbert space dimension
+            self._nh        = self._nhfull
         else:
-            raise ValueError(HilbertSpace._ERRORS["ns"])
-        
+            self._ns        = None                      # number of sites in the system
         # handle local Hilbert space properties
-        self._nhl   = kwargs.get('nhl', 2)                          # local Hilbert space dimension
-        self._nhint = kwargs.get('nhint', 1)                        # number of modes (fermions, bosons, etc. on each site)
+        self._nhl   = kwargs.get('nhl', 2)              # local Hilbert space dimension
+        self._nhint = kwargs.get('nhint', 1)            # number of modes (fermions, bosons, etc. on each site)
+        self._single_part = single_part                 # single particle system flag
         
+        # Check if ns is obtainable from the nh if it is None
+        if self._ns is None and self._nh is not None:
+            if self._nh is not None:
+                if not self._single_part:
+                    # switch between the base of logarithm based on the local Hilbert space dimension
+                    self._ns = int(math.log(self._nhfull, self._nhl))
+                else:
+                    self._ns = self._nhfull // self._nhl
+            else:
+                raise ValueError(HilbertSpace._ERRORS["ns"])
+
         # initialize the backend for the vectors and matrices
         self._backend, self._backend_str, self._state_type = self.reset_backend(backend, state_type)
         
         # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
-        self._single_part   = single_part                           # single particle system flag
-        if self._single_part:
-            self._nhfull    = self._ns * self._nhl                  # single particle system Hilbert space dimension (each site has its own Hilbert space)
-        else:
-            self._nhfull        = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
-            
-        # may be edited later by modifying the symmetry group
-        self._nh            = self._nhfull                          # Hilbert space dimension
+        if self._nhfull is None:
+            if self._single_part:
+                self._nhfull    = self._ns * self._nhl              # single particle system Hilbert space dimension (each site has its own Hilbert space)
+            else:
+                self._nhfull    = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
+            # may be edited later by modifying the symmetry group
+            self._nh            = self._nhfull                      # Hilbert space dimension
         
         # initialize the properties of the Hilbert space
         self._normalization = []                                    # normalization of the states
@@ -364,6 +382,8 @@ class HilbertSpace(ABC):
             log (int) : The flag to log the message (default is 'info').
             lvl (int) : The level of the message.
         """
+        if isinstance(log, str):
+            log = Logger.LEVELS_R[log]
         if append_msg:
             msg = f"[HilbertSpace] {msg}"
         msg = self._logger.colorize(msg, color)
@@ -530,7 +550,7 @@ class HilbertSpace(ABC):
         """
 		
         if (not gen or len(gen) == 0) and not self.check_global_symmetry():
-            self._log("No local or global symmetries provided; symmetry group is empty.", lvl = 1, color = 'green')
+            self._log("No local or global symmetries provided; symmetry group is empty.", lvl = 1, log = 'debug', color = 'green')
             return
         
         # copy the generators to modify them if needed
@@ -610,7 +630,7 @@ class HilbertSpace(ABC):
             self._log(f"Generated the mapping of the states in {t1 - t0:.2f} seconds.", lvl = 2, color = 'green')
             self._mapping           = self._backend.array(self._mapping, dtype = self._backend.int64)
         else:
-            self._log("No mapping generated.", lvl = 1, color = 'green')
+            self._log("No mapping generated.", lvl = 1, color = 'green', log = 'debug')
 
     # --------------------------------------------------------------------------------------------------
 

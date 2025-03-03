@@ -695,22 +695,22 @@ class Hamiltonian(ABC):
         Parameters:
             use_numpy (bool) : A flag indicating whether to use NumPy or JAX.
         '''
-        self._log("Initializing the Hamiltonian matrix...", lvl = 2)
+        self._log("Initializing the Hamiltonian matrix...", lvl = 2, log = "debug")
         
         jax_maybe_avail = _JAX_AVAILABLE and self._backend != np
         if jax_maybe_avail and use_numpy:
             self._log("JAX is available but NumPy is forced...", lvl = 3)
         
         if self.sparse:
-            self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3)
+            self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
             
             # --------------------------------------------------------------------------------------
             
             if not jax_maybe_avail or use_numpy:
-                self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3)
+                self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3, log = "debug")
                 self._hamil = sp.sparse.csr_matrix((self._nh, self._nh), dtype = self._dtype)
             else:
-                self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3)
+                self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
                 # Create an empty sparse Hamiltonian matrix using JAX's BCOO format
                 indices     = self._backend.zeros((0, 2), dtype=DEFAULT_INT_TYPE)
                 data        = self._backend.zeros((0,), dtype=self._dtype)
@@ -719,13 +719,13 @@ class Hamiltonian(ABC):
             # --------------------------------------------------------------------------------------
             
         else:
-            self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3)
+            self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3, log = "debug")
             if not _JAX_AVAILABLE or self._backend == np:
                 self._hamil     = self._backend.zeros((self._nh, self._nh), dtype=self._dtype)
             else:
                 # do not initialize the Hamiltonian matrix
                 self._hamil     = None
-        self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green")
+        self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green", log = "debug")
         
     # ----------------------------------------------------------------------------------------------
     #! Single particle Hamiltonian matrix
@@ -745,7 +745,7 @@ class Hamiltonian(ABC):
     def __hamiltonian_validate(self):
         ''' Check if the Hamiltonian matrix is valid. '''
         if self._hamil is None:
-            self._log("Hamiltonian matrix is not initialized.", lvl=3, color="red")
+            self._log("Hamiltonian matrix is not initialized.", lvl=3, color="red", log = "debug")
         else:
             valid   = False
             # For dense matrices (NumPy/JAX ndarray) which have the 'size' attribute.
@@ -762,9 +762,9 @@ class Hamiltonian(ABC):
                     valid = True
             
             if valid:
-                self._log("Hamiltonian matrix calculated and valid.", lvl=3, color="green")
+                self._log("Hamiltonian matrix calculated and valid.", lvl=3, color="green", log = "debug")
             else:
-                self._log("Hamiltonian matrix calculated but empty or invalid.", lvl=3, color="red")
+                self._log("Hamiltonian matrix calculated but empty or invalid.", lvl=3, color="red", log = "debug")
                 self._hamil = None
 
     # ----------------------------------------------------------------------------------------------
@@ -920,7 +920,7 @@ class Hamiltonian(ABC):
 
         # -----------------------------------------------------------------------------------------
         matrix_type = "sparse" if self.sparse else "dense"
-        self._log(f"Calculating the {matrix_type} Hamiltonian matrix...", lvl=1, color="blue")
+        self._log(f"Calculating the {matrix_type} Hamiltonian matrix...", lvl=1, color="blue", log = 'debug')
         # -----------------------------------------------------------------------------------------
         
         # Check if JAX is available and the backend is not NumPy
@@ -928,7 +928,7 @@ class Hamiltonian(ABC):
         
         # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:
-            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2)
+            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2, log = 'debug')
             
             # Calculate the Hamiltonian matrix using the NumPy implementation.
             self._hamil = operator_create_np(
@@ -941,7 +941,7 @@ class Hamiltonian(ABC):
                 dtype               =   self._dtype
             )
         else:
-            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2)
+            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2, log = 'debug')
 
             # Choose the correct local energy function for JAX.
             local_fun = jit(self.loc_energy_int_jax) if self._is_sparse else self.loc_energy_ham

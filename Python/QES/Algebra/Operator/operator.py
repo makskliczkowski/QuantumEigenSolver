@@ -19,16 +19,18 @@ Date    : April 2023
 Author  : Maksymilian Kliczkowski, WUST, Poland
 """
 
+import copy                  
+import time
 import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
 from typing import Optional, Callable, Union, Iterable
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
-import copy                  
 ####################################################################################################
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as get_backend, _JAX_AVAILABLE
 from general_python.lattices import Lattice
+# from Algebra.hilbert import HilbertSpace
 ####################################################################################################
 
 if _JAX_AVAILABLE:
@@ -91,6 +93,41 @@ class GlobalSymmetries(Enum):
     Other   = auto()
 
 ####################################################################################################
+#! Distinguish type of function
+
+def _local_funct_wrapper(local_fun, *args):
+    '''
+    Basic wrapper for the local function - it is assumed that the local function
+    takes the form (k, *args) -> (rows, values).
+    
+    This allows to remove the arguments from the function and to use the JIT compilation.
+    Parameters:
+        local_fun (Callable)    : The local function.    
+        *args (Any)             : Additional arguments for the local function.
+    Returns:
+        Callable                : The wrapped local function.
+    -----------   
+    '''
+    # check the type of the local function based on the number of arguments
+    if local_fun.__code__.co_argcount == 1:
+        # if the local function takes only one argument, return the function itself
+        return local_fun
+    elif local_fun.__code__.co_argcount == 2 and len(args) == 1:
+        # if the local function takes two arguments and one argument is provided, wrap the function - LOCAL
+        def local_funct_wrapper_in(k):
+            return local_fun(k, args[0])
+        return local_funct_wrapper_in
+    elif local_fun.__code__.co_argcount > 2 and len(args) == 2:
+        # if the local function takes more than two arguments and two arguments are provided, wrap the function - CORRELATION
+        def local_funct_wrapper_in(k):
+            return local_fun(k, args[0], args[1])
+        return local_funct_wrapper_in
+    # otherwise, wrap without possibility of JIT compilation
+    def local_fun_wrapper_in(k):
+        return local_fun(k, *args)
+    return local_fun_wrapper_in
+
+####################################################################################################
 
 class OperatorFunction:
     """
@@ -117,7 +154,52 @@ class OperatorFunction:
 
     # -----------
     
-    def __call__(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+    def _apply_global(self, s: Union[int, jnp.ndarray]) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+        """
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or jnp.ndarray): The state to which the operator is applied.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+        """
+        return self._fun(s)
+    
+    # -----------
+    
+    def _apply_local(self, s: Union[int, jnp.ndarray], i) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+        """
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or jnp.ndarray): The state to which the operator is applied.
+            i: Additional argument for the operator.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+        """
+        return self._fun(s, i)
+    
+    # -----------
+    
+    def _apply_correlation(self, s: Union[int, jnp.ndarray], i, j) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+        """
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or jnp.ndarray): The state to which the operator is applied.
+            i, j: Additional arguments for the operator.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+        """
+        return self._fun(s, i, j)
+    
+    def apply(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
         Apply the operator function to a given state.
 
@@ -135,19 +217,44 @@ class OperatorFunction:
         """
         if len(args) != self._necessary_args:
             raise ValueError(f"Invalid number of arguments for the operator function. Expected {self._necessary_args}, got {len(args)}.")
-
-        result = self._fun(s, *args)
-
+        
+        # apply the operator function based on the number of necessary arguments
+        if self._necessary_args == 0:
+            result = self._apply_global(s)
+        elif self._necessary_args == 1:
+            result = self._apply_local(s, *args)
+        elif self._necessary_args == 2:
+            result = self._apply_correlation(s, *args)
+        else:
+            result = self._fun(s, *args)
+        
         # If the result is a tuple representing a single (state, value) pair
         if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
-            return result if self._modifies_state else (None, result[1])
-        # If the result is already a list of (state, value) pairs
-        elif isinstance(result, list):
-            return (result[0], result[1]) if self._modifies_state else (None, result[1])
-        elif isinstance(result, tuple) and len(result) == 2:
             return result
-
+        # If the result is already a list of (state, value) pairs
+        elif isinstance(result, list) and all(isinstance(item, tuple) and len(item) == 2 for item in result):
+            return result
         raise ValueError("Operator function returned an invalid type. Expected a tuple or a list of (state, value) pairs.")
+    
+    # -----------
+    
+    def __call__(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+        """
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or jnp.ndarray): The state to which the operator is applied.
+            args: Additional arguments for the operator. The number of arguments must equal self._necessary_args.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+
+        Raises:
+            ValueError: If the number of provided arguments does not equal self._necessary_args,
+                        or if the return type from the operator function is not recognized.
+        """
+        return self.apply(s, *args)
 
     # -----------
     #! Getters and Setters
@@ -181,9 +288,7 @@ class OperatorFunction:
         self._necessary_args = val
     
     # -----------
-    
     #! Composition
-    
     # -----------
         
     def __mul__(self, other : Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
@@ -288,8 +393,14 @@ class OperatorFunction:
 
     # -----------
     
+    def __mod__(self, other : 'OperatorFunction'):
+        '''
+        Applies operator to a given
+        '''
+        pass
+        
+    # -----------
     #! Addition
-    
     # -----------
 
     def __add__(self, other : 'OperatorFunction'):
@@ -336,9 +447,7 @@ class OperatorFunction:
         return OperatorFunction(adding, modifies_state = self._modifies_state or other._modifies_state, necessary_args = max(self._necessary_args, other._necessary_args))    
         
     # -----------
-    
     #! Subtraction
-    
     # -----------
     
     @jit
@@ -392,6 +501,19 @@ class OperatorFunction:
         return OperatorFunction(substract, modifies_state = self._modifies_state or other.modifies_state, necessary_args = max(self._necessary_args, other.necessary_args))    
     
     # -----------
+    #! Wrapping
+    # -----------
+    
+    def wrap(self, *args):
+        """
+        Wrap the operator function with additional arguments.
+        
+        Params:
+        - args: Additional arguments for the operator function.
+        """
+        return OperatorFunction(partial(self._fun, *args), modifies_state = self._modifies_state, necessary_args = self._necessary_args)
+    
+    # -----------
     
 ####################################################################################################
 
@@ -430,6 +552,8 @@ class OperatorTypeActing(Enum):
         return self == OperatorTypeActing.Correlation
     
     # -----------
+
+####################################################################################################
 
 class Operator(ABC):
     """
@@ -773,6 +897,32 @@ class Operator(ABC):
     
     # -------------------------------
     
+    def _apply_global(self, states : Union[int, list, np.ndarray | jnp.ndarray]):
+        ''' Apply the operator to the state '''
+        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+            return self._fun(states)
+        results     = [self._fun(state) for state in states]
+        out, val    = zip(*results) if results else ([], [])
+        return list(out), list(val)
+    
+    def _apply_local(self, states : Union[int, list, np.ndarray | jnp.ndarray], i):
+        ''' Apply the operator to the state '''
+        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+            return self._fun(states, i)
+        
+        results     = [self._fun(state, i) for state in states]
+        out, val    = zip(*results) if results else ([], [])
+        return list(out), list(val)
+    
+    def _apply_correlation(self, states : Union[int, list, np.ndarray | jnp.ndarray], i, j):
+        ''' Apply the operator to the state '''
+        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+            return self._fun(states, i, j)
+        
+        results     = [self._fun(state, i, j) for state in states]
+        out, val    = zip(*results) if results else ([], [])
+        return list(out), list(val)
+        
     def apply(self, states : list | np.ndarray | jnp.ndarray, *args):
         """
         Apply the operator to the state. 
@@ -783,12 +933,15 @@ class Operator(ABC):
                                 If there no arguments, the operator acts on the state as a whole - global operator.
                                 If there are arguments, the operator acts on the state locally - local operator (e.g., site-dependent).
         """
-        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
-            return self._fun(states, *args)
-        
-        results     = [self._fun(s, *args) for s in states]
-        out, val    = zip(*results) if results else ([], [])
-        return list(out), list(val)
+        if self._type_acting.is_global():
+            return self._apply_global(states)
+        elif self._type_acting.is_local():
+            return self._apply_local(states, *args)
+        elif self._type_acting.is_correlation():
+            return self._apply_correlation(states, *args)
+        else:
+            raise NotImplementedError("Invalid operator acting type.")
+        return [None], [0.0]
         
     # -------------------------------
     
@@ -808,34 +961,108 @@ class Operator(ABC):
     #! Generate matrix form of the operator
     #################################
     
-    def matrix(self, dim : int, matrix_type : str = 'dense', use_numpy: bool = False, *args, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
+    def _matrix_no_hilbert_np(self, dim: int, is_sparse: bool, wrapped_funct, dtype, max_loc_upd:int = 1):
+        """
+        Generate the matrix form of the operator without Hilbert space.
+        """
+        # create a dummy Hilbert space for convenience
+        from Algebra.hilbert import HilbertSpace
+        from Algebra.Operator.operator_matrix import operator_create_np
+        
+        dummy_hilbert = HilbertSpace(nh = dim, backend = self._backend)
+        dummy_hilbert.log("Calculating the Hamiltonian matrix using NumPy...", lvl = 2, log = 'debug')
+        # calculate the time to create the matrix
+        t1 = time.time()
+        matrix = operator_create_np(ns      = None, 
+                        hilbert_space       = dummy_hilbert,
+                        local_fun           = wrapped_funct,
+                        max_local_changes   = max_loc_upd,
+                        is_sparse           = is_sparse,
+                        start               = None,
+                        dtype               = dtype)
+        time_taken = time.time() - t1
+        dummy_hilbert.log(f"Time taken to create the matrix {self._name}: {time_taken:.2f} seconds", lvl=2, log = 'debug')
+        return matrix
+        
+    def _matrix_no_hilbert_jax(self, dim: int, is_sparse: bool, wrapped_funct, dtype, max_loc_upd:int = 1):
+        """
+        Generate the matrix form of the operator without Hilbert space.
+        """
+        # create a dummy Hilbert space for convenience
+        dummy_hilbert = HilbertSpace(nh = dim, backend = self._backend)
+        dummy_hilbert.log("Calculating the Hamiltonian matrix using JAX...", lvl = 2)
+        #!TODO: Implement the JAX version of the matrix function
+        return None
+        
+    def matrix(self, matrix_type : str, *args, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
         """
         Generates the matrix representation of the operator.
 
         Parameters:
         - param dim             : Dimension of the matrix.
         - param matrix_type     : Type of matrix ("dense" or "sparse").
+        - param *args           : Additional arguments for the operator function - moved to self._fun.
+        - param **kwargs        : Additional keyword arguments for the operator function.
         :return: The matrix representation of the operator.
         """
-        if not isinstance(dim, int) or dim <= 0:
-            raise ValueError("Dimension must be a positive integer.")
+        
+        hilbert_1   = kwargs.get('hilbert_1', None)     # first Hilbert space
+        hilbert_2   = kwargs.get('hilbert_2', None)     # second Hilbert space
+        
+        # check the dimension of the matrix
+        dim1, dim2      = None, None
+        matrix_hilbert  = 'None'
+        if hilbert_1 is not None and hilbert_2 is not None:
+            dim1, dim2  = hilbert_1.nh, hilbert_2.nh
+            matrix_hilbert = 'double'
+        elif hilbert_1 is not None and hilbert_2 is None:
+            dim1, dim2  = hilbert_1.nh, hilbert_1.nh
+            matrix_hilbert = 'single'
+        elif hilbert_1 is None and hilbert_2 is not None:
+            hilbert_1   = hilbert_2
+            dim1, dim2  = hilbert_2.nh, hilbert_2.nh
+            matrix_hilbert = 'single'
+        else:
+            dim         = kwargs.get('dim', None)
+            if dim is None:
+                raise ValueError("Dimension or at least one Hilbert space must be provided.")
+            dim1, dim2  = dim, dim
+            matrix_hilbert = 'None'
+
+        # check if there are functions from the Hilbert space
+        use_numpy    = kwargs.get('use_numpy', False)
+        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
+        is_sparse    = (matrix_type == 'sparse')
         
         # check if the matrix function is provided and skips kwargs if unnecessary
         if self._matrix_fun is not None:
-            if matrix_type == 'sparse':
-                return self._matrix_fun(dim, matrix_type, *args)
+            if is_sparse:
+                return self._matrix_fun(dim1, matrix_type, *args)
             else:
-                return jnp.asarray(self._matrix_fun(dim, matrix_type, *args))
-        # check if there are functions from the Hilbert space
-        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
-        is_sparse    = matrix_type == 'sparse'
+                return self._backend.asarray(self._matrix_fun(dim1, matrix_type, *args))
         
-        # easiest case - no Hilbert space provided
+        # wrap the function
+        wrapped_fun  = self._fun.wrap(*args)
+        dtype        = kwargs.get('dtype', self._backend.float64 if not use_numpy else np.float64)
+        max_loc_upd  = kwargs.get('max_loc_upd', 1)
+
+        # Case1: easiest case - no Hilbert space provided
+        if matrix_hilbert == 'None':
+            # maximum local updates - how many states does the operator create - for sparse
+            if not jax_maybe_av or use_numpy:
+                return self._matrix_no_hilbert_np(dim1, is_sparse, wrapped_fun, dtype, max_loc_upd)
+            else:
+                return self._matrix_no_hilbert_jax(dim1, is_sparse, wrapped_fun, dtype, max_loc_upd)
+        # Case2: one Hilbert space provided
+        elif matrix_hilbert == 'single':
+            pass
+        # Case3: two Hilbert spaces provided
+        elif matrix_hilbert == 'double':
+            pass
+        else:
+            raise ValueError("Invalid Hilbert space provided.")
+        return None
         
-        
-        if not jax_maybe_av or use_numpy:
-            matrix  = OpMatrix.operator_create_np()
-    
     #################################
     
     def standardize_matrix(self, matrix):

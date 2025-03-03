@@ -47,6 +47,8 @@ if _JAX_AVAILABLE:
 ################################################################################
 
 # Define the Pauli matrices for reference
+_SIG_0 = np.array([[1, 0],
+                [0, 1]], dtype=float)
 _SIG_X = np.array([[0, 1],
                 [1, 0]], dtype=float)
 _SIG_Y = np.array([[0, -1j],
@@ -122,7 +124,7 @@ def _sigma_x_int(state  : int,
     Apply the Pauli-X (σₓ) operator on the given sites.
     For each site, flip the bit at position (ns-1-site) using binary.flip.
     """
-    if not isinstance(state, int):
+    if not isinstance(state, (int, np.integer)):
         return _sigma_x_int_jnp(state, ns, sites, spin_value, backend)
     return _sigma_x_int_np(state, ns, sites, spin_value)
 
@@ -205,7 +207,7 @@ def sigma_x(state,
     if sites is None:
         sites = list(range(ns))
     
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_x_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_x_np(state, ns, sites, spin, spin_value)
@@ -302,7 +304,7 @@ def _sigma_y_int(state      : int,
     int
         The state after applying the operator.    
     """
-    if not isinstance(state, int):
+    if not isinstance(state, (int, np.integer)):
         return _sigma_y_int_jnp(state, ns, sites, spin_value, backend)
     return _sigma_y_int_np(state, ns, sites, spin_value)
 
@@ -394,7 +396,7 @@ def sigma_y(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_y_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_y_np(state, sites, spin, spin_value)
@@ -482,15 +484,15 @@ def _sigma_z_int(state      : int,
     For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
     The state is unchanged.
     """
-    if not isinstance(state, int):
+    if not isinstance(state, (int, np.integer)):
         return _sigma_z_int_jnp(state, ns, sites, spin_value, backend)
     return _sigma_z_int_np(state, ns, sites, spin_value)
 
 def _sigma_z_np(state: np.ndarray,
-                ns: int,
-                sites: Union[List[int], None],
-                spin: bool = _BACKEND_DEF_SPIN,
-                spin_value: float = _SPIN):
+                ns          : int,
+                sites       : Union[List[int], None],
+                spin        : bool = _BACKEND_DEF_SPIN,
+                spin_value  : float = _SPIN):
     """
     σ_z on a NumPy array state.
     """
@@ -519,18 +521,18 @@ def _sigma_z_jnp(state,
     return state, coeff
 
 def sigma_z(state,
-            ns: int,
-            sites: Union[List[int], None],
-            spin: bool = _BACKEND_DEF_SPIN,
-            spin_value: float = _SPIN,
-            backend: str = DEFAULT_BACKEND):
+            ns          : int,
+            sites       : Union[List[int], None],
+            spin        : bool  = _BACKEND_DEF_SPIN,
+            spin_value  : float = _SPIN,
+            backend     : str   = DEFAULT_BACKEND):
     """
     Dispatch for σ_z.
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
-        return _sigma_z_int_np(state, ns, sites, spin_value)
+    if isinstance(state, (int, np.integer, jnp.integer)):
+        return _sigma_z_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_z_np(state, ns, sites, spin, spin_value)
     else:
@@ -606,7 +608,7 @@ def sigma_plus(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_plus_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_plus_np(state, ns, sites, spin, spin_value)
@@ -706,7 +708,7 @@ def sigma_minus(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_minus_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_minus_np(state, ns, sites, spin, spin_value)
@@ -819,7 +821,7 @@ def sigma_pm(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_pm_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_pm_np(state, ns, sites, spin, spin_value)
@@ -935,7 +937,7 @@ def sigma_mp(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_mp_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_mp_np(state, ns, sites, spin, spin_value)
@@ -1039,7 +1041,7 @@ def sigma_k(state,
     """
     if sites is None:
         sites = list(range(ns))
-    if isinstance(state, int):
+    if isinstance(state, (int, np.integer)):
         return _sigma_k_int(state, ns, sites, k, spin, spin_value)
     elif isinstance(state, np.ndarray):
         return _sigma_k_np(state, ns, sites, k, spin, spin_value)
@@ -1261,19 +1263,21 @@ def sig_z( lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Local:
         def op(state, site):
             return sigma_z(state, ns, [site], spin, spin_value, backend)
-        return Operator(fun = op,
-                        eigval = 1.0,
+        return Operator(fun     = op,
+                        eigval  = 1.0,
                         lattice = lattice,
-                        name = "Sz/L",
-                        typek = SymmetryGenerators.Other, modifies=False)
+                        ns      = ns,
+                        name    = "Sz/L",
+                        typek   = SymmetryGenerators.Other, modifies=False, backend=backend)
     elif type_act == OperatorTypeActing.Correlation:
         def op(state, site1, site2):
             return sigma_z(state, ns, [site1, site2], spin, spin_value)
-        return Operator(fun = op,
-                        eigval = 1.0,
+        return Operator(fun     = op,
+                        eigval  = 1.0,
                         lattice = lattice,
-                        name = "Sz/C",
-                        typek = SymmetryGenerators.Other, modifies=False)
+                        name    = "Sz/C",
+                        ns      = ns,
+                        typek   = SymmetryGenerators.Other, modifies=False, backend=backend)
     else:
         raise ValueError("Invalid OperatorTypeActing")
 
@@ -1525,7 +1529,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         should change the state from 0b0101 to 0b0111.
         """
         # state: 0b0101 (bits: [0,1,0,1])
-        if not isinstance(state, int):
+        if not isinstance(state, (int, np.integer)):
             state = base2int(state, spin = _BACKEND_DEF_SPIN, spin_value = _SPIN)
         elif state is None:
             state = 0b0101
@@ -1565,7 +1569,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         if isinstance(sites, int):
             sites = [sites]
         # Convert integer state to a binary vector (using spin convention)
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state
@@ -1622,7 +1626,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         if isinstance(sites, int):
             sites = [sites]
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state
@@ -1679,7 +1683,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         if isinstance(sites, int):
             sites = [sites]
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state
@@ -1734,7 +1738,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         if isinstance(sites, int):
             sites = [sites]
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state
@@ -1789,7 +1793,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         if isinstance(sites, int):
             sites = [sites]
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state
@@ -1847,7 +1851,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         if sites is None:
             sites = list(range(ns))
-        if isinstance(state, int):
+        if isinstance(state, (int, np.integer)):
             base_state = int2base(state, ns, spin=True, spin_value=_SPIN)
         else:
             base_state = state

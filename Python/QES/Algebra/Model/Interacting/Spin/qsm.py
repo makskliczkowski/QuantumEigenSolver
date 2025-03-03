@@ -297,7 +297,7 @@ class QSM(Hamiltonian):
         
         if _QSM_CHECK_HS_NORM:
             _norm           = linalg.hilbert_schmidt_norm(hdot, backend=self._backend)
-            self._log(f"H_dot norm: {_norm:.3e}", lvl = 2)
+            self._log(f"H_dot norm: {_norm:.3e}", lvl = 2, log = 'debug')
             return hdot / np.sqrt(_norm)
         return hdot
 
@@ -305,7 +305,7 @@ class QSM(Hamiltonian):
         ''' Initialize the random distances for the 'free' particles. '''
         nout        = self.nout
         xi          = self._xi
-        u           = np.ones(nout)
+        u           = np.zeros(nout)
         for i in range(1, nout):
             u[i]    = np.random.uniform(low=i-xi[i], high=i+xi[i])
         self._u     = u
@@ -328,10 +328,11 @@ class QSM(Hamiltonian):
         self.__init_a_distances()
 
         # log information
-        self._log("alpha = [{}]".format(", ".join(f"{val:.3f}" for val in self._a)), lvl=1)
-        self._log("u = [{}]".format(", ".join(f"{val:.3f}" for val in self._u)), lvl=2)
-        self._log("alpha^u = [{}]".format(", ".join(f"{val:.3f}" for val in self._au)), lvl=2)
+        self._log("alpha = [{}]".format(", ".join(f"{val:.3f}" for val in self._a)), lvl=1, log = 'debug')
+        self._log("u = [{}]".format(", ".join(f"{val:.3f}" for val in self._u)), lvl=2, log = 'debug')
+        self._log("alpha^u = [{}]".format(", ".join(f"{val:.3f}" for val in self._au)), lvl=2, log = 'debug')
 
+        # initialize the Hamiltonian in the dot
         self._hdot      = self.__init_hdot()
         
         # based on the backend, convert the Hamiltonian to the appropriate type
@@ -345,9 +346,7 @@ class QSM(Hamiltonian):
         self._a         = np.array(self._a, dtype = np.float64)
         self._xi        = np.array(self._xi, dtype = np.float64)
         self._neidot    = np.array(self._neidot, dtype = np.int64)
-        
-        
-
+    
     # ----------------------------------------------------------------------------------------------
 
     def set_alpha(self, a, initialize = True):
@@ -370,7 +369,7 @@ class QSM(Hamiltonian):
         if isinstance(h, list) and len(h) == self.nout:
             self._h = h
         elif isinstance(h, float):
-            self._h = [h] * self.nout
+            self._h = random_vector(self.nout, typek = f'r;{h-0.5};{h+0.5}', backend=self._backend, dtype=self._dtype)
         elif isinstance(h, str):
             self._h = random_vector(self.nout, h, backend=self._backend, dtype=self._dtype)
         else:
@@ -448,10 +447,10 @@ class QSM(Hamiltonian):
             self._log("Empty Hilbert, not building anything.", "INFO", 1)
             return
 
-        self._log(f"QSM: alpha={self._a[0]:.3f}, xi={self._xi[0]:.3f}", lvl = 2)
+        self._log(f"QSM: alpha={self._a[0]:.3f}, xi={self._xi[0]:.3f}", lvl = 2, log = 'debug')
         
         for i in range(self.nout):
-            self._log(f"QSM: i={i} -> h={self._h[i]:.3e}, a^u={self._au[i]:.3e}", lvl = 3)
+            self._log(f"QSM: i={i} -> h={self._h[i]:.3e}, a^u={self._au[i]:.3e}", lvl = 3, log = 'debug')
 
         super()._hamiltonian(use_numpy)
         
