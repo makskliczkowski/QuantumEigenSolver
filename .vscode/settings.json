@@ -90,7 +90,8 @@
         "locale": "cpp",
         "print": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "*.tpp": "cpp"
     },
     "files.exclude": {
         "**/.git": true,

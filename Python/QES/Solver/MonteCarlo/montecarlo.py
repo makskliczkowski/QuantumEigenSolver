@@ -119,6 +119,7 @@ class MonteCarloSolver(Solver):
                 hilbert : Optional[HilbertSpace]        = None,
                 modes   : Optional[int]                 = 2,
                 dir     : Optional[(str, Directories)]  = None,
+                nthreads: Optional[int]                 = 1,
                 **kwargs):
         """
         Initializes the Monte Carlo solver with default parameters.
@@ -140,12 +141,16 @@ class MonteCarloSolver(Solver):
         _best_loss (float)      : Best loss value.
         _replica (int)          : Replica index (default is 1).
         _beta (float)           : Inverse temperature beta = 1/T.
+        _nthreads (int)         : Number of threads.
+        _hilbert (HilbertSpace) : Hilbert space object.
+        _backend (str)          : Backend to use (default is 'default').
+        _dir (str)              : Directory for saving the data.
         _rng_key [_rng]         : Random number generator key.
         _info (str)             : Information about the solver.
         """
         
         # call the parent class constructor with the arguments and keyword arguments passed
-        super().__init__(size=size, modes=modes, seed=seed,
+        super().__init__(size=size, modes=modes, seed=seed, nthreads=nthreads,
                          hilbert=hilbert, backend=backend, dir=dir, **kwargs)
         
         # define the instance variables
@@ -264,11 +269,11 @@ class MonteCarloSolver(Solver):
     #! GETTERS AND SETTERS
     # ----------------------------------------------------------------------
     
-    @abstractmethod
     def get_state(self):
         '''
         Get the state of the Monte Carlo solver.
         '''
+        return self._currstate
     
     @property
     def beta(self):

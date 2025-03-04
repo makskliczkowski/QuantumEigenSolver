@@ -77,12 +77,14 @@ class Solver(ABC):
     ###################################
     
     def __init__(self,
-                size    : int = 1,
-                modes   : int = 2,
-                seed    : Optional[int] = None,
-                hilbert : Optional[HilbertSpace] = None,
-                dir     : Union[str, Directories] = defdir,
-                backend : str = 'default', **kwargs):
+                size        : int = 1,
+                modes       : int = 2,
+                seed        : Optional[int] = None,
+                hilbert     : Optional[HilbertSpace] = None,
+                directory   : Union[str, Directories] = defdir,
+                nthreads    : int = 1,
+                backend     : str = 'default', 
+                **kwargs):
         '''
         Initialize the solver.
         
@@ -90,13 +92,26 @@ class Solver(ABC):
         - size          : size of the configuration (like lattice sites etc.)
         - modes         : number of modes for the binary representation
         - hilbert       : Hilbert space representation
-        - dir           : directory for saving the data (potentially)
+        - directory     : directory for saving the data (potentially)
         - seed          : seed for the random number generator
         - backend       : backend for the calculations (default is 'default')
         '''
         self._size          = size                                                          # size of the configuration (like lattice sites etc.)
         self._modes         = modes                                                         # number of modes for the binary representation
-        self._dir           = dir                                                           # directory for saving the data (potentially)
+        self._hilbert       = hilbert                                                       # Hilbert space representation
+        if self._hilbert is not None:
+            self._size  = hilbert.ns
+            self._modes = hilbert.modes
+        elif hilbert is None and size is not None:
+            self._hilbert   = HilbertSpace(ns=size, modes=modes)
+        elif hilbert is None and size is None:
+            raise ValueError("The size of the system is not defined.")
+        
+        # directory creation
+        self._dir           = directory                                                     # directory for saving the data (potentially)
+        if not isinstance(directory, Directories):
+            self._dir       = Directories(directory)
+        self._dir.create_folder(False)
         
         # check the backend
         self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
@@ -111,7 +126,6 @@ class Solver(ABC):
 
         # set the current state of the system
         self._currstate     = self._backend.zeros(size * (modes // 2), dtype=self._prec)    # current state of the system
-        self._hilbert       = hilbert                                                       # Hilbert space representation
         
         # statistical 
         self._lastloss      = None                                                          # last loss
@@ -123,7 +137,17 @@ class Solver(ABC):
         self._bestloss      = None                                                          # best loss
         
         self._replica_idx   = 1                                                             # replica index
-    
+        # initialize threads
+        self._nthreads      = nthreads
+        
+        # allow for preconditioner and scheduler
+        self._precond       = kwargs.get('preconditioner', None)
+        self._scheduler     = kwargs.get('scheduler', None)
+        self._solver        = kwargs.get('solver', None)
+        self._optimizer     = kwargs.get('optimizer', None)
+        self._early_stop    = kwargs.get('early_stop', None)
+        self._arch_params   = kwargs.get('architecture_parameters', None)
+
     #####################################
     #! PROPERTIES AND GETTERS
     #####################################
@@ -253,6 +277,46 @@ class Solver(ABC):
         '''
         self._replica_idx = idx
         return self._replica_idx
+    
+    def set_early_stopping(self, *args, **kwargs):
+        '''
+        Set the early stopping criteria.
+        '''
+        #!TODO: implement the early stopping criteria
+        self._early_stop = kwargs.get('early_stop', None)
+        return self._early_stop
+    
+    def set_optimizer(self, *args, **kwargs):
+        '''
+        Set the optimizer.
+        '''
+        #!TODO: implement the optimizer
+        self._optimizer = kwargs.get('optimizer', None)
+        return self._optimizer
+    
+    def set_preconditioner(self, *args, **kwargs):
+        '''
+        Set the preconditioner.
+        '''
+        #!TODO: implement the preconditioner
+        self._preconditioner = kwargs.get('preconditioner', None)
+        return self._preconditioner
+    
+    def set_scheduler(self, *args, **kwargs):
+        '''
+        Set the scheduler.
+        '''
+        #!TODO: implement the scheduler        
+        self._scheduler = kwargs.get('scheduler', None)
+        return self._scheduler
+    
+    def set_solver(self, *args, **kwargs):
+        '''
+        Set the solver.
+        '''
+        #!TODO: implement the solver        
+        self._solver = kwargs.get('solver', None)
+        return self._solver
     
     ###################################
     #! Set the state of the system
