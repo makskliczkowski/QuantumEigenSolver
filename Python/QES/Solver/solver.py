@@ -10,6 +10,7 @@ from enum import Enum, auto, unique
 
 # from algebra
 from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
 import general_python.common.binary as Binary
 
@@ -118,6 +119,8 @@ class Solver(ABC):
         self._lastloss_mean = None                                                          # last loss mean
         self._lastloss_max  = None                                                          # last loss maximum
         self._lastloss_min  = None                                                          # last loss minimum
+        self._currentloss   = None                                                          # current loss
+        self._bestloss      = None                                                          # best loss
         
         self._replica_idx   = 1                                                             # replica index
     
@@ -199,6 +202,13 @@ class Solver(ABC):
         '''Return the random number generator key.'''
         return self._rng_key
     
+    @property
+    def random(self):
+        '''Return random number'''
+        return uniform(shape=(1,), backend=self._backend, rng=self._rng, rng_k=self._rng_key)[0]
+    
+    # ----------------------------------
+    
     def reset_backend(self, backend: str = 'default', seed: Optional[int] = None):
         '''
         Reset the backend for the calculations.
@@ -229,23 +239,34 @@ class Solver(ABC):
             else:
                 _backend, _backend_sp = bck, None
                 _rng, _rng_k = None, None
-            return _backend, _backend_sp, (_rng, _rng_k)
+            return _backend, _backend_sp, (_rng, _rng_k), backend
         _backendstr = 'np' if (backend is None or (backend == 'default' and not _JAX_AVAILABLE) or backend == np) else 'jax'
         return Solver.obtain_backend(_backendstr, seed)
+    
+    ###################################
+    #! Setters
+    ###################################
+    
+    def set_replica_idx(self, idx: int):
+        '''
+        Set the replica index.
+        '''
+        self._replica_idx = idx
+        return self._replica_idx
     
     ###################################
     #! Set the state of the system
     ###################################
     
-    @abstractmethod
+    # @abstractmethod
     def _set_state_tens(self, state : Union[jnp.ndarray, np.ndarray], _mode_repr : float = 0.5):
         '''
         Set the state configuration from the tensor.
         - state         : state configuration
         - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
         '''
-        pass
-    
+        self._currstate = state
+
     #! TODO: implement the set_state_int and set_state_rand for the fermions
     def _set_state_int(self, state: int, _mode_repr : float = 0.5):
         '''
@@ -271,34 +292,35 @@ class Solver(ABC):
         if self._hilbert is None:
             if self._modes == 2:
                 # set the state from tensor
-                self.set_state_tens(jnp.array([1 if (state & (1 << i)) else -1 for i in range(self.size)], dtype = Solver.prec) * _mode_repr)
+                self._set_state_tens(Binary.int2base(state, self._size, self.backend, spin_value = _mode_repr), _mode_repr)
             elif self.modes == 4:
-                # first half is up and the second half is down
-                int_left    = state >> (self.size)              # the left part     - the last _size bits   - move the bits to the right by _size
-                # int_right   = state % self.size               # the right part    - the first _size bits  - get the modulo of the state by _size
-                int_right   = state & ((1 << self.size) - 1)    # the right part    - the first _size bits  - get the modulo of the state by _size 
-                                                                # for size not power of 2
-                self.set_state_tens(jnp.array(
-                            [1 if (int_right & (1 << i)) else 0 for i in range(self.size)] +
-                            [1 if (int_left & (1 << i)) else 0 for i in range(self.size)],
-                            dtype = Solver.prec) * _mode_repr)
+                # # first half is up and the second half is down
+                # int_left    = state >> (self.size)              # the left part     - the last _size bits   - move the bits to the right by _size
+                # # int_right   = state % self.size               # the right part    - the first _size bits  - get the modulo of the state by _size
+                # int_right   = state & ((1 << self.size) - 1)    # the right part    - the first _size bits  - get the modulo of the state by _size 
+                #                                                 # for size not power of 2
+                # self.set_state_tens(jnp.array(
+                #             [1 if (int_right & (1 << i)) else 0 for i in range(self.size)] +
+                #             [1 if (int_left & (1 << i)) else 0 for i in range(self.size)],
+                #             dtype = Solver.prec) * _mode_repr)
                 raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         else:
             #!TODO : implement the Hilbert space representation
             raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         
-    def set_state_rand(self, _mode_repr : float = 0.5):
+    def _set_state_rand(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration randomly.
         - _mode_repr : mode representation (default is 0.5 - for binary spins +-1)
         '''
         if self.hilbert is None:
             if self.modes == 2:
-                self.set_state_tens(jnp.array(jnp.random.choice([-1, 1], self.size),
-                                            dtype = Solver.prec) * _mode_repr)
+                ran_state = choice([-1, 1], self.size, rng=self._rng, rng_k=self._rng_key, dtype=self._prec)
+                self._set_state_tens(ran_state * _mode_repr)
+                
             elif self.modes == 4:
-                self.set_state_tens(jnp.array(jnp.random.choice([0, 1], 2 * self.size),
-                                            dtype = Solver.prec) * _mode_repr)
+                ran_state = choice([0, 1], 2 * self.size, rng=self._rng, rng_k=self._rng_key, dtype=self._prec)
+                self._set_state_tens(ran_state * _mode_repr)
                 # ! TODO : this is a specific implementation for the fermions 
                 # ! TODO : create a specific basis so that symmetries can be implemented
             else:
@@ -307,49 +329,55 @@ class Solver(ABC):
             # ! TODO : implement the Hilbert space representation
             raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
             
-    def set_state_up(self, _mode_repr : float = 0.5):
+    def _set_state_up(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration to all up.
         '''
         if self.hilbert is None:
             if self.modes == 2:
-                self.set_state_tens(jnp.ones(self.size, dtype = Solver.prec) * _mode_repr)
+                state = self._backend.ones(self.size, dtype = self._prec) * _mode_repr
+                self._set_state_tens(state, _mode_repr)
             elif self.modes == 4:
-                self.set_state_tens(jnp.array([1 for _ in range(self.size)] +
-                                            [0 for _ in range(self.size)],
-                                            dtype = Solver.prec) * _mode_repr)
+                state = self._backend.array(  [1 for _ in range(self.size)] +
+                                    [0 for _ in range(self.size)],
+                                    dtype = self._prec) * _mode_repr
+                self._set_state_tens(state, _mode_repr)
             else:
                 raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         else:
             # ! TODO : implement the Hilbert space representation
             raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         
-    def set_state_down(self, _mode_repr : float = 0.5):
+    def _set_state_down(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration to all down. 
         '''
         if self.hilbert is None:
             if self.modes == 2:
-                self.set_state_tens(-jnp.ones(self.size, dtype = Solver.prec) * _mode_repr)
+                state = self._backend.ones(self.size, dtype = self._prec) * (-_mode_repr)
+                self._set_state_tens(state, _mode_repr)
             elif self.modes == 4:
-                self.set_state_tens(jnp.array([0 for _ in range(self.size)] 
-                                            + [1 for _ in range(self.size)]
-                                            , dtype = Solver.prec) * _mode_repr)
+                state = self._backend.array(  [0 for _ in range(self.size)] +
+                                    [1 for _ in range(self.size)],
+                                    dtype = self._prec) * _mode_repr
+                self._set_state_tens(state, _mode_repr)
         else:
             # ! TODO : implement the Hilbert space representation
             raise NotImplementedError("The state is not implemented for the given modes.")
     
-    def set_state_af(self):
+    def _set_state_af(self, _mode_repr : float = 0.5):
         '''
         Set the state configuration to antiferromagnetic.
         '''
         if self.hilbert is None:
             if self.modes == 2:
-                self.set_state_tens(jnp.array([1 if i % 2 == 0 else -1 for i in range(self.size)], dtype = jnp.float32))
+                state = self._backend.array([1 if i % 2 == 0 else -1 for i in range(self.size)], dtype = self._prec) * _mode_repr
+                self._set_state_tens(state, _mode_repr)
             elif self.modes == 4:
-                self.set_state_tens(jnp.array([1 if i % 2 == 0 else 0 for i in range(self.size)] 
-                                    + [0 if i % 2 == 0 else 1 for i in range(self.size)]
-                                    , dtype = jnp.float32))
+                state = self._backend.array([1 if i % 2 == 0 else 0 for i in range(self.size)]
+                                    + [0 if i % 2 == 0 else 1 for i in range(self.size)],
+                                    dtype = self._prec) * _mode_repr
+                self._set_state_tens(state, _mode_repr)
             else:
                 raise NotImplementedError("The state is not implemented for the given modes.")
         else:
@@ -379,32 +407,50 @@ class Solver(ABC):
         Raises:
         ValueError: If the state is not an integer, jnp.ndarray, np.ndarray, or a valid string representing an initial state.
         """
-        if isinstance(statetype, int):
-            self.set_state_int(statetype, mode_repr)
-        elif isinstance(statetype, jnp.ndarray):
-            self.set_state_tens(statetype, mode_repr)
+        if isinstance(statetype, int, np.integer, jnp.integer):
+            self._set_state_int(statetype, mode_repr)
+        elif isinstance(statetype, jnp.ndarray, np.ndarray):
+            self._set_state_tens(statetype, mode_repr)
         elif isinstance(statetype, str):
             return self._state_distinguish(statetype)
-        elif isinstance(statetype, SolverInitState): 
+        elif isinstance(statetype, SolverInitState):
             if statetype == SolverInitState.RND:
-                self.set_state_rand(mode_repr)
+                self._set_state_rand(mode_repr)
             elif statetype == SolverInitState.F_UP:
-                self.set_state_up(mode_repr)
+                self._set_state_up(mode_repr)
             elif statetype == SolverInitState.F_DN:
-                self.set_state_down(mode_repr)
+                self._set_state_down(mode_repr)
             elif statetype == SolverInitState.AF:
-                self.set_state_af(mode_repr)
+                self._set_state_af(mode_repr)
         else:
             raise ValueError("The state must be an integer, a jnp.ndarray, or a valid string representing an initial state.")
             
     def set_state(self, state, mode_repr = 0.5, update = True):
         '''
         Set the state (either integer or vector) of the Monte Carlo solver.
-        - state : state of the system
+        - state     : state of the system
         - mode_repr : mode representation (default is 0.5 - for binary spins +-1)
-        - update : update the current state of the system
-        '''    
+        - update    : update the current state of the system
+        '''
         self._state_distinguish(state, mode_repr)
-    
+        #!TODO: handle the update of the current state of the system
+        
+    ###################################
+    #! ABSTRACT METHODS
     ###################################
     
+    @abstractmethod
+    def clone(self):
+        '''
+        Clone the solver.
+        '''
+        pass
+    
+    @abstractmethod
+    def swap(self, other):
+        '''
+        Swap the state of the solver with another solver.
+        '''
+        pass
+    
+########################################
