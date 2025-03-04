@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        ".inl": "cpp",
         "chrono": "cpp",
         "ostream": "cpp",
         "sstream": "cpp",
@@ -74,7 +75,22 @@
         "ranges": "cpp",
         "span": "cpp",
         "cinttypes": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "__bit_reference": "cpp",
+        "__hash_table": "cpp",
+        "__locale": "cpp",
+        "__node_handle": "cpp",
+        "__split_buffer": "cpp",
+        "__threading_support": "cpp",
+        "__tree": "cpp",
+        "__verbose_abort": "cpp",
+        "execution": "cpp",
+        "forward_list": "cpp",
+        "ios": "cpp",
+        "locale": "cpp",
+        "print": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     },
     "files.exclude": {
         "**/.git": true,

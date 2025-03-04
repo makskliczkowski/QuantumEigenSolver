@@ -1,13 +1,27 @@
+import numpy as np
+import scipy as sp
+from numba import jit, njit, prange
+from typing import Union, Tuple, Union, Callable, Optional
+
+# for the abstract class
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum, auto
-from typing import Union
+from enum import Enum, auto, unique
+
+# from algebra
+from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.common.directories import Directories
+import general_python.common.binary as Binary
+
+# from hilbert
+from Algebra.hilbert import HilbertSpace
 
 # JAX imports
-import jax
-import jax.numpy as jnp
-import jax.random as random
-from jax import vmap
+if _JAX_AVAILABLE:
+    import jax
+    import jax.numpy as jnp
+    import jax.random as random
+    from jax import vmap
 
 #######################################
 
@@ -19,7 +33,7 @@ class SolverInitState(Enum):
     RND         = auto()    # random configuration
     F_UP        = auto()    # ferromagnetic up
     F_DN        = auto()    # ferromagnetic down
-    AF          = auto()    # antiferromagnetic  
+    AF          = auto()    # antiferromagnetic
     
     # -----------------------
     
@@ -34,9 +48,9 @@ class SolverInitState(Enum):
         """
         Create an enum member from a string, ignoring case.
         Parameters:
-        state_str (str)     : The string representation of the enum member.
+            state_str (str)     : The string representation of the enum member.
         Returns:
-        SolverInitState     : The enum member corresponding to the input string.
+            SolverInitState     : The enum member corresponding to the input string.
         """
         # Normalize input (upper-case) to match enum member names
         normalized = state_str.upper()
@@ -45,7 +59,7 @@ class SolverInitState(Enum):
         raise ValueError(f"Unknown initial state: {state_str}")
 
     # -----------------------
-    
+
 #######################################
 
 class Solver(ABC):
@@ -54,48 +68,191 @@ class Solver(ABC):
     """
     
     ###################################
-    epsilon    = jnp.finfo(jnp.float64).eps         # machine epsilon for float64 - might be changed to float32
-    prec       = jnp.float32                        # precision of the calculations - might be changed to float64
-    defdir     = "data"                             # default directory for saving the data
+    defdir     = "./data"       # default directory for saving the data
 
     ###################################
     NOT_IMPLEMENTED_ERROR       = "The state is not implemented for the given modes."
     NOT_IMPLEMENTED_ERROR_SAVE  = "The saving is not implemented for the given modes."
     ###################################
     
-    def __init__(self, **kwargs):
+    def __init__(self,
+                size    : int = 1,
+                modes   : int = 2,
+                seed    : Optional[int] = None,
+                hilbert : Optional[HilbertSpace] = None,
+                dir     : Union[str, Directories] = defdir,
+                backend : str = 'default', **kwargs):
         '''
         Initialize the solver.
         
         Parameters:
         - size          : size of the configuration (like lattice sites etc.)
         - modes         : number of modes for the binary representation
+        - hilbert       : Hilbert space representation
+        - dir           : directory for saving the data (potentially)
+        - seed          : seed for the random number generator
+        - backend       : backend for the calculations (default is 'default')
         '''
-        self.size               = kwargs.get("size", 1)                                             # size of the configuration (like lattice sites etc.)
-        self.modes              = kwargs.get("modes", 2)                                            # number of modes for the binary representation 
-        self.currstate          = jnp.array([0.0 for _ in range(self.size)], dtype = Solver.prec)   # current state of the system
-        if "hilbert" in kwargs:
-            self.hilbert        = kwargs.get("hilbert", None)                                       # Hilbert space for the system
+        self._size          = size                                                          # size of the configuration (like lattice sites etc.)
+        self._modes         = modes                                                         # number of modes for the binary representation
+        self._dir           = dir                                                           # directory for saving the data (potentially)
+        
+        # check the backend
+        self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
+        
+        # set the precision
+        if self._backend == np:
+            self._eps   = np.finfo(np.float64).eps
+            self._prec  = np.float32
+        else:
+            self._eps   = jnp.finfo(jnp.float64).eps
+            self._prec  = jnp.float32
+
+        # set the current state of the system
+        self._currstate     = self._backend.zeros(size * (modes // 2), dtype=self._prec)    # current state of the system
+        self._hilbert       = hilbert                                                       # Hilbert space representation
+        
+        # statistical 
+        self._lastloss      = None                                                          # last loss
+        self._lastloss_std  = None                                                          # last loss standard deviation
+        self._lastloss_mean = None                                                          # last loss mean
+        self._lastloss_max  = None                                                          # last loss maximum
+        self._lastloss_min  = None                                                          # last loss minimum
+        
+        self._replica_idx   = 1                                                             # replica index
+    
+    #####################################
+    #! PROPERTIES AND GETTERS
+    #####################################
+    
+    @property
+    def size(self):
+        '''Return the size of the configuration.'''
+        return self._size
+    
+    @property
+    def modes(self):
+        '''Return the number of modes for the binary representation.'''
+        return self._modes
+    
+    @property
+    def hilbert(self):
+        '''Return the Hilbert space representation.'''
+        return self._hilbert
+    
+    @property
+    def currstate(self):
+        '''Return the current state of the system.'''
+        return self._currstate
+    
+    @property
+    def lastloss(self):
+        '''Return the last loss.'''
+        return self._lastloss
+    
+    @property
+    def lastloss_std(self):
+        '''Return the last loss standard deviation.'''
+        return self._lastloss_std
+    
+    @property
+    def lastloss_mean(self):
+        '''Return the last loss mean.'''
+        return self._lastloss_mean
+    
+    @property
+    def lastloss_max(self):
+        '''Return the last loss maximum.'''
+        return self._lastloss_max
+    
+    @property
+    def lastloss_min(self):
+        '''Return the last loss minimum.'''
+        return self._lastloss_min
+    
+    @property
+    def replica_idx(self):
+        '''Return the replica index.'''
+        return self._replica_idx
+    
+    #####################################
+    #! BACKEND
+    #####################################
+    
+    @property
+    def backend(self):
+        '''Return the backend used for calculations.'''
+        return self._backend
+    
+    @property
+    def backend_sp(self):
+        '''Return the backend (SciPy) used for calculations.'''
+        return self._backend_sp
+    
+    @property
+    def rng(self):
+        '''Return the random number generator.'''
+        return self._rng
+    
+    @property
+    def rng_key(self):
+        '''Return the random number generator key.'''
+        return self._rng_key
+    
+    def reset_backend(self, backend: str = 'default', seed: Optional[int] = None):
+        '''
+        Reset the backend for the calculations.
+        Parameters:
+        - backend       : backend for the calculations (default is 'default')
+        - seed          : seed for the random number generator
+        '''
+        self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
+        self._currstate = self._backend.zeros(self._size * (self._modes // 2), dtype=Solver.prec)
+        return self._backend, self._backend_sp, (self._rng, self._rng_key)
+    
+    @staticmethod
+    def obtain_backend(backend: str, seed: Optional[int]):
+        '''
+        Set the backend for the calculations.
+        Parameters:
+        - backend       : backend for the calculations (default is 'default')
+        - seed          : seed for the random number generator
+        '''
+        if isinstance(backend, str):
+            bck = get_backend(backend, scipy=True, random=True, seed=seed)
+            if isinstance(bck, tuple):
+                _backend, _backend_sp = bck[0], bck[1]
+                if isinstance(bck[2], tuple):
+                    _rng, _rng_k = bck[2][0], bck[2][1]
+                else:
+                    _rng, _rng_k = bck[2], None
+            else:
+                _backend, _backend_sp = bck, None
+                _rng, _rng_k = None, None
+            return _backend, _backend_sp, (_rng, _rng_k)
+        _backendstr = 'np' if (backend is None or (backend == 'default' and not _JAX_AVAILABLE) or backend == np) else 'jax'
+        return Solver.obtain_backend(_backendstr, seed)
     
     ###################################
-    
-    # Set the state of the system
-    
+    #! Set the state of the system
     ###################################
     
     @abstractmethod
-    def set_state_tens(self, state : jnp.ndarray, _mode_repr : float = 0.5):
+    def _set_state_tens(self, state : Union[jnp.ndarray, np.ndarray], _mode_repr : float = 0.5):
         '''
         Set the state configuration from the tensor.
         - state         : state configuration
         - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
         '''
         pass
-        
+    
     #! TODO: implement the set_state_int and set_state_rand for the fermions
-    def set_state_int(self, state : int, _mode_repr : float = 0.5):
+    def _set_state_int(self, state: int, _mode_repr : float = 0.5):
         '''
-        Set the state configuration from the integer.
+        Set the state configuration from the integer representation.
+        - state         : state configuration
+        - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1) 
+        
         Transforms the integer to a given configuration 
         Notes:
             The states are given in binary or other representation 
@@ -111,8 +268,9 @@ class Solver(ABC):
                     need 2 * _size to represent the state and we have 0 and ones for the
                     presence of the fermions.
         '''
-        if self.hilbert is None:
-            if self.modes == 2:
+        if self._hilbert is None:
+            if self._modes == 2:
+                # set the state from tensor
                 self.set_state_tens(jnp.array([1 if (state & (1 << i)) else -1 for i in range(self.size)], dtype = Solver.prec) * _mode_repr)
             elif self.modes == 4:
                 # first half is up and the second half is down
@@ -126,7 +284,7 @@ class Solver(ABC):
                             dtype = Solver.prec) * _mode_repr)
                 raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         else:
-            # ! TODO : implement the Hilbert space representation
+            #!TODO : implement the Hilbert space representation
             raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
         
     def set_state_rand(self, _mode_repr : float = 0.5):
