@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 from numba import jit, njit, prange
-from typing import Union, Tuple, Union, Callable, Optional
+from typing import Union, Tuple, Union, Callable, Optional, Dict, Any
 
 # for the abstract class
 from abc import ABC, abstractmethod
@@ -28,6 +28,8 @@ if _JAX_AVAILABLE:
 
 ###################################
 from Solver.solver import Solver, SolverInitState
+from Solver.MonteCarlo.sampler import Sampler, get_sampler
+
 ###################################
 
 @dataclass
@@ -52,45 +54,36 @@ class McsTrain:
     mcsam   : int = 10          # number of Monte Carlo Steps - for samplers - inner loop for taking the samples 
     mcth    : int = 0           # number of mcSteps to thermalize - for samplers 
     bsize   : int = 4           # single block size (for autocorrelation) - for samplers (correlation)
-    dir     : str = ""          # saving directory for the data
+    mcchain : int = 1           # number of chains - for samplers
+    direct  : str = ""          # saving directory for the data
     nflip   : int = 1           # number of flips for a single MC step
     nrepl   : int = 1           # number of replicas
     accepted: int = 0           # number of accepted steps
     total   : int = 0           # total number of steps
     acc_rate: float = 0.0       # acceptance rate
 
+    
     def hi(self, prefix: str = "Train: ") -> None:
-        """
-        Prints a detailed overview of the Monte Carlo simulation training configuration.
-
-        This method displays all the relevant parameters used during the Monte Carlo simulation,
-        including the number of samples, thermalization steps, block size, epochs, and flip counts.
-        It also reports the directory for saving results, the number of replicas, and current metrics
-        such as accepted steps, total steps, and the acceptance rate. This detailed output is useful
-        for verifying the simulation settings and for debugging purposes.
-
-        Args:
-            prefix (str): A string to prepend to the beginning of the output message. Default is "Train: ".
-        """
-        outstr = (
+        """Prints the configuration."""
+        config_str = (
             f"\nMonte Carlo Simulation Configuration:\n"
-            f"  - Number of Monte Carlo Samples      : {self.mcsam}\n"
-            f"  - Number of Thermalization Steps     : {self.mcth}\n"
-            f"  - Block Size (for autocorrelation)   : {self.bsize}\n"
-            f"  - Number of Epochs                   : {self.epochs}\n"
-            f"  - Number of Flips per MC Step        : {self.nflip}\n"
-            f"  - Saving Directory                   : {self.dir if self.dir else 'Not specified'}\n"
-            f"  - Number of Replicas                 : {self.nrepl}\n"
-            f"  - Accepted Steps                     : {self.accepted}\n"
-            f"  - Total Steps                        : {self.total}\n"
-            f"  - Acceptance Rate                    : {self.acc_rate:.4f}\n"
+            f"  - Samples       : {self.mcsam}\n"
+            f"  - Thermal Steps : {self.mcth}\n"
+            f"  - Block Size    : {self.bsize}\n"
+            f"  - Epochs        : {self.epochs}\n"
+            f"  - Flips per Step: {self.nflip}\n"
+            f"  - Save Directory: {self.direct or 'Not specified'}\n"
+            f"  - Replicas      : {self.nrepl}\n"
+            f"  - Accepted      : {self.accepted}\n"
+            f"  - Total Steps   : {self.total}\n"
+            f"  - Acceptance    : {self.acc_rate:.4f}\n"
         )
-        print(prefix + outstr)
+        print(prefix + config_str)
     
 ###################################
 
 @dataclass
-class TrainStepVars:
+class McsReturn:
     """
     TrainStepVars is a class that encapsulates the variables used during a training step.
     """
@@ -103,77 +96,97 @@ class TrainStepVars:
 
 class MonteCarloSolver(Solver):
     '''
+    MonteCarloSolver: A base abstract class for Monte Carlo simulation solvers.
+    This class defines the foundation for Monte Carlo solvers, providing common functionality
+    for sampling, state management, training loops, and statistical tracking. Concrete
+    implementations should inherit from this class and implement the abstract methods.
+    The Monte Carlo solver works by generating samples according to specified sampling methods,
+    tracking acceptance rates, and iteratively optimizing a model through training steps.
+
+    Abstract Methods:
+        train_stop: Determines termination condition for the training loop
+        train_step: Performs a single Monte Carlo training iteration
+        train: Executes the complete Monte Carlo training process
+    Methods:
+        reset(): Resets the solver's counters and statistical tracking
+        set_sampler(): Configures the Monte Carlo sampler
+        init(): Initializes the solver's state
+        get_state(): Returns the current state of the solver
+        set_beta(): Sets the inverse temperature parameter
+        log(): Records messages to the logger with appropriate formatting
+    Notes:
+        - Concrete implementations must provide the training loop logic
+        - The solver tracks statistical information about the Monte Carlo process
+        - The class supports replica-based parallel simulations
+        
     Monte Carlo Solver is an abstract class that defines the basic structure of the Monte Carlo solver.
     The class is inherited by the specific Monte Carlo solvers.
     '''
+    
+    _ERROR_MSG_SAMPLER  = "Sampler is not defined - it is necessary for the Monte Carlo solver."
+    _ERROR_MSG_HILBERT  = "Hilbert space is not defined - it is necessary for the Monte Carlo solver."
+    _ERROR_MSG_SHAPE    = "Shape is not defined - it is necessary for the Monte Carlo solver."
     
     # define the static variables
     # ----------------
     
     def __init__(self,
-                sampler,
-                seed    : Optional[int]                 = None,
-                beta    : Optional[float]               = 1.0,
-                replica : Optional[int]                 = 1,
-                backend : Optional[str]                 = 'default',
-                size    : Optional[int]                 = 1,
-                hilbert : Optional[HilbertSpace]        = None,
-                modes   : Optional[int]                 = 2,
-                dir     : Optional[(str, Directories)]  = None,
-                nthreads: Optional[int]                 = 1,
+                sampler     : Sampler,
+                seed        : Optional[int]                 = None,
+                beta        : Optional[float]               = 1.0,
+                mu          : Optional[float]               = 2.0,
+                replica     : Optional[int]                 = 1,
+                shape       : Optional[int]                 = 1,
+                hilbert     : Optional[HilbertSpace]        = None,
+                modes       : Optional[int]                 = 2,
+                directory   : Optional[(str, Directories)]  = None,
+                nthreads    : Optional[int]                 = 1,
+                backend     : Optional[str]                 = 'default',
                 **kwargs):
         """
         Initializes the Monte Carlo solver with default parameters.
         Parameters:
             - {sampler} (Sampler)   : Sampler object.
             - {seed}    (int)       : Random seed (default is None).
-            - {replica} (int)       : Replica index (default is 1).
             - {beta}    (float)     : Inverse temperature beta = 1/T.
-            - {rng}     (int)       : Random number generator key
-            - {size}    (int)       : Configuration size (like lattice sites etc.)
+            - {mu}      (float)     : Modification of the probability distribution.
+            - {replica} (int)       : Replica index (default is 1).
+            - {shape}   (int)       : Shape of the system.
+            - {hilbert} (HilbertSpace): Hilbert space object.
+            - {directory} (str, Directories): Directory for saving the data.
+            - {nthreads} (int)      : Number of threads.
+            - {backend} (str)       : Backend to use (default is 'default').
             - {modes}   (int)       : Number of spin modes (in MB systems 2 for spins etc.)
-        Instance Variables:
-        _accepted (int)         : Number of accepted steps.
-        _total (int)            : Total number of steps.
-        _acceptance_rate (float): Acceptance rate.
-        _current_loss (float)   : Current loss value.
-        _last_loss (float)      : Last loss value.
-        _last_std_loss (float)  : Last standard deviation of the loss.
-        _best_loss (float)      : Best loss value.
-        _replica (int)          : Replica index (default is 1).
-        _beta (float)           : Inverse temperature beta = 1/T.
-        _nthreads (int)         : Number of threads.
-        _hilbert (HilbertSpace) : Hilbert space object.
-        _backend (str)          : Backend to use (default is 'default').
-        _dir (str)              : Directory for saving the data.
-        _rng_key [_rng]         : Random number generator key.
-        _info (str)             : Information about the solver.
         """
         
         # call the parent class constructor with the arguments and keyword arguments passed
-        super().__init__(size=size, modes=modes, seed=seed, nthreads=nthreads,
-                         hilbert=hilbert, backend=backend, dir=dir, **kwargs)
-        
-        if sampler is None:
-            raise ValueError("Sampler is not defined.")
-        self._sampler           = sampler       # sampler object - for sampling the states
+        super().__init__(shape=shape, modes=modes, seed=seed, nthreads=nthreads,
+                        hilbert=hilbert, backend=backend,
+                        directory=directory, **kwargs)
         
         # define the instance variables
         self._mcparams          = McsTrain(
             epochs      = kwargs.get("epochs", 1),
             mcsam       = kwargs.get("mcsam", 10),
             mcth        = kwargs.get("mcth", 0),
+            mcchain     = kwargs.get("mcchain", 1),
             bsize       = kwargs.get("bsize", 4),
-            dir         = kwargs.get("dir", ""),
             nflip       = kwargs.get("nflip", 1),
             nrepl       = kwargs.get("nrepl", 1),
+            direct      = directory
         )
+        
+        if sampler is None:
+            raise ValueError(self._ERROR_MSG_SAMPLER)
+        self._sampler           = self.set_sampler(sampler)
+        
         self._accepted          = 0             # number of accepted steps
         self._total             = 0             # total number of steps
         self._acceptance_rate   = None          # acceptance rate
         
         self._replica_idx       = replica       # replica index
         self._beta              = beta          # inverse temperature beta = 1/T
+        self._mu                = mu            # modification of the probability distribution
         
         # information
         self._info              = "Monte Carlo Solver"
@@ -261,6 +274,29 @@ class MonteCarloSolver(Solver):
         '''
         self._accepted      = 0
         self._total         = 0
+        self.init()
+    
+    def set_sampler(self, sampler: Union[Sampler, str]):
+        '''
+        Set the sampler for the Monte Carlo solver.
+        '''
+        self._sampler = get_sampler(sampler,
+                            shape       =   self._shape,
+                            upd_fun     =   self._upd_fun,                  #!TODO: add possibility of changing the update function
+                            rng         =   self._rng,
+                            rng_k       =   self._rng_key,
+                            hilbert     =   self._hilbert,
+                            numsamples  =   self._mcparams.mcsam,           #!TODO: this can be modified later
+                            numchains   =   self._mcparams.mcchain,         #!TODO: this can be modified later
+                            )
+        # set the sampler properties
+        if hasattr(self._sampler, "set_beta"):
+            self._sampler.set_beta(self._beta)
+        if hasattr(self._sampler, "set_mu"):
+            self._sampler.set_mu(self._mu)
+        return self._sampler
+    
+    # ----------------
     
     def init(self):
         '''
@@ -269,16 +305,35 @@ class MonteCarloSolver(Solver):
         self._losses        = []
         self._losses_mean   = []
         self._losses_std    = []
-        
+    
+    def _update_mcparams(self,
+                        par         : Union[McsTrain, Dict[str, Any], None],
+                        extra_kwargs: Dict[str, Any]) -> None:
+        """
+        Update Monte Carlo training parameters from either a dataclass, dict, or kwargs.
+        Parameters:
+            - par         : Monte Carlo training parameters (McsTrain or dict)
+            - extra_kwargs: Additional keyword arguments for parameters.
+        1. Initializes a list of keys to update.
+        2. Iterates through each key and updates the corresponding parameter.
+        3. If the parameter is not provided, it uses the value from extra_kwargs or the default value.
+        4. Updates the _mcparams attribute with the new parameters.
+        """
+        keys            = ['mcsam', 'mcth', 'bsize', 'nflip', 'epochs', 'directory', 'nrepl']
+        updated_params  = {}
+        for key in keys:
+            if par is not None:
+                if isinstance(par, McsTrain):
+                    updated_params[key] = getattr(par, key, getattr(self._mcparams, key))
+                elif isinstance(par, dict):
+                    updated_params[key] = par.get(key, getattr(self._mcparams, key))
+            else:
+                updated_params[key] = extra_kwargs.get(key, getattr(self._mcparams, key))
+        self._mcparams = McsTrain(**updated_params)
+    
     # ----------------------------------------------------------------------
     #! GETTERS AND SETTERS
     # ----------------------------------------------------------------------
-    
-    def get_state(self):
-        '''
-        Get the state of the Monte Carlo solver.
-        '''
-        return self._currstate
     
     @property
     def beta(self):
@@ -365,38 +420,11 @@ class MonteCarloSolver(Solver):
     #! TRAINING
     # ----------------------------------------------------------------------  
     
-    def _train_step_impl(self,
-                        start_st    : Optional[Union[SolverInitState, int, jnp.ndarray]] = None,
-                        par         : Union[McsTrain, dict, None] = None,
-                        update      : bool = True, **kwargs):
-        '''
-        Prepare the training step.
-
-        ''' 
-        is_mcs_train            = (par is not None and isinstance(par, McsTrain))
-        # set the parameters - if they are passed as a dictionary or as a class or as kwargs
-        self._mcparams.mcsam    = par.MC_sam    if is_mcs_train else kwargs.get("mcsam", par.get("mcsam", self._mcparams.mcsam))
-        self._mcparams.mcth     = par.MC_th     if is_mcs_train else kwargs.get("mcth", par.get("mcth", self._mcparams.mcth))
-        self._mcparams.bsize    = par.bsize     if is_mcs_train else kwargs.get("bsize", par.get("bsize", self._mcparams.bsize))
-        self._mcparams.nflip    = par.nflip     if is_mcs_train else kwargs.get("nflip", par.get("nflip", self._mcparams.nflip))
-        self._mcparams.epochs   = par.epochs    if is_mcs_train else kwargs.get("epochs", par.get("epochs", self._mcparams.epochs))
-        self._mcparams.dir      = par.dir       if is_mcs_train else kwargs.get("dir", par.get("dir", self._mcparams.dir))
-        self._mcparams.nrepl    = par.nrepl     if is_mcs_train else kwargs.get("nrepl", par.get("nrepl", self._mcparams.nrepl))
-        self._mcparams.dir      = par.dir       if is_mcs_train else kwargs.get("dir", par.get("dir", self._mcparams.dir))
-        self._mcparams.accepted = 0
-        self._mcparams.total    = 0
-        self._mcparams.acc_rate = None
-        
-        # set the state
-        self.set_state(start_st, update=update)
-        # return the parameters
-        return self._mcparams 
-    
     @abstractmethod
     def train_stop(self,
                 i           : int   = 0,
                 verbose     : bool  = False,
-                **kwargs):
+                **kwargs) -> bool:
         '''
         Determine when to stop training.
         Implementations should define the condition to stop based on the training progress.
@@ -411,7 +439,7 @@ class MonteCarloSolver(Solver):
                 par         : Union[McsTrain, dict, None] = None,
                 update      : bool  = True,
                 timer       : Optional[Timer] = None,
-                **kwargs) -> TrainStepVars:
+                **kwargs) -> 'McsReturn':
         '''
         Perform a single training step.
         Parameters:
@@ -431,7 +459,7 @@ class MonteCarloSolver(Solver):
             verbose     : bool,
             rand_start  : bool,
             timer       : Optional[Timer] = None,
-            **kwargs) -> TrainStepVars:
+            **kwargs) -> 'McsReturn':
         '''
         Perform the training.
 
@@ -450,13 +478,13 @@ class MonteCarloSolver(Solver):
     #! Save and load
     # ----------------------------------------------------------------------
     
-    def save_weights(self, dir: Union[str, Directories] = None, name: str = "weights"):
+    def save_weights(self, directory: Union[str, Directories] = None, name: str = "weights"):
         '''
         Save the weights of the model.
         '''
         pass
     
-    def load_weights(self, dir: Union[str, Directories] = None, name: str = "weights"):
+    def load_weights(self, directory: Union[str, Directories] = None, name: str = "weights"):
         '''
         Load the weights of the model.
         '''

@@ -15,7 +15,7 @@ from Algebra.Operator.operator import Operator, SymmetryGenerators
 
 # from general Python modules
 from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
-from general_python.common.binary import rotate_left, rotate_right, flip_all, rev, rotate_left_ax, popcount, _BACKEND_DEF_SPIN, _BACKEND_REPR
+from general_python.common.binary import rotate_left, rotate_right, flip_all, rev, rotate_left_ax, popcount, BACKEND_DEF_SPIN, BACKEND_REPR
 from general_python.algebra.utils import get_backend as __backend, DEFAULT_BACKEND, maybe_jit
 
 ####################################################################################################
@@ -252,7 +252,7 @@ def reflection(sec : int, lat : Optional[Lattice] = None, ns : Optional[int] = N
 
 # --- Parity Z ---
 
-def _flip_z(ns: int, backend: str = 'default', spin: bool = _BACKEND_DEF_SPIN, spin_value: float = _BACKEND_REPR):
+def _flip_z(ns: int, backend: str = 'default', spin: bool = BACKEND_DEF_SPIN, spin_value: float = BACKEND_REPR):
     """
     Creates the behavior that checks the parity of the state by applying the Z-flip operator
     to the state and returning the phase factor. The state is assumed to be in the
@@ -268,7 +268,7 @@ def _flip_z(ns: int, backend: str = 'default', spin: bool = _BACKEND_DEF_SPIN, s
 
 
 def parity_z(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = None,
-            backend : str = 'default', spin: bool = _BACKEND_DEF_SPIN, spin_value : float = _BACKEND_REPR):
+            backend : str = 'default', spin: bool = BACKEND_DEF_SPIN, spin_value : float = BACKEND_REPR):
     """
     Generates a partity operator by applying the Pauli-Z flip operator to the state.
     The state is assumed to be in the Pauli-Z basis.
@@ -285,7 +285,7 @@ def parity_z(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
 # --- Parity Y ---
 
 def _flip_y(ns: int, backend: str = 'default', 
-        spin: bool = _BACKEND_DEF_SPIN, spin_value: float = _BACKEND_REPR):
+        spin: bool = BACKEND_DEF_SPIN, spin_value: float = BACKEND_REPR):
     """
     Creates the behavior that checks the parity of the state by applying the Y-flip operator
     to the state and returning the phase factor. The state is assumed to be in the
@@ -302,7 +302,7 @@ def _flip_y(ns: int, backend: str = 'default',
     return op
 
 def parity_y(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = None,
-            backend : str = 'default', spin: bool = _BACKEND_DEF_SPIN, spin_value : float = _BACKEND_REPR):
+            backend : str = 'default', spin: bool = BACKEND_DEF_SPIN, spin_value : float = BACKEND_REPR):
     """
     Generates a parity operator by applying the Y-flip operator to the state.
     The state is assumed to be in the Pauli-Z basis.
@@ -323,7 +323,7 @@ def parity_y(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
 # --- Parity X ---
 
 def _flip_x(ns: int, backend: str = 'default',
-            spin: bool = _BACKEND_DEF_SPIN, spin_value : float = _BACKEND_REPR):
+            spin: bool = BACKEND_DEF_SPIN, spin_value : float = BACKEND_REPR):
     """
     Creates the behavior that checks the parity of the state by applying the X-flip operator
     to the state and returning the phase factor. The state is assumed to be in the
@@ -337,7 +337,7 @@ def _flip_x(ns: int, backend: str = 'default',
     return op
 
 def parity_x(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = None,
-            backend : str = 'default', spin: bool = _BACKEND_DEF_SPIN, spin_value : float = _BACKEND_REPR):
+            backend : str = 'default', spin: bool = BACKEND_DEF_SPIN, spin_value : float = BACKEND_REPR):
     """
     Generates a parity operator by applying the X-flip operator to the state.
     The state is assumed to be in the Pauli-Z basis.
@@ -357,7 +357,7 @@ def parity_x(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
 
 def choose(sym_specifier : Tuple[SymmetryGenerators, int], 
         ns : Optional[int] = None, lat : Optional[Lattice] = None,
-        backend : str = 'default', spin_value : Optional[float] = _BACKEND_REPR, spin : Optional[bool] = _BACKEND_DEF_SPIN):
+        backend : str = 'default', spin_value : Optional[float] = BACKEND_REPR, spin : Optional[bool] = BACKEND_DEF_SPIN):
     """
     Given a symmetry specification (a tuple of (SymmetryGenerators, eigenvalue))
     and a lattice, returns the corresponding symmetry operator.

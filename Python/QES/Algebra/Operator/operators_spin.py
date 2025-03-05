@@ -31,7 +31,7 @@ from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.__lattice__ import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
-from general_python.common.binary import _BACKEND_REPR as _SPIN, _BACKEND_DEF_SPIN, _JAX_AVAILABLE
+from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE
 from general_python.common.binary import flip, flip_all, check, base2int, int2base, int2binstr
 import general_python.common.binary as _binary
 ################################################################################
@@ -131,7 +131,7 @@ def _sigma_x_int(state  : int,
 def _sigma_x_np(state   : np.ndarray,
             ns          : int,
             sites       : Union[List[int], None],
-            spin        : bool      = _BACKEND_DEF_SPIN,
+            spin        : bool      = BACKEND_DEF_SPIN,
             spin_value  : float     = _SPIN):
     """
     Apply the Pauli-X (σₓ) operator on the given sites.
@@ -147,7 +147,7 @@ def _sigma_x_np(state   : np.ndarray,
 def _sigma_x_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin        : bool = _BACKEND_DEF_SPIN,
+                spin        : bool = BACKEND_DEF_SPIN,
                 spin_value  : float = _SPIN,
                 backend     : str = DEFAULT_BACKEND):
     """
@@ -179,7 +179,7 @@ def _sigma_x_jnp(state,
 def sigma_x(state,
             ns          : int,
             sites       : Union[List[int], None],
-            spin        : bool      = _BACKEND_DEF_SPIN,
+            spin        : bool      = BACKEND_DEF_SPIN,
             spin_value  : float     = _SPIN,
             backend     : str       = DEFAULT_BACKEND):
     """
@@ -310,7 +310,7 @@ def _sigma_y_int(state      : int,
 
 def _sigma_y_np(state: np.ndarray,
                 sites: Union[List[int], None],
-                spin: bool = _BACKEND_DEF_SPIN,
+                spin: bool = BACKEND_DEF_SPIN,
                 spin_value: float = _SPIN):
     """
     σᵧ on a NumPy array state.
@@ -342,7 +342,7 @@ def _sigma_y_np(state: np.ndarray,
 def _sigma_y_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin        : bool = _BACKEND_DEF_SPIN,
+                spin        : bool = BACKEND_DEF_SPIN,
                 spin_value  : float = _SPIN,
                 backend     : str = DEFAULT_BACKEND):
     """
@@ -388,7 +388,7 @@ def _sigma_y_jnp(state,
 def sigma_y(state,
             ns: int,
             sites: Union[List[int], None],
-            spin: bool = _BACKEND_DEF_SPIN,
+            spin: bool = BACKEND_DEF_SPIN,
             spin_value: float = _SPIN,
             backend: str = DEFAULT_BACKEND):
     """
@@ -491,7 +491,7 @@ def _sigma_z_int(state      : int,
 def _sigma_z_np(state: np.ndarray,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin        : bool = _BACKEND_DEF_SPIN,
+                spin        : bool = BACKEND_DEF_SPIN,
                 spin_value  : float = _SPIN):
     """
     σ_z on a NumPy array state.
@@ -506,7 +506,7 @@ def _sigma_z_np(state: np.ndarray,
 def _sigma_z_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin        : bool  = _BACKEND_DEF_SPIN,
+                spin        : bool  = BACKEND_DEF_SPIN,
                 spin_value  : float = _SPIN,
                 backend     : str   = DEFAULT_BACKEND):
     """
@@ -523,7 +523,7 @@ def _sigma_z_jnp(state,
 def sigma_z(state,
             ns          : int,
             sites       : Union[List[int], None],
-            spin        : bool  = _BACKEND_DEF_SPIN,
+            spin        : bool  = BACKEND_DEF_SPIN,
             spin_value  : float = _SPIN,
             backend     : str   = DEFAULT_BACKEND):
     """
@@ -562,7 +562,7 @@ def _sigma_plus_int(state  : int,
 def _sigma_plus_np(state    : np.ndarray,
                     ns      : int,
                     sites   : Union[List[int], None],
-                    spin    : bool = _BACKEND_DEF_SPIN,
+                    spin    : bool = BACKEND_DEF_SPIN,
                     spin_value : float = _SPIN):
     """
     σ⁺ on a NumPy array state.
@@ -579,7 +579,7 @@ def _sigma_plus_np(state    : np.ndarray,
 def _sigma_plus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
-                    spin    : bool = _BACKEND_DEF_SPIN,
+                    spin    : bool = BACKEND_DEF_SPIN,
                     spin_value : float = _SPIN,
                     backend : str = DEFAULT_BACKEND):
     """
@@ -600,7 +600,7 @@ def _sigma_plus_jnp(state,
 def sigma_plus(state,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN,
                 backend : str = DEFAULT_BACKEND):
     """
@@ -663,7 +663,7 @@ def _sigma_minus_int(state  : int,
 def _sigma_minus_np(state   : np.ndarray,
                     ns      : int,
                     sites   : Union[List[int], None],
-                    spin    : bool = _BACKEND_DEF_SPIN,
+                    spin    : bool = BACKEND_DEF_SPIN,
                     spin_value : float = _SPIN):
     """
     σ⁻ on a NumPy array state.
@@ -680,7 +680,7 @@ def _sigma_minus_np(state   : np.ndarray,
 def _sigma_minus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
-                    spin    : bool = _BACKEND_DEF_SPIN,
+                    spin    : bool = BACKEND_DEF_SPIN,
                     spin_value : float = _SPIN,
                     backend : str = DEFAULT_BACKEND):
     """
@@ -700,7 +700,7 @@ def _sigma_minus_jnp(state,
 def sigma_minus(state,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN,
                 backend : str = DEFAULT_BACKEND):
     """
@@ -764,7 +764,7 @@ def _sigma_pm_int(state  : int,
 def _sigma_pm_np(state   : np.ndarray,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN):
     """
     Alternating operator on a NumPy array state.
@@ -786,7 +786,7 @@ def _sigma_pm_np(state   : np.ndarray,
 def _sigma_pm_jnp(state,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN,
                 backend : str = DEFAULT_BACKEND):
     """
@@ -813,7 +813,7 @@ def _sigma_pm_jnp(state,
 def sigma_pm(state,
             ns      : int,
             sites   : Union[List[int], None],
-            spin    : bool = _BACKEND_DEF_SPIN,
+            spin    : bool = BACKEND_DEF_SPIN,
             spin_value : float = _SPIN,
             backend : str = DEFAULT_BACKEND):
     """
@@ -881,7 +881,7 @@ def _sigma_mp_int(state  : int,
 def _sigma_mp_np(state   : np.ndarray,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN):
     """
     Alternating operator (σ⁻ then σ⁺) on a NumPy array state.
@@ -903,7 +903,7 @@ def _sigma_mp_np(state   : np.ndarray,
 def _sigma_mp_jnp(state,
                 ns      : int,
                 sites   : Union[List[int], None],
-                spin    : bool = _BACKEND_DEF_SPIN,
+                spin    : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN,
                 backend : str = DEFAULT_BACKEND):
     """
@@ -929,7 +929,7 @@ def _sigma_mp_jnp(state,
 def sigma_mp(state,
             ns      : int,
             sites   : Union[List[int], None],
-            spin    : bool = _BACKEND_DEF_SPIN,
+            spin    : bool = BACKEND_DEF_SPIN,
             spin_value : float = _SPIN,
             backend : str = DEFAULT_BACKEND):
     """
@@ -976,7 +976,7 @@ def _sigma_k_int(state : int,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
-                spin     : bool = _BACKEND_DEF_SPIN,
+                spin     : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN):
     """
     Compute the Fourier-transformed spin operator (σₖ) on an integer state.
@@ -995,7 +995,7 @@ def _sigma_k_np(state : np.ndarray,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
-                spin     : bool = _BACKEND_DEF_SPIN,
+                spin     : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN):
     """
     Compute the Fourier-transformed spin operator (σₖ) on a NumPy array state.
@@ -1012,7 +1012,7 @@ def _sigma_k_jnp(state,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
-                spin     : bool = _BACKEND_DEF_SPIN,
+                spin     : bool = BACKEND_DEF_SPIN,
                 spin_value : float = _SPIN,
                 backend  : str = DEFAULT_BACKEND):
     """
@@ -1033,7 +1033,7 @@ def sigma_k(state,
             ns       : int,
             sites    : Union[List[int], None],
             k        : float,
-            spin     : bool = _BACKEND_DEF_SPIN,
+            spin     : bool = BACKEND_DEF_SPIN,
             spin_value : float = _SPIN,
             backend  : str = DEFAULT_BACKEND):
     """
@@ -1076,7 +1076,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
             ns          : Optional[int]         = None,
             type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
             sites       : Optional[List[int]]   = [0],
-            spin        : bool                  = _BACKEND_DEF_SPIN,
+            spin        : bool                  = BACKEND_DEF_SPIN,
             spin_value  : float                 = _SPIN,
             backend     : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1149,7 +1149,7 @@ def sig_y( lattice     : Optional[Lattice]     = None,
            ns          : Optional[int]         = None,
            type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
            sites       : Optional[List[int]]   = [0],
-           spin        : bool                  = _BACKEND_DEF_SPIN,
+           spin        : bool                  = BACKEND_DEF_SPIN,
            spin_value  : float                 = _SPIN,
            backend     : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1218,7 +1218,7 @@ def sig_z( lattice     : Optional[Lattice]     = None,
            ns          : Optional[int]         = None,
            type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
            sites       : Optional[List[int]]   = [0],
-           spin        : bool                  = _BACKEND_DEF_SPIN,
+           spin        : bool                  = BACKEND_DEF_SPIN,
            spin_value  : float                 = _SPIN,
            backend     : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1289,7 +1289,7 @@ def sig_p( lattice    : Optional[Lattice]     = None,
               ns         : Optional[int]         = None,
               type_act   : OperatorTypeActing    = OperatorTypeActing.Global,
               sites      : Optional[List[int]]   = [0],
-              spin       : bool                  = _BACKEND_DEF_SPIN,
+              spin       : bool                  = BACKEND_DEF_SPIN,
               spin_value : float                 = _SPIN,
               backend    : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1358,7 +1358,7 @@ def sig_m( lattice   : Optional[Lattice]     = None,
                ns        : Optional[int]         = None,
                type_act  : OperatorTypeActing    = OperatorTypeActing.Global,
                sites     : Optional[List[int]]   = [0],
-               spin      : bool                  = _BACKEND_DEF_SPIN,
+               spin      : bool                  = BACKEND_DEF_SPIN,
                spin_value: float                 = _SPIN,
                backend   : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1428,7 +1428,7 @@ def sig_k( lattice     : Optional[Lattice]     = None,
            type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
            sites       : Optional[List[int]]   = None,
            k           : float                 = 0.0,
-           spin        : bool                  = _BACKEND_DEF_SPIN,
+           spin        : bool                  = BACKEND_DEF_SPIN,
            spin_value  : float                 = _SPIN,
            backend     : str                   = DEFAULT_BACKEND) -> Operator:
     """
@@ -1530,7 +1530,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
         """
         # state: 0b0101 (bits: [0,1,0,1])
         if not isinstance(state, (int, np.integer)):
-            state = base2int(state, spin = _BACKEND_DEF_SPIN, spin_value = _SPIN)
+            state = base2int(state, spin = BACKEND_DEF_SPIN, spin_value = _SPIN)
         elif state is None:
             state = 0b0101
             ns    = 4
@@ -1544,7 +1544,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                     ns          = ns,
                     type_act    = OperatorTypeActing.Global,
                     sites       = sites,
-                    spin        = _BACKEND_DEF_SPIN,
+                    spin        = BACKEND_DEF_SPIN,
                     spin_value  = _SPIN,
                     backend     = self.backend)
         
@@ -1578,7 +1578,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                     ns           = ns,
                     type_act     = OperatorTypeActing.Global,
                     sites        = sites,
-                    spin         = _BACKEND_DEF_SPIN,
+                    spin         = BACKEND_DEF_SPIN,
                     spin_value   = _SPIN,
                     backend      = self.backend)
         new_base, coeff = op(base_state)
@@ -1604,7 +1604,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    ns=ns,
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN,
                    backend=self.backend)
         new_state, coeff = op(state)
@@ -1634,7 +1634,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    ns=ns,
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN,
                    backend=self.backend)
         new_base, coeff = op(base_state)
@@ -1661,7 +1661,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    ns=ns,
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN)
         new_state, coeff = op(state)
         self.__log(f"sig_z_global_int: {state:04b} -> {new_state:04b}, coeff: {coeff}",
@@ -1691,7 +1691,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    ns=ns,
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN)
         new_base, coeff = op(base_state)
         self._log(f"sig_z_global_np: {base_state} -> {new_base}, coeff: {coeff}",
@@ -1716,7 +1716,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                       ns=ns,
                       type_act=OperatorTypeActing.Global,
                       sites=sites,
-                      spin=_BACKEND_DEF_SPIN,
+                      spin=BACKEND_DEF_SPIN,
                       spin_value=_SPIN,
                       backend=self.backend)
         new_state, coeff = op(state)
@@ -1746,7 +1746,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                       ns=ns,
                       type_act=OperatorTypeActing.Global,
                       sites=sites,
-                      spin=_BACKEND_DEF_SPIN,
+                      spin=BACKEND_DEF_SPIN,
                       spin_value=_SPIN,
                       backend=self.backend)
         new_base, coeff = op(base_state)
@@ -1772,7 +1772,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                        ns=ns,
                        type_act=OperatorTypeActing.Global,
                        sites=sites,
-                       spin=_BACKEND_DEF_SPIN,
+                       spin=BACKEND_DEF_SPIN,
                        spin_value=_SPIN,
                        backend=self.backend)
         new_state, coeff = op(state)
@@ -1801,7 +1801,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                        ns=ns,
                        type_act=OperatorTypeActing.Global,
                        sites=sites,
-                       spin=_BACKEND_DEF_SPIN,
+                       spin=BACKEND_DEF_SPIN,
                        spin_value=_SPIN,
                        backend=self.backend)
         new_base, coeff = op(base_state)
@@ -1829,7 +1829,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
                    k=k,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN,
                    backend=self.backend)
         new_state, coeff = op(state)
@@ -1860,7 +1860,7 @@ class SpinOperatorTests(GeneralAlgebraicTest):
                    type_act=OperatorTypeActing.Global,
                    sites=sites,
                    k=k,
-                   spin=_BACKEND_DEF_SPIN,
+                   spin=BACKEND_DEF_SPIN,
                    spin_value=_SPIN,
                    backend=self.backend)
         new_base, coeff = op(base_state)

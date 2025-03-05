@@ -2,11 +2,16 @@ import numpy as np
 import scipy as sp
 from numba import jit, njit, prange
 from typing import Union, Tuple, Union, Callable, Optional
+from math import isclose
+from functools import partial
 
 # for the abstract class
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto, unique
+
+# flax for the network
+from flax import linen as nn
 
 # from algebra
 from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
@@ -20,15 +25,34 @@ from Algebra.hilbert import HilbertSpace
 # JAX imports
 if _JAX_AVAILABLE:
     import jax
-    import jax.numpy as jnp
-    import jax.random as random
-    from jax import vmap
+    from jax import jit, grad, vmap, random
+    from jax import numpy as jnp
+    from jax.tree_util import tree_flatten, tree_unflatten, tree_map
+    from jax.flatten_util import ravel_pytree
+
+    # use flax
+    import flax
+    import flax.linen as nn
+    from flax.core.frozen_dict import freeze, unfreeze
+# try to import autograd for numpy
+try:
+    import autograd.numpy as anp
+    from autograd import grad as np_grad
+    from autograd.misc.flatten import flatten_func
+    AUTOGRAD_AVAILABLE = True
+except ImportError:
+    AUTOGRAD_AVAILABLE = False
+    
+#########################################
+
+from Solver.MonteCarlo.montecarlo import MonteCarloSolver, McsTrain, McsReturn, Sampler
+from Algebra.Operator.operator import Operator, OperatorFunction
+from Algebra.hamil import Hamiltonian
 
 #########################################
 
-from Solver.MonteCarlo.montecarlo import MonteCarloSolver, McsTrain
-from Algebra.Operator.operator import Operator, OperatorFunction
-from Algebra.hamil import Hamiltonian
+# for the gradients and stuff
+import NQS.nqs_utils as NQSUtils
 
 #########################################
 
@@ -42,46 +66,230 @@ class NQS(MonteCarloSolver):
     _ERROR_NO_HAMILTONIAN   = "A Hamiltonian must be provided!"
     
     def __init__(self,
+                net         : Union[Callable, str, nn.Module],
+                sampler     : Union[Callable, str, Sampler],
                 hamiltonian : Hamiltonian,
-                hilbert     : Optional[HilbertSpace]    = None,
-                size        : int                       = 1,
                 lower_states: Optional[list]            = None,
                 lower_betas : Optional[list]            = None,
-                backend     : str                       = 'default',
-                directory   : Optional[str]             = MonteCarloSolver.defdir,
-                num_threads : Optional[int]             = 1,
-                beta        : float                     = 1,
-                seed        : Optional[int]             = None,
-                replica     : int                       = 1,
-                modes       : int                       = 2,
                 nparticles  : Optional[int]             = None,
+                seed        : Optional[int]             = None,
+                beta        : float                     = 1,
+                mu          : float                     = 0,
+                replica     : int                       = 1,
+                shape       : Union[list, tuple]        = (1,),
+                hilbert     : Optional[HilbertSpace]    = None,
+                modes       : int                       = 2,
+                directory   : Optional[str]             = MonteCarloSolver.defdir,
+                backend     : str                       = 'default',
+                nthreads    : Optional[int]             = 1,
                 **kwargs):
         '''
         Initialize the NQS solver.
         '''
-        super().__init__(seed=seed, beta=beta, replica=replica, backend=backend, size=size,
-                         hilbert=hilbert, modes=modes, directory=directory, nthreads=num_threads, **kwargs)        
+        super().__init__(sampler=sampler, seed=seed, beta=beta, mu=mu, replica=replica,
+                    shape=shape, hilbert=hilbert, modes=modes, directory=directory, backend=backend, nthreads=nthreads)
         # set the Hamiltonian
         if hamiltonian is None:
             raise ValueError(self._ERROR_NO_HAMILTONIAN)
         self._hamiltonian   = hamiltonian
         
-        # collect the Hilbert space information
-        self._nh            = self._hilbert.Nh
-        self._nparticles    = nparticles if nparticles is not None else 1
-        self._nparticles2   = self._nparticles**2
+        #######################################
+        #! collect the Hilbert space information
+        #######################################
+        self._nh            = self._hilbert.Nh if self._hilbert is not None else None
+        self._nparticles    = nparticles if nparticles is not None else self._size
         self._nvisible      = self._size
+        self._nparticles2   = self._nparticles**2
         self._nvisible2     = self._nvisible**2
         
-        # set the lower states
+        #######################################
+        #! set the lower states
+        #######################################
+        
         if lower_states is not None:
             self._lower_states = NQSLowerStates(lower_states, lower_betas, self)
         else:
             self._lower_states = None
-            
-        # state modifier
+        
+        #######################################
+        #! state modifier (for later)
+        #######################################
         self._modifier      = None
         
+        #######################################
+        #! handle the network
+        #######################################
+        self._initialized   = False
+        self._weights       = None
+        self._dtype         = None
+        self._net           = self._init_network(net, **kwargs)     # initialize network type
+        self.init_network(self._backend.ones(self._shape))          # run the network
+        self._init_gradients()
+        self._init_functions()
+    
+    #####################################
+    #! INITIALIZATION
+    #####################################
+    
+    def _check_holomorphic(self, s):
+        '''
+        Check if the network is holomorphic. 
+        Parameters are holomorphic if the gradient of the real part is equal to
+        the imaginary part multiplied by i.
+        Parameters:
+            s: The state vector.
+        1. Compute the gradients of the real and imaginary parts of the network output.
+        2. Check if the gradients are equal up to a small tolerance.
+        3. If they are equal, set the holomorphic flag to True.
+        4. If not, set the appropriate gradient functions based on the flag.
+        '''
+        if self._isjax:
+            def make_flat(x):
+                return jnp.concatenate([p.ravel() for p in tree_flatten(x)[0]])
+            grads_r = make_flat(jax.grad(lambda a,b: jnp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+            grads_i = make_flat(jax.grad(lambda a,b: jnp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+            return isclose(jnp.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
+        
+        def make_flat(x):
+            return np.concatenate([p.ravel() for p in flatten_func(x)[0]])
+        grads_r = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+        grads_i = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+        return isclose(np.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
+    
+    def init_network(self, s):
+        '''
+        In1tialize the network truly.
+        '''
+
+        if not self._initialized:
+            self._weights   = self._net.init(self._rng_key)
+            dtypes          = [a.dtype for a in tree_flatten(self._weights)[0]] \
+                                if self._isjax                                  \
+                                else [a.dtype for a in flatten_func(self._weights)[0]]
+
+            if not all([a == dtypes[0] for a in dtypes]):
+                raise ValueError("All weights must have the same dtype!")
+            
+            # check if the network is complex
+            self._iscpx = not (dtypes[0] == np.single or dtypes[0] == np.double)
+            
+            # check if the network is holomorphic
+            self._holomorphic = self._check_holomorphic(s)
+            
+            # check the shape of the weights
+            if self._isjax:
+                self._paramshape = [(p.size, p.shape) for p in tree_flatten(self._weights)[0]]
+            else:
+                self._paramshape = [(p.size, p.shape) for p in flatten_func(self._weights)[0]]
+            
+            # number of parameters
+            if self ._isjax:
+                self._nparams = jnp.sum(jnp.array([p.size for p in tree_flatten(self.parameters["params"])[0]]))
+            else:
+                self._nparams = np.sum(np.array([p.size for p in flatten_func(self.parameters["params"])[0]]))
+    
+    def _init_network(self, net, **kwargs) -> nn.Module:
+        '''
+        Initialize the variational parameters ansatz via the provided network - it simply creates
+        the network instance. To truly initialize the network, use the init_network method.
+        Parameters:
+            net: The network to be used (can be a string or a callable).
+            kwargs: Additional arguments for the network.
+        Returns:
+            The initialized network.
+        '''
+        if isinstance(net, nn.Module):
+            self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
+        elif isinstance(net, str):
+            self.log(f"Network {net} provided from the string.", log='info', lvl = 2, color = 'blue')
+            # TODO: Add the network
+            net = None
+        self.log(f"Network {net} provided from the {type(net).__name__}.", log='info', lvl = 2, color = 'blue')        
+        return net
+    
+    def _init_gradients(self):
+        '''
+        Initialize the gradients.
+        '''
+        self._isjax         = self._backend != np
+        self._forces        = None
+        self._gradients     = None
+        
+        self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
+                                        isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
+
+    def _init_functions(self):
+        '''
+        Initialize the functions.
+        '''
+        
+        if self._isjax:
+            self._eval_func = self._eval_jax
+            self._grad_func = self._grad_jax
+        else:
+            self._eval_func = self._eval_np
+            self._grad_func = self._grad_np
+
+    #####################################
+    #! EVALUATION
+    #####################################
+    
+    def _eval_np(self, net, params, batch_size, data):
+        '''
+        Evaluate the network.
+        '''
+        return NQSUtils.eval_batched_np(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
+
+    def _eval_jax(self, net, params, batch_size, data):
+        '''
+        Evaluate the network.
+        '''
+        return NQSUtils.eval_batched_jax(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
+    
+    def __call__(self, s, **kwargs):
+        '''
+        Evaluate the network using the provided state.
+        Parameters:
+            s: The state vector.
+            kwargs: Additional arguments for model-specific behavior.
+        Returns:
+            The evaluated network output.
+        '''
+        return self._eval_func(self._net, self._weights, s, kwargs.get('batch_size', 1))
+    
+    #####################################
+    #! GRADIENTS
+    #####################################
+    
+    def _grad_jax(self, net, params, batch_size, data, flat_grad):
+        '''
+        Compute the gradients using JAX.
+        '''
+        sb = NQSUtils.create_batches_jax(data, batch_size)
+        
+        def scan_fun(c, x):
+            return c, jax.vmap(lambda y: flat_grad(net, params, y), in_axes=(0,))(x)
+        g = jax.lax.scan(scan_fun, None, sb)[1]
+        g = tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
+        return tree_map(lambda x: x[:data.shape[0]], g)
+    
+    def _grad_np(self, net, params, batch_size, data, flat_grad):
+        '''
+        Compute the gradients using NumPy.
+        '''
+        sb = NQSUtils.create_batches_np(data, batch_size)
+        for i, b in enumerate(sb):
+            g[i] = flat_grad(net, params, b)
+        return g
+    
+    def _grad(self, data, **kwargs):
+        '''
+        Compute the gradients.
+        '''
+        return self._grad_func(net=self._net, batch_size=kwargs.get('batch_size', 1),
+                        params=self._weights, data=data,
+                        flat_grad=self._flat_grad_fun)
+    
     #####################################
     #! TRAINING OVERRIDES
     #####################################
@@ -105,21 +313,9 @@ class NQS(MonteCarloSolver):
         return super().train(nsteps, verbose, start_st, par, update, timer, **kwargs)
     
     #####################################
-    #! SET STATE
-    #####################################
-    
-    def set_state(self, state: Union[np.ndarray, list], mode_repr: Optional[float] = 0.5, update = True):
-        '''
-        Set the state of the NQS solver.
-        '''
-        super().set_state(state, mode_repr, update)
-        # handle the state update
-        
-    #####################################
     #! LOG_PROBABILITY_RATIO
     #####################################
     
-    @abstractmethod
     def _log_probability_ratio(self, v1, v2 = None, **kwargs) -> Union[np.float64, jnp.float64, float, complex]:
         '''
         Compute the log probability ratio between two configurations.
@@ -147,7 +343,6 @@ class NQS(MonteCarloSolver):
             where <ψ|s> represents the wave function amplitude for state s. The derived implementation should compute
             the new <ψ|s'> efficiently.
         '''
-        pass
     
     def log_probability_ratio(self, v1, v2 = None, **kwargs) -> Union[np.float64, jnp.float64, float, complex]:
         '''
@@ -158,7 +353,7 @@ class NQS(MonteCarloSolver):
                         state is used.
             kwargs  : Additional arguments.
         '''
-        #!TODO: Add the state modifier
+        base_ratio = self._log_probability_ratio(v1, v2, **kwargs)
         return self._log_probability_ratio(v1, v2, **kwargs) + (0)
     
     def probability_ratio(self, v1, v2 = None, **kwargs):
