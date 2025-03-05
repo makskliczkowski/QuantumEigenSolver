@@ -69,6 +69,20 @@ class Solver(ABC):
     """
     
     ###################################
+    @dataclass
+    class SolverLastLoss:
+        """
+        Class to store the last loss.
+        """
+        last            : float = None
+        std             : float = None
+        mean            : float = None
+        max             : float = None
+        min             : float = None
+        current         : float = None
+        best            : float = None
+    
+    ###################################
     defdir     = "./data"       # default directory for saving the data
 
     ###################################
@@ -78,13 +92,13 @@ class Solver(ABC):
     ###################################
     
     def __init__(self,
-                shape       : Union[int, Tuple[int, ...]] = (1,),
-                modes       : int = 2,
-                seed        : Optional[int] = None,
-                hilbert     : Optional[HilbertSpace] = None,
-                directory   : Union[str, Directories] = defdir,
-                nthreads    : int = 1,
-                backend     : str = 'default',
+                shape       : Union[int, Tuple[int, ...]]   = (1,),
+                modes       : int                           = 2,
+                seed        : Optional[int]                 = None,
+                hilbert     : Optional[HilbertSpace]        = None,
+                directory   : Union[str, Directories]       = defdir,
+                nthreads    : int                           = 1,
+                backend     : str                           = 'default',
                 **kwargs):
         '''
         Initialize the solver.
@@ -127,20 +141,11 @@ class Solver(ABC):
         else:
             self._eps   = jnp.finfo(jnp.float64).eps
             self._prec  = jnp.float32
-
-        # set the current state of the system
-        self._currstate     = self._backend.zeros(size * (modes // 2), dtype=self._prec)    # current state of the system
         
-        # statistical 
-        self._lastloss      = None                                                          # last loss
-        self._lastloss_std  = None                                                          # last loss standard deviation
-        self._lastloss_mean = None                                                          # last loss mean
-        self._lastloss_max  = None                                                          # last loss maximum
-        self._lastloss_min  = None                                                          # last loss minimum
-        self._currentloss   = None                                                          # current loss
-        self._bestloss      = None                                                          # best loss
+        # statistical
+        self._lastloss      = Solver.SolverLastLoss()
+        self._replica_idx   = 1
         
-        self._replica_idx   = 1                                                             # replica index
         # initialize threads
         self._nthreads      = nthreads
         
@@ -172,34 +177,34 @@ class Solver(ABC):
         return self._hilbert
     
     @property
-    def currstate(self):
-        '''Return the current state of the system.'''
-        return self._currstate
-    
-    @property
     def lastloss(self):
         '''Return the last loss.'''
-        return self._lastloss
+        return self._lastloss.last
     
     @property
     def lastloss_std(self):
         '''Return the last loss standard deviation.'''
-        return self._lastloss_std
+        return self._lastloss.std
     
     @property
     def lastloss_mean(self):
         '''Return the last loss mean.'''
-        return self._lastloss_mean
+        return self._lastloss.mean
     
     @property
     def lastloss_max(self):
         '''Return the last loss maximum.'''
-        return self._lastloss_max
+        return self._lastloss.max
     
     @property
     def lastloss_min(self):
         '''Return the last loss minimum.'''
-        return self._lastloss_min
+        return self._lastloss.min
+    
+    @property
+    def currentloss(self):
+        '''Return the current loss.'''
+        return self._lastloss.current
     
     @property
     def replica_idx(self):
@@ -245,7 +250,6 @@ class Solver(ABC):
         - seed          : seed for the random number generator
         '''
         self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
-        self._currstate = self._backend.zeros(self._size * (self._modes // 2), dtype=Solver.prec)
         return self._backend, self._backend_sp, (self._rng, self._rng_key)
     
     @staticmethod
@@ -326,17 +330,18 @@ class Solver(ABC):
     #! Set the state of the system
     ###################################
     
-    # @abstractmethod
-    def _set_state_tens(self, state : Union[jnp.ndarray, np.ndarray], _mode_repr : float = 0.5):
-        '''
-        Set the state configuration from the tensor.
-        - state         : state configuration
-        - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
-        '''
-        self._currstate = state
+    # # @abstractmethod
+    # def _set_state_tens(self, state : Union[jnp.ndarray, np.ndarray], _mode_repr : float = 0.5):
+    #     '''
+    #     Set the state configuration from the tensor.
+    #     - state         : state configuration
+    #     - _mode_repr    : mode representation (default is 0.5 - for binary spins +-1)
+    #     '''
+    #     self._currstate = state
 
     #! TODO: implement the set_state_int and set_state_rand for the fermions
-    def _set_state_int(self, state: int, _mode_repr : float = 0.5):
+    @staticmethod
+    def _set_state_int(state: int, modes: int = 2, hilbert: Optional[HilbertSpace] = None, _mode_repr: float = Binary._BACKEND_REPR):
         '''
         Set the state configuration from the integer representation.
         - state         : state configuration
@@ -357,10 +362,10 @@ class Solver(ABC):
                     need 2 * _size to represent the state and we have 0 and ones for the
                     presence of the fermions.
         '''
-        if self._hilbert is None:
+        if hilbert is None:
             if self._modes == 2:
                 # set the state from tensor
-                self._set_state_tens(Binary.int2base(state, self._size, self.backend, spin_value = _mode_repr), _mode_repr)
+                return Binary.int2base(state, self._size, self.backend, spin_value = _mode_repr), _mode_repr)
             elif self.modes == 4:
                 # # first half is up and the second half is down
                 # int_left    = state >> (self.size)              # the left part     - the last _size bits   - move the bits to the right by _size
