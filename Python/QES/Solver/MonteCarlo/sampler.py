@@ -515,6 +515,14 @@ class Sampler(ABC):
         
         # handle the update function
         self._upd_fun       = upd_fun
+        if self._upd_fun is None:
+            if self._isjax:
+                # Bind RNG arguments to the JAX updater and then wrap with JIT.
+                updater = partial(_propose_random_flip_jax, rng=self._rng, rng_k=self._rng_key)
+                self._upd_fun = JIT(updater)
+            else:
+                # For NumPy backend, bind the RNG to the updater.
+                self._upd_fun = partial(_propose_random_flip_np, rng=self._rng)
     
     ###################################################################
     #! ABSTRACT
