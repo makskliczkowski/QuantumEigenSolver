@@ -111,6 +111,7 @@ class MonteCarloSolver(Solver):
     # ----------------
     
     def __init__(self,
+                sampler,
                 seed    : Optional[int]                 = None,
                 beta    : Optional[float]               = 1.0,
                 replica : Optional[int]                 = 1,
@@ -124,13 +125,13 @@ class MonteCarloSolver(Solver):
         """
         Initializes the Monte Carlo solver with default parameters.
         Parameters:
-        kwargs:
-            - {replica} (int)   : Replica index (default is 1).
-            - {beta}    (float) : Inverse temperature beta = 1/T.
-            - {rng}     (int)   : Random number generator key
-            - {size}    (int)   : Configuration size (like lattice sites etc.)
-            - {modes}   (int)   : Number of spin modes (in MB systems 2 for spins etc.)
-        **kwargs                : Arbitrary keyword arguments.
+            - {sampler} (Sampler)   : Sampler object.
+            - {seed}    (int)       : Random seed (default is None).
+            - {replica} (int)       : Replica index (default is 1).
+            - {beta}    (float)     : Inverse temperature beta = 1/T.
+            - {rng}     (int)       : Random number generator key
+            - {size}    (int)       : Configuration size (like lattice sites etc.)
+            - {modes}   (int)       : Number of spin modes (in MB systems 2 for spins etc.)
         Instance Variables:
         _accepted (int)         : Number of accepted steps.
         _total (int)            : Total number of steps.
@@ -152,6 +153,10 @@ class MonteCarloSolver(Solver):
         # call the parent class constructor with the arguments and keyword arguments passed
         super().__init__(size=size, modes=modes, seed=seed, nthreads=nthreads,
                          hilbert=hilbert, backend=backend, dir=dir, **kwargs)
+        
+        if sampler is None:
+            raise ValueError("Sampler is not defined.")
+        self._sampler           = sampler       # sampler object - for sampling the states
         
         # define the instance variables
         self._mcparams          = McsTrain(

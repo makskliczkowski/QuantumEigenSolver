@@ -74,16 +74,17 @@ class Solver(ABC):
     ###################################
     NOT_IMPLEMENTED_ERROR       = "The state is not implemented for the given modes."
     NOT_IMPLEMENTED_ERROR_SAVE  = "The saving is not implemented for the given modes."
+    NOT_GIVEN_SIZE_ERROR        = "The size or shape of the system is not defined."
     ###################################
     
     def __init__(self,
-                size        : int = 1,
+                shape       : Union[int, Tuple[int, ...]] = (1,),
                 modes       : int = 2,
                 seed        : Optional[int] = None,
                 hilbert     : Optional[HilbertSpace] = None,
                 directory   : Union[str, Directories] = defdir,
                 nthreads    : int = 1,
-                backend     : str = 'default', 
+                backend     : str = 'default',
                 **kwargs):
         '''
         Initialize the solver.
@@ -96,16 +97,19 @@ class Solver(ABC):
         - seed          : seed for the random number generator
         - backend       : backend for the calculations (default is 'default')
         '''
-        self._size          = size                                                          # size of the configuration (like lattice sites etc.)
+        self._shape         = shape                                                         # size of the configuration (like lattice sites etc.)
+                                                                                            # This can be either 1D chain, 2D lattice, transformed
+                                                                                            # lattice, etc.
+        self._size          = np.prod(shape) if isinstance(shape, tuple) else shape         # size of the configuration (like lattice sites etc.)
         self._modes         = modes                                                         # number of modes for the binary representation
         self._hilbert       = hilbert                                                       # Hilbert space representation
         if self._hilbert is not None:
             self._size  = hilbert.ns
             self._modes = hilbert.modes
-        elif hilbert is None and size is not None:
-            self._hilbert   = HilbertSpace(ns=size, modes=modes)
-        elif hilbert is None and size is None:
-            raise ValueError("The size of the system is not defined.")
+        elif hilbert is None and shape is not None:
+            self._hilbert   = HilbertSpace(ns=self._size, modes=self._modes)
+        elif hilbert is None and shape is None:
+            raise ValueError(Solver.NOT_GIVEN_SIZE_ERROR)
         
         # directory creation
         self._dir           = directory                                                     # directory for saving the data (potentially)

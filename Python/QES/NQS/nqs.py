@@ -248,6 +248,63 @@ class NQS(MonteCarloSolver):
     
 #########################################
 
+class VariationalDerivatives:
+    """
+    Class to manage derivatives information for variational methods:
+    
+    Generally, stores the derivatives of the energy with respect to the variational parameters.
+    
+    \\frac{\\partial E}{\\partial \\theta_i} = \\frac{\\langle\\partial_i \\psi|H|\\psi\\rangle}{\\langle\\psi|\\psi\\rangle} = 
+    \\langle E_{\\mathrm{loc}} O^*_i \\rangle - \\langle E_{\\mathrm{loc}} \\rangle \\langle O^*_i \\rangle = 
+    \\langle (E_{\\mathrm{loc}} - \\langle E_{\\mathrm{loc}} \\rangle) O^*_i \\rangle
+    
+    This class provides an interface for computing and retrieving various derivatives
+    used in the optimization process of the NQS.
+    """
+    
+    def __init__(self, parent: NQS):
+        """
+        Initialize the derivatives container.
+
+        Parameters:
+            parent (NQS): The parent NQS solver instance.
+        """
+        self._parent            = parent
+        self._derivatives_mean  = None
+        self._energies_centered = None
+        
+    @property
+    def parent(self) -> NQS:
+        """Return the parent NQS solver instance."""
+        return self._parent
+
+class StochasticReconfiguration:
+    """
+    Class to manage the stochastic reconfiguration process for Neural Quantum State (NQS) solvers.
+    
+    This class provides an interface for computing and retrieving various derivatives
+    used in the optimization process of the NQS.
+    """
+    
+    def __init__(self, parent: NQS):
+        """
+        Initialize the stochastic reconfiguration container.
+
+        Parameters:
+            parent (NQS): The parent NQS solver instance.
+        """
+        self._parent            = parent
+        self._derivatives_mean  = None
+        self._energies_centered = None
+        
+    @property
+    def parent(self) -> NQS:
+        """Return the parent NQS solver instance."""
+        return self._parent
+
+
+#########################################
+
 class NQSLowerStates:
     """
     Class to manage lower states information for Neural Quantum State (NQS) solvers.
