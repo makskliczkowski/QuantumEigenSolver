@@ -54,8 +54,9 @@ from Algebra.hilbert import HilbertSpace
 if _JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    import jax.random as random
+    import jax.random as random_jp
     from jax import vmap
+from concurrent.futures import ThreadPoolExecutor
 
 #########################################################################
 #! Errors
@@ -113,52 +114,63 @@ class SolverInitState(Enum):
 
 if _JAX_AVAILABLE:
     # @JIT
-    def _propose_random_flip_jax(state: jnp.ndarray, rng, rng_k):
+    def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         """
         Propose a random flip of a state using JAX.
         Parameters:
         - state (jnp.ndarray)           : The state array
-        - rng (jax.random.PRNGKey)      : The random key for JAX
         - rng_k (jax.random.PRNGKey)    : The random key for JAX
         - num (int)                     : The number of flips to propose
         Returns:
         - jnp.ndarray: The proposed flipped state
         """
-        idx = randint_jax(rng_module=rng, key=rng_k, shape=(1,), low=0, high=state.size)[0]
+        idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)[0]
         return Binary.flip_array_jax_spin(state, idx)
 
     # @JIT
-    def _propose_random_flips_jax(state: jnp.ndarray, rng, rng_k, num = 1):
+    def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
         """
         Propose a random flip of a state using JAX.
         Parameters:
         - state (jnp.ndarray)           : The state array
-        - rng (jax.random.PRNGKey)      : The random key for JAX
         - rng_k (jax.random.PRNGKey)    : The random key for JAX
         - num (int)                     : The number of flips to propose
         Returns:
         - jnp.ndarray: The proposed flipped state
         """
-        idx = randint_jax(rng_module=rng, key=rng_k, shape=(num,), low=0, high=state.size)
+        idx = randint_jax(key=rng_k, shape=(num,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)
         return Binary.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
 
-# @njit
+@njit
 def _propose_random_flips_np(state: np.ndarray, rng, num = 1):
     """
     Propose a random flip of a state using numpy.
     """
-    idx = randint_np(rng=rng, low=0, high=state.size, size=num)
-    return Binary.flip_array_np_multi(state, idx,
-                                    spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
+    if state.ndim == 1:
+        idx = randint_np(rng=rng, low=0, high=state.size, size=num)
+        return Binary.flip_array_np_multi(state, idx,
+                                        spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
+    n_chains, state_size = state.shape[0], state.shape[1]
+    for i in prange(n_chains):
+        idx = randint_np(rng=rng, low=0, high=state_size, size=num)
+        state[i] = Binary.flip_array_np_multi(state[i], idx,
+                                        spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
+    return state
 
-# @njit
-def _propose_random_flip_np(state: np.ndarray, rng):
-    
+@njit(parallel=True)
+def _propose_random_flip_np(state: np.ndarray, rng: np.random.Generator):
     """
     Propose a random flip of a state using numpy.
     """
-    idx = randint_np(rng=rng, low=0, high=state.size, size=1)[0]
-    return Binary.flip_array_np(state, idx)
+    if state.ndim == 1:
+        idx = randint_np(rng=rng, low=0, high=state.size, size=1)[0]
+        return Binary.flip_array_np(state, idx)
+    
+    n_chains, state_size = state.shape[0], state.shape[1]
+    for i in prange(n_chains):
+        idx         = randint_np(low=0, high=state_size, size=1)[0]
+        state[i]    = Binary.flip_array_np(state[i], idx)
+    return state
 
 def propose_random_flip(state: 'array-like', backend = 'default',
                         rng = None, rng_k = None, num = 1):
@@ -581,11 +593,10 @@ class Sampler(ABC):
         if self._upd_fun is None:
             if self._isjax:
                 # Bind RNG arguments to the JAX updater and then wrap with JIT.
-                updater = partial(_propose_random_flip_jax, rng=self._rng, rng_k=self._rng_k)
-                self._upd_fun = JIT(updater)
+                self._upd_fun = _propose_random_flip_jax
             else:
                 # For NumPy backend, bind the RNG to the updater.
-                self._upd_fun = partial(_propose_random_flip_np, rng=self._rng)
+                self._upd_fun = _propose_random_flip_np
     
     ###################################################################
     #! ABSTRACT
@@ -774,9 +785,10 @@ class Sampler(ABC):
         if numchains is None:
             numchains = self._numchains
         if self._isjax:
-            self._states = jnp.stack([jnp.array(initstate)] * numchains, axis=0)
+            self._states    = jnp.stack([jnp.array(initstate)] * numchains, axis=0)
         else:
-            self._states = np.stack([np.array(initstate.copy())] * numchains, axis=0)
+            self._states    = np.stack([np.array(initstate.copy())] * numchains, axis=0)
+            self._tmpstates = self._states.copy()   # for the temporary states (for the proposal)
     
     # ---
     
@@ -863,10 +875,10 @@ class MCSampler(Sampler):
         if self._upd_fun is None:
             if self._isjax:
                 # Bind RNG arguments to the JAX updater and then wrap with JIT.
-                self._upd_fun = JIT(partial(_propose_random_flip_jax, rng=self._rng, rng_k=self._rng_k))
+                self._upd_fun = _propose_random_flip_jax
             else:
                 # For NumPy backend, bind the RNG to the updater.
-                self._upd_fun = partial(_propose_random_flip_np, rng=self._rng)
+                self._upd_fun = _propose_random_flip_np
     
     #####################################################################
     
@@ -915,7 +927,7 @@ class MCSampler(Sampler):
             - The acceptance probability as a float
         '''
 
-        log_acceptance_ratio = beta * (candidate_val - current_val)
+        log_acceptance_ratio = beta * jnp.real(candidate_val - current_val)
         return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
     
     def _acceptance_probability_np(self, current_val, candidate_val, beta: float = 1.0):
@@ -930,7 +942,7 @@ class MCSampler(Sampler):
             - The acceptance probability as a float
         '''
 
-        log_acceptance_ratio = beta * (candidate_val - current_val)
+        log_acceptance_ratio = beta * np.real(candidate_val - current_val)
         return np.minimum(1.0, np.exp(log_acceptance_ratio))
     
     def acceptance_probability(self, current_val, candidate_val, beta: float = 1.0):
@@ -989,9 +1001,9 @@ class MCSampler(Sampler):
         '''
         if net_params is None:
             # If no parameters are needed, call net_callable with just y
-            return np.array([mu * net_callable(y) for y in x])
+            return np.array([mu * net_callable(y) for y in x]).reshape(x.shape[0])
             # return np.array([mu * np.real(net_callable(y)) for y in x])
-        return np.array([mu * net_callable(net_params, y) for y in x])
+        return np.array([mu * net_callable(net_params, y) for y in x]).reshape(x.shape[0])
         # return np.array([mu * np.real(net_callable(net_params, y)) for y in x])
     
     def logprob(self, x, mu: float = 1.0, net_callable = None, net_params = None):
@@ -1082,56 +1094,69 @@ class MCSampler(Sampler):
             chain_in, current_val_in, rng_k_in, num_proposed_in, num_accepted_in = carry
             
             # Print iteration and current state info
-            jax.debug.print("Iteration {}: Processing chain step", i)
-            jax.debug.print("Current chain shape: {}", chain_in.shape)
-            jax.debug.print("Current values shape: {}", current_val_in.shape)
+            # jax.debug.print("Iteration {}: Processing chain step", i)
+            # jax.debug.print("Current chain shape: {}", chain_in.shape)
+            # jax.debug.print("Current values shape: {}", current_val_in.shape)
             
+        
             # split the random key to get a new key for each chain element
-            new_rng_ks      = random.split(rng_k_in, num = chain_in.shape[0] + 1)
+            new_rng_ks      = random_jp.split(rng_k_in, num = chain_in.shape[0] + 1)
             carry_key       = new_rng_ks[-1]
-            jax.debug.print("Split {} random keys", len(new_rng_ks))
+            # jax.debug.print("Split {} random keys", len(new_rng_ks))
+            # jax.debug.print("New random keys shape: {}", new_rng_ks[:-1].shape)
+            # jax.debug.print("New random key[0]: {}", new_rng_ks[0])
             
             # update the chain by proposing a new state via the update_proposer
-            new_chain       = jax.vmap(update_proposer, in_axes=(0, 0, None))(new_rng_ks[:-1], chain_in)
-            jax.debug.print("New chain shape: {}", new_chain.shape)
+            new_chain       = jax.vmap(update_proposer, in_axes=(0, 0))(
+                                    chain_in, new_rng_ks[:-1])
+            # jax.debug.print("New chain shape: {}", new_chain.shape)
+            
 
             # compute the acceptance probability (it is already partially called on mu and beta)
             logprobas_new   = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
-            jax.debug.print("New logprobs shape: {}, first few values: {}", 
-                    logprobas_new.shape, logprobas_new[:5])
+            # jax.debug.print("New logprobs shape: {}, first few values: {}", 
+                    # logprobas_new.shape, logprobas_new[:5])
+            
             
             # acceptance probability (already partially called on mu and beta)
             acc_probability = accept_config_fun(current_val_in, logprobas_new)
-            jax.debug.print("Acceptance probs shape: {}, min: {}, max: {}, mean: {}", 
-                    acc_probability.shape, jnp.min(acc_probability), 
-                    jnp.max(acc_probability), jnp.mean(acc_probability))
+            # jax.debug.print("Acceptance probs shape: {}, min: {}, max: {}, mean: {}", 
+                    # acc_probability.shape, jnp.min(acc_probability), 
+                    # jnp.max(acc_probability), jnp.mean(acc_probability))
             
             # decide with dice rule
-            new_rng_k, carry_key = random.split(carry_key,)
-            accepted        = random.bernoulli(new_rng_k, acc_probability).reshape((-1,))
-            jax.debug.print("Accepted: count={} out of {}", jnp.sum(accepted), len(accepted))
+            new_rng_k, carry_key = random_jp.split(carry_key,)
+            accepted        = random_jp.bernoulli(new_rng_k, acc_probability).reshape((-1,))
+            # jax.debug.print("Accepted: count={} out of {}", jnp.sum(accepted), len(accepted))
             
             # keep track of the updates
             num_proposed    = num_proposed_in + len(chain_in)
-            num_accepted    = num_accepted_in + jax.lax.reduce_sum(accepted)
-            jax.debug.print("Cumulative: proposed={}, accepted={}, rate={}", 
-                   num_proposed, num_accepted, num_accepted / num_proposed)
+            num_accepted    = num_accepted_in + jnp.sum(accepted)
+            # jax.debug.print("Cumulative: proposed={}, accepted={}, rate={}", 
+                            # num_proposed, num_accepted, num_accepted / num_proposed)
             
+        
             # accept by jax
             def update(acc, old, new):
                 return jax.lax.select(acc, new, old)
             new_carry_states= jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
-            new_carry_vals  = jnp.where(accepted, logprobas_new, current_val_in)
-            
-            jax.debug.print("End of iteration {}: Updated chain shape: {}",  i, new_carry_states.shape)
+            new_carry_vals  = jax.vmap(update, in_axes=(0, 0, 0))(accepted, current_val_in, logprobas_new)
+            # jax.debug.print("New chain shape: {}", new_carry_states.shape)
+            # jax.debug.print("First chain vs new chain: {} vs {}",
+            #                 chain_in[0], new_chain[0])
+            # jax.debug.print("Values before vs after: {} vs {} with shapes {} vs {}",
+            #                 current_val_in[0], new_carry_vals[0],
+            #                 current_val_in.shape, new_carry_vals.shape)
+            # return chain_in, current_val_in, new_rng_k, num_proposed, num_accepted
+            # jax.debug.print("End of iteration {}: Updated chain shape: {}",  i, new_carry_states.shape)
             return (new_carry_states, new_carry_vals, carry_key, num_proposed, num_accepted)
         return jax.lax.fori_loop(0, steps, body, carry)
 
     def _sweep_chain_np(self,
                         chain               : np.ndarray,
                         logprobas           : np.ndarray,
-                        num_proposed        : int,
-                        num_accepted        : int,
+                        num_proposed        : np.ndarray,
+                        num_accepted        : np.ndarray,
                         params              : Any,
                         update_proposer     : Callable,
                         log_proba_fun       : Callable,
@@ -1168,7 +1193,42 @@ class MCSampler(Sampler):
         A tuple (chain, current_logprobas, rng_k, num_proposed, num_accepted)
         """
         
-        current_val = logprobas if logprobas is not None else log_proba_fun(chain, net_callable=net_callable_fun, net_params=params)
+        current_val     = logprobas if logprobas is not None else log_proba_fun(chain, net_callable=net_callable_fun, net_params=params)
+
+        def loop_sweep(chain, current_val, num_proposed, num_accepted, tmpstates, rng):
+            # Loop through the number of steps
+            for _ in range(steps):
+                
+                # use the temporary states for the proposal 
+                tmpstates               = chain.copy()
+                
+                # For each chain element, generate a new candidate using the update proposer.
+                # Here, we simulate splitting rng_k by simply generating a new random integer key.
+                # also, this flips the state inplace, so we need to copy the chain
+                # and then update the chain with the new state.
+                # Use NumPy's vectorized operations to generate new states
+                new_chain               = update_proposer(tmpstates, rng)
+                
+                # Compute new log probabilities for candidates using the provided log probability function.
+                new_logprobas           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
+                
+                # Compute acceptance probability for each chain element.
+                acc_probability         = accept_config_fun(current_val, new_logprobas)
+                
+                # Decide acceptance by comparing against a random uniform sample.
+                rand_vals               = self._rng.random(size=chain.shape[0] if len(chain.shape) > 1 else 1)
+                accepted                = rand_vals < acc_probability
+                num_proposed            += chain.shape[0] if len(chain.shape) > 1 else 1
+                num_accepted[accepted]  += 1
+                
+                # Update: if accepted, take candidate, else keep old.
+                new_val                 = np.where(accepted, new_logprobas, current_val)
+                # Update the carry:
+                chain                   = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
+                current_val             = new_val
+                
+                # Update rng_k with a new random integer (not used further)
+            return chain, current_val, num_proposed, num_accepted, tmpstates
         
         # go through the number of steps, for each step: 
         # 1. propose a new state
@@ -1178,30 +1238,9 @@ class MCSampler(Sampler):
         # 5. update the chain
         # 6. update the carry
         # 7. update rng_k with a new random integer (not used further)
-        for _ in range(steps):
-            
-            # For each chain element, generate a new candidate using the update proposer.
-            # Here, we simulate splitting rng_k by simply generating a new random integer key.
-            # also, this flips the state inplace, so we need to copy the chain
-            # and then update the chain with the new state.
-            new_chain       = np.array([update_proposer(state) for state in chain.copy()])
-            # Compute new log probabilities for candidates using the provided log probability function.
-            new_logprobas   = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
-            # Compute acceptance probability for each chain element.
-            acc_probability = accept_config_fun(current_val, new_logprobas)
-            # Decide acceptance by comparing against a random uniform sample.
-            rand_vals               = np.random.uniform(size=chain.shape[0])
-            accepted                = rand_vals < acc_probability
-            num_proposed            += chain.shape[0] if len(chain.shape) > 1 else 1
-            num_accepted[accepted]  += 1
-            
-            # Update: if accepted, take candidate, else keep old.
-            new_state       = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
-            new_val         = np.where(accepted, new_logprobas, current_val)
-            # Update the carry:
-            chain           = new_state
-            current_val     = new_val
-            # Update rng_k with a new random integer (not used further)
+        chain, current_val, num_proposed, num_accepted, self._tmpstates = loop_sweep(chain, 
+                                                                    current_val, num_proposed, 
+                                                                num_accepted, self._tmpstates, self._rng)
         return chain, current_val, num_proposed, num_accepted
 
     def _sweep_chain(self,
@@ -1304,10 +1343,17 @@ class MCSampler(Sampler):
         def scan_fun(carry, i):
             states, logprobas, rng_k, num_proposed, num_accepted = carry
             states, logprobas, rng_k, num_proposed, num_accepted = self._sweep_chain_jax(
-                chain=states, logprobas=logprobas, rng_k=rng_k, 
-                num_proposed=num_proposed, num_accepted=num_accepted,
-                params=params, update_proposer=update_proposer, log_probability=log_probability, 
-                accept_config=accept_config, net_callable=net_callable, steps=sweep_steps)
+                chain               = states,
+                logprobas           = logprobas,
+                rng_k               = rng_k,
+                num_proposed        = num_proposed,
+                num_accepted        = num_accepted,
+                params              = params,
+                update_proposer     = update_proposer,
+                log_proba_fun       = log_proba_fun,
+                accept_config_fun   = accept_config,
+                net_callable_fun    = net_callable,
+                steps               = sweep_steps)
             return (states, logprobas, rng_k, num_proposed, num_accepted), states
 
         meta, configs = jax.lax.scan(scan_fun, 
@@ -1350,7 +1396,7 @@ class MCSampler(Sampler):
         configs_list    = []
         
         # Perform the sampling sweeps - do the same as the thermalization but save the states
-        for i in range(num_samples):
+        for _ in range(num_samples):
             states, logprobas, num_proposed, num_accepted = self._sweep_chain_np(
                 chain               = states,
                 logprobas           = logprobas,
@@ -1362,14 +1408,14 @@ class MCSampler(Sampler):
                 accept_config_fun   = self.acceptance_probability,
                 net_callable_fun    = self._net_callable,
                 steps               = self._sweep_steps)
-            meta.append((states.copy(), logprobas.copy(), num_proposed, num_accepted))
+            meta        = (states.copy(), logprobas.copy(), num_proposed, num_accepted)
             # Assume states is of shape (num_chains, *self._shape)
             configs_list.append(states.copy())
         
         # Concatenate configurations along the chain axis
         # Then reshape to (num_samples, -1) + self._shape (flattening the chain dimension per sample)
         configs = np.concatenate(configs_list, axis=0)
-        return (states, logprobas, None, num_proposed, num_accepted), configs.reshape((num_samples, -1) + self._shape)
+        return meta, configs.reshape((num_samples, -1) + self._shape)
     
     def sample(self, parameters=None, num_samples=None, num_chains=None):
         '''
@@ -1399,22 +1445,22 @@ class MCSampler(Sampler):
                 parameters = self._net.get_parameters()
             else:
                 parameters = self._parameters
-        else:
+        if parameters is not None:
             self._net.set_parameters(parameters)
-            
-        net_callable, params = self._set_net_callable(self._net)
+        
+        net_callable, parameters= self._set_net_callable(self._net)
         
         # set the log probabilities directly for the states that are already set
-        self._logprobas = self.logprob(self._states,
-                                mu              =   self._mu,
-                                net_callable    =   net_callable,
-                                net_params      =   params)
+        self._logprobas         = self.logprob(self._states,
+                                                mu              =   self._mu,
+                                                net_callable    =   net_callable,
+                                                net_params      =   parameters)
         
         if self._isjax:
             (self._states, self._logprobas, self._rng_k, self._num_proposed, self._num_accepted), configs =\
                 self._get_samples_jax(
                     shape           =   self._shape,
-                    params          =   params,
+                    params          =   parameters,
                     num_samples     =   num_samples,
                     therm_steps     =   self._therm_steps,
                     sweep_steps     =   self._sweep_steps,
@@ -1427,18 +1473,18 @@ class MCSampler(Sampler):
                     num_proposed    =   self._num_proposed,
                     num_accepted    =   self._num_accepted)
             
-            configs_log_ansatz  = jax.vmap(net_callable)(params, configs)
-            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(configs_log_ansatz))   
-            norm                = jnp.sum(probs, axis=1, keepdims=True)
-            probs               = probs / norm
-            return configs, configs_log_ansatz, probs
-        (self._states, self._logprobas, self._rng_k, self._num_proposed, self._num_accepted), configs =\
-            self._get_samples_np(params, num_samples, num_chains)
-        configs_log_ansatz  = self._net(configs)
+            configs_log_ansatz  = jax.vmap(net_callable)(parameters, configs)
+            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(self._logprobas))   
+            norm                = jnp.sum(probs, axis=0, keepdims=True)
+            probs               = probs / norm * self._numchains
+            return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
+        (self._states, self._logprobas, self._num_proposed, self._num_accepted), configs =\
+            self._get_samples_np(parameters, num_samples, num_chains)
+        configs_log_ansatz  = np.array([self._net(config) for config in configs])
         probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
         norm                = np.sum(probs, axis=0, keepdims=True)
-        probs               = probs / norm
-        return configs, configs_log_ansatz, probs
+        probs               = probs / norm * self._numchains
+        return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
     
     ###################################################################
     #! SETTERS
