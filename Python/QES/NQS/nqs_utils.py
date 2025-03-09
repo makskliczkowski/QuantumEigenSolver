@@ -4,23 +4,34 @@ author  : Maksymilian Kliczkowski
 date    : 2025-03-01
 
 
+-----------------
+
+
 # Some info:
 
-Holomorphic networks:
+This file contains functions for creating batches of data, evaluating functions on batches, 
+and handling various network types and their corresponding operations.
+It includes implementations for both JAX and NumPy backends, as well as functions for computing gradients
+using both analytical and numerical methods.
+It also provides a wrapper for selecting the appropriate gradient function based on the input parameters.
+The code is designed to be flexible and can handle complex and real-valued functions,
+as well as holomorphic and non-holomorphic networks.
+
+## Holomorphic networks:
 If the function (for example, a variational ansatz for a quantum state)
 is holomorphic with respect to its complex parameters, then the derivative with respect to the complex variable 
 is well defined in the usual sense. The gradient can be computed using standard complex differentiation rules,
 and the real and imaginary parts of the gradient are not independent—they satisfy the Cauchy-Riemann conditions.
 
-Non-holomorphic networks:
+## Non-holomorphic networks:
 When we say the gradient is not holomorphic,
 it means that the function is not complex differentiable in the standard sense.
 In this case, the function does not satisfy the Cauchy-Riemann equations and the differentiation with respect
 to the complex parameters must be done by treating the real and imaginary parts as independent variables. This results
 in a gradient that generally has extra degrees of freedom compared to the holomorphic case and requires more care in its computation.
 
-For example, if you have a wave function ansatz ψ(s;θ)ψ(s;θ) where θθ is complex, a holomorphic ansatz would allow
-you to compute derivatives with respect to θθ directly. However, if the ansatz is non-holomorphic,
+For example, if you have a wave function ansatz ψ(s;θ), where θ is complex, a holomorphic ansatz would allow
+you to compute derivatives with respect to θ directly. However, if the ansatz is non-holomorphic,
 you need to compute the derivatives with respect to Re(θ) and Im(θ) separately and then combine them appropriately.
 '''
 

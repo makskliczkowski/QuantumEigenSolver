@@ -46,6 +46,7 @@ except ImportError:
 #########################################
 
 from Solver.MonteCarlo.montecarlo import MonteCarloSolver, McsTrain, McsReturn, Sampler
+from Solver.MonteCarlo.sampler import SamplerType, get_sampler
 from Algebra.Operator.operator import Operator, OperatorFunction
 from Algebra.hamil import Hamiltonian
 
@@ -122,7 +123,7 @@ class NQS(MonteCarloSolver):
         self._initialized   = False
         self._weights       = None
         self._dtype         = None
-        self._net           = self._init_network(net, **kwargs)     # initialize network type
+        self._net           = self._choose_network(net, **kwargs)   # initialize network type
         self.init_network(self._backend.ones(self._shape))          # run the network
         self._init_gradients()
         self._init_functions()
@@ -149,16 +150,81 @@ class NQS(MonteCarloSolver):
             grads_r = make_flat(jax.grad(lambda a,b: jnp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
             grads_i = make_flat(jax.grad(lambda a,b: jnp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
             return isclose(jnp.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
+        else:
+            def make_flat(x):
+                return np.concatenate([p.ravel() for p in flatten_func(x)[0]])
+            grads_r = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+            grads_i = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
+            return isclose(np.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
         
-        def make_flat(x):
-            return np.concatenate([p.ravel() for p in flatten_func(x)[0]])
-        grads_r = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-        grads_i = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-        return isclose(np.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
+    def _check_analitic(self):
+        '''
+        Check if the network is analitic, this means that we check
+        whether 
+        '''
+        pass
+        
+        
+    def _choose_network(self, net, **kwargs) -> nn.Module:
+        '''
+        Initialize the variational parameters ansatz via the provided network - it simply creates
+        the network instance. To truly initialize the network, use the init_network method.
+        Parameters:
+            net: The network to be used (can be a string or a callable).
+            kwargs: Additional arguments for the network.
+        Returns:
+            The initialized network.
+        '''
+        if isinstance(net, nn.Module):
+            self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
+        elif isinstance(net, str):
+            self.log(f"Network {net} provided from the string.", log='info', lvl = 2, color = 'blue')
+            # TODO: Add the network
+            net = None
+        self.log(f"Network {net} provided from the {type(net).__name__}.", log='info', lvl = 2, color = 'blue')
+        
+        return net
+    
+    def _init_gradients(self):
+        '''
+        Initialize the gradients.
+        1. Check if the backend is JAX or NumPy.
+        2. If JAX, set the gradient function to JAX's grad, if NumPy, set the gradient function to NumPy's grad.
+        3. If the network is complex, set the gradient function to JAX's grad with holomorphic=True, otherwise set it to JAX's grad with holomorphic=False.
+        '''
+        self._isjax         = self._backend != np
+        self._forces        = None
+        self._gradients     = None
+        
+        self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
+                                        isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
+
+    def _init_functions(self):
+        '''
+        Initialize the functions.
+        '''
+        
+        if self._isjax:
+            self._eval_func = self._eval_jax
+            self._grad_func = self._grad_jax
+        else:
+            self._eval_func = self._eval_np
+            self._grad_func = self._grad_np
+
     
     def init_network(self, s):
         '''
         In1tialize the network truly.
+        Parameters:
+            s: The state vector, can be any, but it is used to initialize the network.
+        1. Check if the network is already initialized.
+        2. If not, initialize the weights using the network's init method.
+        3. Check the dtypes of the weights and ensure they are consistent.
+        4. Check if the network is complex and holomorphic.
+        5. Check the shape of the weights and store them.
+        6. Calculate the number of parameters in the network.
+        7. Set the initialized flag to True.
+        8. If the network is not initialized, raise a ValueError.
         '''
 
         if not self._initialized:
@@ -188,48 +254,6 @@ class NQS(MonteCarloSolver):
             else:
                 self._nparams = np.sum(np.array([p.size for p in flatten_func(self.parameters["params"])[0]]))
     
-    def _init_network(self, net, **kwargs) -> nn.Module:
-        '''
-        Initialize the variational parameters ansatz via the provided network - it simply creates
-        the network instance. To truly initialize the network, use the init_network method.
-        Parameters:
-            net: The network to be used (can be a string or a callable).
-            kwargs: Additional arguments for the network.
-        Returns:
-            The initialized network.
-        '''
-        if isinstance(net, nn.Module):
-            self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
-        elif isinstance(net, str):
-            self.log(f"Network {net} provided from the string.", log='info', lvl = 2, color = 'blue')
-            # TODO: Add the network
-            net = None
-        self.log(f"Network {net} provided from the {type(net).__name__}.", log='info', lvl = 2, color = 'blue')        
-        return net
-    
-    def _init_gradients(self):
-        '''
-        Initialize the gradients.
-        '''
-        self._isjax         = self._backend != np
-        self._forces        = None
-        self._gradients     = None
-        
-        self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
-                                        isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
-
-    def _init_functions(self):
-        '''
-        Initialize the functions.
-        '''
-        
-        if self._isjax:
-            self._eval_func = self._eval_jax
-            self._grad_func = self._grad_jax
-        else:
-            self._eval_func = self._eval_np
-            self._grad_func = self._grad_np
-
     #####################################
     #! EVALUATION
     #####################################
