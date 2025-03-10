@@ -23,6 +23,7 @@ from numba import njit
 from Algebra.hilbert import HilbertSpace
 from Algebra.hamil import Hamiltonian
 from Algebra.Operator.operators_spin import _sigma_z_int_np, _sigma_x_int_np, _sigma_z_int_jnp, _sigma_x_int_jnp
+from Algebra.Operator.operators_spin import _sigma_z_jnp, _sigma_x_jnp
 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
@@ -31,6 +32,10 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 ##########################################################################################
 
 _QSM_CHECK_HS_NORM = True
+
+# ----------------------------------------------------------------------------------------
+#! INTEGER STATES
+# ----------------------------------------------------------------------------------------
 
 def _local_energy_int(k_map     : int,
                         i       : int,
@@ -88,7 +93,6 @@ def _local_energy_int(k_map     : int,
     new_vals[1:] = coupling_v
     return new_rows, new_vals
 
-
 # JIT the local energy interaction function
 _jitted_local_energy_int = njit(_local_energy_int)
 
@@ -99,6 +103,41 @@ def create_local_energy_int_jitted(n, ns, neidot, h, g0, au):
         # return _local_energy_int(k, i, n, ns, neidot, h, g0, au)
         return _jitted_local_energy_int(k, i, n, ns, neidot, h, g0, au)
     return wrapper
+
+# ----------------------------------------------------------------------------------------
+#! ARRAY STATES
+# ----------------------------------------------------------------------------------------
+
+def loc_energy_arr(self, 
+                    k       : np.ndarray,
+                    i       : int,
+                    n       : int,
+                    ns      : int,
+                    neidot  : jnp.ndarray, h: jnp.ndarray, g0: float, au: jnp.ndarray):
+        # Determine the index in the "outside" part
+        part_idx = i - self._n
+
+        # --- First contribution: σ_z term ---
+        # Apply σ_z on site i. (Note: the state is unchanged but multiplied by eigenvalue.)
+        state_z, val_z  = _sigma_z_jnp(k, i)
+        energy_z        = h[part_idx] * val_z
+
+        # --- Second contribution: σ_x term ---
+        # Get the neighbor index in the dot (this is chosen at random during initialization)
+        neighbor_index  = self._neidot[part_idx]
+        # First flip the bit at the dot (neighbor_index)
+        state_x1, sign1 = sigma_x_array(k, neighbor_index)
+        # Then flip the bit at site i in the intermediate state.
+        state_x2, sign2 = sigma_x_array(state_x1, i)
+        energy_x = self._g0 * self._au[part_idx] * sign1 * sign2
+
+        # Assemble the contributions.
+        # For consistency with the integer version (which returns a tuple of row indices and values),
+        # here we return a list of original states (rows), the resulting states (cols), and the coupling values.
+        rows = [k.copy(), k.copy()]
+        cols = [state_z, state_x2]
+        vals = [energy_z, energy_x]
+        return rows, cols, vals
 
 ##########################################################################################
 
@@ -526,7 +565,7 @@ class QSM(Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def loc_energy_arr(self, k, i):
+    def loc_energy_arr(self, k):
         '''!TODO: Implement the local energy interaction for the array case.'''
         rows, cols, vals = [], [], []
         return rows, cols, vals

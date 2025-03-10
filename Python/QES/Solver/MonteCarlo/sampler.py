@@ -113,7 +113,7 @@ class SolverInitState(Enum):
 #########################################################################
 
 if _JAX_AVAILABLE:
-    # @JIT
+    @JIT
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         """
         Propose a random flip of a state using JAX.
@@ -124,10 +124,10 @@ if _JAX_AVAILABLE:
         Returns:
         - jnp.ndarray: The proposed flipped state
         """
-        idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)[0]
+        idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size)[0]
         return Binary.flip_array_jax_spin(state, idx)
 
-    # @JIT
+    @JIT
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
         """
         Propose a random flip of a state using JAX.
@@ -875,7 +875,7 @@ class MCSampler(Sampler):
         if self._upd_fun is None:
             if self._isjax:
                 # Bind RNG arguments to the JAX updater and then wrap with JIT.
-                self._upd_fun = _propose_random_flip_jax
+                self._upd_fun = JIT(_propose_random_flip_jax)
             else:
                 # For NumPy backend, bind the RNG to the updater.
                 self._upd_fun = _propose_random_flip_np
@@ -1079,7 +1079,7 @@ class MCSampler(Sampler):
         carry       = (chain, current_val, rng_k, num_proposed, num_accepted)
         
         # define the body of the fori_loop
-        def body(i, carry):
+        def body(_, carry):
             '''
             Carry:
             - 0 : The current state of the chain
@@ -1092,63 +1092,33 @@ class MCSampler(Sampler):
             # obtain the current key (0. current state of the chain, 1. current value of the chain,
             # 2. the random key, 3. the number of proposed updates, 4. the number of accepted updates
             chain_in, current_val_in, rng_k_in, num_proposed_in, num_accepted_in = carry
-            
-            # Print iteration and current state info
-            # jax.debug.print("Iteration {}: Processing chain step", i)
-            # jax.debug.print("Current chain shape: {}", chain_in.shape)
-            # jax.debug.print("Current values shape: {}", current_val_in.shape)
-            
-        
+
             # split the random key to get a new key for each chain element
             new_rng_ks      = random_jp.split(rng_k_in, num = chain_in.shape[0] + 1)
             carry_key       = new_rng_ks[-1]
-            # jax.debug.print("Split {} random keys", len(new_rng_ks))
-            # jax.debug.print("New random keys shape: {}", new_rng_ks[:-1].shape)
-            # jax.debug.print("New random key[0]: {}", new_rng_ks[0])
-            
+
             # update the chain by proposing a new state via the update_proposer
             new_chain       = jax.vmap(update_proposer, in_axes=(0, 0))(
                                     chain_in, new_rng_ks[:-1])
-            # jax.debug.print("New chain shape: {}", new_chain.shape)
-            
 
             # compute the acceptance probability (it is already partially called on mu and beta)
             logprobas_new   = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
-            # jax.debug.print("New logprobs shape: {}, first few values: {}", 
-                    # logprobas_new.shape, logprobas_new[:5])
-            
             
             # acceptance probability (already partially called on mu and beta)
             acc_probability = accept_config_fun(current_val_in, logprobas_new)
-            # jax.debug.print("Acceptance probs shape: {}, min: {}, max: {}, mean: {}", 
-                    # acc_probability.shape, jnp.min(acc_probability), 
-                    # jnp.max(acc_probability), jnp.mean(acc_probability))
-            
+
             # decide with dice rule
-            new_rng_k, carry_key = random_jp.split(carry_key,)
-            accepted        = random_jp.bernoulli(new_rng_k, acc_probability).reshape((-1,))
-            # jax.debug.print("Accepted: count={} out of {}", jnp.sum(accepted), len(accepted))
+            new_rng_k, carry_key    = random_jp.split(carry_key,)
+            accepted                = random_jp.bernoulli(new_rng_k, acc_probability)
             
-            # keep track of the updates
-            num_proposed    = num_proposed_in + len(chain_in)
-            num_accepted    = num_accepted_in + jnp.sum(accepted)
-            # jax.debug.print("Cumulative: proposed={}, accepted={}, rate={}", 
-                            # num_proposed, num_accepted, num_accepted / num_proposed)
+            # Update the chain: if accepted, use new state; else keep old.
+            # Use jnp.where to avoid an extra vmap.
+            new_carry_states = jnp.where(accepted, new_chain, chain_in)
+            new_carry_vals   = jnp.where(accepted, logprobas_new, current_val_in)
             
-        
-            # accept by jax
-            def update(acc, old, new):
-                return jax.lax.select(acc, new, old)
-            new_carry_states= jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
-            new_carry_vals  = jax.vmap(update, in_axes=(0, 0, 0))(accepted, current_val_in, logprobas_new)
-            # jax.debug.print("New chain shape: {}", new_carry_states.shape)
-            # jax.debug.print("First chain vs new chain: {} vs {}",
-            #                 chain_in[0], new_chain[0])
-            # jax.debug.print("Values before vs after: {} vs {} with shapes {} vs {}",
-            #                 current_val_in[0], new_carry_vals[0],
-            #                 current_val_in.shape, new_carry_vals.shape)
-            # return chain_in, current_val_in, new_rng_k, num_proposed, num_accepted
-            # jax.debug.print("End of iteration {}: Updated chain shape: {}",  i, new_carry_states.shape)
+            # Update counters.
+            num_proposed = num_proposed_in + chain_in.shape[0]
+            num_accepted = num_accepted_in + jnp.sum(accepted)
             return (new_carry_states, new_carry_vals, carry_key, num_proposed, num_accepted)
         return jax.lax.fori_loop(0, steps, body, carry)
 
@@ -1224,7 +1194,8 @@ class MCSampler(Sampler):
                 # Update: if accepted, take candidate, else keep old.
                 new_val                 = np.where(accepted, new_logprobas, current_val)
                 # Update the carry:
-                chain                   = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
+                # chain                   = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
+                chain                   = np.where(accepted[:, None], new_chain, chain)
                 current_val             = new_val
                 
                 # Update rng_k with a new random integer (not used further)
@@ -1445,6 +1416,7 @@ class MCSampler(Sampler):
                 parameters = self._net.get_parameters()
             else:
                 parameters = self._parameters
+        
         if parameters is not None:
             self._net.set_parameters(parameters)
         
@@ -1474,7 +1446,7 @@ class MCSampler(Sampler):
                     num_accepted    =   self._num_accepted)
             
             configs_log_ansatz  = jax.vmap(net_callable)(parameters, configs)
-            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(self._logprobas))   
+            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(self._logprobas))
             norm                = jnp.sum(probs, axis=0, keepdims=True)
             probs               = probs / norm * self._numchains
             return (self._states, self._logprobas), (configs, configs_log_ansatz), probs

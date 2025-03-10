@@ -864,7 +864,7 @@ class Hamiltonian(ABC):
         pass
     
     @abstractmethod
-    def loc_energy_arr(self, k : Union[int, np.ndarray], i : int) -> Tuple[List[int], List[int], List[int]]:
+    def loc_energy_arr(self, k : Union[int, np.ndarray]) -> Tuple[List[int], List[int]]:
         '''
         Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
         Uses an array as a state input.
@@ -874,6 +874,19 @@ class Hamiltonian(ABC):
                 - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
                                             there it is not necessary to memorize the column indices.
                 - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+        '''
+        pass
+    
+    @abstractmethod
+    def loc_energy_arr_jax(self, k : Union[int, np.ndarray]) -> Tuple[List[int], List[int]]:
+        '''
+        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
+        Uses JAX as a backend.
+        Returns:
+            Tuple[List[int], List[int]]: Indices and values related to local energy.
+                - List[int] : The row indices - states after modification by the Hamiltonian.
+                - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
+                                            there it is not necessary to memorize the column indices.
         '''
         pass
     

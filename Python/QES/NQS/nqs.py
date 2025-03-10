@@ -160,18 +160,18 @@ class NQS(MonteCarloSolver):
     def _check_analitic(self):
         '''
         Check if the network is analitic, this means that we check
-        whether 
+        whether the function has an analitic gradient - like RBMs or 
+        other networks that have a closed form gradient.
         '''
         pass
-        
         
     def _choose_network(self, net, **kwargs) -> nn.Module:
         '''
         Initialize the variational parameters ansatz via the provided network - it simply creates
         the network instance. To truly initialize the network, use the init_network method.
         Parameters:
-            net: The network to be used (can be a string or a callable).
-            kwargs: Additional arguments for the network.
+            net     : The network to be used (can be a string or a callable).
+            kwargs  : Additional arguments for the network.
         Returns:
             The initialized network.
         '''
@@ -201,30 +201,36 @@ class NQS(MonteCarloSolver):
 
     def _init_functions(self):
         '''
-        Initialize the functions.
+        Initialize the functions for the gradient and network evaluation.
+        1. Check if the backend is JAX or NumPy.
+        2. If so, set the evaluation and gradient functions to the appropriate JAX or NumPy functions.
         '''
-        
+        #!TODO: fix the local energy function
         if self._isjax:
-            self._eval_func = self._eval_jax
-            self._grad_func = self._grad_jax
+            self._eval_func         = self._eval_jax
+            self._grad_func         = self._grad_jax
+            self._local_en_func     = self._hamiltonian.loc_energy_arr
         else:
-            self._eval_func = self._eval_np
-            self._grad_func = self._grad_np
+            self._eval_func         = self._eval_np
+            self._grad_func         = self._grad_np
+            self._local_en_func     = self._hamiltonian.loc_energy_arr
 
-    
     def init_network(self, s):
         '''
-        In1tialize the network truly.
+        In1tialize the network truly. This means that the weights are initialized correctly 
+        and the dtypes are checked. In addition, the network is checked if it is holomorphic or not.
         Parameters:
             s: The state vector, can be any, but it is used to initialize the network.
-        1. Check if the network is already initialized.
-        2. If not, initialize the weights using the network's init method.
-        3. Check the dtypes of the weights and ensure they are consistent.
-        4. Check if the network is complex and holomorphic.
-        5. Check the shape of the weights and store them.
-        6. Calculate the number of parameters in the network.
-        7. Set the initialized flag to True.
-        8. If the network is not initialized, raise a ValueError.
+        
+        Note:
+            1. Check if the network is already initialized.
+            2. If not, initialize the weights using the network's init method.
+            3. Check the dtypes of the weights and ensure they are consistent.
+            4. Check if the network is complex and holomorphic.
+            5. Check the shape of the weights and store them.
+            6. Calculate the number of parameters in the network.
+            7. Set the initialized flag to True.
+            8. If the network is not initialized, raise a ValueError.
         '''
 
         if not self._initialized:
@@ -260,19 +266,36 @@ class NQS(MonteCarloSolver):
     
     def _eval_np(self, net, params, batch_size, data):
         '''
-        Evaluate the network.
+        Evaluate the network using NumPy.
+        Parameters:
+            net         : The network to be evaluated.
+            params      : The parameters of the network.
+            batch_size  : The size of the batch.
+            data        : The data to be evaluated.
+        Returns:
+            The evaluated network output.
         '''
         return NQSUtils.eval_batched_np(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
 
     def _eval_jax(self, net, params, batch_size, data):
         '''
-        Evaluate the network.
+        Evaluate the network using JAX.
+        Parameters:
+            net         : The network to be evaluated.
+            params      : The parameters of the network.
+            batch_size  : The size of the batch.
+            data        : The data to be evaluated.
+        Returns:
+            The evaluated network output.
         '''
         return NQSUtils.eval_batched_jax(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
     
     def __call__(self, s, **kwargs):
         '''
-        Evaluate the network using the provided state.
+        Evaluate the network using the provided state. This
+        will return the log ansatz of the state coefficient. Uses
+        the default backend for this class - using self._eval_func.
+        
         Parameters:
             s: The state vector.
             kwargs: Additional arguments for model-specific behavior.
@@ -282,26 +305,125 @@ class NQS(MonteCarloSolver):
         return self._eval_func(self._net, self._weights, s, kwargs.get('batch_size', 1))
     
     #####################################
+    #! EVALUATE FUNCTION VALUES
+    #####################################
+    
+    def _local_energy(self, s):
+        '''
+        Evaluate the local energy of the system.
+        Parameters:
+            s: The state vector.
+        Returns:
+            The evaluated local energy. In principle returns a tuple 
+            (new_states, new_vals) where new_states are the new states
+            and new_vals are the values of the local energy.
+            After that, a probability ratio is computed that modifies the 
+            new_vals.
+        '''
+        return self._local_en_func(s)
+    
+    def _evaluate_local_energy(self, s, log_values, probabilities = None):
+        '''
+        '''
+
+        def scan(c, x):
+            new_states, new_vals    = self._local_energy(x)
+            # use the new states to compute the probability ratio
+            new_log_vals_rati       = self.log_probability_ratio(log_values, new_states)
+            
+            # compute the new values
+            
+            
+            return c, new_vals
+        
+    def _evaluate_fun(self, s, log_values, funct: Callable, probabilities = None):
+        '''
+        '''
+        # return funct(self._net, self._weights, s)
+    
+        
+    def evaluate_fun(self, s_and_psi = None,
+                probabilities = None, sampler = None, functions : Optional[list] = None,
+                **kwargs):
+        '''
+        '''
+        if sampler is None:
+            sampler = self._sampler
+        
+        # get the parameters, if not provided set the default values
+        num_samples = kwargs.get('num_samples', None)
+        num_chains  = kwargs.get('num_chains', None)
+        
+        if s_and_psi is None or not isinstance(s_and_psi, tuple):
+            # create the samples if not provided
+            _, (s, p), probabilities = self._sampler.sample(self._net.get_parameters(), num_samples=num_samples,
+                                                            num_chains=num_chains)
+        else:
+            s, p = s_and_psi
+        
+        # if we already have the samples, choose the function.add()
+        # Namely, if the list of functions is empty, we shall use the 
+        # local energy function to obtain the estimate of the local energy
+        
+        if functions is None or len(functions) == 0:
+            return self._evaluate_local_energy(s, p, probabilities)
+        
+        # otherwise, we shall use the functions provided
+        # to evaluate other operators
+        return [self._evaluate_fun(s, p, f, probabilities) for f in functions]    
+    
+    #####################################
     #! GRADIENTS
     #####################################
     
-    def _grad_jax(self, net, params, batch_size, data, flat_grad):
+    def _grad_jax(self, net, params, batch_size, data, flat_grad_fun):
         '''
-        Compute the gradients using JAX.
+        Compute the gradients using JAX. This function uses JAX's
+        vmap and scan functions to compute the gradients in a batched manner.
+        Parameters:
+            net         : The network to be evaluated.
+            params      : The parameters of the network.
+            batch_size  : The size of the batch.
+            data        : The data to be evaluated.
+            flat_grad   : The function to compute the gradients.
+        Note: 
+            For the networks that have a closed form gradient, we can use the
+            flat_grad function to compute the gradients analytically. This 
+            shall be set previously in the init function.
         '''
+        
+        # create the batches
         sb = NQSUtils.create_batches_jax(data, batch_size)
         
+        # compute the gradients using JAX's vmap and scan
         def scan_fun(c, x):
-            return c, jax.vmap(lambda y: flat_grad(net, params, y), in_axes=(0,))(x)
+            return c, jax.vmap(lambda y: flat_grad_fun(net, params, y), in_axes=(0,))(x)
         g = jax.lax.scan(scan_fun, None, sb)[1]
         g = tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
         return tree_map(lambda x: x[:data.shape[0]], g)
     
     def _grad_np(self, net, params, batch_size, data, flat_grad):
         '''
-        Compute the gradients using NumPy.
+        Compute the gradients using NumPy. This function uses NumPy's
+        loop to compute the gradients in a batched manner.
+        Parameters:
+            net         : The network to be evaluated.
+            params      : The parameters of the network.
+            batch_size  : The size of the batch.
+            data        : The data to be evaluated.
+            flat_grad   : The function to compute the gradients.
+        Note:
+            For the networks that have a closed form gradient, we can use the
+            flat_grad function to compute the gradients analytically. This
+            shall be set previously in the init function.
+        Returns:
+            The computed gradients.
+        !TODO: Add the precomputed gradient vector - memory efficient
         '''
         sb = NQSUtils.create_batches_np(data, batch_size)
+        
+        # compute the gradients using NumPy's loop
+        g = np.zeros((len(sb),) + self._paramshape[0][1], dtype=self._dtype)
         for i, b in enumerate(sb):
             g[i] = flat_grad(net, params, b)
         return g
@@ -317,6 +439,7 @@ class NQS(MonteCarloSolver):
     #####################################
     #! TRAINING OVERRIDES
     #####################################
+    #!TODO 
     
     def train_stop(self, i = 0, verbose = False, **kwargs):
         '''
