@@ -1,6 +1,7 @@
 import numpy as np
-import scipy as sp
-from numba import jit, njit, prange
+import inspect
+import numba
+
 from typing import Union, Tuple, Union, Callable, Optional
 from math import isclose
 from functools import partial
@@ -25,7 +26,7 @@ from Algebra.hilbert import HilbertSpace
 # JAX imports
 if _JAX_AVAILABLE:
     import jax
-    from jax import jit, grad, vmap, random
+    from jax import jit as jax_jit, grad, vmap, random
     from jax import numpy as jnp
     from jax.tree_util import tree_flatten, tree_unflatten, tree_map
     from jax.flatten_util import ravel_pytree
@@ -65,6 +66,8 @@ class NQS(MonteCarloSolver):
     '''
     
     _ERROR_NO_HAMILTONIAN   = "A Hamiltonian must be provided!"
+    _ERROR_HAMILTONIAN_TYPE = "Hamiltonian must be either a Hamiltonian class or a callable function!"
+    _ERROR_HAMILTONIAN_ARGS = "Hamiltonian function must accept a state vector only!"
     
     def __init__(self,
                 net         : Union[Callable, str, nn.Module],
@@ -93,7 +96,11 @@ class NQS(MonteCarloSolver):
         if hamiltonian is None:
             raise ValueError(self._ERROR_NO_HAMILTONIAN)
         self._hamiltonian   = hamiltonian
-        
+        # Hamiltonian can be either a class containing the Hamiltonian
+        # or a function that returns the local energy given a state vector s
+        # set this callable function
+ 
+            
         #######################################
         #! collect the Hilbert space information
         #######################################
@@ -209,11 +216,30 @@ class NQS(MonteCarloSolver):
         if self._isjax:
             self._eval_func         = self._eval_jax
             self._grad_func         = self._grad_jax
-            self._local_en_func     = self._hamiltonian.loc_energy_arr
         else:
             self._eval_func         = self._eval_np
             self._grad_func         = self._grad_np
-            self._local_en_func     = self._hamiltonian.loc_energy_arr
+            
+        # check the local energy function before setting it
+        if not isinstance(self._hamiltonian, Hamiltonian):
+            if not callable(self._hamiltonian):
+                raise ValueError(self._ERROR_HAMILTONIAN_TYPE)
+            # check if it accepts a state vector only
+            elif len(inspect.signature(self._hamiltonian).parameters) != 1:
+                raise ValueError(self._ERROR_HAMILTONIAN_ARGS)
+            self._local_en_func = self._hamiltonian
+        else:
+            # check if the Hamiltonian is a valid class
+            if not isinstance(self._hamiltonian, Hamiltonian):
+                raise ValueError(self._ERROR_HAMILTONIAN_TYPE)
+            # set the local energy function
+            self._local_en_func = self._hamiltonian.get_loc_energy_arr
+        
+        # set the local energy function
+        if self._isjax:
+            self._local_en_func = jax_jit(self._local_en_func)
+        else:
+            self._local_en_func = numba.jit(self._local_en_func)
 
     def init_network(self, s):
         '''

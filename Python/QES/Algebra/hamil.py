@@ -224,7 +224,8 @@ class Hamiltonian(ABC):
         '''
         
         self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian.__backend(backend)
-
+        self._is_jax        = _JAX_AVAILABLE and self._backend != np
+        self._is_numpy      = not self._is_jax
         # get the backend, scipy, and random number generator for the backend
         self._dtypeint      = self._backend.int64
         self._hilbert_space = hilbert_space
@@ -258,6 +259,7 @@ class Hamiltonian(ABC):
         
         # functions for jit
         self._loc_energy_int = None
+        self._loc_energy_arr = None
     
     def _log(self, msg : str, log = 'info', lvl : int = 0, color : str = "white"):
         """
@@ -489,6 +491,33 @@ class Hamiltonian(ABC):
                 return None
         else:
             return self._hamil.diagonal()
+    
+    # ----------------------------------------------------------------------------------------------
+    #! Local energy getters
+    # ----------------------------------------------------------------------------------------------
+    
+    def get_loc_energy_int(self):
+        '''
+        Returns the local energy of the Hamiltonian
+        
+        Returns:
+            Tuple[np.ndarray, np.ndarray]:  (row_indices, values)
+                - row_indices:  The row indices after the operator acts.
+                - values: The corresponding matrix element values.
+        '''
+        return self._loc_energy_int
+    
+    def get_loc_energy_arr(self):
+        '''
+        Returns the local energy of the Hamiltonian
+        Returns:
+            Tuple[List[int], List[int]]: Indices and values related to local energy.
+                - List[int] : The row indices - states after modification by the Hamiltonian.
+                - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
+                                            there it is not necessary to memorize the column indices.
+                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
+        '''
+        return self._loc_energy_arr
     
     # ----------------------------------------------------------------------------------------------
     #! Memory properties
@@ -844,26 +873,6 @@ class Hamiltonian(ABC):
         raise NotImplementedError("loc_energy_int method must be implemented by subclasses.")
     
     @abstractmethod
-    def loc_energy_int_jax(self, k : int, k_map : int, i : int) -> Tuple[List[int], List[int], List[int]]:
-        '''
-        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
-        Uses JAX as a backend.
-        Parameters:
-            k (int)     : The k'th element of the Hilbert space.
-            k_map (int) : The mapping of the k'th element obtained from the Hilbert space
-                    (which is a mapping of the Hilbert space). This means that other index may correspond to the
-                    element k in the Hilbert space.
-            i (int)     : The i'th site (the site [or local state] where the Hamiltonian acts).
-        Returns:
-        
-            Tuple[List[int], List[int], List[int]]: Indices and values related to local energy:
-                - List[int] : The row indices - states after modification by the Hamiltonian.
-                - List[int] : The column indices - states before modification by the Hamiltonian.
-                - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
-        '''
-        pass
-    
-    @abstractmethod
     def loc_energy_arr(self, k : Union[int, np.ndarray]) -> Tuple[List[int], List[int]]:
         '''
         Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
@@ -874,19 +883,6 @@ class Hamiltonian(ABC):
                 - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
                                             there it is not necessary to memorize the column indices.
                 - List[int] : The data values - the values of the Hamiltonian matrix at the given indices.
-        '''
-        pass
-    
-    @abstractmethod
-    def loc_energy_arr_jax(self, k : Union[int, np.ndarray]) -> Tuple[List[int], List[int]]:
-        '''
-        Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
-        Uses JAX as a backend.
-        Returns:
-            Tuple[List[int], List[int]]: Indices and values related to local energy.
-                - List[int] : The row indices - states after modification by the Hamiltonian.
-                - List[int] : List[None] - here we won't use the column indices as the state remains the same and we are using an array,
-                                            there it is not necessary to memorize the column indices.
         '''
         pass
     

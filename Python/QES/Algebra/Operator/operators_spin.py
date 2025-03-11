@@ -40,11 +40,11 @@ _I      = 1j
 
 if _JAX_AVAILABLE:
     # sigma x
-    from Algebra.Operator.operators_spin_jax import _sigma_x_int_jnp, _sigma_x_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp
     # sigma y
-    from Algebra.Operator.operators_spin_jax import _sigma_y_int_jnp, _sigma_y_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_y_int_jnp, sigma_y_jnp
     # sigma z
-    from Algebra.Operator.operators_spin_jax import _sigma_z_int_jnp, _sigma_z_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_z_int_jnp, sigma_z_jnp
 
 ################################################################################
 #! Standard Pauli matrices
@@ -69,7 +69,7 @@ _SIG_M = np.array([[0, 0],
 # -----------------------------------------------------------------------------
 
 @njit
-def _sigma_x_int_np(state, ns, sites, spin_value=_SPIN):
+def sigma_x_int_np(state, ns, sites, spin_value=_SPIN):
     """
     Apply the Pauli-X (σₓ) operator on the given sites.
     For each site, flip the bit at position (ns-1-site) using binary.flip.
@@ -86,7 +86,7 @@ def _sigma_x_int_np(state, ns, sites, spin_value=_SPIN):
     out_coeff[0]    = coeff
     return out_state, out_coeff
 
-def _sigma_x_int(state  : int,
+def sigma_x_int(state  : int,
             ns          : int,
             sites       : Union[List[int], None],
             spin_value  : float     = _SPIN):
@@ -109,10 +109,10 @@ def _sigma_x_int(state  : int,
     -------
     """
     if not isinstance(state, (int, np.integer)):
-        return _sigma_x_int_jnp(state, ns, sites, spin_value)
-    return _sigma_x_int_np(state, ns, sites, spin_value)
+        return sigma_x_int_jnp(state, ns, sites, spin_value)
+    return sigma_x_int_np(state, ns, sites, spin_value)
 
-def _sigma_x_np(state   : np.ndarray,
+def sigma_x_np(state   : np.ndarray,
             sites       : Union[List[int], None],
             spin        : bool      = BACKEND_DEF_SPIN,
             spin_value  : float     = _SPIN):
@@ -172,17 +172,17 @@ def sigma_x(state,
         sites = list(range(ns))
     
     if isinstance(state, (int, np.integer)):
-        return _sigma_x_int(state, ns, sites, spin_value)
+        return sigma_x_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_x_np(state, sites, spin, spin_value)
-    return _sigma_x_jnp(state, ns, sites, spin, spin_value)
+        return sigma_x_np(state, sites, spin, spin_value)
+    return sigma_x_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-Y (σᵧ) operator
 # -----------------------------------------------------------------------------
 
 @njit
-def _sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
+def sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
     """
     σᵧ on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
@@ -202,7 +202,7 @@ def _sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
     out_coeff[0]    = coeff
     return out_state, out_coeff
 
-def _sigma_y_int(state      : int,
+def sigma_y_int(state      : int,
                 ns          : int,
                 sites       : Union[List[int], None],
                 spin_value  : float = _SPIN,
@@ -227,10 +227,10 @@ def _sigma_y_int(state      : int,
         The state after applying the operator.    
     """
     if not isinstance(state, (int, np.integer)):
-        return _sigma_y_int_jnp(state, ns, sites, spin_value, backend)
-    return _sigma_y_int_np(state, ns, sites, spin_value)
+        return sigma_y_int_jnp(state, ns, sites, spin_value, backend)
+    return sigma_y_int_np(state, ns, sites, spin_value)
 
-def _sigma_y_np(state: np.ndarray,
+def sigma_y_np(state: np.ndarray,
                 sites: Union[List[int], None],
                 spin: bool = BACKEND_DEF_SPIN,
                 spin_value: float = _SPIN):
@@ -272,36 +272,51 @@ def sigma_y(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_y_int(state, ns, sites, spin_value)
+        return sigma_y_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_y_np(state, sites, spin, spin_value)
+        return sigma_y_np(state, sites, spin, spin_value)
     else:
-        return _sigma_y_jnp(state, ns, sites, spin, spin_value)
+        return sigma_y_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-Z (σ_z) operator
 # -----------------------------------------------------------------------------
 
 @njit
-def _sigma_z_int_np(state, ns, sites, spin_value=_SPIN):
+def sigma_z_int_np(state, ns, sites, spin_value = _SPIN):
     """
     σ_z on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
     The state is unchanged.
+    Parameters
+    ----------
+    state : int
+        The state to apply the operator to.
+    ns : int
+        The number of spins in the system.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    int
+        The state after applying the operator.
+    float
+        The coefficient after applying the operator.
     """
-    
-    coeff = 1.0
+    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
+    out_coeff       = np.empty(1, dtype=DEFAULT_NP_FLOAT_TYPE)
+    out_state[0]    = state
+    coeff           = 1.0
     for site in sites:
         pos     = ns - 1 - site
         factor  = spin_value if _binary.check_int(state, pos) else -spin_value
         coeff   *= factor
-    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
-    out_state[0]    = state
-    out_coeff       = np.empty(1, dtype=DEFAULT_NP_FLOAT_TYPE)
     out_coeff[0]    = coeff
     return out_state, out_coeff
 
-def _sigma_z_int(state      : int,
+def sigma_z_int(state       : int,
                 ns          : int,
                 sites       : Union[List[int], None],
                 spin_value  : float = _SPIN,
@@ -312,45 +327,98 @@ def _sigma_z_int(state      : int,
     The state is unchanged.
     """
     if not isinstance(state, (int, np.integer)):
-        return _sigma_z_int_jnp(state, ns, sites, spin_value, backend)
-    return _sigma_z_int_np(state, ns, sites, spin_value)
+        return sigma_z_int_jnp(state, ns, sites, spin_value, backend)
+    return sigma_z_int_np(state, ns, sites, spin_value)
 
-def _sigma_z_np(state: np.ndarray,
-                ns          : int,
-                sites       : Union[List[int], None],
-                spin        : bool = BACKEND_DEF_SPIN,
-                spin_value  : float = _SPIN):
+def sigma_z_np_nspin(state      : np.ndarray,
+                    sites       : Union[List[int], None],
+                    spin_value  : float = _SPIN):
     """
     σ_z on a NumPy array state.
+    For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
+    The state is unchanged.
+    Parameters
+    ----------
+    state : np.ndarray
+        The state to apply the operator to.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    np.ndarray
+        The state after applying the operator.
     """
     coeff = 1.0
     for site in sites:
-        factor = spin_value if check(state, site) else -spin_value
-        coeff *= factor
+        coeff   *=  spin_value * check(state, site)
+    return state, coeff
+
+def sigma_z_np(state        : np.ndarray,
+                sites       : Union[List[int], None],
+                spin_value  : float = _SPIN):
+    """
+    σ_z on a NumPy array state.
+    Parameters
+    ----------
+    state : np.ndarray
+        The state to apply the operator to.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    np.ndarray
+        The state after applying the operator.
+    float
+        The coefficient after applying the operator.
+    """
+    coeff   = np.prod([spin_value if check(state, site) else -spin_value for site in sites])
     return state, coeff
 
 def sigma_z(state,
             ns          : int,
             sites       : Union[List[int], None],
             spin        : bool  = BACKEND_DEF_SPIN,
-            spin_value  : float = _SPIN,
-            backend     : str   = DEFAULT_BACKEND):
+            spin_value  : float = _SPIN):
     """
     Dispatch for σ_z.
+    Parameters
+    ----------
+    state : int or np.ndarray
+        The state to apply the operator to.
+    ns : int
+        The number of spins in the system.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin : bool, optional
+        If True, use the spin convention for flipping the bits.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    int or np.ndarray
+        The state after applying the operator.
+    float
+        The coefficient after applying the operator.
     """
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer, jnp.integer)):
-        return _sigma_z_int(state, ns, sites, spin_value)
+        return sigma_z_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_z_np(state, ns, sites, spin, spin_value)
-    return _sigma_z_jnp(state, ns, sites, spin_value)
+        if not spin:
+            return sigma_z_np_nspin(state, sites, spin_value)
+        return sigma_z_np(state, sites, spin_value)
+    return sigma_z_jnp(state, ns, sites, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-Plus (σ⁺) operator
 # -----------------------------------------------------------------------------
 
-def _sigma_plus_int(state  : int,
+def sigma_plus_int(state  : int,
                     ns     : int,
                     sites  : Union[List[int], None],
                     spin_value : float = _SPIN):
@@ -367,7 +435,7 @@ def _sigma_plus_int(state  : int,
         coeff *= spin_value
     return state, coeff
 
-def _sigma_plus_np(state    : np.ndarray,
+def sigma_plus_np(state    : np.ndarray,
                     ns      : int,
                     sites   : Union[List[int], None],
                     spin    : bool = BACKEND_DEF_SPIN,
@@ -395,16 +463,16 @@ def sigma_plus(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_plus_int(state, ns, sites, spin_value)
+        return sigma_plus_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_plus_np(state, ns, sites, spin, spin_value)
-    return _sigma_plus_jnp(state, ns, sites, spin, spin_value)
+        return sigma_plus_np(state, ns, sites, spin, spin_value)
+    return sigma_plus_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-Minus (σ⁻) operator
 # -----------------------------------------------------------------------------
 
-def _sigma_minus_int(state  : int,
+def sigma_minus_int(state  : int,
                     ns     : int,
                     sites  : Union[List[int], None],
                     spin_value : float = _SPIN):
@@ -424,7 +492,7 @@ def _sigma_minus_int(state  : int,
         coeff *= spin_value
     return state, coeff
 
-def _sigma_minus_np(state   : np.ndarray,
+def sigma_minus_np(state   : np.ndarray,
                     ns      : int,
                     sites   : Union[List[int], None],
                     spin    : bool = BACKEND_DEF_SPIN,
@@ -452,16 +520,16 @@ def sigma_minus(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_minus_int(state, ns, sites, spin_value)
+        return sigma_minus_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_minus_np(state, ns, sites, spin, spin_value)
-    return _sigma_minus_jnp(state, ns, sites, spin, spin_value)
+        return sigma_minus_np(state, ns, sites, spin, spin_value)
+    return sigma_minus_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma_pm (σ⁺ then σ⁻) operator
 # -----------------------------------------------------------------------------
 
-def _sigma_pm_int(state  : int,
+def sigma_pm_int(state  : int,
                 ns     : int,
                 sites  : Union[List[int], None],
                 spin_value : float = _SPIN):
@@ -482,7 +550,7 @@ def _sigma_pm_int(state  : int,
         coeff *= spin_value
     return state, coeff
 
-def _sigma_pm_np(state   : np.ndarray,
+def sigma_pm_np(state   : np.ndarray,
                 ns      : int,
                 sites   : Union[List[int], None],
                 spin    : bool = BACKEND_DEF_SPIN,
@@ -515,16 +583,16 @@ def sigma_pm(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_pm_int(state, ns, sites, spin_value)
+        return sigma_pm_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_pm_np(state, ns, sites, spin, spin_value)
-    return _sigma_pm_jnp(state, ns, sites, spin, spin_value)
+        return sigma_pm_np(state, ns, sites, spin, spin_value)
+    return sigma_pm_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma_mp (σ⁻ then σ⁺) operator
 # -----------------------------------------------------------------------------
 
-def _sigma_mp_int(state  : int,
+def sigma_mp_int(state  : int,
                 ns     : int,
                 sites  : Union[List[int], None],
                 spin_value : float = _SPIN):
@@ -545,7 +613,7 @@ def _sigma_mp_int(state  : int,
         coeff *= spin_value
     return state, coeff
 
-def _sigma_mp_np(state   : np.ndarray,
+def sigma_mp_np(state   : np.ndarray,
                 ns      : int,
                 sites   : Union[List[int], None],
                 spin    : bool = BACKEND_DEF_SPIN,
@@ -578,16 +646,16 @@ def sigma_mp(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_mp_int(state, ns, sites, spin_value)
+        return sigma_mp_int(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_mp_np(state, ns, sites, spin, spin_value)
-    return _sigma_mp_jnp(state, ns, sites, spin, spin_value)
+        return sigma_mp_np(state, ns, sites, spin, spin_value)
+    return sigma_mp_jnp(state, ns, sites, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-K operator (Fourier-transformed spin operator)
 # -----------------------------------------------------------------------------
 
-def _sigma_k_int(state : int,
+def sigma_k_int(state : int,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
@@ -606,7 +674,7 @@ def _sigma_k_int(state : int,
     norm = math.sqrt(len(sites)) if sites else 1.0
     return state, total / norm
 
-def _sigma_k_np(state : np.ndarray,
+def sigma_k_np(state : np.ndarray,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
@@ -635,10 +703,10 @@ def sigma_k(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return _sigma_k_int(state, ns, sites, k, spin, spin_value)
+        return sigma_k_int(state, ns, sites, k, spin, spin_value)
     elif isinstance(state, np.ndarray):
-        return _sigma_k_np(state, ns, sites, k, spin, spin_value)
-    return _sigma_k_jnp(state, ns, sites, k, spin, spin_value)
+        return sigma_k_np(state, ns, sites, k, spin, spin_value)
+    return sigma_k_jnp(state, ns, sites, k, spin, spin_value)
 
 ################################################################################
 # Factory Functions: Wrap the elementary functions in Operator objects.

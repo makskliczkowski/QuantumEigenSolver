@@ -56,12 +56,12 @@ namespace NQS_NS
 			{
 				// !TODO check the SVD, whether it correctly works for regularization
 				// arma::Mat<_T> _U, _V;
-				// arma::vec _sigma;
-				// arma::svd(_U, _sigma, _V, this->derivativesCentered_);
+				// arma::vec sigma;
+				// arma::svd(_U, sigma, _V, this->derivativesCentered_);
 				// clamp the singular values
-				// _sigma = arma::clamp(_sigma, 1e-6, arma::datum::inf);
-				// this->derivativesCentered_ = (_U * arma::diagmat(_sigma)) * _V.t();
-				// this->derivativesCenteredH_ = (_V * arma::diagmat(_sigma)) * _U.t();
+				// sigma = arma::clamp(sigma, 1e-6, arma::datum::inf);
+				// this->derivativesCentered_ = (_U * arma::diagmat(sigma)) * _V.t();
+				// this->derivativesCenteredH_ = (_V * arma::diagmat(sigma)) * _U.t();
 			}
 
 			this->solver_->setReg(this->info_p_.reg());											// set the regularization

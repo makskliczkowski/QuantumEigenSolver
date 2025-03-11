@@ -53,7 +53,7 @@ _SIG_M_jnp = jnp.array([[0, 0],
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_x_int_jnp(state, 
+def sigma_x_int_jnp(state, 
                     ns, 
                     sites, 
                     spin_value  =   _SPIN):
@@ -88,7 +88,7 @@ def _sigma_x_int_jnp(state,
     return final_state, final_coeff
 
 @JIT
-def _sigma_x_jnp(state,
+def sigma_x_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
                 spin        : bool = BACKEND_DEF_SPIN,
@@ -130,7 +130,7 @@ def _sigma_x_jnp(state,
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_y_int_jnp(state,
+def sigma_y_int_jnp(state,
                     ns          : int,
                     sites       : Union[List[int], None],
                     spin_value  : float = _SPIN):
@@ -169,7 +169,7 @@ def _sigma_y_int_jnp(state,
     return final_state, final_coeff
 
 @JIT
-def _sigma_y_jnp(state,
+def sigma_y_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
                 spin        : bool = BACKEND_DEF_SPIN,
@@ -211,7 +211,7 @@ def _sigma_y_jnp(state,
 # -----------------------------------------------------------------------------
 
 @maybe_jit
-def _sigma_z_int_jnp(state,
+def sigma_z_int_jnp(state,
                     ns          : int,
                     sites       : Union[List[int], None],
                     spin_value  : float     = _SPIN):
@@ -256,7 +256,7 @@ def _sigma_z_int_jnp(state,
     return state, coeff
 
 @JIT
-def _sigma_z_jnp(state,
+def sigma_z_jnp(state,
                 ns          : int,
                 sites       : Union[List[int], None],
                 spin_value  : float = _SPIN):
@@ -287,7 +287,7 @@ def _sigma_z_jnp(state,
 
 
 @JIT
-def _sigma_plus_int_jnp(state, 
+def sigma_plus_int_jnp(state, 
                        ns          : int, 
                        sites       : Union[List[int], None], 
                        spin_value  : float = _SPIN):
@@ -324,7 +324,7 @@ def _sigma_plus_int_jnp(state,
     return final_state, final_coeff
 
 @JIT
-def _sigma_plus_jnp(state,
+def sigma_plus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
                     spin    : bool = BACKEND_DEF_SPIN,
@@ -349,7 +349,7 @@ def _sigma_plus_jnp(state,
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN):
+def sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
     def body(i, carry):
@@ -371,7 +371,7 @@ def _sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN):
     return final_state, final_coeff
 
 @JIT
-def _sigma_minus_jnp(state,
+def sigma_minus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
                     spin    : bool = BACKEND_DEF_SPIN,
@@ -396,7 +396,7 @@ def _sigma_minus_jnp(state,
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_pm_jnp(state, ns, sites, spin=True, spin_value=_SPIN):
+def sigma_pm_jnp(state, ns, sites, spin=True, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     if sites is None:
         sites = list(range(ns))
@@ -417,7 +417,7 @@ def _sigma_pm_jnp(state, ns, sites, spin=True, spin_value=_SPIN):
     return new_state, coeff
 
 @JIT
-def _sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
+def sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
     # Alternating operator: even index applies sigma⁺, odd index sigma⁻.
     backend = __backend(backend)
     sites = backend.array(sites)
@@ -447,7 +447,7 @@ def _sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEN
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
+def sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
     def body(i, carry):
@@ -469,7 +469,7 @@ def _sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
     return final_state, final_coeff
 
 @maybe_jit
-def _sigma_mp_jnp(state,
+def sigma_mp_jnp(state,
                 ns      : int,
                 sites   : Union[List[int], None],
                 spin    : bool = BACKEND_DEF_SPIN,
@@ -500,7 +500,7 @@ def _sigma_mp_jnp(state,
 # -----------------------------------------------------------------------------
 
 @JIT
-def _sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
+def sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
     def body(i, total):
@@ -517,7 +517,7 @@ def _sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
     return state, total / norm
 
 @maybe_jit
-def _sigma_k_jnp(state,
+def sigma_k_jnp(state,
                 ns       : int,
                 sites    : Union[List[int], None],
                 k        : float,
@@ -538,3 +538,4 @@ def _sigma_k_jnp(state,
     norm = math.sqrt(len(sites)) if sites else 1.0
     return state, total / norm
 
+# - -----------------------------------------------------------------------------

@@ -129,7 +129,7 @@ if _JAX_AVAILABLE:
 
     @JIT
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
-        """
+        """0
         Propose a random flip of a state using JAX.
         Parameters:
         - state (jnp.ndarray)           : The state array
