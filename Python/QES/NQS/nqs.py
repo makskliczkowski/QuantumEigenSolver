@@ -2,6 +2,7 @@ import numpy as np
 import inspect
 import numba
 
+# typing and other imports
 from typing import Union, Tuple, Union, Callable, Optional
 from math import isclose
 from functools import partial
@@ -11,13 +12,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto, unique
 
-# flax for the network
-from flax import linen as nn
-
-# from algebra
+# from general_python imports
 from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
+import general_python.ml.networks as Networks 
 import general_python.common.binary as Binary
 
 # from hilbert
@@ -35,6 +34,7 @@ if _JAX_AVAILABLE:
     import flax
     import flax.linen as nn
     from flax.core.frozen_dict import freeze, unfreeze
+    
 # try to import autograd for numpy
 try:
     import autograd.numpy as anp
@@ -47,8 +47,9 @@ except ImportError:
 #########################################
 
 from Solver.MonteCarlo.montecarlo import MonteCarloSolver, McsTrain, McsReturn, Sampler
-from Solver.MonteCarlo.sampler import SamplerType, get_sampler
 from Algebra.Operator.operator import Operator, OperatorFunction
+
+# Hamiltonian imports
 from Algebra.hamil import Hamiltonian
 
 #########################################
@@ -68,6 +69,9 @@ class NQS(MonteCarloSolver):
     _ERROR_NO_HAMILTONIAN   = "A Hamiltonian must be provided!"
     _ERROR_HAMILTONIAN_TYPE = "Hamiltonian must be either a Hamiltonian class or a callable function!"
     _ERROR_HAMILTONIAN_ARGS = "Hamiltonian function must accept a state vector only!"
+    _ERROR_ALL_DTYPE_SAME   = "All weights must have the same dtype!"
+    
+    _TOL_HOLOMORPHIC        = 1e-14
     
     def __init__(self,
                 net         : Union[Callable, str, nn.Module],
@@ -90,17 +94,23 @@ class NQS(MonteCarloSolver):
         '''
         Initialize the NQS solver.
         '''
-        super().__init__(sampler=sampler, seed=seed, beta=beta, mu=mu, replica=replica,
-                    shape=shape, hilbert=hilbert, modes=modes, directory=directory, backend=backend, nthreads=nthreads)
-        # set the Hamiltonian
+        super().__init__(sampler    =   sampler, 
+                        seed        =   seed, 
+                        beta        =   beta, 
+                        mu          =   mu, 
+                        replica     =   replica,
+                        shape       =   shape, 
+                        hilbert     =   hilbert, 
+                        modes       =   modes, 
+                        directory   =   directory, 
+                        backend     =   backend, 
+                        nthreads    =   nthreads)
+        
+        # pre-set the Hamiltonian
         if hamiltonian is None:
             raise ValueError(self._ERROR_NO_HAMILTONIAN)
         self._hamiltonian   = hamiltonian
-        # Hamiltonian can be either a class containing the Hamiltonian
-        # or a function that returns the local energy given a state vector s
-        # set this callable function
- 
-            
+        
         #######################################
         #! collect the Hilbert space information
         #######################################
@@ -136,43 +146,10 @@ class NQS(MonteCarloSolver):
         self._init_functions()
     
     #####################################
-    #! INITIALIZATION
+    #! NETWORK
     #####################################
     
-    def _check_holomorphic(self, s):
-        '''
-        Check if the network is holomorphic. 
-        Parameters are holomorphic if the gradient of the real part is equal to
-        the imaginary part multiplied by i.
-        Parameters:
-            s: The state vector.
-        1. Compute the gradients of the real and imaginary parts of the network output.
-        2. Check if the gradients are equal up to a small tolerance.
-        3. If they are equal, set the holomorphic flag to True.
-        4. If not, set the appropriate gradient functions based on the flag.
-        '''
-        if self._isjax:
-            def make_flat(x):
-                return jnp.concatenate([p.ravel() for p in tree_flatten(x)[0]])
-            grads_r = make_flat(jax.grad(lambda a,b: jnp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-            grads_i = make_flat(jax.grad(lambda a,b: jnp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-            return isclose(jnp.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
-        else:
-            def make_flat(x):
-                return np.concatenate([p.ravel() for p in flatten_func(x)[0]])
-            grads_r = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-            grads_i = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, s[0,0,...])["params"] )
-            return isclose(np.linalg.norm(grads_r - 1.j * grads_i)/grads_r.shape[0], 0.0, abs_tol=1e-14)
-        
-    def _check_analitic(self):
-        '''
-        Check if the network is analitic, this means that we check
-        whether the function has an analitic gradient - like RBMs or 
-        other networks that have a closed form gradient.
-        '''
-        pass
-        
-    def _choose_network(self, net, **kwargs) -> nn.Module:
+    def _choose_network(self, net, **kwargs) -> Networks.GeneralNet:
         '''
         Initialize the variational parameters ansatz via the provided network - it simply creates
         the network instance. To truly initialize the network, use the init_network method.
@@ -182,15 +159,76 @@ class NQS(MonteCarloSolver):
         Returns:
             The initialized network.
         '''
-        if isinstance(net, nn.Module):
+        if issubclass(type(net), nn.Module):
             self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
-        elif isinstance(net, str):
-            self.log(f"Network {net} provided from the string.", log='info', lvl = 2, color = 'blue')
-            # TODO: Add the network
-            net = None
-        self.log(f"Network {net} provided from the {type(net).__name__}.", log='info', lvl = 2, color = 'blue')
+        return Networks.choose_network(network_type=net, input_shape=self._shape, backend=self._backend, dtype=self._dtype, **kwargs)
+    
+    #####################################
+    #! INITIALIZATION OF THE NETWORK AND FUNCTIONS
+    #####################################
+    
+    def _check_holomorphic(self, s) -> bool:
+        """
+        Check if the network provided is holomorphic.
+
+        A network is considered holomorphic if the gradient of its real part equals 
+        i times the gradient of its imaginary part. This method computes the gradients 
+        of the real and imaginary parts of the network's output with respect to the 
+        network parameters, flattens these gradients, and checks if they are equal 
+        (up to a small tolerance) when combined appropriately.
+
+        Parameters
+        ----------
+        s : array-like
+            The state vector, assumed to have at least the shape such that s[0, 0, ...]
+            is valid.
+
+        Returns
+        -------
+        bool
+            True if the holomorphic condition is met, False otherwise.
+        """
+
+        # Extract the sample state for gradient computation.
+        sample_state    = s[0, 0, ...]
+
+        if self._isjax and _JAX_AVAILABLE:
+            # Flatten the parameters tree into a 1D array.
+            def make_flat(x):
+                leaves, _   = tree_flatten(x)
+                return jnp.concatenate([p.ravel() for p in leaves])
+            
+            # Compute gradients of the real and imaginary parts.
+            grads_real      = make_flat(jax.grad(lambda a,b: jnp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"])
+            grads_imag      = make_flat(jax.grad(lambda a,b: jnp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
+            # Flatten the gradients.
+            flat_real       = make_flat(grads_real)
+            flat_imag       = make_flat(grads_imag)
+            
+            norm_diff       = jnp.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
+            return jnp.isclose(norm_diff, 0.0, atol = self._TOL_HOLOMORPHIC)
+        else:
+            # Using numpy-based gradients.
+            def make_flat(x):
+                leaves, _ = flatten_func(x)
+                return np.concatenate([p.ravel() for p in leaves])
+            
+            grads_real      = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
+            grads_imag      = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
+            
+            flat_real       = make_flat(grads_real)
+            flat_imag       = make_flat(grads_imag)
+            
+            norm_diff       = np.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
+            return np.isclose(norm_diff, 0.0, atol= self._TOL_HOLOMORPHIC)
         
-        return net
+    def _check_analitic(self):
+        '''
+        Check if the network is analitic, this means that we check
+        whether the function has an analitic gradient - like RBMs or 
+        other networks that have a closed form gradient.
+        '''
+        pass
     
     def _init_gradients(self):
         '''
@@ -199,7 +237,6 @@ class NQS(MonteCarloSolver):
         2. If JAX, set the gradient function to JAX's grad, if NumPy, set the gradient function to NumPy's grad.
         3. If the network is complex, set the gradient function to JAX's grad with holomorphic=True, otherwise set it to JAX's grad with holomorphic=False.
         '''
-        self._isjax         = self._backend != np
         self._forces        = None
         self._gradients     = None
         
@@ -212,35 +249,50 @@ class NQS(MonteCarloSolver):
         1. Check if the backend is JAX or NumPy.
         2. If so, set the evaluation and gradient functions to the appropriate JAX or NumPy functions.
         '''
-        #!TODO: fix the local energy function
         if self._isjax:
             self._eval_func         = self._eval_jax
             self._grad_func         = self._grad_jax
         else:
             self._eval_func         = self._eval_np
             self._grad_func         = self._grad_np
-            
-        # check the local energy function before setting it
+        
+        # set the local energy function
+        self._init_hamiltonian(self._hamiltonian)
+
+    def _init_hamiltonian(self, hamiltonian):
+        '''
+        Initialize the Hamiltonian.
+        Parameters:
+            hamiltonian: The Hamiltonian to be used.
+        '''
+        if hamiltonian is None:
+            raise ValueError(self._ERROR_NO_HAMILTONIAN)
+        self._hamiltonian   = hamiltonian
+        # Hamiltonian can be either a class containing the Hamiltonian
+        # or a function that returns the local energy given a state vector s
+        # set this callable function
         if not isinstance(self._hamiltonian, Hamiltonian):
             if not callable(self._hamiltonian):
                 raise ValueError(self._ERROR_HAMILTONIAN_TYPE)
             # check if it accepts a state vector only
             elif len(inspect.signature(self._hamiltonian).parameters) != 1:
                 raise ValueError(self._ERROR_HAMILTONIAN_ARGS)
-            self._local_en_func = self._hamiltonian
+            else:
+                self._local_en_func = self._hamiltonian
         else:
-            # check if the Hamiltonian is a valid class
-            if not isinstance(self._hamiltonian, Hamiltonian):
-                raise ValueError(self._ERROR_HAMILTONIAN_TYPE)
-            # set the local energy function
-            self._local_en_func = self._hamiltonian.get_loc_energy_arr
+            if self._isjax:
+                self._local_en_func = self._hamiltonian.get_loc_energy_jax_fun()
+            else:
+                self._local_en_func = self._hamiltonian.get_loc_energy_np_fun()
         
-        # set the local energy function
+        # set the local energy function - jit or numba
+        # if the backend is JAX, use jax.jit
+        # if the backend is NumPy, use numba.jit
         if self._isjax:
             self._local_en_func = jax_jit(self._local_en_func)
         else:
             self._local_en_func = numba.jit(self._local_en_func)
-
+            
     def init_network(self, s):
         '''
         In1tialize the network truly. This means that the weights are initialized correctly 
@@ -260,31 +312,41 @@ class NQS(MonteCarloSolver):
         '''
 
         if not self._initialized:
+            
+            # initialize the network 
             self._weights   = self._net.init(self._rng_key)
-            dtypes          = [a.dtype for a in tree_flatten(self._weights)[0]] \
-                                if self._isjax                                  \
-                                else [a.dtype for a in flatten_func(self._weights)[0]]
-
+            
+            # check the dtypes of the weights
+            # dtypes          = [a.dtype for a in tree_flatten(self._weights)[0]] \
+            #                     if self._isjax                                  \
+            #                     else [a.dtype for a in flatten_func(self._weights)[0]]
+            dtypes          = self._net.dtypes
+            
+            # check if all dtypes are the same
             if not all([a == dtypes[0] for a in dtypes]):
-                raise ValueError("All weights must have the same dtype!")
+                raise ValueError(self._ERROR_ALL_DTYPE_SAME)
             
             # check if the network is complex
-            self._iscpx = not (dtypes[0] == np.single or dtypes[0] == np.double)
+            self._iscpx     = not (dtypes[0] == np.single or dtypes[0] == np.double)
             
             # check if the network is holomorphic
-            self._holomorphic = self._check_holomorphic(s)
+            # if the value is set to None, we check if the network is holomorphic
+            # through calculating the gradients of the real and imaginary parts
+            # of the network. Otherwise, we use the value provided.
+            if self._net.holomorphic is None:
+                self._holomorphic   = self._check_holomorphic(s)
+            else:
+                self._holomorphic   = self._net.holomorphic
             
             # check the shape of the weights
-            if self._isjax:
-                self._paramshape = [(p.size, p.shape) for p in tree_flatten(self._weights)[0]]
-            else:
-                self._paramshape = [(p.size, p.shape) for p in flatten_func(self._weights)[0]]
+            self._paramshape        = self._net.shapes
             
             # number of parameters
-            if self ._isjax:
-                self._nparams = jnp.sum(jnp.array([p.size for p in tree_flatten(self.parameters["params"])[0]]))
-            else:
-                self._nparams = np.sum(np.array([p.size for p in flatten_func(self.parameters["params"])[0]]))
+            self._nparams           = self._net.nparams
+            # if self._isjax:
+            #     self._nparams = jnp.sum(jnp.array([p.size for p in tree_flatten(self.parameters["params"])[0]]))
+            # else:
+            #     self._nparams = np.sum(np.array([p.size for p in flatten_func(self.parameters["params"])[0]]))
     
     #####################################
     #! EVALUATION
@@ -367,7 +429,6 @@ class NQS(MonteCarloSolver):
         '''
         # return funct(self._net, self._weights, s)
     
-        
     def evaluate_fun(self, s_and_psi = None,
                 probabilities = None, sampler = None, functions : Optional[list] = None,
                 **kwargs):
@@ -590,11 +651,12 @@ class NQS(MonteCarloSolver):
     #! WEIGHTS
     #####################################
     
-    @abstractmethod
     def set_weights(self, **kwargs):
         '''
         Set the weights of the NQS solver.
         '''
+        
+        #! TODO: Add the weights setter
         pass
     
     def update_weights(self, f: Optional[Union['array-like', float]] = None, **kwargs):
@@ -611,6 +673,11 @@ class NQS(MonteCarloSolver):
     
     #####################################
     #! GRADIENT
+    #####################################
+    
+    
+    #####################################
+    #! OVERLOADS
     #####################################
     
     

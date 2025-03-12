@@ -73,6 +73,7 @@ class SamplerErrors(Exception):
     NOT_A_VALID_SAMPLER_TYPE    = "The sampler type is not a valid sampler type"
     NOT_IN_RANGE_MU             = "The parameter \\mu must be in the range [0, 2]"
     NOT_HAVING_RNG              = "Either rng or seed must be provided"
+
 class SolverInitState(Enum):
     """Enum for potential initial states """
     
@@ -1550,10 +1551,12 @@ def get_sampler(typek: Union[str, SamplerType], *args, **kwargs) -> Sampler:
     Raises:
     - ValueError: If the requested sampler type is not implemented
     """
-    if isinstance(typek, str):
+    if isinstance(typek, str):                  # is a string to convert to enum
         typek = SamplerType.from_str(typek)
-    elif typek == MCSampler:
+    elif typek == MCSampler:                    # is a sampler type from the enum
         typek = SamplerType.MCSampler
+    elif isinstance(typek, Sampler):            # is already a sampler
+        return typek
     else:
         raise ValueError(SamplerErrors.NOT_A_VALID_SAMPLER_TYPE)
     

@@ -15,10 +15,10 @@ Version : 0.1
 """
 
 import numpy as np
+import numba
 import math
 from dataclasses import dataclass
 from typing import List, Tuple, Union, Optional
-import numba
 
 # Assume these are available from the QES package:
 from Algebra.hilbert import HilbertSpace
@@ -261,22 +261,7 @@ class QSM(Hamiltonian):
     Hamiltonian for an ergodic quantum dot coupled to an external system.
     The external system is modeled as a quantum spin chain.
     '''
-    
-    #############################
-    
-    @dataclass
-    class Parameters:
-        n       : int
-        ns      : int
-        neidot  : np.ndarray
-        h       : np.ndarray
-        g0      : float
-        au      : np.ndarray
-        
-        @classmethod
-        def to_tuple(cls):
-            return (cls.n, cls.ns, cls.neidot, cls.h, cls.g0, cls.au)
-    
+
     #############################
     
     _ERR_PARTICLES_DONT_MATCH   = "QSM: the number of particles in the dot is larger than the number of particles in the system."
@@ -325,7 +310,6 @@ class QSM(Hamiltonian):
         '''
 
         # Initialize the Hamiltonian
-        
         if hilbert_space is None:
             if ns is None:
                 raise ValueError(self._ERR_EITHER_HIL_OR_NS)
@@ -355,13 +339,11 @@ class QSM(Hamiltonian):
         self._max_local_ch  = 2
         self.init_particles()
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
-        self._loc_energy_int    = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
-        self._loc_energy_arr    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=self._is_jax)
-        
-        # test the Hamiltonian and allow jit to be built - trigger the §jit compilation
-        idx, val                = self._loc_energy_int(0, 0)
-        self._log(f"QSM test(0,0): idx={idx}, vals={val}", lvl = 2, log = 'debug')
-        
+        self._loc_energy_int_fun        = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
+        self._loc_energy_np_fun         = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=False)
+        if _JAX_AVAILABLE:
+            self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)        
+        self._local_energy_test()
     
     # ----------------------------------------------------------------------------------------------
     
@@ -394,6 +376,10 @@ class QSM(Hamiltonian):
 
         name += self._hilbert_space.get_sym_info()
         return name
+
+    def __str__(self):
+        ''' Return the string representation of the QSM model. '''
+        return self.__repr__()
 
     # ----------------------------------------------------------------------------------------------
     
@@ -634,20 +620,6 @@ class QSM(Hamiltonian):
         kron_prod   = linalg.sparse.kron(self._hdot, eye, backend=backend_changed)
         self._hamil += kron_prod
 
-    # ----------------------------------------------------------------------------------------------
-    #! ABSTRACT METHODS OVERRIDE
-    # ----------------------------------------------------------------------------------------------
-    
-    def loc_energy_int(self, k_map, i):
-        ''' Compute the local energy interaction. '''
-        return self._loc_energy_int(k_map, i)
-
-    # ----------------------------------------------------------------------------------------------
-
-    def loc_energy_arr(self, k):
-        ''' Compute the local energy interaction for a numpy array state. '''
-        return self._loc_energy_arr(k)
-    
     # ----------------------------------------------------------------------------------------------
 
 

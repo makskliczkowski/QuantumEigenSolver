@@ -24,29 +24,30 @@ from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.__lattice__ import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
-from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE
+from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE, JIT
 
 # binary operations
 import general_python.common.binary as _binary
 
 # JAX imports
-from jax import lax
-from jax import numpy as jnp
-from general_python.algebra.utils import DEFAULT_JP_INT_TYPE, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_CPX_TYPE, JIT
+if _JAX_AVAILABLE:
+    from jax import lax
+    from jax import numpy as jnp
+    from general_python.algebra.utils import DEFAULT_JP_INT_TYPE, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_CPX_TYPE, JIT
 
-# transform the matrices to JAX arrays
-_SIG_0_jnp = jnp.array([[1, 0],
-                [0, 1]], dtype=float)
-_SIG_X_jnp = jnp.array([[0, 1],
-                [1, 0]], dtype=float)
-_SIG_Y_jnp = jnp.array([[0, -1j],
-                [1j, 0]], dtype=complex)
-_SIG_Z_jnp = jnp.array([[1,  0],
-                [0, -1]], dtype=float)
-_SIG_P_jnp = jnp.array([[0, 1],
-                [0, 0]], dtype=float)
-_SIG_M_jnp = jnp.array([[0, 0],
-                [1, 0]], dtype=float)
+    # transform the matrices to JAX arrays
+    _SIG_0_jnp = jnp.array([[1, 0],
+                    [0, 1]], dtype=float)
+    _SIG_X_jnp = jnp.array([[0, 1],
+                    [1, 0]], dtype=float)
+    _SIG_Y_jnp = jnp.array([[0, -1j],
+                    [1j, 0]], dtype=complex)
+    _SIG_Z_jnp = jnp.array([[1,  0],
+                    [0, -1]], dtype=float)
+    _SIG_P_jnp = jnp.array([[0, 1],
+                    [0, 0]], dtype=float)
+    _SIG_M_jnp = jnp.array([[0, 0],
+                    [1, 0]], dtype=float)
 
 # -----------------------------------------------------------------------------
 #! Sigma-X (σₓ) operator
@@ -210,7 +211,7 @@ def sigma_y_jnp(state,
 #! Sigma-Z (σ_z) operator
 # -----------------------------------------------------------------------------
 
-@maybe_jit
+@JIT
 def sigma_z_int_jnp(state,
                     ns          : int,
                     sites       : Union[List[int], None],
@@ -468,7 +469,7 @@ def sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
     return final_state, final_coeff
 
-@maybe_jit
+@JIT
 def sigma_mp_jnp(state,
                 ns      : int,
                 sites   : Union[List[int], None],
@@ -516,7 +517,7 @@ def sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
     norm = math.sqrt(len(sites)) if len(sites) > 0 else 1.0
     return state, total / norm
 
-@maybe_jit
+@JIT
 def sigma_k_jnp(state,
                 ns       : int,
                 sites    : Union[List[int], None],

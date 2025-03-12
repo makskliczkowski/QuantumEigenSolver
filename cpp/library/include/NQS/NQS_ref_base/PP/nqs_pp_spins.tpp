@@ -116,10 +116,10 @@ namespace NQS_NS
 	inline void NQS_PP_S<2, _Ht, _T, _stateType, _CorrState>::setX_changed(int fP, float fV)
 	{
 		// check if the column is already set to a given size and resize if not
-		if (this->pp_weights_.X_upd_.empty())
-			this->pp_weights_.X_upd_.emplace_back(NQSW(this->info_p_.nParticles_));
-		else if (this->pp_weights_.X_upd_[0].n_rows != this->info_p_.nParticles_)
-			this->pp_weights_.X_upd_[0].resize(this->info_p_.nParticles_);
+		// if (this->pp_weights_.X_upd_.empty())
+		// 	this->pp_weights_.X_upd_.emplace_back(NQSW(this->info_p_.nParticles_));
+		// else if (this->pp_weights_.X_upd_[0].n_rows != this->info_p_.nParticles_)
+		// 	this->pp_weights_.X_upd_[0].resize(this->info_p_.nParticles_);
 
 		// check the spin at a given position (fP) -> this corresponds to the value before the flip
 		const int flipped_val = !(fV > 0); // take the opposite value - the value after the flip

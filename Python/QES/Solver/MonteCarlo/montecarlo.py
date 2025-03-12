@@ -27,9 +27,8 @@ if _JAX_AVAILABLE:
     from jax import vmap
 
 ###################################
-from Solver.solver import Solver, SolverInitState
-from Solver.MonteCarlo.sampler import Sampler, get_sampler
-
+from Solver.solver import Solver
+from Solver.MonteCarlo.sampler import Sampler, get_sampler, SolverInitState
 ###################################
 
 @dataclass
@@ -139,7 +138,7 @@ class MonteCarloSolver(Solver):
                 shape       : Optional[int]                 = 1,
                 hilbert     : Optional[HilbertSpace]        = None,
                 modes       : Optional[int]                 = 2,
-                directory   : Optional[(str, Directories)]  = None,
+                directory   : Optional[str]                 = None,
                 nthreads    : Optional[int]                 = 1,
                 backend     : Optional[str]                 = 'default',
                 **kwargs):
@@ -153,43 +152,50 @@ class MonteCarloSolver(Solver):
             - {replica} (int)       : Replica index (default is 1).
             - {shape}   (int)       : Shape of the system.
             - {hilbert} (HilbertSpace): Hilbert space object.
-            - {directory} (str, Directories): Directory for saving the data.
+            - {directory} (str)     : Directory for saving the data.
             - {nthreads} (int)      : Number of threads.
             - {backend} (str)       : Backend to use (default is 'default').
             - {modes}   (int)       : Number of spin modes (in MB systems 2 for spins etc.)
+            - {upd_fun} (Callable)  : Update function for the sampler - if None, the default is used.
         """
         
         # call the parent class constructor with the arguments and keyword arguments passed
-        super().__init__(shape=shape, modes=modes, seed=seed, nthreads=nthreads,
-                        hilbert=hilbert, backend=backend,
-                        directory=directory, **kwargs)
+        super().__init__(shape      =   shape, 
+                        modes       =   modes,
+                        seed        =   seed,
+                        hilbert     =   hilbert, 
+                        directory   =   directory, 
+                        nthreads    =   nthreads,
+                        backend     =   backend,
+                        **kwargs)
         
         # define the instance variables
         self._mcparams          = McsTrain(
-            epochs      = kwargs.get("epochs", 1),
-            mcsam       = kwargs.get("mcsam", 10),
-            mcth        = kwargs.get("mcth", 0),
-            mcchain     = kwargs.get("mcchain", 1),
-            bsize       = kwargs.get("bsize", 4),
-            nflip       = kwargs.get("nflip", 1),
-            nrepl       = kwargs.get("nrepl", 1),
-            direct      = directory
-        )
+                            epochs      = kwargs.get("epochs", 1),
+                            mcsam       = kwargs.get("mcsam", 10),
+                            mcth        = kwargs.get("mcth", 0),
+                            mcchain     = kwargs.get("mcchain", 1),
+                            bsize       = kwargs.get("bsize", 4),
+                            nflip       = kwargs.get("nflip", 1),
+                            nrepl       = kwargs.get("nrepl", 1),
+                            direct      = directory,
+                            )
         
         if sampler is None:
             raise ValueError(self._ERROR_MSG_SAMPLER)
-        self._sampler           = self.set_sampler(sampler)
+        # for the replica and Monte Carlo process
+        self._replica_idx       = replica       # replica index
+        self._beta              = beta          # inverse temperature beta = 1/T
+        self._mu                = mu            # modification of the probability distribution
+        self._sampler           = self.set_sampler(sampler, kwargs.get("upd_fun", None))
         
         self._accepted          = 0             # number of accepted steps
         self._total             = 0             # total number of steps
         self._acceptance_rate   = None          # acceptance rate
         
-        self._replica_idx       = replica       # replica index
-        self._beta              = beta          # inverse temperature beta = 1/T
-        self._mu                = mu            # modification of the probability distribution
         
         # information
-        self._info              = "Monte Carlo Solver"
+        self._info              = "a general Monte Carlo Solver"
         
         # create the logger
         self._logger            = get_global_logger() if self._hilbert is None else self._hilbert.logger
@@ -276,13 +282,13 @@ class MonteCarloSolver(Solver):
         self._total         = 0
         self.init()
     
-    def set_sampler(self, sampler: Union[Sampler, str]):
+    def set_sampler(self, sampler: Union[Sampler, str], upd_fun: Optional[Callable] = None) -> Sampler:
         '''
         Set the sampler for the Monte Carlo solver.
         '''
         self._sampler = get_sampler(sampler,
                             shape       =   self._shape,
-                            upd_fun     =   self._upd_fun,                  #!TODO: add possibility of changing the update function
+                            upd_fun     =   upd_fun,
                             rng         =   self._rng,
                             rng_k       =   self._rng_key,
                             hilbert     =   self._hilbert,

@@ -973,7 +973,39 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
 	// time evolution saved here
 	long double _heisenberg_time_est	= _Nh;
-	arma::Col<double> _timespace		= arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), 5000);
+	const bool _uniform_time			= true;
+	arma::Col<double> _timespace;
+	if (!_uniform_time)
+		_timespace = arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), 5000);
+	else
+	{
+		// Create a uniform distribution of times at long times (10*_heisenberg_time_est to 1000*_heisenberg_time_est)
+		arma::Col<double> _long_times 	= arma::linspace(10 * _heisenberg_time_est, 1000 * _heisenberg_time_est, 1000);
+		
+		// Create uniform distributions for short and medium times
+		arma::Col<double> _short_times 	= arma::linspace(1e-2, 1e-1, 1000);
+		arma::Col<double> _medium_times = arma::linspace(1e-1, 1e0, 1000);
+		
+		// Create middle times from logspace (more points in the transition region)
+		double _t_th 		= _heisenberg_time_est;
+		if (modP.modTyp_ == MY_MODELS::ULTRAMETRIC_M)
+			_t_th			= 1.0 / Ultrametric_types::UM_default::getThouless(std::reinterpret_pointer_cast<Ultrametric<_T>>(_H)->get_alpha(), (int)std::log2(_Nh));
+		// else if (modP.modTyp_ == MY_MODELS::QSM_M)
+			// _bwIn			= Ultrametric_types::UM_default::getBandwidth(std::reinterpret_pointer_cast<QSM<_T>>(_H)->get_alpha(), (int)std::log2(_Nh));
+		// else if (modP.modTyp_ == MY_MODELS::POWER_LAW_RANDOM_BANDED_M)
+			// _bwIn			= PRLB_types::PRLB_default::getBandwidth(std::reinterpret_pointer_cast<PowerLawRandomBanded<_T>>(_H)->get_a(), (int)std::log2(_Nh));
+		// else if (modP.modTyp_ == MY_MODELS::RP_M)
+			// _bwIn			= RP_types::RP_default::getBandwidth(std::reinterpret_pointer_cast<RosenzweigPorter<_T>>(_H)->get_gamma(), (int)std::log2(_Nh));
+		
+		arma::Col<double> _middle_times = arma::linspace(std::log10(_t_th * 0.5) , std::log10(5 * _t_th), 2000);
+		
+		// Combine all the time ranges
+		_timespace.set_size(5000);
+		_timespace.rows(0, 999) 		= _short_times;
+		_timespace.rows(1000, 1999) 	= _medium_times;
+		_timespace.rows(2000, 3999) 	= _middle_times;
+		_timespace.rows(4000, 4999) 	= _long_times;
+	}
 	// create initial states for the quench
 	arma::Col<_T> _initial_state_me		= arma::Col<_T>(_Nh, arma::fill::zeros);
 
