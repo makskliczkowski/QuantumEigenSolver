@@ -59,6 +59,34 @@ import NQS.nqs_utils as NQSUtils
 
 #########################################
 
+def apply_to_all(func, states):
+    """
+    Apply a function to all elements in a list of states.
+
+    Parameters:
+        func (callable): The function to apply.
+        states (list): List of states to apply the function to.
+
+    Returns:
+        list: List of results after applying the function.
+    """
+    return [func(state) for state in states]
+
+def apply_to_all_np(func, states):
+    """
+    Apply a function to all elements in a list of states using NumPy.
+
+    Parameters:
+        func (callable): The function to apply.
+        states (list): List of states to apply the function to.
+
+    Returns:
+        list: List of results after applying the function.
+    """
+    return np.array([func(state) for state in states])
+
+#########################################
+
 class NQS(MonteCarloSolver):
     '''
     Neural Quantum State (NQS) Solver.
@@ -240,8 +268,8 @@ class NQS(MonteCarloSolver):
         self._forces        = None
         self._gradients     = None
         
-        self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
-                                        isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
+        # self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
+        #                                 isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
 
     def _init_functions(self):
         '''
@@ -288,10 +316,10 @@ class NQS(MonteCarloSolver):
         # set the local energy function - jit or numba
         # if the backend is JAX, use jax.jit
         # if the backend is NumPy, use numba.jit
-        if self._isjax:
-            self._local_en_func = jax_jit(self._local_en_func)
-        else:
-            self._local_en_func = numba.jit(self._local_en_func)
+        # if self._isjax:
+        #     self._local_en_func = jax_jit(self._local_en_func)
+        # else:
+        #     self._local_en_func = numba.jit(self._local_en_func)
             
     def init_network(self, s):
         '''
@@ -334,7 +362,8 @@ class NQS(MonteCarloSolver):
             # through calculating the gradients of the real and imaginary parts
             # of the network. Otherwise, we use the value provided.
             if self._net.holomorphic is None:
-                self._holomorphic   = self._check_holomorphic(s)
+                # self._holomorphic   = self._check_holomorphic(s)
+                self._holomorphic   = True
             else:
                 self._holomorphic   = self._net.holomorphic
             

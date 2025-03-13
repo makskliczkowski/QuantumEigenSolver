@@ -28,6 +28,7 @@ from Algebra.hamil import Hamiltonian
 ##########################################################################################
 import general_python.algebra.linalg as linalg
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
+from general_python.common import binary as _binary
 ##########################################################################################
 
 # ----------------------------------------------------------------------------------------
@@ -63,8 +64,8 @@ def _local_energy_int(k_map     : int,
     new_rows    = np.empty(2, dtype=DEFAULT_NP_INT_TYPE)
     new_vals    = np.empty(2, dtype=type(param))
     
-    # simulate diagonal element 
-    idx, val    = k_map, param / 2.0
+    # simulate diagonal element
+    idx, val    = k_map, param / 2.0 * _binary.check_int(k_map, i)
     new_rows[0] = idx
     new_vals[0] = val
     
@@ -125,7 +126,7 @@ def _local_energy_arr_loop(state, param: Union[float, complex]):
     # range through all elements in the state
     for i in numba.prange(size):
         # calculate the diagonal element
-        val                 = param / 2.0
+        val                 = param / 2.0 * state[i]
         local_value         += val
         
         # off-diagonal element
@@ -169,7 +170,7 @@ if _JAX_AVAILABLE:
         size = state.shape[0]
         
         def scan_fun(local_value, i):
-            val         = param / 2.0
+            val         = param / 2.0 * state[i]
             new_state   = state.at[i].set(-state[i])
             new_val     = param**2.0
             return local_value + val, (new_state, new_val)
