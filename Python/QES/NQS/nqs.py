@@ -55,35 +55,8 @@ from Algebra.hamil import Hamiltonian
 #########################################
 
 # for the gradients and stuff
-import NQS.nqs_utils as NQSUtils
-
-#########################################
-
-def apply_to_all(func, states):
-    """
-    Apply a function to all elements in a list of states.
-
-    Parameters:
-        func (callable): The function to apply.
-        states (list): List of states to apply the function to.
-
-    Returns:
-        list: List of results after applying the function.
-    """
-    return [func(state) for state in states]
-
-def apply_to_all_np(func, states):
-    """
-    Apply a function to all elements in a list of states using NumPy.
-
-    Parameters:
-        func (callable): The function to apply.
-        states (list): List of states to apply the function to.
-
-    Returns:
-        list: List of results after applying the function.
-    """
-    return np.array([func(state) for state in states])
+import general_python.ml.net_impl.utils.net_utils as net_utils
+import general_python.ml.net_impl.net_general as net_general
 
 #########################################
 
@@ -102,9 +75,10 @@ class NQS(MonteCarloSolver):
     _TOL_HOLOMORPHIC        = 1e-14
     
     def __init__(self,
-                net         : Union[Callable, str, nn.Module],
+                net         : Union[Callable, str, nn.Module, net_general.GeneralNet],
                 sampler     : Union[Callable, str, Sampler],
                 hamiltonian : Hamiltonian,
+                batch_size  : Optional[int]             = 1,
                 lower_states: Optional[list]            = None,
                 lower_betas : Optional[list]            = None,
                 nparticles  : Optional[int]             = None,
@@ -122,16 +96,16 @@ class NQS(MonteCarloSolver):
         '''
         Initialize the NQS solver.
         '''
-        super().__init__(sampler    =   sampler, 
-                        seed        =   seed, 
-                        beta        =   beta, 
-                        mu          =   mu, 
+        super().__init__(sampler    =   sampler,
+                        seed        =   seed,
+                        beta        =   beta,
+                        mu          =   mu,
                         replica     =   replica,
-                        shape       =   shape, 
-                        hilbert     =   hilbert, 
-                        modes       =   modes, 
-                        directory   =   directory, 
-                        backend     =   backend, 
+                        shape       =   shape,
+                        hilbert     =   hilbert,
+                        modes       =   modes,
+                        directory   =   directory,
+                        backend     =   backend,
                         nthreads    =   nthreads)
         
         # pre-set the Hamiltonian
@@ -147,7 +121,6 @@ class NQS(MonteCarloSolver):
         self._nvisible      = self._size
         self._nparticles2   = self._nparticles**2
         self._nvisible2     = self._nvisible**2
-        
         #######################################
         #! set the lower states
         #######################################
@@ -165,12 +138,22 @@ class NQS(MonteCarloSolver):
         #######################################
         #! handle the network
         #######################################
-        self._initialized   = False
-        self._weights       = None
-        self._dtype         = None
-        self._net           = self._choose_network(net, **kwargs)   # initialize network type
-        self.init_network(self._backend.ones(self._shape))          # run the network
+        self._batch_size        = batch_size
+        self._initialized       = False
+        self._weights           = None
+        self._dtype             = None
+        self._net               = self._choose_network(net, **kwargs)   # initialize network type
+        self.init_network(self._backend.ones(self._shape))              # run the network
         self._init_gradients()
+        #######################################
+        #! handle the functions
+        #######################################
+        self._ansatz_func       = None
+        self._local_en_func     = None
+        self._grad_func         = None
+        self._eval_func         = None
+        self._flat_grad_fun     = None
+        self._dict_grad_type    = None
         self._init_functions()
     
     #####################################
@@ -277,12 +260,20 @@ class NQS(MonteCarloSolver):
         1. Check if the backend is JAX or NumPy.
         2. If so, set the evaluation and gradient functions to the appropriate JAX or NumPy functions.
         '''
+        
+        # set the evaluation function
+        self._ansatz_func, self._params = self._net.get_apply(use_jax=self._isjax)
+        
         if self._isjax:
-            self._eval_func         = self._eval_jax
+            self._eval_func         = net_utils.jaxpy.eval_batched_jax
             self._grad_func         = self._grad_jax
+            # jit the ansatz function
+            self._ansatz_func       = self._ansatz_func
         else:
-            self._eval_func         = self._eval_np
+            self._eval_func         = net_utils.numpy.eval_batched_np
             self._grad_func         = self._grad_np
+            # numba the ansatz function
+            self._ansatz_func       = self._ansatz_func
         
         # set the local energy function
         self._init_hamiltonian(self._hamiltonian)
@@ -381,33 +372,88 @@ class NQS(MonteCarloSolver):
     #! EVALUATION
     #####################################
     
-    def _eval_np(self, net, params, batch_size, data):
-        '''
-        Evaluate the network using NumPy.
-        Parameters:
-            net         : The network to be evaluated.
-            params      : The parameters of the network.
-            batch_size  : The size of the batch.
-            data        : The data to be evaluated.
-        Returns:
-            The evaluated network output.
-        '''
-        return NQSUtils.eval_batched_np(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
+    def _eval_jax(self, states, batch_size = None, params = None):
+        """
+        Evaluates the neural network (log ansatz) for the given quantum states using JAX.
+        This method applies the network function to the provided quantum states, using
+        JAX for computation. The evaluation can be performed in batches for memory efficiency.
+        Parameters
+        ----------
+        states : array_like
+            The quantum states for which to evaluate the network.
+        states : array_like
+            The quantum states (configurations) to evaluate the network on.
+        batch_size : int, optional
+            The size of batches to use for the evaluation. If None, uses the default batch size
+            stored in self._batch_size.
+        params : dict, optional
+            The parameters (weights) to use for the network evaluation. If None, uses the
+            current parameters stored in self._weights.
+        Returns
+        -------
+        array_like
+            The output of the neural network for the given states, representing the log of the 
+            wavefunction amplitudes.
+        """
 
-    def _eval_jax(self, net, params, batch_size, data):
+        if params is None:
+            params = self._weights
+            
+        if batch_size is None:
+            batch_size = self._batch_size
+        
+        # evaluate the network (log ansatz) using JAX
+        return net_utils.jaxpy.eval_batched_jax(batch_size, self._ansatz_func, params, states)
+    
+    def _eval_np(self, states, batch_size = None, params = None):
+        """
+        Evaluates the neural network (log ansatz) for the given quantum states using NumPy.
+        This method applies the network function to the provided quantum states, using
+        NumPy for computation. The evaluation can be performed in batches for memory efficiency.
+        Parameters
+        ----------
+        states : array_like
+            The quantum states for which to evaluate the network.
+        batch_size : int, optional
+            The size of batches to use for the evaluation. If None, uses the default batch size
+            stored in self._batch_size.
+        params : dict, optional
+            The parameters (weights) to use for the network evaluation. If None, uses the
+            current parameters stored in self._weights.
+        Returns
+        -------
+        array_like
+            The output of the neural network for the given states, representing the log of the 
+            wavefunction amplitudes.
+        """
         '''
-        Evaluate the network using JAX.
+        '''
+        if params is None:
+            params = self._weights
+            
+        if batch_size is None:
+            batch_size = self._batch_size
+        
+        # evaluate the network (log ansatz) using NumPy
+        return net_utils.numpy.eval_batched_np(batch_size, self._ansatz_func, params, states)
+    
+    def evaluate(self, states, batch_size = None, params = None):
+        '''
+        Evaluate the network using the provided state. This
+        will return the log ansatz of the state coefficient.
+        
         Parameters:
-            net         : The network to be evaluated.
-            params      : The parameters of the network.
-            batch_size  : The size of the batch.
-            data        : The data to be evaluated.
+            states      : The state vector.
+            batch_size  : The size of batches to use for the evaluation.
+            params      : The parameters (weights) to use for the network evaluation.
         Returns:
             The evaluated network output.
         '''
-        return NQSUtils.eval_batched_jax(batch_size=batch_size, func=net, params=params, data=data)[:data.shape[0]]
+        if self._isjax:
+            return self._eval_jax(states, batch_size=batch_size, params=params)
+        return self._eval_np(states, batch_size=batch_size, params=params)
     
-    def __call__(self, s, **kwargs):
+    def __call__(self, states, **kwargs):
         '''
         Evaluate the network using the provided state. This
         will return the log ansatz of the state coefficient. Uses
@@ -419,26 +465,18 @@ class NQS(MonteCarloSolver):
         Returns:
             The evaluated network output.
         '''
-        return self._eval_func(self._net, self._weights, s, kwargs.get('batch_size', 1))
+        return self.evaluate(states, **kwargs)
     
     #####################################
     #! EVALUATE FUNCTION VALUES
     #####################################
     
-    def _local_energy(self, s):
-        '''
-        Evaluate the local energy of the system.
-        Parameters:
-            s: The state vector.
-        Returns:
-            The evaluated local energy. In principle returns a tuple 
-            (new_states, new_vals) where new_states are the new states
-            and new_vals are the values of the local energy.
-            After that, a probability ratio is computed that modifies the 
-            new_vals.
-        '''
-        return self._local_en_func(s)
-    
+    def _local_energy(self, states, logprobas, probabilities = None):
+
+        if self._isjax:
+            if probabilities is None:
+                return net_utils.jaxpy.app
+            
     def _evaluate_local_energy(self, s, log_values, probabilities = None):
         '''
         '''
@@ -839,4 +877,6 @@ class NQSLowerStates:
         Returns:
             Tuple[np.ndarray, float]: A tuple containing the lower state configuration and its beta value.
         """
+        if index < 0 or index >= len(self._lower_states):
+            raise IndexError("Index out of range for lower states.")
         return self._lower_states[index], self._lower_betas[index]

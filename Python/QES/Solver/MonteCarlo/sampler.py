@@ -981,9 +981,9 @@ class MCSampler(Sampler):
         Returns:
             - The log probability as a float or complex number
         '''
-        if net_params is None:
+        # if net_params is None:
             # If no parameters are needed, call net_callable with just y
-            return jax.vmap(lambda y: mu * net_callable(y), in_axes=(0,))(x)
+            # return jax.vmap(lambda y: mu * net_callable(y), in_axes=(0,))(x)
             # return jax.vmap(lambda y: mu * jnp.real(net_callable(y)), in_axes=(0,))(x)
         return jax.vmap(lambda y: mu * (net_callable(net_params, y)), in_axes=(0,))(x)
         # return jax.vmap(lambda y: mu * jnp.real(net_callable(net_params, y)), in_axes=(0,))(x)
@@ -1413,13 +1413,13 @@ class MCSampler(Sampler):
         
         # check the parameters - if not given, use the current parameters
         if parameters is None:
-            if hasattr(self._net, 'get_parameters'):
-                parameters = self._net.get_parameters()
+            if hasattr(self._net, 'get_params'):
+                parameters = self._net.get_params()
             else:
                 parameters = self._parameters
-        
-        if parameters is not None:
-            self._net.set_parameters(parameters)
+        else:
+            if hasattr(self._net, 'set_params'):
+                parameters = self._net.get_params()
         
         net_callable, parameters= self._set_net_callable(self._net)
         
@@ -1446,14 +1446,16 @@ class MCSampler(Sampler):
                     num_proposed    =   self._num_proposed,
                     num_accepted    =   self._num_accepted)
             
-            configs_log_ansatz  = jax.vmap(net_callable)(parameters, configs)
-            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(self._logprobas))
+            configs_log_ansatz  = jax.vmap(net_callable, in_axes=(None, 0))(parameters, configs)
+            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(configs_log_ansatz))
             norm                = jnp.sum(probs, axis=0, keepdims=True)
             probs               = probs / norm * self._numchains
             return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
+        
+        # for numpy
         (self._states, self._logprobas, self._num_proposed, self._num_accepted), configs =\
             self._get_samples_np(parameters, num_samples, num_chains)
-        configs_log_ansatz  = np.array([self._net(config) for config in configs])
+        configs_log_ansatz  = np.array([self._net(parameters, config) for config in configs])
         probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
         norm                = np.sum(probs, axis=0, keepdims=True)
         probs               = probs / norm * self._numchains
