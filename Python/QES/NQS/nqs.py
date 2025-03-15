@@ -34,16 +34,7 @@ if _JAX_AVAILABLE:
     import flax
     import flax.linen as nn
     from flax.core.frozen_dict import freeze, unfreeze
-    
-# try to import autograd for numpy
-try:
-    import autograd.numpy as anp
-    from autograd import grad as np_grad
-    from autograd.misc.flatten import flatten_func
-    AUTOGRAD_AVAILABLE = True
-except ImportError:
-    AUTOGRAD_AVAILABLE = False
-    
+
 #########################################
 
 from Solver.MonteCarlo.montecarlo import MonteCarloSolver, McsTrain, McsReturn, Sampler
@@ -71,8 +62,7 @@ class NQS(MonteCarloSolver):
     _ERROR_HAMILTONIAN_TYPE = "Hamiltonian must be either a Hamiltonian class or a callable function!"
     _ERROR_HAMILTONIAN_ARGS = "Hamiltonian function must accept a state vector only!"
     _ERROR_ALL_DTYPE_SAME   = "All weights must have the same dtype!"
-    
-    _TOL_HOLOMORPHIC        = 1e-14
+    _ERROR_JAX_WITH_FLAX    = "JAX backend is only compatible with Flax networks!"
     
     def __init__(self,
                 net         : Union[Callable, str, nn.Module, net_general.GeneralNet],
@@ -172,66 +162,56 @@ class NQS(MonteCarloSolver):
         '''
         if issubclass(type(net), nn.Module):
             self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
+            if not self._isjax:
+                raise ValueError(self._ERROR_JAX_WITH_FLAX)
+            
         return Networks.choose_network(network_type=net, input_shape=self._shape, backend=self._backend, dtype=self._dtype, **kwargs)
     
     #####################################
     #! INITIALIZATION OF THE NETWORK AND FUNCTIONS
     #####################################
     
-    def _check_holomorphic(self, s) -> bool:
-        """
-        Check if the network provided is holomorphic.
+    # def _check_holomorphic(self) -> bool:
+    #     """
+    #     Check if the network provided is holomorphic.
 
-        A network is considered holomorphic if the gradient of its real part equals 
-        i times the gradient of its imaginary part. This method computes the gradients 
-        of the real and imaginary parts of the network's output with respect to the 
-        network parameters, flattens these gradients, and checks if they are equal 
-        (up to a small tolerance) when combined appropriately.
+    #     A network is considered holomorphic if the gradient of its real part equals 
+    #     i times the gradient of its imaginary part. This method computes the gradients 
+    #     of the real and imaginary parts of the network's output with respect to the 
+    #     network parameters, flattens these gradients, and checks if they are equal 
+    #     (up to a small tolerance) when combined appropriately.
 
-        Parameters
-        ----------
-        s : array-like
-            The state vector, assumed to have at least the shape such that s[0, 0, ...]
-            is valid.
+    #     Parameters
+    #     ----------
+    #     s : array-like
+    #         The state vector, assumed to have at least the shape such that s[0, 0, ...]
+    #         is valid.
 
-        Returns
-        -------
-        bool
-            True if the holomorphic condition is met, False otherwise.
-        """
+    #     Returns
+    #     -------
+    #     bool
+    #         True if the holomorphic condition is met, False otherwise.
+    #     """
 
-        # Extract the sample state for gradient computation.
-        sample_state    = s[0, 0, ...]
+    #     # check if the network is holomorphic
+        
 
-        if self._isjax and _JAX_AVAILABLE:
-            # Flatten the parameters tree into a 1D array.
-            def make_flat(x):
-                leaves, _   = tree_flatten(x)
-                return jnp.concatenate([p.ravel() for p in leaves])
+    #     # if self._isjax and _JAX_AVAILABLE:
             
-            # Compute gradients of the real and imaginary parts.
-            grads_real      = make_flat(jax.grad(lambda a,b: jnp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"])
-            grads_imag      = make_flat(jax.grad(lambda a,b: jnp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
-            # Flatten the gradients.
-            flat_real       = make_flat(grads_real)
-            flat_imag       = make_flat(grads_imag)
+    #     # else:
+    #     #     # Using numpy-based gradients.
+    #     #     def make_flat(x):
+    #     #         leaves, _ = flatten_func(x)
+    #     #         return np.concatenate([p.ravel() for p in leaves])
             
-            norm_diff       = jnp.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
-            return jnp.isclose(norm_diff, 0.0, atol = self._TOL_HOLOMORPHIC)
-        else:
-            # Using numpy-based gradients.
-            def make_flat(x):
-                leaves, _ = flatten_func(x)
-                return np.concatenate([p.ravel() for p in leaves])
+    #     #     grads_real      = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
+    #     #     grads_imag      = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
             
-            grads_real      = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
-            grads_imag      = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
+    #     #     flat_real       = make_flat(grads_real)
+    #     #     flat_imag       = make_flat(grads_imag)
             
-            flat_real       = make_flat(grads_real)
-            flat_imag       = make_flat(grads_imag)
-            
-            norm_diff       = np.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
-            return np.isclose(norm_diff, 0.0, atol= self._TOL_HOLOMORPHIC)
+    #     #     norm_diff       = np.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
+    #     #     return np.isclose(norm_diff, 0.0, atol= self._TOL_HOLOMORPHIC)
         
     def _check_analitic(self):
         '''
@@ -239,20 +219,34 @@ class NQS(MonteCarloSolver):
         whether the function has an analitic gradient - like RBMs or 
         other networks that have a closed form gradient.
         '''
-        pass
+        return self._net.has_analitic_grad
+    
+    # ---
     
     def _init_gradients(self):
-        '''
-        Initialize the gradients.
-        1. Check if the backend is JAX or NumPy.
-        2. If JAX, set the gradient function to JAX's grad, if NumPy, set the gradient function to NumPy's grad.
-        3. If the network is complex, set the gradient function to JAX's grad with holomorphic=True, otherwise set it to JAX's grad with holomorphic=False.
-        '''
-        self._forces        = None
-        self._gradients     = None
+        """
+        Initializes the gradient computation method for the neural quantum state (NQS).
+        This method determines the appropriate gradient computation function and gradient type
+        based on the properties of the system, such as whether the system is complex-valued,
+        uses JAX for computation, employs analytic gradients, or is holomorphic.
+        Attributes:
+            self._flat_grad_fun : A function for computing gradients in a flattened format.
+            self._dict_grad_type: A dictionary specifying the type of gradients to be used.
+        Dependencies:
+            - net_utils.decide_grads: A utility function that selects the gradient computation
+                method based on the provided flags.
+        Flags:
+            - self._iscpx: Boolean indicating if the system is complex-valued.
+            - self._isjax: Boolean indicating if JAX is used for computation.
+            - self._analytic: Boolean indicating if analytic gradients are used.
+            - self._holomorphic: Boolean indicating if the system is holomorphic.
+        """
+
         
-        # self._flat_grad_fun, self._dict_grad_type = NQSUtils.decide_grads(iscpx=self._iscpx,
-        #                                 isjax=self._isjax, isanalitic=self._isanalitic, isholomorphic=self._holomorphic)
+        self._flat_grad_fun = net_utils.decide_grads(iscpx=self._iscpx,
+                            isjax=self._isjax, isanalitic=self._analytic, isholomorphic=self._holomorphic)
+
+    # ---
 
     def _init_functions(self):
         '''
@@ -278,6 +272,8 @@ class NQS(MonteCarloSolver):
         # set the local energy function
         self._init_hamiltonian(self._hamiltonian)
 
+    # ---
+    
     def _init_hamiltonian(self, hamiltonian):
         '''
         Initialize the Hamiltonian.
@@ -303,18 +299,12 @@ class NQS(MonteCarloSolver):
                 self._local_en_func = self._hamiltonian.get_loc_energy_jax_fun()
             else:
                 self._local_en_func = self._hamiltonian.get_loc_energy_np_fun()
-        
-        # set the local energy function - jit or numba
-        # if the backend is JAX, use jax.jit
-        # if the backend is NumPy, use numba.jit
-        # if self._isjax:
-        #     self._local_en_func = jax_jit(self._local_en_func)
-        # else:
-        #     self._local_en_func = numba.jit(self._local_en_func)
-            
+
+    # ---
+
     def init_network(self, s):
         '''
-        In1tialize the network truly. This means that the weights are initialized correctly 
+        Initialize the network truly. This means that the weights are initialized correctly 
         and the dtypes are checked. In addition, the network is checked if it is holomorphic or not.
         Parameters:
             s: The state vector, can be any, but it is used to initialize the network.
@@ -332,7 +322,7 @@ class NQS(MonteCarloSolver):
 
         if not self._initialized:
             
-            # initialize the network 
+            # initialize the network
             self._weights   = self._net.init(self._rng_key)
             
             # check the dtypes of the weights
@@ -352,11 +342,10 @@ class NQS(MonteCarloSolver):
             # if the value is set to None, we check if the network is holomorphic
             # through calculating the gradients of the real and imaginary parts
             # of the network. Otherwise, we use the value provided.
-            if self._net.holomorphic is None:
-                # self._holomorphic   = self._check_holomorphic(s)
-                self._holomorphic   = True
-            else:
-                self._holomorphic   = self._net.holomorphic
+            self._holomorphic       = self._net.check_holomorphic()
+            self.log(f"Network is holomorphic: {self._holomorphic}", log='info', lvl = 2, color = 'blue')
+            self._analytic          = self._net.has_analitic_grad
+            self.log(f"Network has analytic gradient: {self._analytic}", log='info', lvl = 2, color = 'blue')
             
             # check the shape of the weights
             self._paramshape        = self._net.shapes
@@ -369,7 +358,7 @@ class NQS(MonteCarloSolver):
             #     self._nparams = np.sum(np.array([p.size for p in flatten_func(self.parameters["params"])[0]]))
     
     #####################################
-    #! EVALUATION
+    #! EVALUATION OF THE ANSATZ
     #####################################
     
     def _eval_jax(self, states, batch_size = None, params = None):
@@ -471,125 +460,252 @@ class NQS(MonteCarloSolver):
     #! EVALUATE FUNCTION VALUES
     #####################################
     
-    def _local_energy(self, states, logprobas, probabilities = None):
-
-        if self._isjax:
-            if probabilities is None:
-                return net_utils.jaxpy.app
-            
-    def _evaluate_local_energy(self, s, log_values, probabilities = None):
-        '''
-        '''
-
-        def scan(c, x):
-            new_states, new_vals    = self._local_energy(x)
-            # use the new states to compute the probability ratio
-            new_log_vals_rati       = self.log_probability_ratio(log_values, new_states)
-            
-            # compute the new values
-            
-            
-            return c, new_vals
+    @staticmethod
+    def _evaluate_fun(func          : Callable,
+                    states          : Union[np.ndarray, jnp.ndarray],
+                    probabilities   : Union[np.ndarray, jnp.ndarray],
+                    logproba_in     : Union[np.ndarray, jnp.ndarray],
+                    logproba_fun    : Callable,
+                    parameters      : Union[dict, list, np.ndarray],
+                    batch_size      : Optional[int] = None,
+                    is_jax          : bool = True):
+        """
+        Evaluates a given function on a set of states and probabilities, with optional batching.
         
-    def _evaluate_fun(self, s, log_values, funct: Callable, probabilities = None):
-        '''
-        '''
-        # return funct(self._net, self._weights, s)
+        Args:
+            func (Callable)                                 : The function to be evaluated.
+            states (Union[np.ndarray, jnp.ndarray])         : The input states for the function.
+            probabilities (Union[np.ndarray, jnp.ndarray])  : The probabilities associated with the states.
+            logproba_in (Union[np.ndarray, jnp.ndarray])    : The logarithm of the probabilities for the input states.
+            logproba_fun (Callable)                         : A function to compute the logarithm of probabilities.
+            parameters (Union[dict, list, np.ndarray])      : Parameters to be passed to the function.
+            batch_size (Optional[int], optional)            : The size of batches for evaluation. 
+                                                            If None, the function is evaluated without batching. Defaults to None.
+            is_jax (bool, optional)                         : Flag indicating if JAX is used for computation. Defaults to True.
+        Returns:
+            The result of the function evaluation, either batched or unbatched, depending on the value of `batch_size`.
+        """
+                    
+        if batch_size is None:
+            funct_in = net_utils.jaxpy.apply_callable_jax if is_jax else net_utils.numpy.apply_callable_np
+            return funct_in(func, states, probabilities, logproba_in, logproba_fun, parameters)
+        # otherwise, we shall use the batched version
+        funct_in = net_utils.jaxpy.apply_callable_batched_jax if is_jax else net_utils.numpy.apply_callable_batched_np
+        return funct_in(func            = func,
+                        states          = states,
+                        sample_probas   = probabilities,
+                        logprobas_in    = logproba_in,
+                        logproba_fun    = logproba_fun,
+                        parameters      = parameters,
+                        batch_size      = batch_size)
     
-    def evaluate_fun(self, s_and_psi = None,
-                probabilities = None, sampler = None, functions : Optional[list] = None,
+    @staticmethod
+    def _evaluate_fun_s(func        : list[Callable],
+                        sampler     : Sampler,
+                        num_samples : int,
+                        num_chains  : int,
+                        logproba_fun: Callable,
+                        parameters  : dict,
+                        batch_size  : Optional[int] = None,
+                        is_jax      : bool = True):
+        """
+        Evaluates a given function using samples generated by a sampler.
+
+        This method utilizes a sampler to generate states, ansatze, and their 
+        associated probabilities, and then evaluates the provided function 
+        using these samples.
+
+        Args:
+            func (Callable)                 : The function to be evaluated. It should accept 
+                                            states, probabilities, ansatze, logproba_fun, and parameters 
+                                            as inputs.
+            sampler (Sampler)               : The sampler object used to generate samples.
+            num_samples (int)               : The total number of samples to generate.
+            num_chains (int)                : The number of independent Markov chains to use 
+                                            in the sampling process.
+            logproba_fun (Callable)         : A function that computes the logarithm 
+                                            of the probability for given states.
+            parameters (dict)               : A dictionary of parameters to be passed to 
+                                            the function being evaluated.
+            batch_size (Optional[int])      : The size of batches to process at a 
+                                            time. If None, the entire dataset is processed at once.
+                                            Defaults to None.
+            is_jax (bool, optional)         : Flag indicating if JAX is used for computation. 
+                                            Defaults to True.
+        Returns:    
+            Any: The result of evaluating the provided function `func` using 
+            the generated samples.
+        """
+
+        _, (states, ansatze), probabilities = sampler.sample(parameters=parameters, num_samples=num_samples, num_chains=num_chains)
+        evaluated_results = [NQS._evaluate_fun(f, states, probabilities, ansatze, logproba_fun, parameters, batch_size, is_jax) for f in func]
+        return (states, ansatze), probabilities, evaluated_results
+    
+    def evaluate_fun(self,
+                functions       : Optional[list] = None,
+                states_and_psi  : Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]] = None,
+                probabilities   : Optional[Union[np.ndarray, jnp.ndarray]] = None,
                 **kwargs):
-        '''
-        '''
-        if sampler is None:
-            sampler = self._sampler
+        """
+        Evaluate a set of functions based on the provided states, wavefunction, and probabilities.
+        This method computes the output of one or more functions using the provided states, 
+        wavefunction (ansatze), and probabilities. If states and wavefunction are not provided, 
+        it uses a sampler to generate the required data.
+        Args:
+            functions (Optional[list])      : A list of functions to evaluate. If not provided, 
+                                            defaults to using the local energy function (`self._local_en_func`).
+            states_and_psi (Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]])
+                                            : A tuple containing the states and the corresponding wavefunction (ansatze). 
+                                            If not provided, the sampler is used to generate these.
+            probabilities (Optional[Union[np.ndarray, jnp.ndarray]])
+                                            : Probabilities associated with the states. If not provided, defaults to an array of ones with the same 
+                                            shape as the wavefunction ansatze.
+            **kwargs                        : Additional keyword arguments:
+                - batch_size (int)          : The batch size for evaluation. Defaults to self._batch_size.
+                - num_samples (int)         : Number of samples to generate if using the sampler.
+                - num_chains (int)          : Number of chains to use if using the sampler.
+        Returns:
+            Union[Any, list]                : The output of the evaluated functions. If a single function is 
+                                            provided, the result is returned directly. If multiple functions are provided, 
+                                            a list of results is returned.
+        """
         
-        # get the parameters, if not provided set the default values
-        num_samples = kwargs.get('num_samples', None)
-        num_chains  = kwargs.get('num_chains', None)
+        output          = [None]
         
-        if s_and_psi is None or not isinstance(s_and_psi, tuple):
-            # create the samples if not provided
-            _, (s, p), probabilities = self._sampler.sample(self._net.get_parameters(), num_samples=num_samples,
-                                                            num_chains=num_chains)
-        else:
-            s, p = s_and_psi
+        # get from kwargs
+        batch_size      = kwargs.get('batch_size', self._batch_size)
         
-        # if we already have the samples, choose the function.add()
-        # Namely, if the list of functions is empty, we shall use the 
-        # local energy function to obtain the estimate of the local energy
-        
+        # check if the functions are provided
         if functions is None or len(functions) == 0:
-            return self._evaluate_local_energy(s, p, probabilities)
+            functions = [self._local_en_func]
         
-        # otherwise, we shall use the functions provided
-        # to evaluate other operators
-        return [self._evaluate_fun(s, p, f, probabilities) for f in functions]    
+        # check if the states and psi are provided
+        states, ansatze = None, None
+        if states_and_psi is not None:
+            if isinstance(states_and_psi, tuple):
+                states, ansatze = states_and_psi
+            else:
+                states          = states_and_psi
+                ansatze         = self(states)
+            
+            # check if the probabilities are provided
+            if probabilities is None:
+                probabilities = self._backend.ones_like(ansatze)
+            
+            output = [self._evaluate_fun(func           = f,
+                                        states          = states,
+                                        probabilities   = probabilities,
+                                        logproba_in     = ansatze,
+                                        logproba_fun    = self._ansatz_func,
+                                        parameters      = self._net.get_params(),
+                                        batch_size      = batch_size,
+                                        is_jax          = self._isjax) for f in functions]
+        else:
+            # get other parameters from kwargs
+            num_samples = kwargs.get('num_samples', None)
+            num_chains  = kwargs.get('num_chains', None)
+            
+            # otherwise, we shall use the sampler
+            (states, ansatze), probabilities, output    = \
+                    self._evaluate_fun_s(func           = functions,
+                                        sampler         = self._sampler, 
+                                        num_samples     = num_samples,
+                                        num_chains      = num_chains,
+                                        logproba_fun    = self._ansatz_func,
+                                        parameters      = self._net.get_params(),
+                                        batch_size      = batch_size,
+                                        is_jax          = self._isjax)
+        
+        # check if the output is a list
+        if isinstance(output, list) and len(output) == 1:
+            output = output[0]
+        return (states, ansatze), probabilities, output
+
+    #####################################
+    #! SAMPLE
+    #####################################
+    
+    def sample(self, num_samples = 1, num_chains = 1):
+        '''
+        Sample the NQS using the provided sampler. This will return
+        the sampled states and the corresponding probabilities.
+        Parameters:
+            num_samples : The number of samples to generate.
+            num_chains  : The number of chains to use for sampling.
+            kwargs      : Additional arguments for the sampler.
+        Returns:
+            The sampled states and the corresponding probabilities.
+            (last configs, last ansatze), (all configs, all ansatze), (all probabilities)
+        '''
+        return self._sampler.sample(num_samples=num_samples, num_chains=num_chains)    
     
     #####################################
     #! GRADIENTS
     #####################################
     
-    def _grad_jax(self, net, params, batch_size, data, flat_grad_fun):
+    @staticmethod
+    def _grad_jax(net_apply, params, batch_size, states, flat_grad_fun):
         '''
-        Compute the gradients using JAX. This function uses JAX's
-        vmap and scan functions to compute the gradients in a batched manner.
-        Parameters:
-            net         : The network to be evaluated.
-            params      : The parameters of the network.
-            batch_size  : The size of the batch.
-            data        : The data to be evaluated.
-            flat_grad   : The function to compute the gradients.
-        Note: 
-            For the networks that have a closed form gradient, we can use the
-            flat_grad function to compute the gradients analytically. This 
-            shall be set previously in the init function.
+        Compute the gradients of the ansatz logarithmic wave-function using JAX. 
+        
+        Compute gradient of the logarithmic wave function coefficients, \
+        :math:`\\nabla\\ln\\psi(s)`, for computational configurations :math:`s`.
         '''
         
         # create the batches
-        sb = NQSUtils.create_batches_jax(data, batch_size)
-        
+        sb = net_utils.jaxpy.create_batches_jax(states, batch_size)
+
         # compute the gradients using JAX's vmap and scan
+        # use the provided flat_grad_fun to compute the gradients
+        # this is a function that computes the gradients of the network
+        print(flat_grad_fun)
         def scan_fun(c, x):
-            return c, jax.vmap(lambda y: flat_grad_fun(net, params, y), in_axes=(0,))(x)
+            return c, jax.vmap(lambda y: flat_grad_fun(net_apply, params, y), in_axes=(0,))(x)
+        
+        # use jax's scan to compute the gradients of the logarithmic wave function
         g = jax.lax.scan(scan_fun, None, sb)[1]
-        g = tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
-        return tree_map(lambda x: x[:data.shape[0]], g)
+        g = jax.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
+        
+        # only take the non-padded values
+        return jax.tree_map(lambda x: x[:states.shape[0]], g)
     
-    def _grad_np(self, net, params, batch_size, data, flat_grad):
+    @staticmethod
+    def _grad_np(net, params, batch_size, states, flat_grad):
         '''
-        Compute the gradients using NumPy. This function uses NumPy's
-        loop to compute the gradients in a batched manner.
-        Parameters:
-            net         : The network to be evaluated.
-            params      : The parameters of the network.
-            batch_size  : The size of the batch.
-            data        : The data to be evaluated.
-            flat_grad   : The function to compute the gradients.
-        Note:
-            For the networks that have a closed form gradient, we can use the
-            flat_grad function to compute the gradients analytically. This
-            shall be set previously in the init function.
-        Returns:
-            The computed gradients.
         !TODO: Add the precomputed gradient vector - memory efficient
         '''
-        sb = NQSUtils.create_batches_np(data, batch_size)
+        sb = net_utils.numpy.create_batches_np(states, batch_size)
         
         # compute the gradients using NumPy's loop
-        g = np.zeros((len(sb),) + self._paramshape[0][1], dtype=self._dtype)
+        g = np.zeros((len(sb),) + params.shape[1:], dtype=np.float64)
         for i, b in enumerate(sb):
             g[i] = flat_grad(net, params, b)
         return g
     
-    def _grad(self, data, **kwargs):
+    def gradient(self, states, batch_size = None, params = None):
         '''
-        Compute the gradients.
+        Compute the gradients of the ansatz logarithmic wave-function using JAX or NumPy.
+        
+        Parameters:
+            states      : The state vector.
+            batch_size  : The size of batches to use for the evaluation.
+            params      : The parameters (weights) to use for the network evaluation.
+        Returns:
+            The computed gradients.
         '''
-        return self._grad_func(net=self._net, batch_size=kwargs.get('batch_size', 1),
-                        params=self._weights, data=data,
-                        flat_grad=self._flat_grad_fun)
-    
+        
+        # check if the batch size is provided
+        batch_size = batch_size if batch_size is not None else self._batch_size
+        if batch_size is None:
+            batch_size = 1
+            
+        # check if the parameters are provided
+        params = params if (params is not None) else self._net.get_params()
+        print(params)
+        if self._isjax:
+            return self._grad_jax(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
+        return self._grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
+
     #####################################
     #! TRAINING OVERRIDES
     #####################################
@@ -737,15 +853,6 @@ class NQS(MonteCarloSolver):
     
     def load_weights(self, dir = None, name = "weights"):
         return super().load_weights(dir, name)
-    
-    #####################################
-    #! GRADIENT
-    #####################################
-    
-    
-    #####################################
-    #! OVERLOADS
-    #####################################
     
     
 #########################################

@@ -1450,6 +1450,12 @@ class MCSampler(Sampler):
             probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(configs_log_ansatz))
             norm                = jnp.sum(probs, axis=0, keepdims=True)
             probs               = probs / norm * self._numchains
+            
+            # flatten the configs to be of shape (num_samples * num_chains)
+            configs             = configs.reshape(-1, *configs.shape[2:])
+            configs_log_ansatz  = configs_log_ansatz.reshape(-1, *configs_log_ansatz.shape[2:])
+            probs               = probs.reshape(-1, *probs.shape[2:])
+
             return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
         
         # for numpy
@@ -1459,6 +1465,12 @@ class MCSampler(Sampler):
         probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
         norm                = np.sum(probs, axis=0, keepdims=True)
         probs               = probs / norm * self._numchains
+        
+        # flatten the configs to be of shape (num_samples * num_chains)
+        configs             = configs.reshape(-1, *configs.shape[2:])
+        configs_log_ansatz  = configs_log_ansatz.reshape(-1, *configs_log_ansatz.shape[2:])
+        probs               = probs.reshape(-1, *probs.shape[2:])
+        
         return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
     
     ###################################################################
