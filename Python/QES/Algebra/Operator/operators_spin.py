@@ -39,6 +39,7 @@ import general_python.common.binary as _binary
 _I      = 1j
 
 if _JAX_AVAILABLE:
+    import Algebra.Operator.operators_spin_jax as jaxpy
     # sigma x
     from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp
     # sigma y

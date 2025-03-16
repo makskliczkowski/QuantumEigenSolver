@@ -9,13 +9,14 @@ from numba import njit, objmode, jit, prange
 from typing import Callable, Union
 
 ####################################################################################################
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, JIT, DEFAULT_NP_INT_TYPE, DEFAULT_JP_INT_TYPE
+from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, DEFAULT_NP_INT_TYPE
 if _JAX_AVAILABLE:
+    from general_python.algebra.utils import JIT, DEFAULT_JP_INT_TYPE
     import jax.numpy as jnp
     import jax.scipy as jsp
 
 ####################################################################################################
-from Algebra.hilbert import HilbertSpace, set_operator_elem, get_mapping, get_matrix_element
+# from Algebra.hilbert import HilbertSpace, set_operator_elem, get_mapping, get_matrix_element
 import Algebra.hilbert as Hilbert
 
 ####################################################################################################
@@ -63,7 +64,7 @@ def _operator_create_np_inner_loop_no_hilbert(ranges = None):
             data_idx = inner_k(k, local_funct, cols, rows, data, data_idx)
     return _inner_loop
 
-def _operator_create_np_sparse_inner_loop(hilbert : HilbertSpace, ranges = None):
+def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges = None):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert is not None and hilbert.modifies:
@@ -130,7 +131,7 @@ def _operator_create_np_sparse_inner_loop(hilbert : HilbertSpace, ranges = None)
     return _operator_create_np_inner_loop_no_hilbert(ranges)
 
 def operator_create_np_sparse(  ns                  : int,
-                                hilbert             : HilbertSpace,
+                                hilbert             : Hilbert.HilbertSpace,
                                 local_fun           : Union[Callable],
                                 max_local_changes   : int,
                                 start               = 0,
@@ -216,7 +217,7 @@ def _operator_create_np_dense_inner_loop_no_hilbert(ranges = None):
         return matrix
     return _inner_loop
 
-def _operator_create_np_dense_inner_loop(hilbert : HilbertSpace, ranges = None):
+def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges = None):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert.modifies:
@@ -276,7 +277,7 @@ def _operator_create_np_dense_inner_loop(hilbert : HilbertSpace, ranges = None):
     # @jit(forceobj=True, fastmath=True)
     
 def operator_create_np_dense(ns                     : int,
-                    hilbert_space                   : HilbertSpace,
+                    hilbert_space                   : Hilbert.HilbertSpace,
                     local_fun                       : Callable,
                     start                           = 0,
                     dtype                           = None):
@@ -314,7 +315,7 @@ def operator_create_np_dense(ns                     : int,
 #####################################################################################################
 
 def operator_create_np( ns                  : Union[int, None],
-                        hilbert_space       : HilbertSpace,
+                        hilbert_space       : Hilbert.HilbertSpace,
                         local_fun           : Union[Callable],
                         max_local_changes   : int,
                         is_sparse           : bool,
@@ -341,8 +342,8 @@ def operator_create_np( ns                  : Union[int, None],
 
 ####################################################################################################
 
-def operator_create(ns                 : int,
-                    hilbert_space       : HilbertSpace,
+def operator_create(ns                  : int,
+                    hilbert_space       : Hilbert.HilbertSpace,
                     local_fun           : Union[Callable],
                     max_local_changes   : int,
                     is_sparse           : bool,

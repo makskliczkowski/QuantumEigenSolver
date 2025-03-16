@@ -20,7 +20,7 @@ import general_python.ml.networks as Networks
 import general_python.common.binary as Binary
 
 # from hilbert
-from Algebra.hilbert import HilbertSpace
+import Algebra.hilbert as Hilbert
 
 # JAX imports
 if _JAX_AVAILABLE:
@@ -68,20 +68,20 @@ class NQS(MonteCarloSolver):
                 net         : Union[Callable, str, nn.Module, net_general.GeneralNet],
                 sampler     : Union[Callable, str, Sampler],
                 hamiltonian : Hamiltonian,
-                batch_size  : Optional[int]             = 1,
-                lower_states: Optional[list]            = None,
-                lower_betas : Optional[list]            = None,
-                nparticles  : Optional[int]             = None,
-                seed        : Optional[int]             = None,
-                beta        : float                     = 1,
-                mu          : float                     = 0,
-                replica     : int                       = 1,
-                shape       : Union[list, tuple]        = (1,),
-                hilbert     : Optional[HilbertSpace]    = None,
-                modes       : int                       = 2,
-                directory   : Optional[str]             = MonteCarloSolver.defdir,
-                backend     : str                       = 'default',
-                nthreads    : Optional[int]             = 1,
+                batch_size  : Optional[int]                     = 1,
+                lower_states: Optional[list]                    = None,
+                lower_betas : Optional[list]                    = None,
+                nparticles  : Optional[int]                     = None,
+                seed        : Optional[int]                     = None,
+                beta        : float                             = 1,
+                mu          : float                             = 0,
+                replica     : int                               = 1,
+                shape       : Union[list, tuple]                = (1,),
+                hilbert     : Optional[Hilbert.HilbertSpace]    = None,
+                modes       : int                               = 2,
+                directory   : Optional[str]                     = MonteCarloSolver.defdir,
+                backend     : str                               = 'default',
+                nthreads    : Optional[int]                     = 1,
                 **kwargs):
         '''
         Initialize the NQS solver.
@@ -133,7 +133,11 @@ class NQS(MonteCarloSolver):
         self._weights           = None
         self._dtype             = None
         self._net               = self._choose_network(net, **kwargs)   # initialize network type
-        self.init_network(self._backend.ones(self._shape))              # run the network
+        self._analytic          = False
+        self._holomorphic       = True
+        self.init_network()
+        self._flat_grad_fun     = None
+        self._dict_grad_type    = None
         self._init_gradients()
         #######################################
         #! handle the functions
@@ -142,8 +146,6 @@ class NQS(MonteCarloSolver):
         self._local_en_func     = None
         self._grad_func         = None
         self._eval_func         = None
-        self._flat_grad_fun     = None
-        self._dict_grad_type    = None
         self._init_functions()
     
     #####################################
@@ -226,6 +228,10 @@ class NQS(MonteCarloSolver):
     def _init_gradients(self):
         """
         Initializes the gradient computation method for the neural quantum state (NQS).
+        It sets up the gradient of the logarithmic wave function. It checks whether the network is:
+        - complex
+        - holomorphic
+        - has an analytic gradient solution
         This method determines the appropriate gradient computation function and gradient type
         based on the properties of the system, such as whether the system is complex-valued,
         uses JAX for computation, employs analytic gradients, or is holomorphic.
@@ -242,8 +248,7 @@ class NQS(MonteCarloSolver):
             - self._holomorphic: Boolean indicating if the system is holomorphic.
         """
 
-        
-        self._flat_grad_fun = net_utils.decide_grads(iscpx=self._iscpx,
+        self._flat_grad_fun, self._dict_grad_type = net_utils.decide_grads(iscpx=self._iscpx,
                             isjax=self._isjax, isanalitic=self._analytic, isholomorphic=self._holomorphic)
 
     # ---
@@ -302,7 +307,7 @@ class NQS(MonteCarloSolver):
 
     # ---
 
-    def init_network(self, s):
+    def init_network(self):
         '''
         Initialize the network truly. This means that the weights are initialized correctly 
         and the dtypes are checked. In addition, the network is checked if it is holomorphic or not.
@@ -644,6 +649,7 @@ class NQS(MonteCarloSolver):
     #####################################
     
     @staticmethod
+    @partial(jax.jit, static_argnums=(0,2,4))
     def _grad_jax(net_apply, params, batch_size, states, flat_grad_fun):
         '''
         Compute the gradients of the ansatz logarithmic wave-function using JAX. 
@@ -658,16 +664,15 @@ class NQS(MonteCarloSolver):
         # compute the gradients using JAX's vmap and scan
         # use the provided flat_grad_fun to compute the gradients
         # this is a function that computes the gradients of the network
-        print(flat_grad_fun)
         def scan_fun(c, x):
             return c, jax.vmap(lambda y: flat_grad_fun(net_apply, params, y), in_axes=(0,))(x)
         
         # use jax's scan to compute the gradients of the logarithmic wave function
         g = jax.lax.scan(scan_fun, None, sb)[1]
-        g = jax.tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
+        g = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
         
         # only take the non-padded values
-        return jax.tree_map(lambda x: x[:states.shape[0]], g)
+        return jax.tree.map(lambda x: x[:states.shape[0]], g)
     
     @staticmethod
     def _grad_np(net, params, batch_size, states, flat_grad):
@@ -701,11 +706,35 @@ class NQS(MonteCarloSolver):
             
         # check if the parameters are provided
         params = params if (params is not None) else self._net.get_params()
-        print(params)
+        
+        #!TODO: Handle the analytic gradients
+        
         if self._isjax:
             return self._grad_jax(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
         return self._grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
 
+    #####################################
+    #! UPDATE PARAMETERS
+    #####################################
+    
+    def update_parameters(self, d_par: Union[dict, list, np.ndarray]):
+        '''
+        Update the parameters of the model.
+        
+        Parameters:
+            d_par : The new parameters to update the model with, can be a dictionary,
+                    list, or numpy array.
+        '''
+        new_parameters = jax.tree_util.tree_map(jax.lax.add,
+                                    self.params,
+                                    self._param_unflatten(d_par))
+        
+        # set the new parameters already
+        self._weights = new_parameters
+        
+        # set the new parameters to the network
+        self._net.set_params(new_parameters)
+        
     #####################################
     #! TRAINING OVERRIDES
     #####################################
