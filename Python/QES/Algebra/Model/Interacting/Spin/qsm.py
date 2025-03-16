@@ -16,18 +16,17 @@ Version : 0.1
 
 import numpy as np
 import numba
-import math
-from dataclasses import dataclass
 from typing import List, Tuple, Union, Optional
+from functools import partial
 
 # Assume these are available from the QES package:
-from Algebra.hilbert import HilbertSpace
-from Algebra.hamil import Hamiltonian
-import Algebra.Operator.operators_spin as _operators_spin
+import Algebra.hilbert as hilbert_module
+import Algebra.hamil as hamil_module
+import Algebra.Operator.operators_spin as operators_spin_module
 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
-from general_python.algebra.ran_wrapper import choice, randint, RMT, random_matrix, random_vector
+from general_python.algebra.ran_wrapper import RMT, random_matrix, random_vector
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
 ##########################################################################################
 
@@ -41,6 +40,7 @@ _QSM_CHECK_HS_NORM = True
 #! INTEGER STATES
 # ----------------------------------------------------------------------------------------
 
+@numba.njit
 def _local_energy_int(k_map     : int,
                         i       : int,
                         n       : int,
@@ -81,13 +81,13 @@ def _local_energy_int(k_map     : int,
     this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
     
     # apply the sigma_z operator
-    idx, val    = _operators_spin.sigma_z_int_np(k_map, ns, this_site)
+    idx, val    = operators_spin_module.sigma_z_int_np(k_map, ns, this_site)
     vals        = h[part_idx] * val.astype(h.dtype)
     
     # apply the sigma_x * sigma_x operator
     next_site   = np.array([neidot[part_idx]], dtype=DEFAULT_NP_INT_TYPE)
-    idx1, sxn   = _operators_spin.sigma_x_int_np(k_map, ns, next_site)
-    idx2, sxj   = _operators_spin.sigma_x_int_np(idx1[0], ns, this_site)
+    idx1, sxn   = operators_spin_module.sigma_x_int_np(k_map, ns, next_site)
+    idx2, sxj   = operators_spin_module.sigma_x_int_np(idx1[0], ns, this_site)
     coupling_v  = g0 * au[part_idx] * sxj * sxn
     
     new_rows[:1] = idx
@@ -107,7 +107,8 @@ def _local_energy_int_wrap(n, ns, neidot, h, g0, au):
 #! ARRAY STATES
 # ----------------------------------------------------------------------------------------
 
-def _local_energy_arr_loop(state, neidot, h, g0, n, au, sigma_x, sigma_z):
+@numba.njit
+def _local_energy_arr_loop(state, neidot, h, g0, n, au):
     """
     Compute the local energy interaction for a numpy array state.
     
@@ -120,51 +121,59 @@ def _local_energy_arr_loop(state, neidot, h, g0, n, au, sigma_x, sigma_z):
     Returns:
         Tuple [states], [energies] containing the new states and energies.
     """
-    local_state = [state.copy()]
+    size        = state.shape[0]
     local_value = 0.0
-    states      = []
-    values      = []
+    new_states  = np.empty((size+1, size), dtype=state.dtype)
+    vals        = np.empty(size+1, dtype=h.dtype)
     
-    for i in numba.prange(len(state)):
+    for i in numba.prange(size):
         # Apply the local energy interaction.
         part_idx    = i - n
         this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
         # Apply the sigma_z operator
-        _, val      = sigma_z(state, this_site)
-        vals        = h[part_idx] * val.astype(h.dtype)
+        _, sz_i     = operators_spin_module.sigma_z_np(state, this_site)
+        local_in    = h[part_idx] * sz_i
         
         # Apply the sigma_x * sigma_x operator
-        next_site   = neidot[part_idx]
-        idx1, sxn   = sigma_x(state, int(next_site))
-        idx2, sxj   = sigma_x(idx1, this_site)
-        coupling_v  = g0 * au[part_idx] * sxj * sxn
-        # Store the results        
-        local_value += vals
-        states.append(idx2[0])
-        values.append(coupling_v)
-    return states + local_state, values + [local_value]
+        next_site   = np.array([neidot[part_idx]], dtype=DEFAULT_NP_INT_TYPE)
+        # s1, sx_n    = sigma_x(state, next_site)
+        # s2, sx_i    = sigma_x(s1, this_site)
+        s1, sx_n    = operators_spin_module.sigma_x_np(state, next_site)
+        s2, sx_i    = operators_spin_module.sigma_x_np(s1, this_site)
+        coupling_v  = g0 * au[part_idx] * sx_i * sx_n
+        # Store the results
+        local_value         += local_in
+        new_states[i, :]    = s2
+        vals[i]             = coupling_v
 
-@numba.njit
+    new_states[size, :] = state
+    vals[size]          = local_value
+
+    return new_states, vals
+
+# @numba.njit
 def _local_energy_arr_np(state, neidot, h, g0, n, au):
     '''
     Compute the local energy interaction for a numpy array state.
     Parameters:
-        state   : numpy array of spins (0 or 1)
-        neidot  : numpy array of neighbor indices for free particles
-        h, g0, n, au : model parameters
+        state           : numpy array of spins (0 or 1)
+        neidot          : numpy array of neighbor indices for free particles
+        h, g0, n, au    : model parameters
     Returns:
         Tuple [states], [energies] containing the new states and energies.
     '''
-    sigma_x = _operators_spin.sigma_x_np
-    sigma_z = _operators_spin.sigma_z_np
-    return _local_energy_arr_loop(state, neidot, h, g0, n, au, sigma_x, sigma_z)
+    # sigma_x = operators_spin_module.sigma_x_np
+    # sigma_z = operators_spin_module.sigma_z_np
+    return _local_energy_arr_loop(state, neidot, h, g0, n, au)
+
+# ----------------------------------------------------------------------------------------
 
 if _JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax import jit as jax_jit
     
-    @jax_jit
+    # @jax_jit
     def _local_energy_arr_lax(state     : jnp.ndarray,
                             neidot      : jnp.ndarray,
                             h           : jnp.ndarray,
@@ -195,24 +204,26 @@ if _JAX_AVAILABLE:
         """
         
         # Get the size of the state - assumed to be the same for all states.
-        size = state.shape[0]
-        
+        size                    = state.shape[0]
+        h_in                    = jnp.array(h)
+        au_in                   = jnp.array(au)
+        neidot_in               = jnp.array(neidot)
         # Assume free indices: i from n to size-1.
         def scan_fun(local_value, i):
-            part_idx            = i - n  # index into h and au arrays
-            
+            this_idx            = jnp.ones((1,), dtype = jnp.int32) * i
+            part_idx            = n - i
             # Diagonal term: apply σ_z at site i.
-            _, eigen_z          = sigma_z(state, i)
-            vals                = h[part_idx] * eigen_z
+            _, sz_i             = sigma_z(state, this_idx)
+            local_in            = sz_i * h_in[part_idx]
             # Off-diagonal term: apply two successive σₓ operations.
-            next_site           = neidot[part_idx]
-            state_temp, v1      = sigma_x(state, next_site)
-            state_x, v2         = sigma_x(state_temp, i)
-            coupling_v          = g0 * au[part_idx] * v1 * v2
+            next_site           = jnp.ones((1,), dtype = jnp.int32) * neidot_in[part_idx]
+            s1, sx_n            = sigma_x(state, next_site)
+            s2, sx_i            = sigma_x(s1, this_idx)
+            coupling_v          = g0 * au_in[part_idx] * sx_n * sx_i
             # Accumulate the σ_z contribution.
-            new_local_value     = local_value + vals
+            new_local_value     = local_value + local_in
             # For each free site we output the new state (from σₓσₓ) and the coupling energy.
-            return new_local_value, (state_x, coupling_v)
+            return new_local_value, (s2, coupling_v)
         
         free_indices            = jnp.arange(n, size, dtype=jnp.int32)
         init_local_value        = 0.0
@@ -224,7 +235,7 @@ if _JAX_AVAILABLE:
         all_values = jnp.concatenate([free_values, jnp.array([final_local_value])], axis=0)
         return all_states, all_values
     
-    @jax_jit
+    # @jax_jit
     def _local_energy_arr_jax(state, neidot, h, g0, n, au):
         '''
         Compute the local energy interaction for a JAX array state.
@@ -235,28 +246,28 @@ if _JAX_AVAILABLE:
         Returns:
             Tuple [states], [energies] containing the new states and energies.
         '''
-        sigma_x = _operators_spin.sigma_x_jnp
-        sigma_z = _operators_spin.sigma_z_jnp
+        sigma_x = operators_spin_module.sigma_x_jnp
+        sigma_z = operators_spin_module.sigma_z_jnp
         return _local_energy_arr_lax(state, neidot, h, g0, n, au, sigma_x, sigma_z)
 
 def _local_energy_arr_wrap(n, neidot, h, g0, au, use_jax = False):
     '''Creates a JIT-compiled local energy interaction function.'''
     if use_jax and _JAX_AVAILABLE:
-        @jax_jit
+        # @jax_jit
         def wrapper(state):
             return _local_energy_arr_jax(state, neidot, h, g0, n, au)
         return wrapper
-        
-    @numba.njit
-    def wrapper(state):
-        return _local_energy_arr_np(state, neidot, h, g0, n, au)
-    return wrapper
+    else:
+        # @numba.njit
+        def wrapper(state):
+            return _local_energy_arr_np(state, neidot, h, g0, n, au)
+        return wrapper
 
 ##########################################################################################
 #! HAMILTONIAN CLASS
 ##########################################################################################
 
-class QSM(Hamiltonian):
+class QSM(hamil_module.Hamiltonian):
     '''
     Hamiltonian for an ergodic quantum dot coupled to an external system.
     The external system is modeled as a quantum spin chain.
@@ -271,16 +282,16 @@ class QSM(Hamiltonian):
     _ERR_EITHER_HIL_OR_NS       = "QSM: either the Hilbert space or the number of particles in the system must be provided."
     
     def __init__(self,
-                ns                  : Optional[int] = None,
-                hilbert_space       : Optional[HilbertSpace] = None,
-                n                   : int = 1,
-                gamma               : float = 1.0,
-                g0                  : float = 1.0,
-                a                   : Union[List[float], None, float] = None,
-                h                   : Union[List[float], None, float] = 1.0,
-                xi                  : Union[List[float], None, float] = 0.2,
-                dtype               : type = np.float32,
-                backend             : str = "default",
+                ns                  : Optional[int]                             = None,
+                hilbert_space       : Optional[hilbert_module.HilbertSpace]     = None,
+                n                   : int                                       = 1,
+                gamma               : float                                     = 1.0,
+                g0                  : float                                     = 1.0,
+                a                   : Union[List[float], None, float]           = None,
+                h                   : Union[List[float], None, float]           = 1.0,
+                xi                  : Union[List[float], None, float]           = 0.2,
+                dtype               : type                                      = np.float32,
+                backend             : str                                       = "default",
                 **kwargs):
         '''
         Constructor for the QSM Hamiltonian.
@@ -313,7 +324,7 @@ class QSM(Hamiltonian):
         if hilbert_space is None:
             if ns is None:
                 raise ValueError(self._ERR_EITHER_HIL_OR_NS)
-            hilbert_space = HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
+            hilbert_space = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
         
         # Initialize the Hamiltonian
         super().__init__(hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
@@ -339,10 +350,12 @@ class QSM(Hamiltonian):
         self._max_local_ch  = 2
         self.init_particles()
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
+        self._hamil                     = None
         self._loc_energy_int_fun        = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
         self._loc_energy_np_fun         = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=False)
+        self._std_en                    = None
         if _JAX_AVAILABLE:
-            self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)        
+            self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)       
         self._local_energy_test()
     
     # ----------------------------------------------------------------------------------------------
@@ -528,7 +541,7 @@ class QSM(Hamiltonian):
         ''' Set the magnetic field vector. '''
         if isinstance(h, list) and len(h) == self.nout:
             self._h = h
-        elif isinstance(h, float):
+        elif isinstance(h, float) or initialize:
             self._h = random_vector(self.nout, typek = f'r;{h-0.5};{h+0.5}', backend=self._backend, dtype=self._dtype)
         elif isinstance(h, str):
             self._h = random_vector(self.nout, h, backend=self._backend, dtype=self._dtype)
@@ -584,12 +597,12 @@ class QSM(Hamiltonian):
             return None
         
         if self._std_en is None:
-            self._std_en = np.std(self.eig_val)
+            self._std_en    = np.std(self.eig_val)
 
-        _std            = self._std_en / np.sqrt(self.ns)
-        _eps            = (energy - self.eig_val[0]) / (self.eig_val[self._nh - 1] - self.eig_val[0])
-        _bwd            = (self.eig_val[self._nh - 1] - self.eig_val[0])
-        _bwd            = _bwd / float(self.ns)
+        _std                = self._std_en / np.sqrt(self.ns)
+        _eps                = (energy - self.eig_val[0]) / (self.eig_val[self._nh - 1] - self.eig_val[0])
+        _bwd                = (self.eig_val[self._nh - 1] - self.eig_val[0])
+        _bwd                = _bwd / float(self.ns)
         return np.exp(_bwd * _bwd * (_eps - 0.5) * (_eps - 0.5) / _std / _std / 4.0) / np.sqrt(2.0)
 
     # ----------------------------------------------------------------------------------------------
@@ -621,6 +634,5 @@ class QSM(Hamiltonian):
         self._hamil += kron_prod
 
     # ----------------------------------------------------------------------------------------------
-
 
 ####################################################################################################

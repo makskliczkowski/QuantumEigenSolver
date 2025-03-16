@@ -231,8 +231,12 @@ class Hamiltonian(ABC):
         self._hilbert_space = hilbert_space
         self._dtype         = dtype if dtype is not None else self._hilbert_space.dtype
         if self._hilbert_space is None:
-            raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
-        
+            self._lattice   = kwargs.get("lattice", None)
+            if self._lattice is None:
+                raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
+            else:
+                self._hilbert_space = HilbertSpace(lattice = self._lattice)
+            
         self._is_sparse     = is_sparse
 
         # get the lattice and the number of sites
@@ -982,7 +986,7 @@ class Hamiltonian(ABC):
             self._hamil = operator_create_np(
                 ns                  =   self._ns,
                 hilbert_space       =   self._hilbert_space,
-                local_fun           =   self._loc_energy_int,
+                local_fun           =   self._loc_energy_int_fun,
                 max_local_changes   =   self._max_local_ch,
                 is_sparse           =   self._is_sparse,
                 start               =   self._startns,
@@ -1134,10 +1138,13 @@ class Hamiltonian(ABC):
             k_map (int) : The mapping of the k'th element.
             i (int)     : The i'th site.
         '''
+        
+        # integer function
         if self._loc_energy_int_fun is not None:
             idx, val = self._loc_energy_int_fun(k_map, i)
             self._log(f"{self._name} test_int({k_map},{i}): idx={idx}, vals={val}", lvl = 2, log = 'debug')
         
+        # array functions
         if self._loc_energy_np_fun is not None:
             input_vec   = np.ones(self._ns, dtype = np.float32)
             idx, val    = self._loc_energy_np_fun(input_vec)

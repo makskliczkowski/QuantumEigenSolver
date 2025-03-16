@@ -20,7 +20,7 @@ from typing import Union, Optional, Callable, Tuple, List     # type hints for t
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ####################################################################################################
-from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
+from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
 from general_python.algebra.utils import get_backend, maybe_jit, _JAX_AVAILABLE, DEFAULT_INT_TYPE
 if _JAX_AVAILABLE:
@@ -253,7 +253,7 @@ class HilbertSpace(ABC):
             self._nh        = None
         elif "lattice" in kwargs:
             self._lattice   = kwargs.get('lattice')     # lattice object provided
-            self._ns        = self._lattice.get_Ns()    # number of sites in the system
+            self._ns        = self._lattice.ns          # number of sites in the system
             self._nhfull    = None                      # full Hilbert space dimension
             self._nh        = None
         elif "nh" in kwargs:

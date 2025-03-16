@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from Algebra.Operator.operator import Operator, GlobalSymmetries
 
 # from general Python modules
-from general_python.lattices.__lattice__ import Lattice, LatticeBC, LatticeDirection
+from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.binary import rotate_left, rotate_right, flip_all, rev, rotate_left_ax, popcount, BACKEND_DEF_SPIN, BACKEND_REPR
 from general_python.algebra.utils import get_backend as __backend, DEFAULT_BACKEND, maybe_jit
 

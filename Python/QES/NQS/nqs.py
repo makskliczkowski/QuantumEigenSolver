@@ -48,6 +48,7 @@ from Algebra.hamil import Hamiltonian
 # for the gradients and stuff
 import general_python.ml.net_impl.utils.net_utils as net_utils
 import general_python.ml.net_impl.net_general as net_general
+import general_python.algebra.solvers.stochastic_rcnfg as sr
 
 #########################################
 
@@ -142,10 +143,12 @@ class NQS(MonteCarloSolver):
         #######################################
         #! handle the functions
         #######################################
+        self._stochastic_reconf = sr.StochasticReconfiguration(None, self._backend)
         self._ansatz_func       = None
         self._local_en_func     = None
-        self._grad_func         = None
         self._eval_func         = None
+        # if the network has an analytic gradient
+        self._grad_func         = None
         self._init_functions()
     
     #####################################
@@ -173,56 +176,11 @@ class NQS(MonteCarloSolver):
     #! INITIALIZATION OF THE NETWORK AND FUNCTIONS
     #####################################
     
-    # def _check_holomorphic(self) -> bool:
-    #     """
-    #     Check if the network provided is holomorphic.
-
-    #     A network is considered holomorphic if the gradient of its real part equals 
-    #     i times the gradient of its imaginary part. This method computes the gradients 
-    #     of the real and imaginary parts of the network's output with respect to the 
-    #     network parameters, flattens these gradients, and checks if they are equal 
-    #     (up to a small tolerance) when combined appropriately.
-
-    #     Parameters
-    #     ----------
-    #     s : array-like
-    #         The state vector, assumed to have at least the shape such that s[0, 0, ...]
-    #         is valid.
-
-    #     Returns
-    #     -------
-    #     bool
-    #         True if the holomorphic condition is met, False otherwise.
-    #     """
-
-    #     # check if the network is holomorphic
+    def reset(self):
         
-
-    #     # if self._isjax and _JAX_AVAILABLE:
-            
-    #     # else:
-    #     #     # Using numpy-based gradients.
-    #     #     def make_flat(x):
-    #     #         leaves, _ = flatten_func(x)
-    #     #         return np.concatenate([p.ravel() for p in leaves])
-            
-    #     #     grads_real      = make_flat(np_grad(lambda a,b: anp.real(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
-    #     #     grads_imag      = make_flat(np_grad(lambda a,b: anp.imag(self.net.apply(a,b)))(self._weights, sample_state)["params"] )
-            
-    #     #     flat_real       = make_flat(grads_real)
-    #     #     flat_imag       = make_flat(grads_imag)
-            
-    #     #     norm_diff       = np.linalg.norm(flat_real - 1.j * flat_imag) / flat_real.shape[0]
-    #     #     return np.isclose(norm_diff, 0.0, atol= self._TOL_HOLOMORPHIC)
+        self._initialized       = False
+        self._net.force_init()
         
-    def _check_analitic(self):
-        '''
-        Check if the network is analitic, this means that we check
-        whether the function has an analitic gradient - like RBMs or 
-        other networks that have a closed form gradient.
-        '''
-        return self._net.has_analitic_grad
-    
     # ---
     
     def _init_gradients(self):
@@ -265,12 +223,12 @@ class NQS(MonteCarloSolver):
         
         if self._isjax:
             self._eval_func         = net_utils.jaxpy.eval_batched_jax
-            self._grad_func         = self._grad_jax
+            self._grad_func         = self._net.get_gradient(use_jax=True)
             # jit the ansatz function
             self._ansatz_func       = self._ansatz_func
         else:
             self._eval_func         = net_utils.numpy.eval_batched_np
-            self._grad_func         = self._grad_np
+            self._grad_func         = self._net.get_gradient(use_jax=False)
             # numba the ansatz function
             self._ansatz_func       = self._ansatz_func
         
@@ -306,7 +264,7 @@ class NQS(MonteCarloSolver):
                 self._local_en_func = self._hamiltonian.get_loc_energy_np_fun()
 
     # ---
-
+    
     def init_network(self):
         '''
         Initialize the network truly. This means that the weights are initialized correctly 
@@ -707,12 +665,15 @@ class NQS(MonteCarloSolver):
         # check if the parameters are provided
         params = params if (params is not None) else self._net.get_params()
         
-        #!TODO: Handle the analytic gradients
-        
         if self._isjax:
-            return self._grad_jax(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
-        return self._grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
-
+            if not self._analytic:
+                return self._grad_jax(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
+            return self._grad_jax(self._grad_func, params, batch_size, states, self._flat_grad_fun)
+        
+        if not self._analytic:
+            return self._grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
+        return self._grad_np(self._grad_func, params, batch_size, states, self._flat_grad_fun)
+        
     #####################################
     #! UPDATE PARAMETERS
     #####################################
@@ -752,6 +713,24 @@ class NQS(MonteCarloSolver):
         
         # set the new parameters to the network
         self._net.set_params(new_parameters)
+    
+    def optimization(self,
+                    energies,
+                    derivatives,
+                    mean_loss   = None,
+                    mean_deriv  = None,
+                    use_sr      = True,
+                    use_s       = False,
+                    use_minsr   = False):
+        '''
+        Seeks for the update solution to
+        '''
+        
+        # set the values in the stochastic reconfiguration
+        self._stochastic_reconf.set_values(energies, derivatives, mean_loss, mean_deriv, use_s, use_minsr)
+        if use_sr:
+            return self._stochastic_reconf.solve(use_s, use_minsr)
+        return self._stochastic_reconf.forces
         
     #####################################
     #! TRAINING OVERRIDES
@@ -774,8 +753,31 @@ class NQS(MonteCarloSolver):
         '''
         Train the NQS solver for a specified number of steps.
         '''
-        return super().train(nsteps, verbose, start_st, par, update, timer, **kwargs)
-    
+        
+        energies   = []
+        batch_size = kwargs.get("batch_size", self._batch_size)
+        for step in range(nsteps):
+            
+            # get the values
+            (configs, ansatze), probabilities, (v, means, stds) = self.evaluate_fun(batch_size = batch_size)
+
+            # get the variational derivatives
+            g = self.gradient(configs, batch_size = batch_size)
+            
+            self._stochastic_reconf.set_values(loss     =   v, 
+                                            derivatives =   g,
+                                            mean_loss   =   means,
+                                            mean_deriv  =   None,
+                                            calculate_s =   False, 
+                                            use_minsr   =   False)
+            
+            # dummy solution
+            solution = self._stochastic_reconf.solve(use_s = True, use_minsr = False)
+
+            # update weights
+            self.update_parameters(-1e-2 * solution)
+            energies.append(means)
+        return energies
     #####################################
     #! LOG_PROBABILITY_RATIO
     #####################################
@@ -901,64 +903,6 @@ class NQS(MonteCarloSolver):
     def load_weights(self, dir = None, name = "weights"):
         return super().load_weights(dir, name)
     
-    
-#########################################
-
-class VariationalDerivatives:
-    """
-    Class to manage derivatives information for variational methods:
-    
-    Generally, stores the derivatives of the energy with respect to the variational parameters.
-    
-    \\frac{\\partial E}{\\partial \\theta_i} = \\frac{\\langle\\partial_i \\psi|H|\\psi\\rangle}{\\langle\\psi|\\psi\\rangle} = 
-    \\langle E_{\\mathrm{loc}} O^*_i \\rangle - \\langle E_{\\mathrm{loc}} \\rangle \\langle O^*_i \\rangle = 
-    \\langle (E_{\\mathrm{loc}} - \\langle E_{\\mathrm{loc}} \\rangle) O^*_i \\rangle
-    
-    This class provides an interface for computing and retrieving various derivatives
-    used in the optimization process of the NQS.
-    """
-    
-    def __init__(self, parent: NQS):
-        """
-        Initialize the derivatives container.
-
-        Parameters:
-            parent (NQS): The parent NQS solver instance.
-        """
-        self._parent            = parent
-        self._derivatives_mean  = None
-        self._energies_centered = None
-        
-    @property
-    def parent(self) -> NQS:
-        """Return the parent NQS solver instance."""
-        return self._parent
-
-class StochasticReconfiguration:
-    """
-    Class to manage the stochastic reconfiguration process for Neural Quantum State (NQS) solvers.
-    
-    This class provides an interface for computing and retrieving various derivatives
-    used in the optimization process of the NQS.
-    """
-    
-    def __init__(self, parent: NQS):
-        """
-        Initialize the stochastic reconfiguration container.
-
-        Parameters:
-            parent (NQS): The parent NQS solver instance.
-        """
-        self._parent            = parent
-        self._derivatives_mean  = None
-        self._energies_centered = None
-        
-    @property
-    def parent(self) -> NQS:
-        """Return the parent NQS solver instance."""
-        return self._parent
-
-
 #########################################
 
 class NQSLowerStates:
