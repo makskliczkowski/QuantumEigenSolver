@@ -717,6 +717,22 @@ class NQS(MonteCarloSolver):
     #! UPDATE PARAMETERS
     #####################################
     
+    def _update_unflatten(self, d_par):
+        
+        # Reshape parameter update according to net tree structure
+        p_tree_shape    = []
+        start           = 0
+        for s in self._net.shapes:
+            if self._iscpx:
+                p_tree_shape.append((d_par[start:start + s[0]] + 1.j * d_par[start + s[0]:start + 2*s[0]]).reshape(s[1]))
+                start   += 2 * s[0]
+            else:
+                p_tree_shape.append(d_par[start:start + s[0]].reshape(s[1]))
+                start   += s[0]
+        
+        # Return unflattened parameters
+        return jax.tree_unflatten(self._net.tree_def, p_tree_shape)
+    
     def update_parameters(self, d_par: Union[dict, list, np.ndarray]):
         '''
         Update the parameters of the model.
@@ -725,9 +741,11 @@ class NQS(MonteCarloSolver):
             d_par : The new parameters to update the model with, can be a dictionary,
                     list, or numpy array.
         '''
-        new_parameters = jax.tree_util.tree_map(jax.lax.add,
-                                    self.params,
-                                    self._param_unflatten(d_par))
+        
+        unflattened     = self._update_unflatten(d_par)
+        new_parameters  = jax.tree_util.tree_map(jax.lax.add,
+                                    self._net.get_params()['params'],
+                                    unflattened)
         
         # set the new parameters already
         self._weights = new_parameters
