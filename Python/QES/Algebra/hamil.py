@@ -44,7 +44,7 @@ if _JAX_AVAILABLE:
     from jax.experimental.sparse import BCOO, CSR
 
 ###################################################################################################
-# Pure (functional) Hamiltonian update functions.
+#! Pure (functional) Hamiltonian update functions.
 ###################################################################################################
 
 if _JAX_AVAILABLE:
@@ -156,7 +156,7 @@ if _JAX_AVAILABLE:
     # ----------------------------------------------------------------------------------------------
 
 ####################################################################################################
-# Hamiltonian class - abstract class
+#! Hamiltonian class - abstract class
 ####################################################################################################
 
 class Hamiltonian(ABC):
@@ -262,9 +262,7 @@ class Hamiltonian(ABC):
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
         
         # functions for local energy calculation in a jitted way (numpy and jax)
-        self._loc_energy_int_fun    = None
-        self._loc_energy_np_fun     = None
-        self._loc_energy_jax_fun    = None
+        self._set_local_energy_functions()
     
     # ----------------------------------------------------------------------------------------------
     
@@ -1014,7 +1012,7 @@ class Hamiltonian(ABC):
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
         self.__hamiltonian_validate()
-
+    
     # ----------------------------------------------------------------------------------------------
     #! Calculators
     # ----------------------------------------------------------------------------------------------
@@ -1127,8 +1125,26 @@ class Hamiltonian(ABC):
             print(f"Error in _set_hamil_elem: Failed to set element at <newk(idx)|H|k>, newk={newk},k={k},value: {val}. Please verify that the indices and value are correct. Exception details: {e}")
 
     # ----------------------------------------------------------------------------------------------
-    #! Testers
+    #! Energy related methods
     # ----------------------------------------------------------------------------------------------
+    
+    @abstractmethod
+    def _set_local_neighbors(self):
+        '''
+        Sets the local neighbors of the Hamiltonian matrix.
+        This method should be implemented by subclasses to provide a specific implementation.
+        '''
+        pass
+    
+    def _set_local_energy_functions(self):
+        '''
+        Sets the functions for local energy calculation.
+        This method should be implemented by subclasses to provide a specific implementation.
+        '''
+        self._loc_energy_int_fun    = None
+        self._loc_energy_np_fun     = None
+        self._loc_energy_jax_fun    = None
+        
     
     def _local_energy_test(self, k_map = 0, i = 0):
         '''

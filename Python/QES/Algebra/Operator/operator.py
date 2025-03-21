@@ -34,6 +34,7 @@ from general_python.lattices import Lattice
 ####################################################################################################
 
 if _JAX_AVAILABLE:
+    import jax
     import jax.numpy as jnp
     from jax import jit, vmap
     from jax.experimental import sparse
@@ -130,15 +131,55 @@ def _local_funct_wrapper(local_fun, *args):
 ####################################################################################################
 
 class OperatorFunction:
-    """
-    Imitates the operator function behavior. The function shall act on the state (or list of states) and return the transformed 
-    state(s) with the corresponding value(s). States can be represented as integers or numpy arrays or JAX arrays. This enables
-    the user to define any operator that can be applied to the state. The function shall return a list of pairs (state, value). 
-    """
+    '''
+    OperatorFunction is a class that represents a mathematical operator that can be applied to a state. 
+    The operator can be defined for different backends (integer, NumPy, JAX) and supports various operations 
+    such as addition, subtraction, multiplication, and composition.
+    Attributes:
+    -----------
+    - fun_int (Callable): The function defining the operator for integer states.
+    - fun_np (Optional[Callable]): The function defining the operator for NumPy array states.
+    - fun_jax (Optional[Callable]): The function defining the operator for JAX array states.
+    - modifies_state (bool): A flag indicating whether the operator modifies the state.
+    - necessary_args (int): The number of necessary arguments for the operator function.
+    Methods:
+    --------
+    - __init__(fun_int, fun_np=None, fun_jax=None, modifies_state=True, necessary_args=0):
+        Initializes the OperatorFunction object with the provided functions and attributes.
+    - apply(s, *args):
+        Applies the operator function to a given state with the specified arguments.
+    - __call__(s, *args):
+        Calls the operator function on a given state. Equivalent to `apply`.
+    - __mul__(other):
+        Composes the current operator with another operator or scales it by a scalar.
+    - __rmul__(other):
+        Reverse composition of the current operator with another operator or scales it by a scalar.
+    - __add__(other):
+        Adds two operator functions, combining their effects.
+    - __sub__(other):
+        Subtracts one operator function from another, combining their effects.
+    - wrap(*args):
+        Wraps the operator function with additional arguments.
+    - fun (property):
+        Gets or sets the function defining the operator for integer states.
+    - np (property):
+        Gets or sets the function defining the operator for NumPy array states.
+    - jax (property):
+        Gets or sets the function defining the operator for JAX array states.
+    - modifies_state (property):
+        Gets or sets the flag indicating whether the operator modifies the state.
+    - necessary_args (property):
+        Gets or sets the number of necessary arguments for the operator function.
+    '''
     
     # -----------
     
-    def __init__(self, fun : Callable, modifies_state : bool = True, necessary_args : int = 0):
+    def __init__(self,
+                fun_int         : Callable,
+                fun_np          : Optional[Callable]    = None,
+                fun_jax         : Optional[Callable]    = None,
+                modifies_state  : bool                  = True,
+                necessary_args  : int                   = 0):
         """
         Initialize the OperatorFunction object.
         
@@ -148,7 +189,9 @@ class OperatorFunction:
             represented as integers or numpy arrays or JAX arrays. This enables the user to define
             any operator that can be applied to the state. The function shall return a list of pairs (state, value).
         """
-        self._fun               = fun                       # the function that defines the operator
+        self._fun_int           = fun_int
+        self._fun_np            = fun_np
+        self._fun_jax           = fun_jax
         self._modifies_state    = modifies_state            # flag for the operator that modifies the state
         self._necessary_args    = int(necessary_args)       # number of necessary arguments for the operator function
 
@@ -165,7 +208,13 @@ class OperatorFunction:
             A list of tuples (state, value), where each tuple contains the transformed state 
             (or None if not applicable) and its corresponding value.
         """
-        return self._fun(s)
+        if isinstance(s, jnp.ndarray):
+            # If the state is a JAX array, use the JAX function
+            return self._fun_jax(s)
+        elif isinstance(s, np.ndarray):
+            # If the state is a NumPy array, use the NumPy function
+            return self._fun_np(s)
+        return self._fun_int(s)
     
     # -----------
     
@@ -181,7 +230,15 @@ class OperatorFunction:
             A list of tuples (state, value), where each tuple contains the transformed state 
             (or None if not applicable) and its corresponding value.
         """
-        return self._fun(s, i)
+        if isinstance(s, jnp.ndarray):
+            # If the state is a JAX array, use the JAX function
+            return self._fun_jax(s, i)
+        elif isinstance(s, np.ndarray):
+            # If the state is a NumPy array, use the NumPy function
+            return self._fun_np(s, i)
+        # If the state is an integer, use the integer function
+        # Note: The integer function should be able to handle the additional argument
+        return self._fun_int(s, i)
     
     # -----------
     
@@ -197,7 +254,15 @@ class OperatorFunction:
             A list of tuples (state, value), where each tuple contains the transformed state 
             (or None if not applicable) and its corresponding value.
         """
-        return self._fun(s, i, j)
+        if isinstance(s, jnp.ndarray):
+            # If the state is a JAX array, use the JAX function
+            return self._fun_jax(s, i, j)
+        elif isinstance(s, np.ndarray):
+            # If the state is a NumPy array, use the NumPy function
+            return self._fun_np(s, i, j)
+        # If the state is an integer, use the integer function
+        # Note: The integer function should be able to handle the additional arguments
+        return self._fun_int(s, i, j)
     
     def apply(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
@@ -218,6 +283,7 @@ class OperatorFunction:
         if len(args) != self._necessary_args:
             raise ValueError(f"Invalid number of arguments for the operator function. Expected {self._necessary_args}, got {len(args)}.")
         
+        result = None
         # apply the operator function based on the number of necessary arguments
         if self._necessary_args == 0:
             result = self._apply_global(s)
@@ -226,8 +292,13 @@ class OperatorFunction:
         elif self._necessary_args == 2:
             result = self._apply_correlation(s, *args)
         else:
-            result = self._fun(s, *args)
-        
+            if isinstance(s, jnp.ndarray):
+                result = self._fun_jax(s, *args)
+            elif isinstance(s, np.ndarray):
+                result = self._fun_np(s, *args)
+            else:
+                result = self._fun(s, *args)
+
         # If the result is a tuple representing a single (state, value) pair
         if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
             return result
@@ -263,11 +334,21 @@ class OperatorFunction:
     @property
     def fun(self):
         ''' Set the function that defines the operator '''
-        return self._fun
+        return self._fun_int
+    
+    @property
+    def np(self):
+        ''' Set the function that defines the operator '''
+        return self._fun_np
+    
+    @property
+    def jax(self):
+        ''' Set the function that defines the operator '''
+        return self._fun_jax
     
     @fun.setter
     def fun(self, val):
-        self._fun = val
+        self._fun_int = val
         
     @property
     def modifies_state(self):
@@ -291,94 +372,139 @@ class OperatorFunction:
     #! Composition
     # -----------
         
-    def __mul__(self, other : Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
+    def __mul__(self, other: Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
         """
         Composition of two operator functions.
-        Implements the operator composition: f * g ≡ f(g(n,...),...) for two operator functions f and g,
+        Implements the operator composition: f * g ≡ f(g(n, ...), ...) for two operator functions f and g,
         where f is the current operator function and g is the other operator function.
+        
         Notes:
-        - If the operator functions have different number of arguments, the maximum number of arguments is taken.
+        - If the operator functions have a different number of arguments, the maximum number is taken.
         - If the operator functions modify the state, the result is a list of pairs (state, value).
-        - The multiplication is performed as f * g.
-        - JIT compilation is used for the multiplication operation when the state is a JAX array.
-        - if other is a scalar, the operator function is multiplied by the scalar. 
-        Params:
-        - other (OperatorFunction) : The operator function to be composed with the current operator function - those 
-        may have different number of arguments so it is important to combine them properly. 
+        - The multiplication is performed as f * g, meaning that (f * g)(state) = f(g(state)).
+        - JIT compilation is applied to the JAX version when available.
+        - If 'other' is a scalar, the operator function is simply scaled by that value.
+        
+        Parameters
+        ----------
+        other : Union[int, float, complex, np.int64, np.float64, np.complex128, OperatorFunction]
+            Either a scalar (in which case the operator’s output values are multiplied by that scalar)
+            or another operator function to be composed with the current operator function.
+        
+        Returns
+        -------
+        OperatorFunction
+            A new OperatorFunction representing the composition or scaled operator.
         """
+        # Handle scalar multiplication.
         if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
-            return OperatorFunction(jit(lambda s, *args: [(s, v * other) for s, v in self(s, *args)]),
-                modifies_state=self._modifies_state,
-                necessary_args=self._necessary_args)
+            def fun_int(s, *args):
+                return [(state, value * other) for state, value in self(s, *args)]
+            def fun_np(s, *args):
+                return [(state, value * other) for state, value in self(s, *args)]
+            def fun_jax(s, *args):
+                return [(state, value * other) for state, value in self(s, *args)]
+            if _JAX_AVAILABLE:
+                fun_jax = jax.jit(fun_jax)
+            return OperatorFunction(fun_int, fun_np, fun_jax,
+                                    modifies_state=True,
+                                    necessary_args=self._necessary_args)
         
-        other_modifies  = other.modifies_state if isinstance(other, OperatorFunction) else True
-        args_needed     = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        # Make sure that 'other' is an OperatorFunction.
+        if not isinstance(other, OperatorFunction):
+            raise TypeError("Unsupported multiplication with type {}".format(type(other)))
         
-        @jit
-        def composed_fun(s: Union[int, jnp.ndarray], *args):
-            """
-            Composed function for the operator function.
-            First, apply the function on the right side (other), then apply the function on the left side (self).
-
-            Params:
-            - s (int, jnp.ndarray): The state to which the operator is applied.
-            - args: Additional arguments for the operator.
-
-            Returns:
-            - List of (state, value) pairs after applying the composed operator function.
-            """
-            # First apply the right-side operator
-            intermediate = other(s, *args)
-            final_result = []
-
-            for s1, v1 in intermediate:
-                next_result = self(s1, *args)
-                if self._modifies_state:
+        # Determine the maximum number of necessary arguments and whether any operator modifies state.
+        other_modifies = other.modifies_state
+        args_needed = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        
+        # Compose the operator functions.
+        # Note: by definition (f * g)(s) = f(g(s)); here, g is 'other' and f is 'self'.
+        if self._modifies_state:
+            # If self modifies the state, assume that self returns a single pair.
+            def composed_fun(s, *args):
+                intermediate = other(s, *args)
+                final_result = []
+                for s1, v1 in intermediate:
+                    next_result = self(s1, *args)
+                    # Since self modifies the state, we assume it produces one pair.
+                    # We keep the state from 'other' (s1) and multiply the values.
                     final_result.append((s1, v1 * next_result[0][1]))
-                else:
+                return final_result
+        else:
+            # Otherwise, self may produce multiple results.
+            def composed_fun(s, *args):
+                intermediate = other(s, *args)
+                final_result = []
+                for s1, v1 in intermediate:
+                    next_result = self(s1, *args)
                     final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
+                return final_result
 
-            return final_result
+        # Prepare the versions for different backends.
+        fun_int = composed_fun
+        fun_np = composed_fun
+        fun_jax = composed_fun
+        if _JAX_AVAILABLE:
+            fun_jax = jax.jit(composed_fun)
+        
+        return OperatorFunction(fun_int, fun_np, fun_jax,
+                                modifies_state=(self._modifies_state or other_modifies),
+                                necessary_args=args_needed)
 
-        return OperatorFunction(composed_fun,
-            modifies_state=self._modifies_state or other_modifies,
-            necessary_args=args_needed)
 
     # -----------
     
-    def __rmul__(self, other):
+    def __rmul__(self, other: Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
         """
-        Reverse composition of two operator functions: g * f ≡ g(f(n,...),...).
-        Applies `f` first, then `g` on the result.
+        Reverse composition of two operator functions: g * f ≡ g(f(n,...), ...).
+        That is, the current operator (self) is applied first, and then the left-hand operator (other)
+        is applied to the resulting states.
         
-        :param other: The operator function to compose with `self` in reversed order.
-        :return: A new composed operator function.
+        If other is a scalar, the operator's output values are simply scaled by that scalar.
+        
+        JIT compilation is applied for the JAX version when available.
+        
+        Parameters
+        ----------
+        other : int, float, complex, np.int64, np.float64, np.complex128, or OperatorFunction
+            Either a scalar multiplier or an operator function to compose with self in reverse order.
+        
+        Returns
+        -------
+        OperatorFunction
+            A new operator function representing the reverse composition.
         """
+        # Handle scalar multiplication: other * self.
         if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
-            return OperatorFunction(jit(lambda s, *args: [(s, v * other) for s, v in self(s, *args)]),
-                modifies_state=self._modifies_state,
-                necessary_args=self._necessary_args)
-            
-        other_modifies  = other.modifies_state if isinstance(other, OperatorFunction) else True
-        args_needed     = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+            def fun_int(s, *args):
+                return [(s, other * v) for s, v in self(s, *args)]
+            def fun_np(s, *args):
+                return [(s, other * v) for s, v in self(s, *args)]
+            def fun_jax(s, *args):
+                return [(s, other * v) for s, v in self(s, *args)]
+            if _JAX_AVAILABLE:
+                fun_jax = jax.jit(fun_jax)
+            return OperatorFunction(fun_int, fun_np, fun_jax,
+                                    modifies_state=self._modifies_state,
+                                    necessary_args=self._necessary_args)
         
-        @jit
-        def composed_fun(s: Union[int, jnp.ndarray], *args):
+        # Ensure that other is an OperatorFunction.
+        if not isinstance(other, OperatorFunction):
+            raise TypeError("Unsupported reverse multiplication with type {}".format(type(other)))
+        
+        other_modifies = other.modifies_state
+        args_needed = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        
+        def composed_fun(s, *args):
             """
-            Composed function for the operator function.
-            First, apply the function on the right side (other), then apply the function on the left side (self).
-
-            Params:
-            - s (int, jnp.ndarray): The state to which the operator is applied.
-            - args: Additional arguments for the operator.
-
-            Returns:
-            - List of (state, value) pairs after applying the composed operator function.
+            Composed function for reverse operator composition.
+            First applies self (f), then applies other (g) on each resulting state.
             """
-            # First apply the right-side operator
+            # Apply self first.
             intermediate = self(s, *args)
             final_result = []
-
+            # Then apply other to each result.
             for s1, v1 in intermediate:
                 next_result = other(s1, *args)
                 if other_modifies:
@@ -386,10 +512,16 @@ class OperatorFunction:
                 else:
                     final_result.extend([(s2, v1 * v2) for s2, v2 in next_result])
             return final_result
-
-        return OperatorFunction(composed_fun,
-            modifies_state=self._modifies_state or other_modifies,
-            necessary_args=args_needed)
+        
+        fun_int = composed_fun
+        fun_np  = composed_fun
+        fun_jax = composed_fun
+        if _JAX_AVAILABLE:
+            fun_jax = jax.jit(composed_fun)
+        
+        return OperatorFunction(fun_int, fun_np, fun_jax,
+                                modifies_state=self._modifies_state or other_modifies,
+                                necessary_args=args_needed)
 
     # -----------
     
@@ -403,103 +535,113 @@ class OperatorFunction:
     #! Addition
     # -----------
 
-    def __add__(self, other : 'OperatorFunction'):
+    def __add__(self, other: 'OperatorFunction'):
         """
-        Add two operator functions. The operator takes a maximum of two arguments. 
-        The operator function is defined as f'(s, *args) = f(s, *args[:max_F]) + g(s, *args[:max_g]).
-        Note:
-        - If the operator functions have different number of arguments, the maximum number of arguments is taken. 
-        - If the operator functions modify the state, the result is a list of pairs (state, value).
-        - The addition is performed as f + g.
-        - JIT compilation is used for the addition operation when the state is a JAX array.
+        Add two operator functions. The operator is defined as:
+        (f + g)(s, *args) = f(s, *args) + g(s, *args)
+        where the sum means that when applied to a state, the outputs (a list of (state, value) pairs)
+        are combined by summing the values for duplicate states.
         
-        Params:
-        - other (OperatorFunction) : The operator function to be added to the current operator function.
+        JIT compilation is applied for the JAX version when available.
         """
-
-        @jit
-        def adding(s : Union[int, jnp.ndarray], *args):
-            """
-            Add the operator functions.
-            
-            Params:
-            - s (int, jnp.ndarray)  : The state to which the operator is applied.
-            - args                  : Additional arguments for the operator.
-            """
-            # if isinstance(s, jnp.ndarray):
-            result_f = jnp.array(self(s, *args))
-            result_g = jnp.array(other(s, *args))
-
-            # Extract states and values
-            states_f, values_f = result_f[:, 0], result_f[:, 1]
-            states_g, values_g = result_g[:, 0], result_g[:, 1]
-            
-            # Combine both results
-            combined_states = jnp.concatenate([states_f, states_g])
-            combined_values = jnp.concatenate([values_f, values_g])
-
-            # Get unique states and sum corresponding values
-            unique_states, indices = jnp.unique(combined_states, return_inverse=True)
-            summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
-
+        # Pure Python / NumPy version.
+        def add_int(s, *args):
+            result_f            = np.array(self(s, *args))
+            result_g            = np.array(other(s, *args))
+            # Extract states and values.
+            states_f, values_f  = result_f[:, 0], result_f[:, 1]
+            states_g, values_g  = result_g[:, 0], result_g[:, 1]
+            # Combine results.
+            combined_states     = np.concatenate([states_f, states_g])
+            combined_values     = np.concatenate([values_f, values_g])
+            # Get unique states and sum the corresponding values.
+            unique_states, indices  = np.unique(combined_states, return_inverse=True)
+            summed_values           = np.zeros_like(unique_states, dtype=complex)
+            for idx, val in zip(indices, combined_values):
+                summed_values[idx] += val
             return list(zip(unique_states, summed_values))
         
-        return OperatorFunction(adding, modifies_state = self._modifies_state or other._modifies_state, necessary_args = max(self._necessary_args, other._necessary_args))    
+        # For the NumPy version we use the same as add_int.
+        def add_np(s, *args):
+            return add_int(s, *args)
+        
+        # JAX version.
+        def add_jax(s, *args):
+            result_f                = jnp.array(self(s, *args))
+            result_g                = jnp.array(other(s, *args))
+            states_f, values_f      = result_f[:, 0], result_f[:, 1]
+            states_g, values_g      = result_g[:, 0], result_g[:, 1]
+            combined_states         = jnp.concatenate([states_f, states_g])
+            combined_values         = jnp.concatenate([values_f, values_g])
+            unique_states, indices  = jnp.unique(combined_states, return_inverse=True)
+            # jnp.zeros returns a jax array; note that we use jnp.complex128 as the dtype.
+            summed_values           = jnp.zeros(unique_states.shape, dtype=jnp.complex128).at[indices].add(combined_values)
+            return list(zip(unique_states, summed_values))
+        
+        fun_jax = add_jax
+        if _JAX_AVAILABLE:
+            fun_jax = jax.jit(add_jax)
+        
+        return OperatorFunction(
+            add_int,
+            add_np, 
+            fun_jax,
+            modifies_state=self._modifies_state or other._modifies_state,
+            necessary_args=max(self._necessary_args, other._necessary_args)
+        )
+
         
     # -----------
     #! Subtraction
     # -----------
     
-    @jit
-    def __sub__(self, other : 'OperatorFunction'):
+    def __sub__(self, other: 'OperatorFunction'):
         """
-        Substract two operator functions. The operator takes a maximum of two arguments. 
-        The operator function is defined as f'(s, *args) = f(s, *args[:max_F]) - g(s, *args[:max_g]).
-        Note:
-        - If the operator functions have different number of arguments, the maximum number of arguments is taken. 
-        - If the operator functions modify the state, the result is a list of pairs (state, value).
-        - The subtraction is performed as f - g.
-        - JIT compilation is used for the subtraction operation when the state is a JAX array.
+        Subtract two operator functions. The operator is defined as:
+        (f - g)(s, *args) = f(s, *args) - g(s, *args)
+        which is implemented by negating the output of g and then combining results.
         
-        Params:
-        - other (OperatorFunction) : The operator function to be added to the current operator function.
+        JIT compilation is applied for the JAX version when available.
         """
-
-        @jit
-        def substract(s : Union[int, jnp.ndarray], *args):
-            """
-            Substract the operator functions. When the operator is applied to a state, the function returns the
-            transformed state with the corresponding value. The returned value is a list of pairs (state, value).
-            
-            Note:
-            - If the operator functions have different number of arguments, the maximum number of arguments is taken.
-            - If the operator functions modify the state, the result is a list of pairs (state, value).
-            
-            Params:
-            - s (int, jnp.ndarray)  : The state to which the operator is applied.
-            - args                  : Additional arguments for the operator.
-            """
-
-            # Get results from both operators
-            result_f = jnp.array(self(s, *args))
-            result_g = jnp.array(other(s, *args))
-
-            # Extract states and values
+        def sub_int(s, *args):
+            result_f = np.array(self(s, *args))
+            result_g = np.array(other(s, *args))
             states_f, values_f = result_f[:, 0], result_f[:, 1]
             states_g, values_g = result_g[:, 0], result_g[:, 1]
-
-            # Combine results with signs for subtraction
-            combined_states = jnp.concatenate([states_f, states_g])
-            combined_values = jnp.concatenate([values_f, -values_g])  # Negate `g` values for subtraction
-
-            # Get unique states and sum corresponding values
-            unique_states, indices = jnp.unique(combined_states, return_inverse=True)
-            summed_values = jnp.zeros_like(unique_states, dtype=complex).at[indices].add(combined_values)
-
+            combined_states = np.concatenate([states_f, states_g])
+            combined_values = np.concatenate([values_f, -values_g])  # negate g's values
+            unique_states, indices = np.unique(combined_states, return_inverse=True)
+            summed_values = np.zeros_like(unique_states, dtype=complex)
+            for idx, val in zip(indices, combined_values):
+                summed_values[idx] += val
             return list(zip(unique_states, summed_values))
         
-        return OperatorFunction(substract, modifies_state = self._modifies_state or other.modifies_state, necessary_args = max(self._necessary_args, other.necessary_args))    
-    
+        def sub_np(s, *args):
+            return sub_int(s, *args)
+        
+        def sub_jax(s, *args):
+            result_f = jnp.array(self(s, *args))
+            result_g = jnp.array(other(s, *args))
+            states_f, values_f = result_f[:, 0], result_f[:, 1]
+            states_g, values_g = result_g[:, 0], result_g[:, 1]
+            combined_states = jnp.concatenate([states_f, states_g])
+            combined_values = jnp.concatenate([values_f, -values_g])
+            unique_states, indices = jnp.unique(combined_states, return_inverse=True)
+            summed_values = jnp.zeros(unique_states.shape, dtype=jnp.complex128).at[indices].add(combined_values)
+            return list(zip(unique_states, summed_values))
+        
+        fun_jax = sub_jax
+        if _JAX_AVAILABLE:
+            fun_jax = jax.jit(sub_jax)
+        
+        return OperatorFunction(
+            sub_int,
+            sub_np,
+            fun_jax,
+            modifies_state=self._modifies_state or other.modifies_state,
+            necessary_args=max(self._necessary_args, other.necessary_args)
+        )
+        
     # -----------
     #! Wrapping
     # -----------
@@ -508,10 +650,36 @@ class OperatorFunction:
         """
         Wrap the operator function with additional arguments.
         
-        Params:
-        - args: Additional arguments for the operator function.
+        Parameters
+        ----------
+        args : tuple
+            Additional arguments that will be passed to the underlying operator function.
+        
+        Returns
+        -------
+        OperatorFunction
+            A new operator function where the underlying function is partially applied with the provided arguments.
         """
-        return OperatorFunction(partial(self._fun, *args), modifies_state = self._modifies_state, necessary_args = self._necessary_args)
+        # For the “int”/NumPy version, we use partial application.
+        def wrap_int(s, *more_args):
+            return self._fun(s, *(args + more_args))
+        
+        def wrap_np(s, *more_args):
+            return self._fun(s, *(args + more_args))
+        
+        def wrap_jax(s, *more_args):
+            return self._fun(s, *(args + more_args))
+        
+        if _JAX_AVAILABLE:
+            wrap_jax = jax.jit(wrap_jax)
+        
+        return OperatorFunction(
+            wrap_int,
+            wrap_np,
+            wrap_jax,
+            modifies_state=self._modifies_state,
+            necessary_args=self._necessary_args
+        )
     
     # -----------
     
@@ -564,12 +732,16 @@ class Operator(ABC):
     
     _INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
     _INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
-
+    _INVALID_FUNCTION_NONE        = "Invalid number of necessary arguments for the operator function."
+    
     #################################
     
     def __init__(self,
-                fun         : Callable,
-                eigval      = 1.0,
+                op_fun      : OperatorFunction              = None,
+                fun_int     : Callable                      = None,        
+                fun_np      : Optional[Callable]            = None,
+                fun_jax     : Optional[Callable]            = None,
+                eigval                                      = 1.0,
                 lattice     : Optional[Lattice]             = None,
                 ns          : Optional[int]                 = None,
                 typek       : Optional[SymmetryGenerators]  = SymmetryGenerators.Other,
@@ -626,18 +798,51 @@ class Operator(ABC):
         self._quadratic     = quadratic                             # flag for the quadratic operator - this enables different matrix representation
         self._acton         = kwargs.get('acton', False)            # flag for the action of the operator on the local physical space
         self._modifies      = modifies                              # flag for the operator that modifies the state
+        self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
+        self._necessary_args= 0                                     # number of necessary arguments for the operator function
+        self._fun           = None                                  # the function that defines the operator - it is set to None if not provided
+        self._init_functions(op_fun, fun_int, fun_np, fun_jax)      # initialize the operator function
         
-        if isinstance(fun, OperatorFunction):
-            self._fun       = fun                                   # the function that defines the operator already through the OperatorFunction object
-        elif isinstance(fun, Callable):
-            self._fun       = OperatorFunction(fun, modifies_state = self._modifies)  # Change kwargs.get('fun') to fun
+    #################################
+    #! Initialize functions
+    #################################
+    
+    def _init_functions(self, op_fun = None, fun_int = None, fun_np = None, fun_jax = None):
+        """
+        Initializes the operator functions and determines the operator type based on the 
+        number of necessary arguments.
+        Parameters:
+            op_fun (OperatorFunction, optional): An instance of `OperatorFunction`. If provided, 
+                it is directly assigned to the operator.
+            fun_int (callable, optional): A Python function representing the internal implementation 
+                of the operator. Must be provided if `op_fun` is not specified.
+            fun_np (callable, optional): A NumPy-compatible implementation of the operator function.
+            fun_jax (callable, optional): A JAX-compatible implementation of the operator function.
+        Raises:
+            ValueError: If both `op_fun` and `fun_int` are `None`.
+            NotImplementedError: If the number of necessary arguments exceeds 2.
+        Notes:
+            - The `necessary_args` attribute is determined based on the number of arguments 
+                required by `fun_int`, excluding the first argument (assumed to be `self`).
+            - The operator type (`_type_acting`) is set based on the number of necessary arguments:
+                - 0 arguments: `OperatorTypeActing.Global`
+                - 1 argument: `OperatorTypeActing.Local`
+                - 2 arguments: `OperatorTypeActing.Correlation`
+        """
+        
+        if op_fun is not None and isinstance(op_fun, OperatorFunction):
+            self._fun               = op_fun
+            self._necessary_args    = op_fun.necessary_args
         else:
-            raise ValueError(Operator._INVALID_OPERATION_TYPE_ERROR)
-        # set the necessary arguments for the operator function
-        if hasattr(fun, 'necessary_args'):
-            self._necessary_args = fun.necessary_args
-        elif isinstance(fun, Callable):
-            self._necessary_args = fun.__code__.co_argcount - 1
+            if fun_int is None:
+                raise ValueError(self._INVALID_FUNCTION_NONE)
+            
+            # get the necessary args
+            self._necessary_args    = fun_int.__code__.co_argcount - 1
+            self._fun               = OperatorFunction(fun_int, fun_np, fun_jax,
+                                        modifies_state = self._modifies,
+                                        necessary_args = self._necessary_args)
+        # set the operator function type
         if self._necessary_args == 0:
             self._type_acting = OperatorTypeActing.Global
         elif self._necessary_args == 1:
@@ -645,13 +850,9 @@ class Operator(ABC):
         elif self._necessary_args == 2:
             self._type_acting = OperatorTypeActing.Correlation
         else:
-            raise NotImplementedError("Invalid number of necessary arguments for the operator function.")
-        self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
-    
+            raise NotImplementedError()
     #################################
-    
-    # Static methods
-    
+    #! Static methods
     #################################
     
     @staticmethod
@@ -669,9 +870,7 @@ class Operator(ABC):
         return 1.0
     
     #################################
-    
-    # Copying and cloning
-    
+    #! Copying and cloning
     #################################
     
     def copy(self):
@@ -687,9 +886,7 @@ class Operator(ABC):
         return Operator(**self.__dict__)
     
     #################################
-    
-    # Operators that modify the operator class itself
-    
+    #! Operators that modify the operator class itself
     #################################
     
     def __imul__(self, scalar):
@@ -790,9 +987,7 @@ class Operator(ABC):
     # -------------------------------
     
     #################################
-    
-    # Setters and Getters
-    
+    #! Setters and Getters
     #################################
     
     @property
@@ -875,7 +1070,22 @@ class Operator(ABC):
     @fun.setter
     def fun(self, val):
         self._fun = val
-        
+    
+    @property
+    def int(self):
+        ''' Set the function that defines the operator '''
+        return self._fun.fun
+    
+    @property
+    def np(self):
+        ''' Set the function that defines the operator '''
+        return self._fun.np
+    
+    @property
+    def jax(self):
+        ''' Set the function that defines the operator '''
+        return self._fun.jax
+    
     # -------------------------------
     
     def override_matrix_fuction(self, function : Callable):
@@ -883,7 +1093,6 @@ class Operator(ABC):
         Override the matrix function of the operator.
         """
         self._matrix_fun = function
-        
         
     #################################
     #! Apply the operator
@@ -898,7 +1107,29 @@ class Operator(ABC):
     # -------------------------------
     
     def _apply_global(self, states : Union[int, list, np.ndarray | jnp.ndarray]):
-        ''' Apply the operator to the state '''
+        """
+        Applies a function to a given state or a collection of states.
+
+        This method processes either a single state or an iterable of states, 
+        applying the `_fun` function to each state. If the input is a single 
+        state, the result of `_fun` is returned directly. If the input is a 
+        collection of states, the method returns two lists: one containing 
+        the transformed states and the other containing the corresponding 
+        values.
+
+        Args:
+            states (Union[int, list, np.ndarray, jnp.ndarray]): 
+                A single state or a collection of states to which the `_fun` 
+                function will be applied. Can be an integer, list, numpy 
+                array, or jax.numpy array.
+
+        Returns:
+            Union[tuple[list, list], Any]: 
+                - If `states` is a single state, returns the result of `_fun(states)`.
+                - If `states` is a collection, returns a tuple of two lists:
+                    - The first list contains the transformed states.
+                    - The second list contains the corresponding values.
+        """
         if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
             return self._fun(states)
         results     = [self._fun(state) for state in states]
@@ -906,16 +1137,40 @@ class Operator(ABC):
         return list(out), list(val)
     
     def _apply_local(self, states : Union[int, list, np.ndarray | jnp.ndarray], i):
-        ''' Apply the operator to the state '''
+        """
+        Applies a local operation to a given state or a collection of states.
+        Parameters:
+            states (Union[int, list, np.ndarray, jnp.ndarray]): The input state(s) to which the operation is applied.
+                Can be a single integer, a list of integers, or a NumPy/JAX array.
+            i (int): The index or parameter used by the local operation.
+        Returns:
+            tuple: A tuple containing two lists:
+                - The first list contains the resulting states after applying the operation.
+                - The second list contains the corresponding values or results of the operation.
+                If the input is a single state, the result is returned as a single state and value.
+        """
         if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
             return self._fun(states, i)
-        
         results     = [self._fun(state, i) for state in states]
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val)
     
     def _apply_correlation(self, states : Union[int, list, np.ndarray | jnp.ndarray], i, j):
-        ''' Apply the operator to the state '''
+        """
+        Applies a correlation function to a given state or a collection of states.
+        Parameters:
+            states (Union[int, list, np.ndarray, jnp.ndarray]): The input state(s) to which the correlation function 
+                will be applied. Can be a single integer, a list of integers, or a NumPy/JAX array of states.
+            i (int): The first index parameter for the correlation function.
+            j (int): The second index parameter for the correlation function.
+        Returns:
+            tuple: If `states` is a single state, returns a tuple `(out, val)` where:
+                - `out` is the output state after applying the correlation function.
+                - `val` is the value associated with the correlation function.
+            If `states` is a collection of states, returns a tuple of lists `(out_list, val_list)` where:
+                - `out_list` contains the output states for each input state.
+                - `val_list` contains the corresponding values for each input state.
+        """
         if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
             return self._fun(states, i, j)
         

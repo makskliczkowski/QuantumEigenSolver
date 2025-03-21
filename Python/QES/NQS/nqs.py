@@ -4,13 +4,7 @@ import numba
 
 # typing and other imports
 from typing import Union, Tuple, Union, Callable, Optional
-from math import isclose
 from functools import partial
-
-# for the abstract class
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from enum import Enum, auto, unique
 
 # from general_python imports
 from general_python.algebra.utils import _JAX_AVAILABLE, get_backend

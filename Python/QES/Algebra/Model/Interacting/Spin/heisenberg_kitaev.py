@@ -37,22 +37,22 @@ HEI_KIT_X_BOND_NEI = 0
 #! INTEGER STATES
 # ----------------------------------------------------------------------------------------
 
-@numba.njit
+# @numba.njit
 def _apply_heisenberg(org_idx, new_idx, nei, sx_i, sy_i, sz_i, this_site, ns):
     if nei < 0:
         return 0,0.0,0.0,0.0
     
     # nei             = np.array(, dtype=DEFAULT_NP_INT_TYPE)
     # apply sig_z
-    _, sz_j         = operators_spin_module.sigma_z_int_np(org_idx, ns, [nei])
+    _, sz_j             = operators_spin_module.sigma_z_int_np(org_idx, ns, [nei])
     # apply sig_y
-    sy_j            = sx_i * 1.0j if (sz_j[0] > 0) else -1.0j * sx_i
+    sy_j                = (sx_i * 1.0j) if (sz_j[0] > 0) else (-1.0j * sx_i)
     # apply sig_x
-    new_new_idx, sx_j = operators_spin_module.sigma_x_int_np(new_idx, ns, this_site)
+    new_new_idx, sx_j   = operators_spin_module.sigma_x_int_np(new_idx[0], ns, this_site)
     # return new_state, s^z_i * s^z_j, s^y_i * s^y_j, s^x_i * s^x_j
-    return new_new_idx, sz_i * sz_j, np.real(sy_i * sy_j), sx_i * sx_j
+    return new_new_idx, (sz_i * sz_j), np.real(sy_i * sy_j), (sx_i * sx_j)
 
-@numba.njit
+# @numba.njit
 def _local_energy_int(k_map         : int,
                         i           : int,
                         ns          : int,
@@ -92,25 +92,25 @@ def _local_energy_int(k_map         : int,
     # - 1 for S_x
     # - len(neib_z) + len(neib_y) + len(neib_x) + len(addit_n) for S_xS_x and S_yS_y
     # num_states_m= 2 + neib_x.shape[0] + neib_y.shape[0] + addit_n.shape[0]
-    nn_x_in     = neib_x[i]
-    nn_y_in     = neib_y[i]
-    nn_z_in     = neib_z[i]
-    nn_a_in     = neiadd[i]
+    nn_x_in             = neib_x[i]
+    nn_y_in             = neib_y[i]
+    nn_z_in             = neib_z[i]
+    nn_a_in             = neiadd[i]
     
-    num_states  = 2 + nn_x_in.shape[0] + nn_y_in.shape[0] + nn_z_in.shape[0] + nn_a_in.shape[0]
-    new_rows    = np.empty(num_states, dtype=np.int64)
-    new_vals    = np.empty(num_states, dtype=DEFAULT_NP_FLOAT_TYPE)
+    num_states          = 2 + nn_x_in.shape[0] + nn_y_in.shape[0] + nn_z_in.shape[0] + nn_a_in.shape[0]
+    new_rows            = np.empty(num_states, dtype=np.int64)
+    new_vals            = np.empty(num_states, dtype=DEFAULT_NP_FLOAT_TYPE)
     
     # store here the rows, columns, and values
-    this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
+    this_site           = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
     
     # apply the sigma_z operator (and use this for later as well)
-    _, sz_i     = operators_spin_module.sigma_z_int_np(k_map, ns, this_site)
-    h_z_val     = hz[i] * sz_i
+    _, sz_i             = operators_spin_module.sigma_z_int_np(k_map, ns, this_site)
+    h_z_val             = hz[i] * sz_i
     
     # start with setting hz
-    new_rows[0] = k_map
-    new_rows[0] = h_z_val
+    new_rows[0]         = k_map
+    new_vals[0]         = h_z_val
     
     # apply the sigma_x operator (and use this for later as well)
     new_idx, sx_i       = operators_spin_module.sigma_x_int_np(k_map, ns, this_site)
@@ -119,7 +119,7 @@ def _local_energy_int(k_map         : int,
     new_vals[1]         = h_x_val
     
     # get the value for sy_i
-    sy_i        = sx_i * 1.0j if (sz_i[0] > 0) else -1.0j * sx_i
+    sy_i                = (sx_i * 1.0j) if (sz_i[0] > 0) else (-1.0j * sx_i)
     
     # define heisenberg part function
     iter_in             = 2
@@ -129,7 +129,7 @@ def _local_energy_int(k_map         : int,
             # continue
         
         new_new_idx, sz_val, sy_val, sx_val = _apply_heisenberg(k_map, new_idx, nei,
-                                                            sx_i, sy_i, sz_i, this_site, ns)
+                                            sx_i, sy_i, sz_i, this_site, ns)
         
         # add-up the values to the local contribution - add Kitaev - Z direction
         new_vals[0]             += (j_cpl[i] * delta_cpl[i] + kz_cpl[i]) * sz_val
@@ -206,7 +206,7 @@ def _local_energy_int_wrap(ns       : int,
     neib_y      = np.array(neib_y, dtype = DEFAULT_NP_INT_TYPE)
     neib_x      = np.array(neib_x, dtype = DEFAULT_NP_INT_TYPE)
     addit_n     = np.array(addit_n, dtype = DEFAULT_NP_INT_TYPE)
-    @numba.njit
+    # @numba.njit
     def wrapper(k, i):
         return _local_energy_int(k, i, ns,
                     hx, hz, j_cpl, delta_cpl, kx_cpl, ky_cpl, kz_cpl,
@@ -466,9 +466,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         self._is_sparse                 = True
         self._max_local_ch              = 6
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
-        self._loc_energy_int_fun        = _local_energy_int_wrap(self._ns, self._hx, self._hz, self._j, self._dlt,
-                                                                self._kx, self._ky, self._kz, 
-                                                                self._neibz, self._neiby, self._neibx, self._neiadd)
+
         # self._loc_energy_np_fun         = _local_energy_arr_wrap(self._ns, self._hx, self._hz, self._j, self._dlt,
         #                                                         self._kx, self._ky, self._kz, 
         #                                                         self._neibz, self._neiby, self._neibx, self._neiadd)
@@ -479,8 +477,39 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
     # ----------------------------------------------------------------------------------------------
     
     def __repr__(self):
-        ''' Return the string representation of the QSM model. '''
-        return ''
+        """
+        Returns a string representation of the model.
+        """
+        sep     = ","
+        prec    = 3
+
+        def param_str(param_name, values):
+            # Check that the list is non-empty and uniform.
+            if values and all(x == values[0] for x in values):
+                # Format the common value using the desired precision.
+                return f"{param_name}={values[0]:.{prec}f}"
+            else:
+                return f"{param_name}=r"
+
+        # Build the representation string.
+        info_str = f"{sep}heikit,Ns={self.Ns}"
+        info_str += sep + param_str("J", self.J)
+        info_str += sep + param_str("Kx", self.Kx)
+        info_str += sep + param_str("Ky", self.Ky)
+        info_str += sep + param_str("Kz", self.Kz)
+        info_str += sep + param_str("dlt", self.delta)
+        info_str += sep + param_str("hz", self.hz)
+        info_str += sep + param_str("hx", self.hx)
+
+        # Append symmetry information from the hilbertSpace.
+        info_str += self.hilbertSpace.getSymInfo()
+        info_str += sep + str(self.hilbertSpace.getBC())
+
+        # If this class inherits from a Hamiltonian base class that further augments info,
+        # you might call that method here. For now, we simply return the constructed string.
+        return info_str
+
+    # ----------------------------------------------------------------------------------------------
     
     def __str__(self):
         ''' Return the string representation of the QSM model. '''
@@ -527,45 +556,75 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         else:
             raise ValueError(self._ERR_COUP_VEC_SIZE)
 
-    def _set_neighbors(self):
-        '''
-        Presets the neighbors based on the lattice - to be used in the energy calculation
-        '''
+    def _set_local_energy_functions(self):
         
-        self._neibz                     = []
-        self._neiby                     = []
-        self._neibx                     = []
-        self._neiadd                    = []
-        # go through sites
+        # prepare the integer energy
+        
+        
+        
+        
+        
+                self._loc_energy_int_fun        = _local_energy_int_wrap(self._ns, self._hx, self._hz, self._j, self._dlt,
+                                                                self._kx, self._ky, self._kz, 
+                                                                self._neibz, self._neiby, self._neibx, self._neiadd)
+
+    def _set_local_neighbors(self):
+        """
+        Sets the neighbors for the Heisenberg-Kitaev model based on the lattice structure.
+
+        This method initializes and populates the neighbor lists for different bond types
+        (Z, Y, X, and additional bonds) for each site in the lattice. The neighbors are
+        determined using the lattice's nearest-neighbor information.
+
+        Attributes:
+            _neibz (list)   : List of neighbors corresponding to Z-bonds for each site.
+            _neiby (list)   : List of neighbors corresponding to Y-bonds for each site.
+            _neibx (list)   : List of neighbors corresponding to X-bonds for each site.
+            _neiadd (list)  : List of additional neighbors for each site, or [-1] if none exist.
+
+        Process:
+            - Iterates over all sites in the lattice.
+            - Retrieves the number of forward nearest neighbors for each site.
+            - Categorizes neighbors into Z, Y, X, or additional bonds based on their indices.
+            - Appends the categorized neighbors to the respective lists.
+
+        Logs:
+            Logs a success message upon completion of neighbor assignment.
+
+        Raises:
+            None
+        """
+
+        self._neibz, self._neiby, self._neibx, self._neiadd = [], [], [], []
+        lattice = self._lattice
+
+        # Cache the bond constant indices locally.
+        z_idx = HEI_KIT_Z_BOND_NEI
+        y_idx = HEI_KIT_Y_BOND_NEI
+        x_idx = HEI_KIT_X_BOND_NEI
+
         for i in range(self._ns):
-            
-            # check number on nearest neighbors
-            nn_forward_num              = self._lattice.get_nn_forward_num(i)
-            nn_z_in                     = []
-            nn_y_in                     = []
-            nn_x_in                     = []
-            nn_add_in                   = []
-            # go through them
+            nn_forward_num = lattice.get_nn_forward_num(i)
+            nn_z_in, nn_y_in, nn_x_in, nn_add_in = [], [], [], []
+
             for nn in range(nn_forward_num):
-                
-                # check if ok
-                nei = self._lattice.get_nn_forward(i, num = nn)
-                # if self._ns > nei >= 0:
-                if nn == HEI_KIT_Z_BOND_NEI:
+                nei = lattice.get_nn_forward(i, num=nn)
+                if nn == z_idx:
                     nn_z_in.append(nei)
-                elif nn == HEI_KIT_Y_BOND_NEI:
+                elif nn == y_idx:
                     nn_y_in.append(nei)
-                elif nn == HEI_KIT_X_BOND_NEI:
+                elif nn == x_idx:
                     nn_x_in.append(nei)
                 else:
                     nn_add_in.append(nei)
-            
+
             self._neibz.append(nn_z_in)
             self._neiby.append(nn_y_in)
             self._neibx.append(nn_x_in)
-            self._neiadd.append(nn_add_in if len(nn_add_in) > 0 else [-1])
-        self._log(f"Succesfully set the neighbors for the couplings...", log = 2)
-    
+            self._neiadd.append(nn_add_in or [-1])
+
+        self._log("Successfully set the neighbors for the couplings...", log=2)
+
     # ----------------------------------------------------------------------------------------------
 
 
