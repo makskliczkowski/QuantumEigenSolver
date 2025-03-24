@@ -79,7 +79,7 @@ def sigma_x_int_np(state, ns, sites, spin_value=_SPIN):
     """
     out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
     out_coeff       = np.empty(1, dtype=DEFAULT_NP_FLOAT_TYPE)
-    coeff = 1.0
+    coeff           = 1.0
     for site in sites:
         pos     = ns - 1 - site
         state   = _binary.flip_int(state, pos)
@@ -173,7 +173,7 @@ def sigma_x(state,
         sites = list(range(ns))
     
     if isinstance(state, (int, np.integer)):
-        return sigma_x_int(state, ns, sites, spin_value)
+        return sigma_x_int_np(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return sigma_x_np(state, sites, spin, spin_value)
     return sigma_x_jnp(state, ns, sites, spin, spin_value)
@@ -183,14 +183,14 @@ def sigma_x(state,
 # -----------------------------------------------------------------------------
 
 @numba.njit
-def sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
+def sigma_y_int_np_real(state, ns, sites, spin_value=_SPIN):
     """
     σᵧ on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
     otherwise by -I*spin_value; then flip the bit.
     """
-    out_state       = np.empty(1, dtype=np.int64)
-    out_coeff       = np.empty(1, dtype=np.complex128)
+    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
+    out_coeff       = np.empty(1, dtype=DEFAULT_NP_FLOAT_TYPE)
     coeff           = 1.0 + 0j
     for site in sites:
         pos     = ns - 1 - site
@@ -198,15 +198,34 @@ def sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
         state   = _binary.flip_int(state, pos)
         
     # Create output arrays
-    out_state[0]    = state
-    out_coeff[0]    = coeff
+    out_state[0] = state
+    out_coeff[0] = coeff.real
+    return out_state, out_coeff
+
+@numba.njit
+def sigma_y_int_np(state, ns, sites, spin_value=_SPIN):
+    """
+    σᵧ on an integer state.
+    For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
+    otherwise by -I*spin_value; then flip the bit.
+    """
+    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
+    out_coeff       = np.empty(1, dtype=DEFAULT_NP_CPX_TYPE)
+    coeff           = 1.0 + 0j
+    for site in sites:
+        pos     = ns - 1 - site
+        coeff   *= (2 * _binary.check_int(state, pos) - 1.0) * 1.0j * spin_value
+        state   = _binary.flip_int(state, pos)
+        
+    # Create output arrays
+    out_state[0] = state
+    out_coeff[0] = coeff
     return out_state, out_coeff
 
 def sigma_y_int(state       : int,
                 ns          : int,
                 sites       : Union[List[int], None],
-                spin_value  : float = _SPIN,
-                backend     : str = DEFAULT_BACKEND):
+                spin_value  : float = _SPIN):
     """
     σᵧ on an integer state.
     For each site, if the bit at (ns-1-site) is set then multiply coefficient by I*spin_value,
@@ -228,7 +247,37 @@ def sigma_y_int(state       : int,
     """
     if not isinstance(state, (int, np.integer)):
         return sigma_y_int_jnp(state, ns, sites, spin_value)
-    return sigma_y_int_np(state, ns, sites, spin_value)
+    if len(sites) % 2 == 1:
+        return sigma_y_int_np(state, ns, sites, spin_value)
+    return sigma_y_int_np_real(state, ns, sites, spin_value)
+
+@numba.njit
+def sigma_y_np_real(state        : np.ndarray,
+                    sites       : Union[List[int], None],
+                    spin_value  : float = _SPIN):
+    """
+    σᵧ on a NumPy array state.
+    For each site, use the given site as index.
+    Parameters
+    ----------
+    state : np.ndarray
+        The state to apply the operator to.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    np.ndarray
+        The state after applying the operator    
+    """
+    coeff = 1.0 + 0j
+    for site in sites:
+        # For NumPy arrays, we use the site index directly.
+        factor  =   (2.0 * _binary.check_arr_np(state, site) - 1.0) * 1.0j * spin_value
+        coeff   *=  factor
+        state   =   flip(state, site, spin_value=spin_value)
+    return state, coeff.real
 
 @numba.njit
 def sigma_y_np(state        : np.ndarray,
@@ -272,7 +321,7 @@ def sigma_y(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer)):
-        return sigma_y_int(state, ns, sites, spin_value)
+        return sigma_y_int_np(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         return sigma_y_np(state, sites, spin, spin_value)
     else:
@@ -409,7 +458,7 @@ def sigma_z(state,
     if sites is None:
         sites = list(range(ns))
     if isinstance(state, (int, np.integer, jnp.integer)):
-        return sigma_z_int(state, ns, sites, spin_value)
+        return sigma_z_int_np(state, ns, sites, spin_value)
     elif isinstance(state, np.ndarray):
         if not spin:
             return sigma_z_np_nspin(state, sites, spin_value)
@@ -711,7 +760,7 @@ def sigma_k(state,
     return sigma_k_jnp(state, ns, sites, k, spin, spin_value)
 
 ################################################################################
-# Factory Functions: Wrap the elementary functions in Operator objects.
+#! Factory Functions: Wrap the elementary functions in Operator objects.
 ################################################################################
 
 # -----------------------------------------------------------------------------
@@ -759,7 +808,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
             sites = list(range(ns))
         
         def funct_int(state):
-            return sigma_x_int(state, ns, sites, spin_value)
+            return sigma_x_int_np(state, ns, sites, spin_value)
         
         def funct_np(state):
             return sigma_x_np(state, sites, spin_value)
@@ -790,7 +839,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Local:
         
         def funct_int(state, site):
-            return sigma_x_int(state, ns, [site], spin_value)
+            return sigma_x_int_np(state, ns, [site], spin_value)
         
         def funct_np(state, site):
             return sigma_x_np(state, [site], spin_value)
@@ -815,7 +864,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Correlation:
         
         def funct_int(state, site1, site2):
-            return sigma_x_int(state, ns, [site1, site2], spin_value)
+            return sigma_x_int_np(state, ns, [site1, site2], spin_value)
         
         def funct_np(state, site1, site2):
             return sigma_x_np(state, [site1, site2], spin_value)
@@ -880,11 +929,19 @@ def sig_y( lattice     : Optional[Lattice]     = None,
         if sites is None or len(sites) == 0:
             sites = list(range(ns))
         
-        def funct_int(state):
-            return sigma_y_int(state, ns, sites, spin_value)
         
-        def funct_np(state):
-            return sigma_y_np(state, sites, spin, spin_value)
+        if len(sites) % 2 == 1:
+            def funct_int(state):
+                return sigma_y_int_np(state, ns, sites, spin_value)
+            
+            def funct_np(state):
+                return sigma_y_np(state, sites, spin, spin_value)
+        else:
+            def funct_int(state):
+                return sigma_y_int_np_real(state, ns, sites, spin_value)
+            
+            def funct_np(state):
+                return sigma_y_np_real(state, sites, spin_value)
         
         if _JAX_AVAILABLE:
             @jax.jit
@@ -910,7 +967,7 @@ def sig_y( lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Local:
         
         def funct_int(state, site):
-            return sigma_y_int(state, ns, [site], spin_value)
+            return sigma_y_int_np(state, ns, [site], spin_value)
         
         def funct_np(state, site):
             return sigma_y_np(state, [site], spin, spin_value)
@@ -935,10 +992,10 @@ def sig_y( lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Correlation:
         
         def funct_int(state, site1, site2):
-            return sigma_y_int(state, ns, [site1, site2], spin_value)
+            return sigma_y_int_np_real(state, ns, [site1, site2], spin_value)
         
         def funct_np(state, site1, site2):
-            return sigma_y_np(state, [site1, site2], spin, spin_value)
+            return sigma_y_np_real(state, [site1, site2], spin_value)
         
         if _JAX_AVAILABLE:
             @jax.jit
@@ -1005,7 +1062,7 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
             sites = list(range(ns))
         
         def funct_int(state):
-            return sigma_z_int(state, ns, sites, spin_value)
+            return sigma_z_int_np(state, ns, sites, spin_value)
         
         def funct_np(state):
             return sigma_z_np(state, sites, spin_value)
@@ -1038,7 +1095,7 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
     elif type_act == OperatorTypeActing.Local:
         
         def funct_int(state, site):
-            return sigma_z_int(state, ns, [site], spin_value)
+            return sigma_z_int_np(state, ns, [site], spin_value)
         
         def funct_np(state, site):
             return sigma_z_np(state, [site], spin_value)
@@ -1061,11 +1118,12 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
                         typek     = SymmetryGenerators.Other,
                         modifies  = True,
                         backend   = backend)
+    
     # Correlation function
     elif type_act == OperatorTypeActing.Correlation:
         
         def funct_int(state, site1, site2):
-            return sigma_z_int(state, ns, [site1, site2], spin_value)
+            return sigma_z_int_np(state, ns, [site1, site2], spin_value)
         
         def funct_np(state, site1, site2):
             return sigma_z_np(state, [site1, site2], spin_value)

@@ -17,20 +17,20 @@ Changes :
 
 import numpy as np
 import scipy as sp
-from numba import njit, cfunc, types
-from typing import List, Tuple, Union, Callable
+from typing import List, Tuple, Union
 from abc import ABC, abstractmethod
 from functools import partial
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
 from Algebra.Operator.operator_matrix import operator_create_np_sparse, operator_create_np, operator_create_np_dense
+from Algebra.hamil_types import *
+from Algebra.hamil_energy import local_energy_int_wrap
 ###################################################################################################
 
 ###################################################################################################
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, maybe_jit, DEFAULT_INT_TYPE, DEFAULT_FLOAT_TYPE, DEFAULT_CPX_TYPE
+from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, DEFAULT_INT_TYPE, DEFAULT_FLOAT_TYPE, DEFAULT_CPX_TYPE
 import general_python.algebra.linalg as linalg
 if _JAX_AVAILABLE:
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax, process_matrix_elem_np, process_matrix_batch_np
@@ -226,19 +226,22 @@ class Hamiltonian(ABC):
         self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian.__backend(backend)
         self._is_jax        = _JAX_AVAILABLE and self._backend != np
         self._is_numpy      = not self._is_jax
+        self._is_sparse     = is_sparse
+        
         # get the backend, scipy, and random number generator for the backend
         self._dtypeint      = self._backend.int64
         self._hilbert_space = hilbert_space
         self._dtype         = dtype if dtype is not None else self._hilbert_space.dtype
         if self._hilbert_space is None:
             self._lattice   = kwargs.get("lattice", None)
-            if self._lattice is None:
+            if self._lattice is None and kwargs.get('ns', None) is None:
                 raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
-            else:
+            # otherwise do that
+            if self._lattice is not None:
                 self._hilbert_space = HilbertSpace(lattice = self._lattice)
-            
-        self._is_sparse     = is_sparse
-
+            else:
+                self._hilbert_space = HilbertSpace(ns = kwargs.get('ns', None))
+                    
         # get the lattice and the number of sites
         self._lattice       = self._hilbert_space.get_lattice()
         self._nh            = self._hilbert_space.get_Nh()
@@ -261,9 +264,9 @@ class Hamiltonian(ABC):
         self._name          = "Hamiltonian"
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
         
-        # functions for local energy calculation in a jitted way (numpy and jax)
+        # set to None
         self._set_local_energy_functions()
-    
+        
     # ----------------------------------------------------------------------------------------------
     
     def _log(self, msg : str, log = 'info', lvl : int = 0, color : str = "white"):
@@ -311,9 +314,21 @@ class Hamiltonian(ABC):
         return self._dtype
     
     @property
+    def inttype(self):
+        ''' Integer types for the model '''
+        return self._dtypeint
+    
+    @property
     def backend(self):
         ''' Returns string backend '''
         return self._backendstr
+
+    @property
+    def quadratic(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is quadratic or not.
+        '''
+        return not self.manybody
     
     def is_quadratic(self):
         '''
@@ -355,13 +370,6 @@ class Hamiltonian(ABC):
         return self._max_local_ch
 
     @property
-    def quadratic(self):
-        '''
-        Returns a flag indicating whether the Hamiltonian is quadratic or not.
-        '''
-        return False
-        
-    @property
     def name(self):
         '''
         Returns the name of the Hamiltonian.
@@ -383,7 +391,18 @@ class Hamiltonian(ABC):
         '''
         Returns the number of sites.
         '''
-        return self._ns
+        return self._lattice.ns if self._lattice is not None else self._ns
+
+    @property
+    def sites(self):
+        return self.ns
+    
+    @property
+    def lattice(self):
+        '''
+        Returns the lattice associated with the Hamiltonian.
+        '''
+        return self._lattice
     
     @property
     def modes(self):
@@ -398,13 +417,6 @@ class Hamiltonian(ABC):
         Returns the Hilbert space associated with the Hamiltonian.
         '''
         return self._hilbert_space
-    
-    @property
-    def lattice(self):
-        '''
-        Returns the lattice associated with the Hamiltonian.
-        '''
-        return self._lattice
     
     @property
     def hilbert_size(self):
@@ -501,6 +513,10 @@ class Hamiltonian(ABC):
     #! Local energy getters
     # ----------------------------------------------------------------------------------------------
     
+    @property
+    def fun_int(self):
+        return self._loc_energy_int_fun
+    
     def get_loc_energy_int_fun(self):
         '''
         Returns the local energy of the Hamiltonian
@@ -510,6 +526,10 @@ class Hamiltonian(ABC):
         '''
         return self._loc_energy_int_fun
     
+    @property
+    def fun_npy(self):
+        return self._loc_energy_np_fun
+    
     def get_loc_energy_np_fun(self):
         '''
         Returns the local energy of the Hamiltonian
@@ -517,6 +537,10 @@ class Hamiltonian(ABC):
             A function that takes an integer k and returns the local energy for a NumPy representation.
         '''
         return self._loc_energy_np_fun
+    
+    @property
+    def fun_jax(self):
+        return self._loc_energy_jax_fun
     
     def get_loc_energy_jax_fun(self):
         '''
@@ -526,6 +550,8 @@ class Hamiltonian(ABC):
         '''
         return self._loc_energy_jax_fun
     
+    # ----------------------------------------------------------------------------------------------
+    
     def get_loc_energy_arr_fun(self, backend: str = 'default'):
         '''
         Returns the local energy of the Hamiltonian
@@ -534,8 +560,8 @@ class Hamiltonian(ABC):
             a given backend - either NumPy or JAX.
         '''
         if (backend == 'default' or backend == 'jax' or backend == 'jnp') and _JAX_AVAILABLE:
-            return self._loc_energy_jax_fun
-        return self._loc_energy_np_fun
+            return self.fun_jax
+        return self.fun_npy
     
     # ----------------------------------------------------------------------------------------------
     #! Memory properties
@@ -647,7 +673,7 @@ class Hamiltonian(ABC):
     #! Standard getters
     # ----------------------------------------------------------------------------------------------
     
-    def get_mean_lvl_spacing(self):
+    def get_mean_lvl_spacing(self, use_npy = True):
         '''
         Returns the mean level spacing of the Hamiltonian. The mean level spacing is defined as the
         average difference between consecutive eigenvalues.
@@ -657,7 +683,7 @@ class Hamiltonian(ABC):
         '''
         if self._eig_val.size == 0:
             raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
-        if not _JAX_AVAILABLE or self._backend == np:
+        if (not _JAX_AVAILABLE or self._backend == np or use_npy):
             return self._backend.mean(self._backend.diff(self._eig_val))
         return hjm.mean_level_spacing(self._eig_val)
     
@@ -670,14 +696,14 @@ class Hamiltonian(ABC):
             raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
         return self._eig_val[-1] - self._eig_val[0]
     
-    def get_energywidth(self):
+    def get_energywidth(self, use_npy = True):
         '''
         Returns the energy width of the Hamiltonian. The energy width is defined as trace of the
         Hamiltonian matrix squared.
         '''
         if self._hamil.size == 0:
             raise ValueError(Hamiltonian._ERR_HAMILTONIAN_NOT_AVAILABLE)
-        if not _JAX_AVAILABLE or self._backend == np:
+        if (not _JAX_AVAILABLE or self._backend == np or use_npy):
             return self._backend.trace(self._backend.dot(self._hamil, self._hamil))
         return hjm.energy_width(self._hamil)
     
@@ -974,11 +1000,11 @@ class Hamiltonian(ABC):
         # -----------------------------------------------------------------------------------------
         
         # Check if JAX is available and the backend is not NumPy
-        jax_maybe_av = _JAX_AVAILABLE and self._backend != np 
+        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
         
         # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:
-            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2, log = 'debug')
+            self._log("Calculating the Hamiltonian matrix using NumPy...", lvl=2, log = 'info')
             
             # Calculate the Hamiltonian matrix using the NumPy implementation.
             self._hamil = operator_create_np(
@@ -991,24 +1017,25 @@ class Hamiltonian(ABC):
                 dtype               =   self._dtype
             )
         else:
-            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2, log = 'debug')
+            raise ValueError("JAX not yet implemented for the build...")
+            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2, log = 'info')
 
             # Choose the correct local energy function for JAX.
-            local_fun = jit(self.loc_energy_int_jax) if self._is_sparse else self.loc_energy_ham
+            # local_fun = jit(self.loc_energy_int_jax) if self._is_sparse else self.loc_energy_ham
 
             # Calculate the Hamiltonian matrix using the JAX implementation.
-            self._hamil = hamiltonian_functional_jax(
-                self._ns,
-                self._hilbert_space,
-                loc_energy          = local_fun,
-                is_sparse           = self._is_sparse,
-                max_local_changes   = self._max_local_ch,
-                start               = self._startns,
-                dtype               = self._dtype)
+            # self._hamil = hamiltonian_functional_jax(
+            #     self._ns,
+            #     self._hilbert_space,
+            #     loc_energy          = local_fun,
+            #     is_sparse           = self._is_sparse,
+            #     max_local_changes   = self._max_local_ch,
+            #     start               = self._startns,
+            #     dtype               = self._dtype)
             
-            # Ensure the computation completes.
-            if not self._is_sparse:
-                self._hamil = self._hamil.block_until_ready()
+            # # Ensure the computation completes.
+            # if not self._is_sparse:
+            #     self._hamil = self._hamil.block_until_ready()
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
         self.__hamiltonian_validate()
@@ -1057,9 +1084,9 @@ class Hamiltonian(ABC):
         Diagonalizes the Hamiltonian matrix using one of several methods.
         
         Supported methods:
-        - 'eigh'        : Full diagonalization using a dense eigen–solver.
+        - 'eigh'        : Full diagonalization using a dense eigen-solver.
         - 'lanczos'     : Iterative Lanczos diagonalization via SciPy's eigsh.
-        - 'shift-invert': Iterative shift–invert diagonalization via SciPy's eigsh.
+        - 'shift-invert': Iterative shift-invert diagonalization via SciPy's eigsh.
         
         Additional kwargs:
         - k (int)       : Number of eigenpairs to compute (default: 6 for Lanczos/shift-invert).
@@ -1073,6 +1100,8 @@ class Hamiltonian(ABC):
         diag_start  = time.perf_counter()
         method      = kwargs.get("method", "standard")
         backend     = self._backend if not isinstance(self._hamil, np.ndarray) and not sp.sparse.isspmatrix(self._hamil) else np
+        if verbose:
+            self._log(f"Diagonalization started using ({method})...", lvl = 1)
         try:
             if self._is_sparse or method.lower() in ["lanczos", "shift-invert"]:
                 self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, method, backend, **kwargs)
@@ -1089,7 +1118,7 @@ class Hamiltonian(ABC):
         
         diag_duration = time.perf_counter() - diag_start
         if verbose:
-            self._log(f"Diagonalization ({method}) completed in {diag_duration:.6f} seconds.")
+            self._log(f"Diagonalization ({method}) completed in {diag_duration:.6f} seconds.", lvl = 2)
         self._calculate_av_en()
 
     # ----------------------------------------------------------------------------------------------
@@ -1128,22 +1157,14 @@ class Hamiltonian(ABC):
     #! Energy related methods
     # ----------------------------------------------------------------------------------------------
     
-    @abstractmethod
-    def _set_local_neighbors(self):
-        '''
-        Sets the local neighbors of the Hamiltonian matrix.
-        This method should be implemented by subclasses to provide a specific implementation.
-        '''
-        pass
-    
     def _set_local_energy_functions(self):
         '''
         Sets the functions for local energy calculation.
         This method should be implemented by subclasses to provide a specific implementation.
         '''
-        self._loc_energy_int_fun    = None
-        self._loc_energy_np_fun     = None
-        self._loc_energy_jax_fun    = None
+        self._loc_energy_int_fun    = lambda x, i: x, 0.0
+        self._loc_energy_np_fun     = lambda x: x, 0.0
+        self._loc_energy_jax_fun    = lambda x: x, 0.0
         
     
     def _local_energy_test(self, k_map = 0, i = 0):

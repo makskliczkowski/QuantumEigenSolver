@@ -297,7 +297,7 @@ class OperatorFunction:
             elif isinstance(s, np.ndarray):
                 result = self._fun_np(s, *args)
             else:
-                result = self._fun(s, *args)
+                result = self._fun_int(s, *args)
 
         # If the result is a tuple representing a single (state, value) pair
         if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
@@ -337,7 +337,7 @@ class OperatorFunction:
         return self._fun_int
     
     @property
-    def np(self):
+    def npy(self):
         ''' Set the function that defines the operator '''
         return self._fun_np
     
@@ -451,7 +451,6 @@ class OperatorFunction:
         return OperatorFunction(fun_int, fun_np, fun_jax,
                                 modifies_state=(self._modifies_state or other_modifies),
                                 necessary_args=args_needed)
-
 
     # -----------
     
@@ -662,13 +661,13 @@ class OperatorFunction:
         """
         # For the “int”/NumPy version, we use partial application.
         def wrap_int(s, *more_args):
-            return self._fun(s, *(args + more_args))
+            return self._fun_int(s, *(args + more_args))
         
         def wrap_np(s, *more_args):
-            return self._fun(s, *(args + more_args))
+            return self._fun_np(s, *(args + more_args))
         
         def wrap_jax(s, *more_args):
-            return self._fun(s, *(args + more_args))
+            return self._fun_jax(s, *(args + more_args))
         
         if _JAX_AVAILABLE:
             wrap_jax = jax.jit(wrap_jax)
@@ -779,7 +778,7 @@ class Operator(ABC):
             self._lattice   = lattice
         elif lattice is not None:
             self._lattice   = lattice
-            self._ns        = self._lattice.ns()
+            self._ns        = self._lattice.ns
         else:
             raise ValueError(Operator._INVALID_SYSTEM_SIZE_PROVIDED)
         
@@ -851,6 +850,7 @@ class Operator(ABC):
             self._type_acting = OperatorTypeActing.Correlation
         else:
             raise NotImplementedError()
+    
     #################################
     #! Static methods
     #################################
@@ -1077,7 +1077,7 @@ class Operator(ABC):
         return self._fun.fun
     
     @property
-    def np(self):
+    def npy(self):
         ''' Set the function that defines the operator '''
         return self._fun.np
     
@@ -1341,6 +1341,14 @@ def operator_identity(backend : str = 'default') -> Operator:
     def identity_fun(state):
         return state, 1.0
     
-    return Operator(fun = identity_fun, eigval = 1.0, ns = 1, backend = backend, name = SymmetryGenerators.E, modifies=False, quadratic=False)
+    return Operator(fun_int = identity_fun,
+                    fun_np  = identity_fun,
+                    fun_jax = identity_fun, 
+                    eigval  = 1.0,
+                    ns      = 1, 
+                    backend = backend, 
+                    name    = SymmetryGenerators.E, 
+                    modifies=False, 
+                    quadratic=False)
 
 ####################################################################################################

@@ -62,6 +62,7 @@ def _operator_create_np_inner_loop_no_hilbert(ranges = None):
         # Loop over all basis states.
         for k in np.arange(nh):
             data_idx = inner_k(k, local_funct, cols, rows, data, data_idx)
+        return data_idx
     return _inner_loop
 
 def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges = None):
@@ -170,9 +171,9 @@ def operator_create_np_sparse(  ns                  : int,
     dtype       = dtype if dtype is not None else hilbert.dtype
         
     # Pre-allocate arrays with the estimated size
-    rows        = np.empty(max_nnz, dtype=DEFAULT_NP_INT_TYPE)
-    cols        = np.empty(max_nnz, dtype=DEFAULT_NP_INT_TYPE)
-    data        = np.empty(max_nnz, dtype=dtype)
+    rows        = np.zeros(max_nnz, dtype=DEFAULT_NP_INT_TYPE)
+    cols        = np.zeros(max_nnz, dtype=DEFAULT_NP_INT_TYPE)
+    data        = np.zeros(max_nnz, dtype=dtype)
     data_idx    = 0
     
     # Inner loop is now a separate Numba function for clarity and potential reuse
@@ -181,9 +182,11 @@ def operator_create_np_sparse(  ns                  : int,
     # Call the Numba-accelerated inner loop
     data_idx = _inner_loop(local_funct=local_fun, nh=nh,
             cols=cols, rows=rows, data=data, data_idx=data_idx)
-
+    data        = data[:data_idx]
+    rows        = rows[:data_idx]
+    cols        = cols[:data_idx]
     # Create the sparse matrix from the collected data (outside the jitted function)
-    return sp.sparse.csr_matrix((data[:data_idx], (rows[:data_idx], cols[:data_idx])), shape=(nh, nh))
+    return sp.sparse.csr_matrix((data, (rows, cols)), shape=(nh, nh))#, dtype=dtype, copy=False)
 
 #####################################################################################################
 #! Numpy DENSE operator setup
@@ -194,13 +197,13 @@ def _operator_create_np_dense_inner_loop_no_hilbert(ranges = None):
     - when hilbert is not used or not modifies 
     '''
     if ranges is None:
-        @njit(fastmath=True)
+        # @njit(fastmath=True)
         def _inner_k(k, local_funct, matrix):
             # Get the new rows and data from the local function.
             new_rows, new_data  = local_funct(k)
             matrix[new_rows, k] += new_data
     else:
-        @njit(fastmath=True)
+        # @njit(fastmath=True)
         def _inner_k(k, local_funct, matrix):
             # Loop over the sites (modes).
             for i in ranges:
@@ -228,24 +231,24 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges 
         if _repr.ndim == 1:
             _repr = _repr.reshape(-1, 2)
             
-        @njit(fastmath=True)
+        # @njit(fastmath=True)
         def _get_mapping(k):
             return Hilbert.jitted_get_mapping(_mapping, k)
 
-        @jit(forceobj=True, fastmath=True)
+        # @jit(forceobj=True, fastmath=True)
         def _get_matrix_elem(k, new_row, k_map):
             # Apply transformation and get the matrix element directly
             return Hilbert.jitted_get_matrix_element(k, new_row, k_map, False,
                     _mapping, _norm, _sym, _repr)
         
-        @njit(fastmath=True)
+        # @njit(fastmath=True)
         def _update_data(num_new, new_rows, new_data, k, k_map, matrix):
             for j in range(num_new):
                 (new_row, _), sym_eig   =   _get_matrix_elem(k, new_rows[j], k_map)
                 matrix[new_row, k]      +=  new_data[j] * sym_eig
         
         if ranges is None:
-            @njit(fastmath=True)
+            # @njit(fastmath=True)
             def _inner_k(k, local_funct, matrix):
                 # Get the mapping for the current basis state
                 k_map               = _get_mapping(k)
@@ -254,7 +257,7 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges 
                 num_new             = len(new_rows)
                 _update_data(num_new, new_rows, new_data, k, k_map, matrix)
         else:
-            @njit(fastmath=True)
+            # @njit(fastmath=True)
             def _inner_k(k, local_funct, matrix):
                 # Get the mapping for the current basis state
                 k_map                   = _get_mapping(k)

@@ -37,73 +37,6 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 _QSM_CHECK_HS_NORM = True
 
 # ----------------------------------------------------------------------------------------
-#! INTEGER STATES
-# ----------------------------------------------------------------------------------------
-
-@numba.njit
-def _local_energy_int(k_map     : int,
-                        i       : int,
-                        n       : int,
-                        ns      : int,
-                        neidot  : np.ndarray, h: np.ndarray, g0: float, au: np.ndarray
-                    ) -> Tuple[np.ndarray, np.ndarray]:
-    '''
-    Compute the local energy interaction.
-    Parameters:
-        k : int
-            The state index.
-        k_map : int
-            The mapped state (from the Hilbert space) corresponding to k.
-        i : int
-            An index parameter (typically i >= self.n).
-        n : int
-            Number of particles in the dot.
-        ns : int
-            Number of particles in the system.
-        neidot : np.ndarray
-            Array of random neighbors for the 'free' particles.
-        h : np.ndarray
-            Magnetic field vector for the particles outside the dot.
-        g0 : float
-            Coupling strength between the particles in the dot and the particles outside the dot.
-        au : np.ndarray
-            Array of coupling strengths.
-    Returns:
-        Tuple of arrays representing the row indices, column indices, and matrix values for this interaction.
-    '''
-
-    # Pre-allocate arrays
-    new_rows    = np.empty(2, dtype=np.int64)
-    new_vals    = np.empty(2, dtype=DEFAULT_NP_FLOAT_TYPE)
-    
-    # store here the rows, columns, and values
-    part_idx    = i - n
-    this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
-    
-    # apply the sigma_z operator
-    idx, val    = operators_spin_module.sigma_z_int_np(k_map, ns, this_site)
-    vals        = h[part_idx] * val.astype(h.dtype)
-    
-    # apply the sigma_x * sigma_x operator
-    next_site   = np.array([neidot[part_idx]], dtype=DEFAULT_NP_INT_TYPE)
-    idx1, sxn   = operators_spin_module.sigma_x_int_np(k_map, ns, next_site)
-    idx2, sxj   = operators_spin_module.sigma_x_int_np(idx1[0], ns, this_site)
-    coupling_v  = g0 * au[part_idx] * sxj * sxn
-    
-    new_rows[:1] = idx
-    new_vals[:1] = vals
-    new_rows[1:] = idx2[0]
-    new_vals[1:] = coupling_v
-    return new_rows, new_vals
-
-def _local_energy_int_wrap(n, ns, neidot, h, g0, au):
-    '''Creates a JIT-compiled local energy interaction function.'''
-    @numba.njit
-    def wrapper(k, i):
-        return _local_energy_int(k, i, n, ns, neidot, h, g0, au)
-    return wrapper
-
-# ----------------------------------------------------------------------------------------
 #! ARRAY STATES
 # ----------------------------------------------------------------------------------------
 
@@ -325,7 +258,7 @@ class QSM(hamil_module.Hamiltonian):
             if ns is None:
                 raise ValueError(self._ERR_EITHER_HIL_OR_NS)
             hilbert_space = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
-        
+            
         # Initialize the Hamiltonian
         super().__init__(hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
         
@@ -351,12 +284,14 @@ class QSM(hamil_module.Hamiltonian):
         self.init_particles()
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
         self._hamil                     = None
-        self._loc_energy_int_fun        = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
-        self._loc_energy_np_fun         = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=False)
         self._std_en                    = None
+        self._set_local_energy_functions()
+        
+        # self._loc_energy_int_fun        = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
+        self._loc_energy_np_fun         = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=False)
         if _JAX_AVAILABLE:
             self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)       
-        self._local_energy_test()
+        # self._local_energy_test()
     
     # ----------------------------------------------------------------------------------------------
     
@@ -486,7 +421,7 @@ class QSM(hamil_module.Hamiltonian):
     
     def __init_a_distances(self):
         ''' Initialize the random distances for the 'free' particles. '''
-        self._au = self._a ** self._u
+        self._au        = self._a ** self._u
     
     def init_particles(self):
         ''' Initialize the particles in the dot and outside the dot. '''
@@ -635,4 +570,33 @@ class QSM(hamil_module.Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
+    def _set_local_energy_functions(self):
+        # operators
+        operators       = [[] for _ in range(self.ns)]
+        operators_local = [[] for _ in range(self.ns)]
+        
+        op_sz_l         =   operators_spin_module.sig_z(ns = self.ns,
+                                type_act = operators_spin_module.OperatorTypeActing.Local)
+        op_sx_sx_c      =   operators_spin_module.sig_x(ns = self.ns,
+                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
+        
+        for i in range(self.n, self.ns):
+            self._log(f"Starting i: {i}", lvl = 1, log = 'debug')
+            part_idx    =   i - self.n
+            
+            # now check the local operators
+            operators_local[i].append((op_sz_l, [i], self._h[part_idx]))
+            operators[i].append((op_sx_sx_c, [i, self._neidot[part_idx]], self.g0 * self._au[part_idx]))
+        
+        # finish
+        operators_int               = [[(op.int, sites, vals) for (op, sites, vals) in operators[i]] for i in range(self.ns)]
+        operators_local_int         = [[(op.int, sites, vals) for (op, sites, vals) in operators_local[i]] for i in range(self.ns)]
+        self._loc_energy_int_fun    = hamil_module.local_energy_int_wrap(self.ns, operators_int, operators_local_int)
+        # self._loc_energy_jax_fun    = None
+        # self._loc_energy_np_fun     = None
+        # if _JAX_AVAILABLE:
+            # self._loc_energy_int_jax_fun = hamil_module.local_energy_int_wrap(ns, operators, operators_local, use_jax=True)
+        
+        self._log("Successfully set local energy functions...", log=2)
+        
 ####################################################################################################
