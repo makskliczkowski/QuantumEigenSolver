@@ -5,10 +5,16 @@ author  :
 
 ################################################################################
 
-from typing import Callable, Tuple, Optional, Any
-import numba.typed
-import numpy as np
 import numba
+import numpy as np
+import numba.typed
+
+from general_python.algebra.utils import _JAX_AVAILABLE
+from typing import Callable, Tuple, Optional, Any
+from Algebra.hamil_energy_helper import unpack_operator_terms
+
+if _JAX_AVAILABLE:
+    from Algebra.hamil_energy_jax import local_energy_arr_jax, local_energy_jax_wrap
 
 #################################################################################
 
@@ -122,36 +128,9 @@ def local_energy_int_wrap(ns : int,
         - wrapper : function
             A function that takes a state and site index as input and returns the new states and operator values.
     '''
-    
-    if len(operator_terms_list) == 1:
-        operator_terms_list     = [operator_terms_list for _ in range(ns)]
-        for i in range(len(operator_terms_list, ns)):
-            operator_terms_list.append(([],[],[]))
-            
-    if len(local_operators_list) != ns:
-        for i in range(len(local_operators_list, ns)):
-            local_operators_list.append(([],[],[]))
-    
-    # unpack nonlocal
-    nonlocal_func_unpacked  = [[] for _ in range(ns)]
-    nonlocal_site_unpacked  = [[] for _ in range(ns)]
-    nonlocal_mult_unpacked  = [[] for _ in range(ns)]
-    for i in range(ns):
-        nonlocal_i_size     = len(operator_terms_list[i])
-        for k in range(nonlocal_i_size):
-            nonlocal_func_unpacked[i].append(operator_terms_list[i][k][0])
-            nonlocal_site_unpacked[i].append(operator_terms_list[i][k][1])
-            nonlocal_mult_unpacked[i].append(operator_terms_list[i][k][2])
-    # locals
-    local_func_unpacked     = [[] for _ in range(ns)]
-    local_site_unpacked     = [[] for _ in range(ns)]
-    local_mult_unpacked     = [[] for _ in range(ns)]
-    for i in range(ns):
-        local_i_size        = len(local_operators_list[i])
-        for k in range(local_i_size):
-            local_func_unpacked[i].append(local_operators_list[i][k][0])
-            local_site_unpacked[i].append(local_operators_list[i][k][1])
-            local_mult_unpacked[i].append(local_operators_list[i][k][2])
+    # Unpack the nonlocal and local operators
+    nonlocal_func_unpacked, nonlocal_site_unpacked, nonlocal_mult_unpacked  = unpack_operator_terms(ns, operator_terms_list)
+    local_func_unpacked, local_site_unpacked, local_mult_unpacked           = unpack_operator_terms(ns, local_operators_list)
 
     # @numba.njit(nopytho)
     def wrapper(k_map, i):
@@ -203,15 +182,17 @@ def process_term_nonlocal_arr(state         : np.ndarray,
         op_value is scaled by the multiplier.
     """
     new_state, op_value = op_func(state, sites_args)
+    
+    # ensure that new state is two dimensional
     if new_state.ndim == 1:
         new_state = new_state.reshape(1, new_state.shape[0])
     return new_state, multiplier * op_value
 
 @numba.njit
-def process_term_local_arr(state        : np.ndarray,
-                            sites_args  : Any,
-                            multiplier  : float,
-                            op_func     : Callable) -> float:
+def process_term_local_arr(state            : np.ndarray,
+                            sites_args      : Any,
+                            multiplier      : float,
+                            op_func         : Callable) -> float:
     """
     Apply a local operator to the given array state.
     
@@ -228,7 +209,7 @@ def process_term_local_arr(state        : np.ndarray,
     return multiplier * op_value
 
 @numba.njit
-def local_energy_arr(state: np.ndarray,
+def local_energy_arr(state                  : np.ndarray,
                     operator_terms_func,
                     operator_terms_site,
                     operator_terms_mult,
@@ -237,6 +218,11 @@ def local_energy_arr(state: np.ndarray,
                     loc_operator_mult) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute non-local and local energy contributions for an array state.
+    
+    Assumptions:
+        - Each non-local operator function returns a 2D array of shape (n, state_dim)
+            and a corresponding value array of shape (n,). (n is fixed for each operator - usually n = 1)
+        - Each local operator returns a scalar energy contribution.
     
     Parameters:
         state               : 1D numpy array representing the current state.
@@ -256,9 +242,8 @@ def local_energy_arr(state: np.ndarray,
     states_list = numba.typed.List()
     values_list = numba.typed.List()
     
-    num_nonloc  = len(operator_terms_func)
-    
     # Process non-local operator terms.
+    num_nonloc  = len(operator_terms_func)
     for i in range(num_nonloc):
         new_states_term, op_values_term = process_term_nonlocal_arr(state,
                                                                 operator_terms_site[i],
@@ -269,9 +254,7 @@ def local_energy_arr(state: np.ndarray,
         # Ensure op_values_term is a 1D array.
         if op_values_term.ndim == 0:
             op_values_term = np.array([op_values_term])
-        elif op_values_term.ndim == 1:
-            pass
-        else:
+        elif op_values_term.ndim != 1:
             op_values_term = op_values_term.reshape(-1)
         values_list.append(op_values_term)
     
@@ -312,47 +295,10 @@ def local_energy_np_wrap(ns                 : int,
             (all_new_states, all_energy_values)
         where the results are aggregated over all sites.
     """
-    # Broadcast non-local operator terms if only one set is provided.
-    if len(operator_terms_list) == 1:
-        operator_terms_list = operator_terms_list * ns
-    # Ensure the local operators list has one entry per site.
-    if len(local_operators_list) == 1:
-        local_operators_list = local_operators_list * ns
-    elif len(local_operators_list) < ns:
-        for _ in range(ns - len(local_operators_list)):
-            local_operators_list.append(([], [], []))
     
-    # Unpack non-local operator components for each site.
-    nonlocal_func_unpacked  = numba.typed.List()
-    nonlocal_site_unpacked  = numba.typed.List()
-    nonlocal_mult_unpacked  = numba.typed.List()
-    for i in range(ns):
-        funcs = numba.typed.List()
-        sites = numba.typed.List()
-        mults = numba.typed.List()
-        for term in operator_terms_list[i]:
-            funcs.append(term[0])
-            sites.append(term[1])
-            mults.append(term[2])
-        nonlocal_func_unpacked.append(funcs)
-        nonlocal_site_unpacked.append(sites)
-        nonlocal_mult_unpacked.append(mults)
-    
-    # Unpack local operator components for each site.
-    local_func_unpacked = numba.typed.List()
-    local_site_unpacked = numba.typed.List()
-    local_mult_unpacked = numba.typed.List()
-    for i in range(ns):
-        funcs = numba.typed.List()
-        sites = numba.typed.List()
-        mults = numba.typed.List()
-        for term in local_operators_list[i]:
-            funcs.append(term[0])
-            sites.append(term[1])
-            mults.append(term[2])
-        local_func_unpacked.append(funcs)
-        local_site_unpacked.append(sites)
-        local_mult_unpacked.append(mults)
+    # unpack the nonlocal and local operators
+    nonlocal_func_unpacked, nonlocal_site_unpacked, nonlocal_mult_unpacked  = unpack_operator_terms(ns, operator_terms_list)
+    local_func_unpacked, local_site_unpacked, local_mult_unpacked           = unpack_operator_terms(ns, local_operators_list)
     
     @numba.njit
     def wrapper(state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -373,8 +319,8 @@ def local_energy_np_wrap(ns                 : int,
             all_states_list.append(new_states)
             all_energies_list.append(energies)
         
-        all_new_states = np.concatenate(all_states_list, axis=0)
-        all_energy_values = np.concatenate(all_energies_list)
+        all_new_states      = np.concatenate(all_states_list, axis=0)
+        all_energy_values   = np.concatenate(all_energies_list)
         return all_new_states, all_energy_values
     return wrapper
 

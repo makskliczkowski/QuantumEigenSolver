@@ -21,7 +21,6 @@ import Algebra.Operator.operators_spin as operators_spin_module
 import general_python.algebra.linalg as linalg
 from general_python.lattices.lattice import Lattice, LatticeType
 from general_python.lattices.honeycomb import HoneycombLattice
-from general_python.algebra.ran_wrapper import RMT, random_matrix, random_vector
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
 ##########################################################################################
 
@@ -283,6 +282,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         self.set_couplings()
         
         # functions for local energy calculation in a jitted way (numpy and jax)
+        self._set_local_energy_operators()
         self._set_local_energy_functions()
 
         
@@ -361,25 +361,39 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         self._j             = self._set_some_coupling(self._j   if j   is None else j  )
         self._dlt           = self._set_some_coupling(self._dlt if dlt is None else dlt)
     
-    def _set_some_coupling(self, coupling):
-        '''
-        Distinghuishes between different initial values for the coupling and returns it.
+    def _set_local_energy_operators(self):
+        """
+        Set up the local and non-local energy operators for the spin lattice.
+        This method constructs the operator lists representing local (single-site)
+        and correlation (two-site) interactions for the system. It iterates over
+        each site and performs the following steps:
         
-        Parameters:
-            - coupling : some coupling to be set
-        Returns:
-            array to be used latter with corresponding couplings
-        '''
-        if isinstance(coupling, list) and len(coupling) == self.ns:
-            return self._backend.array(coupling)
-        elif isinstance(coupling, (float, int)):
-            return self._backend.array([coupling] * self.ns)
-        elif isinstance(coupling, str):
-            return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
-        else:
-            raise ValueError(self._ERR_COUP_VEC_SIZE)
-
-    def _set_local_energy_functions(self):
+            - Initializes lists to store local (operators_local) and non-local
+                (operators) operator tuples.
+            - For each site:
+                - Creates local operators (sig_x and sig_z) acting on the site.
+                - Creates correlation operators for sig_x, sig_y, and sig_z.
+                - Appends local operators to the local operators list with their associated
+                    field strengths (from self._hx and self._hz).
+            - For each site, iterates over forward nearest neighbors as provided by the
+                lattice object:
+                - Retrieves the neighbor indices using lattice.get_nn_forward.
+                - Computes the interaction multipliers based on Heisenberg coupling terms
+                    (self._j and self._dlt) and Kitaev interaction contributions (self._kx,
+                    self._ky, self._kz), with adjustments made according to the bond directions
+                    (e.g., HEI_KIT_Z_BOND_NEI, HEI_KIT_Y_BOND_NEI).
+                - Appends the corresponding correlation operator tuples to the operator lists.
+            - Logs detailed debug messages at various levels throughout the process.
+            
+        The resulting operator tuples are stored as:
+            - self._local_ops: a list containing tuples of (operator, [site index], coefficient)
+                for local energy contributions.
+            - self._nonlocal_ops: a list containing tuples of (operator, [site index, neighbor index],
+                coefficient) for two-site interactions.
+                
+        Note:
+            This method updates internal state and does not return a value.
+        """
         
         # operators
         operators       = [[] for _ in range(self.ns)]
@@ -402,9 +416,9 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
             op_sz_sz_c  =   operators_spin_module.sig_z(lattice = self._lattice,
                                 type_act = operators_spin_module.OperatorTypeActing.Correlation)
             
-            # now check the local operators 
-            operators_local[i].append((op_sz_l, [i], self._hz[i]))
-            operators[i].append((op_sx_l, [i], self._hx[i]))
+            # now check the local operators
+            self.add(op_sz_l, [i], self._hz[i], is_local = True)
+            self.add(op_sx_l, [i], self._hx[i])
             
             self._log(f"Adding local Sz at {i} with value {self._hz[i]:.2f}", lvl = 2, log = 'debug')
             self._log(f"Adding local Sx at {i} with value {self._hx[i]:.2f}", lvl = 2, log = 'debug')
@@ -434,25 +448,17 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                     sx_sx += self._kx[i]
 
                 # append the operators
-                operators_local[i].append((op_sz_sz_c, [i, nei], sz_sz))
+                self.add(op_sz_sz_c, [i, nei], sz_sz, is_local = True)
                 self._log(f"Adding SzSz at {i},{nei} with value {sz_sz:.2f}", lvl = 2, log = 'debug')
-                operators[i].append((op_sx_sx_c, [i, nei], sx_sx))
+                self.add(op_sx_sx_c, [i, nei], sx_sx)
                 self._log(f"Adding SySy at {i},{nei} with value {sy_sy:.2f}", lvl = 2, log = 'debug')
-                operators[i].append((op_sy_sy_c, [i, nei], sy_sy))
+                self.add(op_sy_sy_c, [i, nei], sy_sy)
                 self._log(f"Adding SxSx at {i},{nei} with value {sx_sx:.2f}", lvl = 2, log = 'debug')
             # finished
             self._log(f"Finished i with len_local: {len(operators_local[i])}, len_normal: {len(operators[i])}", lvl = 1, log = 'debug')
-            
-        
-        operators_int       = [[(op.int, sites, vals) for (op, sites, vals) in operators[i]] for i in range(self.ns)]
-        operators_local_int = [[(op.int, sites, vals) for (op, sites, vals) in operators_local[i]] for i in range(self.ns)]
-        self._loc_energy_int_fun    = hamil_module.local_energy_int_wrap(self.ns, operators_int, operators_local_int)
-        self._loc_energy_jax_fun    = None
-        self._loc_energy_np_fun     = None
-        # if _JAX_AVAILABLE:
-            # self._loc_energy_int_jax_fun = hamil_module.local_energy_int_wrap(ns, operators, operators_local, use_jax=True)
-        
-        self._log("Successfully set local energy functions...", log=2)
+        self._local_ops     = operators_local
+        self._nonlocal_ops  = operators
+        self._log("Successfully set local energy operators...", lvl=1)
 
     # ----------------------------------------------------------------------------------------------
 

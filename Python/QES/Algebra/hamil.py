@@ -17,7 +17,7 @@ Changes :
 
 import numpy as np
 import scipy as sp
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional, Callable
 from abc import ABC, abstractmethod
 from functools import partial
 import time
@@ -26,13 +26,16 @@ import time
 from Algebra.hilbert import HilbertSpace, set_operator_elem
 from Algebra.Operator.operator_matrix import operator_create_np_sparse, operator_create_np, operator_create_np_dense
 from Algebra.hamil_types import *
-from Algebra.hamil_energy import local_energy_int_wrap
+from Algebra.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
 ###################################################################################################
 
 ###################################################################################################
+from general_python.algebra.ran_wrapper import random_vector
 from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, DEFAULT_INT_TYPE, DEFAULT_FLOAT_TYPE, DEFAULT_CPX_TYPE
 import general_python.algebra.linalg as linalg
+
 if _JAX_AVAILABLE:
+    from Algebra.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax, process_matrix_elem_np, process_matrix_batch_np
 ###################################################################################################
 
@@ -173,6 +176,7 @@ class Hamiltonian(ABC):
     _ERR_HAMILTONIAN_INITIALIZATION = "An error occurred during Hamiltonian initialization."
     _ERR_HAMILTONIAN_BUILD          = "An error occurred during Hamiltonian build."
     _ERR_HILBERT_SPACE_NOT_PROVIDED = "The Hilbert space must be provided."
+    _ERR_COUP_VEC_SIZE              = "The coupling vector size is invalid."
     
     _ERRORS = {
         "eigenvalues_not_available"  : _ERR_EIGENVALUES_NOT_AVAILABLE,
@@ -264,8 +268,12 @@ class Hamiltonian(ABC):
         self._name          = "Hamiltonian"
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
         
-        # set to None
-        self._set_local_energy_functions()
+        #! set the local energy functions and the corresponding methods
+        self._nonlocal_ops                                  = [[] for _ in range(self.ns)]
+        self._local_ops                                     = [[] for _ in range(self.ns)]
+        self._loc_energy_int_fun    : Optional[Callable]    = None
+        self._loc_energy_np_fun     : Optional[Callable]    = None
+        self._loc_energy_jax_fun    : Optional[Callable]    = None
         
     # ----------------------------------------------------------------------------------------------
     
@@ -799,7 +807,32 @@ class Hamiltonian(ABC):
                 # do not initialize the Hamiltonian matrix
                 self._hamil     = None
         self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green", log = "debug")
-        
+    
+    # ----------------------------------------------------------------------------------------------
+    
+    def _set_some_coupling(self, coupling: Union[list, np.ndarray, float, complex, int, str]):
+        '''
+        Distinghuishes between different initial values for the coupling and returns it.
+        One distinguishes between:
+            - a full vector of a correct size
+            - single value 
+            - random string
+        ---
+        Parameters:
+            - coupling : some coupling to be set
+        ---
+        Returns:
+            array to be used latter with corresponding couplings
+        '''
+        if isinstance(coupling, list) and len(coupling) == self.ns:
+            return self._backend.array(coupling)
+        elif isinstance(coupling, (float, int, complex)):
+            return self._backend.array([coupling] * self.ns)
+        elif isinstance(coupling, str):
+            return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
+        else:
+            raise ValueError(self._ERR_COUP_VEC_SIZE)
+    
     # ----------------------------------------------------------------------------------------------
     #! Single particle Hamiltonian matrix
     # ----------------------------------------------------------------------------------------------
@@ -1157,16 +1190,110 @@ class Hamiltonian(ABC):
     #! Energy related methods
     # ----------------------------------------------------------------------------------------------
     
-    def _set_local_energy_functions(self):
-        '''
-        Sets the functions for local energy calculation.
-        This method should be implemented by subclasses to provide a specific implementation.
-        '''
-        self._loc_energy_int_fun    = lambda x, i: x, 0.0
-        self._loc_energy_np_fun     = lambda x: x, 0.0
-        self._loc_energy_jax_fun    = lambda x: x, 0.0
+    def add(self, operator, sites, multiplier, is_local: bool = False):
+        """
+        Add an operator to the internal operator collections based on its locality.
         
+        ---
+        Parameters:
+            operator                    : The operator to be added. This can be any object representing an operation,
+                                        typically in the context of a quantum system.
+            sites (list[int])           : A list of site indices where the operator should act. If empty,
+                                        the operator will be associated with site 0.
+            multiplier (numeric)        : A scaling factor to be applied to the operator.
+            is_local (bool, optional)   : Determines the type of operator. If True, the operator is
+                                        considered local (i.e., it does not modify the state) and is
+                                        appended to the local operator list. If False, it is added to
+                                        the non-local operator list. Defaults to False.
+        ---
+        Behavior:
+            - Determines the primary site for the operator based on the first element in the
+                'sites' list, or defaults to index 0 if 'sites' is empty.
+            - Depending on the value of 'is_local', the operator is appended to either the local
+                operator collection (_local_ops) or the non-local operator collection (_nonlocal_ops).
+            - Logs a debug message indicating the addition of the operator along with its details.
+        
+        ---
+        Returns:
+            None
+            
+        --- 
+        Example:
+            operator    = sig_z
+            sites       = [0, 1]
+            hamiltonian.add(operator, sites, multiplier=1.0, is_local=True)
+            # This would add the operator 'sig_z' to the local operator list at site 0 with a multiplier of 1.0.
+        """
+        
+        # check if the sites are provided, if one sets the operator, we would put it at a given site
+        i = 0 if len(sites) == 0 else sites[0]
+        
+        # if the operator is meant to be local, it does not modify the state
+        if is_local:
+            self._local_ops[i].append((operator, sites, multiplier))
+            self._log(f"Adding local operator {operator} at site {i} (sites: {str(sites)}) with multiplier {multiplier}", lvl = 2, log = 'debug')
+        else:
+            self._nonlocal_ops[i].append((operator, sites, multiplier))
+            self._log(f"Adding non-local operator {operator} at site {i} (sites: {str(sites)}) with multiplier {multiplier}", lvl = 2, log = 'debug')
+
+    def _set_local_energy_operators(self):
+        '''
+        This function is meant to be overridden by subclasses to set the local energy operators.
+        The local energy operators are used to calculate the local energy of the Hamiltonian.
+        Note:
+            It is the internal function that knows about the structure of the Hamiltonian.
+        '''
+        pass
     
+    def _set_local_energy_functions(self):
+        """
+        Private method that configures and sets local energy functions for different numerical backends.
+        
+        This method initializes three versions of the local energy function based on the available operator representations:
+            - Integer operations: Constructs a version using the integer attributes (op.int) of both nonlocal and local operators.
+            - NumPy operations: Constructs a version using the NumPy functions (op.npy) for numerical evaluations.
+            - JAX operations: If JAX is available, constructs a version using the JAX functions (op.jax).
+            
+        The method uses the following wrapper functions to create the local energy functions:
+        For each backend, the method:
+        
+            1. Iterates over the nonlocal and local operators for each site.
+            2. Extracts the appropriate operator function (int, npy, or jax), along with corresponding sites and values.
+            3. Wraps the extracted operators using the respective wrapper function (local_energy_int_wrap, local_energy_np_wrap, or local_energy_jax_wrap)
+                to create the corresponding local energy function.
+            4. Stores the resulting function into instance attributes (_loc_energy_int_fun, _loc_energy_np_fun, _loc_energy_jax_fun).
+        
+        --- 
+        Note:
+            - This function assumes that the instance has the attributes:
+                - self.ns: number of sites.
+                - self._nonlocal_ops: a list of nonlocal operator tuples for each site.
+                - self._local_ops: a list of local operator tuples for each site.
+            - JAX version is set only if the flag _JAX_AVAILABLE is True.
+        """
+
+        
+        # set the integer functions
+        operators_int               = [[(op.int, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
+        operators_local_int         = [[(op.int, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
+        self._loc_energy_int_fun    = local_energy_int_wrap(self.ns, operators_int, operators_local_int)
+        
+        # set the numpy functions
+        operators_np               = [[(op.npy, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
+        operators_local_np         = [[(op.npy, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
+        self._loc_energy_np_fun    = local_energy_np_wrap(self.ns, operators_np, operators_local_np)
+
+        # set the jax functions
+        if _JAX_AVAILABLE:
+            operators_jax              = [[(op.jax, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
+            operators_local_jax        = [[(op.jax, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
+            self._loc_energy_jax_fun   = local_energy_jax_wrap(self.ns, operators_jax, operators_local_jax)
+        else:
+            self._loc_energy_jax_fun   = None
+
+        # log success
+        self._log("Successfully set local energy functions...", lvl=1)
+
     def _local_energy_test(self, k_map = 0, i = 0):
         '''
         Tests the local energy calculation.
