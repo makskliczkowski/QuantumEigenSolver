@@ -27,6 +27,7 @@ from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGene
 ################################################################################
 
 ################################################################################
+
 from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.lattice import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
@@ -34,6 +35,7 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE
 from general_python.common.binary import flip, flip_all, check, base2int, int2base, int2binstr
 import general_python.common.binary as _binary
+
 ################################################################################
 
 _I      = 1j
@@ -861,103 +863,6 @@ def sig_y( lattice     : Optional[Lattice]     = None,
         name        = "Sy",
         modifies    = True
     )
-    
-    
-    if lattice is None:
-        assert ns is not None, "Either lattice or ns must be provided."
-    else:
-        ns = lattice.ns
-
-    if type_act == OperatorTypeActing.Global or sites is not None:
-        if sites is None or len(sites) == 0:
-            sites = list(range(ns))
-        
-        
-        if len(sites) % 2 == 1:
-            def funct_int(state):
-                return sigma_y_int_np(state, ns, sites, spin_value)
-            
-            def funct_np(state):
-                return sigma_y_np(state, sites, spin, spin_value)
-        else:
-            def funct_int(state):
-                return sigma_y_int_np_real(state, ns, sites, spin_value)
-            
-            def funct_np(state):
-                return sigma_y_np_real(state, sites, spin_value)
-        
-        if _JAX_AVAILABLE:
-            @jax.jit
-            def funct_jnp(state):
-                return sigma_y_jnp(state, sites, spin_value)
-        else:
-            def funct_jnp(state):
-                return state, 0.0
-
-        _name = "Sy/"
-        for site in sites:
-            _name += f"{site}-"
-        _name = _name[:-1]
-        return Operator(fun_int = funct_int,
-                        fun_np  = funct_np,
-                        fun_jnp = funct_jnp,
-                        eigval  = 1.0,
-                        lattice = lattice,
-                        ns      = ns,
-                        name    = _name,
-                        typek   = SymmetryGenerators.Other, modifies=True)
-    
-    elif type_act == OperatorTypeActing.Local:
-        
-        def funct_int(state, site):
-            return sigma_y_int_np(state, ns, [site], spin_value)
-        
-        def funct_np(state, site):
-            return sigma_y_np(state, [site], spin, spin_value)
-        
-        if _JAX_AVAILABLE:
-            @jax.jit
-            def funct_jnp(state, site):
-                return sigma_y_jnp(state, ns, [site], spin, spin_value)
-        else:
-            def funct_jnp(state, site):
-                return state, 0.0
-        
-        return Operator(fun_int = funct_int,
-                        fun_np  = funct_np,
-                        fun_jnp = funct_jnp,
-                        eigval  = 1.0,
-                        lattice = lattice,
-                        ns      = ns,
-                        name    = "Sy/L",
-                        typek   = SymmetryGenerators.Other, modifies=True)
-    
-    elif type_act == OperatorTypeActing.Correlation:
-        
-        def funct_int(state, site1, site2):
-            return sigma_y_int_np_real(state, ns, [site1, site2], spin_value)
-        
-        def funct_np(state, site1, site2):
-            return sigma_y_np_real(state, [site1, site2], spin_value)
-        
-        if _JAX_AVAILABLE:
-            @jax.jit
-            def funct_jnp(state, site1, site2):
-                return sigma_y_jnp(state, ns, [site1, site2], spin, spin_value)
-        else:
-            def funct_jnp(state, site1, site2):
-                return state, 0.0
-            
-        return Operator(fun_int = funct_int,
-                        fun_np  = funct_np,
-                        fun_jnp = funct_jnp,
-                        eigval  = 1.0,
-                        lattice = lattice,
-                        ns      = ns,
-                        name    = "Sy/C",
-                        typek   = SymmetryGenerators.Other, modifies=True)
-        
-    raise ValueError("Invalid OperatorTypeActing")
 
 # -----------------------------------------------------------------------------
 #! Factory function for sigma_z (σ_z)
@@ -1011,13 +916,13 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
 # Factory function for sigma-plus (σ⁺)
 # -----------------------------------------------------------------------------
 
-def sig_p( lattice    : Optional[Lattice]     = None,
-              ns         : Optional[int]         = None,
-              type_act   : OperatorTypeActing    = OperatorTypeActing.Global,
-              sites      : Optional[List[int]]   = [0],
-              spin       : bool                  = BACKEND_DEF_SPIN,
-              spin_value : float                 = _SPIN,
-              backend    : str                   = DEFAULT_BACKEND) -> Operator:
+def sig_p( lattice     : Optional[Lattice]     = None,
+            ns         : Optional[int]         = None,
+            type_act   : OperatorTypeActing    = OperatorTypeActing.Global,
+            sites      : Optional[List[int]]   = [0],
+            spin       : bool                  = BACKEND_DEF_SPIN,
+            spin_value : float                 = _SPIN,
+            backend    : str                   = DEFAULT_BACKEND) -> Operator:
     """
     Factory function for σ⁺.
     Parameters

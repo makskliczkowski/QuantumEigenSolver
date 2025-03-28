@@ -233,36 +233,33 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         """
         
         # operators
-        operators       = [[] for _ in range(self.ns)]
-        operators_local = [[] for _ in range(self.ns)]
         lattice         = self._lattice
+        #! define the operators beforehand
+        op_sx_l         =   operators_spin_module.sig_x(lattice = self._lattice,
+                                type_act = operators_spin_module.OperatorTypeActing.Local)
+        op_sz_l         =   operators_spin_module.sig_z(lattice = self._lattice,
+                                type_act = operators_spin_module.OperatorTypeActing.Local)
+        
+        # Kitaev and Heisenberg terms
+        op_sx_sx_c      =   operators_spin_module.sig_x(lattice = self._lattice,
+                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
+        op_sy_sy_c      =   operators_spin_module.sig_y(lattice = self._lattice,
+                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
+        op_sz_sz_c      =   operators_spin_module.sig_z(lattice = self._lattice,
+                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
         
         for i in range(self.ns):
             self._log(f"Starting i: {i}", lvl = 1, log = 'debug')
             
-            op_sx_l     =   operators_spin_module.sig_x(lattice = self._lattice,
-                                type_act = operators_spin_module.OperatorTypeActing.Local)
-            op_sz_l     =   operators_spin_module.sig_z(lattice = self._lattice,
-                                type_act = operators_spin_module.OperatorTypeActing.Local)
-            
-            # Kitaev and Heisenberg terms
-            op_sx_sx_c  =   operators_spin_module.sig_x(lattice = self._lattice,
-                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
-            op_sy_sy_c  =   operators_spin_module.sig_y(lattice = self._lattice,
-                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
-            op_sz_sz_c  =   operators_spin_module.sig_z(lattice = self._lattice,
-                                type_act = operators_spin_module.OperatorTypeActing.Correlation)
-            
             # now check the local operators
-            self.add(op_sz_l, [i], self._hz[i], is_local = True)
-            self.add(op_sx_l, [i], self._hx[i])
+            self.add(op_sz_l, multiplier = self._hz[i], is_local = True, sites = [i])
+            self.add(op_sx_l, multiplier = self._hx[i], is_local = False, sites = [i])
             
             self._log(f"Adding local Sz at {i} with value {self._hz[i]:.2f}", lvl = 2, log = 'debug')
             self._log(f"Adding local Sx at {i} with value {self._hx[i]:.2f}", lvl = 2, log = 'debug')
             
             # now check the correlation operators
             nn_forward_num = lattice.get_nn_forward_num(i)
-            # Kitaev - Z direction and Heisenberg - SzSz
             for nn in range(nn_forward_num):
                 nei = lattice.get_nn_forward(i, num=nn)
 
@@ -285,17 +282,15 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                     sx_sx += self._kx[i]
 
                 # append the operators
-                self.add(op_sz_sz_c, [i, nei], sz_sz, is_local = True)
+                self.add(op_sz_sz_c, sites = [i, nei], multiplier = sz_sz, is_local = True)
                 self._log(f"Adding SzSz at {i},{nei} with value {sz_sz:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sx_sx_c, [i, nei], sx_sx)
+                self.add(op_sx_sx_c, sites = [i, nei], multiplier = sx_sx)
                 self._log(f"Adding SySy at {i},{nei} with value {sy_sy:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sy_sy_c, [i, nei], sy_sy)
+                self.add(op_sy_sy_c, sites = [i, nei], multiplier = sy_sy)
                 self._log(f"Adding SxSx at {i},{nei} with value {sx_sx:.2f}", lvl = 2, log = 'debug')
             # finished
-            self._log(f"Finished i with len_local: {len(operators_local[i])}, len_normal: {len(operators[i])}", lvl = 1, log = 'debug')
-        self._local_ops     = operators_local
-        self._nonlocal_ops  = operators
-        self._log("Successfully set local energy operators...", lvl=1)
+            self._log(f"Finished i with len_local: {len(self._local_ops[i])}, len_normal: {len(self._nonlocal_ops[i])}", lvl = 1, log = 'info')
+        self._log("Successfully set local energy operators...", lvl=1, log='info')
 
     # ----------------------------------------------------------------------------------------------
 

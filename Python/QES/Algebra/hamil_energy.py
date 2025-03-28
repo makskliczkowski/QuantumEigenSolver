@@ -88,8 +88,8 @@ def local_energy_int(k_map : np.int64,
         multiplier              = loc_operator_mult[ii]
         local_value             += process_term_local_numba(k_map, sites_args, multiplier, op_func)[0]
     if num_locals > 0:
-        states_list.append(np.array(k_map))
-        values_list.append(np.array(local_value))
+        states_list.append(np.array([k_map], dtype = np.int64))
+        values_list.append(np.array([local_value]))
         
     # Concatenate the resulting arrays.
     if states_list:

@@ -141,70 +141,53 @@ def local_energy_jax_wrap(ns                        : int,
     total_rows      = rows_per_site * ns
     
     # create a wrapper function
-    @partial(jax.jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9))
-    def wrapper(state                   : jnp.ndarray,
-                nonloc_funcs_unpacked   : List[List[Callable]],
-                nonloc_sites_unpacked   : List[List[int]],
-                nonloc_mult_unpacked    : List[float],
-                local_funcs_unpacked    : List[List[Callable]],
-                local_sites_unpacked    : List[List[int]],
-                local_mult_unpacked     : List[float],
-                ns                      : int,
-                rows_per_site           : int,
-                state_dim               : int) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    def init_wrapper(nonloc_funcs_unpacked      : List[List[Callable]],
+                nonloc_sites_unpacked           : List[List[int]],
+                nonloc_mult_unpacked            : List[float],
+                local_funcs_unpacked            : List[List[Callable]],
+                local_sites_unpacked            : List[List[int]],
+                local_mult_unpacked             : List[float],
+                ns                              : int,
+                rows_per_site                   : int,
+                state_dim                       : int) -> Tuple[jnp.ndarray, jnp.ndarray]:
         
-        # Preallocate arrays for the aggregated output.
-        all_states      = jnp.zeros((total_rows, state_dim), dtype=state.dtype)
-        all_energies    = jnp.zeros((total_rows,), dtype=dtype)
         
-        def body_fun(i, carry):
-            all_states_acc, all_energies_acc = carry
-            site_states, site_energies = local_energy_arr_jax(
-                state,
-                nonloc_funcs_unpacked[i],
-                nonloc_sites_unpacked[i],
-                nonloc_mult_unpacked[i],
-                local_funcs_unpacked[i],
-                local_sites_unpacked[i],
-                local_mult_unpacked[i]
-            )
+        @jax.jit
+        def wrapper(state: jnp.ndarray):
             
-            start               = i * rows_per_site
-            all_states_acc      = jax.lax.dynamic_update_slice(all_states_acc, site_states, (start, 0))
-            all_energies_acc    = jax.lax.dynamic_update_slice(all_energies_acc, site_energies, (start,))
-            return (all_states_acc, all_energies_acc)
+            # Preallocate arrays for the aggregated output.
+            all_states      = jnp.zeros((total_rows, state_dim), dtype=state.dtype)
+            all_energies    = jnp.zeros((total_rows,), dtype=dtype)
+            
+            def body_fun(i, carry):
+                all_states_acc, all_energies_acc = carry
+                site_states, site_energies = local_energy_arr_jax(
+                    state,
+                    nonloc_funcs_unpacked[i],
+                    nonloc_sites_unpacked[i],
+                    nonloc_mult_unpacked[i],
+                    local_funcs_unpacked[i],
+                    local_sites_unpacked[i],
+                    local_mult_unpacked[i]
+                )
+                
+                start               = i * rows_per_site
+                all_states_acc      = jax.lax.dynamic_update_slice(all_states_acc, site_states, (start, 0))
+                all_energies_acc    = jax.lax.dynamic_update_slice(all_energies_acc, site_energies, (start,))
+                return (all_states_acc, all_energies_acc)
+            all_states, all_energies = jax.lax.fori_loop(0, ns, body_fun, (all_states, all_energies))
+            return all_states, all_energies
         
-        all_states, all_energies = jax.lax.fori_loop(0, ns, body_fun, (all_states, all_energies))
-        return all_states, all_energies
+        return wrapper
     
-    # Return the wrapper function
-    def final_wrapper(state: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
-        """
-        Final wrapper function to call the JAX compiled function.
-        
-        ---
-        Params:
-        state (jnp.ndarray): 
-            Input state array.
-        
-        ---
-        Returns:
-        Tuple[jnp.ndarray, jnp.ndarray]:
-            Padded states and energies.
-        """
-        return wrapper(
-            state,
-            operator_funcs,
-            operator_indices,
-            operator_mult,
-            operator_local_funcs,
-            operator_local_indices,
-            operator_local_mult,
-            ns,
-            rows_per_site,
-            state.shape[1]
-        )
-    
-    return jax.jit(final_wrapper)
+    return init_wrapper(operator_funcs,
+                        operator_indices,
+                        operator_mult,
+                        operator_local_funcs,
+                        operator_local_indices,
+                        operator_local_mult,
+                        ns,
+                        rows_per_site,
+                        state_dim=ns)
 
 #################################################################################

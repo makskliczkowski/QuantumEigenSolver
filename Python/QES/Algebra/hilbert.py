@@ -1377,8 +1377,8 @@ class HilbertSpace(ABC):
         Returns:
             np.ndarray: The i-th basis state of the Hilbert space.
         """
-        if isinstance(i, int):
-            return self._mapping[i] if len(self._mapping) > 0 else i
+        if isinstance(i, (int, np.integer)):
+            return self._mapping[i] if (self._mapping is not None and len(self._mapping) > 0) else i
         return self._mapping[i]
     
     def __call__(self, i):

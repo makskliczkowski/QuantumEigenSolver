@@ -18,13 +18,14 @@ Changes :
 import numpy as np
 import scipy as sp
 from typing import List, Tuple, Union, Optional, Callable
-from abc import ABC, abstractmethod
+from abc import ABC
 from functools import partial
 import time
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
-from Algebra.Operator.operator_matrix import operator_create_np_sparse, operator_create_np, operator_create_np_dense
+from Algebra.Operator.operator import Operator, create_add_operator
+from Algebra.Operator.operator_matrix import operator_create_np
 from Algebra.hamil_types import *
 from Algebra.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
 ###################################################################################################
@@ -36,7 +37,7 @@ import general_python.algebra.linalg as linalg
 
 if _JAX_AVAILABLE:
     from Algebra.hamil_energy import local_energy_jax_wrap
-    from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax, process_matrix_elem_np, process_matrix_batch_np
+    from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
 ###################################################################################################
 
 if _JAX_AVAILABLE:
@@ -976,9 +977,11 @@ class Hamiltonian(ABC):
                 - row_indices               :  The row indices after the operator acts.
                 - values                    : The corresponding matrix element values.
         '''
+        if self._loc_energy_int_fun is None:
+            self._set_local_energy_functions()
         return self._loc_energy_int_fun(k_map, i)
     
-    def _loc_energy_arr_jax(self, k : Union[int, np.ndarray]):
+    def loc_energy_arr_jax(self, k : Union[int, np.ndarray]):
         '''
         Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
         Uses an array as a state input.
@@ -989,7 +992,7 @@ class Hamiltonian(ABC):
         '''
         return self._loc_energy_jax_fun(k)
     
-    def _loc_energy_arr_np(self, k : Union[int, np.ndarray]):
+    def loc_energy_arr_np(self, k : Union[np.ndarray]):
         '''
         Calculates the local energy based on the Hamiltonian. This method should be implemented by subclasses.
         Uses an array as a state input.
@@ -1012,9 +1015,15 @@ class Hamiltonian(ABC):
                 - row_indices               : The row indices after the operator acts.
                 - values                    : The corresponding matrix element values.
         '''
-        if self._is_jax:
-            return self._loc_energy_arr_jax(k)
-        return self._loc_energy_arr_np(k)
+        if self._is_jax or isinstance(k, jnp.ndarray):
+            if self._loc_energy_jax_fun is None:
+                self._set_local_energy_functions()
+            return self.loc_energy_arr_jax(k)
+        
+        # go!
+        if self._loc_energy_np_fun is None:
+            self._set_local_energy_functions()
+        return self.loc_energy_arr_np(k)
     
     def loc_energy(self, k : Union[int, np.ndarray], i : int = 0):
         '''
@@ -1027,7 +1036,7 @@ class Hamiltonian(ABC):
             k (Union[int, Backend.ndarray])         : The k'th element of the Hilbert space - may use mapping if necessary.
             i (int)                                 : The i'th site.
         '''
-        if isinstance(k, (int, np.integer)):
+        if isinstance(k, (int, np.integer, int, jnp.integer)):
             return self.loc_energy_int(self._hilbert_space[k], i)
         elif isinstance(k, List):
             # concatenate the results
@@ -1220,27 +1229,39 @@ class Hamiltonian(ABC):
     #! Energy related methods
     # ----------------------------------------------------------------------------------------------
     
-    def add(self, operator, sites: List[int], multiplier: Union[float, complex, int], is_local: bool = False):
+    def reset_operators(self):
+        '''
+        Resets the Hamiltonian operators...
+        '''
+        self._local_ops             = [[] for _ in range(self.ns)]
+        self._nonlocal_ops          = [[] for _ in range(self.ns)]
+        self._loc_energy_int_fun    = None
+        self._loc_energy_np_fun     = None
+        self._loc_energy_jax_fun    = None
+    
+    def add(self, operator, multiplier: Union[float, complex, int], is_local: bool = False, sites = None):
         """
         Add an operator to the internal operator collections based on its locality.
         
         ---
         Parameters:
-            operator                    : The operator to be added. This can be any object representing an operation,
-                                        typically in the context of a quantum system.
-            sites (list[int])           : A list of site indices where the operator should act. If empty,
-                                        the operator will be associated with site 0.
-            multiplier (numeric)        : A scaling factor to be applied to the operator.
-            is_local (bool, optional)   : Determines the type of operator. If True, the operator is
-                                        considered local (i.e., it does not modify the state) and is
-                                        appended to the local operator list. If False, it is added to
-                                        the non-local operator list. Defaults to False.
+            operator: 
+                The operator to be added. This can be any object representing an operation,
+                typically in the context of a quantum system.
+            sites (list[int]): 
+                A list of site indices where the operator should act. If empty,
+                the operator will be associated with site 0.
+            multiplier (numeric): A scaling factor to be applied to the operator.
+            is_local (bool, optional):
+                Determines the type of operator. If True, the operator is
+                considered local (i.e., it does not modify the state) and is
+                appended to the local operator list. If False, it is added to
+                the non-local operator list. Defaults to False.
         ---
         Behavior:
-            - Determines the primary site for the operator based on the first element in the
-                'sites' list, or defaults to index 0 if 'sites' is empty.
-            - Depending on the value of 'is_local', the operator is appended to either the local
-                operator collection (_local_ops) or the non-local operator collection (_nonlocal_ops).
+        
+            - Determines the primary site for the operator based on the first element in the 'sites' list, or defaults to index 0 if 'sites' is empty.
+            - Depending on the value of 'is_local', the operator is appended to either the local operator collection (_local_ops) or the non-local operator collection (_nonlocal_ops).
             - Logs a debug message indicating the addition of the operator along with its details.
         
         ---
@@ -1249,22 +1270,23 @@ class Hamiltonian(ABC):
             
         --- 
         Example:
-            operator    = sig_z
-            sites       = [0, 1]
-            hamiltonian.add(operator, sites, multiplier=1.0, is_local=True)
-            # This would add the operator 'sig_z' to the local operator list at site 0 with a multiplier of 1.0.
+        >> operator    = sig_z
+        >> sites       = [0, 1]
+        >> hamiltonian.add(operator, sites, multiplier=1.0, is_local=True)
+        >> This would add the operator 'sig_z' to the local operator list at site 0 with a multiplier of 1.0.
         """
         
         # check if the sites are provided, if one sets the operator, we would put it at a given site
-        i = 0 if len(sites) == 0 else sites[0]
+        i           = 0 if (sites is None or len(sites) == 0) else sites[0]
+        op_tuple    = create_add_operator(operator, multiplier, sites)
         
         # if the operator is meant to be local, it does not modify the state
         if is_local:
-            self._local_ops[i].append((operator, sites, multiplier))
-            self._log(f"Adding local operator {operator} at site {i} (sites: {str(sites)}) with multiplier {multiplier}", lvl = 2, log = 'debug')
+            self._local_ops[i].append((op_tuple))
+            self._log(f"Adding local operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2, log = 'debug')
         else:
-            self._nonlocal_ops[i].append((operator, sites, multiplier))
-            self._log(f"Adding non-local operator {operator} at site {i} (sites: {str(sites)}) with multiplier {multiplier}", lvl = 2, log = 'debug')
+            self._nonlocal_ops[i].append((op_tuple))
+            self._log(f"Adding non-local operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2, log = 'debug')
 
     def _set_local_energy_operators(self):
         '''

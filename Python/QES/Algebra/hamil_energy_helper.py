@@ -15,10 +15,18 @@ description:
 from typing import Callable, Tuple, Optional, Any, List
 from numba.typed import List as TypedList
 
+# ListType = TypedList
+ListType = list
+
 ################################################################################
 
 # Define a default operator function.
 def default_operator(x, i):
+    '''Default operator function'''
+    return (x, 0.0)
+
+def default_operator_njit(x, i):
+    '''Default operator function for numba'''
     return (x, 0.0)
 
 def unpack_operator_terms(
@@ -58,24 +66,30 @@ def unpack_operator_terms(
     
     if len(operator_terms) < ns:
         for ii in range(ns - len(operator_terms)):
-            operator_terms.append((default_operator, [[ii]], [0.0]))
+            operator_terms.append((TypedList(), [[ii]], [0.0]))
     
-    operator_funcs      = TypedList()
-    operator_indices    = TypedList()
-    operator_mult       = TypedList()
+    operator_funcs      = ListType()
+    operator_indices    = ListType()
+    operator_mult       = ListType()
     
     # handle the unpacking now
     for i in range(ns):
-        funcs = TypedList()
-        sites = TypedList()
-        mults = TypedList()
+        funcs = ListType()
+        sites = ListType()
+        mults = ListType()
         for term in operator_terms[i]:
             funcs.append(term[0])
             sites.append(term[1])
             mults.append(term[2])
-        operator_funcs.append(funcs)
-        operator_indices.append(sites)
-        operator_mult.append(mults)
+        if len(funcs) != 0:
+            operator_funcs.append(funcs)
+            operator_indices.append(sites)
+            operator_mult.append(mults)
+        else:
+            operator_funcs.append(ListType())
+            operator_indices.append(ListType())
+            operator_mult.append(0.0)
+            
     return operator_funcs, operator_indices, operator_mult
 
 ################################################################################

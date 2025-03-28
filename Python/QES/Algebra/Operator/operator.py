@@ -22,6 +22,7 @@ Author  : Maksymilian Kliczkowski, WUST, Poland
 import copy                  
 import time
 import numpy as np
+import numba
 from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
 from typing import Optional, Callable, Union, Iterable, Any
@@ -1093,7 +1094,7 @@ class Operator(ABC):
     @property
     def npy(self):
         ''' Set the function that defines the operator '''
-        return self._fun.np
+        return self._fun.npy
     
     @property
     def jax(self):
@@ -1102,7 +1103,7 @@ class Operator(ABC):
     
     # -------------------------------
     
-    def override_matrix_fuction(self, function : Callable):
+    def override_matrix_function(self, function : Callable):
         """
         Override the matrix function of the operator.
         """
@@ -1369,7 +1370,6 @@ def operator_identity(backend : str = 'default') -> Operator:
 
 ####################################################################################################
 
-
 def create_operator(type_act        : int | OperatorTypeActing,
                     op_func_int     : Callable,
                     op_func_np      : Callable,
@@ -1433,23 +1433,29 @@ def create_operator(type_act        : int | OperatorTypeActing,
     else:
         assert ns is not None, "Either lattice or ns must be provided."
     
+    sites_jnp = jnp.array(sites, dtype = jnp.int32) if sites is not None and _JAX_AVAILABLE else sites
+    
     # Global operator: the operator acts on a specified set of sites (or all if sites is None)
     if type_act == OperatorTypeActing.Global or sites is not None:
         
         # If sites is None, we act on all sites.
         if sites is None or len(sites) == 0:
             sites = list(range(ns))
+        if _JAX_AVAILABLE:
+            sites_jnp = jnp.array(sites, dtype = jnp.int32)
         
+        # @numba.njit
         def fun_int(state):
             return op_func_int(state, ns, sites, *extra_args)
         
+        # @numba.njit
         def fun_np(state):
             return op_func_np(state, sites, *extra_args)
         
         if _JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state):
-                return op_func_jnp(state, sites, *extra_args)
+                return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state):
                 return state, 0.0
@@ -1468,14 +1474,20 @@ def create_operator(type_act        : int | OperatorTypeActing,
     
     # Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
     elif type_act == OperatorTypeActing.Local:
+        
+        # @numba.njit
         def fun_int(state, i):
             return op_func_int(state, ns, [i], *extra_args)
+        
+        # @numba.njit
         def fun_np(state, i):
             return op_func_np(state, [i], *extra_args)
+        
         if _JAX_AVAILABLE:
-            @jax.jit
+            @partial(jax.jit, static_argnums=(1,))
             def fun_jnp(state, i):
-                return op_func_jnp(state, ns, [i], *extra_args)
+                sites_jnp = jnp.array([i], dtype = jnp.int32)
+                return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i):
                 return state, 0.0
@@ -1492,14 +1504,20 @@ def create_operator(type_act        : int | OperatorTypeActing,
     
     # Correlation operator: the operator acts on a pair of sites.
     elif type_act == OperatorTypeActing.Correlation:
+        
+        # @numba.njit
         def fun_int(state, i, j):
             return op_func_int(state, ns, [i, j], *extra_args)
+        
+        # @numba.njit
         def fun_np(state, i, j):
             return op_func_np(state, [i, j], *extra_args)
+        
         if _JAX_AVAILABLE:
-            @jax.jit
+            @partial(jax.jit, static_argnums=(1, 2))
             def fun_jnp(state, i, j):
-                return op_func_jnp(state, ns, [i, j], *extra_args)
+                sites_jnp = jnp.array([i, j], dtype = jnp.int32)
+                return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i, j):
                 return state, 0.0
@@ -1531,3 +1549,36 @@ def create_operator(type_act        : int | OperatorTypeActing,
 # For a correlation operator:
 #   op = create_operator(OperatorTypeActing.Correlation, sigma_x_int_np, sigma_x_np, sigma_x_jnp,
 #                        ns=16, extra_args=(spin_value,))
+
+def create_add_operator(operator: Operator, multiplier: Union[float, int, complex], sites = None):
+    """
+    Create a tuple representing an operator with its associated sites and multiplier.
+    This function takes an operator instance along with a multiplier and an optional list of sites,
+    and returns a tuple containing the operator, its sites, and the multiplier. If the operator is of
+    Global type, the provided sites are ignored and replaced with an empty list.
+    Parameters:
+        operator (Operator):
+            The operator instance to be added.
+        multiplier (Union[float, int, complex]):
+            The scalar multiplier associated with the operator.
+        sites (Optional[List[Any]], optional):
+            The list of sites where the operator acts. Defaults to None. If the operator's type is Global, sites will be overridden with an empty list.
+    
+    ---
+    Returns:
+        Tuple[Operator, List[Any], Union[float, int, complex]]:
+            A tuple containing the operator, the adjusted list of sites, and the multiplier.
+    """
+
+    
+    # if the operator is of Global type, we don't want to add the states to the argument, pass empty list
+    sites_arg   = sites if not operator.type == OperatorTypeActing.Global else []
+    
+    # if sites is None, we pass an empty list
+    if sites_arg is None:
+        sites_arg = []
+    
+    # create the operator tuple
+    return (operator, sites_arg, multiplier)
+
+####################################################################################################
