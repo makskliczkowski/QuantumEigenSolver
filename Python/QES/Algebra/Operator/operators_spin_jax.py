@@ -13,6 +13,7 @@ Version     : 1.0
 
 import math
 from typing import List, Union
+from functools import partial
 
 ################################################################################
 from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGenerators
@@ -54,7 +55,7 @@ if _JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 
 if _JAX_AVAILABLE:
-    @jax.jit
+    @partial(jax.jit, static_argnums=(1, 2))
     def sigma_x_int_jnp(state,
                         ns,
                         sites,
@@ -89,7 +90,7 @@ if _JAX_AVAILABLE:
         final_state, final_coeff = lax.fori_loop(0, num_sites, body, init)
         return final_state, final_coeff
 
-    @jax.jit
+    # @partial(jax.jit, static_argnums=(1))
     def sigma_x_jnp(state,
                     sites       : Union[List[int], None],
                     spin_value  : float = _SPIN):
@@ -107,7 +108,6 @@ if _JAX_AVAILABLE:
         
         # Pre-calculate the overall coefficient as spin_value raised to the number of flips.
         coeff = spin_value ** len(sites)
-        
         # Define the loop body function.
         def body_fun(i, state_val):
             # Get the current site from the (static) list.
@@ -125,7 +125,7 @@ if _JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 
 if _JAX_AVAILABLE:
-    @jax.jit
+    @partial(jax.jit, static_argnums=(1,3))
     def sigma_y_int_jnp(state,
                         ns          : int,
                         sites       : Union[List[int], None],
@@ -164,7 +164,7 @@ if _JAX_AVAILABLE:
         final_state, final_coeff = lax.fori_loop(0, len(sites), body, (state, 1.0 + 0j))
         return final_state, final_coeff
 
-    @jax.jit
+    @partial(jax.jit, static_argnums=(1))
     def sigma_y_jnp(state,
                     sites       : Union[List[int], None],
                     spin_value  : float = _SPIN):
@@ -204,7 +204,7 @@ if _JAX_AVAILABLE:
 
 if _JAX_AVAILABLE:
 
-    @jax.jit
+    @partial(jax.jit, static_argnums=(1,3))
     def sigma_z_int_jnp(state,
                         ns          : int,
                         sites       : Union[List[int], None],
@@ -249,7 +249,7 @@ if _JAX_AVAILABLE:
         coeff = lax.fori_loop(0, len(sites), body, 1.0)
         return state, coeff
 
-    @jax.jit
+    # @partial(jax.jit, static_argnums=(1))
     def sigma_z_jnp(state,
                     sites       : Union[List[int], None],
                     spin_value  : float = _SPIN):

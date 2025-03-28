@@ -21,8 +21,6 @@ import Algebra.Operator.operators_spin as operators_spin_module
 import general_python.algebra.linalg as linalg
 from general_python.lattices.lattice import Lattice, LatticeType
 from general_python.lattices.honeycomb import HoneycombLattice
-from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
-##########################################################################################
 
 # ----------------------------------------------------------------------------------------
 #! DEFINE CONSTANTS
@@ -31,168 +29,6 @@ from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_T
 HEI_KIT_Z_BOND_NEI = 1
 HEI_KIT_Y_BOND_NEI = 2
 HEI_KIT_X_BOND_NEI = 0
-
-# ----------------------------------------------------------------------------------------
-#! ARRAY STATES
-# ----------------------------------------------------------------------------------------
-
-@numba.njit
-def _local_energy_arr_loop(state,
-                        hx          : np.ndarray,
-                        hz          : np.ndarray,
-                        j_cpl       : np.ndarray,
-                        delta_cpl   : np.ndarray,
-                        kx_cpl      : np.ndarray,
-                        ky_cpl      : np.ndarray,
-                        kz_cpl      : np.ndarray,
-                        neib_z      : np.ndarray,
-                        neib_y      : np.ndarray,
-                        neib_x      : np.ndarray,
-                        addit_n     : np.ndarray):
-    """
-    Compute the local energy interaction for a numpy array state.
-    
-    Parameters:
-        state   : numpy array of spins (0 or 1)
-        neidot  : numpy array of neighbor indices for free particles
-        h, g0, n, au : model parameters
-        sigma_x, sigma_z : functions to compute the spin operators
-    
-    Returns:
-        Tuple [states], [energies] containing the new states and energies.
-    """
-    size        = state.shape[0]
-    local_value = 0.0
-    
-    states_size = 1 + (1 + neib_x.shape[0] + addit_n.shape[0]) * size
-    new_states  = np.empty((states_size, size), dtype=state.dtype)
-    vals        = np.empty(states_size, dtype=hx.dtype)
-    
-    for i in numba.prange(len(state)):
-        # Apply the local energy interaction.
-        part_idx    = i - n
-        this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
-        
-        # Apply the sigma_z operator
-        _, val      = sigma_z(state, this_site)
-        vals        = h[part_idx] * val.astype(h.dtype)
-        
-        # Apply the sigma_x * sigma_x operator
-        next_site   = neidot[part_idx]
-        idx1, sxn   = sigma_x(state, int(next_site))
-        idx2, sxj   = sigma_x(idx1, this_site)
-        coupling_v  = g0 * au[part_idx] * sxj * sxn
-        # Store the results        
-        local_value += vals
-        states.append(idx2[0])
-        values.append(coupling_v)
-    return states + local_state, values + [local_value]
-
-@numba.njit
-def _local_energy_arr_np(state, neidot, h, g0, n, au):
-    '''
-    Compute the local energy interaction for a numpy array state.
-    Parameters:
-        state   : numpy array of spins (0 or 1)
-        neidot  : numpy array of neighbor indices for free particles
-        h, g0, n, au : model parameters
-    Returns:
-        Tuple [states], [energies] containing the new states and energies.
-    '''
-    return _local_energy_arr_loop(state, neidot, h, g0, n, au)
-
-if _JAX_AVAILABLE:
-    import jax
-    import jax.numpy as jnp
-    from jax import jit as jax_jit
-    
-    @jax_jit
-    def _local_energy_arr_lax(state     : jnp.ndarray,
-                            neidot      : jnp.ndarray,
-                            h           : jnp.ndarray,
-                            g0          : float,
-                            n           : int,
-                            au          : jnp.ndarray,
-                            sigma_x,
-                            sigma_z) -> (jnp.ndarray, jnp.ndarray):
-        """
-        Compute the local energy interaction for a JAX array state.
-        
-        Parameters:
-            state   : jnp.ndarray of spins (0 or 1), shape (S,)
-            neidot  : jnp.ndarray of neighbor indices for free particles, shape (free_count,)
-            h       : jnp.ndarray of magnetic field values, shape (free_count,)
-            g0      : float, coupling strength
-            n       : int, number of particles in the dot
-            au      : jnp.ndarray of coupling strengths, shape (free_count,)
-            sigma_x : function(state, site) -> (new_state, sign)
-                    Operator helper to compute the σₓ operation.
-            sigma_z : function(state, site) -> (state, eigenvalue)
-                    Operator helper to compute the σ_z operation.
-                    
-        Returns:
-            Tuple (all_states, all_values) where:
-                all_states: jnp.ndarray of shape (free_count+1, S) containing the new states.
-                all_values: jnp.ndarray of shape (free_count+1,) containing the corresponding energies.
-        """
-        
-        # Get the size of the state - assumed to be the same for all states.
-        size = state.shape[0]
-        
-        # Assume free indices: i from n to size-1.
-        def scan_fun(local_value, i):
-            part_idx            = i - n  # index into h and au arrays
-            
-            # Diagonal term: apply σ_z at site i.
-            _, eigen_z          = sigma_z(state, i)
-            vals                = h[part_idx] * eigen_z
-            # Off-diagonal term: apply two successive σₓ operations.
-            next_site           = neidot[part_idx]
-            state_temp, v1      = sigma_x(state, next_site)
-            state_x, v2         = sigma_x(state_temp, i)
-            coupling_v          = g0 * au[part_idx] * v1 * v2
-            # Accumulate the σ_z contribution.
-            new_local_value     = local_value + vals
-            # For each free site we output the new state (from σₓσₓ) and the coupling energy.
-            return new_local_value, (state_x, coupling_v)
-        
-        free_indices            = jnp.arange(n, size, dtype=jnp.int32)
-        init_local_value        = 0.0
-        final_local_value, (free_states, free_values) = jax.lax.scan(scan_fun,
-                                                                    init_local_value,
-                                                                    free_indices)
-        # Concatenate the free sites' states with the original state.
-        all_states = jnp.concatenate([free_states, state[None, :]], axis=0)
-        all_values = jnp.concatenate([free_values, jnp.array([final_local_value])], axis=0)
-        return all_states, all_values
-    
-    @jax_jit
-    def _local_energy_arr_jax(state, neidot, h, g0, n, au):
-        '''
-        Compute the local energy interaction for a JAX array state.
-        Parameters:
-            state   : numpy array of spins (0 or 1)
-            neidot  : numpy array of neighbor indices for free particles
-            h, g0, n, au : model parameters
-        Returns:
-            Tuple [states], [energies] containing the new states and energies.
-        '''
-        sigma_x = _operators_spin.sigma_x_jnp
-        sigma_z = _operators_spin.sigma_z_jnp
-        return _local_energy_arr_lax(state, neidot, h, g0, n, au, sigma_x, sigma_z)
-
-def _local_energy_arr_wrap(n, neidot, h, g0, au, use_jax = False):
-    '''Creates a JIT-compiled local energy interaction function.'''
-    if use_jax and _JAX_AVAILABLE:
-        @jax_jit
-        def wrapper(state):
-            return _local_energy_arr_jax(state, neidot, h, g0, n, au)
-        return wrapper
-        
-    @numba.njit
-    def wrapper(state):
-        return _local_energy_arr_np(state, neidot, h, g0, n, au)
-    return wrapper
 
 ##########################################################################################
 #! HAMILTONIAN CLASS
@@ -223,29 +59,33 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                 **kwargs):
         '''
         Constructor for the QSM Hamiltonian.
+        
+        ---
         Parameters:
-            hilbert_space : HilbertSpace
-                Hilbert space for the Hamiltonian - this shall be the Hilbert space for spin 1/2 particles.
-            n : int
-                Number of particles in the dot (ergodic quantum dot).
-            gamma : float
-                Hilbert-Schmidt norm of the coupling operator normalizer.
-            g0 : float
-                Coupling strength between the particles in the dot and the particles outside the dot.
-            a : Union[List[float], None, float]
-                Coupling between the dot and outside world
-            h : Union[List[float], None, float]
-                Magnetic field vector for the particles outside the dot. If it is None, it will be
-                initialized to [1.0] * (Ns - N). If it is a float, it will be initialized to [h] * (Ns - N).
-                If it is a list, it will be used as is.
-            xi : Union[List[float], None, float]
-                Random box distribution vector for the particles outside the dot. If 
-                it is None, it will be initialized to [0.2] * (Ns - N). If it is a float,
-                it will be initialized to [xi] * (Ns - N).
-            dtype : type
-                Data type for the Hamiltonian matrix. Default is np.float64.
-            backend : str
-                Backend for the Hamiltonian matrix (default is "default").
+            lattice : Optional[Lattice]:
+                The lattice structure for the Hamiltonian.
+            hilbert_space : Optional[hilbert_module.HilbertSpace]:
+                The Hilbert space associated with the Hamiltonian.
+            hx : Union[List[float], None, float]:
+                Magnetic field for the x-direction.
+            hz : Union[List[float], None, float]:
+                Magnetic field for the z-direction.
+            kx : Union[List[float], None, float]:
+                Coefficient for the x-direction Kitaev interaction.
+            ky : Union[List[float], None, float]:
+                Coefficient for the y-direction Kitaev interaction.
+            kz : Union[List[float], None, float]:
+                Coefficient for the z-direction Kitaev interaction.
+            j : Union[List[float], None, float]:
+                Coupling constant.
+            dlt : Union[List[float], None, float]:
+                Delta parameter.
+            dtype : type:
+                Data type for the Hamiltonian (default: np.float32).
+            backend : str:
+                Backend to use for computations (default: "default").
+            **kwargs :
+                Additional keyword arguments.
         '''
         
         # Initialize the Hamiltonian
@@ -284,9 +124,6 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         # functions for local energy calculation in a jitted way (numpy and jax)
         self._set_local_energy_operators()
         self._set_local_energy_functions()
-
-        
-        
 
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
 
@@ -461,6 +298,5 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         self._log("Successfully set local energy operators...", lvl=1)
 
     # ----------------------------------------------------------------------------------------------
-
 
 ####################################################################################################

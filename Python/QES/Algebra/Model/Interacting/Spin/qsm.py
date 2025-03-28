@@ -28,173 +28,12 @@ import Algebra.Operator.operators_spin as operators_spin_module
 import general_python.algebra.linalg as linalg
 from general_python.algebra.ran_wrapper import RMT, random_matrix, random_vector
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
-##########################################################################################
 
 # ----------------------------------------------------------------------------------------
 #! DEFINE CONSTANTS
 # ----------------------------------------------------------------------------------------
 
 _QSM_CHECK_HS_NORM = True
-
-# ----------------------------------------------------------------------------------------
-#! ARRAY STATES
-# ----------------------------------------------------------------------------------------
-
-@numba.njit
-def _local_energy_arr_loop(state, neidot, h, g0, n, au):
-    """
-    Compute the local energy interaction for a numpy array state.
-    
-    Parameters:
-        state   : numpy array of spins (0 or 1)
-        neidot  : numpy array of neighbor indices for free particles
-        h, g0, n, au : model parameters
-        sigma_x, sigma_z : functions to compute the spin operators
-    
-    Returns:
-        Tuple [states], [energies] containing the new states and energies.
-    """
-    size        = state.shape[0]
-    local_value = 0.0
-    new_states  = np.empty((size+1, size), dtype=state.dtype)
-    vals        = np.empty(size+1, dtype=h.dtype)
-    
-    for i in numba.prange(size):
-        # Apply the local energy interaction.
-        part_idx    = i - n
-        this_site   = np.array([i], dtype=DEFAULT_NP_INT_TYPE)
-        # Apply the sigma_z operator
-        _, sz_i     = operators_spin_module.sigma_z_np(state, this_site)
-        local_in    = h[part_idx] * sz_i
-        
-        # Apply the sigma_x * sigma_x operator
-        next_site   = np.array([neidot[part_idx]], dtype=DEFAULT_NP_INT_TYPE)
-        # s1, sx_n    = sigma_x(state, next_site)
-        # s2, sx_i    = sigma_x(s1, this_site)
-        s1, sx_n    = operators_spin_module.sigma_x_np(state, next_site)
-        s2, sx_i    = operators_spin_module.sigma_x_np(s1, this_site)
-        coupling_v  = g0 * au[part_idx] * sx_i * sx_n
-        # Store the results
-        local_value         += local_in
-        new_states[i, :]    = s2
-        vals[i]             = coupling_v
-
-    new_states[size, :] = state
-    vals[size]          = local_value
-
-    return new_states, vals
-
-# @numba.njit
-def _local_energy_arr_np(state, neidot, h, g0, n, au):
-    '''
-    Compute the local energy interaction for a numpy array state.
-    Parameters:
-        state           : numpy array of spins (0 or 1)
-        neidot          : numpy array of neighbor indices for free particles
-        h, g0, n, au    : model parameters
-    Returns:
-        Tuple [states], [energies] containing the new states and energies.
-    '''
-    # sigma_x = operators_spin_module.sigma_x_np
-    # sigma_z = operators_spin_module.sigma_z_np
-    return _local_energy_arr_loop(state, neidot, h, g0, n, au)
-
-# ----------------------------------------------------------------------------------------
-
-if _JAX_AVAILABLE:
-    import jax
-    import jax.numpy as jnp
-    from jax import jit as jax_jit
-    
-    # @jax_jit
-    def _local_energy_arr_lax(state     : jnp.ndarray,
-                            neidot      : jnp.ndarray,
-                            h           : jnp.ndarray,
-                            g0          : float,
-                            n           : int,
-                            au          : jnp.ndarray,
-                            sigma_x,
-                            sigma_z) -> (jnp.ndarray, jnp.ndarray):
-        """
-        Compute the local energy interaction for a JAX array state.
-        
-        Parameters:
-            state   : jnp.ndarray of spins (0 or 1), shape (S,)
-            neidot  : jnp.ndarray of neighbor indices for free particles, shape (free_count,)
-            h       : jnp.ndarray of magnetic field values, shape (free_count,)
-            g0      : float, coupling strength
-            n       : int, number of particles in the dot
-            au      : jnp.ndarray of coupling strengths, shape (free_count,)
-            sigma_x : function(state, site) -> (new_state, sign)
-                    Operator helper to compute the σₓ operation.
-            sigma_z : function(state, site) -> (state, eigenvalue)
-                    Operator helper to compute the σ_z operation.
-                    
-        Returns:
-            Tuple (all_states, all_values) where:
-                all_states: jnp.ndarray of shape (free_count+1, S) containing the new states.
-                all_values: jnp.ndarray of shape (free_count+1,) containing the corresponding energies.
-        """
-        
-        # Get the size of the state - assumed to be the same for all states.
-        size                    = state.shape[0]
-        h_in                    = jnp.array(h)
-        au_in                   = jnp.array(au)
-        neidot_in               = jnp.array(neidot)
-        # Assume free indices: i from n to size-1.
-        def scan_fun(local_value, i):
-            this_idx            = jnp.ones((1,), dtype = jnp.int32) * i
-            part_idx            = n - i
-            # Diagonal term: apply σ_z at site i.
-            _, sz_i             = sigma_z(state, this_idx)
-            local_in            = sz_i * h_in[part_idx]
-            # Off-diagonal term: apply two successive σₓ operations.
-            next_site           = jnp.ones((1,), dtype = jnp.int32) * neidot_in[part_idx]
-            s1, sx_n            = sigma_x(state, next_site)
-            s2, sx_i            = sigma_x(s1, this_idx)
-            coupling_v          = g0 * au_in[part_idx] * sx_n * sx_i
-            # Accumulate the σ_z contribution.
-            new_local_value     = local_value + local_in
-            # For each free site we output the new state (from σₓσₓ) and the coupling energy.
-            return new_local_value, (s2, coupling_v)
-        
-        free_indices            = jnp.arange(n, size, dtype=jnp.int32)
-        init_local_value        = 0.0
-        final_local_value, (free_states, free_values) = jax.lax.scan(scan_fun,
-                                                                    init_local_value,
-                                                                    free_indices)
-        # Concatenate the free sites' states with the original state.
-        all_states = jnp.concatenate([free_states, state[None, :]], axis=0)
-        all_values = jnp.concatenate([free_values, jnp.array([final_local_value])], axis=0)
-        return all_states, all_values
-    
-    # @jax_jit
-    def _local_energy_arr_jax(state, neidot, h, g0, n, au):
-        '''
-        Compute the local energy interaction for a JAX array state.
-        Parameters:
-            state   : numpy array of spins (0 or 1)
-            neidot  : numpy array of neighbor indices for free particles
-            h, g0, n, au : model parameters
-        Returns:
-            Tuple [states], [energies] containing the new states and energies.
-        '''
-        sigma_x = operators_spin_module.sigma_x_jnp
-        sigma_z = operators_spin_module.sigma_z_jnp
-        return _local_energy_arr_lax(state, neidot, h, g0, n, au, sigma_x, sigma_z)
-
-def _local_energy_arr_wrap(n, neidot, h, g0, au, use_jax = False):
-    '''Creates a JIT-compiled local energy interaction function.'''
-    if use_jax and _JAX_AVAILABLE:
-        # @jax_jit
-        def wrapper(state):
-            return _local_energy_arr_jax(state, neidot, h, g0, n, au)
-        return wrapper
-    else:
-        # @numba.njit
-        def wrapper(state):
-            return _local_energy_arr_np(state, neidot, h, g0, n, au)
-        return wrapper
 
 ##########################################################################################
 #! HAMILTONIAN CLASS
@@ -285,13 +124,10 @@ class QSM(hamil_module.Hamiltonian):
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
         self._hamil                     = None
         self._std_en                    = None
-        self._set_local_energy_functions()
         
-        # self._loc_energy_int_fun        = _local_energy_int_wrap(self._n, self.ns, self._neidot, self._h, self._g0, self._au)
-        self._loc_energy_np_fun         = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=False)
-        if _JAX_AVAILABLE:
-            self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)       
-        # self._local_energy_test()
+        # set the Hamiltonian operators
+        self._set_local_energy_operators()
+        self._set_local_energy_functions()
     
     # ----------------------------------------------------------------------------------------------
     
@@ -570,10 +406,36 @@ class QSM(hamil_module.Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def _set_local_energy_functions(self):
+    def _set_local_energy_operators(self):
+        """
+        Set local and nonlocal energy operators for the spin system.
+        This method initializes the operators used to calculate the local energy in an interacting 
+        spin model. It creates two lists of operator definitions: one for local operators and another 
+        for nonlocal (correlation) operators.
+        
+        Operators defined:
+            - op_sz_l: Local spin-z operator operating on a single site.
+            - op_sx_sx_c: Spin-x correlation operator operating between two sites.
+        For each index i from self.n to self.ns, the method:
+            - Logs the start of processing for index i.
+            - Adds a tuple containing the local operator (op_sz_l), the target site [i], and the corresponding 
+                coefficient from self._h to the local operators list.
+            - Adds a tuple containing the correlation operator (op_sx_sx_c), the target site pair [i, self._neidot[part_idx]],
+                and the weighted coefficient (self.g0 multiplied by the corresponding value in self._au) to the nonlocal
+                operators list.
+        After populating these lists, it assigns:
+            - self._local_ops with the constructed local operators.
+            - self._nonlocal_ops with the constructed nonlocal (correlation) operators.
+        This setup is crucial for correctly formulating the energy operator matrices used in the quantum 
+        eigenvalue calculations for the spin system. Logging is performed to assist in debugging the construction 
+        process.
+        """
+        
+        
+        
         # operators
-        operators       = [[] for _ in range(self.ns)]
-        operators_local = [[] for _ in range(self.ns)]
+        operators       =   [[] for _ in range(self.ns)]
+        operators_local =   [[] for _ in range(self.ns)]
         
         op_sz_l         =   operators_spin_module.sig_z(ns = self.ns,
                                 type_act = operators_spin_module.OperatorTypeActing.Local)
@@ -589,14 +451,8 @@ class QSM(hamil_module.Hamiltonian):
             operators[i].append((op_sx_sx_c, [i, self._neidot[part_idx]], self.g0 * self._au[part_idx]))
         
         # finish
-        operators_int               = [[(op.int, sites, vals) for (op, sites, vals) in operators[i]] for i in range(self.ns)]
-        operators_local_int         = [[(op.int, sites, vals) for (op, sites, vals) in operators_local[i]] for i in range(self.ns)]
-        self._loc_energy_int_fun    = hamil_module.local_energy_int_wrap(self.ns, operators_int, operators_local_int)
-        # self._loc_energy_jax_fun    = None
-        # self._loc_energy_np_fun     = None
-        # if _JAX_AVAILABLE:
-            # self._loc_energy_int_jax_fun = hamil_module.local_energy_int_wrap(ns, operators, operators_local, use_jax=True)
-        
+        self._local_ops             = operators_local
+        self._nonlocal_ops          = operators
         self._log("Successfully set local energy functions...", log=2)
         
 ####################################################################################################

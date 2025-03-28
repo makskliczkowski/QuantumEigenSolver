@@ -24,11 +24,11 @@ import time
 import numpy as np
 from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
-from typing import Optional, Callable, Union, Iterable
+from typing import Optional, Callable, Union, Iterable, Any
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 ####################################################################################################
-from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as get_backend, _JAX_AVAILABLE
+from general_python.algebra.utils import get_backend as get_backend, _JAX_AVAILABLE
 from general_python.lattices import Lattice
 # from Algebra.hilbert import HilbertSpace
 ####################################################################################################
@@ -96,37 +96,25 @@ class GlobalSymmetries(Enum):
 ####################################################################################################
 #! Distinguish type of function
 
-def _local_funct_wrapper(local_fun, *args):
-    '''
-    Basic wrapper for the local function - it is assumed that the local function
-    takes the form (k, *args) -> (rows, values).
-    
-    This allows to remove the arguments from the function and to use the JIT compilation.
+def op_func_wrapper(op_func: Callable, *args: Any) -> Callable:
+    """
+    Wrap an operator function by fixing extra arguments so that the resulting function
+    has the signature f(k) -> (rows, values), where op_func is assumed to have signature
+    (k, *args) -> (rows, values).
+
     Parameters:
-        local_fun (Callable)    : The local function.    
-        *args (Any)             : Additional arguments for the local function.
+        op_func (Callable): The operator function.
+        *args (Any): Additional arguments to fix in the operator function.
+
     Returns:
-        Callable                : The wrapped local function.
-    -----------   
-    '''
-    # check the type of the local function based on the number of arguments
-    if local_fun.__code__.co_argcount == 1:
-        # if the local function takes only one argument, return the function itself
-        return local_fun
-    elif local_fun.__code__.co_argcount == 2 and len(args) == 1:
-        # if the local function takes two arguments and one argument is provided, wrap the function - LOCAL
-        def local_funct_wrapper_in(k):
-            return local_fun(k, args[0])
-        return local_funct_wrapper_in
-    elif local_fun.__code__.co_argcount > 2 and len(args) == 2:
-        # if the local function takes more than two arguments and two arguments are provided, wrap the function - CORRELATION
-        def local_funct_wrapper_in(k):
-            return local_fun(k, args[0], args[1])
-        return local_funct_wrapper_in
-    # otherwise, wrap without possibility of JIT compilation
-    def local_fun_wrapper_in(k):
-        return local_fun(k, *args)
-    return local_fun_wrapper_in
+        Callable: A function of one argument (k) that calls op_func(k, *args).
+    """
+    if op_func.__code__.co_argcount == 1:
+        # If op_func takes only one argument, no wrapping is needed.
+        return op_func
+    else:
+        # Otherwise, return a new function that calls op_func with the fixed extra arguments.
+        return lambda k: op_func(k, *args)
 
 ####################################################################################################
 
@@ -135,15 +123,24 @@ class OperatorFunction:
     OperatorFunction is a class that represents a mathematical operator that can be applied to a state. 
     The operator can be defined for different backends (integer, NumPy, JAX) and supports various operations 
     such as addition, subtraction, multiplication, and composition.
-    Attributes:
-    -----------
-    - fun_int (Callable): The function defining the operator for integer states.
-    - fun_np (Optional[Callable]): The function defining the operator for NumPy array states.
-    - fun_jax (Optional[Callable]): The function defining the operator for JAX array states.
-    - modifies_state (bool): A flag indicating whether the operator modifies the state.
-    - necessary_args (int): The number of necessary arguments for the operator function.
+    The class provides a flexible way to define and apply operators to quantum states, allowing for
+    different manipulations and analyses of quantum systems.
+    
+    Attr:
+    ---
+    - fun_int (Callable): 
+        The function defining the operator for integer states.
+    - fun_np (Optional[Callable]): 
+        The function defining the operator for NumPy array states.
+    - fun_jax (Optional[Callable]): 
+        The function defining the operator for JAX array states.
+    - modifies_state (bool): 
+        A flag indicating whether the operator modifies the state.
+    - necessary_args (int): 
+        The number of necessary arguments for the operator function.
+        
     Methods:
-    --------
+    ---
     - __init__(fun_int, fun_np=None, fun_jax=None, modifies_state=True, necessary_args=0):
         Initializes the OperatorFunction object with the provided functions and attributes.
     - apply(s, *args):
@@ -197,12 +194,13 @@ class OperatorFunction:
 
     # -----------
     
-    def _apply_global(self, s: Union[int, jnp.ndarray]) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+    def _apply_global(self, s: Union[int, np.ndarray, jnp.ndarray]) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
         Apply the operator function to a given state.
 
         Parameters:
-            s (int or jnp.ndarray): The state to which the operator is applied.
+            s (int or np.ndarray or jnp.ndarray): 
+                The state to which the operator is applied.
 
         Returns:
             A list of tuples (state, value), where each tuple contains the transformed state 
@@ -211,14 +209,14 @@ class OperatorFunction:
         if isinstance(s, jnp.ndarray):
             # If the state is a JAX array, use the JAX function
             return self._fun_jax(s)
-        elif isinstance(s, np.ndarray):
+        elif isinstance(s, (np.ndarray, List)):
             # If the state is a NumPy array, use the NumPy function
             return self._fun_np(s)
         return self._fun_int(s)
     
     # -----------
     
-    def _apply_local(self, s: Union[int, jnp.ndarray], i) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+    def _apply_local(self, s: Union[int, np.ndarray, jnp.ndarray], i) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
         Apply the operator function to a given state.
 
@@ -264,13 +262,17 @@ class OperatorFunction:
         # Note: The integer function should be able to handle the additional arguments
         return self._fun_int(s, i, j)
     
-    def apply(self, s: Union[int, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
+    # -----------
+    
+    def apply(self, s: Union[int, np.ndarray, jnp.ndarray], *args) -> List[Tuple[Optional[Union[int, jnp.ndarray]], Union[float, complex]]]:
         """
         Apply the operator function to a given state.
 
         Parameters:
-            s (int or jnp.ndarray): The state to which the operator is applied.
-            args: Additional arguments for the operator. The number of arguments must equal self._necessary_args.
+            s (int or np.ndarray or jnp.ndarray): 
+                The state to which the operator is applied.
+            args:
+                Additional arguments for the operator. The number of arguments must equal self._necessary_args.
 
         Returns:
             A list of tuples (state, value), where each tuple contains the transformed state 
@@ -284,13 +286,15 @@ class OperatorFunction:
             raise ValueError(f"Invalid number of arguments for the operator function. Expected {self._necessary_args}, got {len(args)}.")
         
         result = None
+        
         # apply the operator function based on the number of necessary arguments
         if self._necessary_args == 0:
             result = self._apply_global(s)
+            # this means that either the function does not take the argument really or it has them embedded within
         elif self._necessary_args == 1:
-            result = self._apply_local(s, *args)
+            result = self._apply_local(s, args[0])
         elif self._necessary_args == 2:
-            result = self._apply_correlation(s, *args)
+            result = self._apply_correlation(s, args[0], args[1])
         else:
             if isinstance(s, jnp.ndarray):
                 result = self._fun_jax(s, *args)
@@ -301,7 +305,7 @@ class OperatorFunction:
 
         # If the result is a tuple representing a single (state, value) pair
         if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
-            return result
+            return result        
         # If the result is already a list of (state, value) pairs
         elif isinstance(result, list) and all(isinstance(item, tuple) and len(item) == 2 for item in result):
             return result
@@ -388,7 +392,7 @@ class OperatorFunction:
         Parameters
         ----------
         other : Union[int, float, complex, np.int64, np.float64, np.complex128, OperatorFunction]
-            Either a scalar (in which case the operator’s output values are multiplied by that scalar)
+            Either a scalar (in which case the operator's output values are multiplied by that scalar)
             or another operator function to be composed with the current operator function.
         
         Returns
@@ -396,6 +400,7 @@ class OperatorFunction:
         OperatorFunction
             A new OperatorFunction representing the composition or scaled operator.
         """
+        
         # Handle scalar multiplication.
         if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
             def fun_int(s, *args):
@@ -407,16 +412,16 @@ class OperatorFunction:
             if _JAX_AVAILABLE:
                 fun_jax = jax.jit(fun_jax)
             return OperatorFunction(fun_int, fun_np, fun_jax,
-                                    modifies_state=True,
+                                    modifies_state=self._modifies_state,
                                     necessary_args=self._necessary_args)
         
         # Make sure that 'other' is an OperatorFunction.
         if not isinstance(other, OperatorFunction):
-            raise TypeError("Unsupported multiplication with type {}".format(type(other)))
+            raise TypeError(f"Unsupported multiplication with type {type(other)}")
         
         # Determine the maximum number of necessary arguments and whether any operator modifies state.
-        other_modifies = other.modifies_state
-        args_needed = max(self._necessary_args, getattr(other, 'necessary_args', 0))
+        other_modifies  = other.modifies_state
+        args_needed     = max(self._necessary_args, getattr(other, 'necessary_args', 0))
         
         # Compose the operator functions.
         # Note: by definition (f * g)(s) = f(g(s)); here, g is 'other' and f is 'self'.
@@ -443,14 +448,14 @@ class OperatorFunction:
 
         # Prepare the versions for different backends.
         fun_int = composed_fun
-        fun_np = composed_fun
+        fun_np  = composed_fun
         fun_jax = composed_fun
         if _JAX_AVAILABLE:
             fun_jax = jax.jit(composed_fun)
         
         return OperatorFunction(fun_int, fun_np, fun_jax,
-                                modifies_state=(self._modifies_state or other_modifies),
-                                necessary_args=args_needed)
+                                modifies_state  =   self._modifies_state or other_modifies,
+                                necessary_args  =   args_needed)
 
     # -----------
     
@@ -693,7 +698,6 @@ class OperatorTypeActing(Enum):
     Global      = auto()    # Global operator - acts on the whole system (does not need additional arguments).
     Local       = auto()    # Local operator - acts on the local physical space (needs additional argument - 1).
     Correlation = auto()    # Correlation operator - acts on the correlation space (needs additional argument - 2).
-    
     # -----------
     
     def is_global(self):
@@ -739,7 +743,7 @@ class Operator(ABC):
                 op_fun      : OperatorFunction              = None,
                 fun_int     : Callable                      = None,        
                 fun_np      : Optional[Callable]            = None,
-                fun_jax     : Optional[Callable]            = None,
+                fun_jnp     : Optional[Callable]            = None,
                 eigval                                      = 1.0,
                 lattice     : Optional[Lattice]             = None,
                 ns          : Optional[int]                 = None,
@@ -783,7 +787,7 @@ class Operator(ABC):
             raise ValueError(Operator._INVALID_SYSTEM_SIZE_PROVIDED)
         
         # set the backend for the operator
-        self._backend_str   = backend
+        self._backend_str               = backend
         self._backend, self._backend_sp = get_backend(backend, scipy=True)
         
         # property of the operator itself
@@ -800,7 +804,7 @@ class Operator(ABC):
         self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
         self._necessary_args= 0                                     # number of necessary arguments for the operator function
         self._fun           = None                                  # the function that defines the operator - it is set to None if not provided
-        self._init_functions(op_fun, fun_int, fun_np, fun_jax)      # initialize the operator function
+        self._init_functions(op_fun, fun_int, fun_np, fun_jnp)      # initialize the operator function
         
     #################################
     #! Initialize functions
@@ -810,13 +814,19 @@ class Operator(ABC):
         """
         Initializes the operator functions and determines the operator type based on the 
         number of necessary arguments.
+        
+        ---
         Parameters:
-            op_fun (OperatorFunction, optional): An instance of `OperatorFunction`. If provided, 
+            op_fun (OperatorFunction, optional): 
+                An instance of `OperatorFunction`. If provided, 
                 it is directly assigned to the operator.
-            fun_int (callable, optional): A Python function representing the internal implementation 
+            fun_int (callable, optional): 
+                A Python function representing the internal implementation 
                 of the operator. Must be provided if `op_fun` is not specified.
-            fun_np (callable, optional): A NumPy-compatible implementation of the operator function.
-            fun_jax (callable, optional): A JAX-compatible implementation of the operator function.
+            fun_np (callable, optional): 
+                A NumPy-compatible implementation of the operator function.
+            fun_jax (callable, optional): 
+                A JAX-compatible implementation of the operator function.
         Raises:
             ValueError: If both `op_fun` and `fun_int` are `None`.
             NotImplementedError: If the number of necessary arguments exceeds 2.
@@ -992,6 +1002,7 @@ class Operator(ABC):
     
     @property
     def eigval(self):
+        '''Eigenvalue of the operator.'''
         return self._eigval
     
     @eigval.setter
@@ -1002,6 +1013,7 @@ class Operator(ABC):
     
     @property
     def name(self):
+        '''Name of the operator.'''
         return self._name
     
     @name.setter
@@ -1012,6 +1024,7 @@ class Operator(ABC):
     
     @property
     def type(self):
+        '''Type of the operator.'''
         return self._type
     
     @type.setter
@@ -1022,6 +1035,7 @@ class Operator(ABC):
     
     @property
     def quadratic(self):
+        '''Quadratic property of the operator.'''
         return self._quadratic
     
     @quadratic.setter
@@ -1130,8 +1144,10 @@ class Operator(ABC):
                     - The first list contains the transformed states.
                     - The second list contains the corresponding values.
         """
-        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+        if (hasattr(states, 'shape') and len(states.shape) == 1) or isinstance(states, (int, np.int8, np.int16, np.int32, np.int64)):
+            # if the state is a single state, apply the function directly
             return self._fun(states)
+        # if the state is a collection of states, apply the function to each state
         results     = [self._fun(state) for state in states]
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val)
@@ -1149,7 +1165,7 @@ class Operator(ABC):
                 - The second list contains the corresponding values or results of the operation.
                 If the input is a single state, the result is returned as a single state and value.
         """
-        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+        if (hasattr(states, 'shape') and len(states.shape) == 1) or isinstance(states, (int, np.int8, np.int16, np.int32, np.int64)):
             return self._fun(states, i)
         results     = [self._fun(state, i) for state in states]
         out, val    = zip(*results) if results else ([], [])
@@ -1171,7 +1187,7 @@ class Operator(ABC):
                 - `out_list` contains the output states for each input state.
                 - `val_list` contains the corresponding values for each input state.
         """
-        if not isinstance(states, Iterable) or (hasattr(states, 'ndim') and states.ndim == 0):
+        if (hasattr(states, 'shape') and len(states.shape) == 1) or isinstance(states, (int, np.int8, np.int16, np.int32, np.int64)):
             return self._fun(states, i, j)
         
         results     = [self._fun(state, i, j) for state in states]
@@ -1352,3 +1368,166 @@ def operator_identity(backend : str = 'default') -> Operator:
                     quadratic=False)
 
 ####################################################################################################
+
+
+def create_operator(type_act        : int | OperatorTypeActing,
+                    op_func_int     : Callable,
+                    op_func_np      : Callable,
+                    op_func_jnp     : Callable,
+                    lattice         : Optional[Any]         = None,
+                    ns              : Optional[int]         = None,
+                    sites           : Optional[List[int]]   = None,
+                    extra_args      : Tuple[Any, ...]       = (),
+                    name            : Optional[str]         = None,
+                    modifies        : bool                  = True) -> Operator:
+    """
+    Create a general operator that distinguishes the type of operator action (global, local, correlation)
+    and wraps the provided operator functions for int, NumPy, and JAX. The operator functions must have
+    the signature: (state, *args) -> (new_state, op_value) for global or (state, site, *args) for local,
+    and (state, site1, site2, *args) for correlation.
+    
+    ---
+    Note:
+        - The operator functions should be defined to handle the specific state representation (int, NumPy, JAX).
+        - The operator functions should return a tuple of the new state and the operator value.
+        - The global operator should have either a list of sites or act on all sites.
+        - The local operator should have a single site argument (additional to the state).
+        - The correlation operator should have two site arguments (additional to the state).
+        - The operator functions should be able to handle the extra arguments passed to them.
+    
+    The extra arguments (extra_args) are passed on to the operator functions (apart from the sites,
+    which are provided dynamically). For global operators, if no sites are provided the operator is applied
+    to all sites (0, 1, ..., ns-1).
+    
+    ---
+    Parameters:
+        type_act (int):
+            The type of operator acting. Use OperatorTypeActing.Global, .Local, or .Correlation.
+        op_func_int (Callable):
+            Operator function for integer-based states.
+        op_func_np (Callable):
+            Operator function for NumPy-based states.
+        op_func_jnp (Callable):
+            Operator function for JAX-based states.
+        lattice (Optional[Any]):
+            A lattice object; if provided, ns is set from lattice.ns.
+        ns (Optional[int]):
+            The number of sites. Required if lattice is None.
+        sites (Optional[List[int]]):
+            For global operators: a list of sites on which to act. If None, all sites are used.
+            (For local or correlation operators, sites are provided when the operator is applied.)
+        extra_args (Tuple[Any,...]):
+            Extra parameters to be forwarded to the operator functions.
+        name (Optional[str]):
+            A base name for the operator. If not provided, op_func_int.__name__ is used.
+        modifies (bool):
+            Whether the operator modifies the state.
+    
+    Returns:
+        Operator:
+            An operator object with fun_int, fun_np, fun_jnp methods appropriately wrapped.
+    """
+    # Ensure we know ns.
+    if lattice is not None:
+        ns = lattice.ns
+    else:
+        assert ns is not None, "Either lattice or ns must be provided."
+    
+    # Global operator: the operator acts on a specified set of sites (or all if sites is None)
+    if type_act == OperatorTypeActing.Global or sites is not None:
+        
+        # If sites is None, we act on all sites.
+        if sites is None or len(sites) == 0:
+            sites = list(range(ns))
+        
+        def fun_int(state):
+            return op_func_int(state, ns, sites, *extra_args)
+        
+        def fun_np(state):
+            return op_func_np(state, sites, *extra_args)
+        
+        if _JAX_AVAILABLE:
+            @jax.jit
+            def fun_jnp(state):
+                return op_func_jnp(state, sites, *extra_args)
+        else:
+            def fun_jnp(state):
+                return state, 0.0
+        
+        op_name =   (name if name is not None else op_func_int.__name__) + "/"
+        op_name +=  "-".join(str(site) for site in sites)
+        return Operator(fun_int = fun_int,
+                        fun_np  = fun_np,
+                        fun_jnp = fun_jnp,
+                        eigval  = 1.0,
+                        lattice = lattice,
+                        ns      = ns,
+                        name    = op_name,
+                        typek   = SymmetryGenerators.Other,
+                        modifies= modifies)
+    
+    # Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
+    elif type_act == OperatorTypeActing.Local:
+        def fun_int(state, i):
+            return op_func_int(state, ns, [i], *extra_args)
+        def fun_np(state, i):
+            return op_func_np(state, [i], *extra_args)
+        if _JAX_AVAILABLE:
+            @jax.jit
+            def fun_jnp(state, i):
+                return op_func_jnp(state, ns, [i], *extra_args)
+        else:
+            def fun_jnp(state, i):
+                return state, 0.0
+        op_name = (name if name is not None else op_func_int.__name__) + "/L"
+        return Operator(fun_int = fun_int,
+                        fun_np  = fun_np,
+                        fun_jnp = fun_jnp,
+                        eigval  = 1.0,
+                        lattice = lattice,
+                        ns      = ns,
+                        name    = op_name,
+                        typek   = SymmetryGenerators.Other,
+                        modifies= modifies)
+    
+    # Correlation operator: the operator acts on a pair of sites.
+    elif type_act == OperatorTypeActing.Correlation:
+        def fun_int(state, i, j):
+            return op_func_int(state, ns, [i, j], *extra_args)
+        def fun_np(state, i, j):
+            return op_func_np(state, [i, j], *extra_args)
+        if _JAX_AVAILABLE:
+            @jax.jit
+            def fun_jnp(state, i, j):
+                return op_func_jnp(state, ns, [i, j], *extra_args)
+        else:
+            def fun_jnp(state, i, j):
+                return state, 0.0
+        op_name = (name if name is not None else op_func_int.__name__) + "/C"
+        return Operator(fun_int = fun_int,
+                        fun_np  = fun_np,
+                        fun_jnp = fun_jnp,
+                        eigval  = 1.0,
+                        lattice = lattice,
+                        ns      = ns,
+                        name    = op_name,
+                        typek   = SymmetryGenerators.Other,
+                        modifies= modifies)
+    
+    else:
+        raise ValueError("Invalid OperatorTypeActing")
+
+# Example usage:
+# (Assume sigma_x_int_np, sigma_x_np, sigma_x_jnp are defined elsewhere and _JAX_AVAILABLE is set.)
+
+# For a global operator:
+#   op = create_operator(OperatorTypeActing.Global, sigma_x_int_np, sigma_x_np, sigma_x_jnp,
+#                        lattice=my_lattice, sites=[0, 2, 3], extra_args=(spin_value,))
+#
+# For a local operator:
+#   op = create_operator(OperatorTypeActing.Local, sigma_x_int_np, sigma_x_np, sigma_x_jnp,
+#                        ns=16, extra_args=(spin_value,))
+#
+# For a correlation operator:
+#   op = create_operator(OperatorTypeActing.Correlation, sigma_x_int_np, sigma_x_np, sigma_x_jnp,
+#                        ns=16, extra_args=(spin_value,))

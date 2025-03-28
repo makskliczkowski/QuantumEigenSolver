@@ -208,15 +208,23 @@ class Hamiltonian(ABC):
                 else:
                     _rng, _rng_k = bck[2], None
             else:
-                _backend, _backend_sp = bck, None
-                _rng, _rng_k = None, None
+                _backend, _backend_sp   = bck, None
+                _rng, _rng_k            = None, None
             return backend, _backend, _backend_sp, (_rng, _rng_k)
-        _backendstr = 'np' if backend is None or backend == np else 'jax'
+        if _JAX_AVAILABLE and backend == 'default':
+            _backendstr = 'jax'
+        else:
+            _backendstr = 'np'
         return Hamiltonian.__backend(_backendstr)
     
     # ----------------------------------------------------------------------------------------------
     
-    def __init__(self, hilbert_space: HilbertSpace, is_sparse: bool = True, dtype=None, backend='default', **kwargs):
+    def __init__(self,
+                hilbert_space   : HilbertSpace,
+                is_sparse       : bool  =   True,
+                dtype                   =   None,
+                backend         : str   =   'default',
+                **kwargs):
         '''
         Initialize the Hamiltonian class.
         
@@ -288,6 +296,28 @@ class Hamiltonian(ABC):
         """
         msg = f"[{self._name}] {msg}"
         self._hilbert_space.log(msg, log = log, lvl = lvl, color = color)
+    
+    def __str__(self):
+        '''
+        Returns the string representation of the Hamiltonian class.
+        
+        Returns:
+            str : The string representation of the Hamiltonian class.
+        '''
+        return f"Hamiltonian with {self._nh} elements and {self._ns} modes."
+    
+    def __repr__(self):
+        '''
+        Returns the detailed string representation of the Hamiltonian class.
+
+        Provides information about the number of elements and modes, whether a Hilbert space is provided,
+        details about the associated lattice, and the computational backend.
+        '''
+        hilbert_info = "with HilbertSpace" if self._hilbert_space is not None else "without HilbertSpace"
+        lattice_info = f"on lattice {self._lattice}" if self._lattice is not None else "without lattice"
+        backend_info = f"using backend {self._backendstr}"
+        return (f"Hamiltonian: {self._nh} elements, {self._ns} modes, "
+            f"{hilbert_info}, {lattice_info}, {backend_info}.")
     
     # ----------------------------------------------------------------------------------------------
     
@@ -1093,7 +1123,7 @@ class Hamiltonian(ABC):
         
         # average energy index
         self._av_en_idx = self._backend.argmin(self._backend.abs(self._eig_val - self._av_en))
-        
+    
     def calculate_en_idx(self, en : float):
         '''
         Calculates the index of the energy level closest to the given energy.
@@ -1190,7 +1220,7 @@ class Hamiltonian(ABC):
     #! Energy related methods
     # ----------------------------------------------------------------------------------------------
     
-    def add(self, operator, sites, multiplier, is_local: bool = False):
+    def add(self, operator, sites: List[int], multiplier: Union[float, complex, int], is_local: bool = False):
         """
         Add an operator to the internal operator collections based on its locality.
         
