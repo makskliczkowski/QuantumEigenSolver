@@ -1484,7 +1484,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             return op_func_np(state, [i], *extra_args)
         
         if _JAX_AVAILABLE:
-            @partial(jax.jit, static_argnums=(1,))
+            @jax.jit
             def fun_jnp(state, i):
                 sites_jnp = jnp.array([i], dtype = jnp.int32)
                 return op_func_jnp(state, sites_jnp, *extra_args)
@@ -1572,12 +1572,15 @@ def create_add_operator(operator: Operator, multiplier: Union[float, int, comple
 
     
     # if the operator is of Global type, we don't want to add the states to the argument, pass empty list
-    sites_arg   = sites if not operator.type == OperatorTypeActing.Global else []
     
+    if operator.type == OperatorTypeActing.Global:
+        return (operator, [], multiplier)
+        
     # if sites is None, we pass an empty list
-    if sites_arg is None:
+    if sites is None:
         sites_arg = []
-    
+    else:
+        sites_arg = sites
     # create the operator tuple
     return (operator, sites_arg, multiplier)
 

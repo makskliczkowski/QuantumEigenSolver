@@ -226,7 +226,9 @@ if _JAX_AVAILABLE:
             of the factors determined by the bits in state.
         """
         # Body function for the fori_loop. The loop variable 'i' runs over site indices.
-                
+        
+        sites = jnp.array(sites)
+        
         def body(i, coeff):
             # Since sites is a static Python list, we can extract the site index.
             site        = sites[i]
@@ -264,7 +266,8 @@ if _JAX_AVAILABLE:
         Returns:
             tuple: (state, coeff) where state is unchanged and coeff is the accumulated coefficient.
         """        
-        coeff = 1.0
+        coeff       = 1.0
+        sites       = jnp.array(sites)
         for site in sites:
             factor  =   (2 * _binary.check_arr_jax(state, site) - 1.0) * spin_value
             coeff   *=  factor

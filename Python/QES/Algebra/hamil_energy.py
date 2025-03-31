@@ -14,7 +14,7 @@ from typing import Callable, Tuple, Optional, Any
 from Algebra.hamil_energy_helper import unpack_operator_terms
 
 if _JAX_AVAILABLE:
-    from Algebra.hamil_energy_jax import local_energy_arr_jax, local_energy_jax_wrap
+    from Algebra.hamil_energy_jax import local_energy_jax_wrap
 
 #################################################################################
 

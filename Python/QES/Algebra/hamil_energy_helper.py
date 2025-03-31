@@ -29,6 +29,43 @@ def default_operator_njit(x, i):
     '''Default operator function for numba'''
     return (x, 0.0)
 
+def flatten_operator_terms(
+    operators,
+    operator_indices    = List[List[List[int]]],
+    operator_mult       = List[List[Any]]):
+    """
+    Flattens the operator terms into a single list of operators, indices, and multiplicative factors.
+    
+    Parameters:
+        operators (List[List[Callable]]):
+            A list of lists, where each sublist contains callable operator functions.
+        operator_indices (List[List[List[int]]]):
+            A list of lists, where each sublist contains index lists corresponding to the operator terms.
+        operator_mult (List[List[Any]]):
+            A list of lists, where each sublist contains multiplicative factors for the operator terms.
+    ---
+    Returns:
+        Tuple[List[Callable], List[List[int]], List[Any]]:
+            A tuple containing three lists:
+                - flat_operators: A flattened list of callable operator functions.
+                - flat_operator_indices: A flattened list of index lists.
+                - flat_operator_mult: A flattened list of multiplicative factors.
+    """
+    
+    # Flatten the operator terms
+    flat_operators          = []
+    flat_operator_indices   = []
+    flat_operator_mult      = []
+    
+    for i in range(len(operators)):
+        for j in range(len(operators[i])):
+            flat_operators.append(operators[i][j])
+            flat_operator_indices.append(operator_indices[i][j])
+            flat_operator_mult.append(operator_mult[i][j])
+        
+    return flat_operators, flat_operator_indices, flat_operator_mult
+
+
 def unpack_operator_terms(
     ns              : int,
     operator_terms  : List[Tuple[List[Callable], List[List[int]], List[Any]]]):
@@ -64,9 +101,9 @@ def unpack_operator_terms(
     """
 
     
-    if len(operator_terms) < ns:
-        for ii in range(ns - len(operator_terms)):
-            operator_terms.append((TypedList(), [[ii]], [0.0]))
+    # if len(operator_terms) < ns:
+        # for ii in range(ns - len(operator_terms)):
+            # operator_terms.append((TypedList(), [[ii]], [0.0]))
     
     operator_funcs      = ListType()
     operator_indices    = ListType()

@@ -24,7 +24,7 @@ import time
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
-from Algebra.Operator.operator import Operator, create_add_operator
+from Algebra.Operator.operator import Operator, OperatorTypeActing, create_add_operator
 from Algebra.Operator.operator_matrix import operator_create_np
 from Algebra.hamil_types import *
 from Algebra.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
@@ -278,8 +278,10 @@ class Hamiltonian(ABC):
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
         
         #! set the local energy functions and the corresponding methods
-        self._nonlocal_ops                                  = [[] for _ in range(self.ns)]
-        self._local_ops                                     = [[] for _ in range(self.ns)]
+        self._ops_nmod_nosites      = [[] for _ in range(self.ns)]      # operators that do not modify the state and do not act on any site (through the function call)
+        self._ops_nmod_sites        = [[] for _ in range(self.ns)]      # operators that do not modify the state and act on a given site(s)
+        self._ops_mod_nosites       = [[] for _ in range(self.ns)]      # operators that modify the state and do not act on any site (through the function call)
+        self._ops_mod_sites         = [[] for _ in range(self.ns)]      # operators that modify the state and act on a given site(s)
         self._loc_energy_int_fun    : Optional[Callable]    = None
         self._loc_energy_np_fun     : Optional[Callable]    = None
         self._loc_energy_jax_fun    : Optional[Callable]    = None
@@ -424,7 +426,9 @@ class Hamiltonian(ABC):
             name (str) : The name of the Hamiltonian.
         '''
         self._name = name
-        
+    
+    # --- LATTICE BASED
+    
     @property
     def ns(self):
         '''
@@ -434,6 +438,9 @@ class Hamiltonian(ABC):
 
     @property
     def sites(self):
+        '''
+        Returns the number of sites.
+        '''
         return self.ns
     
     @property
@@ -442,6 +449,8 @@ class Hamiltonian(ABC):
         Returns the lattice associated with the Hamiltonian.
         '''
         return self._lattice
+    
+    # --- HILBERT BASED
     
     @property
     def modes(self):
@@ -463,6 +472,8 @@ class Hamiltonian(ABC):
         Returns the number of sites in the Hilbert space.
         '''
         return self._nh
+    
+    # --- EIGENVALUES AND EIGENVECTORS
     
     @property
     def hamil(self):
@@ -502,6 +513,8 @@ class Hamiltonian(ABC):
         '''
         return self._krylov
     
+    # --- ENERGY PROPERTIES
+    
     @property
     def av_en(self):
         '''
@@ -530,7 +543,7 @@ class Hamiltonian(ABC):
         '''
         return self._max_en
     
-    @property 
+    @property
     def diag(self):
         '''
         Returns the diagonal of the Hamiltonian matrix.
@@ -554,6 +567,9 @@ class Hamiltonian(ABC):
     
     @property
     def fun_int(self):
+        '''
+        Returns the local energy of the Hamiltonian - integer representation
+        '''
         return self._loc_energy_int_fun
     
     def get_loc_energy_int_fun(self):
@@ -567,6 +583,9 @@ class Hamiltonian(ABC):
     
     @property
     def fun_npy(self):
+        '''
+        Returns the local energy of the Hamiltonian - NumPy representation
+        '''
         return self._loc_energy_np_fun
     
     def get_loc_energy_np_fun(self):
@@ -579,6 +598,9 @@ class Hamiltonian(ABC):
     
     @property
     def fun_jax(self):
+        '''
+        Returns the local energy of the Hamiltonian - JAX representation
+        '''
         return self._loc_energy_jax_fun
     
     def get_loc_energy_jax_fun(self):
@@ -1233,13 +1255,15 @@ class Hamiltonian(ABC):
         '''
         Resets the Hamiltonian operators...
         '''
-        self._local_ops             = [[] for _ in range(self.ns)]
-        self._nonlocal_ops          = [[] for _ in range(self.ns)]
+        self._ops_nmod_nosites      = [[] for _ in range(self.ns)]      # operators that do not modify the state and do not act on any site (through the function call)
+        self._ops_nmod_sites        = [[] for _ in range(self.ns)]      # operators that do not modify the state and act on a given site(s)
+        self._ops_mod_nosites       = [[] for _ in range(self.ns)]      # operators that modify the state and do not act on any site (through the function call)
+        self._ops_mod_sites         = [[] for _ in range(self.ns)]      # operators that modify the state and act on a given site(s)
         self._loc_energy_int_fun    = None
         self._loc_energy_np_fun     = None
         self._loc_energy_jax_fun    = None
     
-    def add(self, operator, multiplier: Union[float, complex, int], is_local: bool = False, sites = None):
+    def add(self, operator: Operator, multiplier: Union[float, complex, int], modifies: bool = False, sites = None):
         """
         Add an operator to the internal operator collections based on its locality.
         
@@ -1276,17 +1300,29 @@ class Hamiltonian(ABC):
         >> This would add the operator 'sig_z' to the local operator list at site 0 with a multiplier of 1.0.
         """
         
+        # if isinstance(operator, Callable):
+            # if the operator is callable, we try to create the operator from it
+            # raise ValueError("The operator is callable, but it should be an Operator object. TODO: implement this...")
+        
         # check if the sites are provided, if one sets the operator, we would put it at a given site
         i           = 0 if (sites is None or len(sites) == 0) else sites[0]
         op_tuple    = create_add_operator(operator, multiplier, sites)
         
         # if the operator is meant to be local, it does not modify the state
-        if is_local:
-            self._local_ops[i].append((op_tuple))
-            self._log(f"Adding local operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2, log = 'debug')
+        if not modifies and not operator.modifies:
+            if operator.type_acting == OperatorTypeActing.Global:
+                self._ops_nmod_nosites[i].append((op_tuple))
+                self._log(f"Adding non-modifying operator {operator} at site {i} (global) with multiplier {op_tuple[2]}", lvl = 2)
+            else:
+                self._ops_nmod_sites[i].append((op_tuple))
+                self._log(f"Adding non-modifying operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2)
         else:
-            self._nonlocal_ops[i].append((op_tuple))
-            self._log(f"Adding non-local operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2, log = 'debug')
+            if operator.type_acting == OperatorTypeActing.Global:
+                self._ops_mod_nosites[i].append((op_tuple))
+                self._log(f"Adding modifying operator {operator} at site {i} (global) with multiplier {op_tuple[2]}", lvl = 2)
+            else:
+                self._ops_mod_sites[i].append((op_tuple))
+                self._log(f"Adding modifying operator {operator} at site {i} (sites: {str(op_tuple[1])}) with multiplier {op_tuple[2]}", lvl = 2)
 
     def _set_local_energy_operators(self):
         '''
@@ -1326,25 +1362,49 @@ class Hamiltonian(ABC):
 
         
         # set the integer functions
-        operators_int               = [[(op.int, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
-        operators_local_int         = [[(op.int, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
-        self._loc_energy_int_fun    = local_energy_int_wrap(self.ns, operators_int, operators_local_int)
+        try:
+            operators_int           =   [[op.int for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
+            operators_int           +=  [[op.int for (op, sites, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
+            operators_local_int     =   [[op.int for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
+            operators_local_int     +=  [[op.int for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
+            self._loc_energy_int_fun    = local_energy_int_wrap(self.ns, operators_int, operators_local_int)
+        except Exception as e:
+            self._log(f"Failed to set integer local energy functions: {e}", lvl=3, color="red", log='error')
+            self._loc_energy_int_fun = None
         
-        # set the numpy functions
-        operators_np               = [[(op.npy, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
-        operators_local_np         = [[(op.npy, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
-        self._loc_energy_np_fun    = local_energy_np_wrap(self.ns, operators_np, operators_local_np)
-
+        try:
+            # set the numpy functions
+            operators_np            =   [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
+            operators_np            +=  [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
+            operators_local_np      =   [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
+            operators_local_np      +=  [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
+            self._loc_energy_np_fun = local_energy_np_wrap(self.ns, operators_np, operators_local_np)
+        except Exception as e:
+            self._log(f"Failed to set NumPy local energy functions: {e}", lvl=3, color="red", log='error')
+            self._loc_energy_np_fun = None
+            
         # set the jax functions
         if _JAX_AVAILABLE:
-            operators_jax              = [[(op.jax, sites, vals) for (op, sites, vals) in self._nonlocal_ops[i]] for i in range(self.ns)]
-            operators_local_jax        = [[(op.jax, sites, vals) for (op, sites, vals) in self._local_ops[i]] for i in range(self.ns)]
-            self._loc_energy_jax_fun   = local_energy_jax_wrap(self.ns, operators_jax, operators_local_jax)
+            try:
+                operators_jax               = [[(op.jax, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
+                operators_jax_nosites       = [[(op.jax, None, vals) for (op, _, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
+                operators_local_jax         = [[(op.jax, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
+                operators_local_jax_nosites = [[(op.jax, None, vals) for (op, _, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
+                self._loc_energy_jax_fun    = local_energy_jax_wrap(self.ns,
+                                                    operator_terms_list             = operators_jax,
+                                                    operator_terms_list_ns          = operators_jax_nosites,
+                                                    operator_terms_list_nmod        = operators_local_jax,
+                                                    operator_terms_list_nmod_ns     = operators_local_jax_nosites,
+                                                    n_max                           = self._max_local_ch,
+                                                    dtype                           = self._dtype)
+            except Exception as e:
+                self._log(f"Failed to set JAX local energy functions: {e}", lvl=3, color="red", log='error')
         else:
+            self._log("JAX is not available, skipping JAX local energy function setup.", lvl=3, color="yellow", log='warning')
             self._loc_energy_jax_fun   = None
 
         # log success
-        self._log("Successfully set local energy functions...", lvl=1)
+        self._log("Successfully set local energy functions...", lvl=2)
 
     def _local_energy_test(self, k_map = 0, i = 0):
         '''
