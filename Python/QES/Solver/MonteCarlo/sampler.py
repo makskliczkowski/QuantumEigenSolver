@@ -27,6 +27,7 @@ Functions:
 
 import random
 import numpy as np
+import numba
 import scipy as sp
 from numba import jit, njit, prange
 from typing import Union, Tuple, Union, Callable, Optional, Any
@@ -55,8 +56,6 @@ if _JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     import jax.random as random_jp
-    from jax import vmap
-from concurrent.futures import ThreadPoolExecutor
 
 #########################################################################
 #! Errors
@@ -114,7 +113,7 @@ class SolverInitState(Enum):
 #########################################################################
 
 if _JAX_AVAILABLE:
-    @JIT
+    @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         """
         Propose a random flip of a state using JAX.
@@ -128,7 +127,7 @@ if _JAX_AVAILABLE:
         idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size)[0]
         return Binary.flip_array_jax_spin(state, idx)
 
-    @JIT
+    @jax.jit
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
         """0
         Propose a random flip of a state using JAX.
@@ -142,7 +141,7 @@ if _JAX_AVAILABLE:
         idx = randint_jax(key=rng_k, shape=(num,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)
         return Binary.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
 
-@njit
+@numba.njit
 def _propose_random_flips_np(state: np.ndarray, rng, num = 1):
     """
     Propose a random flip of a state using numpy.
@@ -152,13 +151,13 @@ def _propose_random_flips_np(state: np.ndarray, rng, num = 1):
         return Binary.flip_array_np_multi(state, idx,
                                         spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
     n_chains, state_size = state.shape[0], state.shape[1]
-    for i in prange(n_chains):
+    for i in range(n_chains):
         idx = randint_np(rng=rng, low=0, high=state_size, size=num)
         state[i] = Binary.flip_array_np_multi(state[i], idx,
                                         spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
     return state
 
-@njit(parallel=True)
+@numba.njit(parallel=True)
 def _propose_random_flip_np(state: np.ndarray, rng: np.random.Generator):
     """
     Propose a random flip of a state using numpy.
@@ -170,7 +169,7 @@ def _propose_random_flip_np(state: np.ndarray, rng: np.random.Generator):
     n_chains, state_size = state.shape[0], state.shape[1]
     for i in prange(n_chains):
         idx         = randint_np(low=0, high=state_size, size=1)[0]
-        state[i]    = Binary.flip_array_np(state[i], idx)
+        state[i]    = Binary.flip_array_np_spin(state[i], idx)
     return state
 
 def propose_random_flip(state: 'array-like', backend = 'default',

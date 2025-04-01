@@ -252,8 +252,8 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
             self._log(f"Starting i: {i}", lvl = 1, log = 'debug')
             
             # now check the local operators
-            self.add(op_sz_l, multiplier = self._hz[i], is_local = True, sites = [i])
-            self.add(op_sx_l, multiplier = self._hx[i], is_local = False, sites = [i])
+            self.add(op_sz_l, multiplier = self._hz[i], modifies = False, sites = [i])
+            self.add(op_sx_l, multiplier = self._hx[i], modifies = True, sites = [i])
             
             self._log(f"Adding local Sz at {i} with value {self._hz[i]:.2f}", lvl = 2, log = 'debug')
             self._log(f"Adding local Sx at {i} with value {self._hx[i]:.2f}", lvl = 2, log = 'debug')
@@ -282,14 +282,12 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                     sx_sx += self._kx[i]
 
                 # append the operators
-                self.add(op_sz_sz_c, sites = [i, nei], multiplier = sz_sz, is_local = True)
+                self.add(op_sz_sz_c, sites = [i, nei], multiplier = sz_sz, modifies = False)
                 self._log(f"Adding SzSz at {i},{nei} with value {sz_sz:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sx_sx_c, sites = [i, nei], multiplier = sx_sx)
+                self.add(op_sx_sx_c, sites = [i, nei], multiplier = sx_sx, modifies = True)
                 self._log(f"Adding SySy at {i},{nei} with value {sy_sy:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sy_sy_c, sites = [i, nei], multiplier = sy_sy)
+                self.add(op_sy_sy_c, sites = [i, nei], multiplier = sy_sy, modifies = True)
                 self._log(f"Adding SxSx at {i},{nei} with value {sx_sx:.2f}", lvl = 2, log = 'debug')
-            # finished
-            self._log(f"Finished i with len_local: {len(self._local_ops[i])}, len_normal: {len(self._nonlocal_ops[i])}", lvl = 1, log = 'info')
         self._log("Successfully set local energy operators...", lvl=1, log='info')
 
     # ----------------------------------------------------------------------------------------------

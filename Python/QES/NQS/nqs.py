@@ -21,7 +21,15 @@ if _JAX_AVAILABLE:
     import jax
     from jax import jit as jax_jit, grad, vmap, random
     from jax import numpy as jnp
-    from jax.tree_util import tree_flatten, tree_unflatten, tree_map
+    
+    # jax tree
+    try:
+        import jax.tree as jax_tree
+        from jax.tree import tree_flatten, tree_unflatten, tree_map
+    except ImportError:
+        import jax.tree_util as jax_tree
+        from jax.tree_util import tree_map
+    from jax.tree_util import tree_flatten, tree_unflatten
     from jax.flatten_util import ravel_pytree
 
     # use flax
@@ -44,6 +52,12 @@ import general_python.ml.net_impl.utils.net_utils as net_utils
 import general_python.ml.net_impl.net_general as net_general
 import general_python.algebra.solvers.stochastic_rcnfg as sr
 
+# schedulers and preconditioners
+import general_python.algebra.preconditioners as precond_mod
+import general_python.ml.schedulers as scheduler_mod
+import general_python.algebra.solvers as solvers_mod
+
+
 #########################################
 
 class NQS(MonteCarloSolver):
@@ -60,26 +74,70 @@ class NQS(MonteCarloSolver):
     _ERROR_JAX_WITH_FLAX    = "JAX backend is only compatible with Flax networks!"
     
     def __init__(self,
-                net         : Union[Callable, str, nn.Module, net_general.GeneralNet],
+                # information on the NQS
+                net         : Union[Callable, str, net_general.GeneralNet],
                 sampler     : Union[Callable, str, Sampler],
                 hamiltonian : Hamiltonian,
+                # information on the Monte Carlo solver
                 batch_size  : Optional[int]                     = 1,
+                # information on the NQS
                 lower_states: Optional[list]                    = None,
                 lower_betas : Optional[list]                    = None,
                 nparticles  : Optional[int]                     = None,
+                # information on the Monte Carlo solver
                 seed        : Optional[int]                     = None,
                 beta        : float                             = 1,
                 mu          : float                             = 0,
                 replica     : int                               = 1,
+                # information on the NQS - Hilbert space
                 shape       : Union[list, tuple]                = (1,),
                 hilbert     : Optional[Hilbert.HilbertSpace]    = None,
                 modes       : int                               = 2,
+                # information on the Monte Carlo solver
                 directory   : Optional[str]                     = MonteCarloSolver.defdir,
                 backend     : str                               = 'default',
                 nthreads    : Optional[int]                     = 1,
                 **kwargs):
         '''
         Initialize the NQS solver.
+        
+        Parameters:
+            net:
+                The neural network to be used.
+            sampler:
+                The sampler to be used.
+            hamiltonian:
+                The Hamiltonian to be used.
+            batch_size:
+                The batch size for training.
+            lower_states:
+                The lower states for the NQS.
+            lower_betas:
+                The lower betas for the NQS.
+            nparticles:
+                The number of particles in the system.
+            seed:
+                Random seed for initialization.
+            beta:
+                Beta parameter for the NQS.
+            mu:
+                Mu parameter for the NQS.
+            replica:
+                Number of replicas in the system.
+            shape:
+                Shape of the input data.
+            hilbert:
+                Hilbert space object (optional).
+            modes:
+                Number of modes in the system.
+            directory:
+                Directory for saving results (default: MonteCarloSolver.defdir).
+            backend:
+                Backend to be used ('default', 'jax', etc.).
+            nthreads:
+                Number of threads to use (default: 1).
+        
+        
         '''
         super().__init__(sampler    =   sampler,
                         seed        =   seed,
@@ -96,16 +154,17 @@ class NQS(MonteCarloSolver):
         # pre-set the Hamiltonian
         if hamiltonian is None:
             raise ValueError(self._ERROR_NO_HAMILTONIAN)
-        self._hamiltonian   = hamiltonian
+        self._hamiltonian       = hamiltonian
         
         #######################################
         #! collect the Hilbert space information
         #######################################
-        self._nh            = self._hilbert.Nh if self._hilbert is not None else None
-        self._nparticles    = nparticles if nparticles is not None else self._size
-        self._nvisible      = self._size
-        self._nparticles2   = self._nparticles**2
-        self._nvisible2     = self._nvisible**2
+        self._nh                = self._hilbert.Nh if self._hilbert is not None else None
+        self._nparticles        = nparticles if nparticles is not None else self._size
+        self._nvisible          = self._size
+        self._nparticles2       = self._nparticles**2
+        self._nvisible2         = self._nvisible**2
+        
         #######################################
         #! set the lower states
         #######################################
@@ -118,11 +177,13 @@ class NQS(MonteCarloSolver):
         #######################################
         #! state modifier (for later)
         #######################################
-        self._modifier      = None
+        
+        self._modifier          = None
         
         #######################################
         #! handle the network
         #######################################
+        
         self._batch_size        = batch_size
         self._initialized       = False
         self._weights           = None
@@ -131,18 +192,38 @@ class NQS(MonteCarloSolver):
         self._analytic          = False
         self._holomorphic       = True
         self.init_network()
+        
+        #######################################
+        #! handle gradients
+        #######################################
+        
         self._flat_grad_fun     = None
         self._dict_grad_type    = None
         self._init_gradients()
+        
         #######################################
         #! handle the functions
         #######################################
-        self._stochastic_reconf = sr.StochasticReconfiguration(None, self._backend)
+        
         self._ansatz_func       = None
         self._local_en_func     = None
         self._eval_func         = None
         # if the network has an analytic gradient
         self._grad_func         = None
+        
+        #######################################
+        #! handle the optimizer
+        #######################################
+        
+        self._preconditioner    = precond_mod.choose_precond(
+            precond_type = kwargs.get('preconditioner', None),
+            backend      = self._backend)
+        
+        self._lr_scheduler      = kwargs.get('lr_scheduler', None)
+        self._reg_scheduler     = kwargs.get('reg_scheduler', None)
+        
+        self._stochastic_reconf = sr.StochasticReconfiguration(None, self._backend)
+        
         self._init_functions()
     
     #####################################
@@ -171,6 +252,11 @@ class NQS(MonteCarloSolver):
     #####################################
     
     def reset(self):
+        """
+        Resets the initialization state of the object and reinitializes the underlying network.
+        This method marks the object as not initialized and forces a reinitialization of the associated
+        neural network by calling its `force_init` method.
+        """
         
         self._initialized       = False
         self._net.force_init()
@@ -372,8 +458,7 @@ class NQS(MonteCarloSolver):
             The output of the neural network for the given states, representing the log of the 
             wavefunction amplitudes.
         """
-        '''
-        '''
+        
         if params is None:
             params = self._weights
             
@@ -419,13 +504,13 @@ class NQS(MonteCarloSolver):
     
     @staticmethod
     def _evaluate_fun(func          : Callable,
-                    states          : Union[np.ndarray, jnp.ndarray],
-                    probabilities   : Union[np.ndarray, jnp.ndarray],
-                    logproba_in     : Union[np.ndarray, jnp.ndarray],
+                    states          : np.ndarray,
+                    probabilities   : np.ndarray,
+                    logproba_in     : np.ndarray,
                     logproba_fun    : Callable,
                     parameters      : Union[dict, list, np.ndarray],
                     batch_size      : Optional[int] = None,
-                    is_jax          : bool = True):
+                    is_jax          : bool          = True):
         """
         Evaluates a given function on a set of states and probabilities, with optional batching.
         
@@ -508,23 +593,27 @@ class NQS(MonteCarloSolver):
         This method computes the output of one or more functions using the provided states, 
         wavefunction (ansatze), and probabilities. If states and wavefunction are not provided, 
         it uses a sampler to generate the required data.
+        
         Args:
-            functions (Optional[list])      : A list of functions to evaluate. If not provided, 
-                                            defaults to using the local energy function (`self._local_en_func`).
-            states_and_psi (Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]])
-                                            : A tuple containing the states and the corresponding wavefunction (ansatze). 
-                                            If not provided, the sampler is used to generate these.
-            probabilities (Optional[Union[np.ndarray, jnp.ndarray]])
-                                            : Probabilities associated with the states. If not provided, defaults to an array of ones with the same 
-                                            shape as the wavefunction ansatze.
-            **kwargs                        : Additional keyword arguments:
-                - batch_size (int)          : The batch size for evaluation. Defaults to self._batch_size.
-                - num_samples (int)         : Number of samples to generate if using the sampler.
-                - num_chains (int)          : Number of chains to use if using the sampler.
+            functions (Optional[list]):
+                A list of functions to evaluate. If not provided, 
+                defaults to using the local energy function (`self._local_en_func`).
+            states_and_psi (Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]]):
+                A tuple containing the states and the corresponding wavefunction (ansatze). 
+                If not provided, the sampler is used to generate these.
+            probabilities (Optional[Union[np.ndarray, jnp.ndarray]]):
+                Probabilities associated with the states. If not provided, defaults to an array of ones with the same 
+                shape as the wavefunction ansatze.
+            **kwargs:
+                Additional keyword arguments:
+                    - batch_size (int)          : The batch size for evaluation. Defaults to self._batch_size.
+                    - num_samples (int)         : Number of samples to generate if using the sampler.
+                    - num_chains (int)          : Number of chains to use if using the sampler.
         Returns:
-            Union[Any, list]                : The output of the evaluated functions. If a single function is 
-                                            provided, the result is returned directly. If multiple functions are provided, 
-                                            a list of results is returned.
+            Union[Any, list]:
+                The output of the evaluated functions. If a single function is 
+                provided, the result is returned directly. If multiple functions are provided, 
+                a list of results is returned.
         """
         
         output          = [None]
@@ -565,7 +654,7 @@ class NQS(MonteCarloSolver):
             # otherwise, we shall use the sampler
             (states, ansatze), probabilities, output    = \
                     self._evaluate_fun_s(func           = functions,
-                                        sampler         = self._sampler, 
+                                        sampler         = self._sampler,
                                         num_samples     = num_samples,
                                         num_chains      = num_chains,
                                         logproba_fun    = self._ansatz_func,
@@ -621,10 +710,10 @@ class NQS(MonteCarloSolver):
         
         # use jax's scan to compute the gradients of the logarithmic wave function
         g = jax.lax.scan(scan_fun, None, sb)[1]
-        g = jax.tree.map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
+        g = tree_map(lambda x: x.reshape((-1,) + x.shape[2:]), g)
         
         # only take the non-padded values
-        return jax.tree.map(lambda x: x[:states.shape[0]], g)
+        return tree_map(lambda x: x[:states.shape[0]], g)
     
     @staticmethod
     def _grad_np(net, params, batch_size, states, flat_grad):
@@ -657,7 +746,7 @@ class NQS(MonteCarloSolver):
             batch_size = 1
             
         # check if the parameters are provided
-        params = params if (params is not None) else self._net.get_params()
+        params = self._net.get_params() if params is None else params
         
         if self._isjax:
             if not self._analytic:
@@ -686,7 +775,7 @@ class NQS(MonteCarloSolver):
                 start   += s[0]
         
         # Return unflattened parameters
-        return jax.tree_unflatten(self._net.tree_def, p_tree_shape)
+        return tree_unflatten(self._net.tree_def, p_tree_shape)
     
     def update_parameters(self, d_par: Union[dict, list, np.ndarray]):
         '''
@@ -698,14 +787,12 @@ class NQS(MonteCarloSolver):
         '''
         
         unflattened     = self._update_unflatten(d_par)
-        new_parameters  = jax.tree_util.tree_map(jax.lax.add,
+        new_parameters  = tree_map(jax.lax.add,
                                     self._net.get_params()['params'],
                                     unflattened)
         
         # set the new parameters already
-        self._weights = new_parameters
-        
-        # set the new parameters to the network
+        self._weights   = new_parameters
         self._net.set_params(new_parameters)
     
     def optimization(self,
@@ -717,7 +804,22 @@ class NQS(MonteCarloSolver):
                     use_s       = False,
                     use_minsr   = False):
         '''
-        Seeks for the update solution to
+        Perform the optimization step using stochastic reconfiguration.
+        Parameters:
+            energies:
+                The energy values for the configurations.
+            derivatives:
+                The derivatives of the energy values.
+            mean_loss:
+                The mean loss value (optional).
+            mean_deriv:
+                The mean derivative value (optional).
+            use_sr:
+                Flag to use stochastic reconfiguration (default: True).
+            use_s:
+                Flag to calculate the S matrix (default: False).
+            use_minsr:
+                Flag to use the minimum SR method (default: False).
         '''
         
         # set the values in the stochastic reconfiguration
@@ -735,43 +837,80 @@ class NQS(MonteCarloSolver):
         '''
         Stop the training process.
         '''
+        
+        # best            = 
+        
+        
         return super().train_stop(i, verbose, **kwargs)
     
     def train_step(self, i = 0, verbose = False, start_st = None, par = None, update = True, timer = None, **kwargs):
         '''
         Perform a single training step.
         '''
-        return super().train_step(i, verbose, start_st, par, update, timer, **kwargs)
-    
-    def train(self, nsteps = 1, verbose = False, start_st = None, par = None, update = True, timer = None, **kwargs):
+        
+        # get the batch size
+        batch_size      = kwargs.get("batch_size", self._batch_size)
+        use_sr          = kwargs.get("use_sr", True)
+        use_s           = kwargs.get("use_s",  False)
+        use_minsr       = kwargs.get("use_minsr", False)
+        
+        # get the values
+        (configs, _), _, (v, means, _) = self.evaluate_fun(batch_size = batch_size)
+
+        # compute the gradients based on the same configurations
+        g               = self.gradient(configs, batch_size = batch_size)
+        
+        # handle the lower states - if provided
+        if self._lower_states is not None:
+            for lower in self._lower_states:
+                pass
+        
+        # calculate the final solution
+        solution        = self.optimization(
+                                    energies    = v,
+                                    derivatives = g,
+                                    mean_loss   = means,
+                                    mean_deriv  = None,
+                                    use_sr      = use_sr,
+                                    use_s       = use_s,
+                                    use_minsr   = use_minsr
+                                )
+        
+        
+    def train(self,
+            nsteps                  = 1,
+            verbose                 = False,
+            start_st                = None,
+            par       : McsTrain    = None,
+            update    : bool        = True,
+            timer                   = None,
+            **kwargs):
         '''
         Train the NQS solver for a specified number of steps.
         '''
         
-        energies   = []
-        batch_size = kwargs.get("batch_size", self._batch_size)
-        for step in range(nsteps):
+        energies    = []
+        batch_size  = kwargs.get("batch_size", self._batch_size)
+        use_sr      = kwargs.get("use_sr", True)
+        use_s       = kwargs.get("use_s",  False)
+        use_minsr   = kwargs.get("use_minsr", False)
+        lr          = par.get("lr", 1e-2) if par is not None else 1e-2
+        
+        for _ in range(nsteps):
             
-            # get the values
-            (configs, ansatze), probabilities, (v, means, stds) = self.evaluate_fun(batch_size = batch_size)
+
 
             # get the variational derivatives
-            g = self.gradient(configs, batch_size = batch_size)
             
-            self._stochastic_reconf.set_values(loss     =   v, 
-                                            derivatives =   g,
-                                            mean_loss   =   means,
-                                            mean_deriv  =   None,
-                                            calculate_s =   False, 
-                                            use_minsr   =   False)
             
-            # dummy solution
-            solution = self._stochastic_reconf.solve(use_s = True, use_minsr = False)
+
 
             # update weights
-            self.update_parameters(-1e-2 * solution)
+            self.update_parameters(lr * solution)
             energies.append(means)
+            
         return energies
+    
     #####################################
     #! LOG_PROBABILITY_RATIO
     #####################################
@@ -897,6 +1036,17 @@ class NQS(MonteCarloSolver):
     def load_weights(self, dir = None, name = "weights"):
         return super().load_weights(dir, name)
     
+    #####################################
+    #! GETTERS AND PROPERTIES
+    #####################################
+    
+    @property
+    def net(self):
+        '''
+        Return the neural network.
+        '''
+        return self._net
+    
 #########################################
 
 class NQSLowerStates:
@@ -972,3 +1122,21 @@ class NQSLowerStates:
         if index < 0 or index >= len(self._lower_states):
             raise IndexError("Index out of range for lower states.")
         return self._lower_states[index], self._lower_betas[index]
+    
+#################################################
+
+def test_net_ansatz(nqs: NQS, nsamples = 10):
+    '''
+    Tests the NQS ansatz of the provided neural quantum state solver.
+    '''
+    
+    ns          = nqs.shape[0]
+    states      = np.random.choice([-1,1], size=(nsamples, ns), replace=True)
+    if nqs.isjax:
+        states  = jnp.array(states)
+    net         = nqs.net
+    
+    # params      = net.get_params()
+    ansatz      = net(states)
+    ansatz      = ansatz.reshape(-1, 1)
+    return ansatz, ansatz.shape

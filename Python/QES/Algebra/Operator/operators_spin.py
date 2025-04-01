@@ -1125,8 +1125,107 @@ def sig_k( lattice     : Optional[Lattice]     = None,
         raise ValueError("Invalid OperatorTypeActing")
     
 # -----------------------------------------------------------------------------
-# Finalize
+#! Finalize
 # -----------------------------------------------------------------------------
+
+def test_spin_operator_matrices(nh = 4, site = 0):
+    """
+    Test the equality between built-in operator matrices and explicitly constructed matrices
+    using Kronecker products for spin operators.
+    This function constructs representations for Pauli spin operators (sig_x, sig_y, and sig_z)
+    using both the operator’s built-in methods and explicit Kronecker product expansion.
+    It then compares these two implementations for consistency.
+    Parameters:
+        nh (int, optional): The Hilbert space dimension for the subsystem.
+            Typically, nh should be a power of 2 (e.g., 4 represents a two-qubit system).
+            Default is 4.
+        site (int, optional): The index (position) of the site where the active spin operator
+            is applied, with all other sites receiving the identity operator.
+            Default is 0.
+    Functionality:
+        - Constructs a dense identity matrix for the first subsystem.
+        - Computes the number of sites (ns) as the logarithm base 2 of nh.
+        - Generates operator matrices for sig_x, sig_y, and sig_z using built-in methods.
+        - Constructs explicit matrix representations of the operators using successive Kronecker products:
+            * For the target site, the appropriate Pauli matrix (scaled by 0.5) is used.
+            * For non-target sites, the identity matrix (_SIG_0) is used.
+            * Note: The sign for sig_z is inverted (i.e., -_SIG_Z * 0.5) at the active site.
+        - Compares the built-in and explicit matrices using numpy.allclose.
+        - Prints whether the matrices are equal.
+        - If the Hilbert space is small (nh < 64), prints both sets of matrices for visual verification,
+            using a MatrixPrinter utility if available.
+    Returns:
+        None
+    """
+    
+    from general_python.common.plot import MatrixPrinter
+    
+    # Set the Hilbert space dimension (for example, 4) and construct an identity.
+    # Create a dense identity for the first subsystem.
+    ns                  = np.log2(nh)
+    # Build the operator matrices via the operator’s built-in method.
+    sig_x_op            = sig_x(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])
+    sig_y_op            = sig_y(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])
+    sig_z_op            = sig_z(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])
+    sig_x_op_mat        = sig_x_op.matrix(dim=nh, matrix_type='sparse', use_numpy=True)
+    sig_y_op_mat        = sig_y_op.matrix(dim=nh, matrix_type='sparse', use_numpy=True)
+    sig_z_op_mat        = sig_z_op.matrix(dim=nh, matrix_type='sparse', use_numpy=True)
+    
+    # Build the same matrices via explicit Kronecker products.
+    # Note: The Kronecker product is not the most efficient way to build these matrices,
+    # but it is useful for testing purposes.
+    
+    out_sig_x           = _SIG_X * 0.5 if site == 0 else _SIG_0
+    out_sig_y           = _SIG_Y * 0.5 if site == 0 else _SIG_0
+    out_sig_z           = -_SIG_Z * 0.5 if site == 0 else _SIG_0
+    for i in range(1, int(ns)):
+        if i == site:
+            out_sig_x = np.kron(out_sig_x, _SIG_X * 0.5)
+            out_sig_y = np.kron(out_sig_y, _SIG_Y * 0.5)
+            out_sig_z = np.kron(out_sig_z, -_SIG_Z * 0.5)
+        else:
+            out_sig_x = np.kron(out_sig_x, _SIG_0)
+            out_sig_y = np.kron(out_sig_y, _SIG_0)
+            out_sig_z = np.kron(out_sig_z, _SIG_0)
+    
+    # For this test we compare the operator's built-in result to one of the explicit ones.
+    # (Choose which one matches your intended ordering.)
+    is_equal_x = np.allclose(sig_x_op_mat.todense(), out_sig_x)
+    print("Are the two matrices (sig_x) equal?", is_equal_x)
+    is_equal_y = np.allclose(sig_y_op_mat.todense(), out_sig_y)
+    print("Are the two matrices (sig_y) equal?", is_equal_y)
+    is_equal_z = np.allclose(sig_z_op_mat.todense(), out_sig_z)
+    print("Are the two matrices (sig_z) equal?", is_equal_z)
+    
+    # If the dimension is small, print out the matrices.
+    if nh < 64:
+        try:
+            
+            print("Matrix from operator (sig_x):")
+            MatrixPrinter.print_matrix(out_sig_x.todense())
+            print("Matrix from tensor (sig_x):")
+            MatrixPrinter.print_matrix(sig_x_op_mat.todense())
+            print("Matrix from operator (sig_y):")
+            MatrixPrinter.print_matrix(out_sig_y.todense())
+            print("Matrix from tensor (sig_y):")
+            MatrixPrinter.print_matrix(sig_y_op_mat.todense())
+            print("Matrix from operator (sig_z):")
+            MatrixPrinter.print_matrix(out_sig_z.todense())
+            print("Matrix from tensor (sig_z):")
+            MatrixPrinter.print_matrix(sig_z_op_mat.todense())
+        except ImportError:
+            print("Matrix from operator (sig_x):")
+            print(out_sig_x)
+            print("Matrix from tensor (sig_x):")
+            print(sig_x_op_mat.todense())
+            print("Matrix from operator (sig_y):")
+            print(out_sig_y)
+            print("Matrix from tensor (sig_y):")
+            print(sig_y_op_mat.todense())
+            print("Matrix from operator (sig_z):")
+            print(out_sig_z)
+            print("Matrix from tensor (sig_z):")
+            print(sig_z_op_mat.todense())
 
 class SpinOperatorTests(GeneralAlgebraicTest):
     """

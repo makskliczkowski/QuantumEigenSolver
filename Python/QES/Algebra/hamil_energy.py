@@ -22,16 +22,16 @@ if _JAX_AVAILABLE:
 
 # @numba.njit
 def local_energy_int(k_map              : np.int64,
-                    _op_f_mod_sites     : List[Callable],
-                    _op_i_mod_sites     : List[List[int]],
-                    _op_m_mod_sites     : List[float],
-                    _op_f_mod_nosites   : List[Callable],
-                    _op_m_mod_nosites   : List[float],
-                    _op_f_nmod_sites    : List[Callable],
-                    _op_i_nmod_sites    : List[List[int]],
-                    _op_m_nmod_sites    : List[float],
-                    _op_f_nmod_nosites  : List[Callable],
-                    _op_m_nmod_nosites  : List[float],
+                    _op_f_mod_sites     : Tuple[Callable],
+                    _op_i_mod_sites     : Tuple[List[int]],
+                    _op_m_mod_sites     : Tuple[float],
+                    _op_f_mod_nosites   : Tuple[Callable],
+                    _op_m_mod_nosites   : Tuple[float],
+                    _op_f_nmod_sites    : Tuple[Callable],
+                    _op_i_nmod_sites    : Tuple[List[int]],
+                    _op_m_nmod_sites    : Tuple[float],
+                    _op_f_nmod_nosites  : Tuple[Callable],
+                    _op_m_nmod_nosites  : Tuple[float],
                     dtype               : float) -> Tuple[np.ndarray, np.ndarray]:
 
     """
@@ -55,31 +55,42 @@ def local_energy_int(k_map              : np.int64,
         - There is a potential typo in the parameter name "operator_temrs_mult" which likely should be "operator_terms_mult".
     """
 
-    num_mod_sites               = len(_op_f_mod_sites)
-    num_mod_nosites             = len(_op_f_mod_nosites)
-    num_nmod_sites              = len(_op_f_nmod_sites)
-    num_nmod_nosites            = len(_op_f_nmod_nosites)
+    num_mod_sites               = len(_op_f_mod_sites) if _op_f_mod_sites is not None else 0
+    num_mod_nosites             = len(_op_f_mod_nosites) if _op_f_mod_nosites is not None else 0
+    num_nmod_sites              = len(_op_f_nmod_sites) if _op_f_nmod_sites is not None else 0
+    num_nmod_nosites            = len(_op_f_nmod_nosites) if _op_f_nmod_nosites is not None else 0
     
     states_list                 = numba.typed.List.empty_list(numba.types.Array(numba.types.int64, 1, 'A'))
-    values_list                 = numba.typed.List()
+    if dtype == np.float32:
+        values_list             = numba.typed.List.empty_list(numba.types.float32[:])
+    elif dtype == np.float64:
+        values_list             = numba.typed.List.empty_list(numba.types.float64[:])
+    elif dtype == np.complex64:
+        values_list             = numba.typed.List.empty_list(numba.types.complex64[:])
+    elif dtype == np.complex128:
+        values_list             = numba.typed.List.empty_list(numba.types.complex128[:])
+    else:
+        raise ValueError(f"Unsupported dtype: {dtype}. Supported types are float32, float64, complex64, and complex128.")
     
-    for ii in range(num_mod_sites):
-        op_func                 = _op_f_mod_sites[ii]
-        sites_args              = _op_i_mod_sites[ii]
-        multiplier              = _op_m_mod_sites[ii]
-        new_states, op_values   = op_func(k_map, *sites_args)
-        states_list.append(new_states)
-        values_list.append(op_values * multiplier)
+    if num_mod_sites > 0:
+        for ii in range(num_mod_sites):
+            op_func                 = _op_f_mod_sites[ii]
+            sites_args              = _op_i_mod_sites[ii]
+            multiplier              = _op_m_mod_sites[ii]
+            new_states, op_values   = op_func(k_map, *sites_args)
+            states_list.append(new_states)
+            values_list.append(op_values * multiplier)
+    
+    if num_mod_nosites > 0:
+        for ii in range(num_mod_nosites):
+            op_func                 = _op_f_mod_nosites[ii]
+            multiplier              = _op_m_mod_nosites[ii]
+            new_states, op_values   = op_func(k_map)
+            states_list.append(new_states)
+            values_list.append(op_values * multiplier)
         
-    for ii in range(num_mod_nosites):
-        op_func                 = _op_f_mod_nosites[ii]
-        multiplier              = _op_m_mod_nosites[ii]
-        new_states, op_values   = op_func(k_map)
-        states_list.append(new_states)
-        values_list.append(op_values * multiplier)
-    
     # Non-modifying operators
-    value                       = np.zeros((1,), dtype=dtype)
+    value = np.zeros((1,), dtype=dtype)
     if num_nmod_sites > 0:
         for ii in range(num_nmod_sites):
             op_func             = _op_f_nmod_sites[ii]
@@ -116,7 +127,7 @@ def local_energy_int_wrap(ns            : int,
                         _op_mod_nosites : List,
                         _op_nmod_sites  : List,
                         _op_nmod_nosites: List,
-                        dtype           : Optional[np.dtype] = np.float32) -> Callable:  
+                        dtype           : Optional[np.dtype] = np.float32) -> Callable:
     '''                        
     Creates a wrapper function to compute the local energy interaction for a given state 
     and site index using operator terms and local operators.
@@ -145,11 +156,24 @@ def local_energy_int_wrap(ns            : int,
     '''
     # Unpack the nonlocal and local operators
     _op_f_mod_sites, _op_i_mod_sites, _op_m_mod_sites           = unpack_operator_terms(ns, _op_mod_sites)
-    _op_f_mod_nosites, _op_i_mod_nosites, _op_m_mod_nosites     = unpack_operator_terms(ns, _op_mod_nosites)
+    _op_f_mod_nosites, _, _op_m_mod_nosites                     = unpack_operator_terms(ns, _op_mod_nosites)
     _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = unpack_operator_terms(ns, _op_nmod_sites)
-    _op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites  = unpack_operator_terms(ns, _op_nmod_nosites)
+    _op_f_nmod_nosites, _, _op_m_nmod_nosites                   = unpack_operator_terms(ns, _op_nmod_nosites)
     
-    # @numba.njit(nopytho)
+    # transform the multipliers to numpy arrays
+    _op_m_mod_sites_nb = numba.typed.List()
+    for m in _op_m_mod_sites:
+        _op_m_mod_sites_nb.append(np.asarray(m, dtype=dtype).flatten())
+    _op_m_mod_nosites_nb = numba.typed.List()
+    for m in _op_m_mod_nosites:
+        _op_m_mod_nosites_nb.append(np.asarray(m, dtype=dtype).flatten())
+    _op_m_nmod_sites_nb = numba.typed.List()
+    for m in _op_m_nmod_sites:
+        _op_m_nmod_sites_nb.append(np.asarray(m, dtype=dtype).flatten())
+    _op_m_nmod_nosites_nb = numba.typed.List()
+    for m in _op_m_nmod_nosites:
+        _op_m_nmod_nosites_nb.append(np.asarray(m, dtype=dtype).flatten())
+    
     def wrapper(k_map, i):
         """
         Wrapper function to apply operator terms to a state in an optimized manner.
@@ -168,36 +192,54 @@ def local_energy_int_wrap(ns            : int,
         """
         
         # get the local lists
-        _op_f_mod_sites_i      = _op_f_mod_sites[i]
-        _op_i_mod_sites_i      = _op_i_mod_sites[i]
-        _op_m_mod_sites_i      = _op_m_mod_sites[i]
-        _op_f_mod_nosites_i    = _op_f_mod_nosites[i]
-        _op_m_mod_nosites_i    = _op_m_mod_nosites[i]
-        _op_f_nmod_sites_i     = _op_f_nmod_sites[i]
-        _op_i_nmod_sites_i     = _op_i_nmod_sites[i]
-        _op_m_nmod_sites_i     = _op_m_nmod_sites[i]
-        _op_f_nmod_nosites_i   = _op_f_nmod_nosites[i]
-        _op_m_nmod_nosites_i   = _op_m_nmod_nosites[i]
+        op_m_mod_sites_i      = _op_m_mod_sites_nb[i]
+        op_f_mod_sites_i      = _op_f_mod_sites[i] if hasattr(op_m_mod_sites_i, '__len__') else None
+        op_i_mod_sites_i      = _op_i_mod_sites[i] if op_f_mod_sites_i is not None else None
         
-        return local_energy_int(k_map,
-                                _op_f_mod_sites_i,
-                                _op_i_mod_sites_i,
-                                _op_m_mod_sites_i,
-                                _op_f_mod_nosites_i,
-                                _op_m_mod_nosites_i,
-                                _op_f_nmod_sites_i,
-                                _op_i_nmod_sites_i,
-                                _op_m_nmod_sites_i,
-                                _op_f_nmod_nosites_i,
-                                _op_m_nmod_nosites_i,
-                                dtype)
+        op_m_mod_nosites_i    = _op_m_mod_nosites_nb[i]
+        op_f_mod_nosites_i    = _op_f_mod_nosites[i] if hasattr(op_m_mod_nosites_i, '__len__') else None
+        
+        op_m_nmod_sites_i     = _op_m_nmod_sites_nb[i]
+        op_f_nmod_sites_i     = _op_f_nmod_sites[i] if hasattr(op_m_nmod_sites_i, '__len__') else None
+        op_i_nmod_sites_i     = _op_i_nmod_sites[i] if op_f_mod_sites_i is not None else None
+        
+        op_m_nmod_nosites_i   = _op_m_nmod_nosites_nb[i]
+        op_f_nmod_nosites_i   = _op_f_nmod_nosites[i] if hasattr(op_m_nmod_nosites_i, '__len__') else None
+        
+        # Define an inner function that takes all parameters as explicit arguments.
+        # @numba.njit
+        def wrapper_in(
+                    k_map,
+                    _op_f_mod_sites_i, _op_i_mod_sites_i, _op_m_mod_sites_i,
+                    _op_f_mod_nosites_i, _op_m_mod_nosites_i,
+                    _op_f_nmod_sites_i, _op_i_nmod_sites_i, _op_m_nmod_sites_i,
+                    _op_f_nmod_nosites_i, _op_m_nmod_nosites_i, _dtype):
+            return local_energy_int(k_map,
+                                    _op_f_mod_sites_i,
+                                    _op_i_mod_sites_i,
+                                    _op_m_mod_sites_i,
+                                    _op_f_mod_nosites_i,
+                                    _op_m_mod_nosites_i,
+                                    _op_f_nmod_sites_i,
+                                    _op_i_nmod_sites_i,
+                                    _op_m_nmod_sites_i,
+                                    _op_f_nmod_nosites_i,
+                                    _op_m_nmod_nosites_i,
+                                    _dtype)
+        # Call the njitted function passing all required arguments.
+        return wrapper_in(k_map,
+                        op_f_mod_sites_i, op_i_mod_sites_i, op_m_mod_sites_i,
+                        op_f_mod_nosites_i, op_m_mod_nosites_i,
+                        op_f_nmod_sites_i, op_i_nmod_sites_i, op_m_nmod_sites_i,
+                        op_f_nmod_nosites_i, op_m_nmod_nosites_i, dtype)
+    
     return wrapper
 
 ################################################################################
 #! NUMPY ARRAY REPRESENTATION
 ################################################################################
 
-@numba.njit
+# @numba.njit
 def process_mod_sites(state         : np.ndarray,
                     sites_args      : Any,
                     multiplier      : float,
@@ -243,7 +285,7 @@ def process_mod_sites(state         : np.ndarray,
     
     return new_state_2d, op_values_final.astype(dtype)
 
-@numba.njit
+# @numba.njit
 def process_mod_nosites(state       : np.ndarray,
                         multiplier  : float,
                         op_func     : Callable,
@@ -287,7 +329,7 @@ def process_mod_nosites(state       : np.ndarray,
     
     return new_state_2d, op_values_final.astype(dtype)
 
-@numba.njit
+# @numba.njit
 def process_nmod_sites(state        : np.ndarray,
                     sites_flat      : List[np.ndarray],
                     multipliers     : np.ndarray,
@@ -325,7 +367,7 @@ def process_nmod_sites(state        : np.ndarray,
         value               += np.sum(op_value)
     return value
     
-@numba.njit
+# @numba.njit
 def process_nmod_nosites(state      : np.ndarray,
                         multipliers : np.ndarray,
                         op_funcs    : List[Callable],
@@ -449,7 +491,7 @@ def local_energy_np_wrap(ns                         : int,
     _nmax                                                       = n_max
     
     #! Create the wrapper function
-    @numba.njit
+    # @numba.njit
     def wrapper(state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         # Create typed lists to accumulate results.
         state_dim                   = state.shape[0]

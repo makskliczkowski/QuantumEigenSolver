@@ -1359,7 +1359,6 @@ class Hamiltonian(ABC):
                 - self._local_ops: a list of local operator tuples for each site.
             - JAX version is set only if the flag _JAX_AVAILABLE is True.
         """
-
         
         # set the integer functions
         try:
@@ -1416,6 +1415,12 @@ class Hamiltonian(ABC):
             self._loc_energy_jax_fun   = None
 
         # log success
+        
+        self._max_local_ch              = max(self._max_local_ch,   max(len(op) for op in self._ops_mod_sites)    + \
+                                                                    max(len(op) for op in self._ops_mod_nosites)  + \
+                                                                    max(len(op) for op in self._ops_nmod_sites)   + \
+                                                                    max(len(op) for op in self._ops_nmod_nosites))
+        self._log(f"Max local changes set to {self._max_local_ch}", lvl=2, color="green", log='warning')
         self._log("Successfully set local energy functions...", lvl=2)
 
     def _local_energy_test(self, k_map = 0, i = 0):

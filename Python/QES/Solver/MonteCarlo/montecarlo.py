@@ -160,11 +160,11 @@ class MonteCarloSolver(Solver):
         """
         
         # call the parent class constructor with the arguments and keyword arguments passed
-        super().__init__(shape      =   shape, 
+        super().__init__(shape      =   shape,
                         modes       =   modes,
                         seed        =   seed,
-                        hilbert     =   hilbert, 
-                        directory   =   directory, 
+                        hilbert     =   hilbert,
+                        directory   =   directory,
                         nthreads    =   nthreads,
                         backend     =   backend,
                         **kwargs)
@@ -422,14 +422,33 @@ class MonteCarloSolver(Solver):
         '''
         self._replica = value
     
+    # ----------------
+    
+    @property
+    def isjax(self):
+        '''
+        Returns True if the backend is JAX.
+        '''
+        return self._isjax
+    
+    @property
+    def shape(self):
+        '''
+        Returns the shape of the system.
+        '''
+        return self._shape
+    
     # ----------------------------------------------------------------------
     #! TRAINING
     # ----------------------------------------------------------------------  
     
     @abstractmethod
     def train_stop(self,
-                i           : int   = 0,
-                verbose     : bool  = False,
+                i           : int                           = 0,
+                par         : Union[McsTrain, dict, None]   = None,
+                curloss     : Optional[float]               = None,
+                curstd      : Optional[float]               = None,
+                verbose     : bool                          = False,
                 **kwargs) -> bool:
         '''
         Determine when to stop training.
@@ -441,7 +460,7 @@ class MonteCarloSolver(Solver):
     def train_step(self,
                 i           : int   = 0,
                 verbose     : bool  = False,
-                start_st    : Optional[Union[SolverInitState, int, jnp.ndarray]] = None,
+                start_st    : Optional[Union[SolverInitState, int]] = None,
                 par         : Union[McsTrain, dict, None] = None,
                 update      : bool  = True,
                 timer       : Optional[Timer] = None,

@@ -400,43 +400,32 @@ class QSM(hamil_module.Hamiltonian):
         
         # add the Hamiltonian of the dot particles
         backend_changed = self._backend if not use_numpy else np
-        eye         = linalg.sparse.identity(self._dimout, backend=backend_changed, dtype=self._dtype)
-        kron_prod   = linalg.sparse.kron(self._hdot, eye, backend=backend_changed)
-        self._hamil += kron_prod
+        eye             = linalg.sparse.identity(self._dimout, backend=backend_changed, dtype=self._dtype)
+        kron_prod       = linalg.sparse.kron(self._hdot, eye, backend=backend_changed)
+        self._hamil     += kron_prod
 
     # ----------------------------------------------------------------------------------------------
 
     def _set_local_energy_operators(self):
         """
-        Set local and nonlocal energy operators for the spin system.
-        This method initializes the operators used to calculate the local energy in an interacting 
-        spin model. It creates two lists of operator definitions: one for local operators and another 
-        for nonlocal (correlation) operators.
-        
-        Operators defined:
-            - op_sz_l: Local spin-z operator operating on a single site.
-            - op_sx_sx_c: Spin-x correlation operator operating between two sites.
-        For each index i from self.n to self.ns, the method:
-            - Logs the start of processing for index i.
-            - Adds a tuple containing the local operator (op_sz_l), the target site [i], and the corresponding 
-                coefficient from self._h to the local operators list.
-            - Adds a tuple containing the correlation operator (op_sx_sx_c), the target site pair [i, self._neidot[part_idx]],
-                and the weighted coefficient (self.g0 multiplied by the corresponding value in self._au) to the nonlocal
-                operators list.
-        After populating these lists, it assigns:
-            - self._local_ops with the constructed local operators.
-            - self._nonlocal_ops with the constructed nonlocal (correlation) operators.
-        This setup is crucial for correctly formulating the energy operator matrices used in the quantum 
-        eigenvalue calculations for the spin system. Logging is performed to assist in debugging the construction 
-        process.
+        Sets up the local energy operators for the quantum system.
+        This method initializes and registers energy operators acting on the spin sites.
+        It creates two types of operators:
+            - A local spin-z operator (sig_z) acting on individual sites.
+            - A spin-x correlation operator (sig_x) acting on pairs of sites.
+        For each site index i in the range [self.n, self.ns):
+            - Computes an offset index (part_idx = i - self.n) to access the corresponding
+                parameters from self._h, self._au, and self._neidot.
+            - Registers the local operator with a multiplier given by self._h[part_idx].
+            - Registers the correlation operator (modifying the state) with a multiplier given
+              by the product self.g0 * self._au[part_idx], acting between site i and the site
+                indicated by self._neidot[part_idx].
+        Additionally, debug log messages are generated at the start of processing each site,
+        and a success message is logged after all operators have been set.
+        Returns:
+            None
         """
-        
-        
-        
-        # operators
-        operators       =   [[] for _ in range(self.ns)]
-        operators_local =   [[] for _ in range(self.ns)]
-        
+
         op_sz_l         =   operators_spin_module.sig_z(ns = self.ns,
                                 type_act = operators_spin_module.OperatorTypeActing.Local)
         op_sx_sx_c      =   operators_spin_module.sig_x(ns = self.ns,
@@ -445,14 +434,9 @@ class QSM(hamil_module.Hamiltonian):
         for i in range(self.n, self.ns):
             self._log(f"Starting i: {i}", lvl = 1, log = 'debug')
             part_idx    =   i - self.n
-            
-            # now check the local operators
-            operators_local[i].append((op_sz_l, [i], self._h[part_idx]))
-            operators[i].append((op_sx_sx_c, [i, self._neidot[part_idx]], self.g0 * self._au[part_idx]))
+            self.add(op_sz_l, modifies = False, multiplier = self._h[part_idx], sites = [i])
+            self.add(op_sx_sx_c, modifies = True, multiplier = self.g0 * self._au[part_idx], sites = [i, self._neidot[part_idx]])
         
-        # finish
-        self._local_ops             = operators_local
-        self._nonlocal_ops          = operators
         self._log("Successfully set local energy functions...", log=2)
         
 ####################################################################################################
