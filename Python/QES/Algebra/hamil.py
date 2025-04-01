@@ -1363,22 +1363,34 @@ class Hamiltonian(ABC):
         
         # set the integer functions
         try:
-            operators_int           =   [[op.int for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
-            operators_int           +=  [[op.int for (op, sites, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
-            operators_local_int     =   [[op.int for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
-            operators_local_int     +=  [[op.int for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
-            self._loc_energy_int_fun    = local_energy_int_wrap(self.ns, operators_int, operators_local_int)
+            operators_mod_int           =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
+            operators_mod_int_nsites    =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
+            operators_nmod_int          =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
+            operators_nmod_int_nsites   =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
+            self._loc_energy_int_fun    = local_energy_int_wrap(self.ns,
+                                                    _op_mod_sites=operators_mod_int,
+                                                    _op_mod_nosites=operators_mod_int_nsites,
+                                                    _op_nmod_sites=operators_nmod_int,
+                                                    _op_nmod_nosites=operators_nmod_int_nsites,
+                                                    dtype=self._dtype)
+        
         except Exception as e:
             self._log(f"Failed to set integer local energy functions: {e}", lvl=3, color="red", log='error')
             self._loc_energy_int_fun = None
         
+        # set the NumPy functions
         try:
             # set the numpy functions
-            operators_np            =   [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
-            operators_np            +=  [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
-            operators_local_np      =   [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
-            operators_local_np      +=  [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
-            self._loc_energy_np_fun = local_energy_np_wrap(self.ns, operators_np, operators_local_np)
+            operators_mod_np        = [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
+            operators_mod_np_nsites = [[(op.npy, [], vals) for (op, _, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
+            operators_nmod_np       = [[(op.npy, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
+            operators_nmod_np_nsites= [[(op.npy, [], vals) for (op, _, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
+            self._loc_energy_np_fun = local_energy_np_wrap(self.ns,
+                                                    operator_terms_list=operators_mod_np,
+                                                    operator_terms_list_ns=operators_mod_np_nsites,
+                                                    operator_terms_list_nmod=operators_nmod_np,
+                                                    operator_terms_list_nmod_ns=operators_nmod_np_nsites,
+                                                    n_max=self._max_local_ch, dtype=self._dtype)
         except Exception as e:
             self._log(f"Failed to set NumPy local energy functions: {e}", lvl=3, color="red", log='error')
             self._loc_energy_np_fun = None

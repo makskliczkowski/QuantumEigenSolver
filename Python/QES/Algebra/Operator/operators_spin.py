@@ -116,7 +116,7 @@ def sigma_x_int(state  : int,
         return sigma_x_int_jnp(state, ns, sites, spin_value)
     return sigma_x_int_np(state, ns, sites, spin_value)
 
-# @numba.njit
+@numba.njit
 def sigma_x_np(state    : np.ndarray,
             sites       : Union[List[int], None],
             spin_value  : float = _SPIN):
@@ -138,11 +138,12 @@ def sigma_x_np(state    : np.ndarray,
     np.ndarray
         The state after applying the operator.
     """
-    coeff = 1.0
+    coeff   = 1.0
+    out     = state.copy()
     for site in sites:
-        state   = _binary.flip_array_np_spin(state, k=site)
+        out     = _binary.flip_array_np_spin(out, k=site)
         coeff   *= spin_value
-    return state, coeff
+    return out, coeff
 
 def sigma_x(state,
             ns          : int,
@@ -281,7 +282,7 @@ def sigma_y_np_real(state        : np.ndarray,
         state   =   flip(state, site, spin_value=spin_value)
     return state, coeff.real
 
-# @numba.njit
+@numba.njit
 def sigma_y_np(state        : np.ndarray,
                 sites       : Union[List[int], None],
                 spin        : bool  = BACKEND_DEF_SPIN,
@@ -304,13 +305,14 @@ def sigma_y_np(state        : np.ndarray,
     np.ndarray
         The state after applying the operator    
     """
-    coeff = 1.0 + 0j
+    coeff   = 1.0 + 0j
+    out     = state.copy()
     for site in sites:
         # For NumPy arrays, we use the site index directly.
         factor  =   (2.0 * _binary.check_arr_np(state, site) - 1.0) * 1.0j * spin_value
         coeff   *=  factor
-        state   =   flip(state, site, spin=spin, spin_value=spin_value)
-    return state, coeff
+        out     =   _binary.flip_array_np_spin(out, k=site)
+    return out, coeff
 
 def sigma_y(state,
             ns              : int,
@@ -405,7 +407,7 @@ def sigma_z_np_nspin(state      : np.ndarray,
         coeff   *=  spin_value * check(state, site)
     return state, coeff
 
-# @numba.njit
+@numba.njit
 def sigma_z_np(state        : np.ndarray,
                 sites       : Union[List[int], None],
                 spin_value  : float = _SPIN):

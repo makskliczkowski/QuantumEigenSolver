@@ -10,42 +10,30 @@ import numpy as np
 import numba.typed
 
 from general_python.algebra.utils import _JAX_AVAILABLE
-from typing import Callable, Tuple, Optional, Any
-from Algebra.hamil_energy_helper import unpack_operator_terms
+from typing import Callable, Tuple, Optional, Any, List
+from Algebra.hamil_energy_helper import unpack_operator_terms, flatten_operator_terms
 
 if _JAX_AVAILABLE:
     from Algebra.hamil_energy_jax import local_energy_jax_wrap
-
-#################################################################################
-
-# @numba.njit
-def process_term_nonlocal_numba(k_map, sites_args, multiplier, op_func):
-    '''
-    Process a single non-local operator term using Numba.
-    '''
-    new_states, op_values = op_func(k_map, *sites_args)
-    return new_states, multiplier * op_values
-
-# @numba.njit
-def process_term_local_numba(k_map, sites_args, multiplier, op_func):
-    '''
-    Process a single local operator term using Numba.
-    '''
-    _, op_values = op_func(k_map, *sites_args)
-    return op_values * multiplier
 
 #################################################################################
 #! INTEGER REPRESENTATION
 #################################################################################
 
 # @numba.njit
-def local_energy_int(k_map : np.int64,
-                    operator_terms_func,
-                    operator_terms_site,
-                    operator_temrs_mult,
-                    loc_operator_func,
-                    loc_operator_site,
-                    loc_operator_mult) -> Tuple[np.ndarray, np.ndarray]:
+def local_energy_int(k_map              : np.int64,
+                    _op_f_mod_sites     : List[Callable],
+                    _op_i_mod_sites     : List[List[int]],
+                    _op_m_mod_sites     : List[float],
+                    _op_f_mod_nosites   : List[Callable],
+                    _op_m_mod_nosites   : List[float],
+                    _op_f_nmod_sites    : List[Callable],
+                    _op_i_nmod_sites    : List[List[int]],
+                    _op_m_nmod_sites    : List[float],
+                    _op_f_nmod_nosites  : List[Callable],
+                    _op_m_nmod_nosites  : List[float],
+                    dtype               : float) -> Tuple[np.ndarray, np.ndarray]:
+
     """
     Computes the non-local and local energy contributions for a given state map by applying a set of operator functions.
     Parameters:
@@ -67,29 +55,53 @@ def local_energy_int(k_map : np.int64,
         - There is a potential typo in the parameter name "operator_temrs_mult" which likely should be "operator_terms_mult".
     """
 
-    num_nonloc  = len(operator_terms_func)
-    states_list = numba.typed.List()
-    values_list = numba.typed.List()
+    num_mod_sites               = len(_op_f_mod_sites)
+    num_mod_nosites             = len(_op_f_mod_nosites)
+    num_nmod_sites              = len(_op_f_nmod_sites)
+    num_nmod_nosites            = len(_op_f_nmod_nosites)
     
-    for ii in range(num_nonloc):
-        op_func                 = operator_terms_func[ii]
-        sites_args              = operator_terms_site[ii]
-        multiplier              = operator_temrs_mult[ii]
-        new_states, op_values   = process_term_nonlocal_numba(k_map, sites_args, multiplier, op_func)
+    states_list                 = numba.typed.List.empty_list(numba.types.Array(numba.types.int64, 1, 'A'))
+    values_list                 = numba.typed.List()
+    
+    for ii in range(num_mod_sites):
+        op_func                 = _op_f_mod_sites[ii]
+        sites_args              = _op_i_mod_sites[ii]
+        multiplier              = _op_m_mod_sites[ii]
+        new_states, op_values   = op_func(k_map, *sites_args)
         states_list.append(new_states)
-        values_list.append(op_values)
-
-    # locals
-    num_locals                  = len(loc_operator_func)
-    local_value                 = 0.0
-    for ii in range(num_locals):
-        op_func                 = loc_operator_func[ii]
-        sites_args              = loc_operator_site[ii]
-        multiplier              = loc_operator_mult[ii]
-        local_value             += process_term_local_numba(k_map, sites_args, multiplier, op_func)[0]
-    if num_locals > 0:
-        states_list.append(np.array([k_map], dtype = np.int64))
-        values_list.append(np.array([local_value]))
+        values_list.append(op_values * multiplier)
+        
+    for ii in range(num_mod_nosites):
+        op_func                 = _op_f_mod_nosites[ii]
+        multiplier              = _op_m_mod_nosites[ii]
+        new_states, op_values   = op_func(k_map)
+        states_list.append(new_states)
+        values_list.append(op_values * multiplier)
+    
+    # Non-modifying operators
+    value                       = np.zeros((1,), dtype=dtype)
+    if num_nmod_sites > 0:
+        for ii in range(num_nmod_sites):
+            op_func             = _op_f_nmod_sites[ii]
+            sites_args          = _op_i_nmod_sites[ii]
+            multiplier          = _op_m_nmod_sites[ii]
+            _, op_value         = op_func(k_map, *sites_args)
+            op_value            = multiplier * op_value
+            op_value            = np.asarray(op_value, dtype=dtype)
+            value               += np.sum(op_value)
+    
+    if num_nmod_nosites > 0:
+        for ii in range(num_nmod_nosites):
+            op_func             = _op_f_nmod_nosites[ii]
+            multiplier          = _op_m_nmod_nosites[ii]
+            _, op_value         = op_func(k_map)
+            op_value            = multiplier * op_value
+            op_value            = np.asarray(op_value, dtype=dtype)
+            value               += np.sum(op_value)
+    # Append the local energy contribution to the states and values lists.
+    if value.shape[0] > 0:
+        states_list.append(np.array([k_map], dtype=np.int64))
+        values_list.append(value)
         
     # Concatenate the resulting arrays.
     if states_list:
@@ -99,9 +111,12 @@ def local_energy_int(k_map : np.int64,
 
 ################################################################################
 
-def local_energy_int_wrap(ns : int,
-                        operator_terms_list,
-                        local_operators_list):
+def local_energy_int_wrap(ns            : int,
+                        _op_mod_sites   : List,
+                        _op_mod_nosites : List,
+                        _op_nmod_sites  : List,
+                        _op_nmod_nosites: List,
+                        dtype           : Optional[np.dtype] = np.float32) -> Callable:  
     '''                        
     Creates a wrapper function to compute the local energy interaction for a given state 
     and site index using operator terms and local operators.
@@ -129,9 +144,11 @@ def local_energy_int_wrap(ns : int,
             A function that takes a state and site index as input and returns the new states and operator values.
     '''
     # Unpack the nonlocal and local operators
-    nonlocal_func_unpacked, nonlocal_site_unpacked, nonlocal_mult_unpacked  = unpack_operator_terms(ns, operator_terms_list)
-    local_func_unpacked, local_site_unpacked, local_mult_unpacked           = unpack_operator_terms(ns, local_operators_list)
-
+    _op_f_mod_sites, _op_i_mod_sites, _op_m_mod_sites           = unpack_operator_terms(ns, _op_mod_sites)
+    _op_f_mod_nosites, _op_i_mod_nosites, _op_m_mod_nosites     = unpack_operator_terms(ns, _op_mod_nosites)
+    _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = unpack_operator_terms(ns, _op_nmod_sites)
+    _op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites  = unpack_operator_terms(ns, _op_nmod_nosites)
+    
     # @numba.njit(nopytho)
     def wrapper(k_map, i):
         """
@@ -149,13 +166,31 @@ def local_energy_int_wrap(ns : int,
         new_values : np.ndarray
             Concatenated array of corresponding operator values (each multiplied by its multiplier).
         """
+        
+        # get the local lists
+        _op_f_mod_sites_i      = _op_f_mod_sites[i]
+        _op_i_mod_sites_i      = _op_i_mod_sites[i]
+        _op_m_mod_sites_i      = _op_m_mod_sites[i]
+        _op_f_mod_nosites_i    = _op_f_mod_nosites[i]
+        _op_m_mod_nosites_i    = _op_m_mod_nosites[i]
+        _op_f_nmod_sites_i     = _op_f_nmod_sites[i]
+        _op_i_nmod_sites_i     = _op_i_nmod_sites[i]
+        _op_m_nmod_sites_i     = _op_m_nmod_sites[i]
+        _op_f_nmod_nosites_i   = _op_f_nmod_nosites[i]
+        _op_m_nmod_nosites_i   = _op_m_nmod_nosites[i]
+        
         return local_energy_int(k_map,
-                                nonlocal_func_unpacked[i],
-                                nonlocal_site_unpacked[i],
-                                nonlocal_mult_unpacked[i],
-                                local_func_unpacked[i],
-                                local_site_unpacked[i],
-                                local_mult_unpacked[i])
+                                _op_f_mod_sites_i,
+                                _op_i_mod_sites_i,
+                                _op_m_mod_sites_i,
+                                _op_f_mod_nosites_i,
+                                _op_m_mod_nosites_i,
+                                _op_f_nmod_sites_i,
+                                _op_i_nmod_sites_i,
+                                _op_m_nmod_sites_i,
+                                _op_f_nmod_nosites_i,
+                                _op_m_nmod_nosites_i,
+                                dtype)
     return wrapper
 
 ################################################################################
@@ -163,12 +198,14 @@ def local_energy_int_wrap(ns : int,
 ################################################################################
 
 @numba.njit
-def process_term_nonlocal_arr(state         : np.ndarray,
-                                sites_args  : Any,
-                                multiplier  : float,
-                                op_func     : Callable) -> Tuple[np.ndarray, np.ndarray]:
+def process_mod_sites(state         : np.ndarray,
+                    sites_args      : Any,
+                    multiplier      : float,
+                    op_func         : Callable,
+                    dtype           : np.dtype) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Apply a non-local operator to the given array state.
+    Apply a state-modyfing operator to the given array state. 
+    This implementation needs sites to be passed as a list.
     
     Parameters:
         state      : 1D numpy array representing the current state.
@@ -181,147 +218,318 @@ def process_term_nonlocal_arr(state         : np.ndarray,
         A tuple (new_state, op_value) where new_state is guaranteed to be 2D and
         op_value is scaled by the multiplier.
     """
-    new_state, op_value = op_func(state, sites_args)
+    if op_func is None:
+        return state.reshape(1, -1), np.zeros((1,), dtype=dtype)
     
-    # ensure that new state is two dimensional
+    new_state, op_value = op_func(state, sites_args)
+
     if new_state.ndim == 1:
-        new_state = new_state.reshape(1, new_state.shape[0])
-    return new_state, multiplier * op_value
+        new_state_2d = new_state.reshape(1, new_state.shape[0])
+    else:
+        new_state_2d = new_state.reshape(new_state.shape[0], -1)
+
+    # Force op_value to be at least a 1D array.
+    num_states  = new_state_2d.shape[0]
+    op_value    = np.atleast_1d(np.asarray(op_value).astype(dtype))
+    op_value_1d = op_value * multiplier  # Multiply elementwise
+    
+    # If op_value has a single element but multiple states exist, broadcast it.
+    if op_value_1d.shape[0] == 1 and num_states > 1:
+        op_values_final = np.full(num_states, op_value_1d[0], dtype=dtype)
+    elif op_value_1d.shape[0] == num_states:
+        op_values_final = op_value_1d
+    else:
+        raise ValueError("op_value length does not match number of states in process_mod_nosites")
+    
+    return new_state_2d, op_values_final.astype(dtype)
 
 @numba.njit
-def process_term_local_arr(state            : np.ndarray,
-                            sites_args      : Any,
-                            multiplier      : float,
-                            op_func         : Callable) -> float:
+def process_mod_nosites(state       : np.ndarray,
+                        multiplier  : float,
+                        op_func     : Callable,
+                        dtype       : np.dtype) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Apply a local operator to the given array state.
+    Apply a state-modyfing operator to the given array state. 
+    This implementation does not require sites to be passed as a list.
     
     Parameters:
         state      : 1D numpy array representing the current state.
-        sites_args : Site-specific argument(s) for the operator.
         multiplier : Scalar multiplier.
-        op_func    : Function that takes (state, sites_args) and returns (new_state, op_value).
+        op_func    : Function that takes (state) and returns (new_state, op_value).
+                    new_state may have shape (m, n) with m>=1.
     
     Returns:
-        The operator value (scaled by multiplier) as a float.
+        A tuple (new_state, op_value) where new_state is guaranteed to be 2D and
+        op_value is scaled by the multiplier.
     """
-    _, op_value = op_func(state, sites_args)
-    return multiplier * op_value
+    if op_func is None:
+        return state.reshape(1, -1), np.zeros((1,), dtype=dtype)
+    
+    new_state, op_value = op_func(state)
+    
+    if new_state.ndim == 1:
+        new_state_2d = new_state.reshape(1, new_state.shape[0])
+    else:
+        new_state_2d = new_state.reshape(new_state.shape[0], -1)
+
+    # Force op_value to be at least a 1D array.
+    num_states  = new_state_2d.shape[0]
+    op_value    = np.atleast_1d(np.asarray(op_value).astype(dtype))
+    op_value_1d = op_value * multiplier  # Multiply elementwise
+    
+    # If op_value has a single element but multiple states exist, broadcast it.
+    if op_value_1d.shape[0] == 1 and num_states > 1:
+        op_values_final = np.full(num_states, op_value_1d[0], dtype=dtype)
+    elif op_value_1d.shape[0] == num_states:
+        op_values_final = op_value_1d
+    else:
+        raise ValueError("op_value length does not match number of states in process_mod_nosites")
+    
+    return new_state_2d, op_values_final.astype(dtype)
 
 @numba.njit
-def local_energy_arr(state                  : np.ndarray,
-                    operator_terms_func,
-                    operator_terms_site,
-                    operator_terms_mult,
-                    loc_operator_func,
-                    loc_operator_site,
-                    loc_operator_mult) -> Tuple[np.ndarray, np.ndarray]:
+def process_nmod_sites(state        : np.ndarray,
+                    sites_flat      : List[np.ndarray],
+                    multipliers     : np.ndarray,
+                    op_funcs        : List[Callable],
+                    dtype           : np.dtype) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Compute non-local and local energy contributions for an array state.
-    
-    Assumptions:
-        - Each non-local operator function returns a 2D array of shape (n, state_dim)
-            and a corresponding value array of shape (n,). (n is fixed for each operator - usually n = 1)
-        - Each local operator returns a scalar energy contribution.
-    
-    Parameters:
-        state               : 1D numpy array representing the current state.
-        operator_terms_func : Typed list of functions for non-local operator terms.
-        operator_terms_site : Typed list of site-specific arguments for non-local terms.
-        operator_terms_mult : Typed list of multipliers for non-local terms.
-        loc_operator_func   : Typed list of functions for local operator terms.
-        loc_operator_site   : Typed list of site-specific arguments for local terms.
-        loc_operator_mult   : Typed list of multipliers for local terms.
-    
-    Returns:
-        Tuple (new_states, energy_values) where:
-            - new_states is a 2D numpy array where each row is one state produced by any operator term.
-            - energy_values is a 1D numpy array of the corresponding energy contributions.
-    """
-    # Create typed lists to accumulate results.
-    states_list = numba.typed.List()
-    values_list = numba.typed.List()
-    
-    # Process non-local operator terms.
-    num_nonloc  = len(operator_terms_func)
-    for i in range(num_nonloc):
-        new_states_term, op_values_term = process_term_nonlocal_arr(state,
-                                                                operator_terms_site[i],
-                                                                operator_terms_mult[i],
-                                                                operator_terms_func[i])
-        # new_states_term may have several rows.
-        states_list.append(new_states_term)
-        # Ensure op_values_term is a 1D array.
-        if op_values_term.ndim == 0:
-            op_values_term = np.array([op_values_term])
-        elif op_values_term.ndim != 1:
-            op_values_term = op_values_term.reshape(-1)
-        values_list.append(op_values_term)
-    
-    # Process local operator terms.
-    num_locals  = len(loc_operator_func)
-    local_value = 0.0
-    for i in range(num_locals):
-        local_value += process_term_local_arr(state,
-                                            loc_operator_site[i],
-                                            loc_operator_mult[i],
-                                            loc_operator_func[i])
-    if num_locals > 0:
-        # Append the original state (as one row) and the local energy contribution.
-        states_list.append(state.reshape(1, state.shape[0]))
-        values_list.append(np.array([local_value]))
-    
-    # Concatenate the accumulated states and values.
-    new_states_out      = np.concatenate(states_list, axis=0)
-    energy_values_out   = np.concatenate(values_list)
-    return new_states_out, energy_values_out
+    Apply a non-modifying operator to the given array state.
+    This implementation needs sites to be passed as a list.
 
-def local_energy_np_wrap(ns                 : int,
-                    operator_terms_list     : list,
-                    local_operators_list    : list):
-    """
-    Create a wrapper function that computes local energy interactions for all sites,
-    looping over i in ns and including all operator terms.
-    
     Parameters:
-        ns                   : Number of sites.
-        operator_terms_list  : Per-site list of tuples (op_func, sites_args, multiplier) for non-local terms.
-                                If a single list is provided, it is broadcast to all sites.
-        local_operators_list : Per-site list of tuples (op_func, sites_args, multiplier) for local terms.
-                                If a single list is provided, it is broadcast to all sites.
+        state          : 1D numpy array representing the current state.
+        sites_flat     : List of site-specific arguments for the operator - this is a list of arrays.
+        multipliers    : Scalar multipliers - this is a list of floats or complex numbers.
+        op_funcs       : List of functions that take (state, sites_flat) and return (new_state, op_value).
+                        new_state may have shape (m, n) with m>=1.
     
     Returns:
-        A function that takes a state (1D numpy array) and returns a tuple:
-            (all_new_states, all_energy_values)
-        where the results are aggregated over all sites.
+        A tuple (new_state, op_value) where new_state is guaranteed to be 2D and
+        op_value is scaled by the multipliers.
     """
     
-    # unpack the nonlocal and local operators
-    nonlocal_func_unpacked, nonlocal_site_unpacked, nonlocal_mult_unpacked  = unpack_operator_terms(ns, operator_terms_list)
-    local_func_unpacked, local_site_unpacked, local_mult_unpacked           = unpack_operator_terms(ns, local_operators_list)
+    value   = np.zeros((1,), dtype=dtype)
+    if op_funcs is None:
+        return value
     
+    numfunc = multipliers.shape[0]
+    # for ii in numba.prange(numfunc):
+    for ii in range(numfunc):
+        op_func             = op_funcs[ii]
+        sites               = sites_flat[ii]
+        multiplier          = multipliers[ii]
+        _, op_value         = op_func(state, sites)
+        op_value            = multiplier * op_value
+        op_value            = np.asarray(op_value, dtype=dtype)
+        value               += np.sum(op_value)
+    return value
+    
+@numba.njit
+def process_nmod_nosites(state      : np.ndarray,
+                        multipliers : np.ndarray,
+                        op_funcs    : List[Callable],
+                        dtype       : np.dtype) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Apply a non-modifying operator to the given array state.
+    This implementation does not require sites to be passed as a list.
+    Parameters:
+        state          : 1D numpy array representing the current state.
+        multipliers    : Scalar multipliers - this is a list of floats or complex numbers.
+        op_funcs       : List of functions that take (state) and return (new_state, op_value).
+                        new_state may have shape (m, n) with m>=1.
+                        
+    Returns:
+        A tuple (new_state, op_value) where new_state is guaranteed to be 2D and
+        op_value is scaled by the multipliers.
+    """
+    
+    value   = np.zeros((1,), dtype=dtype)
+    if op_funcs is None:
+        return value
+    
+    numfunc = multipliers.shape[0]
+    # for ii in numba.prange(numfunc):
+    for ii in range(numfunc):
+        op_func             =   op_funcs[ii]
+        multiplier          =   multipliers[ii]
+        _, op_value         =   op_func(state)
+        op_value            =   multiplier * op_value
+        op_value            =   np.asarray(op_value, dtype=dtype)
+        value               +=  np.sum(op_value)
+    return value
+
+################################################################################
+
+def local_energy_np_wrap(ns                         : int,
+                        operator_terms_list         : List,
+                        operator_terms_list_ns      : List,
+                        operator_terms_list_nmod    : List,
+                        operator_terms_list_nmod_ns : List,
+                        n_max                       : Optional[int] = 1,
+                        dtype                       : Optional[np.dtype] = np.float32) -> Callable:
+    """
+    Generates a JIT-compiled wrapper function for computing the local energy.
+    
+    This function processes various operator term lists by unpacking and flattening them, converting the multiplier
+    lists to numpy arrays of the specified dtype, and calculating auxiliary parameters required for energy evaluation.
+    It then defines and returns a Numba nopython-mode (njit) compiled wrapper function that executes the local energy
+    calculation using the prepared data.
+    
+    Parameters:
+        ns (int):
+            The number of sites or degrees of freedom.
+        operator_terms_list (List):
+            List of operator terms for local operators acting on sites.
+        operator_terms_list_ns (List):
+            List of operator terms for non-local operators acting on sites.
+        operator_terms_list_nmod (List):
+            List of operator terms for local operators acting on a modified layout.
+        operator_terms_list_nmod_ns (List):
+            List of operator terms for non-local operators acting on a modified layout.
+        n_max (Optional[int], default=1):
+            The maximum number of local modifications (how many states can a single operator produce).
+        dtype (Optional[np.dtype], default=np.float32):
+            The numpy data type to be used for numerical arrays.
+    Returns:
+        Callable: A Numba JIT-compiled function that takes a numpy array `state` as input and returns a tuple of 
+                    numpy arrays (typically representing computed local energies and additional computed metrics).
+    Notes:
+        - The returned function is optimized using Numba's nopython mode for improved performance.
+        - The function internally computes the total number of operator rows (for both local and non-local operators)
+            by multiplying the number of terms by `n_max`.
+        - This wrapper function interfaces with `local_energy_arr`, passing all necessary preprocessed operator data.
+    """
+
+    if not isinstance(dtype, np.dtype):
+        dtype = np.dtype(dtype)
+        
+    # unpack the operator terms
+    _op_f_mod_sites, _op_i_mod_sites, _op_m_mod_sites           = unpack_operator_terms(ns, operator_terms_list)
+    _op_f_mod_nosites, _op_i_mod_nosites, _op_m_mod_nosites     = unpack_operator_terms(ns, operator_terms_list_ns)
+    _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = unpack_operator_terms(ns, operator_terms_list_nmod)
+    _op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites  = unpack_operator_terms(ns, operator_terms_list_nmod_ns)
+        
+    # flatten the operator terms for all the operators
+    _op_f_mod_sites, _op_i_mod_sites, _op_m_mod_sites           = flatten_operator_terms(_op_f_mod_sites, _op_i_mod_sites, _op_m_mod_sites)
+    _op_f_mod_nosites, _, _op_m_mod_nosites                     = flatten_operator_terms(_op_f_mod_nosites, _op_i_mod_nosites, _op_m_mod_nosites)
+    _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = flatten_operator_terms(_op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites)
+    _op_f_nmod_nosites, _, _op_m_nmod_nosites                   = flatten_operator_terms(_op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites)
+    
+    # change all multipliers to numpy arrays
+    _op_m_mod_sites_np                                          = np.array(_op_m_mod_sites, dtype=dtype)
+    _op_m_mod_nosites_np                                        = np.array(_op_m_mod_nosites, dtype=dtype)
+    _op_m_nmod_sites_np                                         = np.array(_op_m_nmod_sites, dtype=dtype)
+    _op_m_nmod_nosites_np                                       = np.array(_op_m_nmod_nosites, dtype=dtype)
+    
+    # calculate the number of non-local and local operators
+    total_rows_sites                                            = len(_op_f_mod_sites) * n_max
+    total_rows_nosites                                          = len(_op_f_mod_nosites) * n_max
+    
+    # convert the functions to numba lists
+    _op_f_mod_sites_py      = tuple(_op_f_mod_sites) if len(_op_f_mod_sites) > 0 else None
+    _op_f_mod_nosites_py    = tuple(_op_f_mod_nosites) if len(_op_f_mod_nosites) > 0 else None
+    _op_f_nmod_sites_py     = tuple(_op_f_nmod_sites) if len(_op_f_nmod_sites) > 0 else None
+    _op_f_nmod_nosites_py   = tuple(_op_f_nmod_nosites) if len(_op_f_nmod_nosites) > 0 else None
+    
+    # convert the sites to numba lists
+    int32_array_type        = numba.types.Array(numba.types.int32, 1, 'A')        # 1D, contiguous
+    _op_i_mod_sites_nb      = numba.typed.List.empty_list(int32_array_type)
+    if _op_i_mod_sites:
+        for s in _op_i_mod_sites:
+            _op_i_mod_sites_nb.append(np.array(s, dtype=np.int32))
+
+    _op_i_nmod_sites_nb = numba.typed.List.empty_list(int32_array_type)
+    if _op_i_nmod_sites:
+        for s in _op_i_nmod_sites:
+            _op_i_nmod_sites_nb.append(np.array(s, dtype=np.int32))
+    
+    _total_rows_mod_sites                                       = total_rows_sites
+    _total_rows_mod_nosites                                     = total_rows_nosites
+    _nmax                                                       = n_max
+    
+    #! Create the wrapper function
     @numba.njit
     def wrapper(state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        # Use typed lists to accumulate the per-site outputs.
-        all_states_list     = numba.typed.List()
-        all_energies_list   = numba.typed.List()
+        # Create typed lists to accumulate results.
+        state_dim                   = state.shape[0]
         
-        for i in range(ns):
-            new_states, energies = local_energy_arr(
-                state,
-                nonlocal_func_unpacked[i],
-                nonlocal_site_unpacked[i],
-                nonlocal_mult_unpacked[i],
-                local_func_unpacked[i],
-                local_site_unpacked[i],
-                local_mult_unpacked[i]
-            )
-            all_states_list.append(new_states)
-            all_energies_list.append(energies)
+        #! start with local energy
+        if _op_m_mod_sites_np.shape[0] > 0 and _op_f_mod_sites_py is not None:
+            e1                      = process_nmod_sites(state, _op_i_nmod_sites_nb,
+                                                            _op_m_nmod_sites_np, _op_f_nmod_sites_py, dtype)
+        else:
+            e1                      = np.zeros((1,), dtype=dtype)
+        if _op_m_nmod_nosites_np.shape[0] > 0 and _op_f_nmod_nosites_py is not None:
+            e2                      = process_nmod_nosites(state, _op_m_nmod_nosites_np,
+                                                            _op_f_nmod_nosites_py, dtype)
+        else:
+            e2                      = np.zeros((1,), dtype=dtype)
+        diagonal_value              = e1 + e2
+        out_states                  = state.reshape(1, -1)
+        out_values                  = diagonal_value
         
-        all_new_states      = np.concatenate(all_states_list, axis=0)
-        all_energy_values   = np.concatenate(all_energies_list)
-        return all_new_states, all_energy_values
+        #! continue with modifying operators
+        num_mod_sites   = len(_op_m_mod_sites_np)
+        if num_mod_sites > 0 and _op_f_mod_sites_py is not None:
+            states_list_mod_sites       = np.zeros((_total_rows_mod_sites, state_dim), dtype=dtype)
+            values_list_mod_sites       = np.zeros((_total_rows_mod_sites,), dtype=dtype)
+            mask_sites                  = np.zeros((_total_rows_mod_sites,), dtype=np.bool_)
+            
+            # for i in numba.prange(num_mod_sites):
+            for i in range(num_mod_sites):
+                new_states, op_values   = process_mod_sites(state,
+                                                        _op_i_mod_sites_nb[i],
+                                                        _op_m_mod_sites_np[i],
+                                                        _op_f_mod_sites_py[i],
+                                                        dtype)
+                # check the size
+                new_states_size                             = new_states.shape[0]
+                if new_states_size > _nmax:
+                    raise ValueError(f"new_states_size ({new_states_size}) > _nmax ({_nmax})")
+                start_idx                                   = i * _nmax
+                end_idx                                     = i * _nmax + new_states_size
+                states_list_mod_sites[start_idx:end_idx, :] = new_states
+                values_list_mod_sites[start_idx:end_idx]    = op_values
+                mask_sites[start_idx:end_idx]               = True
+
+            # concatenate the results
+            states_list_mod_sites       = states_list_mod_sites[mask_sites]
+            values_list_mod_sites       = values_list_mod_sites[mask_sites]
+            if states_list_mod_sites.shape[0] > 0:
+                out_states              = np.concatenate((out_states, states_list_mod_sites), axis=0)
+                out_values              = np.concatenate((out_values, values_list_mod_sites), axis=0)
+    
+        #! continue with non-modifying operators
+        num_mod_nosites = len(_op_m_mod_nosites_np)
+        if num_mod_nosites > 0 and _op_f_mod_nosites_py is not None:
+            states_list_nosites       = np.zeros((_total_rows_mod_nosites, state_dim), dtype=dtype)
+            values_list_nosites       = np.zeros((_total_rows_mod_nosites,), dtype=dtype)
+            mask_nosites              = np.zeros((_total_rows_mod_nosites,), dtype=np.bool_)
+            
+            # for i in numba.prange(num_mod_nosites):
+            for i in range(num_mod_nosites):
+                new_states, op_values   = process_mod_nosites(state,
+                                                            _op_m_mod_nosites_np[i],
+                                                            _op_f_mod_nosites_py[i],
+                                                            dtype)
+                # check the size
+                new_states_size = new_states.shape[0]
+                if new_states_size > _nmax:
+                    raise ValueError(f"new_states_size ({new_states_size}) > _nmax ({_nmax})")
+                start_idx                                   = i * _nmax
+                end_idx                                     = i * _nmax + new_states_size
+                states_list_nosites[start_idx:end_idx, :]   = new_states
+                values_list_nosites[start_idx:end_idx]      = op_values
+                mask_nosites[start_idx:end_idx]             = True
+            
+            # concatenate the results
+            states_list_nosites       = states_list_nosites[mask_nosites]
+            values_list_nosites       = values_list_nosites[mask_nosites]
+            if states_list_nosites.shape[0] > 0:
+                out_states              = np.concatenate((out_states, states_list_nosites), axis=0)
+                out_values              = np.concatenate((out_values, values_list_nosites), axis=0)
+        return out_states, out_values
     return wrapper
 
 ################################################################################
