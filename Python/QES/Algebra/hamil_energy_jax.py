@@ -59,52 +59,6 @@ from Algebra.hamil_energy_helper import unpack_operator_terms, flatten_operator_
 
 ################################################################################
 
-@partial(jax.jit, static_argnums=(1,))
-def local_energy_jax_nonmod_sites(state         : jnp.ndarray,
-                                functions       : Callable,
-                                sites_pad       : jnp.ndarray,
-                                sites_mask      : jnp.ndarray,
-                                multipliers     : List[Union[float, complex]]) -> Tuple[jnp.ndarray, jnp.ndarray]:
-    """
-    Compute local energy contributions for a given state using JAX control flow.
-    
-    Parameters:
-        state:
-            1D jnp.ndarray of shape (state_dim,).
-        functions:
-            Local operator functions.
-        sites_pad:
-            Padded indices for the local operator functions.
-        sites_mask:
-            Mask for the padded indices.
-        multiplier:
-            Multiplier for the local operator.
-    ---
-    Returns:
-        A tuple (site_states, site_energies) where:
-            site_states (jnp.ndarray):
-                jnp.ndarray of shape (1, state_dim) representing the state.
-            site_energies (jnp.ndarray):
-                jnp.ndarray of shape (1,) representing the energy contribution.
-    """
-    
-    # Process local operators by summing their contributions using lax.scan.
-    num_local               = len(functions)
-    
-    if num_local == 0:
-        return jnp.array([0.0], dtype=multipliers.dtype)
-    
-    def local_scan_fn(carry, i):
-        sites_valid         = jnp.compress(sites_mask[i], sites_pad[i])
-        operands            = (state, sites_valid)
-        _, op_energy        = jax.lax.switch(i, functions, operands)
-        # _, op_energy = functions[i](state, sites[i])
-        term_contribution   = jnp.squeeze(op_energy * multipliers[i])
-        return carry + term_contribution, 0.0
-    
-    local_total, _          = jax.lax.scan(local_scan_fn, 0.0, jnp.arange(num_local))
-    return jnp.array([local_total], dtype=multipliers.dtype)
-
 # ------------------------------------------------------------------------------
 
 @partial(jax.jit, static_argnums=(1,))
@@ -149,8 +103,6 @@ def local_energy_jax_nonmod(state               : jnp.ndarray,
                             functions_no_sites  : List[Callable],
                             mult_no_sites       : List[Union[float, complex]],
                             functions_sites     : List[Callable],
-                            sites_pad           : List[List[int]],
-                            sites_mask          : List[List[bool]],
                             mult_sites          : List[Union[float, complex]]) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     Compute local energy contributions for a given state using JAX control flow.
@@ -160,63 +112,13 @@ def local_energy_jax_nonmod(state               : jnp.ndarray,
     # Process the local operators without sites
     e1 = local_energy_jax_nonmod_nosites(state, functions_no_sites, mult_no_sites)
     # Process the local operators with sites
-    e2 = local_energy_jax_nonmod_sites(state, functions_sites, sites_pad, sites_mask, mult_sites)
+    e2 = local_energy_jax_nonmod_nosites(state, functions_sites, mult_sites)
     
     # Combine the local energies
     local_energy = e1 + e2
     return local_energy
 
 ################################################################################
-
-def _pad_indices_2d(indices: List[List[int]], pad_value = -1.0) -> jnp.ndarray:
-    """
-    Pad the indices with zeros to ensure each sublist has the same length.
-    
-    ---
-    Parameters:
-        indices (List[List[int]]):
-            List of lists of indices to be padded.
-    
-    ---
-    Returns:
-        jnp.ndarray:
-            A 2D JAX array with padded indices.
-    """
-    
-    if not indices:
-        # If the input is empty, return an empty array.
-        return jnp.array([[]], dtype=jnp.int32), jnp.array([[]], dtype=jnp.bool_)
-    
-    num_terms = len(indices)
-    if num_terms == 0:
-        # Return arrays with shape (0, 0) - represents 0 terms, 0 indices/term max length
-        return  jnp.array([], dtype=jnp.int32).reshape(0, 0), \
-                jnp.array([], dtype=jnp.bool_).reshape(0, 0)
-    
-
-    # Calculate max length only if there are terms
-    max_idx_length = max(len(idx_list) for idx_list in indices) if indices else 0
-
-    if max_idx_length == 0 and num_terms > 0 :
-        # Handle list of empty lists e.g. [ [], [], [] ]
-        # Shape (num_terms, 0)
-        return  jnp.zeros((num_terms, 0), dtype=jnp.int32), \
-                jnp.zeros((num_terms, 0), dtype=jnp.bool_)
-
-    padded_data_list    = []
-    mask_list           = []
-    for inner in indices:
-        current_length  = len(inner)
-        padding_needed  = max_idx_length - current_length
-        padded_inner    = inner + [pad_value] * padding_needed
-        mask_inner      = [True] * current_length + [False] * padding_needed
-        padded_data_list.append(padded_inner)
-        mask_list.append(mask_inner)
-
-    return  jnp.array(padded_data_list, dtype=jnp.int32), \
-            jnp.array(mask_list, dtype=jnp.bool_)
-
-# ------------------------------------------------------------------------------
 
 def local_energy_jax_wrap(ns                        : int,
                         operator_terms_list         : List,
@@ -291,10 +193,6 @@ def local_energy_jax_wrap(ns                        : int,
     _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = flatten_operator_terms(_op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites)
     _op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites  = flatten_operator_terms(_op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites)
     
-    # pad the indices for the operators that use sites
-    _op_i_mod_sites_padded, _op_i_mod_sites_mask                = _pad_indices_2d(_op_i_mod_sites)
-    _op_i_nmod_sites_padded, _op_i_nmod_sites_mask              = _pad_indices_2d(_op_i_nmod_sites)
-    
     # change all multipliers to jax arrays
     _op_m_mod_sites                                             = jnp.array(_op_m_mod_sites, dtype=dtype)
     _op_m_mod_nosites                                           = jnp.array(_op_m_mod_nosites, dtype=dtype)
@@ -307,25 +205,29 @@ def local_energy_jax_wrap(ns                        : int,
     total_rows                                                  = total_rows_sites + total_rows_nosites + 1 # +1 for the original state
     
     # Convert functions to tuples
-    _op_f_mod_sites                                            = tuple(_op_f_mod_sites)
-    _op_f_mod_nosites                                          = tuple(_op_f_mod_nosites)
-    _op_f_nmod_sites                                           = tuple(_op_f_nmod_sites)
-    _op_f_nmod_nosites                                         = tuple(_op_f_nmod_nosites)
+    def operator_wrap(f, sites):
+        static_sites = jnp.asarray(sites, dtype=jnp.int32)
+        
+        @jax.jit
+        def wrapped_operator(state):
+            return f(state, static_sites)
+        return wrapped_operator
+    
+    _op_f_mod_sites_wrap                                        = tuple(operator_wrap(_op_f_mod_sites[i], _op_i_mod_sites[i]) for i in range(len(_op_f_mod_sites)))
+    _op_f_nmod_sites_wrap                                       = tuple(operator_wrap(_op_f_nmod_sites[i], _op_i_nmod_sites[i]) for i in range(len(_op_f_nmod_sites)))
+    _op_f_mod_nosites                                           = tuple(_op_f_mod_nosites)
+    _op_f_nmod_nosites                                          = tuple(_op_f_nmod_nosites)
     
     # create a wrapper function
     def init_wrapper(
                 # modifies with sites
                 _op_f_mod_sites_                : List[Callable],
-                _op_i_mod_sites_padded_         : jnp.ndarray,
-                _op_i_mod_sites_mask_           : jnp.ndarray,
                 _op_m_mod_sites_                : List[Union[float, complex]],
                 # modifies without sites
                 _op_f_mod_nosites_              : List[Callable],
                 _op_m_mod_nosites_              : List[Union[float, complex]],
                 # not modifies with sites
                 _op_f_nmod_sites_               : List[Callable],
-                _op_i_nmod_sites_padded_        : jnp.ndarray,
-                _op_i_nmod_sites_mask_          : jnp.ndarray,
                 _op_m_nmod_sites_               : List[Union[float, complex]],
                 # not modifies without sites
                 _op_f_nmod_nosites_             : List[Callable],
@@ -346,31 +248,22 @@ def local_energy_jax_wrap(ns                        : int,
                                     _op_f_nmod_nosites_,
                                     _op_m_nmod_nosites_,
                                     _op_f_nmod_sites_,
-                                    _op_i_nmod_sites_padded_,
-                                    _op_i_nmod_sites_mask_,
                                     _op_m_nmod_sites_).reshape((1,))
             all_states          = jax.lax.dynamic_update_slice(all_states, state.reshape(1, -1), (0, 0))
             all_energies        = jax.lax.dynamic_update_slice(all_energies, diagonal_energy, (0,))
-            
             # #! Modifies the states and accepts sites
-            def body_fun_sites(i, carry):
-                all_states_acc_sites, all_energies_acc_sites, start = carry
-                
-                # the masks for the non-local sites
-                sites_in                    = jnp.compress(_op_i_mod_sites_mask_[i], _op_i_mod_sites_padded_[i])
-                
-                # use jax.lax.switch
-                operands                    = (state, sites_in)
-                site_states, site_energies  = jax.lax.switch(i, _op_f_mod_sites_, operands)
-                site_energies               = jnp.reshape(site_energies, (-1,)) * _op_m_mod_sites_[i]
-                
-                # update the state and energy arrays
-                start_idx                   = start + site_energies.shape[0]
-                all_states_acc_sites        = jax.lax.dynamic_update_slice(all_states_acc_sites,
-                                                                        jnp.reshape(site_states, (-1, state_dim)), (start_idx, 0))
-                all_energies_acc_sites      = jax.lax.dynamic_update_slice(all_energies_acc_sites,
-                                                                        site_energies, (start_idx,))
-                return (all_states_acc_sites, all_energies_acc_sites, start_idx)
+            def body_fun_op(_op_f, _op_m):
+                def body_fun(i, carry):
+                    all_states_acc, all_energies_acc, start = carry
+                    # use jax.lax.switch
+                    site_states, site_energies  = jax.lax.switch(i, _op_f, state)
+                    site_energies               = jnp.reshape(site_energies, (-1,)) * _op_m[i]
+                    # update the state and energy arrays
+                    end_idx                     = start + site_energies.shape[0]
+                    all_states_acc              = jax.lax.dynamic_update_slice(all_states_acc, site_states.reshape(1, state_dim), (start, 0))
+                    all_energies_acc            = jax.lax.dynamic_update_slice(all_energies_acc, site_energies, (start,))
+                    return (all_states_acc, all_energies_acc, end_idx)
+                return body_fun
             
             # Initialize the starting row index after the diagonal element (row 0)
             start_row_after_diag    = 1
@@ -380,27 +273,10 @@ def local_energy_jax_wrap(ns                        : int,
                 all_states, all_energies, next_start_row = jax.lax.fori_loop(
                                                                 0,
                                                                 num_mod_sites,
-                                                                body_fun_sites,
+                                                                body_fun_op(_op_f_mod_sites_, _op_m_mod_sites_),
                                                                 (all_states, all_energies, start_row_after_diag))
             else:
                 next_start_row = start_row_after_diag # No rows were added
-            
-            # #! Modifies the states and does not accept sites
-            def body_fun_nosites(i, carry):
-                all_states_acc_nosites, all_energies_acc_nosites, start = carry
-                
-                # use jax.lax.switch
-                operands                    = state
-                site_states, site_energies  = jax.lax.switch(i, _op_f_mod_nosites_, operands)
-                site_energies               = jnp.reshape(site_energies, (-1,)) * _op_m_mod_nosites_[i]
-                
-                # update the state and energy arrays
-                start_idx                   = start + site_energies.shape[0]
-                all_states_acc_nosites      = jax.lax.dynamic_update_slice(all_states_acc_nosites,
-                                                                        site_states.reshape(1, state_dim), (start_idx, 0))
-                all_energies_acc_nosites    = jax.lax.dynamic_update_slice(all_energies_acc_nosites,
-                                                                        site_energies, (start_idx,))
-                return (all_states_acc_nosites, all_energies_acc_nosites, start_idx)
             
             num_mod_nosites         = len(_op_f_mod_nosites)
             if num_mod_nosites > 0:
@@ -408,7 +284,7 @@ def local_energy_jax_wrap(ns                        : int,
                 all_states, all_energies, final_start_row = jax.lax.fori_loop(
                                                                     0,
                                                                     num_mod_nosites,
-                                                                    body_fun_nosites,
+                                                                    body_fun_op(_op_f_mod_nosites_, _op_m_mod_nosites_),
                                                                     (all_states, all_energies, next_start_row))
             else:
                 final_start_row = next_start_row
@@ -416,9 +292,9 @@ def local_energy_jax_wrap(ns                        : int,
         return wrapper
     
     initial_wrapper = init_wrapper(
-        _op_f_mod_sites, _op_i_mod_sites_padded,_op_i_mod_sites_mask, _op_m_mod_sites,
+        _op_f_mod_sites_wrap, _op_m_mod_sites,
         _op_f_mod_nosites, _op_m_mod_nosites,
-        _op_f_nmod_sites, _op_i_nmod_sites_padded, _op_i_nmod_sites_mask, _op_m_nmod_sites,
+        _op_f_nmod_sites_wrap, _op_m_nmod_sites,
         _op_f_nmod_nosites, _op_m_nmod_nosites)
     
     # Create a wrapper function that accepts the state and calls the initial wrapper

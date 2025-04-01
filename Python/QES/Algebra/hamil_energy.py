@@ -88,6 +88,12 @@ def local_energy_int(k_map              : np.int64,
             new_states, op_values   = op_func(k_map)
             states_list.append(new_states)
             values_list.append(op_values * multiplier)
+            
+    if num_mod_sites == 0 and num_mod_nosites == 0:
+        if states_list:
+            return np.concatenate(states_list), np.concatenate(values_list)
+        else:
+            return np.array([]), np.array([])
         
     # Non-modifying operators
     value = np.zeros((1,), dtype=dtype)
@@ -193,18 +199,22 @@ def local_energy_int_wrap(ns            : int,
         
         # get the local lists
         op_m_mod_sites_i      = _op_m_mod_sites_nb[i]
-        op_f_mod_sites_i      = _op_f_mod_sites[i] if hasattr(op_m_mod_sites_i, '__len__') else None
+        op_f_mod_sites_i      = _op_f_mod_sites[i] if hasattr(op_m_mod_sites_i, '__len__') and len(op_m_mod_sites_i) > 0 else None
         op_i_mod_sites_i      = _op_i_mod_sites[i] if op_f_mod_sites_i is not None else None
+        op_m_mod_sites_i      = _op_m_mod_sites_nb[i] if op_f_mod_sites_i is not None else None
         
         op_m_mod_nosites_i    = _op_m_mod_nosites_nb[i]
-        op_f_mod_nosites_i    = _op_f_mod_nosites[i] if hasattr(op_m_mod_nosites_i, '__len__') else None
+        op_f_mod_nosites_i    = _op_f_mod_nosites[i] if hasattr(op_m_mod_nosites_i, '__len__') and len(op_m_mod_nosites_i) > 0 else None
+        op_m_mod_nosites_i    = _op_m_mod_nosites_nb[i] if op_f_mod_nosites_i is not None else None
         
         op_m_nmod_sites_i     = _op_m_nmod_sites_nb[i]
-        op_f_nmod_sites_i     = _op_f_nmod_sites[i] if hasattr(op_m_nmod_sites_i, '__len__') else None
+        op_f_nmod_sites_i     = _op_f_nmod_sites[i] if hasattr(op_m_nmod_sites_i, '__len__') and len(op_m_nmod_sites_i) > 0 else None
         op_i_nmod_sites_i     = _op_i_nmod_sites[i] if op_f_mod_sites_i is not None else None
+        op_m_nmod_sites_i     = _op_m_nmod_sites_nb[i] if op_f_mod_sites_i is not None else None
         
         op_m_nmod_nosites_i   = _op_m_nmod_nosites_nb[i]
-        op_f_nmod_nosites_i   = _op_f_nmod_nosites[i] if hasattr(op_m_nmod_nosites_i, '__len__') else None
+        op_f_nmod_nosites_i   = _op_f_nmod_nosites[i] if hasattr(op_m_nmod_nosites_i, '__len__') and len(op_m_nmod_nosites_i) > 0 else None
+        op_m_nmod_nosites_i   = _op_m_nmod_nosites_nb[i] if op_f_nmod_nosites_i is not None else None
         
         # Define an inner function that takes all parameters as explicit arguments.
         # @numba.njit
@@ -469,23 +479,19 @@ def local_energy_np_wrap(ns                         : int,
     total_rows_nosites                                          = len(_op_f_mod_nosites) * n_max
     
     # convert the functions to numba lists
-    _op_f_mod_sites_py      = tuple(_op_f_mod_sites) if len(_op_f_mod_sites) > 0 else None
-    _op_f_mod_nosites_py    = tuple(_op_f_mod_nosites) if len(_op_f_mod_nosites) > 0 else None
-    _op_f_nmod_sites_py     = tuple(_op_f_nmod_sites) if len(_op_f_nmod_sites) > 0 else None
-    _op_f_nmod_nosites_py   = tuple(_op_f_nmod_nosites) if len(_op_f_nmod_nosites) > 0 else None
+    _op_f_mod_sites_py                                          = tuple(_op_f_mod_sites) if len(_op_f_mod_sites) > 0 else None
+    _op_f_mod_nosites_py                                        = tuple(_op_f_mod_nosites) if len(_op_f_mod_nosites) > 0 else None
+    _op_f_nmod_sites_py                                         = tuple(_op_f_nmod_sites) if len(_op_f_nmod_sites) > 0 else None
+    _op_f_nmod_nosites_py                                       = tuple(_op_f_nmod_nosites) if len(_op_f_nmod_nosites) > 0 else None
     
-    # convert the sites to numba lists
-    int32_array_type        = numba.types.Array(numba.types.int32, 1, 'A')        # 1D, contiguous
-    _op_i_mod_sites_nb      = numba.typed.List.empty_list(int32_array_type)
-    if _op_i_mod_sites:
-        for s in _op_i_mod_sites:
-            _op_i_mod_sites_nb.append(np.array(s, dtype=np.int32))
-
-    _op_i_nmod_sites_nb = numba.typed.List.empty_list(int32_array_type)
-    if _op_i_nmod_sites:
-        for s in _op_i_nmod_sites:
-            _op_i_nmod_sites_nb.append(np.array(s, dtype=np.int32))
-    
+    def wrap_fun(_op_f, _op_i):
+        sites_args = np.asarray(_op_i, dtype=np.int32)
+        @numba.njit
+        def wrapper(state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+            return _op_f(state, sites_args)
+        return wrapper
+    _op_f_mod_sites_py                                          = tuple(wrap_fun(f, i) for f, i in zip(_op_f_mod_sites, _op_i_mod_sites))
+    _op_f_nmod_sites_py                                         = tuple(wrap_fun(f, i) for f, i in zip(_op_f_nmod_sites, _op_i_nmod_sites))
     _total_rows_mod_sites                                       = total_rows_sites
     _total_rows_mod_nosites                                     = total_rows_nosites
     _nmax                                                       = n_max
@@ -495,14 +501,15 @@ def local_energy_np_wrap(ns                         : int,
     def wrapper(state: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         # Create typed lists to accumulate results.
         state_dim                   = state.shape[0]
-        
+        has_mod_sites               = len(_op_f_mod_sites) > 0 and _op_f_mod_sites_py is not None
+        has_mod_nosites             = len(_op_f_mod_nosites) > 0 and _op_f_mod_nosites_py is not None
         #! start with local energy
-        if _op_m_mod_sites_np.shape[0] > 0 and _op_f_mod_sites_py is not None:
-            e1                      = process_nmod_sites(state, _op_i_nmod_sites_nb,
-                                                            _op_m_nmod_sites_np, _op_f_nmod_sites_py, dtype)
+        
+        if has_mod_sites:
+            e1                      = process_nmod_nosites(state, _op_m_nmod_sites_np, _op_f_nmod_sites_py, dtype)
         else:
             e1                      = np.zeros((1,), dtype=dtype)
-        if _op_m_nmod_nosites_np.shape[0] > 0 and _op_f_nmod_nosites_py is not None:
+        if has_mod_nosites:
             e2                      = process_nmod_nosites(state, _op_m_nmod_nosites_np,
                                                             _op_f_nmod_nosites_py, dtype)
         else:
@@ -512,7 +519,7 @@ def local_energy_np_wrap(ns                         : int,
         out_values                  = diagonal_value
         
         #! continue with modifying operators
-        num_mod_sites   = len(_op_m_mod_sites_np)
+        num_mod_sites = len(_op_m_mod_sites_np)
         if num_mod_sites > 0 and _op_f_mod_sites_py is not None:
             states_list_mod_sites       = np.zeros((_total_rows_mod_sites, state_dim), dtype=dtype)
             values_list_mod_sites       = np.zeros((_total_rows_mod_sites,), dtype=dtype)
@@ -520,11 +527,7 @@ def local_energy_np_wrap(ns                         : int,
             
             # for i in numba.prange(num_mod_sites):
             for i in range(num_mod_sites):
-                new_states, op_values   = process_mod_sites(state,
-                                                        _op_i_mod_sites_nb[i],
-                                                        _op_m_mod_sites_np[i],
-                                                        _op_f_mod_sites_py[i],
-                                                        dtype)
+                new_states, op_values   = process_mod_nosites(state, _op_m_mod_sites_np[i], _op_f_mod_sites_py[i], dtype)
                 # check the size
                 new_states_size                             = new_states.shape[0]
                 if new_states_size > _nmax:
