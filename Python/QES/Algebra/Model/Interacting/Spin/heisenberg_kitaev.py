@@ -231,6 +231,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         Note:
             This method updates internal state and does not return a value.
         """
+        super()._set_local_energy_operators()
         
         # operators
         lattice         = self._lattice

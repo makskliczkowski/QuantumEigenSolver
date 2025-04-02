@@ -21,6 +21,7 @@ from typing import List, Tuple, Union, Optional, Callable
 from abc import ABC
 from functools import partial
 import time
+from tabulate import tabulate
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
@@ -190,7 +191,7 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @staticmethod
-    def __backend(backend: str):
+    def _set_backend(backend: str):
         '''
         Get the backend, scipy, and random number generator for the backend.
         
@@ -216,7 +217,7 @@ class Hamiltonian(ABC):
             _backendstr = 'jax'
         else:
             _backendstr = 'np'
-        return Hamiltonian.__backend(_backendstr)
+        return Hamiltonian._set_backend(_backendstr)
     
     # ----------------------------------------------------------------------------------------------
     
@@ -236,7 +237,7 @@ class Hamiltonian(ABC):
             **kwargs                        : Additional arguments.
         '''
         
-        self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian.__backend(backend)
+        self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian._set_backend(backend)
         self._is_jax        = _JAX_AVAILABLE and self._backend != np
         self._is_numpy      = not self._is_jax
         self._is_sparse     = is_sparse
@@ -276,6 +277,7 @@ class Hamiltonian(ABC):
         self._krylov        = None
         self._name          = "Hamiltonian"
         self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
+        self._max_local_ch_o= self._max_local_ch # maximum number of local changes - through the operator
         
         #! set the local energy functions and the corresponding methods
         self._ops_nmod_nosites      = [[] for _ in range(self.ns)]      # operators that do not modify the state and do not act on any site (through the function call)
@@ -1262,6 +1264,7 @@ class Hamiltonian(ABC):
         self._loc_energy_int_fun    = None
         self._loc_energy_np_fun     = None
         self._loc_energy_jax_fun    = None
+        self._max_local_ch          = self._max_local_ch_o
     
     def add(self, operator: Operator, multiplier: Union[float, complex, int], modifies: bool = False, sites = None):
         """
@@ -1307,9 +1310,9 @@ class Hamiltonian(ABC):
         # check if the sites are provided, if one sets the operator, we would put it at a given site
         i           = 0 if (sites is None or len(sites) == 0) else sites[0]
         op_tuple    = create_add_operator(operator, multiplier, sites)
-        
+        modifies    = modifies or operator.modifies
         # if the operator is meant to be local, it does not modify the state
-        if not modifies and not operator.modifies:
+        if not modifies:
             if operator.type_acting == OperatorTypeActing.Global:
                 self._ops_nmod_nosites[i].append((op_tuple))
                 self._log(f"Adding non-modifying operator {operator} at site {i} (global) with multiplier {op_tuple[2]}", lvl = 2)
@@ -1331,7 +1334,7 @@ class Hamiltonian(ABC):
         Note:
             It is the internal function that knows about the structure of the Hamiltonian.
         '''
-        pass
+        self.reset_operators()
     
     def _set_local_energy_functions(self):
         """
@@ -1416,7 +1419,7 @@ class Hamiltonian(ABC):
 
         # log success
         
-        self._max_local_ch              = max(self._max_local_ch,   max(len(op) for op in self._ops_mod_sites)    + \
+        self._max_local_ch              = max(self._max_local_ch_o,   max(len(op) for op in self._ops_mod_sites)    + \
                                                                     max(len(op) for op in self._ops_mod_nosites)  + \
                                                                     max(len(op) for op in self._ops_nmod_sites)   + \
                                                                     max(len(op) for op in self._ops_nmod_nosites))
@@ -1449,4 +1452,85 @@ class Hamiltonian(ABC):
     
     # ----------------------------------------------------------------------------------------------
     
+# --------------------------------------------------------------------------------------------------
+
+def test_generic_hamiltonian(ham: Hamiltonian, ns: int):
+    '''
+    Creates a generic Hamiltonian object based on the provided Hamiltonian class and number of sites.
+    
+    Args:
+        ham (Hamiltonian):
+            The Hamiltonian class to be used.
+        ns (int):
+            The number of sites.
+    Returns:
+    '''
+    import Algebra.Operator.operators_spin as op_spin
+    import general_python.common.binary as bin_mod
+
+    sites   = [0, 2]
+
+    #! GLOBAL
+
+    #@ sig_x
+    sig_x   = op_spin.sig_x(
+        ns      = ns,
+        sites   = sites
+    )
+
+    #@ sig_z
+    sig_z   = op_spin.sig_z(
+        ns      = ns,
+        sites   = sites
+    )
+
+    #@ sig_x_0
+    sig_z_0 = op_spin.sig_z(
+        ns      = ns,
+        sites   = [0]
+    )
+
+    #@ sig_x * 2
+    sig_x_2     = 2 * sig_x
+
+    #@ sig_z * sig_z_0
+    sig_z_sig_z = sig_z_0 * sig_z 
+    #! LOCAL
+    sig_z_loc   = op_spin.sig_z(
+        ns          = ns,
+        type_act    = op_spin.OperatorTypeActing.Local
+    )
+    sig_x_loc   = op_spin.sig_x(
+        ns          = ns,
+        type_act    = op_spin.OperatorTypeActing.Local
+    )
+
+    #! CORRELATION
+    sig_z_corr = op_spin.sig_z(
+        ns          = ns,
+        type_act    = op_spin.OperatorTypeActing.Correlation
+    )
+
+    # create a set of states and test it
+    int_state   = np.random.randint(0, 2**ns)
+    np_state    = np.random.choice([-1.0, 1.0], size=(ns,), replace=True).astype(np.float32)
+    if _JAX_AVAILABLE:
+        jnp_state   = jnp.array(np_state, dtype=jnp.float32)
+    else:
+        jnp_state   = np_state
+
+    # print the operator names
+    operators   = [sig_x, sig_z, sig_z_0, sig_x_2, sig_z_sig_z, sig_z_loc, sig_x_loc, sig_z_corr]
+    for operator in operators:
+        print(f"Operator: {operator.name}, {operator.type_acting}")
+    # data = [
+    #     ["Before", bin_mod.int2binstr(int_state, ns)],
+    #     ["int_state", int_state],
+    #     ["np_state", np_state],
+    #     ["jnp_state", jnp_state]
+    # ]
+    # print(tabulate(data, headers=["State Name", "Value"], tablefmt="grid"))
+    
+    return (int_state, np_state, jnp_state), operators
+
 # --------------------------------------------------------------------------------------------------

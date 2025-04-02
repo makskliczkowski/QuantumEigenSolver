@@ -911,7 +911,13 @@ class Operator(ABC):
         self._necessary_args= 0                                     # number of necessary arguments for the operator function
         self._fun           = None                                  # the function that defines the operator - it is set to None if not provided
         self._init_functions(op_fun, fun_int, fun_np, fun_jnp)      # initialize the operator function
-        
+    
+    def __repr__(self):
+        """
+        String representation of the operator.
+        """
+        return f"Operator({self._name}, eigval={self._eigval}, type={self._type.name})"
+    
     #################################
     #! Initialize functions
     #################################
@@ -1630,8 +1636,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         
         @numba.njit
         def fun_np(state, i):
-            sites_np = np.array([i], dtype = np.int32)
-            return op_func_np(state, sites_np, *extra_args)
+            return op_func_np(state, i, *extra_args)
         
         if _JAX_AVAILABLE:
             @jax.jit
@@ -1661,8 +1666,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         
         @numba.njit
         def fun_np(state, i, j):
-            sites_np = np.array([i, j], dtype = np.int32)
-            return op_func_np(state, sites_np, *extra_args)
+            return op_func_np(state, (i, j), *extra_args)
         
         if _JAX_AVAILABLE:
             @partial(jax.jit, static_argnums=(1, 2))
