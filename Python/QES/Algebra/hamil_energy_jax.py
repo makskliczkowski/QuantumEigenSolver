@@ -422,6 +422,7 @@ def local_energy_jax_wrap(ns                        : int,
         _op_f_nmod_nosites, _op_m_nmod_nosites)
     
     # Create a wrapper function that accepts the state and calls the initial wrapper
+    @jax.jit
     def final_wrapper(state: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
         all_states, all_energies, final_row = initial_wrapper(state)
         return all_states, all_energies
