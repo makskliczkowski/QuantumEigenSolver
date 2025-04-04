@@ -308,13 +308,11 @@ class NQS(MonteCarloSolver):
         if self._isjax:
             # ansatz evaluation function already JITted
             self._eval_func             = net_utils.jaxpy.eval_batched_jax
-            # jit the ansatz function
-            # self._ansatz_func       = self._ansatz_func
+            self._apply_func            = net_utils.jaxpy.apply_callable_batched_jax
         else:
             # ansatz evaluation function already compiled
             self._eval_func             = net_utils.numpy.eval_batched_np
-            # numba the ansatz function
-            # self._ansatz_func       = self._ansatz_func
+            self._apply_func            = net_utils.numpy.apply_callable_batched_np
         
         # set the local energy function
         self._init_hamiltonian(self._hamiltonian)
@@ -642,7 +640,7 @@ class NQS(MonteCarloSolver):
         
         # check if the functions are provided
         if functions is None or len(functions) == 0:
-            functions = [self._local_en_func]
+            functions   = [self._local_en_func]
         
         # check if the states and psi are provided
         states, ansatze = None, None
@@ -686,6 +684,24 @@ class NQS(MonteCarloSolver):
             output = output[0]
         return (states, ansatze), probabilities, output
 
+    def __getitem__(self, funct: Callable):
+        '''
+        Use this to apply a function to the state with the ansatz.
+        Parameters:
+            funct: The function to apply to the state.
+        Returns:
+            The result of the function applied to the state.
+        Note:
+            This method is used to apply a function to the state with the ansatz.
+            It uses the sampler to sample the states and ansatz, and then applies
+            the function to the sampled states and ansatz.
+        '''
+        # sample the states and ansatz
+        (_, _), (configs, configs_ansatze), probabilities = self._sampler.sample()
+        return self._evaluate_fun(funct,
+                                configs, probabilities, configs_ansatze,
+                                self._ansatz_func, self._net.get_params(), self._batch_size, self._isjax)
+    
     #####################################
     #! SAMPLE
     #####################################
@@ -817,14 +833,17 @@ class NQS(MonteCarloSolver):
         self._params   = new_parameters
         self._net.set_params(new_parameters)
     
+    #####################################
+    #! OPTIMIZATION FUNCTION
+    #####################################
+    
+    @staticmethod
     def optimization(self,
                     energies,
                     derivatives,
-                    mean_loss   = None,
-                    mean_deriv  = None,
-                    use_sr      = True,
-                    use_s       = False,
-                    use_minsr   = False):
+                    mean_loss,
+                    mean_deriv      = None,
+                    solve_func      = None):
         '''
         Perform the optimization step using stochastic reconfiguration.
         Parameters:
@@ -844,11 +863,11 @@ class NQS(MonteCarloSolver):
                 Flag to use the minimum SR method (default: False).
         '''
         
-        # set the values in the stochastic reconfiguration
-        self._stochastic_reconf.set_values(energies, derivatives, mean_loss, mean_deriv, use_s, use_minsr)
-        if use_sr:
-            return self._stochastic_reconf.solve(use_s, use_minsr)
-        return self._stochastic_reconf.forces
+        # # set the values in the stochastic reconfiguration
+        # self._stochastic_reconf.set_values(energies, derivatives, mean_loss, mean_deriv, use_s, use_minsr)
+        # if use_sr:
+        #     return self._stochastic_reconf.solve(use_s, use_minsr)
+        # return self._stochastic_reconf.forces
         
     #####################################
     #! TRAINING OVERRIDES
@@ -866,11 +885,12 @@ class NQS(MonteCarloSolver):
         return super().train_stop(i, verbose, **kwargs)
     
     @staticmethod
-    @jax.jit
+    # @jax.jit
     def _train_step_jax_sr(state        : flax.training.train_state.TrainState,
                         step            : int,
                         grad_func       : Callable,
-                        eval_func       : Callable,
+                        energy_func     : Callable,
+                        apply_func      : Callable,
                         sr_class        : sr.StochasticReconfiguration,
                         sampler         : Sampler,
                         num_samples     : int           = None,
@@ -878,33 +898,22 @@ class NQS(MonteCarloSolver):
                         batch_size      : int           = None,
                         lr              : float         = 1e-2,
                         reg             : float         = 1e-7):
-        '''
-        Perform a single training step using JAX - performs just the costly
-        operations. Updates of lr and reg are done in the optimizer or outside.
-        
-        Parameters:
-            state (TrainState):
-                A Flax TrainState object containing the model parameters and optimizer state.
-                Also, contains the step and the number of samples.
-            step (int):
-                The current training step.
-            num_samples (int):
-                The number of samples to generate for training.
-            num_chains (int):            
-                The number of chains to use for sampling.
-            sampler (Sampler):
-                A Sampler object used to generate samples.
-            batch_size (int):
-                The size of batches to use for the training step.
-            start_state (np.ndarray):
-                The initial state for the training step.
-        '''
         
         # create the samples
         (_, _), (configs, configs_ansatze), probabilities = sampler.sample(num_chains=num_chains, num_samples=num_samples)
         
         # evaluate to get the energies
-        applied_energies, applied_energies_m, applied_energies_std = eval_func
+        applied_energies, applied_energies_m, applied_energies_std = apply_func(
+            func            =   energy_func,
+            states          =   configs,
+            sample_probas   =   probabilities,
+            logprobas_in    =   configs_ansatze,
+            logproba_fun    =   state.apply_fn,
+            parameters      =   state.params,
+            batch_size      =   batch_size)
+            
+        # evaluate the variational derivatives
+        a
 
 
 
