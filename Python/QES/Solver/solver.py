@@ -1,8 +1,6 @@
 import numpy as np
 import scipy as sp
-import numba
-
-# typing
+from numba import jit, njit, prange
 from typing import Union, Tuple, Union, Callable, Optional
 
 # for the abstract class
@@ -18,7 +16,7 @@ from general_python.common.directories import Directories
 # from hilbert
 from Algebra.hilbert import HilbertSpace
 
-# preconditioners etc.
+# precodintioners etc.
 from general_python.algebra.preconditioners import Preconditioner
 
 # JAX imports
@@ -61,13 +59,13 @@ class Solver(ABC):
     ###################################
     
     def __init__(self,
-                shape           : Union[int, Tuple[int, ...]]   = (1,),
-                modes           : int                           = 2,
-                seed            : Optional[int]                 = None,
-                hilbert         : Optional[HilbertSpace]        = None,
-                directory       : Union[str, Directories]       = defdir,
-                nthreads        : int                           = 1,
-                backend         : str                           = 'default',
+                shape       : Union[int, Tuple[int, ...]]   = (1,),
+                modes       : int                           = 2,
+                seed        : Optional[int]                 = None,
+                hilbert     : Optional[HilbertSpace]        = None,
+                directory   : Union[str, Directories]       = defdir,
+                nthreads    : int                           = 1,
+                backend     : str                           = 'default',
                 **kwargs):
         '''
         Initialize the solver.
@@ -103,17 +101,15 @@ class Solver(ABC):
         self._dir.create_folder(False)
         
         # check the backend
-        self._backend, self._backend_sp, (self._rng, self._rng_key), self._backend_str = self.obtain_backend(backend, seed)
+        self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
         
         # set the precision
         if self._backend == np:
             self._eps   = np.finfo(np.float64).eps
             self._prec  = np.float32
-            self._isjax = False
         else:
             self._eps   = jnp.finfo(jnp.float64).eps
             self._prec  = jnp.float32
-            self._isjax = True
         
         # statistical
         self._lastloss      = Solver.SolverLastLoss()
@@ -303,18 +299,18 @@ class Solver(ABC):
     #! ABSTRACT METHODS
     ###################################
     
-    # @abstractmethod
-    # def clone(self):
-    #     '''
-    #     Clone the solver.
-    #     '''
-    #     pass
+    @abstractmethod
+    def clone(self):
+        '''
+        Clone the solver.
+        '''
+        pass
     
-    # @abstractmethod
-    # def swap(self, other):
-    #     '''
-    #     Swap the state of the solver with another solver.
-    #     '''
-    #     pass
+    @abstractmethod
+    def swap(self, other):
+        '''
+        Swap the state of the solver with another solver.
+        '''
+        pass
     
 ########################################
