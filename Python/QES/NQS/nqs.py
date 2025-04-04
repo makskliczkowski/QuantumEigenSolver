@@ -190,8 +190,8 @@ class NQS(MonteCarloSolver):
         self._initialized       = False
         self._dtype             = None
         self._net               = self._choose_network(net, **kwargs)   # initialize network type
-        self._analytic          = False                                 # analytic gradients            
-        self._holomorphic       = True                                  # holomorphic network                 
+        self._analytic          = False                                 # analytic gradients
+        self._holomorphic       = True                                  # holomorphic network
         self.init_network()
         
         #######################################
@@ -1188,7 +1188,7 @@ class NQSLowerStates:
             raise IndexError("Index out of range for lower states.")
         return self._lower_states[index], self._lower_betas[index]
     
-#################################################
+#########################################
 
 def test_net_ansatz(nqs: NQS, nsamples = 10):
     '''
@@ -1205,3 +1205,5 @@ def test_net_ansatz(nqs: NQS, nsamples = 10):
     ansatz      = net(states)
     ansatz      = ansatz.reshape(-1, 1)
     return ansatz, ansatz.shape
+
+#########################################
