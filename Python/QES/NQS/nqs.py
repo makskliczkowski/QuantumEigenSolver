@@ -60,8 +60,6 @@ import general_python.algebra.solvers.stochastic_rcnfg as sr
 import general_python.algebra.preconditioners as precond_mod
 import general_python.ml.schedulers as scheduler_mod
 import general_python.algebra.solvers as solvers_mod
-
-
 #########################################
 
 class NQS(MonteCarloSolver):
@@ -76,6 +74,8 @@ class NQS(MonteCarloSolver):
     _ERROR_HAMILTONIAN_ARGS = "Hamiltonian function must accept a state vector only!"
     _ERROR_ALL_DTYPE_SAME   = "All weights must have the same dtype!"
     _ERROR_JAX_WITH_FLAX    = "JAX backend is only compatible with Flax networks!"
+    
+    #####################################
     
     def __init__(self,
                 # information on the NQS
@@ -263,7 +263,7 @@ class NQS(MonteCarloSolver):
         
         self._initialized       = False
         self._net.force_init()
-        
+    
     # ---
     
     def _init_gradients(self):
@@ -419,7 +419,7 @@ class NQS(MonteCarloSolver):
             )
         else:
             return None
-        
+    
     #####################################
     #! EVALUATION OF THE ANSATZ BATCHED
     #####################################
