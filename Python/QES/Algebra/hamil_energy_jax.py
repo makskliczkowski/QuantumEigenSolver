@@ -210,7 +210,7 @@ def local_energy_jax_wrap(ns                        : int,
         
         @jax.jit
         def wrapped_operator(state):
-            return f(state, static_sites)
+            return f(state, *static_sites)
         return wrapped_operator
     
     _op_f_mod_sites_wrap                                        = tuple(operator_wrap(_op_f_mod_sites[i], _op_i_mod_sites[i]) for i in range(len(_op_f_mod_sites)))

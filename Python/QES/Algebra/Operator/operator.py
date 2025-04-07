@@ -1669,7 +1669,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             return op_func_np(state, (i, j), *extra_args)
         
         if _JAX_AVAILABLE:
-            @partial(jax.jit, static_argnums=(1, 2))
+            @partial(jax.jit)
             def fun_jnp(state, i, j):
                 sites_jnp = jnp.array([i, j], dtype = jnp.int32)
                 return op_func_jnp(state, sites_jnp, *extra_args)

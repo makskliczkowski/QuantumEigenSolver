@@ -259,7 +259,9 @@ class NQS(MonteCarloSolver):
             self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
             if not self._isjax:
                 raise ValueError(self._ERROR_JAX_WITH_FLAX)
-            
+        elif issubclass(type(net), net_general.GeneralNet):
+            self.log(f"Network {net} provided from the GeneralNet module.", log='info', lvl = 2, color = 'blue')
+            return net
         return Networks.choose_network(network_type=net, input_shape=self._shape, backend=self._backend, dtype=self._dtype, **kwargs)
     
     #####################################
@@ -720,7 +722,7 @@ class NQS(MonteCarloSolver):
     #! SAMPLE
     #####################################
     
-    def sample(self, num_samples = 1, num_chains = 1):
+    def sample(self, num_samples = None, num_chains = None):
         '''
         Sample the NQS using the provided sampler. This will return
         the sampled states and the corresponding probabilities.
@@ -840,7 +842,7 @@ class NQS(MonteCarloSolver):
         
         unflattened     = self._update_unflatten(d_par)
         new_parameters  = tree_map(jax.lax.add,
-                                    self._net.get_params()['params'],
+                                    self._net.get_params(),
                                     unflattened)
         
         # set the new parameters already
@@ -1134,6 +1136,20 @@ class NQS(MonteCarloSolver):
         Return the neural network.
         '''
         return self._net
+    
+    @property
+    def sr(self):
+        '''
+        Return the stochastic reconfiguration object.
+        '''
+        return self._stochastic_reconf
+    
+    @property
+    def sampler(self):
+        '''
+        Return the sampler object.
+        '''
+        return self._sampler
     
     #####################################
 
