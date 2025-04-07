@@ -101,10 +101,10 @@ class Solver(ABC):
         self._dir.create_folder(False)
         
         # check the backend
-        self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
-        
+        self._backend, self._backend_sp, (self._rng, self._rng_key), self._backend_str = self.obtain_backend(backend, seed)
+        self._isjax         = _JAX_AVAILABLE and self._backend != np
         # set the precision
-        if self._backend == np:
+        if not self._isjax:
             self._eps   = np.finfo(np.float64).eps
             self._prec  = np.float32
         else:
@@ -232,11 +232,11 @@ class Solver(ABC):
         if isinstance(backend, str):
             bck = get_backend(backend, scipy=True, random=True, seed=seed)
             if isinstance(bck, tuple):
-                _backend, _backend_sp = bck[0], bck[1]
-                if isinstance(bck[2], tuple):
-                    _rng, _rng_k = bck[2][0], bck[2][1]
+                _backend, _backend_sp = bck[0], bck[2]
+                if isinstance(bck[1], tuple):
+                    _rng, _rng_k = bck[1][0], bck[1][1]
                 else:
-                    _rng, _rng_k = bck[2], None
+                    _rng, _rng_k = bck[1], None
             else:
                 _backend, _backend_sp = bck, None
                 _rng, _rng_k = None, None

@@ -1,21 +1,18 @@
-#QES/__init__.py
-
 """
 Quantum EigenSolver Package
-@Author: Maksymilian Kliczkowski
-@Email: maksymilian.kliczkowski@pwr.edu.pl
-@Date: 2025-02-01
+Author      : Maksymilian Kliczkowski
+Email       : maksymilian.kliczkowski@pwr.edu.pl
+Date        : 2025-02-01
+file        : QES/__init__.py
 """
-
+import os
 import sys
-import importlib
+# add the QES directory to the system path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 ####################################################################################################
 
-from . import general_python
-from general_python import common
-from general_python import lattices
-from general_python import algebra
-from general_python import maths
+import general_python as general_python
+import Solver as Solver
 
 # -------------------------------------------------------------------------------------------------

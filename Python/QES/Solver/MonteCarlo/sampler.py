@@ -24,8 +24,8 @@ Functions:
     get_sampler     : Factory function for creating samplers
 """
 
-
 import numpy as np
+import numba
 import scipy as sp
 from numba import jit, njit, prange
 from typing import Union, Tuple, Union, Callable, Optional, Any
@@ -36,11 +36,10 @@ from flax import linen as nn
 
 # for the abstract class
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, JIT, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_INT_TYPE
+from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, JIT, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY
 from general_python.algebra.utils import DEFAULT_JP_CPX_TYPE, DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
 from general_python.algebra.ran_wrapper import choice, randint, uniform, randint_np, randint_jax
 from general_python.common.directories import Directories
@@ -49,18 +48,21 @@ import general_python.common.binary as Binary
 # from hilbert
 from Algebra.hilbert import HilbertSpace
 
-# JAX imports
+#! JAX imports
 if _JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    import jax.random as random
-    from jax import vmap
+    import jax.random as random_jp
+else:
+    jax         = None
+    import numpy as jnp
+    random_jp   = None
 
 #########################################################################
 #! Errors
 #########################################################################
 
-class SamplerErrors:
+class SamplerErrors(Exception):
     """
     Errors for the Sampler class.
     """
@@ -68,7 +70,9 @@ class SamplerErrors:
     NOT_IMPLEMENTED_ERROR       = "This feature is not implemented yet"
     NOT_A_VALID_STATE_STRING    = "The state string is not a valid state string"
     NOT_A_VALID_STATE_DISTING   = "The state is not a valid state"
-    NOT_IN_RANGE_MU             = "The parameter \mu must be in the range [0, 2]"
+    NOT_A_VALID_SAMPLER_TYPE    = "The sampler type is not a valid sampler type"
+    NOT_IN_RANGE_MU             = "The parameter \\mu must be in the range [0, 2]"
+    NOT_HAVING_RNG              = "Either rng or seed must be provided"
 
 class SolverInitState(Enum):
     """Enum for potential initial states """
@@ -109,36 +113,99 @@ class SolverInitState(Enum):
 #! Propose a random flip
 #########################################################################
 
-@JIT
-def _propose_random_flip_jax(state: jnp.ndarray, rng, rng_k):
-    """
-    Propose a random flip of a state using JAX.
-    """
-    idx = randint_jax(rng_module=rng, key=rng_k, shape=(1,), low=0, high=state.size)[0]
-    return Binary.flip_array_jax_spin(state, idx)
+if _JAX_AVAILABLE:
+    @jax.jit
+    def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
+        r'''Propose `num` random flips of a state using JAX.
 
-@njit
-def _propose_random_flip_np(state: np.ndarray, rng):
-    
+        Parameters:
+            state (jnp.ndarray):
+                The state array (or batch of states).
+            rng_k (jax.random.PRNGKey):
+                The random key for JAX.
+            num (int):
+                The number of flips to propose per state. Must be static for JIT.
+
+        Returns:
+            jnp.ndarray: The proposed flipped state(s).
+        '''
+        idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size)[0]
+        return Binary.flip_array_jax_spin(state, idx)
+
+    @partial(jax.jit, static_argnums=(2,))
+    def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
+        r'''Propose `num` random flips of a state using JAX.
+
+        Parameters:
+            state (jnp.ndarray):
+                The state array (or batch of states).
+            rng_k (jax.random.PRNGKey):
+                The random key for JAX.
+            num (int):
+                The number of flips to propose per state. Must be static for JIT.
+
+        Returns:
+            jnp.ndarray: The proposed flipped state(s).
+        '''
+        # Handle single state or batch of states
+        if state.ndim == 1:
+            idx = randint_jax(key=rng_k, shape=(num,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)
+            return Binary.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
+        else: # Assume batch dimension
+            batch_size  = state.shape[0]
+            state_size  = state.shape[1]
+            # Generate indices for each state in the batch
+            keys        = random_jp.split(rng_k, batch_size)
+            # Use vmap to apply index generation and flipping per state
+            def flip_single_state(single_state, key):
+                idx     = randint_jax(key=key, shape=(num,), low=0, high=state_size, dtype=DEFAULT_JP_INT_TYPE)
+                return Binary.flip_array_jax_multi(single_state, idx, spin=Binary.BACKEND_DEF_SPIN)
+
+            return jax.vmap(flip_single_state)(state, keys)
+
+@numba.njit
+def _propose_random_flips_np(state: np.ndarray, rng, num = 1):
     """
     Propose a random flip of a state using numpy.
     """
-    idx = randint_np(rng=rng, low=0, high=state.size, size=1)[0]
-    return Binary.flip_array_np(state, idx)
+    if state.ndim == 1:
+        idx = randint_np(rng=rng, low=0, high=state.size, size=num)
+        return Binary.flip_array_np_multi(state, idx,
+                                        spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
+    n_chains, state_size = state.shape[0], state.shape[1]
+    for i in range(n_chains):
+        idx = randint_np(rng=rng, low=0, high=state_size, size=num)
+        state[i] = Binary.flip_array_np_multi(state[i], idx,
+                                        spin=Binary.BACKEND_DEF_SPIN, spin_value=Binary.BACKEND_REPR)
+    return state
 
-def _propose_random_flip(state: 'array-like', backend = 'default', rng = None, rng_k = None):
+@numba.njit(parallel=True)
+def _propose_random_flip_np(state: np.ndarray, rng: np.random.Generator):
+    """
+    Propose a random flip of a state using numpy.
+    """
+    if state.ndim == 1:
+        idx = randint_np(rng=rng, low=0, high=state.size, size=1)[0]
+        return Binary.flip_array_np(state, idx)
+    
+    n_chains, state_size = state.shape[0], state.shape[1]
+    for i in prange(n_chains):
+        idx         = randint_np(low=0, high=state_size, size=1)[0]
+        state[i]    = Binary.flip_array_np_spin(state[i], idx)
+    return state
+
+def propose_random_flip(state: 'array-like', backend = 'default',
+                        rng = None, rng_k = None, num = 1):
     """
     Propose a random flip of a state.
     """
     if backend == np or backend == 'numpy' or backend == 'np':
-        return _propose_random_flip_np(state, rng)
-    return _propose_random_flip_jax(state, rng, rng_k)
+        return _propose_random_flip_np(state, rng) if num == 1 else _propose_random_flips_np(state, rng, num)
+    return _propose_random_flip_jax(state, rng, rng_k) if num == 1 else _propose_random_flips_jax(state, rng, rng_k, num)
 
 #########################################################################
 #! Set the state of the system
 #########################################################################
-
-#!TODO: implement the set_state_int and set_state_rand for the fermions
 
 def _set_state_int(state        : int,
             modes               : int                           = 2,
@@ -149,14 +216,24 @@ def _set_state_int(state        : int,
             ):
     '''
     Set the state configuration from the integer representation.
-    - state         : state configuration
-    - mode_repr    : mode representation (default is 0.5 - for binary spins +-1) 
+    
+    Parameters:
+    - state         : state configuration as an integer
+    - modes         : modes (default is 2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system. For modes == 2, the desired shape of the system (number of spins).
+                    One may want to reshape the state to a given shape (for instance, 2D lattice).
+    - mode_repr     : mode representation (default is 0.5 - for binary spins +-1)
+    - backend       : computational backend ('default', 'numpy', or 'jax')
+    
     
     Transforms the integer to a given configuration 
     Notes:
         The states are given in binary or other representation 
-            : 2 for binary
-            : 4 for fermions
+            : 2 for binary (e.g. spin up/down)
+            : 4 for fermions (e.g. fermions up/down)
+                - The lower size bits (state & ((1 << size)-1)) encode the up orbital occupations.
+                - The upper size bits (state >> size) encode the down orbital occupations.
             ...
         It uses the mode representation to determine the spin value:
         Examples:
@@ -175,28 +252,30 @@ def _set_state_int(state        : int,
         else:
             shape = hilbert.ns
     # check the size from the hilbert
-    size = shape if isinstance(shape, int) else np.prod(shape)
+    size = shape if isinstance(shape, int) else int(np.prod(shape))
     out  = None
     
     ############################################################################
     if hilbert is None:
         if modes == 2:
             # set the state from tensor
-            out = Binary.int2base(state, size, backend, spin_value=mode_repr, spin=Binary.BACKEND_DEF_SPIN).reshape(shape)
+            out = Binary.int2base(state, size, backend, 
+                                spin_value=mode_repr, spin=Binary.BACKEND_DEF_SPIN).reshape(shape)
         elif modes == 4:
-            # # first half is up and the second half is down
-            # int_left    = state >> (size)              # the left part     - the last size bits   - move the bits to the right by size
-            # int_right   = state & ((1 << size) - 1)    # the right part    - the first size bits  - get the modulo of the state by size
-            
-            # out = np.array([1 if (int_right & (1 << i)) else 0 for i in range(size)] +
-            #           [1 if (int_left & (1 << i)) else 0 for i in range(size)],
-            #           dtype=np.float32) * mode_repr
+            # For fermions, split the state into up and down parts.
+            up_int          = state & ((1 << size) - 1)
+            down_int        = state >> size
+            up_array        = np.array([1 if (up_int & (1 << i)) else 0 for i in range(size)],
+                                dtype=DEFAULT_NP_FLOAT_TYPE)
+            down_array      = np.array([1 if (down_int & (1 << i)) else 0 for i in range(size)],
+                                dtype=DEFAULT_NP_FLOAT_TYPE)
+            # Stack to form a (2, size) array: first row up, second row down.
+            out             = np.stack((up_array, down_array), axis=0).flatten().reshape(shape) * mode_repr
+        else:
             raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
     else:
-        #!TODO : implement the Hilbert space representation
         raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
-    # return the state representation reshaped to the shape provided
-    return out.reshape(shape)
+    return out
     
 def _set_state_rand(modes       : int                           = 2,
                     hilbert     : Optional[HilbertSpace]        = None,
@@ -208,58 +287,19 @@ def _set_state_rand(modes       : int                           = 2,
                     ):
     '''
     Generate a random state configuration.
-    - modes          : number of modes (default is 2 for binary spins)
-    - hilbert        : Hilbert space object (optional)
-    - shape          : shape of the system
-    - mode_repr     : mode representation (default is 0.5 - for binary spins +-1)
-    - backend        : computational backend ('default', 'numpy', or 'jax')
-    - rng            : random number generator for numpy
-    - rng_key        : random key for jax
     
-    Returns: random state array
-    '''
+    Parameters:
+    - modes         : number of modes (default is 2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system. For modes == 2, the desired shape of the state array (number of spins).
+                        For fermions (modes == 4), an integer number of sites.
+    - mode_repr     : mode representation (default is 0.5 for binary spins +-1, 1.0 for fermions)
+    - backend       : computational backend ('default', 'numpy', or 'jax')
+    - rng           : random number generator for numpy
+    - rng_key       : random key for JAX
     
-    # check the size from the shape
-    if shape is None:
-        if hilbert is None:
-            raise ValueError(Solver.NOT_GIVEN_SIZE_ERROR)
-        else:
-            shape = hilbert.ns
-    # check the size from the hilbert
-    size = shape if isinstance(shape, int) else np.prod(shape)
-    
-    if hilbert is None:
-        if modes == 2:
-            if Binary.BACKEND_DEF_SPIN:
-                ran_state = choice([-1, 1], size, rng=rng, rng_k=rng_key, backend=backend)
-            else:
-                ran_state = choice([0, 1], size, rng=rng, rng_k=rng_key, backend=backend)
-            return ran_state * mode_repr
-            
-        elif modes == 4:
-            ran_state = choice([0, 1], 2 * size, rng=rng, rng_k=rng_key, backend=backend)
-            return ran_state * mode_repr
-        else:
-            raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
-    else:
-        # ! TODO : implement the Hilbert space representation
-        raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
-
-def _set_state_up(modes         : int                           = 2,
-                    hilbert     : Optional[HilbertSpace]        = None,
-                    shape       : Union[int, Tuple[int, ...]]   = (1,),
-                    mode_repr   : float                         = 0.5,
-                    backend     : str                           = 'default'
-                    ):
-    '''
-    Generate an "all up" state configuration.
-    - modes          : number of modes (default is 2 for binary spins)
-    - hilbert        : Hilbert space object (optional)
-    - shape          : shape of the system
-    - mode_repr      : mode representation (default is 0.5 - for binary spins +-1)
-    - backend        : computational backend ('default', 'numpy', or 'jax')
-    
-    Returns: all up state array
+    Returns:
+    - A random state array.
     '''
     
     # check the size from the shape
@@ -268,23 +308,69 @@ def _set_state_up(modes         : int                           = 2,
             raise ValueError(SamplerErrors.NOT_GIVEN_SIZE_ERROR)
         else:
             shape = hilbert.ns
-    # check the size from the hilbert
-    size = shape if isinstance(shape, int) else np.prod(shape)
-    
-    # Get the appropriate backend module
-    xp = get_backend(backend)
-    
+    # check the size from hilbert
+    size        = shape if isinstance(shape, int) else int(np.prod(shape))
+    ran_state   = None
+    ############################################################################
     if hilbert is None:
         if modes == 2:
-            return xp.ones(size) * mode_repr
+            if Binary.BACKEND_DEF_SPIN:
+                ran_state = choice([-1, 1], shape, rng=rng, rng_k=rng_key, backend=backend)
+            else:
+                ran_state = choice([0, 1], shape, rng=rng, rng_k=rng_key, backend=backend)
         elif modes == 4:
-            return xp.array([1] * size + [0] * size) * mode_repr
+            # Generate random occupancy for 2 * size orbitals.
+            ran_state = choice([0, 1], 2 * size, rng=rng, rng_k=rng_key, backend=backend)
         else:
             raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
     else:
-        # ! TODO : implement the Hilbert space representation
         raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+    return ran_state.astype(DEFAULT_NP_FLOAT_TYPE).reshape(shape) * mode_repr
+
+def _set_state_up(modes         : int                           = 2,
+                hilbert         : Optional[HilbertSpace]        = None,
+                shape           : Union[int, Tuple[int, ...]]   = (1,),
+                mode_repr       : float                         = 0.5,
+                backend         : str                           = 'default'
+                ):
+    '''
+    Generate an "all up" state configuration.
     
+    Parameters:
+    - modes         : number of modes (default is 2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system. For modes == 2, the desired shape (number of spins).
+                        For fermions (modes == 4), an integer number of sites.
+    - mode_repr     : mode representation (default is 0.5 for binary spins +-1, 1.0 for fermions)
+    - backend       : computational backend ('default', 'numpy', or 'jax')
+    
+    Returns:
+    - An "all up" state array.
+    '''
+    
+    # check the size from the shape
+    if shape is None:
+        if hilbert is None:
+            raise ValueError(SamplerErrors.NOT_GIVEN_SIZE_ERROR)
+        else:
+            shape = hilbert.ns
+    size = shape if isinstance(shape, int) else int(np.prod(shape))
+    ############################################################################
+    xp = get_backend(backend)
+    if hilbert is None:
+        if modes == 2:
+            return xp.ones(size, dtype=DEFAULT_NP_FLOAT_TYPE).reshape(shape) * mode_repr
+        elif modes == 4:
+            # For fermions, "up" means up orbitals occupied and down orbitals empty.
+            up_array   = np.ones(size, dtype=DEFAULT_NP_FLOAT_TYPE)
+            down_array = np.zeros(size, dtype=DEFAULT_NP_FLOAT_TYPE)
+            out        = np.stack((up_array, down_array), axis=0).flatten().reshape(shape) * mode_repr
+            return out
+        else:
+            raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+    else:
+        raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+
 def _set_state_down(modes       : int                           = 2,
                     hilbert     : Optional[HilbertSpace]        = None,
                     shape       : Union[int, Tuple[int, ...]]   = (1,),
@@ -293,86 +379,99 @@ def _set_state_down(modes       : int                           = 2,
                     ):
     '''
     Generate an "all down" state configuration.
-    - modes          : number of modes (default is 2 for binary spins)
-    - hilbert        : Hilbert space object (optional)
-    - shape          : shape of the system
-    - mode_repr     : mode representation (default is 0.5 - for binary spins +-1)
-    - backend        : computational backend ('default', 'numpy', or 'jax')
     
-    Returns: all down state array
+    Parameters:
+    - modes         : number of modes (default is 2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system. For modes == 2, the desired shape (number of spins).
+                      For fermions (modes == 4), an integer number of sites.
+    - mode_repr     : mode representation (default is 0.5 for binary spins +-1, 1.0 for fermions)
+    - backend       : computational backend ('default', 'numpy', or 'jax')
+    
+    Returns:
+    - An "all down" state array.
     '''
+    
     # check the size from the shape
     if shape is None:
         if hilbert is None:
-            raise ValueError(Solver.NOT_GIVEN_SIZE_ERROR)
+            raise ValueError(SamplerErrors.NOT_GIVEN_SIZE_ERROR)
         else:
             shape = hilbert.ns
-    # check the size from the hilbert
-    size = shape if isinstance(shape, int) else np.prod(shape)
-    
-    # Get the appropriate backend module
+    size = shape if isinstance(shape, int) else int(np.prod(shape))
+    ############################################################################
     xp = get_backend(backend)
-    
     if hilbert is None:
         if modes == 2:
             if Binary.BACKEND_DEF_SPIN:
-                return xp.ones(size) * (-mode_repr)
+                return xp.ones(size, dtype=DEFAULT_NP_FLOAT_TYPE).reshape(shape) * (-mode_repr)
             else:
-                return xp.zeros(size)
+                return xp.zeros(size, dtype=DEFAULT_NP_FLOAT_TYPE).reshape(shape)
         elif modes == 4:
-            return xp.array([0] * size + [1] * size) * mode_repr
+            # For fermions, "down" means up orbitals empty and down orbitals occupied.
+            up_array   = np.zeros(size, dtype=DEFAULT_NP_FLOAT_TYPE)
+            down_array = np.ones(size, dtype=DEFAULT_NP_FLOAT_TYPE)
+            out        = np.stack((up_array, down_array), axis=0).flatten().reshape(shape) * mode_repr
+            return out
         else:
-            raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+            raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
     else:
-        # ! TODO : implement the Hilbert space representation
-        raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+        raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
 
 def _set_state_af(modes         : int                           = 2,
-                hilbert         : Optional[HilbertSpace]        = None,
-                shape           : Union[int, Tuple[int, ...]]   = (1,),
-                mode_repr       : float                         = 0.5,
-                backend         : str                           = 'default'
-                ):
+                  hilbert       : Optional[HilbertSpace]        = None,
+                  shape         : Union[int, Tuple[int, ...]]   = (1,),
+                  mode_repr     : float                         = 0.5,
+                  backend       : str                           = 'default'
+                  ):
     '''
     Generate an antiferromagnetic state configuration.
-    - modes          : number of modes (default is 2 for binary spins)
-    - hilbert        : Hilbert space object (optional)
-    - shape          : shape of the system
-    - mode_repr     : mode representation (default is 0.5 - for binary spins +-1)
-    - backend        : computational backend ('default', 'numpy', or 'jax')
     
-    Returns: antiferromagnetic state array
+    Parameters:
+    - modes         : number of modes (default is 2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system. For modes == 2, the desired shape (number of spins).
+                      For fermions (modes == 4), an integer number of sites.
+    - mode_repr     : mode representation (default is 0.5 for binary spins +-1, 1.0 for fermions)
+    - backend       : computational backend ('default', 'numpy', or 'jax')
+    
+    Returns:
+    - An antiferromagnetic state array.
     '''
     
     # check the size from the shape
     if shape is None:
         if hilbert is None:
-            raise ValueError(Solver.NOT_GIVEN_SIZE_ERROR)
+            raise ValueError(SamplerErrors.NOT_GIVEN_SIZE_ERROR)
         else:
             shape = hilbert.ns
-    # check the size from the hilbert
-    size = shape if isinstance(shape, int) else np.prod(shape)
-    
-    # Get the appropriate backend module
+    size = shape if isinstance(shape, int) else int(np.prod(shape))
+    ############################################################################
     xp = get_backend(backend)
-    
     if hilbert is None:
         if modes == 2:
             if Binary.BACKEND_DEF_SPIN:
-                return xp.array([1 if i % 2 == 0 else -1 for i in range(size)]) * mode_repr
+                af_state = np.array([1 if i % 2 == 0 else -1 for i in range(size)],
+                                    dtype=DEFAULT_NP_FLOAT_TYPE)
             else:
-                return xp.array([1 if i % 2 == 0 else 0 for i in range(size)]) * mode_repr
+                af_state = np.array([1 if i % 2 == 0 else 0 for i in range(size)],
+                                    dtype=DEFAULT_NP_FLOAT_TYPE)
+            return af_state.reshape(shape) * mode_repr
         elif modes == 4:
-            return xp.array(
-                [1 if i % 2 == 0 else 0 for i in range(size)] + 
-                [0 if i % 2 == 0 else 1 for i in range(size)]
-            ) * mode_repr
+            # For fermions, antiferromagnetic state:
+            # up orbitals: 1 at even sites, 0 at odd sites
+            # down orbitals: 0 at even sites, 1 at odd sites
+            up_array   = np.array([1 if i % 2 == 0 else 0 for i in range(size)],
+                                  dtype=DEFAULT_NP_FLOAT_TYPE)
+            down_array = np.array([0 if i % 2 == 0 else 1 for i in range(size)],
+                                  dtype=DEFAULT_NP_FLOAT_TYPE)
+            out        = np.stack((up_array, down_array), axis=0).flatten().reshape(shape) * mode_repr
+            return out
         else:
-            raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
+            raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
     else:
-        # ! TODO : implement the Hilbert space representation
-        raise NotImplementedError(Solver.NOT_IMPLEMENTED_ERROR)
-    
+        raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+
 def _state_distinguish(statetype,
                     modes       : int,
                     hilbert     : Optional[HilbertSpace],
@@ -385,77 +484,43 @@ def _state_distinguish(statetype,
     Distinguishes the type of the given state and returns the appropriate state configuration.
     
     Parameters:
-    - statetype (int, jnp.ndarray, np.ndarray, str, SolverInitState): The state specification
-        * If int: Converts to binary representation using _set_state_int
-        * If array: Returns the array directly
-        * If str: Converts to SolverInitState enum and processes accordingly
-        * If SolverInitState: Processes according to the enum value
-    - modes (int)                       : Number of modes for the binary representation
-    - hilbert (HilbertSpace, optional)  : Hilbert space representation
-    - shape (int or tuple)              : Shape of the system
-    - mode_repr (float)                 : Mode representation value (default: Binary.BACKEND_REPR)
-    - rng                               : Random number generator for numpy or jax
-    - rng_key                           : Random key for JAX
-    - backend (str)                     : Computational backend ('default', 'numpy', or 'jax')
+    - statetype (int, jnp.ndarray, np.ndarray, str, SolverInitState): The state specification.
+        * If int: Converts to configuration using _set_state_int.
+        * If array: Returns the array directly.
+        * If str: Converts to SolverInitState and processes accordingly.
+        * If SolverInitState: Processes according to the enum value.
+    - modes         : number of modes (2 for binary spins, 4 for fermions)
+    - hilbert       : Hilbert space object (optional)
+    - shape         : shape of the system.
+                        For modes == 2, the desired shape (number of spins);
+                        For modes == 4, an integer number of sites.
+    - mode_repr     : mode representation value.
+    - rng           : random number generator for numpy.
+    - rng_key       : random key for JAX.
+    - backend       : computational backend ('default', 'numpy', or 'jax').
     
     Returns:
-    - ndarray: The corresponding state configuration
-    
-    Raises:
-    - ValueError: If statetype is not a valid state specification
+    - The corresponding state configuration as an ndarray.
     """
     if isinstance(statetype, (int, np.integer, jnp.integer)):
         return _set_state_int(statetype, modes, hilbert, shape, mode_repr, backend)
-    elif isinstance(statetype, (jnp.ndarray, np.ndarray)):
+    elif isinstance(statetype, (np.ndarray, jnp.ndarray)):
         return statetype
     elif isinstance(statetype, str):
         try:
             state_enum = SolverInitState.from_str(statetype)
-            return _state_distinguish(
-                statetype   =   state_enum,
-                modes       =   modes,
-                hilbert     =   hilbert,
-                shape       =   shape,
-                mode_repr   =   mode_repr,
-                backend     =   backend)
+            return _state_distinguish(state_enum, modes, hilbert, shape, mode_repr, rng, rng_key, backend)
         except ValueError as e:
-            raise ValueError(Solver.NOT_A_VALID_STATE_STRING) from e
+            raise ValueError(SamplerErrors.NOT_A_VALID_STATE_STRING) from e
     elif isinstance(statetype, SolverInitState):
         if statetype == SolverInitState.RND:
-            return _set_state_rand(
-                modes       =   modes,
-                hilbert     =   hilbert,
-                shape       =   shape,
-                mode_repr   =   mode_repr,
-                backend     =   backend,
-                rng         =   rng,
-                rng_key     =   rng_key
-                
-            )
+            return _set_state_rand(modes, hilbert, shape, mode_repr, backend, rng, rng_key)
         elif statetype == SolverInitState.F_UP:
-            return _set_state_up(
-                modes       =   modes,
-                hilbert     =   hilbert,
-                shape       =   shape,
-                mode_repr   =   mode_repr,
-                backend     =   backend
-            )
+            return _set_state_up(modes, hilbert, shape, mode_repr, backend)
         elif statetype == SolverInitState.F_DN:
-            return _set_state_down(
-                modes       =   modes,
-                hilbert     =   hilbert,
-                shape       =   shape,
-                mode_repr   =   mode_repr,
-                backend     =   backend
-            )
+            return _set_state_down(modes, hilbert, shape, mode_repr, backend)
         elif statetype == SolverInitState.AF:
-            return _set_state_af(
-                modes       =   modes,
-                hilbert     =   hilbert,
-                shape       =   shape,
-                mode_repr   =   mode_repr,
-                backend     =   backend
-            )
+            return _set_state_af(modes, hilbert, shape, mode_repr, backend)
     else:
         raise ValueError(SamplerErrors.NOT_A_VALID_STATE_DISTING)
 
@@ -467,8 +532,6 @@ class Sampler(ABC):
     """
     A base class for the sampler.     
     """
-    
-    _ERR_NO_RNG_PROVIDED = "Either rng or seed must be provided"
     
     def __init__(self,
                 shape       : Tuple[int, ...],
@@ -483,46 +546,122 @@ class Sampler(ABC):
                 backend     : str                               = 'default',
                 **kwargs
             ):
-        
+        """
+        Abstract base class for samplers.
+        Parameters:
+            shape (Tuple[int, ...]):
+                Shape of the system (e.g., lattice dimensions).
+            upd_fun (Callable):
+                Update function for proposing new states. Signature: `new_state = upd_fun(state, rng/rng_k, **kwargs)`.
+                If None, defaults to single random spin flip.
+            rng (np.random.Generator):
+                NumPy random number generator (used if backend is NumPy or seed is provided).
+            rng_k (Optional[jax.random.PRNGKey]):
+                JAX random key (used if backend is JAX).
+            seed (Optional[int]):
+                Seed for initializing random number generators if `rng` and `rng_k` are not provided.
+            hilbert (Optional[HilbertSpace]):
+                Hilbert space instance (currently not fully utilized in provided code, but kept for structure).
+            numsamples (int):
+                Number of samples to generate per chain *after* thermalization.
+            numchains (int):
+                Number of parallel Markov chains.
+            initstate ('array-like' or str or SolverInitState or int):
+                Initial state configuration specification. Can be an array, an integer state index,
+                a predefined string ('RND', 'F_UP', 'F_DN', 'AF'), or a SolverInitState enum. Defaults to 'RND'.
+            backend (str):
+                Computational backend ('numpy', 'jax', or 'default'). 'default' chooses JAX if available.
+            **kwargs:
+                Additional arguments passed to `_state_distinguish` for state generation (e.g., `modes`, `mode_repr`).
+
+        Raises:
+            SamplerErrors: If backend/initial state is invalid or RNG setup fails.
+
+        Attributes:
+            _shape (Tuple[int, ...])            : Shape of the system.
+            _size (int)                         : Total number of sites/spins.
+            _hilbert (Optional[HilbertSpace])   : Hilbert space instance.
+            _rng, _rng_k                        : Random number generators.
+            _backend                            : Computational backend module (np or jnp).
+            _isjax (bool)                       : True if using JAX backend.
+            _backendstr (str)                   : Name of the backend ('np' or 'jax').
+            _numsamples (int)                   : Number of samples per chain.
+            _numchains (int)                    : Number of chains.
+            _initstate                          : Initial state configuration (single state).
+            _states                             : Current states of all chains (shape: [numchains, *shape]).
+            _tmpstates (np.ndarray)             : Temporary storage for NumPy proposals (if needed).
+            _num_proposed, _num_accepted        : Counters for proposed and accepted moves per chain.
+            _upd_fun                            : The actual update function used.
+        """
         # check the backend
-        if rng is not None and rng_k is not None:
+        if isinstance(backend, str):
+            self._backendstr = backend
+            
+        if rng is not None:
             self._rng       = rng
-            self._rng_k     = rng_k
+            self._rng_k     = rng_k if rng_k is not None else (DEFAULT_BACKEND_KEY if _JAX_AVAILABLE else None)
             self._backend   = get_backend(backend)
         elif seed is not None:
-            self._backend, _, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
+            self._backend, _, (self._rng, self._rng_k) = self.obtain_backend(backend, seed)
         else:
-            raise ValueError(Sampler._ERR_NO_RNG_PROVIDED)
+            raise SamplerErrors(SamplerErrors.NOT_HAVING_RNG)
+        
+        is_valid_key = (
+            self._rng_k is not None and             # Ensure it's not None first
+            isinstance(self._rng_k, jax.Array) and
+            self._rng_k.shape == (2,) and           # Standard shape for a JAX key
+            self._rng_k.dtype == jnp.uint32         # Standard dtype for a JAX key
+        )
+        if not is_valid_key:
+            # Provide more detailed info in the error
+            key_info = f"Value: {self._rng_k}, Type: {type(self._rng_k)}"
+            if isinstance(self._rng_k, jax.Array):
+                key_info += f", Shape: {self._rng_k.shape}, Dtype: {self._rng_k.dtype}"
+            raise TypeError(f"Sampler's RNG key (self._rng_k) is not a valid JAX PRNGKey. {key_info}")
+    
+        # check JAX
+        self._isjax         = (not self._backend == np)
+        if self._isjax and self._rng_k is None:
+            raise SamplerErrors(SamplerErrors.NOT_HAVING_RNG + " (JAX requires rng_k)")
+        if not self._isjax and self._rng is None:
+            raise SamplerErrors(SamplerErrors.NOT_HAVING_RNG + " (NumPy requires rng)")
         
         # set the backend
-        self._isjax         = (not self._backend == np)
+        self._backendstr    = 'np' if not self._isjax else 'jax'
         
         # handle the Hilbert space - may control state initialization
         self._hilbert       = hilbert
         
         # handle the states
         self._shape         = shape
-        self._size          = np.prod(shape) if isinstance(shape, tuple) else shape
+        self._size          = int(np.prod(shape)) if isinstance(shape, tuple) else shape
         self._numsamples    = numsamples
         self._numchains     = numchains
+        self._states        = None
         
         # handle the initial state
-        self.set_initstate(initstate, **kwargs)
+        state_kwargs        = {
+            'modes'     : kwargs.get('modes', 2),
+            'mode_repr' : kwargs.get('mode_repr', Binary.BACKEND_REPR)
+            }
+        self.set_initstate(initstate, **state_kwargs)
         
         # proposed state
-        self._num_proposed  = self._backend.zeros(shape, dtype=self._backend.int64)
-        self._num_accepted  = self._backend.zeros(shape, dtype=self._backend.int64)
+        int_dtype           = DEFAULT_JP_INT_TYPE if self._isjax else DEFAULT_NP_INT_TYPE
+        self._num_proposed  = self._backend.zeros(numchains, dtype=int_dtype)
+        self._num_accepted  = self._backend.zeros(numchains, dtype=int_dtype)
         
         # handle the update function
         self._upd_fun       = upd_fun
         if self._upd_fun is None:
             if self._isjax:
                 # Bind RNG arguments to the JAX updater and then wrap with JIT.
-                updater = partial(_propose_random_flip_jax, rng=self._rng, rng_k=self._rng_key)
-                self._upd_fun = JIT(updater)
+                self._upd_fun = _propose_random_flip_jax
             else:
-                # For NumPy backend, bind the RNG to the updater.
-                self._upd_fun = partial(_propose_random_flip_np, rng=self._rng)
+                # Use the Numba version (potentially parallelized)
+                # Note:
+                #   The parallel Numba version needs careful RNG handling if numchains > 1
+                self._upd_fun = partial(_propose_random_flips_np, rng=self._rng, num=1)
     
     ###################################################################
     #! ABSTRACT
@@ -530,8 +669,9 @@ class Sampler(ABC):
     
     @abstractmethod
     def sample(self, parameters=None, num_samples=None, num_chains=None):
+        ''' Tries to sample the state from the Hilbert space. '''
         pass
-
+    
     ###################################################################
     #! BACKEND
     ###################################################################
@@ -543,6 +683,8 @@ class Sampler(ABC):
         Parameters:
         - backend       : backend for the calculations (default is 'default')
         - seed          : seed for the random number generator
+        Returns:
+        - Tuple         : backend, backend_sp, rng, rng_key 
         '''
         if isinstance(backend, str):
             bck = get_backend(backend, scipy=True, random=True, seed=seed)
@@ -564,80 +706,46 @@ class Sampler(ABC):
     ###################################################################
     
     @property
-    def hilbert(self):
-        return self._hilbert
-    
+    def hilbert(self): return self._hilbert
     @property
-    def numsamples(self):
-        return self._numsamples
-    
+    def numsamples(self): return self._numsamples
     @property
-    def numchains(self):
-        return self._numchains
-    
+    def numchains(self): return self._numchains
     @property
-    def shape(self):
-        return self._shape
-    
+    def shape(self): return self._shape
     @property
-    def size(self):
-        return self._size
-    
+    def size(self): return self._size
     @property
-    def initstate(self):
-        return self._initstate
-    
+    def initstate(self): return self._initstate
     @property
-    def upd_fun(self):
-        return self._upd_fun
-    
+    def upd_fun(self): return self._upd_fun
     @property
-    def states(self):
-        return self._states
-    
+    def states(self): return self._states
     @property
-    def rng(self):
-        return self._rng
-    
+    def rng(self): return self._rng
     @property
-    def rng_key(self):
-        return self._rng_key
-    
+    def rng_key(self): return self._rng_k
     @property
-    def backend(self):
-        return self._backend
-    
+    def backend(self): return self._backend
     @property
-    def proposed(self):
-        return self._num_proposed
-    
+    def proposed(self): return self._num_proposed
     @property
-    def num_proposed(self):
-        return self._backend.sum(self._num_proposed)
-    
+    def num_proposed(self): return self._backend.sum(self._num_proposed)
     @property
-    def accepted(self):
-        return self._num_accepted
-    
+    def accepted(self): return self._num_accepted
     @property
-    def num_accepted(self):
-        return self._backend.sum(self._num_accepted)
-    
+    def num_accepted(self): return self._backend.sum(self._num_accepted)
     @property
-    def rejected(self):
-        return self._num_proposed - self._num_accepted
-    
+    def rejected(self): return self.proposed - self.accepted
     @property
-    def num_rejected(self):
-        return self._backend.sum(self._num_proposed - self._num_accepted)
-    
+    def num_rejected(self): return self.num_proposed - self.num_accepted
     @property
     def accepted_ratio(self):
-        return self.num_accepted / self.num_proposed if self.num_proposed > 0 else 0.0
-    
+        # Ensure float division and handle division by zero
+        num_prop = self.num_proposed
+        return self.num_accepted / num_prop if num_prop > 0 else self._backend.array(0.0)
     @property
-    def isjax(self):
-        return self._isjax
+    def isjax(self): return self._isjax
     
     ###################################################################
     #! SETTERS
@@ -647,44 +755,50 @@ class Sampler(ABC):
         """
         Reset the sampler to its initial state.
         """
-        self._num_proposed = 0
-        self._num_accepted = 0
-        self._num_rejected = 0
-        self._set_chains(self._initstate, self._numchains)
+        int_dtype           = DEFAULT_JP_INT_TYPE if self._isjax else DEFAULT_NP_INT_TYPE
+        self._num_proposed  = self._backend.zeros(self._numchains, dtype=int_dtype)
+        self._num_accepted  = self._backend.zeros(self._numchains, dtype=int_dtype)
+        self.set_chains(self._initstate, self._numchains)
     
     # ---
     
     def set_initstate(self, initstate, **kwargs):
         """
-        Set the initial state of the system.
-        
+        Set the initial state template of the system.
+
         Parameters:
-        - initstate (str, int, np.ndarray, jnp.ndarray): The initial state specification
-        - kwargs (dict): Additional arguments for state generation
+            initstate (str, int, np.ndarray, jnp.ndarray, SolverInitState):
+                The initial state specification. If None, defaults to 'RND'.
+            **kwargs:
+                Additional arguments passed to `_state_distinguish` (e.g., `modes`, `mode_repr`).
+
         Raises:
-        - NotImplementedError: If the requested state type is not implemented
-        Returns:
-        - None
+            SamplerErrors.NOT_A_VALID_STATE_DISTING:
+                If the state type is invalid.
+            ValueError:
+                If underlying state generation fails.
         """
+
+        # handle the initial state type
+        if initstate is None:
+            initstate = SolverInitState.RND # Default to random
         
         # handle the initial state
-        if initstate is None or isinstance(initstate, str):
-            if self._hilbert is None or True:
-                if initstate is None:
-                    if self._isjax:
-                        self._initstate = jnp.zeros(self._shape, dtype = DEFAULT_JP_FLOAT_TYPE)
-                    else:
-                        self._initstate = np.zeros(self._shape, dtype = DEFAULT_NP_FLOAT_TYPE)
-                else:
+        if initstate is None or isinstance(initstate, (str, SolverInitState)):
+            try:
+                current_bcknd_str = 'jax' if self._isjax else 'numpy'
+                if self._hilbert is None or True:
                     self._initstate = _state_distinguish(initstate,
                                         modes   =   kwargs.get('modes', 2),
-                                        hilbert =   self._hilbert, 
-                                        shape   =   self._shape, 
-                                        backend =   self._backend, 
-                                        rng     =   self._rng, 
-                                        rng_key =   self._rng_key)
-            else:
-                raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+                                        hilbert =   self._hilbert,
+                                        shape   =   self._shape,
+                                        backend =   current_bcknd_str,
+                                        rng     =   self._rng,
+                                        rng_key =   self._rng_k)
+                else:
+                    raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
+            except Exception as e:
+                raise ValueError(f"Failed to set initial state: {e}") from e
         else:
             if isinstance(initstate, np.ndarray) and self._isjax:
                 self._initstate = jnp.array(initstate)
@@ -692,20 +806,26 @@ class Sampler(ABC):
                 self._initstate = np.array(initstate)
             else:
                 self._initstate = initstate
-
-        self._set_chains(self._initstate, self._numchains)
+        self.set_chains(self._initstate, self._numchains)
     
     # ---
     
-    def _set_chains(self, initstate: Union[np.ndarray, jnp.ndarray], numchains: Optional[int] = None):
+    def set_chains(self, initstate: Union[np.ndarray, jnp.ndarray], numchains: Optional[int] = None):
         '''
-        Set the chains for the sampler.
+        Set the chains for the sampler, replicating the initstate.
+
         Parameters:
-        - initstate (np.ndarray, jnp.ndarray): The initial state
-        - numchains (int, optional): The number of chains
+            initstate (np.ndarray or jnp.ndarray):
+                The single initial state configuration to replicate.
+            numchains (int, optional):
+                The number of chains. If None, uses the sampler's current `_numchains`.
         '''
         if numchains is None:
             numchains = self._numchains
+        else:
+            self._numchains = numchains
+
+        # Ensure initstate is the correct type for the backend before stacking
         if self._isjax:
             self._states = jnp.stack([jnp.array(initstate)] * numchains, axis=0)
         else:
@@ -717,7 +837,8 @@ class Sampler(ABC):
         '''
         Set the number of samples.
         Parameters:
-        - numsamples (int): The number of samples
+            numsamples (int):
+                The number of samples
         '''
         self._numsamples = numsamples
         
@@ -725,48 +846,133 @@ class Sampler(ABC):
         '''
         Set the number of chains.
         Parameters:
-        - numchains (int): The number of chains
+            numchains (int):
+                The number of chains
         '''
         self._numchains = numchains
-        self._set_chains(self._initstate, numchains)
+        self.set_chains(self._initstate, numchains)
+    
+    ###################################################################
+    #! GETTERS
+    ###################################################################
+    
+    @abstractmethod
+    def get_sampler_jax(self, num_samples=None, num_chains=None):
+        """
+        Get the JAX sampler instance.
+        """
+        pass
+    
+    @abstractmethod
+    def get_sampler_np(self, num_samples=None, num_chains=None):
+        """
+        Get the NumPy sampler instance.
+        """
+        pass
     
 #######################################################################    
 
 class MCSampler(Sampler):
-    """    
-    
-    It provides the basic functionality to sample the basis states from the Hilbert space 
-    according to the Born distribution.
-    
-        :math:`p_{\\mu}(s)=\\frac{|\\psi(s)|^{\\mu}}{\\sum_s|\\psi(s)|^{\\mu}}`.
+    r"""
+    Markov Chain Monte Carlo sampler for quantum states.
 
-    For :math:`\\mu=2` this corresponds to sampling from the Born distribution. \
-    :math:`0\\leq\\mu<2` can be used to perform importance sampling             \
-    (see `[arXiv:2108.08631] <https://arxiv.org/abs/2108.08631>`_).
+    Implements MCMC sampling from the Hilbert space based on a probability distribution
+    derived from the quantum state amplitudes :math:`\psi(s)`. The target distribution is typically
+    proportional to :
     
-    It supports multiple Markov chains running in parallel (for batch sampling). In this
-    implementation the update proposer (upd_fun) and a network (net) are provided. The sampler
-    thermalizes all chains before collecting samples and uses a standard Metropolis-Hastings rule.
+        math:`|\psi(s)|^{\mu}`, where :math:`\mu` controls the sampling bias.
+
+    The standard Born rule distribution\
+        
+        :math:`p(s) = |\psi(s)|^2 / \sum_{s'} |\psi(s')|^2`
+    
+    corresponds to
+    
+        :math:`\mu=2`. Values :math:`0 \le \mu < 2`
+        
+    can be used for importance sampling techniques (see [arXiv:2108.08631](https://arxiv.org/abs/2108.08631)).
+
+    The sampling process uses the Metropolis-Hastings algorithm:
+        1. **Initialization:**
+            Set up with system shape, network/callable for
+                :math:`\log\psi(s)`,
+            proposal function, MCMC parameters 
+                (:math:`\mu`, :math:`\beta`, steps).
+        2. **Network Callable:**
+            Obtain the function to compute :math:`\log\psi(s)` and its parameters.
+        3. **Thermalization:** 
+            Run MCMC chains for `therm_steps * sweep_steps` updates to reach equilibrium.
+        4. **Sampling:**
+            Run MCMC chains for `num_samples * sweep_steps` updates, collecting configurations.
+        5. **Output:**
+            Return final chain states, collected samples, log-ansatz values, and importance weights.
+
+    Supports JAX backend for performance via JIT compilation of core loops.
     """
     
-    def __init__(self, 
+    def __init__(self,
                 net,
                 shape       : Tuple[int, ...],
-                upd_fun     : Callable, 
-                rng, 
+                rng,
                 rng_k                               = None,
+                upd_fun     : Optional[Callable]    = None,
                 mu          : float                 = 2.0,
                 beta        : float                 = 1.0,
                 therm_steps : int                   = 100,
                 sweep_steps : int                   = 100,
-                seed                                = None, 
-                hilbert     : HilbertSpace          = None, 
-                numsamples  : int                   = 1, 
-                numchains   : int                   = 1, 
-                initstate                           = None, 
+                seed                                = None,
+                hilbert     : HilbertSpace          = None,
+                numsamples  : int                   = 1,
+                numchains   : int                   = 1,
+                initstate                           = None,
                 backend     : str                   = 'default',
                 logprob_fact: float                 = 0.5,
                 **kwargs):
+        """
+        Initialize the MCSampler.
+
+        Parameters:
+            net (Callable or Flax Module):
+                The network or function providing `log_psi(s)`. If a Flax module, assumes `net.apply` exists.
+                If a callable, should have signature `log_psi = net(params, state)`.
+            shape (Tuple[int, ...]):
+                Shape of the system configuration (e.g., lattice dimensions).
+            rng (np.random.Generator):
+                NumPy random number generator.
+            rng_k (Optional[jax.random.PRNGKey]):
+                JAX random key.
+            upd_fun (Optional[Callable]):
+                State update proposal function. Defaults to single spin flip.
+                Signature: `new_state = upd_fun(state, rng/rng_k)`
+            mu (float):
+                Exponent :math:`\mu` for the sampling distribution :math:`p(s) \propto |\psi(s)|^{\mu}`.
+                Must be in range [0, 2]. Default is 2 (Born rule).
+            beta (float):
+                Inverse temperature factor :math:`\beta` for the Metropolis acceptance probability. Default is 1.0.
+            therm_steps (int):
+                Number of thermalization sweeps. Each sweep consists of `sweep_steps` MCMC updates per site (on average).
+            sweep_steps (int):
+                Number of MCMC updates per site within a single "sweep". Determines correlation between samples. Default is 1.
+            seed (Optional[int]):
+                Random seed for initialization if `rng`/`rng_k` not provided.
+            hilbert (Optional[HilbertSpace]):
+                Hilbert space object (optional).
+            numsamples (int):
+                Number of samples to collect per chain *after* thermalization.
+            numchains (int):
+                Number of parallel Markov chains.
+            initstate ('array-like' or str or SolverInitState or int):
+                Initial state specification (see Sampler docs). Defaults to 'RND'.
+            backend (str):
+                Computational backend ('numpy', 'jax', 'default').
+            logprob_fact (float):
+                Factor used in calculating importance sampling weights, often :math:`1/\mu`.
+                The probability is calculated as :math:`\exp((\frac{1}{\text{logprob_fact}} - \mu) \text{Re}(\log\psi(s)))`.
+                Default 0.5 corresponds to Born rule :math:`|\psi|^2` when :math:`\mu=1`. Needs careful setting based on :math:`\mu`.
+            **kwargs:
+                Additional arguments for the base Sampler class (e.g., `modes`, `mode_repr`).
+        """
+        
         super().__init__(shape, upd_fun, rng, rng_k, seed, hilbert,
                 numsamples, numchains, initstate, backend, **kwargs)
         
@@ -776,62 +982,116 @@ class MCSampler(Sampler):
         # set the network
         self._net_callable, self._parameters = self._set_net_callable(net)
 
-        # set the parameters - this for modification of the distribution 
+        # set the parameters - this for modification of the distribution
         self._mu            = mu
         if self._mu < 0.0 or self._mu > 2.0:
             raise ValueError(SamplerErrors.NOT_IN_RANGE_MU)
         
-        self._beta          = beta
-        self._therm_steps   = therm_steps
-        self._sweep_steps   = sweep_steps
-        self._logprob_fact  = logprob_fact
+        self._beta                              = beta
+        self._therm_steps                       = therm_steps
+        self._sweep_steps                       = sweep_steps
+        self._logprob_fact                      = logprob_fact
+        self._logprobas                         = None
+        self._total_therm_updates               = therm_steps * sweep_steps * self._size    # Total updates during thermalization
+        self._total_sample_updates_per_sample   = sweep_steps * self._size                  # Updates between collected samples
+        self._updates_per_sample                = self._sweep_steps                         # Steps between samples
+        self._total_sample_updates_per_chain    = numsamples * self._updates_per_sample * self._numchains
         
+        # Set update function if not provided.
+        self._upd_fun = upd_fun
         if self._upd_fun is None:
             if self._isjax:
-                self._upd_fun = JIT(partial(_propose_random_flip_jax, rng=self._rng, rng_k=self._rng_key))
+                # Bind RNG arguments to the JAX updater, already JIT-compiled.
+                self._upd_fun = _propose_random_flip_jax
             else:
-                self._upd_fun = partial(_propose_random_flip_np, rng=self._rng)
-                
-        # Store the initial logprobability obtained from the net sampler
-        self._logprobas     = None
+                # For NumPy backend, bind the RNG to the updater.
+                self._upd_fun = _propose_random_flip_np
     
+        self._logprob_fact  = logprob_fact
+        self._logprobas     = None # Will store log prob of current states
+    
+    #####################################################################
+    
+    def __repr__(self):
+        """
+        Provide a string representation of the MCSampler object.
+
+        Returns:
+            str: A formatted string containing the key attributes of the MCSampler instance,
+        """
+        return (f"MCSampler(shape={self._shape}, mu={self._mu}, beta={self._beta}, "
+                f"therm_steps={self._therm_steps}, sweep_steps={self._sweep_steps}, "
+                f"numsamples={self._numsamples}, numchains={self._numchains}, backend={self._backendstr})")
+
+    def __str__(self):
+        total_therm_updates_display = self._total_therm_updates * self.size                     # Total updates per site
+        total_sample_updates_display = self._numsamples * self._updates_per_sample * self.size  # Total sample updates per site
+        return (f"MCSampler:\n"
+                f"  - State shape: {self._shape} (Size: {self.size})\n"
+                f"  - Backend: {self._backendstr}\n"
+                f"  - Chains: {self._numchains}, Samples/Chain: {self._numsamples}\n"
+                f"  - Params: mu={self._mu:.3f}, beta={self._beta:.3f}, logprob_fact={self._logprob_fact:.3f}\n"
+                f"  - Thermalization: {self._therm_steps} sweeps x {self._sweep_steps} steps/sweep ({total_therm_updates_display} total site updates/chain)\n"
+                f"  - Sampling: {self._updates_per_sample} steps/sample ({total_sample_updates_display} total site updates/chain)\n")
+        
     ###################################################################
     
     def _set_net_callable(self, net):
         '''
-        Set the network callable.
+        Set the network callable and extract parameters if applicable.
+
         Parameters:
-            - net_callable : The network callable
+            net (Callable or Flax Module):
+                Input network object.
+
+        Returns:
+            Tuple[Callable, Any]: (network_callable, parameters)
         '''
-        
-        # this method shall return the callable and the variational parameters
         self._net = net
-        if hasattr(self._net, 'get_apply'):
-            network_callable, parameters = self._net.get_apply()    # if is flax model or similar
+        
+        # Check if it's a Flax Linen module (or similar with apply method)
+        if isinstance(net, nn.Module):
+            # Assume parameters are managed externally or within the module state
+            # We need the apply function and the parameters.
+            # This might require the user to pass parameters explicitly during sampling if they change.
+            # Let's store the apply method and expect parameters at sample time.
+            return net.apply, None # Parameters will be provided later
+        elif hasattr(net, 'apply') and callable(net.apply):
+            return net.apply, None
+        elif hasattr(net, 'get_apply') and callable(net.get_apply):
+            network_callable, parameters = net.get_apply()
             return network_callable, parameters
-        elif callable(self._net):
-            return self._net, None
-        raise ValueError("The network callable is not valid.")
+        elif callable(net):
+            return net, None # Assume no external parameters needed unless provided at sample time
+        raise ValueError("Invalid network object provided. Needs to be callable or have an 'apply' method.")
     
     ###################################################################
     #! ACCEPTANCE PROBABILITY
     ###################################################################
     
+    @partial(jax.jit, static_argnames=('beta',))
     def _acceptance_probability_jax(self, current_val, candidate_val, beta: float = 1.0):
-        '''
-        Calculate the acceptance probability for the Metropolis-Hastings
-        algorithm.
+        r'''Calculate the Metropolis-Hastings acceptance probability using JAX.
+
+        Calculates 
+            :math:`\min(1, \exp(\beta \cdot \text{Re}(\text{val}_{\text{cand}} - \text{val}_{\text{curr}})))`.
+
         Parameters:
-            - current_val   : The value of the current state
-            - candidate_val : The value of the candidate state
-        
+            current_val (jnp.ndarray):
+                Log-probability (or related value) of the current state(s).
+            candidate_val (jnp.ndarray):
+                Log-probability (or related value) of the candidate state(s).
+            beta (float):
+                Inverse temperature :math:`\beta`. Static argument for JIT.
+
         Returns:
-            - The acceptance probability as a float
+            jnp.ndarray: The acceptance probability(ies).
         '''
 
-        log_acceptance_ratio = beta * (candidate_val - current_val)
+        log_acceptance_ratio = beta * jnp.real(candidate_val - current_val)
         return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
     
+    @numba.njit
     def _acceptance_probability_np(self, current_val, candidate_val, beta: float = 1.0):
         '''
         Calculate the acceptance probability for the Metropolis-Hastings
@@ -844,164 +1104,289 @@ class MCSampler(Sampler):
             - The acceptance probability as a float
         '''
 
-        log_acceptance_ratio = beta * (candidate_val - current_val)
+        log_acceptance_ratio = beta * np.real(candidate_val - current_val)
         return np.minimum(1.0, np.exp(log_acceptance_ratio))
     
     def acceptance_probability(self, current_val, candidate_val, beta: float = 1.0):
-        '''
-        Calculate the acceptance probability for the Metropolis-Hastings
-        algorithm.
-        Parameters:
-            - current_val   : The value of the current state
-            - candidate_val : The value of the candidate state
-        It calculates:
-            $$ exp(\\beta (log(p') - log(p))) $$
-        Returns:
-            - The acceptance probability as a float
-        '''
-        if beta is None:
-            beta = self._beta
-            
-        if self._isjax:
-            return self._acceptance_probability_jax(current_val, candidate_val, beta)
-        return self._acceptance_probability_np(current_val, candidate_val, beta)
+        r'''Calculate the Metropolis-Hastings acceptance probability.
 
+        Selects backend automatically. Uses instance `_beta` if `beta` is None.
+
+        Parameters:
+            current_val (array-like):
+                Value (:math:`\log p(s)`) of the current state(s).
+            candidate_val (array-like):
+                Value (:math:`\log p(s')`) of the candidate state(s).
+            beta (Optional[float]):
+                Inverse temperature :math:`\beta`. Uses `self._beta` if None.
+
+        Returns:
+            array-like: Acceptance probability(ies).
+        '''
+        use_beta = beta if beta is not None else self._beta
+
+        if self._isjax:
+            # We need beta to be static for the JIT version.
+            # If beta can change dynamically, we cannot use the JIT version directly here.
+            # Workaround:
+            #   If beta is dynamic, call a non-jitted wrapper or re-jit if necessary.
+            # Assuming beta is constant for a given sampling run for JIT benefits.
+            
+            if beta is not None and beta != self._beta:
+                # If called with a different beta, might need a non-jitted path
+                # or expect user to handle JIT compilation if beta changes often.
+                # For simplicity, we assume the compiled version uses self._beta if beta is None.
+                # If beta is provided *and different*, direct call might be slow if not JITted for that beta.
+                # Let's use the JITted version with the provided beta if possible.
+                # This requires careful handling of static arguments if beta changes frequently.
+                # A simpler approach: always use self._beta in JITted functions called internally.
+                # If external calls need different beta, they call this wrapper which might be slower.
+
+                # Call JITted function with potentially non-static beta (will compile on first call with this beta)
+                @partial(jax.jit, static_argnames=('beta',))
+                def _accept_jax_dynamic_beta(cv, cdv, beta):
+                    log_acceptance_ratio = beta * jnp.real(cdv - cv)
+                    return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
+                return _accept_jax_dynamic_beta(current_val, candidate_val, use_beta)
+            else:
+                return self._acceptance_probability_jax(current_val, candidate_val, beta=use_beta)
+        else:
+            return self._acceptance_probability_np(current_val, candidate_val, beta=use_beta)
+        
     ###################################################################
     #! LOG PROBABILITY
     ###################################################################
     
-    def _logprob_jax(self, x, mu: float, net_callable, net_params):
-        '''
-        Calculate the log probability of a state using JAX.
+    @staticmethod
+    # @partial(jax.jit, static_argnames=('mu'))
+    def _logprob_jax(x, mu: float, net_callable, net_params = None):
+        r'''Calculate log probability :math:`\mu \cdot \text{Re}(\log \psi(s))` using JAX.
+
+        Uses `jax.vmap` for batching over states `x`.
+
         Parameters:
-            - x             : The state
-            - mu            : The parameter mu
-            - beta          : The parameter beta
-            - net_callable  : The network callable (returns \\text{Re}(\\log\\psi(s)))
-            - net_params    : The network parameters
+            x (jnp.ndarray):
+                State configurations (batch dimension expected).
+            mu (float):
+                Exponent :math:`\mu`.
+            net_callable (Callable):
+                Function to compute :math:`\log \psi(s)`. Signature: `log_psi = net_callable(params, state)`.
+            net_params (Any):
+                Parameters for `net_callable`.
+
         Returns:
-            - The log probability as a float
+            jnp.ndarray: Log probabilities.
         '''
-        return jax.vmap(lambda y: mu * jnp.real(net_callable(net_params, y)), in_axes=(0,))(x)
+        # def single_logprob(state):
+        log_psi = net_callable(net_params, x)
+        return mu * jnp.real(log_psi).flatten()
+        # return jax.vmap(single_logprob)(x)
     
-    def _logprob_np(self, x, mu, net_callable, net_params):
+    @staticmethod
+    @numba.njit
+    def _logprob_np(x, mu, net_callable, net_params = None):
         '''
         Calculate the log probability of a state using NumPy.
         Parameters:
             - x             : The state
             - mu            : The parameter mu
-            - beta          : The parameter beta
-            - net_callable  : The network callable (returns \\text{Re}(\\log\\psi(s)))
-            - net_params    : The network parameters
+            - net_callable  : The network callable (returns (\\log\\psi(s)))
+            - net_params    : The network parameters - may be None but for flax callables
+                            the parameters are necessary strictly!
         Returns:
-            - The log probability as a float
+            - The log probability as a float or complex number
         '''
-        return np.array([mu * np.real(net_callable(net_params, y)) for y in x])
+        if net_params is None:
+            # If no parameters are needed, call net_callable with just y
+            return np.array([mu * net_callable(y) for y in x]).reshape(x.shape[0])
+            # return np.array([mu * np.real(net_callable(y)) for y in x])
+        return np.array([mu * net_callable(net_params, y) for y in x]).reshape(x.shape[0])
+        # return np.array([mu * np.real(net_callable(net_params, y)) for y in x])
     
     def logprob(self, x, mu: float = 1.0, net_callable = None, net_params = None):
-        '''
-        Calculate the log probability of a state.
+        r'''Calculate the log probability used for MCMC steps.
+
+        Computes :math:`\mu \cdot \text{Re}(\log \psi(s))`.
+        Uses instance defaults if arguments are None. Selects backend automatically.
+
         Parameters:
-            - x             : The state
-            - mu            : The parameter mu
-            - beta          : The parameter beta
-            - net_callable  : The network callable (returns \\text{Re}(\\log\\psi(s)))
-            - net_params    : The network parameters
+            x (array-like):
+                State configuration(s).
+            mu (Optional[float]):
+                Exponent :math:`\mu`. Uses `self._mu` if None.
+            net_callable (Optional[Callable]):
+                Network callable. Uses `self._net_callable` if None.
+            net_params (Any):
+                Network parameters. Uses `self._parameters` if None.
+
         Returns:
-            - The log probability as a float
+            array-like: Log probabilities.
         '''
-        if net_callable is None:
-            net_callable = self._net_callable
-        if net_params is None:
-            net_params = self._parameters
+        
+        use_mu          = mu if mu is not None else self._mu
+        use_callable    = net_callable if net_callable is not None else self._net_callable
+        use_params      = net_params if net_params is not None else self._parameters
+        
+        if use_callable is None:
+            raise ValueError("No callable provided for log probability calculation.")
+    
+        # if isinstance(self._net, nn.Module) and use_params is None:
+        #     # Try to get params from the network instance if possible
+        #     if hasattr(self._net, 'params'):
+        #         use_params = self._net.params
+        #     elif hasattr(self._net, 'get_params') and callable(self._net.get_params):
+        #         _, use_params = self._net.get_params()
+        #     else:
+        #         # Cannot automatically get params, raise error or warning
+        #         raise ValueError("Network seems to require parameters, but none were provided or found.")
             
         if self._isjax:
-            return self._logprob_jax(x, mu, net_callable, net_params)
-        return self._logprob_np(x, mu, net_callable, net_params)
+            return MCSampler._logprob_jax(x, use_mu, use_callable, use_params)
+        return MCSampler._logprob_np(x, use_mu, use_callable, use_params)
 
     ###################################################################
     #! UPDATE CHAIN
     ###################################################################
     
-    def _sweep_chain_jax(self, 
-                        chain           : 'array-like',
-                        logprobas       : 'array-like',
-                        rng_k           : 'array-like',
-                        num_proposed    : 'array-like',
-                        num_accepted    : 'array-like',
-                        params          : 'array-like',
-                        update_proposer : Callable,
-                        log_probability : Callable,
-                        accept_config   : Callable,
-                        net_callable    : Callable,
-                        steps           : int):
+    @staticmethod
+    @partial(jax.jit, static_argnames=('steps', 'update_proposer',
+                                    'log_proba_fun', 'accept_config_fun',
+                                    'net_callable_fun'))
+    def _run_mcmc_steps_jax(chain_init,
+                            current_val_init,
+                            rng_k_init,
+                            num_proposed_init,
+                            num_accepted_init,
+                            params,
+                            steps               : int,
+                            update_proposer     : Callable,
+                            log_proba_fun       : Callable,
+                            accept_config_fun   : Callable,
+                            net_callable_fun    : Callable,
+                            mu                  : float,
+                            beta                : float = 1.0):
         '''
-        Carry out the update chain using JAX. It uses JAX's fori_loop
-        to iterate over the number of steps.
-        Parameters
-            - chain : The initial state of the chain (array-like)
-            - steps : The number of steps to update the chain (jax.lax.fori_loop)
-        Returns
-            - The updated chain after the specified number of steps.
+        Runs multiple MCMC steps using lax.scan. JIT-compiled.
+        The single-step logic is defined internally via closure.
+        Parameters:
+            chain_init (jnp.ndarray):
+                Initial state of the chain (shape: [numchains, *shape]).
+            current_val_init (jnp.ndarray):
+                Initial log-probability values for each chain (1D array).
+            rng_k_init (jax.random.PRNGKey):
+                Initial random key for JAX.
+            num_proposed_init (jnp.ndarray):
+                Initial number of proposals made so far (1D array).
+            num_accepted_init (jnp.ndarray):
+                Initial number of accepted proposals so far (1D array).
+            params (Any):
+                Network parameters.
+            steps (int):
+                Number of MCMC steps to perform.
+            update_proposer (Callable):
+                Function that proposes a new state.
+            log_proba_fun (Callable):
+                Function to compute log probabilities.
+            accept_config_fun (Callable):
+                Function to compute acceptance probabilities.
+            net_callable_fun (Callable):
+                The network callable.
+            mu (float):
+                Exponent :math:`\mu` for the sampling distribution.
+            beta (float):
+                Inverse temperature :math:`\beta` for the Metropolis acceptance probability.
+        Returns:
+            Tuple[jnp.ndarray, jnp.ndarray, jax.random.PRNGKey, jnp.ndarray, jnp.ndarray]:
+                Final chain states, log-probabilities, updated random key,
         '''
-        
-        # get the current value of the chain
-        # current_val = logprobas if logprobas is not None else net_callable(params, chain)
-        current_val = logprobas if logprobas is not None else log_probability(chain, net_callable=net_callable, net_params=params)
-        carry       = (chain, current_val, rng_k, num_proposed, num_accepted)
-        
-        # define the body of the fori_loop
-        def body(i, carry):
-            '''
-            Carry:
-                - 0 : The current state of the chain
-                - 1 : The current value of the chain
-                - 2 : The random key
-                - 3 : The number of proposed updates
-                - 4 : The number of accepted updates
-            '''
-            
-            # obtain the current key
+
+        # Define the single-step function *inside* so it closes over the arguments
+        # like params, update_proposer, log_proba_fun, etc.
+        def _sweep_chain_jax_step_inner(carry, _):
+            # Unpack dynamic carry state (state changing at each step)
             chain_in, current_val_in, rng_k_in, num_proposed_in, num_accepted_in = carry
+            # jax.debug.print("chain_in: {}", chain_in.shape)
+            # jax.debug.print("current_val_in: {}", current_val_in.shape)
+            # jax.debug.print("rng_k_in: {}", rng_k_in.shape)
+            # jax.debug.print("num_proposed_in: {}", num_proposed_in.shape)
+            # jax.debug.print("num_accepted_in: {}", num_accepted_in.shape)
+            # return carry, None
             
-            new_rng_keys    = random.split(rng_k_in, num = chain_in.shape[0] + 1)
-            carry_key       = new_rng_keys[-1]
-            
-            # update the chain by proposing a new state via the update_proposer
-            new_chain       = jax.vmap(update_proposer, in_axes=(0, 0, None))(new_rng_keys[:-1], chain_in)
+            #! Single MCMC update step logic
+            # Access functions and static parameters via closure from the outer scope
 
-            # compute the acceptance probability (it is already partially called on mu and beta)
-            logprobas_new   = log_probability(new_chain, net_callable=net_callable, net_params=params)
-            # acceptance probability (already partially called on mu and beta)
-            acc_probability = accept_config(current_val_in, logprobas_new)
-            
-            # decide with dice rule
-            new_rng_key, carry_key = random.split(carry_key,)
-            accepted        = random.bernoulli(new_rng_key, acc_probability).reshape((-1,))
-            
-            # keep track of the updates
-            num_proposed    = num_proposed_in + len(chain_in)
-            num_accepted    = num_accepted_in + jax.lax.reduce_sum(accepted)
-            
-            # accept by jax
-            def update(acc, old, new):
-                return jax.lax.select(acc, new, old)
-            new_carry_states= jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
-            new_carry_vals  = jnp.where(accepted, logprobas_new, current_val_in)
-            return (new_carry_states, new_carry_vals, carry_key, num_proposed, num_accepted)
-        return jax.lax.fori_loop(0, steps, body, carry)
+            # Propose update
+            num_chains              = chain_in.shape[0]
+            all_keys                = random_jp.split(rng_k_in, num_chains + 1)
+            proposal_keys           = all_keys[:-1]     # Keys for vmap
+            carry_key               = all_keys[-1]      # Key for next step
+            new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposal_keys)
 
-    def _sweep_chain_np(self, 
-                        chain           : np.ndarray,
-                        logprobas       : np.ndarray,
-                        num_proposed    : int,
-                        num_accepted    : int,
-                        params          : Any,
-                        update_proposer : Callable,
-                        log_probability : Callable,
-                        accept_config   : Callable,
-                        net_callable    : Callable,
-                        steps           : int):
+            # Calculate log probabilities (using log_proba_fun, net_callable_fun, params)
+            logprobas_new           = log_proba_fun(new_chain, mu=mu, net_callable=net_callable_fun, net_params=params)
+
+            # Calculate acceptance probabilities (using accept_config_fun)
+            acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta)
+
+            # Decide acceptance
+            accept_key, carry_key   = random_jp.split(carry_key)
+            # uniform_draw            = random_jp.bernoulli(accept_key, acc_probability)
+            # accepted                = uniform_draw < acc_probability
+            uniform_draw            = random_jp.uniform(accept_key, shape=(chain_in.shape[0],))
+            accepted                = uniform_draw < acc_probability # bool[num_chains]
+            # jax.debug.print("accepted: {}", accepted)
+        
+            # Update counters
+            num_proposed_out        = num_proposed_in + 1
+            num_accepted_out        = num_accepted_in + accepted.astype(num_accepted_in.dtype)
+            
+            accepted_broadcast      = accepted[:, jnp.newaxis]
+            new_carry_states        = jnp.where(accepted_broadcast, new_chain, chain_in)
+            new_carry_vals          = jnp.where(accepted, logprobas_new, current_val_in)
+            # jax.debug.print("accepted: {}", accepted.shape)
+            # jax.debug.print("chain in: {}", chain_in.shape)
+            # jax.debug.print("new_chain: {}", new_chain.shape)
+            # jax.debug.print("logprobas_new: {}", logprobas_new.shape)
+            # jax.debug.print("current_val_in: {}", current_val_in.shape)
+            # return carry, None
+            # def update(acc, old, new):
+                # return jax.lax.select(acc, new, old)
+            # new_carry_states        = jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
+            # new_carry_vals          = jnp.where(accepted, logprobas_new, current_val_in)
+            return (new_carry_states, new_carry_vals, carry_key, num_proposed_out, num_accepted_out), None
+        
+        # Initial carry contains only the dynamic state passed into this function
+        initial_carry = (chain_init, current_val_init, rng_k_init,
+                        num_proposed_init, num_accepted_init)
+
+        # Call lax.scan with the inner step function
+        final_carry, _ = jax.lax.scan(
+            f       = _sweep_chain_jax_step_inner,
+            init    = initial_carry,
+            xs      = None,
+            length  = steps
+        )
+
+        # Unpack final dynamic carry state
+        final_chain, final_val, final_rng_k, final_num_proposed, final_num_accepted = final_carry
+        return final_chain, final_val, final_rng_k, final_num_proposed, final_num_accepted
+
+    @staticmethod
+    @numba.njit
+    def _run_mcmc_steps_np(chain            : np.ndarray,
+                        logprobas           : np.ndarray,
+                        num_proposed        : np.ndarray,
+                        num_accepted        : np.ndarray,
+                        params              : Any,
+                        rng                 : np.random.Generator,
+                        steps               : int,
+                        mu                  : float,
+                        beta                : float,
+                        update_proposer     : Callable,
+                        log_proba_fun       : Callable,
+                        accept_config_fun   : Callable,
+                        net_callable_fun    : Callable,
+                        ):
         """
         NumPy version of sweeping a single chain.
         
@@ -1031,198 +1416,530 @@ class MCSampler(Sampler):
         Returns:
         A tuple (chain, current_logprobas, rng_k, num_proposed, num_accepted)
         """
-        current_val = logprobas if logprobas is not None else log_probability(chain, net_callable=net_callable, net_params=params)
-        for _ in range(steps):
-            # For each chain element, generate a new candidate using the update proposer.
-            # Here, we simulate splitting rng_k by simply generating a new random integer key.
-            new_chain       = np.array([update_proposer(state) for state in chain])
-            # Compute new log probabilities for candidates.
-            new_logprobas   = log_probability(new_chain, net_callable=net_callable, net_params=params)
-            # Compute acceptance probability for each chain element.
-            acc_probability = accept_config(current_val, new_logprobas)
-            # Decide acceptance by comparing against a random uniform sample.
-            rand_vals       = np.random.uniform(size=chain.shape[0])
-            accepted        = rand_vals < acc_probability
-            num_proposed    += chain.shape[0]
-            num_accepted    += np.sum(accepted)
-            
-            # Update: if accepted, take candidate, else keep old.
-            new_state       = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
-            new_val         = np.where(accepted, new_logprobas, current_val)
-            # Update the carry:
-            chain           = new_state
-            current_val     = new_val
-            # Update rng_k with a new random integer (not used further)
+        
+        current_val     = logprobas if logprobas is not None else log_proba_fun(chain, mu=mu, net_callable=net_callable_fun, net_params=params)
+        n_chains        = chain.shape[0] if len(chain.shape) > 1 else 1
+        
+        def loop_sweep(chain, current_val, num_proposed, num_accepted, rng):
+            # Loop through the number of steps
+            for _ in range(steps):
+                
+                # use the temporary states for the proposal
+                # tmpstates               = chain.copy()
+                
+                # For each chain element, generate a new candidate using the update proposer.
+                # Here, we simulate splitting rng_k by simply generating a new random integer key.
+                # also, this flips the state inplace, so we need to copy the chain
+                # and then update the chain with the new state.
+                # Use NumPy's vectorized operations to generate new states
+                new_chain               = update_proposer(chain, rng)
+                
+                # Compute new log probabilities for candidates using the provided log probability function.
+                new_logprobas           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
+                
+                # Compute acceptance probability for each chain element.
+                acc_probability         = accept_config_fun(current_val, new_logprobas, beta)
+                
+                # Decide acceptance by comparing against a random uniform sample.
+                rand_vals               = rng.random(size=n_chains)
+                accepted                = rand_vals < acc_probability
+                num_proposed            += chain.shape[0] if len(chain.shape) > 1 else 1
+                num_accepted[accepted]  += 1
+                
+                # Update: if accepted, take candidate, else keep old.
+                new_val                 = np.where(accepted, new_logprobas, current_val)
+                # Update the carry:
+                # chain                   = np.array([new_chain[i] if accepted[i] else chain[i] for i in range(chain.shape[0])])
+                chain                   = np.where(accepted[:, None], new_chain, chain)
+                current_val             = new_val
+                
+                # Update rng_k with a new random integer (not used further)
+            return chain, current_val, num_proposed, num_accepted
+        
+        # go through the number of steps, for each step: 
+        # 1. propose a new state
+        # 2. compute the log probability
+        # 3. compute the acceptance probability
+        # 4. decide with dice rule
+        # 5. update the chain
+        # 6. update the carry
+        # 7. update rng_k with a new random integer (not used further)
+        chain, current_val, num_proposed, num_accepted = loop_sweep(chain, current_val, num_proposed, num_accepted, rng)
         return chain, current_val, num_proposed, num_accepted
 
-    def _sweep_chain(self, 
-                    chain           : 'array-like',
-                    logprobas       : 'array-like',
-                    rng_k           : 'array-like',
-                    num_proposed    : 'array-like',
-                    num_accepted    : 'array-like',
-                    params          : 'array-like',
-                    update_proposer : Callable,
-                    log_probability : Callable,
-                    accept_config   : Callable,
-                    net_callable    : Callable,
-                    steps           : int):
+    def _sweep_chain(self,
+                    chain               : 'array-like',
+                    logprobas           : 'array-like',
+                    rng_k               : 'array-like',
+                    num_proposed        : 'array-like',
+                    num_accepted        : 'array-like',
+                    params              : 'array-like',
+                    update_proposer     : Callable,
+                    log_proba_fun       : Callable,
+                    accept_config_fun   : Callable,
+                    net_callable_fun    : Callable,
+                    steps               : int):
         '''
-        Sweep the chain for a given number of steps.
+        Sweep the chain for a given number of MCMC steps.
+        One "step" typically involves proposing N updates, where N is the system size.
+
         Parameters:
-            - chain : The initial state of the chain (array-like)
-            - steps : The number of steps to update the chain (jax.lax.fori_loop)
+            chain (array-like):
+                Current states of the chains.
+            logprobas (array-like):
+                Log probabilities of the current states.
+            rng_k_or_rng (Any):
+                JAX PRNGKey or NumPy Generator.
+            num_proposed (array-like):
+                Array tracking proposed moves per chain.
+            num_accepted (array-like):
+                Array tracking accepted moves per chain.
+            params (Any):
+                Network parameters.
+            steps (int):
+                Number of MCMC update steps to perform.
+
         Returns:
-            - The updated chain after the specified number of steps.
+            Tuple: (updated_chain, updated_logprobas, updated_rng_key/rng, updated_num_proposed, updated_num_accepted)
         '''
+        use_log_proba_fun       = self.logprob if log_proba_fun is None else log_proba_fun
+        use_accept_config_fun   = self.acceptance_probability if accept_config_fun is None else accept_config_fun
+        use_net_callable_fun    = self._net_callable if net_callable_fun is None else net_callable_fun
+        use_update_proposer     = self._upd_fun if update_proposer is None else update_proposer
+        
         if logprobas is None:
             logprobas = self._logprobas
             if logprobas is None:
-                logprobas = self.logprob(chain, net_callable=net_callable, net_params=params)
-
+                logprobas = self.logprob(chain, net_callable=net_callable_fun, net_params=params)
+        
         if self._isjax:
-            return self._sweep_chain_jax(chain, logprobas, 
-                    rng_k, num_proposed, num_accepted,
-                    params, update_proposer, log_probability, accept_config, net_callable, steps)
-        return self._sweep_chain_np(chain, logprobas, 
-                    num_proposed, num_accepted,
-                    params, update_proposer, log_probability, accept_config, net_callable, steps)
+            # call the compiled version
+            return self._run_mcmc_steps_jax(chain_init          =   chain,
+                                            current_val_init    = logprobas,
+                                            rng_k_init          = rng_k,
+                                            num_proposed_init   = num_proposed,
+                                            num_accepted_init   = num_accepted,
+                                            params              = params,
+                                            steps               = steps,
+                                            update_proposer     = use_update_proposer,
+                                            log_proba_fun       = use_log_proba_fun,
+                                            accept_config_fun   = use_accept_config_fun,
+                                            net_callable_fun    = use_net_callable_fun,
+                                            mu                  = self._mu)
+        # otherwise, numpy it is
+        return self._run_mcmc_steps_np(chain                =   chain,
+                                        logprobas           =   logprobas,
+                                        rng                 =   rng_k,
+                                        num_proposed        =   num_proposed,
+                                        num_accepted        =   num_accepted,
+                                        params              =   params,
+                                        update_proposer     =   use_update_proposer,
+                                        log_proba_fun       =   use_log_proba_fun,
+                                        accept_config_fun   =  use_accept_config_fun,
+                                        net_callable_fun    =   use_net_callable_fun,
+                                        mu                  =   self._mu,
+                                        beta                =   self._beta,
+                                        steps               =   steps)
     
     ###################################################################
     #! SAMPLING
     ###################################################################
     
-    def _get_samples_jax(self,
-        shape           : Tuple[int, ...],
-        params          : 'array-like',
-        num_samples     : int,
-        therm_steps     : int,
-        sweep_steps     : int,
-        states          : 'array-like',
-        logprobas       : 'array-like',
-        net_callable    : Callable,
-        update_proposer : Callable,
-        log_probability : Callable,
-        accept_config   : Callable,
-        rng_k           : 'array-like',
-        num_proposed    : 'array-like',
-        num_accepted    : 'array-like'):
-        
-        # thermalize the chains
-        states, logprobas, rng_k, num_proposed, num_accepted = self._sweep_chain_jax(
-            chain=states, logprobas=logprobas, rng_k=rng_k, 
-            num_proposed=num_proposed, num_accepted=num_accepted,
-            params=params, update_proposer=update_proposer, log_probability=log_probability, 
-            accept_config=accept_config, net_callable=net_callable, steps=therm_steps*sweep_steps)
-        
-        def scan_fun(carry, i):
-            states, logprobas, rng_k, num_proposed, num_accepted = carry
-            states, logprobas, rng_k, num_proposed, num_accepted = self._sweep_chain_jax(
-                chain=states, logprobas=logprobas, rng_k=rng_k, 
-                num_proposed=num_proposed, num_accepted=num_accepted,
-                params=params, update_proposer=update_proposer, log_probability=log_probability, 
-                accept_config=accept_config, net_callable=net_callable, steps=sweep_steps)
-            return (states, logprobas, rng_k, num_proposed, num_accepted), states
+    @staticmethod
+    @partial(jax.jit, static_argnames=('num_samples', 'total_therm_updates', 'updates_per_sample',
+                                    'update_proposer', 'log_proba_fun',
+                                    'accept_config_fun', 'net_callable_fun'))
+    def _generate_samples_jax(
+        states_init         : 'array-like',
+        logprobas_init      : 'array-like',
+        rng_k_init          : 'array-like',
+        num_proposed_init   : 'array-like',
+        num_accepted_init   : 'array-like',
+        params              : Any,
+        num_samples         : int,
+        total_therm_updates : int,
+        updates_per_sample  : int,
+        mu                  : float,
+        beta                : float,
+        # Pass the actual function objects needed:
+        update_proposer     : Callable,
+        log_proba_fun       : Callable,
+        accept_config_fun   : Callable,
+        net_callable_fun    : Callable):
+        '''
+        JIT-compiled function for thermalization and sample collection using MCMC.
+        Uses closures for scan bodies.
+        '''
 
-        meta, configs = jax.lax.scan(scan_fun, 
-                    (states, logprobas, rng_k, num_proposed, num_accepted), None, length=num_samples)
-        return meta, configs.reshape((num_samples, -1) + shape)
+        #! Thermalization phase
+        # Calls the static method _run_mcmc_steps_jax
+        states_therm, logprobas_therm, rng_k_therm, num_proposed_therm, num_accepted_therm = \
+            MCSampler._run_mcmc_steps_jax(
+            chain_init          =       states_init,
+            current_val_init    =       logprobas_init,
+            rng_k_init          =       rng_k_init,
+            num_proposed_init   =       num_proposed_init,
+            num_accepted_init   =       num_accepted_init,
+            params              =       params,
+            steps               =       total_therm_updates,
+            # Pass the functions through:
+            update_proposer     =       update_proposer,
+            log_proba_fun       =       log_proba_fun,
+            accept_config_fun   =       accept_config_fun,
+            net_callable_fun    =       net_callable_fun,
+            mu                  =       mu,
+            beta                =       beta
+            )
+
+        #! Sampling phase (using lax.scan for collection)
+        def sample_scan_body(carry, _):
+            # Unpack dynamic carry state
+            states_carry, logprobas_carry, rng_k_carry, num_proposed_carry, num_accepted_carry = carry
+
+            # Run MCMC steps between samples using the static method
+            states_new, logprobas_new, rng_k_new, num_proposed_new, num_accepted_new = \
+                MCSampler._run_mcmc_steps_jax(
+                    chain_init          =   states_carry,
+                    current_val_init    =   logprobas_carry,
+                    rng_k_init          =   rng_k_carry,
+                    num_proposed_init   =   num_proposed_carry,
+                    num_accepted_init   =   num_accepted_carry,
+                    params              =   params,
+                    steps               =   updates_per_sample,
+                    update_proposer     =   update_proposer,
+                    log_proba_fun       =   log_proba_fun,
+                    accept_config_fun   =   accept_config_fun,
+                    net_callable_fun    =   net_callable_fun,
+                    mu                  =   mu,
+                    beta                =   beta
+                )
+
+            # Return updated dynamic carry and the collected sample (states_new)
+            return (states_new, logprobas_new, rng_k_new, num_proposed_new, num_accepted_new), states_new
+
+        # Run the scan to collect samples
+        initial_scan_carry              = (states_therm, logprobas_therm, rng_k_therm, num_proposed_therm, num_accepted_therm)
+        final_carry, collected_samples  = jax.lax.scan(
+            f       = sample_scan_body, # Use the inner function defined above
+            init    = initial_scan_carry,
+            xs      = None,
+            length  = num_samples
+        )
+        # final_carry contains the state after the last sample collection sweep
+        return final_carry, collected_samples
     
-    def _get_samples_np(self, params, numSamples, multipleOf=1):
+    def _generate_samples_np(self,
+                        params,
+                        num_samples,
+                        multiple_of = 1):
         """
         NumPy version of obtaining samples via MCMC.
         
         Parameters:
         - params         : Network parameters.
-        - numSamples     : Number of sweeps (sample collection iterations) to perform.
-        - multipleOf     : (Not used here, but could be used for device distribution.)
+        - num_samples    : Number of sweeps (sample collection iterations) to perform.
+        - multiple_of    : (Not used here, but could be used for device distribution.)
         
         Returns:
         A tuple (meta, configs) where:
             meta is a tuple of the final (states, logprobas, rng_k, num_proposed, num_accepted)
             configs is an array of shape (numSamples, -1) + self._shape containing the sampled configurations.
         """
+        
         # Thermalize the chains by sweeping for (therm_steps * sweep_steps)
-        states, logprobas, num_proposed, num_accepted = self._sweep_chain_np(
-            self._states, self._logprobas, self._num_proposed, self._num_accepted,
-            params, self._upd_fun, self.logprob, self.acceptance_probability, self._net_callable,
-            self._therm_steps * self._sweep_steps)
+        states, logprobas, num_proposed, num_accepted = self._run_mcmc_steps_np(
+            chain               = self._states,
+            logprobas           = self._logprobas,
+            num_proposed        = self._num_proposed,
+            num_accepted        = self._num_accepted,
+            params              = params,
+            update_proposer     = self._upd_fun,
+            log_proba_fun       = self.logprob,
+            accept_config_fun   = self.acceptance_probability,
+            net_callable_fun    = self._net_callable,
+            steps               = self._therm_steps * self._sweep_steps,
+            rng                 = self._rng,
+            mu                  = self._mu,
+            beta                = self._beta)
         
         # Now perform numSamples sweeps, collecting the resulting states
-        meta = []
-        configs_list = []
-        for i in range(numSamples):
-            states, logprobas, num_proposed, num_accepted = self._sweep_chain_np(
-                states, logprobas, num_proposed, num_accepted,
-                params, self._upd_fun, self.logprob, self.acceptance_probability, self._net_callable,
-                self._sweep_steps)
-            meta.append((states.copy(), logprobas.copy(), num_proposed, num_accepted))
+        meta            = []
+        configs_list    = []
+        
+        # Perform the sampling sweeps - do the same as the thermalization but save the states
+        for _ in range(num_samples):
+            states, logprobas, num_proposed, num_accepted = self._run_mcmc_steps_np(
+                chain               = states,
+                logprobas           = logprobas,
+                num_proposed        = num_proposed,
+                num_accepted        = num_accepted,
+                params              = params,
+                update_proposer     = self._upd_fun,
+                log_proba_fun       = self.logprob,
+                accept_config_fun   = self.acceptance_probability,
+                net_callable_fun    = self._net_callable,
+                steps               = self._sweep_steps,
+                rng                 = self._rng,
+                mu                  = self._mu,
+                beta                = self._beta)
+                
+            meta        = (states.copy(), logprobas.copy(), num_proposed, num_accepted)
             # Assume states is of shape (num_chains, *self._shape)
             configs_list.append(states.copy())
         
         # Concatenate configurations along the chain axis
-        # Then reshape to (numSamples, -1) + self._shape (flattening the chain dimension per sample)
+        # Then reshape to (num_samples, -1) + self._shape (flattening the chain dimension per sample)
         configs = np.concatenate(configs_list, axis=0)
-        self.globNumSamples = configs.shape[0]
-        return (states, logprobas, None, num_proposed, num_accepted), configs.reshape((numSamples, -1) + self._shape)
+        return meta, configs.reshape((num_samples, -1) + self._shape)
+    
+    ###################################################################
+    #! STATIC JAX SAMPLING KERNEL
+    ###################################################################
+    
+    @staticmethod
+    @partial(jax.jit, static_argnames=(
+        'num_samples', 'num_chains', 'total_therm_updates', 'updates_per_sample', 'shape',
+        'update_proposer', 'log_proba_fun_base', 'accept_config_fun_base',
+        'net_callable_fun'))
+    def _static_sample_jax(
+            # --- Initial State (Dynamic) ---
+            states_init         : jnp.ndarray,
+            rng_k_init          : jnp.ndarray,
+            num_proposed_init   : jnp.ndarray,
+            num_accepted_init   : jnp.ndarray,
+            # --- Network/Model (Dynamic) ---
+            params              : Any,
+            # --- Configuration (Static) ---
+            num_samples         : int,
+            num_chains          : int,
+            total_therm_updates : int,
+            updates_per_sample  : int,
+            shape               : Tuple[int,...],
+            # --- Configuration (Dynamic Values) ---
+            mu                  : float,
+            beta                : float,
+            logprob_fact        : float,
+            # --- Function References (Static) ---
+            update_proposer     : Callable,
+            log_proba_fun_base  : Callable,     # e.g., MCSampler._logprob_jax
+            accept_config_fun_base: Callable,   # e.g., MCSampler._acceptance_probability_jax
+            net_callable_fun    : Callable
+        ):
+        '''
+        Static, JIT-compiled core logic for MCMC sampling in JAX. 
+        
+        Performs the following steps:
+        1. Calculate Initial Log Probs
+        2. Generate Samples via MCMC Kernel
+        3. Post-processing
+        4. Return Results
+        Parameters:
+            states_init (jnp.ndarray):
+                Initial state(s) of the chain(s).
+            rng_k_init (jnp.ndarray):
+                Initial random key for JAX.
+            num_proposed_init (jnp.ndarray):
+                Initial number of proposals made so far.
+            num_accepted_init (jnp.ndarray):
+                Initial number of accepted proposals so far.
+            params (Any):
+                Network parameters.
+            num_samples (int):
+                Number of samples to generate.
+            num_chains (int):
+                Number of chains to use.
+            total_therm_updates (int):
+                Total number of thermalization updates.
+            updates_per_sample (int):
+                Number of updates per sample collection.
+            shape (Tuple[int,...]):
+                Shape of the state configurations.
+            mu (float):
+                Exponent :math:`\mu` for the sampling distribution.
+            beta (float):
+                Inverse temperature :math:`\beta` for the Metropolis acceptance probability.
+            logprob_fact (float):
+                Logarithmic factor for normalization.
+            update_proposer (Callable):
+                Function that proposes a new state.
+            log_proba_fun_base (Callable):
+                Function to compute log probabilities.
+            accept_config_fun_base (Callable):
+                Function to compute acceptance probabilities.
+            net_callable_fun (Callable):
+                The network callable.
+        '''
+
+        #! Calculate Initial Log Probs
+        # Needed for the first step of MCMC generation
+        logprobas_init = log_proba_fun_base(states_init, mu, net_callable_fun, params)
+
+        #! Generate Samples via MCMC Kernel
+        final_carry, collected_samples = MCSampler._generate_samples_jax(
+            states_init             =       states_init,
+            logprobas_init          =       logprobas_init,
+            rng_k_init              =       rng_k_init,
+            num_proposed_init       =       num_proposed_init,
+            num_accepted_init       =       num_accepted_init,
+            params                  =       params,
+            # Static args passed through
+            num_samples             =       num_samples, 
+            total_therm_updates     =       total_therm_updates,
+            updates_per_sample      =       updates_per_sample,
+            update_proposer         =       update_proposer,
+            log_proba_fun           =       log_proba_fun_base,
+            accept_config_fun       =       accept_config_fun_base,
+            net_callable_fun        =       net_callable_fun,
+            # Dynamic values passed through
+            mu                      =       mu,
+            beta                    =       beta
+        )
+        final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_carry
+
+        #! Post-processing
+        configs_flat = collected_samples.reshape((-1,) + shape)
+
+        #! Calculate log_ansatz (log psi) using the raw net callable
+        # Handle params potentially being None for net_callable_fun
+        @partial(jax.jit, static_argnames=('net_call',))
+        def batch_log_ansatz(p, conf, net_call):
+            return jax.vmap(net_call)(p, conf)
+        configs_log_ansatz = batch_log_ansatz(params, configs_flat, net_callable_fun)
+
+
+        #! Calculate importance sampling probabilities/weights
+        log_prob_exponent   = (1.0 / logprob_fact - mu)
+        probs               = jnp.exp(log_prob_exponent * jnp.real(configs_log_ansatz))
+        total_samples_count = num_samples * num_chains
+        prob_sum            = jnp.sum(probs)
+        norm_factor         = jnp.where(prob_sum > 1e-9, prob_sum, 1.0)
+        probs_normalized    = (probs / norm_factor) * total_samples_count
+
+        #! Return Results
+        final_state_tuple   = (final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted)
+        samples_tuple       = (configs_flat, configs_log_ansatz)
+        return final_state_tuple, samples_tuple, probs_normalized
+    
+    ###################################################################
     
     def sample(self, parameters=None, num_samples=None, num_chains=None):
         '''
         Sample the states from the Hilbert space according to the Born distribution.
         Parameters:
-            - parameters : The parameters for the network
-            - num_samples : The number of samples to generate
-            - num_chains  : The number of chains to use
+            parameters:
+                The parameters for the network
+            num_samples:
+                The number of samples to generate
+            num_chains:
+                The number of chains to use
         Returns:
-            - The sampled states
+            The sampled states
         '''
         
         # check the number of samples and chains
-        if num_samples is None:
-            num_samples = self._numsamples
-        else:
-            self.set_numsamples(num_samples)
-            
-        if num_chains is None:
-            num_chains = self._numchains
-        else:
-            self.set_numchains(num_chains)
+        used_num_samples        = num_samples if num_samples is not None else self._numsamples
+        used_num_chains         = num_chains if num_chains is not None else self._numchains
+
+        # Handle temporary state if num_chains differs from instance default
+        current_states = self._states
+        current_proposed        = self._num_proposed
+        current_accepted        = self._num_accepted
+        reinitialized_for_call  = False
+
+        current_states          = self._states
+        current_proposed        = self._num_proposed
+        current_accepted        = self._num_accepted
+        reinitialized_for_call  = False
+        if used_num_chains != self._numchains:
+            print(f"Warning: Running sample with {used_num_chains} chains (instance default is {self._numchains}). State reinitialized for this call.")
+            initstate_template  = self._initstate
+            if self._isjax:
+                if not isinstance(initstate_template, jnp.ndarray):
+                    initstate_template = jnp.array(initstate_template)
+                current_states      = jnp.repeat(initstate_template[jnp.newaxis, ...], used_num_chains, axis=0)
+                current_proposed    = jnp.zeros(used_num_chains, dtype=DEFAULT_JP_INT_TYPE)
+                current_accepted    = jnp.zeros(used_num_chains, dtype=DEFAULT_JP_INT_TYPE)
+            else:
+                if not isinstance(initstate_template, np.ndarray):
+                    initstate_template = np.array(initstate_template)
+                current_states      = np.stack([initstate_template.copy() for _ in range(used_num_chains)], axis=0)
+                current_proposed    = np.zeros(used_num_chains, dtype=DEFAULT_NP_INT_TYPE)
+                current_accepted    = np.zeros(used_num_chains, dtype=DEFAULT_NP_INT_TYPE)
+            reinitialized_for_call = True
         
         # check the parameters - if not given, use the current parameters
-        if parameters is None:
-            parameters = self._net.get_parameters()
-        else:
-            self._net.set_parameters(parameters)
-            
-        net_callable, params = self._set_net_callable(self._net)
+        current_params = None
+        if parameters is not None:
+            current_params = parameters
+        elif self._parameters is not None:
+            current_params = self._parameters
+        elif hasattr(self._net, 'params'):
+            current_params = self._net.params
+        elif hasattr(self._net, 'get_params'):
+            current_params = self._net.get_params()
         
-        # set the log probabilities
-        self._logprobas = self.logprob(self._states, 
-                                mu=self._mu, beta=self._beta, 
-                                net_callable=net_callable, net_params=params)
-        
+        net_callable, current_params = self._set_net_callable(self._net)
+
         if self._isjax:
-            (self._states, self._logprobas, self._rng_key, self._num_proposed, self._num_accepted), configs =\
-                self._get_samples_jax(
-                    shape=self._shape, params=params, num_samples=num_samples,
-                    therm_steps=self._therm_steps, sweep_steps=self._sweep_steps,
-                    states=self._states, logprobas=self._logprobas, net_callable=net_callable,
-                    update_proposer=self._upd_fun, log_probability=self.logprob,
-                    accept_config=self.acceptance_probability, rng_k=self._rng_key,
-                    num_proposed=self._num_proposed, num_accepted=self._num_accepted)
+            if not isinstance(self._rng_k, jax.Array):
+                raise TypeError(f"Sampler's RNG key is invalid: {type(self._rng_k)}")
+
+            # Call the static, JIT-compiled function
+            final_state_tuple, samples_tuple, probs = MCSampler._static_sample_jax(
+                # Initial State (Dynamic)
+                states_init             = current_states,
+                rng_k_init              = self._rng_k,
+                num_proposed_init       = current_proposed,
+                num_accepted_init       = current_accepted,
+                # Network/Model (Dynamic)
+                params                  = current_params,
+                # Configuration (Static Args)
+                num_samples             = used_num_samples,
+                num_chains              = used_num_chains,
+                total_therm_updates     = self._total_therm_updates, # Based on instance settings
+                updates_per_sample      = self._updates_per_sample,  # Based on instance settings
+                shape                   = self._shape,
+                # Configuration (Dynamic Values)
+                mu                      = self._mu,
+                beta                    = self._beta,
+                logprob_fact            = self._logprob_fact,
+                # Function References (Static Args) - Pass the static base methods
+                update_proposer         = self._upd_fun, # The configured update function instance
+                log_proba_fun_base      = MCSampler._logprob_jax,
+                accept_config_fun_base  = MCSampler._acceptance_probability_jax,
+                net_callable_fun        = self._net_callable
+            )
+        
+            # Update Instance State (JAX)
+            final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_state_tuple
+            self._rng_k                 = final_rng_k
+            if not reinitialized_for_call:
+                self._states            = final_states
+                self._logprobas         = final_logprobas
+                self._num_proposed      = final_num_proposed
+                self._num_accepted      = final_num_accepted
+
+            final_state_info            = (self._states, self._logprobas)
+            return final_state_info, samples_tuple, probs
+        else:
+            self._logprobas         = self.logprob(self._states,
+                                            mu              =   self._mu,
+                                            net_callable    =   net_callable,
+                                            net_params      =   parameters)
+            # for numpy
+            (self._states, self._logprobas, self._num_proposed, self._num_accepted), configs =\
+                self._generate_samples_np(parameters, num_samples, num_chains)
+            configs_log_ansatz  = np.array([self._net(parameters, config) for config in configs])
+            probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
+            norm                = np.sum(probs, axis=0, keepdims=True)
+            probs               = probs / norm * self._numchains
             
-            configs_log_ansatz  = jax.vmap(net_callable)(params, configs)
-            probs               = jnp.exp((1.0 / self._logprob_fact - self._mu) * jnp.real(configs_log_ansatz))   
-            norm                = jnp.sum(probs, axis=1, keepdims=True)
-            probs               = probs / norm
-            return configs, configs_log_ansatz, probs
-        (self._states, self._logprobas, self._rng_key, self._num_proposed, self._num_accepted), configs =\
-            self._get_samples_np(params, num_samples, num_chains)
-        configs_log_ansatz  = self._net(configs)
-        probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
-        norm                = np.sum(probs, axis=1, keepdims=True)
-        probs               = probs / norm
-        return configs, configs_log_ansatz, probs
+            # flatten the configs to be of shape (num_samples * num_chains)
+            configs             = configs.reshape(-1, *configs.shape[2:])
+            configs_log_ansatz  = configs_log_ansatz.reshape(-1, *configs_log_ansatz.shape[2:])
+            probs               = probs.reshape(-1, *probs.shape[2:])
+            
+            return (self._states, self._logprobas), (configs, configs_log_ansatz), probs
     
     ###################################################################
     #! SETTERS
@@ -1280,6 +1997,185 @@ class MCSampler(Sampler):
         '''
         return self._sweep_steps
 
+    def get_sampler_jax(self, num_samples: Optional[int] = None, num_chains: Optional[int] = None) -> Callable:
+        """
+        Returns a JIT-compiled static sampling function with baked-in configuration.
+
+        This function partially applies the core static JAX sampling logic
+        (`_static_sample_jax`) with configuration parameters (like mu, beta,
+        step counts, function references) taken from the current sampler instance.
+
+        The returned function is JIT-compiled for the specific `num_samples` and
+        `num_chains` provided (or taken from the instance defaults). It has a
+        simplified signature suitable for repeated calls where only the initial state,
+        RNG key, and network parameters might change frequently.
+
+        Parameters:
+            num_samples (Optional[int]):
+                Number of samples per chain to bake into the static function.
+                If None, uses `self._numsamples`.
+            num_chains (Optional[int]):
+                Number of chains to bake into the static function.
+                If None, uses `self._numchains`.
+
+        Returns:
+            Callable: A JIT-compiled function with the signature:
+            `wrapped_sampler(states_init, rng_k_init, params,
+                            num_proposed_init=None, num_accepted_init=None)`
+            where `num_proposed_init` and `num_accepted_init` default to zero arrays
+            of the correct shape and integer dtype if not provided.
+            It returns the same tuple structure as `_static_sample_jax`:
+            `(final_state_tuple, samples_tuple, probs_normalized)`
+
+        Raises:
+            RuntimeError: If the sampler backend is not 'jax'.
+        """
+        if not self._isjax:
+            raise RuntimeError("Static JAX sampler getter only available for JAX backend.")
+
+        # Use provided sample/chain counts or instance defaults
+        static_num_samples  = num_samples if num_samples is not None else self._numsamples
+        static_num_chains   = num_chains if num_chains is not None else self._numchains
+
+        # Gather arguments to be baked in (partial application)
+        # Configuration values from self
+        baked_args = {
+            #! Static Config
+            "num_samples"               : static_num_samples,
+            "num_chains"                : static_num_chains,
+            "total_therm_updates"       : self._total_therm_updates,
+            "updates_per_sample"        : self._updates_per_sample,
+            "shape"                     : self._shape,
+            "update_proposer"           : self._upd_fun,
+            "log_proba_fun_base"        : MCSampler._logprob_jax,
+            "accept_config_fun_base"    : MCSampler._acceptance_probability_jax,
+            "net_callable_fun"          : self._net_callable,
+            # Dynamic Config (but fixed for this partial function)
+            "mu"                        : self._mu,
+            "beta"                      : self._beta,
+            "logprob_fact"              : self._logprob_fact,
+        }
+
+        # Create the partially applied function
+        # Target function is MCSampler._static_sample_jax
+        partial_sampler = partial(MCSampler._static_sample_jax, **baked_args)
+
+        # Define the final wrapper function with the desired signature
+        # This wrapper handles default values for initial counters
+        int_dtype                       = DEFAULT_JP_INT_TYPE
+
+        @jax.jit
+        def wrapped_sampler(states_init         : jax.Array,
+                            rng_k_init          : jax.Array,
+                            params              : Any,
+                            num_proposed_init   : Optional[jax.Array] = None,
+                            num_accepted_init   : Optional[jax.Array] = None):
+            """
+            JIT-compiled static sampler with baked-in configuration.
+
+            Args:
+                states_init: Initial states [num_chains, *shape].
+                rng_k_init: Initial JAX PRNGKey.
+                params: Network parameters for this run.
+                num_proposed_init: Initial proposal counts [num_chains] (defaults to zeros).
+                num_accepted_init: Initial acceptance counts [num_chains] (defaults to zeros).
+
+            Returns:
+                (final_state_tuple, samples_tuple, probs_normalized)
+            """
+            # Default initial counters to zero if not provided
+            if num_proposed_init is None:
+                num_proposed_init = jnp.zeros(static_num_chains, dtype=int_dtype)
+            if num_accepted_init is None:
+                num_accepted_init = jnp.zeros(static_num_chains, dtype=int_dtype)
+
+            # Validate shapes of inputs relative to static_num_chains
+            if states_init.shape[0] != static_num_chains:
+                raise ValueError(f"states_init first dimension ({states_init.shape[0]}) must match static num_chains ({static_num_chains})")
+            if num_proposed_init.shape != (static_num_chains,):
+                raise ValueError(f"num_proposed_init shape ({num_proposed_init.shape}) must match ({static_num_chains},)")
+            if num_accepted_init.shape != (static_num_chains,):
+                raise ValueError(f"num_accepted_init shape ({num_accepted_init.shape}) must match ({static_num_chains},)")
+
+            # Call the partially applied core function
+            final_state_tuple, samples_tuple, probs = partial_sampler(
+                states_init         =   states_init,
+                rng_k_init          =   rng_k_init,
+                num_proposed_init   =   num_proposed_init.astype(int_dtype),
+                num_accepted_init   =   num_accepted_init.astype(int_dtype),
+                params              =   params
+            )
+            final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_state_tuple
+            # Update Instance State (JAX)
+            final_state_info        = (self._states, self._logprobas)
+            return final_state_info, samples_tuple, probs
+        return wrapped_sampler
+    
+    def get_sampler_np(self, num_samples: Optional[int] = None, num_chains: Optional[int] = None) -> Callable:
+        """
+        Returns a NumPy-based sampling function with baked-in configuration.
+
+        This function partially applies the core NumPy sampling logic
+        (`_generate_samples_np`) with configuration parameters (like mu, beta,
+        step counts, function references) taken from the current sampler instance.
+
+        The returned function has a simplified signature suitable for repeated
+        calls where only the initial state and network parameters might change frequently.
+
+        Parameters:
+            num_samples (Optional[int]):
+                Number of samples per chain to bake into the static function.
+                If None, uses `self._numsamples`.
+            num_chains (Optional[int]):
+                Number of chains to bake into the static function.
+                If None, uses `self._numchains`.
+
+        Returns:
+            Callable: A NumPy-based function with the signature:
+            `wrapped_sampler(states_init, params)`
+            It returns the same tuple structure as `_generate_samples_np`:
+            `(meta, configs)`
+
+        Raises:
+            RuntimeError: If the sampler backend is not 'numpy'.
+        """
+        if self._isjax:
+            raise RuntimeError("NumPy sampler getter only available for NumPy backend.")
+
+        # Use provided sample/chain counts or instance defaults
+        static_num_samples  = num_samples if num_samples is not None else self._numsamples
+        static_num_chains   = num_chains if num_chains is not None else self._numchains
+
+        # Gather arguments to be baked in (partial application)
+        # Configuration values from self
+        baked_args = {
+            #! Static Config
+            "num_samples"               : static_num_samples,
+            "num_chains"                : static_num_chains,
+            "therm_steps"               : self._therm_steps
+        }
+        
+        def wrapper(states_init, rng_k_init, param, num_proposed_init=None, num_accepted_init=None):
+            """
+            Wrapper function for NumPy sampling.
+
+            Args:
+                states_init: Initial states [num_chains, *shape].
+                rng_k_init: Initial RNG key (not used in NumPy).
+                params: Network parameters for this run.
+
+            Returns:
+                (meta, configs)
+            """
+            # Call the partially applied core function
+            self._states        = states_init
+            self._rng_k         = rng_k_init
+            self._num_proposed  = num_proposed_init if num_proposed_init is not None else np.zeros(static_num_chains, dtype=DEFAULT_NP_INT_TYPE)
+            self._num_accepted  = num_accepted_init if num_accepted_init is not None else np.zeros(static_num_chains, dtype=DEFAULT_NP_INT_TYPE)
+            return self.sample(parameters=param, num_samples=baked_args["num_samples"], num_chains=baked_args["num_chains"])
+        
+        return wrapper
+
 #######################################################################
 
 @unique
@@ -1301,28 +2197,34 @@ class SamplerType(Enum):
     
 #######################################################################
         
-def get_sampler(typek: Union[str, SamplerType], *args, **kwargs) -> Sampler:
+def get_sampler(typek: Union[str, SamplerType, Sampler], *args, **kwargs) -> Sampler:
     """
     Get a sampler of the given type.
     
     Parameters:
-    - typek (str or SamplerType): The type of sampler to get
+    - typek (str, SamplerType, or Sampler): The type of sampler to get or an existing sampler instance
     - args: Additional arguments for the sampler
     - kwargs: Additional keyword arguments for the sampler
     
     Returns:
-    - Sampler: The requested sampler
+    - Sampler: The requested sampler or the provided sampler instance
     
     Raises:
     - ValueError: If the requested sampler type is not implemented
     """
-    if isinstance(typek, str):
+    if isinstance(typek, Sampler):              # is already a sampler instance
+        return typek
+    elif isinstance(type, MCSampler):           # is a sampler class
+        return typek
+    elif isinstance(typek, str):                # is a string to convert to enum
         typek = SamplerType.from_str(typek)
-    elif typek == MCSampler:
+    elif typek == SamplerType.MCSampler:        # is a sampler type from the enum
         typek = SamplerType.MCSampler
     else:
-        raise ValueError(SamplerErrors.NOT_A_VALID_SAMPLER_TYPE)
+        return typek
+        # raise ValueError(SamplerErrors.NOT_A_VALID_SAMPLER_TYPE)
     
+    # set from the type enum
     if typek == SamplerType.MCSampler:
         return MCSampler(*args, **kwargs)
     
