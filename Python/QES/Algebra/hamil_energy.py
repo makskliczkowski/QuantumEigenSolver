@@ -72,29 +72,6 @@ def local_energy_int(k_map              : np.int64,
     else:
         raise ValueError(f"Unsupported dtype: {dtype}. Supported types are float32, float64, complex64, and complex128.")
     
-    if num_mod_sites > 0:
-        for ii in range(num_mod_sites):
-            op_func                 = _op_f_mod_sites[ii]
-            sites_args              = _op_i_mod_sites[ii]
-            multiplier              = _op_m_mod_sites[ii]
-            new_states, op_values   = op_func(k_map, *sites_args)
-            states_list.append(new_states)
-            values_list.append(op_values * multiplier)
-    
-    if num_mod_nosites > 0:
-        for ii in range(num_mod_nosites):
-            op_func                 = _op_f_mod_nosites[ii]
-            multiplier              = _op_m_mod_nosites[ii]
-            new_states, op_values   = op_func(k_map)
-            states_list.append(new_states)
-            values_list.append(op_values * multiplier)
-            
-    if num_mod_sites == 0 and num_mod_nosites == 0:
-        if states_list:
-            return np.concatenate(states_list), np.concatenate(values_list)
-        else:
-            return np.array([]), np.array([])
-        
     # Non-modifying operators
     value = np.zeros((1,), dtype=dtype)
     if num_nmod_sites > 0:
@@ -119,6 +96,30 @@ def local_energy_int(k_map              : np.int64,
     if value.shape[0] > 0:
         states_list.append(np.array([k_map], dtype=np.int64))
         values_list.append(value)
+    
+    # Modifying operators
+    if num_mod_sites > 0:
+        for ii in range(num_mod_sites):
+            op_func                 = _op_f_mod_sites[ii]
+            sites_args              = _op_i_mod_sites[ii]
+            multiplier              = _op_m_mod_sites[ii]
+            new_states, op_values   = op_func(k_map, *sites_args)
+            states_list.append(new_states)
+            values_list.append(op_values * multiplier)
+    
+    if num_mod_nosites > 0:
+        for ii in range(num_mod_nosites):
+            op_func                 = _op_f_mod_nosites[ii]
+            multiplier              = _op_m_mod_nosites[ii]
+            new_states, op_values   = op_func(k_map)
+            states_list.append(new_states)
+            values_list.append(op_values * multiplier)
+            
+    if num_mod_sites == 0 and num_mod_nosites == 0:
+        if states_list:
+            return np.concatenate(states_list), np.concatenate(values_list)
+        else:
+            return np.array([]), np.array([])
         
     # Concatenate the resulting arrays.
     if states_list:

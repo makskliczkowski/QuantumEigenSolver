@@ -640,11 +640,14 @@ class Sampler(ABC):
         self._states        = None
         
         # handle the initial state
+        self._modes         = kwargs.get('modes', 2)
+        self._mode_repr     = kwargs.get('mode_repr', Binary.BACKEND_REPR)
         state_kwargs        = {
-            'modes'     : kwargs.get('modes', 2),
-            'mode_repr' : kwargs.get('mode_repr', Binary.BACKEND_REPR)
-            }
-        self.set_initstate(initstate, **state_kwargs)
+            'modes'     : self._modes,
+            'mode_repr' : self._mode_repr
+        }
+        self._initstate_t   = initstate
+        self.set_initstate(self._initstate_t, **state_kwargs)
         
         # proposed state
         int_dtype           = DEFAULT_JP_INT_TYPE if self._isjax else DEFAULT_NP_INT_TYPE
@@ -758,7 +761,11 @@ class Sampler(ABC):
         int_dtype           = DEFAULT_JP_INT_TYPE if self._isjax else DEFAULT_NP_INT_TYPE
         self._num_proposed  = self._backend.zeros(self._numchains, dtype=int_dtype)
         self._num_accepted  = self._backend.zeros(self._numchains, dtype=int_dtype)
-        self.set_chains(self._initstate, self._numchains)
+        state_kwargs        = {
+            'modes'     : self._modes,
+            'mode_repr' : self._mode_repr
+        }
+        self.set_initstate(self._initstate_t, **state_kwargs)
     
     # ---
     
@@ -882,15 +889,18 @@ class MCSampler(Sampler):
     
         math:`|\psi(s)|^{\mu}`, where :math:`\mu` controls the sampling bias.
 
-    The standard Born rule distribution\
+    The standard Born rule distribution
         
         :math:`p(s) = |\psi(s)|^2 / \sum_{s'} |\psi(s')|^2`
+    
     
     corresponds to
     
         :math:`\mu=2`. Values :math:`0 \le \mu < 2`
         
     can be used for importance sampling techniques (see [arXiv:2108.08631](https://arxiv.org/abs/2108.08631)).
+    Note:
+        Is there an error in the paper, where they introduce \mu?
 
     The sampling process uses the Metropolis-Hastings algorithm:
         1. **Initialization:**
@@ -1007,8 +1017,8 @@ class MCSampler(Sampler):
                 # For NumPy backend, bind the RNG to the updater.
                 self._upd_fun = _propose_random_flip_np
     
-        self._logprob_fact  = logprob_fact
-        self._logprobas     = None # Will store log prob of current states
+        self._logprob_fact = logprob_fact
+        self._logprobas = None # Will store log prob of current states
     
     #####################################################################
     
@@ -1024,8 +1034,8 @@ class MCSampler(Sampler):
                 f"numsamples={self._numsamples}, numchains={self._numchains}, backend={self._backendstr})")
 
     def __str__(self):
-        total_therm_updates_display = self._total_therm_updates * self.size                     # Total updates per site
-        total_sample_updates_display = self._numsamples * self._updates_per_sample * self.size  # Total sample updates per site
+        total_therm_updates_display     = self._total_therm_updates * self.size                     # Total updates per site
+        total_sample_updates_display    = self._numsamples * self._updates_per_sample * self.size   # Total sample updates per site
         return (f"MCSampler:\n"
                 f"  - State shape: {self._shape} (Size: {self.size})\n"
                 f"  - Backend: {self._backendstr}\n"
@@ -1069,13 +1079,16 @@ class MCSampler(Sampler):
     #! ACCEPTANCE PROBABILITY
     ###################################################################
     
-    @partial(jax.jit, static_argnames=('beta',))
-    def _acceptance_probability_jax(self, current_val, candidate_val, beta: float = 1.0):
-        r'''Calculate the Metropolis-Hastings acceptance probability using JAX.
+    @staticmethod
+    @jax.jit
+    def _acceptance_probability_jax(current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
+        r'''
+        Calculate the Metropolis-Hastings acceptance probability using JAX.
 
-        Calculates 
-            :math:`\min(1, \exp(\beta \cdot \text{Re}(\text{val}_{\text{cand}} - \text{val}_{\text{curr}})))`.
-
+        ---
+        Calculates:
+            :math:`\min(1, \exp(\beta \mu \cdot \text{Re}(\text{val}_{\text{cand}} - \text{val}_{\text{curr}})))`.
+        ---
         Parameters:
             current_val (jnp.ndarray):
                 Log-probability (or related value) of the current state(s).
@@ -1083,16 +1096,21 @@ class MCSampler(Sampler):
                 Log-probability (or related value) of the candidate state(s).
             beta (float):
                 Inverse temperature :math:`\beta`. Static argument for JIT.
+            mu (float):
+                Exponent :math:`\mu`. Static argument for JIT.
 
         Returns:
             jnp.ndarray: The acceptance probability(ies).
         '''
 
-        log_acceptance_ratio = beta * jnp.real(candidate_val - current_val)
-        return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
+        log_acceptance_ratio = beta * mu * jnp.real(candidate_val - current_val)
+        #! TODO: Is this true? Can I split the abs and the exp?
+        return jnp.exp(log_acceptance_ratio) # jnp.abs(log_acceptance_ratio)
+        # return jnp.minimum(1.0, (jnp.exp(log_acceptance_ratio)))
     
+    @staticmethod
     @numba.njit
-    def _acceptance_probability_np(self, current_val, candidate_val, beta: float = 1.0):
+    def _acceptance_probability_np(current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
         '''
         Calculate the acceptance probability for the Metropolis-Hastings
         algorithm.
@@ -1104,11 +1122,12 @@ class MCSampler(Sampler):
             - The acceptance probability as a float
         '''
 
-        log_acceptance_ratio = beta * np.real(candidate_val - current_val)
+        log_acceptance_ratio = beta * mu * np.real(candidate_val - current_val)
         return np.minimum(1.0, np.exp(log_acceptance_ratio))
     
-    def acceptance_probability(self, current_val, candidate_val, beta: float = 1.0):
-        r'''Calculate the Metropolis-Hastings acceptance probability.
+    def acceptance_probability(self, current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
+        r'''
+        Calculate the Metropolis-Hastings acceptance probability.
 
         Selects backend automatically. Uses instance `_beta` if `beta` is None.
 
@@ -1119,7 +1138,8 @@ class MCSampler(Sampler):
                 Value (:math:`\log p(s')`) of the candidate state(s).
             beta (Optional[float]):
                 Inverse temperature :math:`\beta`. Uses `self._beta` if None.
-
+            mu (Optional[float]):
+                Exponent :math:`\mu`. Uses `self._mu` if None.
         Returns:
             array-like: Acceptance probability(ies).
         '''
@@ -1144,31 +1164,30 @@ class MCSampler(Sampler):
 
                 # Call JITted function with potentially non-static beta (will compile on first call with this beta)
                 @partial(jax.jit, static_argnames=('beta',))
-                def _accept_jax_dynamic_beta(cv, cdv, beta):
-                    log_acceptance_ratio = beta * jnp.real(cdv - cv)
+                def _accept_jax_dynamic_beta(cv, cdv, beta, mu):
+                    log_acceptance_ratio = beta * jnp.real(cdv - cv) * mu
                     return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
-                return _accept_jax_dynamic_beta(current_val, candidate_val, use_beta)
+                return _accept_jax_dynamic_beta(current_val, candidate_val, use_beta, mu)
             else:
-                return self._acceptance_probability_jax(current_val, candidate_val, beta=use_beta)
+                return self._acceptance_probability_jax(current_val, candidate_val, beta=use_beta, mu=mu)
         else:
-            return self._acceptance_probability_np(current_val, candidate_val, beta=use_beta)
+            return self._acceptance_probability_np(current_val, candidate_val, beta=use_beta, mu=mu)
         
     ###################################################################
     #! LOG PROBABILITY
     ###################################################################
     
     @staticmethod
-    # @partial(jax.jit, static_argnames=('mu'))
-    def _logprob_jax(x, mu: float, net_callable, net_params = None):
-        r'''Calculate log probability :math:`\mu \cdot \text{Re}(\log \psi(s))` using JAX.
+    @partial(jax.jit, static_argnames=('net_callable'))
+    def _logprob_jax(x, net_callable, net_params = None):
+        r'''
+        Calculate log probability :math:`\text{Re}(\log \psi(s))` using JAX.
 
         Uses `jax.vmap` for batching over states `x`.
 
         Parameters:
             x (jnp.ndarray):
                 State configurations (batch dimension expected).
-            mu (float):
-                Exponent :math:`\mu`.
             net_callable (Callable):
                 Function to compute :math:`\log \psi(s)`. Signature: `log_psi = net_callable(params, state)`.
             net_params (Any):
@@ -1179,41 +1198,33 @@ class MCSampler(Sampler):
         '''
         # def single_logprob(state):
         log_psi = net_callable(net_params, x)
-        return mu * jnp.real(log_psi).flatten()
-        # return jax.vmap(single_logprob)(x)
+        return jnp.real(log_psi).flatten()
     
     @staticmethod
     @numba.njit
-    def _logprob_np(x, mu, net_callable, net_params = None):
+    def _logprob_np(x, net_callable, net_params = None):
         '''
         Calculate the log probability of a state using NumPy.
         Parameters:
             - x             : The state
-            - mu            : The parameter mu
             - net_callable  : The network callable (returns (\\log\\psi(s)))
             - net_params    : The network parameters - may be None but for flax callables
                             the parameters are necessary strictly!
         Returns:
             - The log probability as a float or complex number
         '''
-        if net_params is None:
-            # If no parameters are needed, call net_callable with just y
-            return np.array([mu * net_callable(y) for y in x]).reshape(x.shape[0])
-            # return np.array([mu * np.real(net_callable(y)) for y in x])
-        return np.array([mu * net_callable(net_params, y) for y in x]).reshape(x.shape[0])
+        return np.array([net_callable(net_params, y) for y in x]).reshape(x.shape[0])
         # return np.array([mu * np.real(net_callable(net_params, y)) for y in x])
     
-    def logprob(self, x, mu: float = 1.0, net_callable = None, net_params = None):
+    def logprob(self, x, net_callable = None, net_params = None):
         r'''Calculate the log probability used for MCMC steps.
 
-        Computes :math:`\mu \cdot \text{Re}(\log \psi(s))`.
+        Computes :math:`\text{Re}(\log \psi(s))`.
         Uses instance defaults if arguments are None. Selects backend automatically.
 
         Parameters:
             x (array-like):
                 State configuration(s).
-            mu (Optional[float]):
-                Exponent :math:`\mu`. Uses `self._mu` if None.
             net_callable (Optional[Callable]):
                 Network callable. Uses `self._net_callable` if None.
             net_params (Any):
@@ -1223,7 +1234,6 @@ class MCSampler(Sampler):
             array-like: Log probabilities.
         '''
         
-        use_mu          = mu if mu is not None else self._mu
         use_callable    = net_callable if net_callable is not None else self._net_callable
         use_params      = net_params if net_params is not None else self._parameters
         
@@ -1241,8 +1251,8 @@ class MCSampler(Sampler):
         #         raise ValueError("Network seems to require parameters, but none were provided or found.")
             
         if self._isjax:
-            return MCSampler._logprob_jax(x, use_mu, use_callable, use_params)
-        return MCSampler._logprob_np(x, use_mu, use_callable, use_params)
+            return MCSampler._logprob_jax(x, use_callable, use_params)
+        return MCSampler._logprob_np(x, use_callable, use_params)
 
     ###################################################################
     #! UPDATE CHAIN
@@ -1323,10 +1333,10 @@ class MCSampler(Sampler):
             new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposal_keys)
 
             # Calculate log probabilities (using log_proba_fun, net_callable_fun, params)
-            logprobas_new           = log_proba_fun(new_chain, mu=mu, net_callable=net_callable_fun, net_params=params)
+            logprobas_new           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
 
             # Calculate acceptance probabilities (using accept_config_fun)
-            acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta)
+            acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta, mu)
 
             # Decide acceptance
             accept_key, carry_key   = random_jp.split(carry_key)
@@ -1438,7 +1448,7 @@ class MCSampler(Sampler):
                 new_logprobas           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
                 
                 # Compute acceptance probability for each chain element.
-                acc_probability         = accept_config_fun(current_val, new_logprobas, beta)
+                acc_probability         = accept_config_fun(current_val, new_logprobas, beta, mu)
                 
                 # Decide acceptance by comparing against a random uniform sample.
                 rand_vals               = rng.random(size=n_chains)
@@ -1500,7 +1510,8 @@ class MCSampler(Sampler):
                 Number of MCMC update steps to perform.
 
         Returns:
-            Tuple: (updated_chain, updated_logprobas, updated_rng_key/rng, updated_num_proposed, updated_num_accepted)
+            Tuple:
+                (updated_chain, updated_logprobas, updated_rng_key/rng, updated_num_proposed, updated_num_accepted)
         '''
         use_log_proba_fun       = self.logprob if log_proba_fun is None else log_proba_fun
         use_accept_config_fun   = self.acceptance_probability if accept_config_fun is None else accept_config_fun
@@ -1535,7 +1546,7 @@ class MCSampler(Sampler):
                                         params              =   params,
                                         update_proposer     =   use_update_proposer,
                                         log_proba_fun       =   use_log_proba_fun,
-                                        accept_config_fun   =  use_accept_config_fun,
+                                        accept_config_fun   =   use_accept_config_fun,
                                         net_callable_fun    =   use_net_callable_fun,
                                         mu                  =   self._mu,
                                         beta                =   self._beta,
@@ -1772,7 +1783,7 @@ class MCSampler(Sampler):
 
         #! Calculate Initial Log Probs
         # Needed for the first step of MCMC generation
-        logprobas_init = log_proba_fun_base(states_init, mu, net_callable_fun, params)
+        logprobas_init = log_proba_fun_base(states_init, net_callable_fun, params)
 
         #! Generate Samples via MCMC Kernel
         final_carry, collected_samples = MCSampler._generate_samples_jax(
@@ -1783,7 +1794,7 @@ class MCSampler(Sampler):
             num_accepted_init       =       num_accepted_init,
             params                  =       params,
             # Static args passed through
-            num_samples             =       num_samples, 
+            num_samples             =       num_samples,
             total_therm_updates     =       total_therm_updates,
             updates_per_sample      =       updates_per_sample,
             update_proposer         =       update_proposer,
@@ -1809,10 +1820,10 @@ class MCSampler(Sampler):
 
         #! Calculate importance sampling probabilities/weights
         log_prob_exponent   = (1.0 / logprob_fact - mu)
-        probs               = jnp.exp(log_prob_exponent * jnp.real(configs_log_ansatz))
+        probs               = jnp.abs(jnp.exp(log_prob_exponent * (configs_log_ansatz)))
         total_samples_count = num_samples * num_chains
         prob_sum            = jnp.sum(probs)
-        norm_factor         = jnp.where(prob_sum > 1e-9, prob_sum, 1.0)
+        norm_factor         = jnp.where(prob_sum > 1e-10, prob_sum, 1e-10)
         probs_normalized    = (probs / norm_factor) * total_samples_count
 
         #! Return Results
@@ -1923,14 +1934,13 @@ class MCSampler(Sampler):
             return final_state_info, samples_tuple, probs
         else:
             self._logprobas         = self.logprob(self._states,
-                                            mu              =   self._mu,
                                             net_callable    =   net_callable,
                                             net_params      =   parameters)
             # for numpy
             (self._states, self._logprobas, self._num_proposed, self._num_accepted), configs =\
                 self._generate_samples_np(parameters, num_samples, num_chains)
             configs_log_ansatz  = np.array([self._net(parameters, config) for config in configs])
-            probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
+            probs               = np.abs(np.exp((1.0 / self._logprob_fact - self._mu) * (configs_log_ansatz)))
             norm                = np.sum(probs, axis=0, keepdims=True)
             probs               = probs / norm * self._numchains
             

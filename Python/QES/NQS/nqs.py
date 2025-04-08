@@ -100,7 +100,7 @@ class NQS(MonteCarloSolver):
                 # information on the Monte Carlo solver
                 seed        : Optional[int]                     = None,
                 beta        : float                             = 1,
-                mu          : float                             = 0,
+                mu          : float                             = 2.0,
                 replica     : int                               = 1,
                 # information on the NQS - Hilbert space
                 shape       : Union[list, tuple]                = (1,),
@@ -722,7 +722,7 @@ class NQS(MonteCarloSolver):
     #! SAMPLE
     #####################################
     
-    def sample(self, num_samples = None, num_chains = None):
+    def sample(self, num_samples = None, num_chains = None, reset: bool = True):
         '''
         Sample the NQS using the provided sampler. This will return
         the sampled states and the corresponding probabilities.
@@ -737,6 +737,8 @@ class NQS(MonteCarloSolver):
             The sampled states and the corresponding probabilities.
             (last configs, last ansatze), (all configs, all ansatze), (all probabilities)
         '''
+        if reset:
+            self._sampler.reset()
         return self._sampler.sample(num_samples=num_samples, num_chains=num_chains)
     
     #####################################
