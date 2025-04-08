@@ -938,7 +938,7 @@ class MCSampler(Sampler):
                 backend     : str                   = 'default',
                 logprob_fact: float                 = 0.5,
                 **kwargs):
-        """
+        r"""
         Initialize the MCSampler.
 
         Parameters:
@@ -1275,7 +1275,7 @@ class MCSampler(Sampler):
                             net_callable_fun    : Callable,
                             mu                  : float,
                             beta                : float = 1.0):
-        '''
+        r'''
         Runs multiple MCMC steps using lax.scan. JIT-compiled.
         The single-step logic is defined internally via closure.
         Parameters:
@@ -1736,7 +1736,7 @@ class MCSampler(Sampler):
             accept_config_fun_base: Callable,   # e.g., MCSampler._acceptance_probability_jax
             net_callable_fun    : Callable
         ):
-        '''
+        r'''
         Static, JIT-compiled core logic for MCMC sampling in JAX. 
         
         Performs the following steps:
