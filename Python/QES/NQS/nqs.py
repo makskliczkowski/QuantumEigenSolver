@@ -532,7 +532,7 @@ class NQS(MonteCarloSolver):
         return self._eval_np(states, batch_size=self._batch_size, params=self._params)
     
     #####################################
-    #! EVALUATE FUNCTION VALUES - LOCAL ENERGY AND OTHER FUNCTIONS
+    #! EVALUATE FUNCTION VALUES - LOCAL ENERGY AND OTHER FUNCTIONS (OPERATORS)
     #####################################
     
     @staticmethod
@@ -727,12 +727,13 @@ class NQS(MonteCarloSolver):
         Sample the NQS using the provided sampler. This will return
         the sampled states and the corresponding probabilities.
         Parameters:
-            num_samples :
+            num_samples (int):
                 The number of samples to generate.
-            num_chains  :
+            num_chains (int):
                 The number of chains to use for sampling.
-            kwargs      :
-                Additional arguments for the sampler.
+            reset (bool):
+                Whether to reset the sampler before sampling. This 
+                corresponds to reinitializing the state before sampling the new ones.
         Returns:
             The sampled states and the corresponding probabilities.
             (last configs, last ansatze), (all configs, all ansatze), (all probabilities)

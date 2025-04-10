@@ -47,6 +47,7 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
                 hilbert_space       : Optional[hilbert_module.HilbertSpace] = None,
                 j                   : Union[List[float], float]             = 1.0,          # Ising coupling
                 hx                  : Union[List[float], float]             = 1.0,          # Transverse field
+                hz                  : Union[List[float], float]             = 1.0,          # Perpendicular field
                 dtype               : type                                  = np.float64,   # Default to float64
                 backend             : str                                   = "default",
                 **kwargs):
@@ -64,6 +65,9 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
                 (though typically uniform). Default is 1.0.
             hx : Union[List[float], float]:
                 Transverse field strength h_x. If a list, specifies site-dependent field.
+                Default is 1.0.
+            hz : Union[List[float], float]:
+                Perpendicular field strength h_z. If a list, specifies site-dependent field.
                 Default is 1.0.
             dtype : type:
                 Data type for the Hamiltonian (default: np.float64).
@@ -87,7 +91,8 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
         # Store model-specific parameters
         self._j             = None # Initialize before setting
         self._hx            = None
-        self.set_couplings(j=j, hx=hx)
+        self._hz            = None
+        self.set_couplings(j=j, hx=hx, hz=hz)
 
         # Set Hamiltonian attributes
         self._name          = "Transverse Field Ising Model"
@@ -136,7 +141,9 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
 
     def set_couplings(self,
                         j       : Union[List[float], float, None] = None,
-                        hx      : Union[List[float], float, None] = None):
+                        hx      : Union[List[float], float, None] = None,
+                        hz      : Union[List[float], float, None] = None
+                        ):
         '''
         Sets or updates the Ising coupling (J) and transverse field (hx).
         Converts scalar inputs to lists matching the number of sites.
@@ -146,14 +153,18 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
                 Ising coupling strength(s).
             hx : Optional[Union[List[float], float]]:
                 Transverse field strength(s).
+            hz : Optional[Union[List[float], float]]:
+                Perpendicular field strength(s).
         '''
         if j is not None:
             self._j = self._set_some_coupling(j)
         if hx is not None:
             self._hx = self._set_some_coupling(hx)
+        if hz is not None:
+            self._hz = self._set_some_coupling(hz)
 
         # Log the update
-        self._log(f"Updated couplings: J={type(self._j)}, hx={type(self._hx)}", lvl=2, log='debug')
+        self._log(f"Updated couplings: J={type(self._j)}, hx={type(self._hx)}, hz={type(self._hz)}", lvl=2, log='debug')
         self._operators_built = False
 
     def _set_local_energy_operators(self):
@@ -177,6 +188,8 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
         # Local operators (act on one site)
         op_sx_l     = operators_spin_module.sig_x(lattice=lattice,
                                 type_act=operators_spin_module.OperatorTypeActing.Local)
+        op_sz_l     = operators_spin_module.sig_z(lattice=lattice,
+                                type_act=operators_spin_module.OperatorTypeActing.Local)
 
         # Correlation operators (act on two sites)
         op_sz_sz_c  = operators_spin_module.sig_z(lattice=lattice,
@@ -192,7 +205,18 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
                 self._log(f"Adding Sx at site {i} with multiplier {-self._hx[i]:.3f}", lvl=2, log='debug')
             else:
                 self._log(f"Skipping Sx at site {i} (hx is zero)", lvl=3, log='debug')
-
+        
+        #! Add Ising Perpendicular Terms
+        for i in range(self.ns):
+            if not np.isclose(self._hz[i], 0.0):
+                self.add(operator   =   op_sz_l,
+                        multiplier  =   -self._hz[i],
+                        sites       =   [i],
+                        modifies    =   False)
+                self._log(f"Adding Sz at site {i} with multiplier {-self._hz[i]:.3f}", lvl=2, log='debug')
+            else:
+                self._log(f"Skipping Sz at site {i} (hz is zero)", lvl=3, log='debug')
+        
         #! Add Ising Interaction Terms
         # Sum over unique nearest-neighbor pairs <i,j>
         for i in range(self.ns):
