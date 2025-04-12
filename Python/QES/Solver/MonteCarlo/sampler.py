@@ -1066,11 +1066,11 @@ class MCSampler(Sampler):
             # This might require the user to pass parameters explicitly during sampling if they change.
             # Let's store the apply method and expect parameters at sample time.
             return net.apply, None # Parameters will be provided later
-        elif hasattr(net, 'apply') and callable(net.apply):
-            return net.apply, None
         elif hasattr(net, 'get_apply') and callable(net.get_apply):
             network_callable, parameters = net.get_apply()
             return network_callable, parameters
+        elif hasattr(net, 'apply') and callable(net.apply):
+            return net.apply, self.net.geta_params() if hasattr(net, 'geta_params') else self._parameters
         elif callable(net):
             return net, None # Assume no external parameters needed unless provided at sample time
         raise ValueError("Invalid network object provided. Needs to be callable or have an 'apply' method.")
