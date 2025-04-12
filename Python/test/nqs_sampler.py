@@ -21,7 +21,7 @@ if parent_dir not in sys.path:
 
 # import QuantEvolveStudio methods
 try:
-    from QES.Solver.MonteCarlo.sampler import Sampler, MCSampler, get_backend, _JAX_AVAILABLE
+    from QES.Solver.MonteCarlo.sampler import Sampler, MCSampler, get_backend, JAX_AVAILABLE
     from QES.general_python.ml.net_impl.net_simple import SimpleNet
     from QES.general_python.common.plot import MatrixPrinter
     from QES.general_python.common.flog import Logger, print_arguments, log_timing_summary
@@ -36,7 +36,7 @@ logger = Logger()
 logger.title("Starting NQS Sampler Test Script...", 50, '#', lvl = 0)
 
 import numpy as np
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
 else:

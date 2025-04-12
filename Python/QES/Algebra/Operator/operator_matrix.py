@@ -9,8 +9,8 @@ from numba import njit, objmode, jit, prange
 from typing import Callable, Union
 
 ####################################################################################################
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, DEFAULT_NP_INT_TYPE
-if _JAX_AVAILABLE:
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_NP_INT_TYPE
+if JAX_AVAILABLE:
     from general_python.algebra.utils import JIT, DEFAULT_JP_INT_TYPE
     import jax.numpy as jnp
     import jax.scipy as jsp

@@ -22,19 +22,17 @@ from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGene
 ################################################################################
 from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.lattice import Lattice
-from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
-from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
-from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE, JIT
+from general_python.algebra.utils import DEFAULT_BACKEND, get_backend
+from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, JAX_AVAILABLE
 
 # binary operations
 import general_python.common.binary as _binary
 
 # JAX imports
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     from jax import lax
     from jax import numpy as jnp
-    from general_python.algebra.utils import DEFAULT_JP_INT_TYPE, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_CPX_TYPE, JIT
 
     # transform the matrices to JAX arrays
     _SIG_0_jnp = jnp.array([[1, 0],
@@ -54,7 +52,7 @@ if _JAX_AVAILABLE:
 #! Sigma-X (σₓ) operator
 # -----------------------------------------------------------------------------
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     
     @partial(jax.jit, static_argnums=(1, 2))
     def sigma_x_int_jnp(state,
@@ -125,7 +123,7 @@ if _JAX_AVAILABLE:
 #! Sigma-Y (σᵧ) operator
 # -----------------------------------------------------------------------------
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     @partial(jax.jit, static_argnums=(1, 2))
     def sigma_y_int_jnp(state,
                         ns          : int,
@@ -203,7 +201,7 @@ if _JAX_AVAILABLE:
 #! Sigma-Z (σ_z) operator
 # -----------------------------------------------------------------------------
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
 
     @partial(jax.jit, static_argnums=(1, 2))
     def sigma_z_int_jnp(state,
@@ -278,7 +276,7 @@ if _JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 
 
-@JIT
+@jax.jit
 def sigma_plus_int_jnp(state, 
                        ns          : int, 
                        sites       : Union[List[int], None], 
@@ -315,7 +313,7 @@ def sigma_plus_int_jnp(state,
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
     return final_state, final_coeff
 
-@JIT
+@jax.jit
 def sigma_plus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
@@ -340,7 +338,7 @@ def sigma_plus_jnp(state,
 #! Sigma-Minus (σ⁻) operator
 # -----------------------------------------------------------------------------
 
-@JIT
+@jax.jit
 def sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
@@ -362,7 +360,7 @@ def sigma_minus_int_jnp(state, ns, sites, spin_value=_SPIN):
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
     return final_state, final_coeff
 
-@JIT
+@jax.jit
 def sigma_minus_jnp(state,
                     ns      : int,
                     sites   : Union[List[int], None],
@@ -387,7 +385,7 @@ def sigma_minus_jnp(state,
 #! Sigma_pm (σ⁺ then σ⁻) operator
 # -----------------------------------------------------------------------------
 
-@JIT
+@jax.jit
 def sigma_pm_jnp(state, ns, sites, spin=True, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     if sites is None:
@@ -408,10 +406,10 @@ def sigma_pm_jnp(state, ns, sites, spin=True, spin_value=_SPIN):
     new_state = lax.fori_loop(0, len(sites), body_fun, state)
     return new_state, coeff
 
-@JIT
+@jax.jit
 def sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND):
     # Alternating operator: even index applies sigma⁺, odd index sigma⁻.
-    backend = __backend(backend)
+    backend = get_backend(backend)
     sites = backend.array(sites)
     def body(i, carry):
         curr_state, curr_coeff = carry
@@ -438,7 +436,7 @@ def sigma_pm_int_jnp(state, ns, sites, spin_value=_SPIN, backend=DEFAULT_BACKEND
 #! Sigma_mp (σ⁺ then σ⁻) operator
 # -----------------------------------------------------------------------------
 
-@JIT
+@jax.jit
 def sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
@@ -460,7 +458,7 @@ def sigma_mp_int_jnp(state, ns, sites, spin_value=_SPIN):
     final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
     return final_state, final_coeff
 
-@JIT
+@jax.jit
 def sigma_mp_jnp(state,
                 ns      : int,
                 sites   : Union[List[int], None],
@@ -491,7 +489,7 @@ def sigma_mp_jnp(state,
 #! Sigma-K (σₖ) operator
 # -----------------------------------------------------------------------------
 
-@JIT
+@jax.jit
 def sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
     # Removed backend parameter; using jnp directly
     sites = jnp.array(sites)
@@ -508,7 +506,7 @@ def sigma_k_int_jnp(state, ns, sites, k, spin_value=_SPIN):
     norm = math.sqrt(len(sites)) if len(sites) > 0 else 1.0
     return state, total / norm
 
-@JIT
+@jax.jit
 def sigma_k_jnp(state,
                 ns       : int,
                 sites    : Union[List[int], None],

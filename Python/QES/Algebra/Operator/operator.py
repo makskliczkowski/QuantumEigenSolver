@@ -29,12 +29,12 @@ from typing import Optional, Callable, Union, Iterable, Any
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 ####################################################################################################
-from general_python.algebra.utils import get_backend as get_backend, _JAX_AVAILABLE
+from general_python.algebra.utils import get_backend as get_backend, JAX_AVAILABLE
 from general_python.lattices import Lattice
 # from Algebra.hilbert import HilbertSpace
 ####################################################################################################
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax import jit, vmap
@@ -445,7 +445,7 @@ class OperatorFunction:
         def mul_jax(s, *args):
             st, val = self._fun_jax(s, *args)
             return st, val * constant
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             mul_jax = jax.jit(mul_jax)
             
         return OperatorFunction(mul_int, mul_np, mul_jax,
@@ -532,7 +532,7 @@ class OperatorFunction:
             res_states = jnp.stack([x[0] for x in result])
             res_values = jnp.stack([x[1] for x in result])
             return res_states, res_values
-        # if _JAX_AVAILABLE:
+        # if JAX_AVAILABLE:
             # mul_jax = jax.jit(mul_jax)
 
         return OperatorFunction(mul_int, mul_np, mul_jax,
@@ -619,7 +619,7 @@ class OperatorFunction:
             res_states = jnp.stack([x[0] for x in result])
             res_values = jnp.stack([x[1] for x in result])
             return res_states, res_values
-        # if _JAX_AVAILABLE:
+        # if JAX_AVAILABLE:
             # rmul_jax = jax.jit(rmul_jax)
 
         return OperatorFunction(rmul_int, rmul_np, rmul_jax,
@@ -689,7 +689,7 @@ class OperatorFunction:
             return list(zip(unique_states, summed_values))
         
         fun_jax = add_jax
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             fun_jax = jax.jit(add_jax)
         
         return OperatorFunction(
@@ -741,7 +741,7 @@ class OperatorFunction:
             return list(zip(unique_states, summed_values))
         
         fun_jax = sub_jax
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             fun_jax = jax.jit(sub_jax)
         
         return OperatorFunction(
@@ -771,7 +771,7 @@ class OperatorFunction:
                     it is decorated with jax.jit for just-in-time compilation.
         Notes:
             - The inner wrapper functions merge the fixed arguments passed to wrap with any further arguments.
-            - If _JAX_AVAILABLE is True, the wrap_jax function is optimized using jax.jit.
+            - If JAX_AVAILABLE is True, the wrap_jax function is optimized using jax.jit.
             - The returned OperatorFunction also propagates metadata such as 'modifies_state' and 'necessary_args'
                 from the current operator instance.
         """
@@ -784,7 +784,7 @@ class OperatorFunction:
         def wrap_jax(s, *more_args):
             return self._fun_jax(s, *(args + more_args))
         
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             wrap_jax = jax.jit(wrap_jax)
         
         return OperatorFunction(wrap_int, wrap_np, wrap_jax,
@@ -1454,7 +1454,7 @@ class Operator(ABC):
 
         # check if there are functions from the Hilbert space
         use_numpy    = kwargs.get('use_numpy', False)
-        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
+        jax_maybe_av = JAX_AVAILABLE and self._backend != np
         is_sparse    = (matrix_type == 'sparse')
         
         # check if the matrix function is provided and skips kwargs if unnecessary
@@ -1584,7 +1584,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
     else:
         assert ns is not None, "Either lattice or ns must be provided."
     
-    sites_jnp = jnp.array(sites, dtype = jnp.int32) if sites is not None and _JAX_AVAILABLE else sites
+    sites_jnp = jnp.array(sites, dtype = jnp.int32) if sites is not None and JAX_AVAILABLE else sites
     
     # Global operator: the operator acts on a specified set of sites (or all if sites is None)
     if type_act == OperatorTypeActing.Global or sites is not None:
@@ -1594,7 +1594,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             sites = list(range(ns))
         sites           = tuple(sites) if isinstance(sites, list) else sites
         sites_np        = np.array(sites, dtype = np.int32)
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             sites_jnp   = jnp.array(sites, dtype = jnp.int32)
         else:
             sites_jnp   = sites_np
@@ -1607,7 +1607,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         def fun_np(state):
             return op_func_np(state, sites_np, *extra_args)
         
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state):
                 return op_func_jnp(state, sites_jnp, *extra_args)
@@ -1638,7 +1638,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         def fun_np(state, i):
             return op_func_np(state, i, *extra_args)
         
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state, i):
                 sites_jnp = jnp.array([i], dtype = jnp.int32)
@@ -1668,7 +1668,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         def fun_np(state, i, j):
             return op_func_np(state, (i, j), *extra_args)
         
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             @partial(jax.jit)
             def fun_jnp(state, i, j):
                 sites_jnp = jnp.array([i, j], dtype = jnp.int32)
@@ -1691,7 +1691,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         raise ValueError("Invalid OperatorTypeActing")
 
 # Example usage:
-# (Assume sigma_x_int_np, sigma_x_np, sigma_x_jnp are defined elsewhere and _JAX_AVAILABLE is set.)
+# (Assume sigma_x_int_np, sigma_x_np, sigma_x_jnp are defined elsewhere and JAX_AVAILABLE is set.)
 
 # For a global operator:
 #   op = create_operator(OperatorTypeActing.Global, sigma_x_int_np, sigma_x_np, sigma_x_jnp,

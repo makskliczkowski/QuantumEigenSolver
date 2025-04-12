@@ -130,7 +130,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         # self._loc_energy_np_fun         = _local_energy_arr_wrap(self.ns, self._hx, self._hz, self._j, self._dlt,
         #                                                         self._kx, self._ky, self._kz, 
         #                                                         self._neibz, self._neiby, self._neibx, self._neiadd)
-        # if _JAX_AVAILABLE:
+        # if JAX_AVAILABLE:
             # self._loc_energy_jax_fun    = _local_energy_arr_wrap(self._n, self._neidot, self._h, self._g0, self._au, use_jax=True)        
         # self._local_energy_test()
     

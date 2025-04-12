@@ -28,7 +28,7 @@ import Algebra.Operator.operators_spin as operators_spin_module
 
 ##########################################################################################
 import general_python.algebra.linalg as linalg
-from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, _JAX_AVAILABLE
+from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, JAX_AVAILABLE
 from general_python.common import binary as _binary
 ##########################################################################################
 

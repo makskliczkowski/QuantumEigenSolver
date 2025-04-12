@@ -9,11 +9,11 @@ import numba
 import numpy as np
 import numba.typed
 
-from general_python.algebra.utils import _JAX_AVAILABLE
+from general_python.algebra.utils import JAX_AVAILABLE
 from typing import Callable, Tuple, Optional, Any, List
 from Algebra.hamil_energy_helper import unpack_operator_terms, flatten_operator_terms
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     from Algebra.hamil_energy_jax import local_energy_jax_wrap
 
 #################################################################################

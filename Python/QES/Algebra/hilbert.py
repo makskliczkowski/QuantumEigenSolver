@@ -22,8 +22,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 ####################################################################################################
 from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
-from general_python.algebra.utils import get_backend, maybe_jit, _JAX_AVAILABLE, DEFAULT_INT_TYPE
-if _JAX_AVAILABLE:
+from general_python.algebra.utils import get_backend, maybe_jit, JAX_AVAILABLE, ACTIVE_INT_TYPE
+if JAX_AVAILABLE:
     from general_python.algebra.utils import pad_array_jax
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE, binary_search_numpy
 ####################################################################################################
@@ -1445,7 +1445,7 @@ def get_operator_elem(hilbert : HilbertSpace, k : int, new_k : int, conj = False
 
 ####################################################################################################
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax.numpy as jnp
     import jax
     from jax import jit, lax
@@ -1516,8 +1516,8 @@ if _JAX_AVAILABLE:
             params (Any)        : Additional parameters for processing.
             max_padding (int)   : Maximum number of padding to apply.
         '''
-        ks      = jnp.arange(batch_start, batch_end, dtype=DEFAULT_INT_TYPE)
-        k_maps  = jnp.array([hilbert.get_mapping(k) for k in ks], dtype=DEFAULT_INT_TYPE)
+        ks      = jnp.arange(batch_start, batch_end, dtype=ACTIVE_INT_TYPE)
+        k_maps  = jnp.array([hilbert.get_mapping(k) for k in ks], dtype=ACTIVE_INT_TYPE)
         # Vectorize process_matrix_elem_jax over the rows in the batch.
         cols_, vals_, counts_ = jax.vmap(
             lambda r, k_map: process_matrix_elem_jax(funct, r, k_map, params, max_padding)

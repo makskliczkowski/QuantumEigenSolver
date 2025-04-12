@@ -7,7 +7,7 @@ from typing import Union, Tuple, Union, Callable, Optional
 from functools import partial
 
 # from general_python imports
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
 import general_python.ml.networks as Networks 
@@ -17,7 +17,7 @@ import general_python.common.binary as Binary
 import Algebra.hilbert as Hilbert
 
 # JAX imports
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     from jax import jit as jax_jit, grad, vmap, random
     from jax import numpy as jnp
@@ -61,7 +61,7 @@ from Algebra.hamil import Hamiltonian
 # for the gradients and stuff
 import general_python.ml.net_impl.utils.net_utils as net_utils
 import general_python.ml.net_impl.net_general as net_general
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import general_python.ml.net_impl.interface_net_flax as net_flax
 
 # schedulers and preconditioners and solvers
@@ -383,7 +383,7 @@ class NQS(MonteCarloSolver):
         if not self._initialized:
             
             # initialize the network
-            self._params           = self._net.init(self._rng_key)
+            self._params           = self._net.init(self._rngJAX_RND_DEFAULT_KEY)
             dtypes                  = self._net.dtypes
             
             # check if all dtypes are the same
@@ -424,8 +424,8 @@ class NQS(MonteCarloSolver):
             
         '''
 
-        if _JAX_AVAILABLE and self._isjax and issubclass(type(self._net), net_flax.FlaxInterface):
-            params   = self._net.init(self._rng_key, jnp.ones(self._shape, dtype=jnp.int32))
+        if JAX_AVAILABLE and self._isjax and issubclass(type(self._net), net_flax.FlaxInterface):
+            params   = self._net.init(self._rngJAX_RND_DEFAULT_KEY, jnp.ones(self._shape, dtype=jnp.int32))
             return flax.training.train_state.TrainState.create(
                 apply_fn = self._ansatz_func,
                 params   = params,

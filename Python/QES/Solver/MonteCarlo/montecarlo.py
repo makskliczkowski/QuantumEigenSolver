@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
 from general_python.common.flog import get_global_logger, Logger
@@ -20,7 +20,7 @@ import general_python.common.binary as Binary
 from Algebra.hilbert import HilbertSpace
 
 # JAX imports
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     import jax.random as random
@@ -290,7 +290,7 @@ class MonteCarloSolver(Solver):
                             shape       =   self._shape,
                             upd_fun     =   upd_fun,
                             rng         =   self._rng,
-                            rng_k       =   self._rng_key,
+                            rng_k       =   self._rngJAX_RND_DEFAULT_KEY,
                             hilbert     =   self._hilbert,
                             numsamples  =   self._mcparams.mcsam,           #!TODO: this can be modified later
                             numchains   =   self._mcparams.mcchain,         #!TODO: this can be modified later

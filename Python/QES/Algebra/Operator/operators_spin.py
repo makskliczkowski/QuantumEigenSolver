@@ -32,7 +32,7 @@ from general_python.common.tests import GeneralAlgebraicTest
 from general_python.lattices.lattice import Lattice
 from general_python.algebra.utils import DEFAULT_BACKEND, get_backend as __backend, maybe_jit
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
-from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, _JAX_AVAILABLE
+from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN, JAX_AVAILABLE
 from general_python.common.binary import flip, flip_all, check, base2int, int2base, int2binstr
 import general_python.common.binary as _binary
 
@@ -40,7 +40,7 @@ import general_python.common.binary as _binary
 
 _I      = 1j
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import Algebra.Operator.operators_spin_jax as jaxpy
     import jax.numpy as jnp
@@ -805,7 +805,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
         type_act    = type_act,
         op_func_int = sigma_x_int,
         op_func_np  = sigma_x_np,
-        op_func_jnp = sigma_x_jnp if _JAX_AVAILABLE else None,
+        op_func_jnp = sigma_x_jnp if JAX_AVAILABLE else None,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -857,7 +857,7 @@ def sig_y( lattice     : Optional[Lattice]     = None,
         type_act    = type_act,
         op_func_int = int_fun,
         op_func_np  = np_fun,
-        op_func_jnp = sigma_y_jnp if _JAX_AVAILABLE else None,
+        op_func_jnp = sigma_y_jnp if JAX_AVAILABLE else None,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -905,7 +905,7 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
         type_act    = type_act,
         op_func_int = sigma_z_int,
         op_func_np  = sigma_z_np,
-        op_func_jnp = sigma_z_jnp if _JAX_AVAILABLE else None,
+        op_func_jnp = sigma_z_jnp if JAX_AVAILABLE else None,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,

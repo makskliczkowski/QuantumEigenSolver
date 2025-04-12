@@ -33,15 +33,15 @@ from Algebra.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
 
 ###################################################################################################
 from general_python.algebra.ran_wrapper import random_vector
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, DEFAULT_INT_TYPE, DEFAULT_FLOAT_TYPE, DEFAULT_CPX_TYPE
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, ACTIVE_INT_TYPE
 import general_python.algebra.linalg as linalg
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     from Algebra.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
 ###################################################################################################
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     from jax import jit
     import jax.lax as lax
@@ -52,7 +52,7 @@ if _JAX_AVAILABLE:
 #! Pure (functional) Hamiltonian update functions.
 ###################################################################################################
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import Algebra.hamil_jit_methods as hjm
     
     def _hamiltonian_functional_jax_sparse( ns                  : int,
@@ -213,7 +213,7 @@ class Hamiltonian(ABC):
                 _backend, _backend_sp   = bck, None
                 _rng, _rng_k            = None, None
             return backend, _backend, _backend_sp, (_rng, _rng_k)
-        if _JAX_AVAILABLE and backend == 'default':
+        if JAX_AVAILABLE and backend == 'default':
             _backendstr = 'jax'
         else:
             _backendstr = 'np'
@@ -238,7 +238,7 @@ class Hamiltonian(ABC):
         '''
         
         self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian._set_backend(backend)
-        self._is_jax        = _JAX_AVAILABLE and self._backend != np
+        self._is_jax        = JAX_AVAILABLE and self._backend != np
         self._is_numpy      = not self._is_jax
         self._is_sparse     = is_sparse
         
@@ -552,7 +552,7 @@ class Hamiltonian(ABC):
         Distinguish between JAX and NumPy/SciPy. 
         '''
         
-        if _JAX_AVAILABLE and self._backend != np:
+        if JAX_AVAILABLE and self._backend != np:
             if isinstance(self._hamil, BCOO):
                 return self._hamil.diagonal()
             elif isinstance(self._hamil, jnp.ndarray):
@@ -622,7 +622,7 @@ class Hamiltonian(ABC):
             A function that takes an integer k and returns the local energy for an array representation in
             a given backend - either NumPy or JAX.
         '''
-        if (backend == 'default' or backend == 'jax' or backend == 'jnp') and _JAX_AVAILABLE:
+        if (backend == 'default' or backend == 'jax' or backend == 'jnp') and JAX_AVAILABLE:
             return self.fun_jax
         return self.fun_npy
     
@@ -647,7 +647,7 @@ class Hamiltonian(ABC):
         self._log("It is not a dense matrix...", lvl=2)
         # Sparse matrix:
         # For NumPy (or when JAX is unavailable) we assume a scipy sparse matrix (e.g. CSR)
-        if self._backend == np or not _JAX_AVAILABLE:
+        if self._backend == np or not JAX_AVAILABLE:
             memory = 0
             for attr in ('data', 'indices', 'indptr'):
                 if hasattr(self._hamil, attr):
@@ -746,7 +746,7 @@ class Hamiltonian(ABC):
         '''
         if self._eig_val.size == 0:
             raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
-        if (not _JAX_AVAILABLE or self._backend == np or use_npy):
+        if (not JAX_AVAILABLE or self._backend == np or use_npy):
             return self._backend.mean(self._backend.diff(self._eig_val))
         return hjm.mean_level_spacing(self._eig_val)
     
@@ -766,7 +766,7 @@ class Hamiltonian(ABC):
         '''
         if self._hamil.size == 0:
             raise ValueError(Hamiltonian._ERR_HAMILTONIAN_NOT_AVAILABLE)
-        if (not _JAX_AVAILABLE or self._backend == np or use_npy):
+        if (not JAX_AVAILABLE or self._backend == np or use_npy):
             return self._backend.trace(self._backend.dot(self._hamil, self._hamil))
         return hjm.energy_width(self._hamil)
     
@@ -833,7 +833,7 @@ class Hamiltonian(ABC):
         '''
         self._log("Initializing the Hamiltonian matrix...", lvl = 2, log = "debug")
         
-        jax_maybe_avail = _JAX_AVAILABLE and self._backend != np
+        jax_maybe_avail = JAX_AVAILABLE and self._backend != np
         if jax_maybe_avail and use_numpy:
             self._log("JAX is available but NumPy is forced...", lvl = 3)
         
@@ -848,7 +848,7 @@ class Hamiltonian(ABC):
             else:
                 self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
                 # Create an empty sparse Hamiltonian matrix using JAX's BCOO format
-                indices     = self._backend.zeros((0, 2), dtype=DEFAULT_INT_TYPE)
+                indices     = self._backend.zeros((0, 2), dtype=ACTIVE_INT_TYPE)
                 data        = self._backend.zeros((0,), dtype=self._dtype)
                 self._hamil = BCOO((data, indices), shape=(self._nh, self._nh))
                 
@@ -856,7 +856,7 @@ class Hamiltonian(ABC):
             
         else:
             self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3, log = "debug")
-            if not _JAX_AVAILABLE or self._backend == np:
+            if not JAX_AVAILABLE or self._backend == np:
                 self._hamil     = self._backend.zeros((self._nh, self._nh), dtype=self._dtype)
             else:
                 # do not initialize the Hamiltonian matrix
@@ -1096,7 +1096,7 @@ class Hamiltonian(ABC):
         # -----------------------------------------------------------------------------------------
         
         # Check if JAX is available and the backend is not NumPy
-        jax_maybe_av = _JAX_AVAILABLE and self._backend != np
+        jax_maybe_av = JAX_AVAILABLE and self._backend != np
         
         # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:
@@ -1206,7 +1206,7 @@ class Hamiltonian(ABC):
         except Exception as e:
             raise ValueError(f"Failed to diagonalize the Hamiltonian using method '{method}' : {e}") from e
         
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             if hasattr(self._eig_val, "block_until_ready"):
                 self._eig_val = self._eig_val.block_until_ready()
             if hasattr(self._eig_vec, "block_until_ready"):
@@ -1360,7 +1360,7 @@ class Hamiltonian(ABC):
                 - self.ns: number of sites.
                 - self._nonlocal_ops: a list of nonlocal operator tuples for each site.
                 - self._local_ops: a list of local operator tuples for each site.
-            - JAX version is set only if the flag _JAX_AVAILABLE is True.
+            - JAX version is set only if the flag JAX_AVAILABLE is True.
         """
         
         # set the integer functions
@@ -1398,7 +1398,7 @@ class Hamiltonian(ABC):
             self._loc_energy_np_fun = None
             
         # set the jax functions
-        if _JAX_AVAILABLE:
+        if JAX_AVAILABLE:
             try:
                 operators_jax               = [[(op.jax, sites, vals) for (op, sites, vals) in self._ops_mod_sites[i]] for i in range(self.ns)]
                 operators_jax_nosites       = [[(op.jax, None, vals) for (op, _, vals) in self._ops_mod_nosites[i]] for i in range(self.ns)]
@@ -1514,7 +1514,7 @@ def test_generic_hamiltonian(ham: Hamiltonian, ns: int):
     # create a set of states and test it
     int_state   = np.random.randint(0, 2**ns)
     np_state    = np.random.choice([-1.0, 1.0], size=(ns,), replace=True).astype(np.float32)
-    if _JAX_AVAILABLE:
+    if JAX_AVAILABLE:
         jnp_state   = jnp.array(np_state, dtype=jnp.float32)
     else:
         jnp_state   = np_state

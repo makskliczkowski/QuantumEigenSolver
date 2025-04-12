@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
 from general_python.common.flog import get_global_logger, Logger

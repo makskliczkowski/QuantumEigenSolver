@@ -39,8 +39,8 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend, JIT, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY
-from general_python.algebra.utils import DEFAULT_JP_CPX_TYPE, DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, DEFAULT_NP_CPX_TYPE
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY
+from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE
 from general_python.algebra.ran_wrapper import choice, randint, uniform, randint_np, randint_jax
 from general_python.common.directories import Directories
 import general_python.common.binary as Binary
@@ -49,7 +49,7 @@ import general_python.common.binary as Binary
 from Algebra.hilbert import HilbertSpace
 
 #! JAX imports
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     import jax.random as random_jp
@@ -113,7 +113,7 @@ class SolverInitState(Enum):
 #! Propose a random flip
 #########################################################################
 
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         r'''Propose `num` random flips of a state using JAX.
@@ -283,7 +283,7 @@ def _set_state_rand(modes       : int                           = 2,
                     mode_repr   : float                         = 0.5,
                     backend     : str                           = 'default',
                     rng         = None,
-                    rng_key     = None
+                    rngJAX_RND_DEFAULT_KEY     = None
                     ):
     '''
     Generate a random state configuration.
@@ -296,7 +296,7 @@ def _set_state_rand(modes       : int                           = 2,
     - mode_repr     : mode representation (default is 0.5 for binary spins +-1, 1.0 for fermions)
     - backend       : computational backend ('default', 'numpy', or 'jax')
     - rng           : random number generator for numpy
-    - rng_key       : random key for JAX
+    - rngJAX_RND_DEFAULT_KEY       : random key for JAX
     
     Returns:
     - A random state array.
@@ -315,12 +315,12 @@ def _set_state_rand(modes       : int                           = 2,
     if hilbert is None:
         if modes == 2:
             if Binary.BACKEND_DEF_SPIN:
-                ran_state = choice([-1, 1], shape, rng=rng, rng_k=rng_key, backend=backend)
+                ran_state = choice([-1, 1], shape, rng=rng, rng_k=rngJAX_RND_DEFAULT_KEY, backend=backend)
             else:
-                ran_state = choice([0, 1], shape, rng=rng, rng_k=rng_key, backend=backend)
+                ran_state = choice([0, 1], shape, rng=rng, rng_k=rngJAX_RND_DEFAULT_KEY, backend=backend)
         elif modes == 4:
             # Generate random occupancy for 2 * size orbitals.
-            ran_state = choice([0, 1], 2 * size, rng=rng, rng_k=rng_key, backend=backend)
+            ran_state = choice([0, 1], 2 * size, rng=rng, rng_k=rngJAX_RND_DEFAULT_KEY, backend=backend)
         else:
             raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
     else:
@@ -478,7 +478,7 @@ def _state_distinguish(statetype,
                     shape       : Union[int, Tuple[int, ...]],
                     mode_repr   : float = Binary.BACKEND_REPR,
                     rng         = None,
-                    rng_key     = None,
+                    rngJAX_RND_DEFAULT_KEY     = None,
                     backend     : str = 'default'):
     """
     Distinguishes the type of the given state and returns the appropriate state configuration.
@@ -496,7 +496,7 @@ def _state_distinguish(statetype,
                         For modes == 4, an integer number of sites.
     - mode_repr     : mode representation value.
     - rng           : random number generator for numpy.
-    - rng_key       : random key for JAX.
+    - rngJAX_RND_DEFAULT_KEY       : random key for JAX.
     - backend       : computational backend ('default', 'numpy', or 'jax').
     
     Returns:
@@ -509,12 +509,12 @@ def _state_distinguish(statetype,
     elif isinstance(statetype, str):
         try:
             state_enum = SolverInitState.from_str(statetype)
-            return _state_distinguish(state_enum, modes, hilbert, shape, mode_repr, rng, rng_key, backend)
+            return _state_distinguish(state_enum, modes, hilbert, shape, mode_repr, rng, rngJAX_RND_DEFAULT_KEY, backend)
         except ValueError as e:
             raise ValueError(SamplerErrors.NOT_A_VALID_STATE_STRING) from e
     elif isinstance(statetype, SolverInitState):
         if statetype == SolverInitState.RND:
-            return _set_state_rand(modes, hilbert, shape, mode_repr, backend, rng, rng_key)
+            return _set_state_rand(modes, hilbert, shape, mode_repr, backend, rng, rngJAX_RND_DEFAULT_KEY)
         elif statetype == SolverInitState.F_UP:
             return _set_state_up(modes, hilbert, shape, mode_repr, backend)
         elif statetype == SolverInitState.F_DN:
@@ -599,20 +599,20 @@ class Sampler(ABC):
             
         if rng is not None:
             self._rng       = rng
-            self._rng_k     = rng_k if rng_k is not None else (DEFAULT_BACKEND_KEY if _JAX_AVAILABLE else None)
+            self._rng_k     = rng_k if rng_k is not None else (DEFAULT_BACKEND_KEY if JAX_AVAILABLE else None)
             self._backend   = get_backend(backend)
         elif seed is not None:
             self._backend, _, (self._rng, self._rng_k) = self.obtain_backend(backend, seed)
         else:
             raise SamplerErrors(SamplerErrors.NOT_HAVING_RNG)
         
-        is_valid_key = (
+        is_validJAX_RND_DEFAULT_KEY = (
             self._rng_k is not None and             # Ensure it's not None first
             isinstance(self._rng_k, jax.Array) and
             self._rng_k.shape == (2,) and           # Standard shape for a JAX key
             self._rng_k.dtype == jnp.uint32         # Standard dtype for a JAX key
         )
-        if not is_valid_key:
+        if not is_validJAX_RND_DEFAULT_KEY:
             # Provide more detailed info in the error
             key_info = f"Value: {self._rng_k}, Type: {type(self._rng_k)}"
             if isinstance(self._rng_k, jax.Array):
@@ -687,7 +687,7 @@ class Sampler(ABC):
         - backend       : backend for the calculations (default is 'default')
         - seed          : seed for the random number generator
         Returns:
-        - Tuple         : backend, backend_sp, rng, rng_key 
+        - Tuple         : backend, backend_sp, rng, rngJAX_RND_DEFAULT_KEY 
         '''
         if isinstance(backend, str):
             bck = get_backend(backend, scipy=True, random=True, seed=seed)
@@ -701,7 +701,7 @@ class Sampler(ABC):
                 _backend, _backend_sp = bck, None
                 _rng, _rng_k = None, None
             return _backend, _backend_sp, (_rng, _rng_k), backend
-        _backendstr = 'np' if (backend is None or (backend == 'default' and not _JAX_AVAILABLE) or backend == np) else 'jax'
+        _backendstr = 'np' if (backend is None or (backend == 'default' and not JAX_AVAILABLE) or backend == np) else 'jax'
         return Sampler.obtain_backend(_backendstr, seed)
     
     ###################################################################
@@ -727,7 +727,7 @@ class Sampler(ABC):
     @property
     def rng(self): return self._rng
     @property
-    def rng_key(self): return self._rng_k
+    def rngJAX_RND_DEFAULT_KEY(self): return self._rng_k
     @property
     def backend(self): return self._backend
     @property
@@ -801,7 +801,7 @@ class Sampler(ABC):
                                         shape   =   self._shape,
                                         backend =   current_bcknd_str,
                                         rng     =   self._rng,
-                                        rng_key =   self._rng_k)
+                                        rngJAX_RND_DEFAULT_KEY =   self._rng_k)
                 else:
                     raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
             except Exception as e:
@@ -1327,10 +1327,10 @@ class MCSampler(Sampler):
 
             # Propose update
             num_chains              = chain_in.shape[0]
-            all_keys                = random_jp.split(rng_k_in, num_chains + 1)
-            proposal_keys           = all_keys[:-1]     # Keys for vmap
-            carry_key               = all_keys[-1]      # Key for next step
-            new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposal_keys)
+            allJAX_RND_DEFAULT_KEYs                = random_jp.split(rng_k_in, num_chains + 1)
+            proposalJAX_RND_DEFAULT_KEYs           = allJAX_RND_DEFAULT_KEYs[:-1]     # Keys for vmap
+            carryJAX_RND_DEFAULT_KEY               = allJAX_RND_DEFAULT_KEYs[-1]      # Key for next step
+            new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposalJAX_RND_DEFAULT_KEYs)
 
             # Calculate log probabilities (using log_proba_fun, net_callable_fun, params)
             logprobas_new           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
@@ -1339,10 +1339,10 @@ class MCSampler(Sampler):
             acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta, mu)
 
             # Decide acceptance
-            accept_key, carry_key   = random_jp.split(carry_key)
-            # uniform_draw            = random_jp.bernoulli(accept_key, acc_probability)
+            acceptJAX_RND_DEFAULT_KEY, carryJAX_RND_DEFAULT_KEY   = random_jp.split(carryJAX_RND_DEFAULT_KEY)
+            # uniform_draw            = random_jp.bernoulli(acceptJAX_RND_DEFAULT_KEY, acc_probability)
             # accepted                = uniform_draw < acc_probability
-            uniform_draw            = random_jp.uniform(accept_key, shape=(chain_in.shape[0],))
+            uniform_draw            = random_jp.uniform(acceptJAX_RND_DEFAULT_KEY, shape=(chain_in.shape[0],))
             accepted                = uniform_draw < acc_probability # bool[num_chains]
             # jax.debug.print("accepted: {}", accepted)
         
@@ -1363,7 +1363,7 @@ class MCSampler(Sampler):
                 # return jax.lax.select(acc, new, old)
             # new_carry_states        = jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
             # new_carry_vals          = jnp.where(accepted, logprobas_new, current_val_in)
-            return (new_carry_states, new_carry_vals, carry_key, num_proposed_out, num_accepted_out), None
+            return (new_carry_states, new_carry_vals, carryJAX_RND_DEFAULT_KEY, num_proposed_out, num_accepted_out), None
         
         # Initial carry contains only the dynamic state passed into this function
         initial_carry = (chain_init, current_val_init, rng_k_init,
@@ -1401,7 +1401,7 @@ class MCSampler(Sampler):
         NumPy version of sweeping a single chain.
         
         This function carries a tuple:
-        (chain, current_logprob, rng_key, num_proposed, num_accepted)
+        (chain, current_logprob, rngJAX_RND_DEFAULT_KEY, num_proposed, num_accepted)
         through a loop over a number of steps. For each step, it:
         - Proposes new candidate states using update_proposer (applied to each chain element)
         - Computes new log-probabilities via log_probability
@@ -1511,7 +1511,7 @@ class MCSampler(Sampler):
 
         Returns:
             Tuple:
-                (updated_chain, updated_logprobas, updated_rng_key/rng, updated_num_proposed, updated_num_accepted)
+                (updated_chain, updated_logprobas, updated_rngJAX_RND_DEFAULT_KEY/rng, updated_num_proposed, updated_num_accepted)
         '''
         use_log_proba_fun       = self.logprob if log_proba_fun is None else log_proba_fun
         use_accept_config_fun   = self.acceptance_probability if accept_config_fun is None else accept_config_fun

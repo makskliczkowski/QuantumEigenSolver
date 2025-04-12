@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import _JAX_AVAILABLE, get_backend
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
 
@@ -20,7 +20,7 @@ from Algebra.hilbert import HilbertSpace
 from general_python.algebra.preconditioners import Preconditioner
 
 # JAX imports
-if _JAX_AVAILABLE:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     import jax.random as random
@@ -101,8 +101,8 @@ class Solver(ABC):
         self._dir.create_folder(False)
         
         # check the backend
-        self._backend, self._backend_sp, (self._rng, self._rng_key), self._backend_str = self.obtain_backend(backend, seed)
-        self._isjax         = _JAX_AVAILABLE and self._backend != np
+        self._backend, self._backend_sp, (self._rng, self._rngJAX_RND_DEFAULT_KEY), self._backend_str = self.obtain_backend(backend, seed)
+        self._isjax         = JAX_AVAILABLE and self._backend != np
         # set the precision
         if not self._isjax:
             self._eps   = np.finfo(np.float64).eps
@@ -200,14 +200,14 @@ class Solver(ABC):
         return self._rng
     
     @property
-    def rng_key(self):
+    def rngJAX_RND_DEFAULT_KEY(self):
         '''Return the random number generator key.'''
-        return self._rng_key
+        return self._rngJAX_RND_DEFAULT_KEY
     
     @property
     def random(self):
         '''Return random number'''
-        return uniform(shape=(1,), backend=self._backend, rng=self._rng, rng_k=self._rng_key)[0]
+        return uniform(shape=(1,), backend=self._backend, rng=self._rng, rng_k=self._rngJAX_RND_DEFAULT_KEY)[0]
     
     # ----------------------------------
     
@@ -218,8 +218,8 @@ class Solver(ABC):
         - backend       : backend for the calculations (default is 'default')
         - seed          : seed for the random number generator
         '''
-        self._backend, self._backend_sp, (self._rng, self._rng_key) = self.obtain_backend(backend, seed)
-        return self._backend, self._backend_sp, (self._rng, self._rng_key)
+        self._backend, self._backend_sp, (self._rng, self._rngJAX_RND_DEFAULT_KEY) = self.obtain_backend(backend, seed)
+        return self._backend, self._backend_sp, (self._rng, self._rngJAX_RND_DEFAULT_KEY)
     
     @staticmethod
     def obtain_backend(backend: str, seed: Optional[int]):
@@ -241,7 +241,7 @@ class Solver(ABC):
                 _backend, _backend_sp = bck, None
                 _rng, _rng_k = None, None
             return _backend, _backend_sp, (_rng, _rng_k), backend
-        _backendstr = 'np' if (backend is None or (backend == 'default' and not _JAX_AVAILABLE) or backend == np) else 'jax'
+        _backendstr = 'np' if (backend is None or (backend == 'default' and not JAX_AVAILABLE) or backend == np) else 'jax'
         return Solver.obtain_backend(_backendstr, seed)
     
     ###################################
