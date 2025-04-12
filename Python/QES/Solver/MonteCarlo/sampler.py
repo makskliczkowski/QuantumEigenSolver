@@ -938,7 +938,7 @@ class MCSampler(Sampler):
                 backend     : str                   = 'default',
                 logprob_fact: float                 = 0.5,
                 **kwargs):
-        """
+        r"""
         Initialize the MCSampler.
 
         Parameters:
@@ -1104,9 +1104,7 @@ class MCSampler(Sampler):
         '''
 
         log_acceptance_ratio = beta * mu * jnp.real(candidate_val - current_val)
-        #! TODO: Is this true? Can I split the abs and the exp?
-        return jnp.exp(log_acceptance_ratio) # jnp.abs(log_acceptance_ratio)
-        # return jnp.minimum(1.0, (jnp.exp(log_acceptance_ratio)))
+        return jnp.exp(log_acceptance_ratio)
     
     @staticmethod
     @numba.njit
@@ -1123,7 +1121,7 @@ class MCSampler(Sampler):
         '''
 
         log_acceptance_ratio = beta * mu * np.real(candidate_val - current_val)
-        return np.minimum(1.0, np.exp(log_acceptance_ratio))
+        return np.exp(log_acceptance_ratio)
     
     def acceptance_probability(self, current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
         r'''
@@ -1166,7 +1164,7 @@ class MCSampler(Sampler):
                 @partial(jax.jit, static_argnames=('beta',))
                 def _accept_jax_dynamic_beta(cv, cdv, beta, mu):
                     log_acceptance_ratio = beta * jnp.real(cdv - cv) * mu
-                    return jnp.minimum(1.0, jnp.exp(log_acceptance_ratio))
+                    return jnp.exp(log_acceptance_ratio)
                 return _accept_jax_dynamic_beta(current_val, candidate_val, use_beta, mu)
             else:
                 return self._acceptance_probability_jax(current_val, candidate_val, beta=use_beta, mu=mu)
@@ -1275,7 +1273,7 @@ class MCSampler(Sampler):
                             net_callable_fun    : Callable,
                             mu                  : float,
                             beta                : float = 1.0):
-        '''
+        r'''
         Runs multiple MCMC steps using lax.scan. JIT-compiled.
         The single-step logic is defined internally via closure.
         Parameters:
@@ -1736,7 +1734,7 @@ class MCSampler(Sampler):
             accept_config_fun_base: Callable,   # e.g., MCSampler._acceptance_probability_jax
             net_callable_fun    : Callable
         ):
-        '''
+        r'''
         Static, JIT-compiled core logic for MCMC sampling in JAX. 
         
         Performs the following steps:
@@ -1820,7 +1818,7 @@ class MCSampler(Sampler):
 
         #! Calculate importance sampling probabilities/weights
         log_prob_exponent   = (1.0 / logprob_fact - mu)
-        probs               = jnp.abs(jnp.exp(log_prob_exponent * (configs_log_ansatz)))
+        probs               = jnp.exp(log_prob_exponent * jnp.real(configs_log_ansatz))
         total_samples_count = num_samples * num_chains
         prob_sum            = jnp.sum(probs)
         norm_factor         = jnp.where(prob_sum > 1e-10, prob_sum, 1e-10)
@@ -1940,7 +1938,7 @@ class MCSampler(Sampler):
             (self._states, self._logprobas, self._num_proposed, self._num_accepted), configs =\
                 self._generate_samples_np(parameters, num_samples, num_chains)
             configs_log_ansatz  = np.array([self._net(parameters, config) for config in configs])
-            probs               = np.abs(np.exp((1.0 / self._logprob_fact - self._mu) * (configs_log_ansatz)))
+            probs               = np.exp((1.0 / self._logprob_fact - self._mu) * np.real(configs_log_ansatz))
             norm                = np.sum(probs, axis=0, keepdims=True)
             probs               = probs / norm * self._numchains
             
