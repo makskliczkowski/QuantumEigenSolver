@@ -1881,7 +1881,7 @@ class MCSampler(Sampler):
         if parameters is not None:
             current_params = parameters
         elif self._parameters is not None:
-            current_params = self._parameters
+            current_params = self._net.get_params()
         elif hasattr(self._net, 'params'):
             current_params = self._net.params
         elif hasattr(self._net, 'get_params'):

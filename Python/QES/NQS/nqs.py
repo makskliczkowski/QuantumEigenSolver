@@ -1,16 +1,24 @@
+#   file    : QES/NQS/nqs.py
+#   author  : Maksymilian Kliczkowski
+#   date    : 2025-04-01
+#   version : 0.1
+
+'''
+'''
+
 import numpy as np
 import inspect
 import numba
 
 # typing and other imports
-from typing import Union, Tuple, Union, Callable, Optional
+from typing import Union, Tuple, Union, Callable, Optional, Any
 from functools import partial
 
 # from general_python imports
-from general_python.algebra.utils import JAX_AVAILABLE, get_backend
+from general_python.algebra.utils import JAX_AVAILABLE, Array
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
-import general_python.ml.networks as Networks 
+import general_python.ml.networks as Networks
 import general_python.common.binary as Binary
 
 # from hilbert
@@ -19,7 +27,7 @@ import Algebra.hilbert as Hilbert
 # JAX imports
 if JAX_AVAILABLE:
     import jax
-    from jax import jit as jax_jit, grad, vmap, random
+    from jax import jit as jax_jit
     from jax import numpy as jnp
     
     # jax tree
@@ -202,10 +210,17 @@ class NQS(MonteCarloSolver):
         self._batch_size        = batch_size
         self._initialized       = False
         self._dtype             = None
-        self._net               = self._choose_network(net, **kwargs)   # initialize network type
         self._analytic          = False                                 # analytic gradients
         self._holomorphic       = True                                  # holomorphic network
-        self.init_network()
+        self._net : Networks.GeneralNet = self._choose_network(net, input_shape=self._shape, backend=self._backend_str, **kwargs)
+        if not self._net.initialized:
+            self.init_network()
+        self._isjax             = getattr(self._net, 'is_jax', True)    # Assumes net object knows its backend type
+        self._iscpx             = self._net.is_complex
+        # self._holomorphic       = self._net.is_holomorphic
+        self._holomorphic       = False #! Enforce False
+        self._analytic          = self._net.has_analytic_grad
+        self._dtype             = self._net.dtype
         
         #######################################
         #! handle gradients
@@ -244,29 +259,65 @@ class NQS(MonteCarloSolver):
         self._stochastic_reconf = sr.StochasticReconfiguration(None, self._backend)
         
         self._init_functions()
-    
+        self._initialized       = True
+        
     #####################################
     #! NETWORK
     #####################################
     
-    def _choose_network(self, net, **kwargs) -> Networks.GeneralNet:
-        '''
-        Initialize the variational parameters ansatz via the provided network - it simply creates
-        the network instance. To truly initialize the network, use the init_network method.
-        Parameters:
-            net     : The network to be used (can be a string or a callable).
-            kwargs  : Additional arguments for the network.
-        Returns:
-            The initialized network.
-        '''
-        if issubclass(type(net), nn.Module):
-            self.log(f"Network {net} provided from the flax module.", log='info', lvl = 2, color = 'blue')
-            if not self._isjax:
-                raise ValueError(self._ERROR_JAX_WITH_FLAX)
-        elif issubclass(type(net), net_general.GeneralNet):
-            self.log(f"Network {net} provided from the GeneralNet module.", log='info', lvl = 2, color = 'blue')
-            return net
-        return Networks.choose_network(network_type=net, input_shape=self._shape, backend=self._backend, dtype=self._dtype, **kwargs)
+    def _choose_network(self, net_spec: Any, input_shape: tuple, backend: str, **kwargs) -> Networks.GeneralNet:
+        """
+        Selects, instantiates, and initializes the network object.
+        Ensures the returned network is initialized and conforms to GeneralNet.
+        
+        Parameters
+        ----------
+        net_spec : Any
+            The network specification, which can be a string, callable, or a GeneralNet instance.
+        input_shape : tuple
+            The shape of the input data for the network.
+        backend : str
+            The backend to be used for the network ('jax' or 'numpy').
+        **kwargs : dict
+            Additional keyword arguments for network instantiation.
+        Returns
+        -------
+        Networks.GeneralNet
+            An initialized instance of the specified network.
+            
+        Raises
+        ------
+        TypeError
+            If the provided network specification is of an unsupported type.
+        """
+        # Force backend to jax if needed
+        if issubclass(type(net_spec), nn.Module) or isinstance(net_spec, Networks.FlaxInterface):
+            backend = 'jax'
+            if not JAX_AVAILABLE:
+                raise ImportError("Flax requires JAX.")
+            
+        #! Check if the network is already a GeneralNet instance
+        if isinstance(net_spec, Networks.GeneralNet):
+            # If already a GeneralNet instance, ensure it's initialized
+            network_instance = net_spec
+            if not network_instance.initialized:
+                network_instance.init()
+            # TODO: Verify backend compatibility?
+            return network_instance
+        elif issubclass(type(net_spec), nn.Module) or callable(net_spec):
+            # Assume it's a Flax module class or similar callable needing wrapping
+            if backend != 'jax':
+                raise ValueError(f"Flax module {net_spec} requires 'jax' backend.")
+            # FlaxInterface handles its own initialization inside its __init__
+            return Networks.FlaxInterface(net_module=net_spec, input_shape=input_shape, backend=backend, **kwargs)
+        elif isinstance(net_spec, str):
+            # Use your existing Networks.choose_network factory
+            network_instance = Networks.choose_network(network_type=net_spec, input_shape=input_shape, backend=backend, **kwargs)
+            if not network_instance.initialized:
+                network_instance.init() # Ensure factory initializes if needed
+            return network_instance
+        else:
+            raise TypeError(f"Unsupported network specification type: {type(net_spec)}")
     
     #####################################
     #! INITIALIZATION OF THE NETWORK AND FUNCTIONS
@@ -308,8 +359,24 @@ class NQS(MonteCarloSolver):
         """
 
         self._flat_grad_fun, self._dict_grad_type = net_utils.decide_grads(iscpx=self._iscpx,
-                            isjax=self._isjax, isanalitic=self._analytic, isholomorphic=self._holomorphic)
-
+                            isjax=self._isjax, isanalytic=self._analytic, isholomorphic=self._holomorphic)
+        
+        if self._analytic:
+            
+            # Get analytical function handle from the network object
+            analytical_pytree_fun = self._net.get_gradient(use_jax=True)
+            if analytical_pytree_fun is None:
+                raise ValueError("Analytical gradient selected but network did not provide grad_func.")
+            
+            # Wrap the analytical function to match the expected signature
+            def single_sample_analytical_wrapped(ignored_apply, p, s):
+                return self._flat_grad_fun(analytical_pytree_fun, p, s)
+            self._single_sample_flat_grad_fun_for_batch = single_sample_analytical_wrapped
+            
+            if self._isjax:
+                self._single_sample_flat_grad_fun_for_batch = jax_jit(single_sample_analytical_wrapped) 
+        else:
+            self._single_sample_flat_grad_fun_for_batch = self._flat_grad_fun
     # ---
 
     def _init_functions(self):
@@ -387,7 +454,7 @@ class NQS(MonteCarloSolver):
         if not self._initialized:
             
             # initialize the network
-            self._params           = self._net.init(self._rngJAX_RND_DEFAULT_KEY)
+            self._params            = self._net.init(self._rng)
             dtypes                  = self._net.dtypes
             
             # check if all dtypes are the same
@@ -403,7 +470,7 @@ class NQS(MonteCarloSolver):
             # of the network. Otherwise, we use the value provided.
             self._holomorphic       = self._net.check_holomorphic()
             self.log(f"Network is holomorphic: {self._holomorphic}", log='info', lvl = 2, color = 'blue')
-            self._analytic          = self._net.has_analitic_grad
+            self._analytic          = self._net.has_analytic_grad
             self.log(f"Network has analytic gradient: {self._analytic}", log='info', lvl = 2, color = 'blue')
             
             # check the shape of the weights
@@ -751,26 +818,50 @@ class NQS(MonteCarloSolver):
     #####################################
     
     @staticmethod
-    @partial(jax.jit, static_argnums=(0,2,4))
-    def _grad_jax(net_apply, params, batch_size, states, flat_grad_fun):
+    @partial(jax.jit, static_argnums=(0, 3, 4))
+    def grad_jax(
+            net_apply                   : Callable,
+            params                      : Any,
+            states                      : jnp.ndarray,
+            single_sample_flat_grad_fun : Callable[[Callable, Any, Any], jnp.ndarray],
+            batch_size                  : int) -> jnp.ndarray:
         '''
-        Compute the gradients of the ansatz logarithmic wave-function using JAX. 
-        
-        Compute gradient of the logarithmic wave function coefficients, \
-        :math:`\\nabla\\ln\\psi(s)`, for computational configurations :math:`s`.
-        
-        Parameters:
-            net_apply    : The function to apply the network.
-            params       : The parameters of the network.
-            batch_size   : The size of the batch for processing.
-            states       : The input states for which gradients are computed.
-            flat_grad_fun: The function to compute the flattened gradients.
+        Compute the batch of flattened gradients using JAX (JIT compiled).
+
+        Returns the gradients (e.g., :math:`O_k = \\nabla \\ln \\psi(s)`)
+        for each state in the batch. The output format (complex/real)
+        depends on the `single_sample_flat_grad_fun` used.
+
+        Parameters
+        ----------
+        net_apply : Callable
+            The network's apply function `f(p, x)`. Static argument for JIT.
+        params : Any
+            Network parameters `p`.
+        states : jnp.ndarray
+            Input states `s_i`, shape `(num_samples, ...)`.
+        single_sample_flat_grad_fun : Callable[[Callable, Any, Any], jnp.ndarray]
+            JAX-traceable function computing the flattened gradient for one sample.
+            Signature: `fun(net_apply, params, single_state) -> flat_gradient_vector`.
+            Static argument for JIT.
+        batch_size : int
+            Batch size. Static argument for JIT.
+
+        Returns
+        -------
+        jnp.ndarray
+            Array of flattened gradients, shape `(num_samples, num_flat_params)`.
+            Dtype matches the output of `single_sample_flat_grad_fun`.
         '''
-        _gradin = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states, flat_grad_fun, batch_size)
-        return net_utils.jaxpy.vector_from_real_repr(_gradin, params)
+        
+        # The dtype (complex/real) depends on single_sample_flat_grad_fun
+        # ${O_k = \\nabla \\ln \\psi(s_i) = \\nabla \\ln \\psi(s_i, p)} $
+        gradients_batch = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states,
+                                                single_sample_flat_grad_fun, batch_size)
+        return gradients_batch
     
     @staticmethod
-    def _grad_np(net, params, batch_size, states, flat_grad):
+    def grad_np(net, params, batch_size, states, flat_grad):
         '''
         !TODO: Add the precomputed gradient vector - memory efficient
         '''
@@ -804,102 +895,117 @@ class NQS(MonteCarloSolver):
         
         if self._isjax:
             if not self._analytic:
-                return self._grad_jax(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
-            return self._grad_jax(self._grad_func, params, batch_size, states, self._flat_grad_fun)
+                return self.grad_jax(self._ansatz_func, params, states, self._flat_grad_fun, batch_size)
+            return self.grad_jax(self._grad_func, params, states, self._flat_grad_fun, batch_size)
         
         if not self._analytic:
-            return self._grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
-        return self._grad_np(self._grad_func, params, batch_size, states, self._flat_grad_fun)
+            return self.grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
+        return self.grad_np(self._grad_func, params, batch_size, states, self._flat_grad_fun)
     
     #####################################
     #! UPDATE PARAMETERS
     #####################################
     
-    def _update_unflatten(self, d_par):
+    def _update_unflatten(self, d_par: Array) -> Any:
         """
-        Reconstructs parameter PyTree from a flattened gradient vector `d_par`.
-
-        Based on user's provided logic:
-        Assumes `d_par` is a REAL vector.
-            
-            - If model is complex (`self._iscpx`),
-                format is [Re(p1)..., Im(p1)...].
-            - If model is real,
-                format is [p1_real..., p2_real...].
+        Reconstructs parameter PyTree from a flattened REAL gradient vector `d_par`.
+        Queries metadata (_shapes, _tree_def, _iscpx) from self._net.
         
-        `self._shapes` stores `(num_real_components_in_leaf, shape_tuple)`.
+        Parameters
+        ----------
+        d_par : Array
+            The flattened REAL gradient vector to be unflattened. It should be a 1D array.
+            Also, it should be a REAL vector, not complex.
         """
-        if not hasattr(self, '_shapes') or not hasattr(self, '_tree_def') or not hasattr(self, '_iscpx'):
-            raise AttributeError("Model must have _shapes, _tree_def, and _iscpx attributes.")
-        if jnp.iscomplexobj(d_par.dtype):
+        
+        # Query metadata from the network object
+        shapes_for_update   = self._net.shapes_for_update
+        tree_def            = self._net.tree_def
+        iscpx               = self._net.is_complex
+
+        if shapes_for_update is None or tree_def is None or iscpx is None:
+            raise RuntimeError("Network object did not provide necessary metadata (_shapes, _tree_def, _iscpx).")
+
+        if jnp.iscomplexobj(d_par):
             raise ValueError("_update_unflatten requires a REAL d_par vector. Received complex.")
 
         p_tree_shape            = []
         start                   = 0
         leaf_index              = 0
-        flat_params_template, _ = tree_flatten(self._params)
+        flat_params_template, _ = tree_flatten(self.get_params()) # Get template leaves
 
-        for s in self._shapes:
-            num_real_components         = s[0] # Num real components based on init logic
+        if len(shapes_for_update) != len(flat_params_template):
+            raise RuntimeError(f"Mismatch between shapes_for_update ({len(shapes_for_update)}) and param leaves ({len(flat_params_template)}).")
+
+        for s in shapes_for_update:
+            num_real_components         = s[0]
             shape                       = s[1]
-            is_original_leaf_complex    = jnp.iscomplexobj(flat_params_template[leaf_index].dtype)
+            is_original_leaf_complex    = jnp.iscomplexobj(flat_params_template[leaf_index])
 
-            # Check bounds before slicing
             if start + num_real_components > d_par.size:
-                raise ValueError(f"Flattened gradient array (size {d_par.size}) is too small for expected leaf shape {shape} (needs {num_real_components} real values from index {start}).")
+                raise ValueError(f"Flattened gradient array (size {d_par.size}) too small for leaf {leaf_index} shape {shape} (needs {num_real_components} real values from index {start}).")
 
-            if self._iscpx and is_original_leaf_complex:
-                # Complex leaf in a complex model: expect [Re, Im] pair
+            # Use iscpx queried from network
+            if iscpx and is_original_leaf_complex:
                 num_complex_elements    = num_real_components // 2
+                
+                #! Sanity check
                 if num_real_components % 2 != 0:
-                    raise ValueError(f"Shape info {s} for complex leaf seems incorrect (num_real should be even).")
-
-                real_part   = d_par[start : start + num_complex_elements]
-                imag_part   = d_par[start + num_complex_elements : start + num_real_components]
+                    raise ValueError(f"Shape info {s} for complex leaf {leaf_index} seems incorrect.")
+                real_part               = d_par[start : start + num_complex_elements]
+                imag_part               = d_par[start + num_complex_elements : start + num_real_components]
                 p_tree_shape.append((real_part + 1.j * imag_part).reshape(shape))
-
             else:
                 p_tree_shape.append(d_par[start : start + num_real_components].reshape(shape).astype(jnp.float32))
 
             start       += num_real_components
             leaf_index  += 1
+
         if start != d_par.size:
             raise ValueError(f"Finished unflattening, but consumed {start} elements != d_par size {d_par.size}.")
-        return tree_unflatten(self._tree_def, p_tree_shape)
-    
-    def update_parameters(self, d_par: Union[dict, list, np.ndarray]):
-        '''
-        Update the parameters of the model using a gradient update `d_par`.
 
-        Parameters:
-        -----------
-        d_par : Union[dict, list, np.ndarray, jnp.ndarray]
-            The parameter update. If a flat array, it's unflattened using
-            `_update_unflatten` (must be REAL vector, [Re..., Im...] for complex params).
-            If a PyTree, it's used directly.
-            Performs `params = params + update_tree`.
+        # Use tree_def queried from network
+        return tree_unflatten(tree_def, p_tree_shape)
+
+    def update_parameters(self, d_par: Union[dict, list, Array]):
         '''
+        Update the parameters using a gradient update `d_par`.
+        Queries network object for params and metadata.
+        '''
+        
+        # Get tree_def for checks
+        tree_def = self._net.tree_def 
+
         if isinstance(d_par, (np.ndarray, jnp.ndarray)):
-            
             if self._isjax:
                 if d_par.ndim != 1:
                     raise ValueError("Flat d_par must be 1D.")
                 
-                # convert to JAX array if not already
-                d_par = jnp.asarray(d_par) # Ensure JAX array
-                
-                if jnp.iscomplexobj(d_par):
-                    raise ValueError("Flattened d_par must be real for _update_unflatten.")
-                update_tree = self._update_unflatten(d_par)
-            elif isinstance(d_par, (dict, list)) or hasattr(d_par, '__jax_flatten__'):
-                _, tree_d_par = tree_flatten(d_par)
-                if tree_d_par != self._tree_def:
-                    raise ValueError("Provided d_par PyTree structure does not match model parameters.")
-                update_tree = d_par
+                d_par_jax           = jnp.asarray(d_par)
+                # Convert complex/real d_par to REAL representation for _update_unflatten
+                # The convention is to use the real part first, then the imaginary part
+                real_repr_update    = net_utils.jaxpy.ensure_real_repr_vector(d_par_jax)
+                # Unflatten using the real representation vector and queried metadata
+                update_tree         = self._update_unflatten(real_repr_update)
             else:
-                raise TypeError(f"Unsupported type for d_par: {type(d_par)}. Expected PyTree or flat array.")
-            new_parameters  = tree_map(jax.lax.add, self._net.get_params(), update_tree)
-            self._net.set_params(new_parameters)
+                #! TODO: Implement NumPy update path
+                raise NotImplementedError("NumPy update path not implemented.")
+        elif isinstance(d_par, (dict, list)) or hasattr(d_par, '__jax_flatten__'):
+            _, tree_d_par = tree_flatten(d_par)
+            # Check against queried tree_def
+            if tree_d_par != tree_def: 
+                raise ValueError("Provided d_par PyTree structure does not match model parameters.")
+            update_tree = d_par
+        else:
+            raise TypeError(f"Unsupported type for d_par: {type(d_par)}. Expected PyTree or flat array.")
+
+        # Apply the update by getting current params and setting new ones via net object
+        
+        #@ Calls self._net.get_params()
+        current_params = self.get_params() 
+        new_parameters = tree_map(jax.lax.add, current_params, update_tree)
+        #@ Calls self._net.set_params()
+        self.set_params(new_parameters) 
     
     #####################################
     #! OPTIMIZATION FUNCTION
@@ -936,7 +1042,7 @@ class NQS(MonteCarloSolver):
         # if use_sr:
         #     return self._stochastic_reconf.solve(use_s, use_minsr)
         # return self._stochastic_reconf.forces
-        
+    
     #####################################
     #! TRAINING OVERRIDES
     #####################################
@@ -1202,6 +1308,14 @@ class NQS(MonteCarloSolver):
         Return the sampler object.
         '''
         return self._sampler
+    
+    def get_params(self) -> Any:
+        """Returns the current parameters from the network object."""
+        return self._net.get_params()
+
+    def set_params(self, new_params: Any):
+        """Sets new parameters in the network object."""
+        self._net.set_params(new_params)
     
     #####################################
 
