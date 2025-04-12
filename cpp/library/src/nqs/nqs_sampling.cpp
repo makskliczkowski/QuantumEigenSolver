@@ -50,9 +50,9 @@ namespace NQS_NS
 			double proba = std::abs(std::exp(this->beta_ * this->logPRatio(this->curVec_, this->tmpVec_)));
 	#else
 			// double proba = std::abs(this->pRatio(this->nFlip_)); 					// check the probability (choose to use the iterative update of presaved weights [the angles previously updated] or calculate ratio from scratch)
-			double proba = std::abs(std::exp(this->beta_ * this->logPRatioFuncFlips_(this->nFlip_)));
+			double proba = std::exp(2.0 * this->beta_ * algebra::real(this->logPRatioFuncFlips_(this->nFlip_)));
 	#endif
-			if (this->ran_->template random<double>() < proba * proba)					// we need to take into account the probability coming from the ratio of states (after and before the flip)
+			if (this->ran_->template random<double>() < proba)							// we need to take into account the probability coming from the ratio of states (after and before the flip)
 			{
 				this->accepted_++; 														// increase the number of accepted flips
 				this->update(this->nFlip_); 											// update angles if needed
