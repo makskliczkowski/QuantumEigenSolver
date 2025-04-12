@@ -1809,12 +1809,14 @@ class MCSampler(Sampler):
         configs_flat = collected_samples.reshape((-1,) + shape)
 
         #! Calculate log_ansatz (log psi) using the raw net callable
-        # Handle params potentially being None for net_callable_fun
         @partial(jax.jit, static_argnames=('net_call',))
-        def batch_log_ansatz(p, conf, net_call):
-            return jax.vmap(net_call)(p, conf)
-        configs_log_ansatz = batch_log_ansatz(params, configs_flat, net_callable_fun)
+        def single_log_ansatz(p, single_conf, net_call):
+            # net_call should expect (params, single_config) -> single_log_psi
+            return net_call(p, single_conf)
+        batch_log_ansatz_vmap = jax.vmap(single_log_ansatz, in_axes=(None, 0, None), out_axes=0)
 
+        # Call the vmapped function
+        configs_log_ansatz = batch_log_ansatz_vmap(params, configs_flat, net_callable_fun)
 
         #! Calculate importance sampling probabilities/weights
         log_prob_exponent   = (1.0 / logprob_fact - mu)

@@ -217,8 +217,8 @@ class NQS(MonteCarloSolver):
             self.init_network()
         self._isjax             = getattr(self._net, 'is_jax', True)    # Assumes net object knows its backend type
         self._iscpx             = self._net.is_complex
-        # self._holomorphic       = self._net.is_holomorphic
-        self._holomorphic       = False #! Enforce False
+        self._holomorphic       = self._net.is_holomorphic
+        # self._holomorphic       = False #! Enforce False
         self._analytic          = self._net.has_analytic_grad
         self._dtype             = self._net.dtype
         
@@ -226,6 +226,7 @@ class NQS(MonteCarloSolver):
         #! handle gradients
         #######################################
         
+        self._slice_metadata    = None
         self._flat_grad_fun     = None
         self._dict_grad_type    = None
         self._init_gradients()
@@ -509,7 +510,7 @@ class NQS(MonteCarloSolver):
     #! EVALUATION OF THE ANSATZ BATCHED
     #####################################
     
-    def _eval_jax(self, states, batch_size = None, params = None):
+    def eval_jax(self, states, batch_size = None, params = None):
         """
         Evaluates the neural network (log ansatz) for the given quantum states using JAX.
         This method applies the network function to the provided quantum states, using
@@ -525,7 +526,7 @@ class NQS(MonteCarloSolver):
             stored in self._batch_size.
         params : dict, optional
             The parameters (weights) to use for the network evaluation. If None, uses the
-            current parameters stored in self._params.
+            current parameters stored in network._params.
         Returns
         -------
         array_like
@@ -536,7 +537,7 @@ class NQS(MonteCarloSolver):
         # evaluate the network (log ansatz) using JAX
         return net_utils.jaxpy.eval_batched_jax(batch_size, self._ansatz_func, params, states)
     
-    def _eval_np(self, states, batch_size = None, params = None):
+    def eval_np(self, states, batch_size = None, params = None):
         """
         Evaluates the neural network (log ansatz) for the given quantum states using NumPy.
         This method applies the network function to the provided quantum states, using
@@ -575,14 +576,14 @@ class NQS(MonteCarloSolver):
         '''
         
         if params is None:
-            params = self._params
+            params = self.get_params()
             
         if batch_size is None:
             batch_size = self._batch_size
         
         if self._isjax:
-            return self._eval_jax(states, batch_size=batch_size, params=params)
-        return self._eval_np(states, batch_size=batch_size, params=params)
+            return self.eval_jax(states, batch_size=batch_size, params=params)
+        return self.eval_np(states, batch_size=batch_size, params=params)
     
     def __call__(self, states, **kwargs):
         '''
@@ -599,8 +600,8 @@ class NQS(MonteCarloSolver):
             The evaluated network output.
         '''
         if self._isjax:
-            return self._eval_jax(states, batch_size=self._batch_size, params=self._params)
-        return self._eval_np(states, batch_size=self._batch_size, params=self._params)
+            return self.eval_jax(states, batch_size=self._batch_size, params=self.get_params())
+        return self.eval_np(states, batch_size=self._batch_size, params=self.get_params())
     
     #####################################
     #! EVALUATE FUNCTION VALUES - LOCAL ENERGY AND OTHER FUNCTIONS (OPERATORS)
@@ -619,15 +620,23 @@ class NQS(MonteCarloSolver):
         Evaluates a given function on a set of states and probabilities, with optional batching.
         
         Args:
-            func (Callable)                                 : The function to be evaluated.
-            states (Union[np.ndarray, jnp.ndarray])         : The input states for the function.
-            probabilities (Union[np.ndarray, jnp.ndarray])  : The probabilities associated with the states.
-            logproba_in (Union[np.ndarray, jnp.ndarray])    : The logarithm of the probabilities for the input states.
-            logproba_fun (Callable)                         : A function to compute the logarithm of probabilities.
-            parameters (Union[dict, list, np.ndarray])      : Parameters to be passed to the function.
-            batch_size (Optional[int], optional)            : The size of batches for evaluation. 
-                                                            If None, the function is evaluated without batching. Defaults to None.
-            is_jax (bool, optional)                         : Flag indicating if JAX is used for computation. Defaults to True.
+            func (Callable):
+                The function to be evaluated.
+            states (Union[np.ndarray, jnp.ndarray]):
+                The input states for the function.
+            probabilities (Union[np.ndarray, jnp.ndarray]):
+                The probabilities associated with the states.
+            logproba_in (Union[np.ndarray, jnp.ndarray]):
+                The logarithm of the probabilities for the input states.
+            logproba_fun (Callable):
+                A function to compute the logarithm of probabilities.
+            parameters (Union[dict, list, np.ndarray]):
+                Parameters to be passed to the function.
+            batch_size (Optional[int], optional):
+                The size of batches for evaluation. 
+                If None, the function is evaluated without batching. Defaults to None.
+            is_jax (bool, optional):
+                Flag indicating if JAX is used for computation. Defaults to True.
         Returns:
             The result of the function evaluation, either batched or unbatched, depending on the value of `batch_size`.
         """
@@ -721,9 +730,8 @@ class NQS(MonteCarloSolver):
         """
         
         output          = [None]
-        
-        # get from kwargs
         batch_size      = kwargs.get('batch_size', self._batch_size)
+        params          = kwargs.get('params', self._net.get_params())
         
         # check if the functions are provided
         if functions is None or len(functions) == 0:
@@ -747,7 +755,7 @@ class NQS(MonteCarloSolver):
                                         probabilities   = probabilities,
                                         logproba_in     = ansatze,
                                         logproba_fun    = self._ansatz_func,
-                                        parameters      = self._net.get_params(),
+                                        parameters      = params,
                                         batch_size      = batch_size,
                                         is_jax          = self._isjax) for f in functions]
         else:
@@ -762,7 +770,7 @@ class NQS(MonteCarloSolver):
                                         num_samples     = num_samples,
                                         num_chains      = num_chains,
                                         logproba_fun    = self._ansatz_func,
-                                        parameters      = self._net.get_params(),
+                                        parameters      = params,
                                         batch_size      = batch_size,
                                         is_jax          = self._isjax)
         
@@ -858,7 +866,8 @@ class NQS(MonteCarloSolver):
         # ${O_k = \\nabla \\ln \\psi(s_i) = \\nabla \\ln \\psi(s_i, p)} $
         gradients_batch = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states,
                                                 single_sample_flat_grad_fun, batch_size)
-        return gradients_batch
+        # return gradients_batch
+        return net_utils.jaxpy.vector_from_real_repr(gradients_batch, params_template=params)
     
     @staticmethod
     def grad_np(net, params, batch_size, states, flat_grad):
@@ -905,107 +914,41 @@ class NQS(MonteCarloSolver):
     #####################################
     #! UPDATE PARAMETERS
     #####################################
-    
-    def _update_unflatten(self, d_par: Array) -> Any:
+
+    def update_parameters(self, d_par):
         """
-        Reconstructs parameter PyTree from a flattened REAL gradient vector `d_par`.
-        Queries metadata (_shapes, _tree_def, _iscpx) from self._net.
-        
-        Parameters
-        ----------
-        d_par : Array
-            The flattened REAL gradient vector to be unflattened. It should be a 1D array.
-            Also, it should be a REAL vector, not complex.
+        Update model parameters using a flat vector or a PyTree.
         """
-        
-        # Query metadata from the network object
-        shapes_for_update   = self._net.shapes_for_update
-        tree_def            = self._net.tree_def
-        iscpx               = self._net.is_complex
-
-        if shapes_for_update is None or tree_def is None or iscpx is None:
-            raise RuntimeError("Network object did not provide necessary metadata (_shapes, _tree_def, _iscpx).")
-
-        if jnp.iscomplexobj(d_par):
-            raise ValueError("_update_unflatten requires a REAL d_par vector. Received complex.")
-
-        p_tree_shape            = []
-        start                   = 0
-        leaf_index              = 0
-        flat_params_template, _ = tree_flatten(self.get_params()) # Get template leaves
-
-        if len(shapes_for_update) != len(flat_params_template):
-            raise RuntimeError(f"Mismatch between shapes_for_update ({len(shapes_for_update)}) and param leaves ({len(flat_params_template)}).")
-
-        for s in shapes_for_update:
-            num_real_components         = s[0]
-            shape                       = s[1]
-            is_original_leaf_complex    = jnp.iscomplexobj(flat_params_template[leaf_index])
-
-            if start + num_real_components > d_par.size:
-                raise ValueError(f"Flattened gradient array (size {d_par.size}) too small for leaf {leaf_index} shape {shape} (needs {num_real_components} real values from index {start}).")
-
-            # Use iscpx queried from network
-            if iscpx and is_original_leaf_complex:
-                num_complex_elements    = num_real_components // 2
-                
-                #! Sanity check
-                if num_real_components % 2 != 0:
-                    raise ValueError(f"Shape info {s} for complex leaf {leaf_index} seems incorrect.")
-                real_part               = d_par[start : start + num_complex_elements]
-                imag_part               = d_par[start + num_complex_elements : start + num_real_components]
-                p_tree_shape.append((real_part + 1.j * imag_part).reshape(shape))
-            else:
-                p_tree_shape.append(d_par[start : start + num_real_components].reshape(shape).astype(jnp.float32))
-
-            start       += num_real_components
-            leaf_index  += 1
-
-        if start != d_par.size:
-            raise ValueError(f"Finished unflattening, but consumed {start} elements != d_par size {d_par.size}.")
-
-        # Use tree_def queried from network
-        return tree_unflatten(tree_def, p_tree_shape)
-
-    def update_parameters(self, d_par: Union[dict, list, Array]):
-        '''
-        Update the parameters using a gradient update `d_par`.
-        Queries network object for params and metadata.
-        '''
-        
-        # Get tree_def for checks
-        tree_def = self._net.tree_def 
-
-        if isinstance(d_par, (np.ndarray, jnp.ndarray)):
-            if self._isjax:
+        if self._isjax:
+            tree_def = self._net.tree_def
+            
+            if isinstance(d_par, (jnp.ndarray,)):
                 if d_par.ndim != 1:
                     raise ValueError("Flat d_par must be 1D.")
-                
-                d_par_jax           = jnp.asarray(d_par)
-                # Convert complex/real d_par to REAL representation for _update_unflatten
-                # The convention is to use the real part first, then the imaginary part
-                real_repr_update    = net_utils.jaxpy.ensure_real_repr_vector(d_par_jax)
-                # Unflatten using the real representation vector and queried metadata
-                update_tree         = self._update_unflatten(real_repr_update)
-            else:
-                #! TODO: Implement NumPy update path
-                raise NotImplementedError("NumPy update path not implemented.")
-        elif isinstance(d_par, (dict, list)) or hasattr(d_par, '__jax_flatten__'):
-            _, tree_d_par = tree_flatten(d_par)
-            # Check against queried tree_def
-            if tree_d_par != tree_def: 
-                raise ValueError("Provided d_par PyTree structure does not match model parameters.")
-            update_tree = d_par
-        else:
-            raise TypeError(f"Unsupported type for d_par: {type(d_par)}. Expected PyTree or flat array.")
 
-        # Apply the update by getting current params and setting new ones via net object
-        
-        #@ Calls self._net.get_params()
-        current_params = self.get_params() 
-        new_parameters = tree_map(jax.lax.add, current_params, update_tree)
-        #@ Calls self._net.set_params()
-        self.set_params(new_parameters) 
+                real_repr_update = net_utils.jaxpy.ensure_real_repr_vector(d_par)
+                
+                # Compute metadata once
+                if self._slice_metadata is None:
+                    self._slice_metadata = net_utils.jaxpy.prepare_unflatten_metadata(self._net.shapes_for_update,
+                                                                                    self._net.is_complex,
+                                                                                    self._net.get_params())
+
+                # Unflatten into leaf list and rebuild tree
+                leaves      = net_utils.jaxpy.fast_unflatten(real_repr_update, self._slice_metadata)
+                update_tree = tree_unflatten(tree_def, leaves)
+            elif isinstance(d_par, (dict, list)) or hasattr(d_par, '__jax_flatten__'):
+                _, tree_d_par = tree_flatten(d_par)
+                if tree_d_par != tree_def:
+                    raise ValueError("Provided d_par PyTree structure does not match model parameters.")
+                update_tree = d_par
+            else:
+                raise TypeError(f"Unsupported type for d_par: {type(d_par)}. Expected PyTree or flat array.")
+
+            # Apply parameter update
+            current_params  = self.get_params()
+            new_params      = net_utils.jaxpy.add_tree(current_params, update_tree)
+            self.set_params(new_params)
     
     #####################################
     #! OPTIMIZATION FUNCTION
