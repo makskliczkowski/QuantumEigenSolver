@@ -378,6 +378,7 @@ class NQS(MonteCarloSolver):
                 self._single_sample_flat_grad_fun_for_batch = jax_jit(single_sample_analytical_wrapped) 
         else:
             self._single_sample_flat_grad_fun_for_batch = self._flat_grad_fun
+    
     # ---
 
     def _init_functions(self):
