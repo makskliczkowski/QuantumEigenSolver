@@ -442,7 +442,7 @@ class MonteCarloSolver(Solver):
     #! TRAINING
     # ----------------------------------------------------------------------  
     
-    @abstractmethod
+    # @abstractmethod
     def train_stop(self,
                 i           : int                           = 0,
                 par         : Union[McsTrain, dict, None]   = None,
@@ -456,7 +456,7 @@ class MonteCarloSolver(Solver):
         '''
         pass
 
-    @abstractmethod
+    # @abstractmethod
     def train_step(self,
                 i           : int   = 0,
                 verbose     : bool  = False,
@@ -478,7 +478,7 @@ class MonteCarloSolver(Solver):
         '''
         pass
     
-    @abstractmethod
+    # @abstractmethod
     def train(self,
             par         : McsTrain,
             verbose     : bool,
