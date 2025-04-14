@@ -191,7 +191,7 @@ if __name__ == '__main__':
         (states, logprobas), (configs, configs_ansatze), probabilities = sampler_fun(
             states_init = sampler.states,
             rng_k_init  = rng_k,
-            params      = None,
+            params      = net.get_params()
         )
         time_jax_f  = time.perf_counter() - time_jax_s
         logger.info(f"Time taken for first JAX sampling: {time_jax_f:.4f} seconds", lvl=3)
@@ -199,7 +199,7 @@ if __name__ == '__main__':
             (states, logprobas), (configs, configs_ansatze), probabilities = sampler_fun(
                 states_init = sampler.states,
                 rng_k_init  = rng_k,
-                params      = None,
+                params      = net.get_params()
             )
         time_all            = time.perf_counter() - time_jax_s
         logger.info(f"Time taken for all JAX sampling: {time_all:.4f} seconds.", lvl=3)

@@ -2068,7 +2068,7 @@ class MCSampler(Sampler):
 
         # Create the partially applied function
         # Target function is MCSampler._static_sample_jax
-        partial_sampler = partial(MCSampler._static_sample_jax, **baked_args)
+        partial_sampler                 = partial(MCSampler._static_sample_jax, **baked_args)
 
         # Define the final wrapper function with the desired signature
         # This wrapper handles default values for initial counters
