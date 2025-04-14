@@ -401,20 +401,11 @@ class NQS(MonteCarloSolver):
         if self._analytic:
             
             # Get analytical function handle from the network object
-            analytical_pytree_fun = self._net.get_gradient(use_jax=True)
+
+            analytical_pytree_fun, _ = self._net.get_gradient(use_jax=True)
             if analytical_pytree_fun is None:
                 raise ValueError("Analytical gradient selected but network did not provide grad_func.")
-            
-            # Wrap the analytical function to match the expected signature
-            def single_sample_analytical_wrapped(ignored_apply, p, s):
-                return self._flat_grad_fun(analytical_pytree_fun, p, s)
-            self._single_sample_flat_grad_fun_for_batch = single_sample_analytical_wrapped
-            
-            if self._isjax:
-                self._single_sample_flat_grad_fun_for_batch = jax_jit(single_sample_analytical_wrapped) 
-        else:
-            self._single_sample_flat_grad_fun_for_batch = self._flat_grad_fun
-    
+
     # ---
 
     def _init_functions(self):
@@ -426,7 +417,7 @@ class NQS(MonteCarloSolver):
         
         # set the evaluation function
         self._ansatz_func, self._params = self._net.get_apply(use_jax=self._isjax)
-        self._grad_func                 = self._net.get_gradient(use_jax=self._isjax)
+        self._grad_func, self._params   = self._net.get_gradient(use_jax=self._isjax)
         
         if self._isjax:
             # ansatz evaluation function already JITted
@@ -542,7 +533,7 @@ class NQS(MonteCarloSolver):
             )
         else:
             return None
-        
+    
     #####################################
     #! EVALUATION OF THE ANSATZ BATCHED
     #####################################
@@ -996,10 +987,9 @@ class NQS(MonteCarloSolver):
         '''
         
         # The dtype (complex/real) depends on single_sample_flat_grad_fun
-        gradients_batch = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states,
+        gradients_batch, shapes, sizes, is_cpx = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states,
                                                 single_sample_flat_grad_fun, batch_size)
-        # return gradients_batch
-        return net_utils.jaxpy.from_real_representation(gradients_batch, params)
+        return gradients_batch, shapes, sizes, is_cpx
     
     @staticmethod
     def grad_np(net, params, batch_size, states, flat_grad):
@@ -1046,8 +1036,37 @@ class NQS(MonteCarloSolver):
     #####################################
     #! UPDATE PARAMETERS
     #####################################
+    
+    def transform_flat_params(self, flat_params: jnp.ndarray,
+                            shapes,
+                            sizes,
+                            is_cpx,
+                            ) -> Any:
+        """
+        Transform a flat parameter vector into a PyTree structure.
 
-    def update_parameters(self, d_par: Any):
+        Parameters
+        ----------
+        flat_params : jnp.ndarray
+            The flat parameter vector to transform.
+
+        Returns
+        -------
+        Any
+            The transformed PyTree structure.
+        """
+        if not self._isjax:
+            raise NotImplementedError("Only JAX backend supported.")
+        # transform shapes to NamedTuple
+        slices = net_utils.jaxpy.prepare_slice_info(shapes, sizes, is_cpx)
+    
+        # Transform the flat parameters back to the original PyTree structure
+        return net_utils.jaxpy.transform_flat_params_jit(flat_params,
+                                                        self._params_tree_def, 
+                                                        slices,
+                                                        self._params_total_size)
+    
+    def update_parameters(self, d_par: Any, mult: Any, shapes, sizes, iscpx):
             """
             Update model parameters using a flat vector (in real representation) or a PyTree.
 
@@ -1066,24 +1085,10 @@ class NQS(MonteCarloSolver):
 
             #! Handle Input Types
             if isinstance(d_par, jnp.ndarray):
-                if d_par.ndim != 1:
-                    raise ValueError(f"Flat parameter update `d_par` must be 1D, got shape {d_par.shape}.")
-
-                # **Crucial Assumption**: d_par is ALREADY the real representation vector.
-                # **Optimized**: Removed ensure_real_repr_vector call. !TODO: Remove this?
-                flat_real_update_vector = net_utils.jaxpy.to_real_representation(d_par, self._params_tree_def)
-
-                if flat_real_update_vector.size != self._params_total_size:
-                    raise ValueError(f"Flat update vector size ({flat_real_update_vector.size}) "
-                                    f"does not match expected size ({self._params_total_size}) "
-                                    f"based on model parameters.")
-
-                leaves      = net_utils.jaxpy.fast_unflatten(flat_real_update_vector, self._params_slice_metadata)
-                update_tree = tree_unflatten(self._params_tree_def, leaves)
-
+                update_tree = self.transform_flat_params(d_par * mult, shapes, sizes, iscpx)
             elif isinstance(d_par, (dict, list)) or hasattr(d_par, '__jax_flatten__'):
                 # Validate PyTree structure (necessary for correctness)
-                flat_leaves_dpar, tree_d_par = tree_flatten(d_par)
+                flat_leaves_dpar, tree_d_par = tree_flatten(d_par * mult)
                 if tree_d_par != self._params_tree_def:
                     raise ValueError("Provided `d_par` PyTree structure does not match model parameters structure.")
                 update_tree = d_par
@@ -1107,7 +1112,8 @@ class NQS(MonteCarloSolver):
                                     "sr_solve_linalg_fun",
                                     "sr_precond_apply_fun",
                                     "use_sr", 
-                                    "sr_options"))
+                                    "sr_options",
+                                    "batch_size"))
     def single_step_jax(
         # Dynamic Inputs (Data & State)
         params                      : Any,                          # Current PyTree parameters
@@ -1123,6 +1129,7 @@ class NQS(MonteCarloSolver):
         sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
         sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
         sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
+        batch_size                  : Optional[int]         = None, # Batch size for evaluation
         # Static for Evaluation
     ) -> Tuple[Any, NQSStepInfo]: # Returns (flat_update_vector, metrics)
         """
@@ -1173,8 +1180,8 @@ class NQS(MonteCarloSolver):
             ValueError: If `use_sr` is True but no SR solver function is provided in `sr_options`.
         """
         
-        batch_size          = configs.shape[0] if configs is not None else 1
-        
+        batch_size          = batch_size if batch_size is not None else 1
+
         #! 1. Compute Local Energy
         (v, means, stds) = NQS.evaluate_fun_jax(
             func            = local_energy_fun,
@@ -1193,13 +1200,12 @@ class NQS(MonteCarloSolver):
         #! 3. Compute Gradients (O_k = ∇ log ψ)
         # The output `flat_grads` will have the dtype determined by single_sample_flat_grad_fun
         # For complex NQS, this is typically complex. Shape: (batch_size, n_params_flat)
-        flat_grads          = NQS.grad_jax(
+        flat_grads, shapes, sizes, iscpx = NQS.grad_jax(
             net_apply                   = apply_fn,
             params                      = params,
             states                      = configs,
             single_sample_flat_grad_fun = flat_grad_fun,
             batch_size                  = batch_size)
-
         # Check if gradients have expected complex type if parameters are complex
         # This check should ideally happen outside JIT, but can be useful during debugging
         # if params_are_complex and not jnp.iscomplexobj(flat_grads):
@@ -1291,7 +1297,7 @@ class NQS(MonteCarloSolver):
 
         # Return the FLAT update vector (complex if params are complex) and metrics
         # The caller (NQS class) handles scaling by -lr (or i * dt for TDVP) and applying the update.
-        return d_par_flat, metrics
+        return d_par_flat, metrics, (shapes, sizes, iscpx)
 
     @staticmethod
     def train_step_np(
