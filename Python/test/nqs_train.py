@@ -220,7 +220,7 @@ if __name__ == "__main__":
                         n_hidden       = n_hidden,
                         dtype          = dtypex,
                         seed           = seed,
-                        visible_bias   = True,
+                        visible_bias   = False,
                         bias           = True
                     )
     
