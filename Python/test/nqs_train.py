@@ -77,7 +77,7 @@ def single_step_train(i: int, lr: float, reset=False):
 
     #! Single step in the NQS (includes ansatz evaluation, local energy computation, and gradient calculation)
     time_start       = time.time()
-    dpar, step_info  = nqs.single_step_jax(
+    dpar, step_info, (shapes, sizes, iscpx) = nqs.single_step_jax(
                             params               = nqs.get_params(),
                             configs              = configs,
                             configs_ansatze      = configs_ansatze,
@@ -99,7 +99,7 @@ def single_step_train(i: int, lr: float, reset=False):
 
     #! Update the parameters
     time_start       = time.time()
-    nqs.update_parameters(-lr * dpar)
+    nqs.update_parameters(dpar, -lr, shapes, sizes, iscpx)
     time_update      = time.time() - time_start
 
     #! Return mean energy and timing details for update, sampling, and step
