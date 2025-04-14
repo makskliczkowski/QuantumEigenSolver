@@ -1308,16 +1308,17 @@ class MCSampler(Sampler):
             #! Single MCMC update step logic
             # Propose update
             new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposal_keys)
+            if new_chain.ndim == chain_in.ndim + 1:
+                new_chain = jnp.squeeze(new_chain, axis=-1)
+                
             logprobas_new           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
+            if logprobas_new.ndim == current_val_in.ndim + 1:
+                logprobas_new = jnp.squeeze(logprobas_new, axis=-1)
 
             # Calculate acceptance probabilities (using accept_config_fun)
             acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta, mu)
             uniform_draw            = random_jp.uniform(new_rng_k, shape=(num_chains,))
             accepted                = uniform_draw < acc_probability
-
-            accept_key, carry_key   = random_jp.split(carry_key)
-            uniform_draw            = random_jp.uniform(accept_key, shape=(chain_in.shape[0],))
-            accepted                = uniform_draw < acc_probability 
         
             num_proposed_out        = num_proposed_in + 1
             num_accepted_out        = num_accepted_in + accepted.astype(num_accepted_in.dtype)
@@ -1744,11 +1745,14 @@ class MCSampler(Sampler):
             net_callable_fun (Callable):
                 The network callable.
         '''
+        logprobas_init = log_proba_fun_base(states_init, net_callable_fun, params)
+        if logprobas_init.ndim > 1:
+            logprobas_init = jnp.squeeze(logprobas_init, axis=-1)
 
         #! Phase 1: Thermalization
         final_carry = MCSampler._run_mcmc_steps_jax(
             chain_init          =   states_init,
-            current_val_init    =   log_proba_fun_base(states_init, net_callable_fun, params),
+            current_val_init    =   logprobas_init,
             rng_k_init          =   rng_k_init,
             num_proposed_init   =   num_proposed_init,
             num_accepted_init   =   num_accepted_init,
@@ -1767,38 +1771,47 @@ class MCSampler(Sampler):
         #! Phase 2: Sampling
         
         def sample_scan_body(carry, _):
+            # Run a fixed number of updates per sample and update the chain carry.
             new_carry = MCSampler._run_mcmc_steps_jax(
-                chain_init          = carry[0],
-                current_val_init    = carry[1],
-                rng_k_init          = carry[2],
-                num_proposed_init   = carry[3],
-                num_accepted_init   = carry[4],
-                params              = params,
-                steps               = updates_per_sample,
-                update_proposer     = update_proposer,
-                log_proba_fun       = log_proba_fun_base,
-                accept_config_fun   = accept_config_fun_base,
-                net_callable_fun    = net_callable_fun,
-                mu                  = mu,
-                beta                = beta
+                chain_init            = carry[0],
+                current_val_init      = carry[1],
+                rng_k_init            = carry[2],
+                num_proposed_init     = carry[3],
+                num_accepted_init     = carry[4],
+                params                = params,
+                steps                 = updates_per_sample,
+                update_proposer       = update_proposer,
+                log_proba_fun         = log_proba_fun_base,
+                accept_config_fun     = accept_config_fun_base,
+                net_callable_fun      = net_callable_fun,
+                mu                    = mu,
+                beta                  = beta
             )
-            return new_carry, new_carry[0] # collect the new state through the lax.scan
-        initial_scan_carry              = (states_therm, logprobas_therm, rng_k_therm, num_proposed_init, num_accepted_init)
-        final_carry, collected_samples  = jax.lax.scan(sample_scan_body, initial_scan_carry, None, length=num_samples)
-        # Reshape the collected samples to flat configurations
-        configs_flat                    = collected_samples.reshape((-1,) + shape)
-        
-        # Batch network evaluation for log_psi (vectorized network call)
-        batched_log_ansatz              = jax.vmap(lambda conf: net_callable_fun(params, conf))(configs_flat)
-        # Importance weights calculation
-        log_prob_exponent               = (1.0 / logprob_fact - mu)
-        probs                           = jnp.exp(log_prob_exponent * jnp.real(batched_log_ansatz))
-        total_samples_count             = num_samples * num_chains
-        norm_factor                     = jnp.where(jnp.sum(probs) > 1e-10, jnp.sum(probs), 1e-10)
-        probs_normalized                = (probs / norm_factor) * total_samples_count
+            # Return updated carry and collect the new chain state.
+            return new_carry, new_carry[0]
 
-        final_state_tuple               = final_carry
-        samples_tuple                   = (configs_flat, batched_log_ansatz)
+        # Initialize the carry for the scan with the thermalized state and counters.
+        initial_scan_carry = (states_therm, logprobas_therm, rng_k_therm, num_proposed_init, num_accepted_init)
+
+        # Run the scan for the specified number of sample steps.
+        final_carry, collected_samples = jax.lax.scan(sample_scan_body, initial_scan_carry, None, length=num_samples)
+
+        # Flatten the collected states from all sample steps.
+        configs_flat        = collected_samples.reshape((-1,) + shape)
+        
+        # Evaluate the network in a fully batched (vectorized) manner to obtain log_ψ.
+        batched_log_ansatz  = jax.vmap(lambda conf: net_callable_fun(params, conf))(configs_flat)
+
+        # Compute the importance weights.
+        log_prob_exponent    = (1.0 / logprob_fact - mu)
+        probs                = jnp.exp(log_prob_exponent * jnp.real(batched_log_ansatz))
+        total_samples        = num_samples * num_chains
+        norm_factor          = jnp.where(jnp.sum(probs) > 1e-10, jnp.sum(probs), 1e-10)
+        probs_normalized     = (probs / norm_factor) * total_samples
+
+        # Prepare the final output tuples.
+        final_state_tuple   = final_carry  # Contains the final chain state and updated counters.
+        samples_tuple       = (configs_flat, batched_log_ansatz)
         return final_state_tuple, samples_tuple, probs_normalized
     
     ###################################################################
@@ -1822,7 +1835,7 @@ class MCSampler(Sampler):
         used_num_chains         = num_chains if num_chains is not None else self._numchains
 
         # Handle temporary state if num_chains differs from instance default
-        current_states = self._states
+        current_states          = self._states
         current_proposed        = self._num_proposed
         current_accepted        = self._num_accepted
         reinitialized_for_call  = False
@@ -1894,16 +1907,16 @@ class MCSampler(Sampler):
             # Update Instance State (JAX)
             final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_state_tuple
             self._rng_k                 = final_rng_k
-            if not reinitialized_for_call:
-                self._states            = final_states
-                self._logprobas         = final_logprobas
-                self._num_proposed      = final_num_proposed
-                self._num_accepted      = final_num_accepted
+            # if not reinitialized_for_call:
+            self._states                = final_states
+            self._logprobas             = final_logprobas
+            self._num_proposed          = final_num_proposed
+            self._num_accepted          = final_num_accepted
 
             final_state_info            = (self._states, self._logprobas)
             return final_state_info, samples_tuple, probs
         else:
-            self._logprobas         = self.logprob(self._states,
+            self._logprobas             = self.logprob(self._states,
                                             net_callable    =   net_callable,
                                             net_params      =   parameters)
             # for numpy

@@ -60,6 +60,7 @@ if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax import jit
+    jax.config.update('jax_platform_name', 'cpu')
 else:
     jax     = None
     jnp     = None
@@ -109,9 +110,9 @@ def single_step_train(i: int, lr: float, reset=False):
 # -----------------------------------------------------------------------
 
 def adaptive_lr(epoch: int, initial_lr: float, decay_rate: float):
-    return initial_lr * (decay_rate ** epoch)
+    return max(5.0e-3, initial_lr * (decay_rate ** epoch))
 
-def train_function(n_epo: int, lr: float = 7e-2, reset: bool = False, decay_rate: float = 0.99):
+def train_function(n_epo: int, lr: float = 7e-2, reset: bool = False, decay_rate: float = 0.999):
     history      = np.zeros(n_epo, dtype=np.float64)
     history_std  = np.zeros(n_epo, dtype=np.float64)
     epoch_times  = np.zeros(n_epo, dtype=np.float64)
@@ -131,6 +132,7 @@ def train_function(n_epo: int, lr: float = 7e-2, reset: bool = False, decay_rate
         postfix_dict = {
             "E_mean"   : f"{mean_energy:.4e}",
             "E_std"    : f"{std_energy:.4e}",
+            "lr"       : f"{current_lr:.3e}",
             "t_samp"   : f"{time_sample:.3e}s",
             "t_step"   : f"{time_single_step:.3e}s",
             "t_update" : f"{time_update:.3e}s",
@@ -236,7 +238,8 @@ if __name__ == "__main__":
                         mu           = 2.0,
                         seed         = seed
                     )
-    
+    sampler_fun = sampler.get_sampler_jax(num_samples=numsamples, num_chains=numchains)
+
     # ----------------------- Setup Hamiltonian -----------------------------
     ham_dtype       = jnp.float64
     lattice         = SquareLattice(

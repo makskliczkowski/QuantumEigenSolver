@@ -146,7 +146,7 @@ if __name__ == '__main__':
     logger.info(f"Number of chains: {numchains}", lvl = 1)
     logger.info(f"Number of sweeps: {numsweeps}", lvl = 1)
     logger.info(f"Number of thermal steps: {numtherm}", lvl = 1)
-    logger.info(f"Succesfully created the sampler {sampler}", lvl = 2)
+    logger.info(f"Successfully created the sampler {sampler}", lvl = 2)
     logger.info(f"Succesfully created the net {net}", lvl = 2)
     
     #! Get the samples
