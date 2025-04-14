@@ -71,9 +71,7 @@ else:
 def single_step_train(i: int, lr: float, reset=False):
     #! Generate samples
     time_start       = time.time()
-    (_, _), (configs, configs_ansatze), probabilities = nqs.sample(reset=reset)
-    if JAX_AVAILABLE:
-        jax.block_until_ready()
+    (_, _), (configs, configs_ansatze), probabilities = nqs.sample(reset=reset)        
     time_sample      = time.time() - time_start
 
     #! Single step in the NQS (includes ansatz evaluation, local energy computation, and gradient calculation)
@@ -92,8 +90,6 @@ def single_step_train(i: int, lr: float, reset=False):
                             sr_precond_apply_fun = precond_fun,
                             sr_solve_linalg_fun  = solver_fun,
                         )
-    if JAX_AVAILABLE:
-        jax.block_until_ready()
     time_single_step = time.time() - time_start
 
     if step_info.failed:
@@ -103,8 +99,6 @@ def single_step_train(i: int, lr: float, reset=False):
     #! Update the parameters
     time_start       = time.time()
     nqs.update_parameters(-lr * dpar)
-    if JAX_AVAILABLE:
-        jax.block_until_ready()
     time_update      = time.time() - time_start
 
     #! Return mean energy and timing details for update, sampling, and step
@@ -127,8 +121,6 @@ def train_function(n_epo: int, lr: float = 7e-2, reset: bool = False, decay_rate
         current_lr = adaptive_lr(i, lr, decay_rate)
         time_start  = time.time()
         (mean_energy, std_energy), (time_update, time_sample, time_single_step) = single_step_train(i, current_lr, reset)
-        if JAX_AVAILABLE:
-            jax.block_until_ready()
         time_epoch  = time.time() - time_start
 
         if mean_energy is None:
@@ -145,9 +137,8 @@ def train_function(n_epo: int, lr: float = 7e-2, reset: bool = False, decay_rate
             "t_epoch"  : f"{time_epoch:.3e}s"
         }
         pbar.set_postfix(postfix_dict, refresh=True)
-
-        history[i]      = mean_energy
-        history_std[i]  = std_energy
+        history[i]      = np.real(mean_energy)
+        history_std[i]  = np.real(std_energy)
         epoch_times[i]  = time_epoch
 
     return history[:i+1], history_std[:i+1], epoch_times[:i+1]
@@ -330,14 +321,14 @@ if __name__ == "__main__":
     # ----------------------- Plotting --------------------------------------
     fig, ax = Plotter.get_subplots(nrows=2, ncols=1, sizex=5, sizey=5, dpi=100, sharex=True)
     Plotter.plot(ax[0], x=np.arange(len(energies)), y=np.real(energies), marker="o", markersize=0.5, lw=1)
-    Plotter.set_ax_params(ax[0], title="Training Progress", ylabel="$E$")
+    Plotter.set_ax_params(ax[0], title="Training Progress", ylabel=r"$E$")
     Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
     
     
     ax[1].plot(np.real(energies_std))
     Plotter.plot(ax[1], x=np.arange(len(energies_std)), y=np.real(energies_std),
                 marker="o", markersize=0.5, lw=1)
-    Plotter.set_ax_params(ax[1], xlabel="Epoch", ylabel="$\sigma_E$")
+    Plotter.set_ax_params(ax[1], xlabel="Epoch", ylabel=r"$\sigma_E$")
     Plotter.set_tickparams(ax[1], maj_tick_l=2, min_tick_l=1)
         
     plt.show()
