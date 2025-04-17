@@ -97,9 +97,9 @@ public:
 
 	// ------------------------------------------- 				 Getters				  -------------------------------------------
 
-	double get_a() const { return this->a_; };
-	double get_b() const { return this->b_; };
-
+	double get_a() 							const 			{ return this->a_; };
+	double get_b() 							const 			{ return this->b_; };
+	double getMainParam()	 				const override 	{ return this->a_; };
 	// ### H A M I L T O N I A N ###
 
 	void hamiltonian() override;

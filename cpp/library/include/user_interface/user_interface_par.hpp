@@ -34,6 +34,4 @@ constexpr int UI_LIMITS_QUADRATIC_STATEFULL						= 32;
 #define UI_DEF_MAT_D_CONDT(sizex, sizey, cond, T) cond ? arma::Mat<T>(sizex, sizey, arma::fill::ones) : arma::Mat<T>()
 #define UI_DEF_COL_D(size) -1e5 * arma::ones<arma::Col<double>>(size)
 
-// ##########################################################################################################################################
-
 #endif // USER_INTERFACE_PARAMS_H

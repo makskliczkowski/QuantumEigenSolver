@@ -82,6 +82,8 @@ public:
 
 	double get_alpha()							const				{ return this->a_[0];	};
 	double get_g0()								const				{ return this->g0_;		};
+	double getMainParam()						const override final{ return this->a_[0];	};
+
 };
 
 // ##########################################################################################################################################

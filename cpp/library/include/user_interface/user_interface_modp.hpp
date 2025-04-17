@@ -333,4 +333,170 @@ namespace UI_PARAMS
 	};
 };
 
+// ##########################################################################################################################################
+
+namespace HamiltonianHelpers
+{
+	// ############################################################################
+
+	/**
+	* @brief Estimates the number of sites (ns) based on the input value nh and the local dimension nh_loc.
+	*
+	* This function computes an estimate of the number of sites by taking the logarithm (base nh_loc) of nh.
+	* By default, nh_loc is set to 2, corresponding to a binary system. For nh_loc values of 2 or 4, optimized
+	* calculations are performed. For other values, the logarithm is computed with respect to nh_loc.
+	*
+	* @param nh The total number of possible sites (must be greater than 0).
+	* @param nh_loc The local dimension (default is 2). Common values are 2 (binary) or 4 (quaternary).
+	* @return The estimated number of sites as a long integer.
+	*/
+	long get_ns_est(u64 nh, int nh_loc = 2)
+	{
+		int ns = 0;
+		if (nh_loc == 2)
+			ns = std::log2(nh);
+		else if (nh_loc == 4)
+			ns = std::log2(nh) / std::log2(4);
+		else
+			ns = std::log2(nh) / std::log2(nh_loc);
+		return ns;
+	}
+
+	// ############################################################################
+	
+	/**
+	* @brief Estimates the Heisenberg time for a given quantum model.
+	*
+	* This function computes an estimate of the Heisenberg time based on the model type,
+	* a model parameter, the Hilbert space dimension, and optionally the local Hilbert space dimension.
+	*
+	* @param mod_typ   The type of quantum model (enumerated in MY_MODELS).
+	* @param param     A model-specific parameter (e.g., disorder strength, coupling constant).
+	* @param nh        The Hilbert space dimension.
+	* @param nh_loc    The local Hilbert space dimension (default is 2).
+	* @return          Estimated Heisenberg time as a long double.
+	*/
+	long double get_heisenberg_time_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	{
+		int ns = get_ns_est(nh, nh_loc);
+		switch (mod_typ)
+		{
+		// interacting models
+		case MY_MODELS::ISING_M:
+		case MY_MODELS::XYZ_M:
+		case MY_MODELS::HEI_KIT_M:
+		case MY_MODELS::QSM_M:
+		case MY_MODELS::RP_M:
+		// return RP_types::RP_default::getMeanLvlSpacing(param, ns);
+		case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+		// return 1.0l / PRLB_types::PRLB_default::getMMeanLvlSpacing(param, ns);
+			return (long double)nh;
+		case MY_MODELS::ULTRAMETRIC_M:
+            return 1.0l / Ultrametric_types::UM_default::getMeanLvlSpacing(param, ns);
+		default:
+			return (long double)nh;
+		}
+	}
+
+	// ############################################################################
+
+	/**
+	* @brief Estimates the bandwidth for a given model type and parameters.
+	*
+	* This function computes an estimated bandwidth based on the specified model type (`mod_typ`),
+	* a model parameter (`param`), the Hilbert space dimension (`nh`), and an optional local Hilbert space dimension (`nh_loc`).
+	* For certain model types, the bandwidth is simply the Hilbert space dimension.
+	* For others, it is computed using model-specific static methods.
+	*
+	* @param mod_typ   The model type (enumeration of MY_MODELS).
+	* @param param     Model-specific parameter used in bandwidth estimation.
+	* @param nh        The Hilbert space dimension.
+	* @param nh_loc    The local Hilbert space dimension (default is 2).
+	* @return          Estimated bandwidth as a long double.
+	*/
+	long double get_bandwidth_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	{
+		int ns = get_ns_est(nh, nh_loc);
+		switch (mod_typ)
+		{
+		case MY_MODELS::ISING_M:
+		case MY_MODELS::XYZ_M:
+		case MY_MODELS::HEI_KIT_M:
+		case MY_MODELS::QSM_M:
+			return (long double)nh;
+		case MY_MODELS::RP_M:
+			return RP_types::RP_default::getBandwidth(param, ns);
+		case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+			return PRLB_types::PRLB_default::getBandwidth(param, ns);
+		case MY_MODELS::ULTRAMETRIC_M:
+			return Ultrametric_types::UM_default::getBandwidth(param, ns);
+		default:
+			return nh;
+		}
+	}
+
+	// ############################################################################
+
+	/**
+	* @brief Estimates the energy width for a given model type and parameters.
+	*
+	* This function computes an estimate of the energy width based on the specified model type,
+	* a model parameter, the Hilbert space dimension, and an optional local Hilbert space dimension.
+	* The estimation method depends on the model type:
+	*   - For ISING_M, XYZ_M, HEI_KIT_M, and QSM_M models, the function returns the Hilbert space dimension.
+	*   - For RP_M, POWER_LAW_RANDOM_BANDED_M, and ULTRAMETRIC_M models, the function calls the corresponding
+	*     static getVariance method from the appropriate type, passing the model parameter and estimated system size.
+	*   - For unknown model types, the function returns the Hilbert space dimension.
+	*
+	* @param mod_typ   The model type (enumeration of MY_MODELS).
+	* @param param     Model-specific parameter (e.g., disorder strength).
+	* @param nh        Hilbert space dimension.
+	* @param nh_loc    Local Hilbert space dimension (default is 2).
+	* @return Estimated energy width as a long double.
+	*/
+	long double get_energy_width_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	{
+		int ns = get_ns_est(nh, nh_loc);
+		switch (mod_typ)
+		{
+		case MY_MODELS::ISING_M:
+		case MY_MODELS::XYZ_M:
+		case MY_MODELS::HEI_KIT_M:
+		case MY_MODELS::QSM_M:
+			return (long double)nh;
+		case MY_MODELS::RP_M:
+			return RP_types::RP_default::getVariance(param, ns);
+		case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+			return PRLB_types::PRLB_default::getVariance(param, ns);
+		case MY_MODELS::ULTRAMETRIC_M:
+			return Ultrametric_types::UM_default::getVariance(param, ns);
+		default:
+			return nh;
+		}
+	}
+
+	// ############################################################################
+
+	long double get_thouless_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	{
+		int ns = get_ns_est(nh, nh_loc);
+		switch (mod_typ)
+		{
+		case MY_MODELS::ISING_M:
+		case MY_MODELS::XYZ_M:
+		case MY_MODELS::HEI_KIT_M:
+		case MY_MODELS::QSM_M:
+		case MY_MODELS::RP_M:
+		case MY_MODELS::POWER_LAW_RANDOM_BANDED_M:
+			return (long double)nh;
+		case MY_MODELS::ULTRAMETRIC_M:
+			return Ultrametric_types::UM_default::getThouless(param, ns);
+		default:
+			return (long double)nh;
+		}
+	}
+
+	// ############################################################################
+}
+
 #endif

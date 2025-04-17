@@ -189,7 +189,7 @@ public:
 	auto getEnAv()										const -> double								{ return this->avEn;															};
 	// hilbert
 	auto getHilbertSize()								const -> u64								{ return this->Nh;																};			
-	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T, _spinModes>& { return this->hilbertSpace;													};							
+	auto getHilbertSpace()								const -> const Hilbert::HilbertSpace<_T, _spinModes>& { return this->hilbertSpace;											};							
 	// energy
 	virtual auto getMeanLevelSpacing()					const -> double								{ return arma::mean(arma::diff(this->eigVal_));									};
 	virtual auto getBandwidth()							const -> double								{ return this->eigVal_(this->Nh_ - 1) - this->eigVal_(0);						};
@@ -198,6 +198,7 @@ public:
 	auto getHamiltonian()								-> const GeneralizedMatrix<_T>&				{ return this->H_;																};
 	auto getHamiltonian()								const -> GeneralizedMatrix<_T>				{ return this->H_;																};
 	auto getDiag()										const -> const arma::Col<_T>				{ return this->H_.diag();														};
+	virtual auto getMainParam()							const -> double								{ return 0;																		};
 	virtual auto getHamiltonian(u64 i, u64 j)			const -> _T									{ return this->H_(i, j);														};
 	virtual auto getHamiltonianSize()					const -> double								{ return this->H_.size() * sizeof(this->H_.get(0, 0));							};								
 	virtual auto getHamiltonianSizeH()					const -> double								{ return std::pow(this->hilbertSpace.getHilbertSize(), 2) * sizeof(_T); };
@@ -228,7 +229,6 @@ public:
 	// quadratic
 	auto getIsQuadratic()								const -> bool								{ return this->isQuadratic_;													};
 	auto getIsManyBody()								const -> bool								{ return this->isManyBody_;														};
-
 	// ------------------------------------------- SETTERS -----------------------------------------------------
 	
 	auto setSeed(u64 seed)								-> void										{ this->ran_.newSeed(seed);														};

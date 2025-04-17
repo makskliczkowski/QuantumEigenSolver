@@ -1,12 +1,13 @@
 #include <map>
 #include <vector>
+#include "general_def.hpp"
 
 namespace Ultrametric_types
 {
-    // is done for N = 3, check if that matters for the other N
-	static struct UM_default
-	{
-        const static int minNs_ = 7;
+      struct _UM_default
+      {
+            const static int minNs_             = 7;
+            const static int maxNs_             = 16;
 
 		// bandwidth
 		static inline std::map<double, std::vector<double>> bandwidth_ = {
@@ -127,13 +128,9 @@ namespace Ultrametric_types
             {0.94, {0.43939705607607904, 0.2818382931264455, 0.23263050671536264, 0.201836636368156, 0.17053682839712728, 0.14819492569603848, 0.13159238833846307, 0.12181879120101147, 0.1031177274593056, 0.08912509381337458}},
             {0.96, {0.48496934285282006, 0.33496543915782795, 0.29286445646252374, 0.2786121168629772, 0.22860772885200067, 0.20733215734859542, 0.3416303824258374, 0.18077686769634344, 0.1685259044750751, 0.1496235656094436}},
             {0.98, {0.5907837911587943, 0.4340102636447441, 0.39810717055349737, 0.354813389233576, 0.3297477327775967, 0.31021776647994986, 0.5877034262673531, 0.2865120269663782, 0.2590200204531328, 0.23713737056616552}}};
-            
-            static int getIndex(int _Ns)                               { return _Ns - minNs_; };
-            static double getBandwidth(double alpha, int _Ns)          { return bandwidth_.contains(alpha) ? bandwidth_[alpha][getIndex(_Ns)] : bandwidth_[0.600][getIndex(_Ns)]; };
-            static double getVariance(double alpha, int _Ns)           { return variance_.contains(alpha) ? variance_[alpha][getIndex(_Ns)] : variance_[0.600][getIndex(_Ns)]; };
-            static double getMeanLvlSpacing(double alpha, int _Ns)     { return mean_lvl_spacing.contains(alpha) ? mean_lvl_spacing[alpha][getIndex(_Ns)] : mean_lvl_spacing[0.600][getIndex(_Ns)]; };
-            static double getThouless(double alpha, int _Ns)           { return thouless.contains(alpha) ? thouless[alpha][getIndex(_Ns)] : thouless[0.600][getIndex(_Ns)]; };
-      } UM_default;
+      };
 
+      struct UM_default : General_types::Model_default<_UM_default>
+      {};
 
 };
