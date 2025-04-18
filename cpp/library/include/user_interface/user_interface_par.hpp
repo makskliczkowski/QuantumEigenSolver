@@ -25,7 +25,7 @@ constexpr int UI_LIMITS_QUADRATIC_STATEFULL						= 32;
 // ##########################################################################################################################################
 
 // for running the complex Hamiltonian or the real one
-#define RUN_CPX_REAL(TAKE_COMPLEX, _F, _MREAL, _MCPX) if (TAKE_COMPLEX) _F(_MCPX); else _F(_MREAL);
+#define RUN_CPX_REAL(TAKE_COMPLEX, _F, _MREAL, _MCPX) if (TAKE_COMPLEX) _F<std::complex<double>>(_MCPX); else _F<double>(_MREAL);
 // default containers
 #define UI_DEF_VMAT(Type, _sizex, _sizey, _sizez) VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5)
 #define UI_DEF_VMAT_COND(Type, _sizex, _sizey, _sizez, _cond) _cond ? VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5) : VMAT<Type>(0, 0, 0, arma::fill::ones, -1e5)

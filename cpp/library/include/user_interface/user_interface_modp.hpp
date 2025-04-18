@@ -350,7 +350,7 @@ namespace HamiltonianHelpers
 	* @param nh_loc The local dimension (default is 2). Common values are 2 (binary) or 4 (quaternary).
 	* @return The estimated number of sites as a long integer.
 	*/
-	long get_ns_est(u64 nh, int nh_loc = 2)
+	inline long get_ns_est(u64 nh, int nh_loc = 2)
 	{
 		int ns = 0;
 		if (nh_loc == 2)
@@ -376,7 +376,7 @@ namespace HamiltonianHelpers
 	* @param nh_loc    The local Hilbert space dimension (default is 2).
 	* @return          Estimated Heisenberg time as a long double.
 	*/
-	long double get_heisenberg_time_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	inline long double get_heisenberg_time_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
 	{
 		int ns = get_ns_est(nh, nh_loc);
 		switch (mod_typ)
@@ -414,7 +414,7 @@ namespace HamiltonianHelpers
 	* @param nh_loc    The local Hilbert space dimension (default is 2).
 	* @return          Estimated bandwidth as a long double.
 	*/
-	long double get_bandwidth_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	inline long double get_bandwidth_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
 	{
 		int ns = get_ns_est(nh, nh_loc);
 		switch (mod_typ)
@@ -454,7 +454,7 @@ namespace HamiltonianHelpers
 	* @param nh_loc    Local Hilbert space dimension (default is 2).
 	* @return Estimated energy width as a long double.
 	*/
-	long double get_energy_width_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	inline long double get_energy_width_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
 	{
 		int ns = get_ns_est(nh, nh_loc);
 		switch (mod_typ)
@@ -477,7 +477,7 @@ namespace HamiltonianHelpers
 
 	// ############################################################################
 
-	long double get_thouless_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
+	inline long double get_thouless_est(MY_MODELS mod_typ, double param, u64 nh, int nh_loc = 2)
 	{
 		int ns = get_ns_est(nh, nh_loc);
 		switch (mod_typ)

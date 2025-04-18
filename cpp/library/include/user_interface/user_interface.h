@@ -835,4 +835,262 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 //	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
 
+// ##########################################################################################################################################
+
+inline std::string PREFIX(const std::string& name, const std::string& random_tag, const std::string& extension, std::string time_tag = "") {
+	if (time_tag.empty()) 
+	{
+		time_tag = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+	}
+	return name + random_tag + "_t=" + time_tag + extension;
+}
+
+namespace TimeEvo
+{
+
+	// ----------------------------------------------------------------
+	// File name prefixes
+	// ----------------------------------------------------------------
+	inline const std::string KEY_ME                      = "/ME";                        // for mean energy
+	inline const std::string KEY_EPS                     = "eps_micro";                  // for a given energy density
+	inline const std::string KEY_MEAN_LVL                = "mean_lvl_spacing";           // mean level spacing
+	inline const std::string KEY_HEIS_TIME_GAMMA         = "heis_time_gamma";            // Heisenberg time (gamma)
+	inline const std::string KEY_HEIS_TIME_AROUND_MEAN   = "heis_time_around_mean";      // Heisenberg time around mean
+	inline const std::string KEY_HEIS_TIME_AROUND_MEAN_T = "heis_time_around_mean_typ";  // Heisenberg time around mean (typical)
+	inline const std::string KEY_ENERGIES                = "energies";                   // energies
+	inline const std::string KEY_MEAN                    = "mean";                       // Tr<psi|H|psi> / N_h
+	inline const std::string KEY_MEAN_STATE              = "mean_state";                 // <psi_0|H|psi_0>
+	inline const std::string KEY_MEAN_STATE2             = "mean_state2";                // <psi_0|H|psi_0>^2
+	inline const std::string KEY_TIME                    = "time";                       // time
+	inline const std::string KEY_TIME_SHORT              = "time/short";                 // time short
+	inline const std::string KEY_TIME_MEDIUM             = "time/medium";                // time medium
+	inline const std::string KEY_TIME_MIDDLE             = "time/middle";                // time middle
+	inline const std::string KEY_TIME_LONG               = "time/long";                  // time long
+	inline const std::string KEY_ENT_ENTROPY_PREFIX      = "entanglement_entropy/";      // entanglement entropy
+	inline const std::string KEY_ENT_SITES               = "entanglement_entropy/sites"; // entanglement entropy for sites
+	inline const std::string KEY_PARTICIPATION           = "participation_entropy";      // participation entropy S_p = - sum_i (|psi_i|^4)
+	inline const std::string KEY_ENERGY_DENSITY          = "energy_density";             // energy density
+	inline const std::string KEY_REALIZATION             = "realization";                // number of realizations
+
+	inline const std::string SUFFIX_ZERO                 = "/zero";                      // for zero energy state
+	inline const std::string SUFFIX_ME                   = "/ME";                        // for mean energy state
+	inline const std::string SUFIX_BIPARTITE             = "/bipartite";               	 // for bipartite entanglement
+	inline const std::string SUFFIX_MICRO_ME             = "/micro/ME/1";                // for microcanonical ensemble
+	inline const std::string SUFFIX_MICRO_ME2            = "/micro/ME/2";                // for microcanonical ensemble squared
+	inline const std::string SUFFIX_DIAGONAL_ME          = "/diagonal/ME";               // for diagonal ensemble
+
+	// For macros/functions that require arguments, use inline constexpr functions:
+	inline std::string SUFFIX_EPS(double x)            { return "/eps=" + std::to_string(x); 				}
+	inline std::string SUFFIX_MICRO_ED(double x)       { return "/micro/eps=" + std::to_string(x) + "/1"; 	}
+	inline std::string SUFFIX_MICRO2_ED(double x)      { return "/micro/eps=" + std::to_string(x) + "/2"; 	}
+	inline std::string SUFFIX_DIAGONAL_ED(double x)    { return "/diagonal/eps=" + std::to_string(x); 		}
+
+	// File name prefixes (these require runtime variables, so keep as inline functions)
+	inline std::string STAT_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("stat", random_tag, extension, time_tag);
+	}
+	inline std::string LDOS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("ldos", random_tag, extension, time_tag);
+	}
+	inline std::string DIAG_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("diag", random_tag, extension, time_tag);
+	}
+	inline std::string EDENS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("energydens", random_tag, extension, time_tag);
+	}
+	inline std::string EVO_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("evo", random_tag, extension, time_tag);
+	}
+	inline std::string AVS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("avs", random_tag, extension, time_tag);
+	}
+
+	template <typename T>
+	struct TimeEvoParams
+	{
+		size_t _Ns;
+		size_t _Nh;
+		size_t _hs_fraction_diag        = 0;
+		bool _isQuadratic               = true;
+		bool _isManyBody                = true;
+	
+		long double _bw_est;
+		long double _dtau_est;
+		long double _heisenberg_time_est;
+		long double _thouless_est;
+		long long   _ntimes;
+		long long   _nrealiz            = 1;
+	
+		// stores the operators
+		std::vector<std::shared_ptr<Operators::Operator<double>>> _ops;
+		std::vector<std::string> _opsN;
+	
+		// stores the model info
+		std::string modelInfo;
+		std::string dir                 = "ETH_MAT_TIME_EVO";
+		std::string randomStr;
+		std::string extension;
+		std::string time_tag;
+
+		// stores the time evolution
+		bool _uniform_time;
+		arma::Col<double> _timespace;
+	
+		// stores the check vectors
+		v_1d<double> _to_check_microcanonical_eps;
+		v_1d<double> _energy_densities;
+		v_1d<size_t> _entropies_sites;
+	
+		// ----------------------------------------------------------------
+		//! Functions
+		// ----------------------------------------------------------------
+	
+		void set_timespace()
+		{
+			if (!_uniform_time)
+			{
+				_timespace = arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), _ntimes);
+			}
+			else
+			{	
+				const long long start_short 	= 0;
+				const long long start_medium 	= _thouless_est * 1e-2;
+				const long long start_middle 	= _thouless_est * 0.5;
+				const long long start_long 		= _heisenberg_time_est * 1e-2;
+				const long long end_short 		= start_short + (_ntimes * _dtau_est);
+				const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
+				const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
+				const long long end_long 		= start_long + (_ntimes * _dtau_est);
+	
+				// Create a uniform distribution of time points
+				arma::Col<double> _short_times 	= arma::linspace(start_short, end_short, _ntimes);
+				arma::Col<double> _medium_times = arma::linspace(start_medium, end_medium, _ntimes);
+				arma::Col<double> _middle_times = arma::linspace(start_middle, end_middle, _ntimes);
+				arma::Col<double> _long_times 	= arma::linspace(start_long, end_long, _ntimes);
+				const long long _total_size		= (_short_times.size() + _medium_times.size() + _middle_times.size() + _long_times.size());
+				
+				// Combine all the time ranges
+				_timespace.set_size(_total_size);
+				_timespace.subvec(0, _short_times.size() - 1) = _short_times;
+				_timespace.subvec(_short_times.size(), _short_times.size() + _medium_times.size() - 1) = _medium_times;
+				_timespace.subvec(_short_times.size() + _medium_times.size(), _short_times.size() + _medium_times.size() + _middle_times.size() - 1) = _middle_times;
+				_timespace.subvec(_short_times.size() + _medium_times.size() + _middle_times.size(), _total_size - 1) = _long_times;
+			}
+		}
+	
+		// ----------------------------------------------------------------
+		//! Set Hamiltonian parameters
+		// ----------------------------------------------------------------
+	
+		void set_hamil_params(MY_MODELS _type, std::shared_ptr<Hamiltonian<T>> _H, size_t n_tot, size_t n_real);
+	
+		// ----------------------------------------------------------------
+		//! Containers to hold all results
+		// ----------------------------------------------------------------
+	
+		struct ResultContainers 
+		{
+			arma::Col<T> initial_state_me;                                  // [nh]
+			arma::Mat<T> initial_state_ed;                                  // [nh x n_ops]
+	
+			// level statistics
+			arma::Mat<double> mean_level_spacing;                           // [4 x n_real]
+			arma::Mat<double> energies;                                     // [nh x n_real]
+	
+			// local density of states
+			arma::Mat<double> ldos_me;                                      // [nh x n_real]
+			std::vector<arma::Mat<double>> ldos_ed;                         // [n_edens][nh x n_real]
+	
+			// energy densities
+			arma::Mat<T> energy_densities_me;                          		// [3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+			std::vector<arma::Mat<T>> energy_densities_ed;             		// [n_edens][3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+	
+			// diagonal elements
+			std::vector<arma::Mat<T>> diagonals;                            // [n_ops][nh x n_real]
+	
+			// time evolution
+			std::vector<arma::Mat<T>> time_evo_me;                          // [n_ops][n_times x n_real]
+			std::vector<arma::Col<T>> time_evo_zero_me;						// [n_ops][n_real]
+			std::vector<std::vector<arma::Mat<T>>> time_evo_ed;             // [n_edens][n_ops][n_times x n_real]
+			std::vector<std::vector<arma::Col<T>>> time_evo_zero_ed;        // [n_edens][n_ops][n_real]
+	
+			// entropies
+			arma::Mat<double> time_participation_entropy;                   // [n_times x n_real]
+			std::vector<arma::Mat<double>> time_ee;                        	// [n_sites][n_times x n_real]
+			arma::Mat<double> time_ee_bipartite;                            // [n_times x n_real]
+	
+			// microcanonical averages
+			std::vector<arma::Mat<T>> microcanonical_me;                   	// [n_ops][n_eps x n_real]
+			std::vector<arma::Mat<double>> microcanonical_me2;              // [n_ops][n_eps x n_real]
+			std::vector<std::vector<arma::Mat<T>>> microcanonical_ed;      	// [n_edens][n_ops][n_eps x n_real]
+			std::vector<std::vector<arma::Mat<double>>> microcanonical_ed2; // [n_edens][n_ops][n_eps x n_real]
+	
+			// diagonal ensembles
+			arma::Mat<double> diagonal_me;                                  // [n_ops x n_real]
+			std::vector<arma::Mat<double>> diagonal_ed;                     // [n_edens][n_ops x n_real]
+	
+			// finished realisations
+			size_t realisation_count = 0;                                   // number of realizations finished
+	
+		} _r;
+	
+		// ----------------------------------------------------------------
+	
+		void save_for_realization(size_t r);		
+	
+		// ----------------------------------------------------------------
+	
+		void allocate_result_containers();
+		
+		// ----------------------------------------------------------------
+	};
+
+	// --------------------------------------------------------------------
+
+	template <typename T>
+	void microcanonical_saver(
+		size_t r,                                            // realization index
+		size_t opi,                                          // operator index
+		const std::vector<arma::Mat<T>>& diagonals,          // diagonals[opi] is [nh × n_real]
+		const arma::Col<double>& soverlaps,                  // |<ψ|n>|² vector of length nh
+		const std::vector<uint64_t>& mins,                   // window start indices per ε - given energy density
+		const std::vector<uint64_t>& maxs,                   // window end indices per ε - given energy density
+		arma::Mat<double>& diagvals,                         // [n_ops × n_real], to write long‑time avg here (the diagonal ensemble)
+		std::vector<arma::Mat<T>>& microvals,                // [n_ops][n_eps × n_real] to save the microcanonical averages here
+		std::vector<arma::Mat<double>>& microvals2           // [n_ops][n_eps × n_real] squares of the microcanonical averages
+		);
+	
+	// --------------------------------------------------------------------
+
+	template <typename T>
+	void evolve_state(
+		size_t                                   r,                      	// realization index
+		const arma::Col<T>&                      init_state,             	// initial state vector [nh]
+		const std::shared_ptr<Hamiltonian<T>>&   H,                     	// Hamiltonian object
+		arma::Mat<double>*                       ldos,                   	// local density of states [nh x n_real] - optional
+		arma::Mat<T>*                            energydensities,        	// energy densities [3 x n_real] - optional
+		std::vector<arma::Mat<T>>*               micro,                  	// microcanonical averages [n_ops][n_eps x n_real] - optional
+		std::vector<arma::Mat<double>>*          micro2,                 	// microcanonical averages squared [n_ops][n_eps x n_real] - optional
+		arma::Mat<double>*                       diagvals,               	// diagonal ensemble [n_ops x n_real] - optional
+		const std::vector<arma::Mat<T>>&         diagonals,              	// operator diagonals [n_ops][nh x n_real]
+		std::vector<arma::Mat<T>>&               time_evo_me,            	// time evolution of operators [n_ops][n_times x n_real]
+		std::vector<arma::Col<T>>*               time_zero_me,           	// zero time value of operators [n_ops][n_real] - optional
+		std::vector<arma::Mat<double>>*          time_ee,                	// entanglement entropy [n_sites][n_times x n_real] - optional
+		arma::Mat<double>*                       time_ee_bipartite,      	// entanglement entropy bipartite [n_times x n_real] - optional
+		arma::Mat<double>*                       time_participation_entropy,// participation entropy [n_times x n_real] - optional
+		const std::vector<GeneralizedMatrix<double>>& matrices,				// operators [n_ops][nh x nh]
+		const arma::Col<double>&                 times,                  	// time grid [n_times]
+		size_t                                   Ns                = 0,  	// total number of sites
+		const std::vector<size_t>&               entropy_sites     = {},  	// sites for entanglement entropy
+		const std::vector<double>&               micro_epsilons    = {},  	// epsilons for microcanonical windows
+		bool                                     append            = false, // append values?
+		bool                                     use_log           = false, // use log of values?
+		bool                                     auto_cor          = false, // enable autocorrelation?
+		int                                      thread_num        = 1      // number of threads
+	);
+
+	// --------------------------------------------------------------------
+};
+
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

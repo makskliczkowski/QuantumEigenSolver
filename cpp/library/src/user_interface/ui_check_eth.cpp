@@ -975,6 +975,3 @@ template std::array<double, 6> UI::checkETH_statistics_mat_elems<cpx>(u64 _start
 	int _opi,
 	int _r
 	);
-
-template void UI::checkETH_time_evo<double>(std::shared_ptr<Hamiltonian<double>> _H);
-template void UI::checkETH_time_evo<cpx>(std::shared_ptr<Hamiltonian<cpx>> _H);
