@@ -57,6 +57,7 @@ icpx ./main.cpp                                                 \
         ./src/nqs/operators/nqs_operator.cpp                    \
         ./src/operators/operator_parser.cpp                     \
         ./src/user_interface/ui_check_eth.cpp                   \
+        ./src/user_interface/ui_check_eth_time_evo.cpp          \
         ./src/user_interface/ui_check_nqs.cpp                   \
         ./src/user_interface/ui_check_quadratic.cpp             \
         ./src/user_interface/ui_check_symmetries.cpp            \

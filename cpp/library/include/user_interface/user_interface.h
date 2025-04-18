@@ -927,7 +927,7 @@ namespace TimeEvo
 	
 		// stores the model info
 		std::string modelInfo;
-		std::string dir                 = "ETH_MAT_TIME_EVO";
+		std::string dir;
 		std::string randomStr;
 		std::string extension;
 		std::string time_tag;

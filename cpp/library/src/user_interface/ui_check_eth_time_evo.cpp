@@ -162,82 +162,96 @@ namespace TimeEvo
 		}
 
 		const size_t n_times 	= times.n_elem;
-		const size_t n_percent 	= static_cast<size_t>(0.05 * n_times);
-#pragma omp parallel for schedule(dynamic) num_threads(thread_num)
-		for (size_t ti = 0; ti < n_times; ++ti) 
+		const size_t log_stride	= std::max<size_t>(1, n_times / 10);  // every 10%
+		auto t_start   			= std::chrono::high_resolution_clock::now();
+		auto t_last    			= t_start;
+		std::atomic<size_t> completed{0};
+#pragma omp parallel num_threads(thread_num)
 		{
-			// start current time for the performance
-			const auto start_t 							= std::chrono::high_resolution_clock::now();
-			const double t 								= times(ti);
-			const arma::Col<std::complex<double>> st 	= SystemProperties::TimeEvolution::time_evo(eigvecs, eigvals, overlaps, t);
-			const auto time_evo							= std::chrono::high_resolution_clock::now();
+			// thread‑local workspace
+			arma::Col<std::complex<double>> st_loc(eigvecs.n_rows);
 
-			for (size_t opi = 0; opi < matrices.size(); ++opi) 
+#pragma omp for schedule(static)
+			for (size_t ti = 0; ti < n_times; ++ti) 
 			{
-				auto val_c 		= arma::as_scalar(arma::cdot(st, matrices[opi] * st));
-				if (auto_cor) 
-					val_c *= zerovals[opi];
-				auto val_c_t 	= algebra::cast<T>(val_c);
+	
+				// start current time for the performance
+				const double t			= times(ti);
+				st_loc 					= SystemProperties::TimeEvolution::time_evo(eigvecs, eigvals, overlaps, t, 1);
 
-				T val = 0.0;
-				if (append) 
+				for (size_t opi = 0; opi < matrices.size(); ++opi) 
 				{
-					if (use_log)
-						val = time_evo_me[opi](ti, r) + std::log(std::abs(val_c_t));
-					else
-						val = time_evo_me[opi](ti, r) + algebra::cast<T>(val_c_t);
-				} 
-				else 
-				{
-					if (use_log)
-						val = std::log(std::abs(val_c_t));
-					else
-						val = algebra::cast<T>(val_c_t);
+					auto val_c 			= arma::as_scalar(arma::cdot(st_loc, matrices[opi] * st_loc));
+					if (auto_cor) 		val_c *= zerovals[opi];
+					auto val_c_t 		= algebra::cast<T>(val_c);
+
+					T val = 0.0;
+					if (append) 
+					{
+						if (use_log)
+							val = time_evo_me[opi](ti, r) + std::log(std::abs(val_c_t));
+						else
+							val = time_evo_me[opi](ti, r) + algebra::cast<T>(val_c_t);
+					} 
+					else 
+					{
+						if (use_log)
+							val = std::log(std::abs(val_c_t));
+						else
+							val = algebra::cast<T>(val_c_t);
+					}
+					time_evo_me[opi](ti, r) = val;
 				}
-				time_evo_me[opi](ti, r) = val;
-			}
-			const auto time_overlap = std::chrono::high_resolution_clock::now();
 
-			// Entropy
-			if (time_ee != nullptr) 
-			{
-				size_t iter = 0;
-				for (auto site : entropy_sites) 
+				// Entropy
+				if (time_ee != nullptr) 
 				{
-					uint64_t maskA = 1ull << (site - 1);
-					// Entanglement entropy per site
-					(*time_ee)[iter++](ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
-						st, 1, Ns, maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+					size_t iter = 0;
+					for (auto site : entropy_sites) 
+					{
+						uint64_t maskA = 1ull << (site - 1);
+						// Entanglement entropy per site
+						(*time_ee)[iter++](ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
+							st_loc, 1, Ns, maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+					}
 				}
-			}
-			// Bipartite entanglement entropy
-			if (time_ee_bipartite != nullptr) 
-			{
-				(*time_ee_bipartite)(ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
-					st, int(Ns / 2), Ns, (ULLPOW(int(Ns / 2))) - 1);
-			}
+				
+				// Bipartite entanglement entropy
+				if (time_ee_bipartite != nullptr) 
+				{
+					(*time_ee_bipartite)(ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
+						st_loc, int(Ns / 2), Ns, (ULLPOW(int(Ns / 2))) - 1);
+				}
 
-			// Participation entropy
-			if (time_participation_entropy != nullptr) 
-			{
-				(*time_participation_entropy)(ti, r) = SystemProperties::information_entropy(st);
-			}
+				// Participation entropy
+				if (time_participation_entropy != nullptr) 
+				{
+					(*time_participation_entropy)(ti, r) = SystemProperties::information_entropy(st_loc);
+				}
 
-			// Print log after 5% of time steps
-			if (ti % n_percent == 0) 
-			{
-				int curr_prcnt 				= static_cast<int>(100.0 * ti / n_times);
-				LOGINFO("Time evolution: " + std::to_string(curr_prcnt) + "%", LOG_TYPES::TRACE, 4);
-				const auto end_t 			= std::chrono::high_resolution_clock::now();
-				const auto elapsed 			= std::chrono::duration_cast<std::chrono::microseconds>(end_t - start_t).count();
-				const auto elapsed_time_evo = std::chrono::duration_cast<std::chrono::microseconds>(time_evo - start_t).count();
-				const auto elapsed_overlap 	= std::chrono::duration_cast<std::chrono::microseconds>(time_overlap - time_evo).count();
-				const auto elapsed_rest		= std::chrono::duration_cast<std::chrono::microseconds>(end_t - time_overlap).count();
-
-				LOGINFO("Time evolution (total): " + std::to_string(ti) + " / " + std::to_string(n_times) + " (" + STRP(elapsed, 2) + " ms)", LOG_TYPES::TRACE, 5);
-				LOGINFO("Time evolution (time evolution): " + std::to_string(ti) + " / " + std::to_string(n_times) + " (" + STRP(elapsed_time_evo, 2) + " ms)", LOG_TYPES::TRACE, 5);
-				LOGINFO("Time evolution (overlap): " + std::to_string(ti) + " / " + std::to_string(n_times) + " (" + STRP(elapsed_overlap, 2) + " ms)", LOG_TYPES::TRACE, 5);
-				LOGINFO("Time evolution (rest): " + std::to_string(ti) + " / " + std::to_string(n_times) + " (" + STRP(elapsed_rest, 2) + " ms)", LOG_TYPES::TRACE, 5);
+				size_t done = completed.fetch_add(1, std::memory_order_relaxed) + 1;
+				if (done % log_stride == 0) 
+				{
+#pragma omp critical
+					{
+						auto now     	= std::chrono::high_resolution_clock::now();
+						auto total   	= std::chrono::duration_cast<std::chrono::milliseconds>(now - t_start).count();
+						auto partial 	= std::chrono::duration_cast<std::chrono::milliseconds>(now - t_last).count();
+	
+						int pct 		= static_cast<int>((100.0 * done) / n_times);
+						LOGINFO("Time evolution progress: " 
+								+ std::to_string(pct) + "% ("
+								+ std::to_string(done) + "/"
+								+ std::to_string(n_times) + ")",
+								LOG_TYPES::TRACE, 4);
+	
+						LOGINFO("  since start: " + STRP(total,2) + " ms; "
+								"since last log: " + STRP(partial,2) + " ms",
+								LOG_TYPES::TRACE, 5);
+	
+						t_last = now;
+					}
+				}
 			}
 		}
 	}
@@ -273,8 +287,10 @@ namespace TimeEvo
 		this->_dtau_est                 = 1.0l / _bw_est;
 		this->_heisenberg_time_est      = HamiltonianHelpers::get_heisenberg_time_est(_type, _H->getMainParam(), _Nh);
 		this->_thouless_est             = HamiltonianHelpers::get_thouless_est(_type, _H->getMainParam(), _Nh);
-		this->_ntimes                   = 200;
+		this->_ntimes                   = 100000;
 		this->_nrealiz                  = n_real;
+		this->_uniform_time			 	= true;
+		this->dir					    = this->_uniform_time ? "ETH_MAT_TIME_EVO_UNIFORM" : "ETH_MAT_TIME_EVO";
 		// this->_isQuadratic              = _H->getIsQuadratic();
 		// this->_isManyBody               = _H->getIsManyBody();
 		this->_ops                      = {};
@@ -282,7 +298,6 @@ namespace TimeEvo
 		this->_entropies_sites 			= { 1, size_t(_Ns / 2), size_t(_Ns) 			};
 		_energy_densities               = { 0.1, 0.2, 0.3                         		};
 		_to_check_microcanonical_eps   	= { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4    };
-		this->_uniform_time			 	= false;
 		this->time_tag					= std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
 	}   
@@ -585,6 +600,10 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 	_timer.checkpoint("START");
 	// -----------------------
 	_p.allocate_result_containers();
+
+#ifdef USE_MKL
+    mkl_set_num_threads(1);
+#endif
 
 	//! go through realizations
 	for (int _r = 0; _r < _p._nrealiz; ++_r)
