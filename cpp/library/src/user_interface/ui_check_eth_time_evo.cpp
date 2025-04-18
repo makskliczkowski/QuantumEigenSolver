@@ -287,7 +287,7 @@ namespace TimeEvo
 		this->_dtau_est                 = 1.0l / _bw_est;
 		this->_heisenberg_time_est      = HamiltonianHelpers::get_heisenberg_time_est(_type, _H->getMainParam(), _Nh);
 		this->_thouless_est             = HamiltonianHelpers::get_thouless_est(_type, _H->getMainParam(), _Nh);
-		this->_ntimes                   = 100;
+		this->_ntimes                   = 100000;
 		this->_nrealiz                  = n_real;
 		this->_uniform_time			 	= true;
 		this->dir					    = this->_uniform_time ? "ETH_MAT_TIME_EVO_UNIFORM" : "ETH_MAT_TIME_EVO";
