@@ -1,34 +1,35 @@
 {
-    "version": 4,
-    "configurations": [
+    "version"           : 4,
+    "configurations"    : [
         {
-            "name": "Debug Program",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/program.o",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "preLaunchTask": "build",
-            "MIMode": "gdb",
-            "setupCommands": [
+            "name"              : "Debug Program",
+            "type"              : "cppdbg",
+            "request"           : "launch",
+            "program"           : "${workspaceFolder}/build/program.o",
+            "args"              : [],
+            "stopAtEntry"       : false,
+            "cwd"               : "${workspaceFolder}",
+            "environment"       : [],
+            "externalConsole"   : false,
+            "preLaunchTask"     : "build",
+            "MIMode"            : "gdb",
+            "setupCommands"     : [
                 {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
+                    "description"       : "Enable pretty-printing for gdb",
+                    "text"              : "-enable-pretty-printing",
+                    "ignoreFailures"    : true
                 }
             ],
-            "miDebuggerPath": "/usr/bin/gdb",
-            "logging": {
-                "engineLogging": true
+            "miDebuggerPath"     : "/usr/bin/gdb",
+            "logging"           : {
+                "engineLogging"      : true
             },
-            "includePath": [
+            "includePath"        : [
                 "${workspaceFolder}",
                 "${ARMADILLO_INCL_DIR}",
                 "${MKL_INCL_DIR}"
-            ]
+            ],
+            "cppStandard"        : "c++20" // Add or update this line for the new C++ standard
         }
     ]
 }

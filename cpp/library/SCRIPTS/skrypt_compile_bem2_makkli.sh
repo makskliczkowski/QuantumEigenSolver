@@ -44,7 +44,9 @@ icpx ./main.cpp                                                 \
         ${CPPSOURCE}/LinearAlgebra/pfaffian.cpp                 \
         ${CPPSOURCE}/LinearAlgebra/ode.cpp                      \
         ./user_interface.cpp                                    \
+        ./src/nqs/nqs_def.cpp                                   \
         ./src/nqs/nqs.cpp                                       \
+        ./src/nqs/nqs_quench.cpp                                \
         ./src/nqs/nqs_opt.cpp                                   \
         ./src/nqs/nqs_lower.cpp                                 \
         ./src/nqs/nqs_sampling.cpp                              \
@@ -53,8 +55,9 @@ icpx ./main.cpp                                                 \
         ./src/nqs/rbm/rbm_spin.cpp                              \
         ./src/nqs/rbmpp/rbmpp.cpp                               \
         ./src/nqs/operators/nqs_operator.cpp                    \
-        ./src/operator_parser.cpp                               \
+        ./src/operators/operator_parser.cpp                     \
         ./src/user_interface/ui_check_eth.cpp                   \
+        ./src/user_interface/ui_check_eth_time_evo.cpp          \
         ./src/user_interface/ui_check_nqs.cpp                   \
         ./src/user_interface/ui_check_quadratic.cpp             \
         ./src/user_interface/ui_check_symmetries.cpp            \

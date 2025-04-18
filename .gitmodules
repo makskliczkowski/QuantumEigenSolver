@@ -1,3 +1,6 @@
 [submodule "cpp/library/source"]
 	path = cpp/library/source
 	url = https://github.com/makskliczkowski/general_cpp
+[submodule "Python/QES/general_python"]
+	path = Python/QES/general_python
+	url = https://github.com/makskliczkowski/general_python

@@ -53,13 +53,14 @@ namespace SystemProperties
 														const double _time,
 														size_t _threads = 1)
 		{
-			arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);		// precompute the exponential
+			return _eigenstates * (_overlaps % arma::exp(-cpx(0,_time) * _eigvals));
+			// arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);		// precompute the exponential
 			// try armadillo multiplication
-			//return _eigenstates * (_exp % _overlaps);
-			arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
-			for (auto i = 0; i < _eigenstates.n_cols; ++i)
-				_ret += (_exp(i) * _overlaps(i)) * _eigenstates.col(i);
-			return _ret;
+			// return _eigenstates * (_exp % _overlaps);
+			// arma::Col<std::complex<double>> _ret(_eigenstates.n_cols, arma::fill::zeros);
+			// for (auto i = 0; i < _eigenstates.n_cols; ++i)
+				// _ret += (_exp(i) * _overlaps(i)) * _eigenstates.col(i);
+			// return _ret;
 		}
 
 		// ---------------------------------------------------------------------------
