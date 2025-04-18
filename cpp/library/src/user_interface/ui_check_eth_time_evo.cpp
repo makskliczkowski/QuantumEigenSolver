@@ -8,34 +8,38 @@
 // ----------------------------------------------------------------
 #define PREFIX(name, random_tag, extension) dir , name + random_tag + extension
 #define STAT_PREFIX PREFIX("stat", random_tag, extension)
-#define     KEY_ME                      "ME"
+#define     KEY_ME                      "/ME"
+#define 	KEY_EPS                     "eps_micro"						// for a given energy density
 #define     KEY_MEAN_LVL                "mean_lvl_spacing"
 #define     KEY_HEIS_TIME_GAMMA         "heis_time_gamma"
 #define     KEY_HEIS_TIME_AROUND_MEAN   "heis_time_around_mean"
 #define     KEY_HEIS_TIME_AROUND_MEAN_T "heis_time_around_mean_typ"
 #define     KEY_ENERGIES                "energies"
 #define LDOS_PREFIX PREFIX("ldos", random_tag, extension)
-
 #define DIAG_PREFIX PREFIX("diag", random_tag, extension)
 #define EDENS_PREFIX PREFIX("energydens", random_tag, extension)
-#define     KEY_MEAN                    "mean"
-#define     KEY_MEAN_STATE              "mean_state"
-#define     KEY_MEAN_STATE2             "mean_state2"
+#define     KEY_MEAN                    "mean"							// Tr<psi|H|psi> / N_h
+#define     KEY_MEAN_STATE              "mean_state"					// <psi_0|H|psi_0>
+#define     KEY_MEAN_STATE2             "mean_state2"					// <psi_0|H|psi_0>^2
 #define EVO_PREFIX PREFIX("evo", random_tag, extension)
-#define     KEY_TIME                    "time"
-#define     KEY_ENT_ENTROPY_PREFIX      "entanglement_entropy/"
-#define     KEY_EE_BIPARTITE            "entanglement_entropy/bipartite"
-#define     KEY_PARTICIPATION           "participation_entropy"
+#define     KEY_TIME                    "time"							// time
+#define 	KEY_TIME_SHORT				"time/short"					// time short
+#define 	KEY_TIME_MEDIUM				"time/medium"					// time medium
+#define 	KEY_TIME_MIDDLE				"time/middle"					// time middle
+#define 	KEY_TIME_LONG				"time/long"						// time long
+#define     KEY_ENT_ENTROPY_PREFIX      "entanglement_entropy/"			// entanglement entropy
+#define     KEY_PARTICIPATION           "participation_entropy"			// participation entropy S_p = - sum_i (|psi_i|^4)
 #define AVS_PREFIX PREFIX("avs", random_tag, extension)
 
-#define SUFFIX_ME                       "/ME"
-#define SUFFIX_EPS                      "/eps="
-#define SUFFIX_MICRO_ME                 "/micro_ME"
-#define SUFFIX_MICRO_ME2                "/micro_ME2"
-#define SUFFIX_DIAGONAL_ME              "/diagonal_ME"
-#define SUFFIX_MICRO_ED                 "/micro"
-#define SUFFIX_MICRO2_ED                "/micro2"
-#define SUFFIX_DIAGONAL_ED              "/diagonal"
+#define SUFFIX_ME                       "/ME/"							// for mean energy state
+#define SUFIX_BIPARTITE 			 	"/bipartite/"					// for bipartite entanglement
+#define SUFFIX_EPS(x)                   "/eps=" + STR(x)	 			// for a given energy density		
+#define SUFFIX_MICRO_ME                 "/micro/ME/1"					// for microcanonical ensemble
+#define SUFFIX_MICRO_ME2                "/micro/ME/2"					// for microcanonical ensemble squared
+#define SUFFIX_MICRO_ED(x)              "/micro/eps=" + STR(x) + "/1"	// for microcanonical ensemble
+#define SUFFIX_MICRO2_ED(x)             "/micro/eps=" + STR(x) + "/2"	// for microcanonical ensemble squared
+#define SUFFIX_DIAGONAL_ME              "/diagonal/ME"
+#define SUFFIX_DIAGONAL_ED(x)           "/diagonal/eps=" + STR(x)
 
 // ----------------------------------------------------------------
 
@@ -51,6 +55,7 @@ constexpr static bool check_multithread_operator(u64 _Nh)
 
 // ----------------------------------------------------------------
 
+template <typename T>
 struct TimeEvoParams
 {
     size_t _Ns;
@@ -129,6 +134,8 @@ struct TimeEvoParams
     }
 
     // ------------------------------------------------------------
+	//! Set Hamiltonian parameters
+	// ------------------------------------------------------------
 
     void set_hamil_params(MY_MODELS _type, std::shared_ptr<Hamiltonian<double>> _H, size_t n_tot, size_t n_real)
     {
@@ -147,112 +154,144 @@ struct TimeEvoParams
         this->_opsN                     = {};
     }   
 
+	// ----------------------------------------------------------------
+	//! Containers to hold all results
+	// ----------------------------------------------------------------
+
+	struct ResultContainers 
+	{
+		arma::Col<T> initial_state_me;                                  // [nh]
+		arma::Mat<T> initial_state_ed;                                  // [nh x n_ops]
+
+		// level statistics
+		arma::Mat<double> mean_level_spacing;                           // [4 x n_real]
+		arma::Mat<double> energies;                                     // [nh x n_real]
+
+		// local density of states
+		arma::Mat<double> ldos_me;                                      // [nh x n_real]
+		std::vector<arma::Mat<double>> ldos_ed;                         // [n_edens][nh x n_real]
+
+		// energy densities
+		arma::Mat<double> energy_densities_me;                          // [3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+		std::vector<arma::Mat<double>> energy_densities_ed;             // [n_edens][3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+
+		// diagonal elements
+		std::vector<arma::Mat<T>> diagonals;                            // [n_ops][nh x n_real]
+
+		// time evolution
+		arma::Col<double> times, times_s, times_m, times_mi, times_l;	// [n_times]
+		std::vector<arma::Mat<T>> time_evo_me;                          // [n_ops][n_times x n_real]
+		std::vector<std::vector<arma::Mat<T>>> time_evo_ed;             // [n_edens][n_ops][n_times x n_real]
+
+		// entropies
+		arma::Mat<double> time_participation_entropy;                   // [n_times x n_real]
+		std::vector<arma::Mat<double> > time_ee;                        // [n_sites][n_times x n_real]
+		arma::Mat<double> time_ee_bipartite;                            // [n_times x n_real]
+
+		// microcanonical averages
+		std::vector<arma::Mat<T>> microcanonical_me;                   	// [n_ops][n_eps x n_real]
+		std::vector<arma::Mat<double>> microcanonical_me2;              // [n_ops][n_eps x n_real]
+		std::vector<std::vector<arma::Mat<T>>> microcanonical_ed;      	// [n_edens][n_ops][n_eps x n_real]
+		std::vector<std::vector<arma::Mat<double>>> microcanonical_ed2; // [n_edens][n_ops][n_eps x n_real]
+
+		// diagonal ensembles
+		arma::Mat<double> diagonal_me;                                  // [n_ops x n_real]
+		std::vector<arma::Mat<double>> diagonal_ed;                     // [n_edens][n_ops x n_real]
+
+		// finished realisations
+		size_t realisation_count = 0;                                   // number of realizations finished
+
+	} _r;
+
+	// ----------------------------------------------------------------
+
+	void save_for_realization(size_t r)
+	{
+		std::string random_tag = this->randomStr;
+
+		//! level statistics
+		saveAlgebraic(STAT_PREFIX, arma::vec(_r.mean_level_spacing.row(0).as_col()), KEY_MEAN_LVL, false);
+		saveAlgebraic(STAT_PREFIX, arma::vec(_r.mean_level_spacing.row(1).as_col()), KEY_HEIS_TIME_GAMMA, true);
+		saveAlgebraic(STAT_PREFIX, arma::vec(_r.mean_level_spacing.row(2).as_col()), KEY_HEIS_TIME_AROUND_MEAN, true);
+		saveAlgebraic(STAT_PREFIX, arma::vec(_r.mean_level_spacing.row(3).as_col()), KEY_HEIS_TIME_AROUND_MEAN_T, true);
+		saveAlgebraic(STAT_PREFIX, _r.energies, KEY_ENERGIES, true);
+
+		//! LDOS
+		saveAlgebraic(LDOS_PREFIX, _r.ldos_me, KEY_ME, false);
+		for(size_t i = 0; i < _r.e_densities.size(); ++i)
+			saveAlgebraic(LDOS_PREFIX, _r.ldos_ed[i], SUFFIX_EPS(_r.e_densities[i]), true);
+
+		// energy densities obtained from the given initial state
+		saveAlgebraic(EDENS_PREFIX, arma::vec(_r.energy_densities_me.row(0).t()), KEY_MEAN KEY_ME, false);			// mean energy
+		saveAlgebraic(EDENS_PREFIX, arma::vec(_r.energy_densities_me.row(1).t()), KEY_MEAN_STATE KEY_ME, true);		// <state|H|state>
+		saveAlgebraic(EDENS_PREFIX, arma::vec(_r.energy_densities_me.row(2).t()), KEY_MEAN_STATE2 KEY_ME, true);	// <state|H|state>^2
+		for(size_t i = 0; i < _r._energy_densities_ed.size(); ++i) 
+		{
+			const std::string tag = SUFFIX_EPS(this->_energy_densities[i]);
+			saveAlgebraic(EDENS_PREFIX, _r._energy_densities_ed[i], KEY_MEAN + tag, true);
+			saveAlgebraic(EDENS_PREFIX, _r._energy_densities_ed[i], KEY_MEAN_STATE + tag, true);
+			saveAlgebraic(EDENS_PREFIX, _r._energy_densities_ed[i], KEY_MEAN_STATE2 + tag, true);
+		}
+
+		//! time grid
+		saveAlgebraic(EVO_PREFIX, _r.times, KEY_TIME, false);
+		if (_uniform_time)
+		{
+			const long long start_short 	= 0;
+			const long long start_medium 	= _thouless_est * 1e-2;
+			const long long start_middle 	= _thouless_est * 0.5;
+			const long long end_short 		= start_short + (_ntimes * _dtau_est);
+			const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
+			const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
+			const long long _total_size		= (_timespace.size());
+			const long long _short_size		= end_short - start_short;
+			const long long _medium_size	= end_medium - start_medium;
+			const long long _middle_size	= end_middle - start_middle;
+
+			saveAlgebraic(dir, EVO_PREFIX, _timespace.subvec(0, _short_size - 1), KEY_TIME_SHORT, true);
+			saveAlgebraic(dir, EVO_PREFIX, _timespace.subvec(_short_size, _short_size + _medium_size - 1), KEY_TIME_MEDIUM, true);
+			saveAlgebraic(dir, EVO_PREFIX, _timespace.subvec(_short_size + _medium_size, _short_size + _medium_size + _middle_size - 1), KEY_TIME_MIDDLE, true);
+			saveAlgebraic(dir, EVO_PREFIX, _timespace.subvec(_short_size + _medium_size + _middle_size, _total_size - 1), KEY_TIME_LONG, true);
+		}
+
+		//! time evolution of entropies
+		saveAlgebraic(dir, EVO_PREFIX, _r.time_evo_me[0], "time_evo/sites", _r._entropies_sites, false);
+		for(int i = 0; i < _entropies_sites.size(); ++i)
+			saveAlgebraic(dir, EVO_PREFIX, _r.time_ee, KEY_ENT_ENTROPY_PREFIX SUFFIX_ME + STR(i), _r.time_ee[i], true);
+		
+		// bipartite entanglement entropy
+		saveAlgebraic(EVO_PREFIX, _r.time_ee_bipartite, KEY_ENT_ENTROPY_PREFIX SUFFIX_ME SUFFIX_ME, true);
+		saveAlgebraic(EVO_PREFIX, _r.time_participation_entropy, KEY_PARTICIPATION SUFFIX_ME, true);
+
+		// microcanonical averages and diagonal ensembles
+		saveAlgebraic(AVS_PREFIX, arma::vec(_to_check_microcanonical_eps), KEY_EPS, false);
+		for(size_t i = 0; i < _r.microcanonical_me.size(); ++i) 
+		{
+			const std::string _name = this->_opsN[i];
+
+			// time evolution
+			saveAlgebraic(EVO_PREFIX, _r.time_evo_me[i], _name + SUFFIX_ME, true);
+			saveAlgebraic(EVO_PREFIX, _r.time_evo_me2[i], _name + SUFFIX_ME, true);
+			saveAlgebraic(AVS_PREFIX, _r.microcanonical_me[i], _name + SUFFIX_MICRO_ME, true);
+			saveAlgebraic(AVS_PREFIX, _r.microcanonical_me2[i], _name + SUFFIX_MICRO_ME2, true);
+			saveAlgebraic(AVS_PREFIX, _r.diagonal_me.row(i).t(), _name + SUFFIX_DIAGONAL_ME, true);
+			
+			// finite energy density
+			for(size_t e = 0; e < this->_energy_densities.size(); ++e)
+			{	
+				const std::string tag = "/eps=" + std::to_string(this->_energy_densities[e]);
+				saveAlgebraic(EVO_PREFIX, _r.time_evo_ed[e][i], _name + tag, true);
+				saveAlgebraic(EVO_PREFIX, _r.time_evo_ed2[e][i], _name + tag, true);
+				saveAlgebraic(AVS_PREFIX, _r.microcanonical_ed[e][i], _name + SUFFIX_MICRO_ED(this->_energy_densities[e]), true);
+				saveAlgebraic(AVS_PREFIX, _r.microcanonical_ed2[e][i], _name + SUFFIX_MICRO2_ED(this->_energy_densities[e]), true);
+				saveAlgebraic(AVS_PREFIX, _r.diagonal_ed[e].row(i).t(), _name +  , true);
+	
+			}
+		}
+	}
+
+
     // ------------------------------------------------------------
-};
-
-// ----------------------------------------------------------------
-// Containers to hold all results
-// ----------------------------------------------------------------
-
-template<typename T>
-struct ResultContainers {
-    arma::Col<T> initial_state_me;                                  // [nh]
-    arma::Mat<T> initial_state_ed;                                  // [nh x n_ops]
-
-    // level statistics
-    arma::Mat<double> mean_level_spacing;                           // [4 x n_real]
-    arma::Mat<double> energies;                                     // [nh x n_real]
-
-    // local density of states
-    arma::Mat<double> ldos_me;                                      // [nh x n_real]
-    std::vector<arma::Mat<double>> ldos_ed;                         // [n_edens][nh x n_real]
-
-    // energy densities
-    arma::Mat<double> energy_densities_me;                          // [3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
-    std::vector<arma::Mat<double>> energy_densities_ed;             // [n_edens][3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
-
-    // diagonal elements
-    std::vector<arma::Mat<T>> diagonals;                            // [n_ops][nh x n_real]
-
-    // time evolution
-    std::vector<arma::Mat<T>> time_evo_me;                          // [n_ops][n_times x n_real]
-    std::vector<std::vector<arma::Mat<T>>> time_evo_ed;             // [n_edens][n_ops][n_times x n_real]
-
-    // entropies
-    arma::Mat<double> time_participation_entropy;                   // [n_times x n_real]
-    std::vector<arma::Cube<double> > time_ee;                       // [n_sites][n_times x n_real]
-    arma::Mat<double> time_ee_bipartite;                            // [n_times x n_real]
-
-    // microcanonical averages
-    std::vector<arma::Mat<_T>> microcanonical_me;                   // [n_ops][n_eps x n_real]
-    std::vector<arma::Mat<double>> microcanonical_me2;              // [n_ops][n_eps x n_real]
-    std::vector<std::vector<arma::Mat<_T>>> microcanonical_ed;      // [n_edens][n_ops][n_eps x n_real]
-    std::vector<std::vector<arma::Mat<double>>> microcanonical_ed2; // [n_edens][n_ops][n_eps x n_real]
-
-    // diagonal ensembles
-    arma::Mat<double> diagonal_me;                                  // [n_ops x n_real]
-    std::vector<arma::Mat<double>> diagonal_ed;                     // [n_edens][n_ops x n_real]
-
-    // finished realisations
-    size_t realisation_count = 0;                                   // number of realizations finished
-
-    void save_for_realization(size_t r, const std::string& dir, 
-        const std::string& random_tag, const std::string& extension) const 
-    {
-        // level statistics
-        saveAlgebraic(STAT_PREFIX, arma::vec(mean_level_spacing.row(0).as_col()), KEY_MEAN_LVL, false);
-        saveAlgebraic(STAT_PREFIX, arma::vec(mean_level_spacing.row(1).as_col()), KEY_HEIS_TIME_GAMMA, true);
-        saveAlgebraic(STAT_PREFIX, arma::vec(mean_level_spacing.row(2).as_col()), KEY_HEIS_TIME_AROUND_MEAN, true);
-        saveAlgebraic(STAT_PREFIX, arma::vec(mean_level_spacing.row(3).as_col()), KEY_HEIS_TIME_AROUND_MEAN_T, true);
-        saveAlgebraic(STAT_PREFIX, energies, KEY_ENERGIES, true);
-
-        // LDOS
-        saveAlgebraic(LDOS_PREFIX, ldos_me, KEY_ME, false);
-        for(size_t i = 0; i < ldos_ed.size(); ++i)
-            saveAlgebraic(LDOS_PREFIX, ldos_ed[i], operator_names[i], true);
-
-        // energy densities
-        saveAlgebraic(EDENS_PREFIX, arma::vec(energy_densities_me.row(0).t()), KEY_MEAN, false);
-        saveAlgebraic(EDENS_PREFIX, arma::vec(energy_densities_me.row(1).t()), KEY_MEAN_STATE, true);
-        saveAlgebraic(EDENS_PREFIX, arma::vec(energy_densities_me.row(2).t()), KEY_MEAN_STATE2, true);
-        for(size_t i = 0; i < energy_densities_ed.size(); ++i) {
-            const std::string tag = "/eps=" + std::to_string(energy_density_targets[i]);
-            saveAlgebraic(EDENS_PREFIX, energy_densities_ed[i], "mean" + tag, true);
-            saveAlgebraic(EDENS_PREFIX, energy_densities_ed[i], "mean_state" + tag, true);
-            saveAlgebraic(EDENS_PREFIX, energy_densities_ed[i], "mean_state2" + tag, true);
-        }
-
-        // time grid
-        saveAlgebraic(EVO_PREFIX, time_grid, KEY_TIME, false);
-
-        // time evolution
-        for(size_t i = 0; i < time_evo_me.size(); ++i)
-            saveAlgebraic(EVO_PREFIX, time_evo_me[i], operator_names[i] + SUFFIX_ME, true);
-        for(size_t e = 0; e < time_evo_ed.size(); ++e)
-            for(size_t i = 0; i < time_evo_ed[e].size(); ++i)
-                saveAlgebraic(EVO_PREFIX, time_evo_ed[e][i], operator_names[i] + SUFFIX_EPS + std::to_string(energy_density_targets[e]), true);
-
-        // entropies
-        for(size_t s = 0; s < time_ee.size(); ++s)
-            saveAlgebraic(EVO_PREFIX, time_ee[s], std::string(KEY_ENT_ENTROPY_PREFIX) + std::to_string(entropy_sites[s]), true);
-        saveAlgebraic(EVO_PREFIX, time_ee_bipartite, KEY_EE_BIPARTITE, true);
-        saveAlgebraic(EVO_PREFIX, time_participation_entropy, KEY_PARTICIPATION, true);
-
-        // microcanonical averages and diagonal ensembles
-        for(size_t i = 0; i < microcanonical_me.size(); ++i) {
-            saveAlgebraic(AVS_PREFIX, microcanonical_me[i], operator_names[i] + SUFFIX_MICRO_ME, true);
-            saveAlgebraic(AVS_PREFIX, microcanonical_me2[i], operator_names[i] + SUFFIX_MICRO_ME2, true);
-            saveAlgebraic(AVS_PREFIX, diagonal_me.row(i).t(), operator_names[i] + SUFFIX_DIAGONAL_ME, true);
-        }
-        for(size_t e = 0; e < microcanonical_ed.size(); ++e)
-            for(size_t i = 0; i < microcanonical_ed[e].size(); ++i) {
-                const std::string tag = "/eps=" + std::to_string(energy_density_targets[e]);
-                saveAlgebraic(AVS_PREFIX, microcanonical_ed[e][i], operator_names[i] + SUFFIX_MICRO_ED + tag, true);
-                saveAlgebraic(AVS_PREFIX, microcanonical_ed2[e][i], operator_names[i] + SUFFIX_MICRO2_ED + tag, true);
-                saveAlgebraic(AVS_PREFIX, diagonal_ed[e].row(i).t(), operator_names[i] + SUFFIX_DIAGONAL_ED + tag, true);
-            }
-    }
-
 };
 
 
