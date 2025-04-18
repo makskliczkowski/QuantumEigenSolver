@@ -15,7 +15,11 @@ FUN=$6
 RUN_DIR=/home/makkli4548/CODES/QuantumEigenSolver/cpp/library/
 cd ${RUN_DIR}
 
-lustredir=/home/makkli4548/mylustre/DATA_FIDELITY/
+if [ "$FUN" -le 45 ]; then
+    lustredir=/home/makkli4548/mylustre/DATA_FIDELITY/
+else
+    lustredir=/home/makkli4548/mylustre/DATA_TIME/
+fi
 mkdir -p ${lustredir}
 
 # create log directory
@@ -27,9 +31,11 @@ mkdir -p $LOGDIR
 # parameters
 SSYYMS=$(tr -d ' ' <<< "$PARS")
 
-b="qsm_mat_ns=${Ns},${SSYYMS}"
-arhname="Ns=${Ns},${b},\${SLURM_JOBID}.tar.gz"
-a="ns=${Ns}_${SSYYMS}"
+# Extract meaningful parts from SSYYMS for a shorter job name
+parsed_ssyms=$(echo "$SSYYMS" | sed 's/-/,/g')
+b=",fun=${FUN},Ns=${Ns}${parsed_ssyms}"
+# arhname="Ns=${Ns},${b},\${SLURM_JOBID}.tar.gz"
+a="fun=${FUN},Ns=${Ns}${parsed_ssyms}"
 echo "#!/bin/bash" >> ${a}
 echo "#SBATCH -N1" >> ${a}
 echo "#SBATCH -c${CPU}" >> ${a}
@@ -48,13 +54,13 @@ echo "mkdir -p \${SAVDIR}" >> ${a}
 echo >> ${a}
 echo "source /usr/local/sbin/modules.sh" >> ${a}
 echo >> ${a}
-echo "module load intel/2022b" >> ${a}
+echo "module load intel" >> ${a}
 echo >> ${a}
 echo "module load HDF5" >> ${a}
 echo >> ${a}
 echo "cd ${RUN_DIR}" >> ${a}
 echo >> ${a}
-echo "${RUN_DIR}/qsolver -Ntot ${Ns} -plrb_mb 1 -Ntots ${Ns} -op 'Sz/L;Sx/0;Sz/0' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -checkpoint 0 -fun ${FUN} ${PARS} -th ${CPU} -dir ${lustredir}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
+echo "${RUN_DIR}/qsolver -Ntot ${Ns} -plrb_mb 1 -Ntots ${Ns} -op 'Sx/0-1;Sz/0' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -checkpoint 0 -fun ${FUN} ${PARS} -th ${CPU} -dir ${lustredir}/ >& ${LOGDIR}/log${b}.log" >> ${a}
 # echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;Sz/0-1;Sz/0-1-2;Sz/0-1-2-3;Sz/1:Lm3:1;Sz/0-1:Lm3:1' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -fun ${FUN} ${PARS} -th ${CPU} -dir \${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
 echo >> ${a}
 # echo "rsync -a --ignore-existing --remove-source-files \${SAVDIR}/* ${lustredir}" >> ${a}
