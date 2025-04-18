@@ -287,7 +287,7 @@ namespace TimeEvo
 		this->_dtau_est                 = 1.0l / _bw_est;
 		this->_heisenberg_time_est      = HamiltonianHelpers::get_heisenberg_time_est(_type, _H->getMainParam(), _Nh);
 		this->_thouless_est             = HamiltonianHelpers::get_thouless_est(_type, _H->getMainParam(), _Nh);
-		this->_ntimes                   = 100000;
+		this->_ntimes                   = 100;
 		this->_nrealiz                  = n_real;
 		this->_uniform_time			 	= true;
 		this->dir					    = this->_uniform_time ? "ETH_MAT_TIME_EVO_UNIFORM" : "ETH_MAT_TIME_EVO";
@@ -296,7 +296,8 @@ namespace TimeEvo
 		this->_ops                      = {};
 		this->_opsN                     = {};
 		this->_entropies_sites 			= { 1, size_t(_Ns / 2), size_t(_Ns) 			};
-		_energy_densities               = { 0.1, 0.2, 0.3                         		};
+		// _energy_densities               = { 0.1, 0.2, 0.3                         		};
+		this->_energy_densities			= { 0.2 };
 		_to_check_microcanonical_eps   	= { 1e-1, 5e-2, 1e-2, 5e-3, 1e-3, 5e-4, 1e-4    };
 		this->time_tag					= std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 
@@ -342,6 +343,7 @@ namespace TimeEvo
 			const long long start_short 	= 0;
 			const long long start_medium 	= _thouless_est * 1e-2;
 			const long long start_middle 	= _thouless_est * 0.5;
+			const long long start_long 		= _heisenberg_time_est * 1e-2;
 			const long long end_short 		= start_short + (_ntimes * _dtau_est);
 			const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
 			const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
@@ -349,6 +351,12 @@ namespace TimeEvo
 			const long long _short_size		= end_short - start_short;
 			const long long _medium_size	= end_medium - start_medium;
 			const long long _middle_size	= end_middle - start_middle;
+			// const long long _long_size		= _total_size - (_short_size + _medium_size + _middle_size);
+			// save times 
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_short, end_short - 1), KEY_TIME_SHORT, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_medium, end_medium - 1), KEY_TIME_MEDIUM, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_middle, end_middle - 1), KEY_TIME_MIDDLE, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_long, _total_size - 1), KEY_TIME_LONG, true);
 
 			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(0, _short_size - 1), KEY_TIME_SHORT, true);
 			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(_short_size, _short_size + _medium_size - 1), KEY_TIME_MEDIUM, true);
