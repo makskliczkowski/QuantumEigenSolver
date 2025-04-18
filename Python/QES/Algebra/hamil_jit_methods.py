@@ -18,17 +18,20 @@ Future development may include the implementation of utility functions to facili
 matrix operations, eigenvalue solvers, and advanced Hamiltonian manipulation routines.
 '''
 
-try:
-    import jax 
+import numba
+import numpy as np
+import scipy.sparse as sp
+from general_python.algebra.utils import JAX_AVAILABLE, Array
+
+if JAX_AVAILABLE:
+    import jax
     import jax.numpy as jnp
-    from jax.scipy.sparse import BCOO
     import jax.lax as lax
-    from jax import jit
     
     # -----------------------------------------------------------------
     
-    @jit
-    def mean_level_spacing(eigenvalues):
+    @jax.jit
+    def mean_level_spacing_jax(eigenvalues):
         '''
         Compute the mean level spacing of a set of energy eigenvalues.
 
@@ -42,12 +45,12 @@ try:
         float
             The mean level spacing of the energy eigenvalues.
         '''
-        return jnp.mean(jnp.diff(jnp.sort(eigenvalues)))
+        return jnp.mean(jnp.diff(eigenvalues))
     
     # -----------------------------------------------------------------
     
-    @jit
-    def energy_width(hamil):
+    @jax.jit
+    def energy_width_jax(hamil):
         '''
         Compute the energy width of a Hamiltonian matrix.
 
@@ -64,7 +67,46 @@ try:
         return jnp.dot(hamil, hamil).trace()
     
     # -----------------------------------------------------------------
-    
-except ImportError:
-    pass
-    
+else:
+    jax                     = None
+    jnp                     = None
+    mean_level_spacing_jax  = None
+    energy_width_jax        = None
+
+# ---------------------------------------------------------------------
+
+# @numba.njit
+def mean_level_spacing(eigenvalues: Array):
+    '''
+    Compute the mean level spacing of a set of energy eigenvalues.
+
+    Parameters
+    ----------
+    eigenvalues : array-like
+        A 1D array of energy eigenvalues.
+
+    Returns
+    -------
+    float
+        The mean level spacing of the energy eigenvalues.
+    '''
+    return np.mean(np.diff(eigenvalues))
+
+# @numba.njit
+def energy_width(hamil: Array):
+    '''
+    Compute the energy width of a Hamiltonian matrix.
+
+    Parameters
+    ----------
+    hamil : array-like
+        A 2D array representing the Hamiltonian matrix.
+
+    Returns
+    -------
+    float
+        The energy width of the Hamiltonian matrix.
+    '''
+    return np.trace(np.matmul(hamil, hamil))
+
+# ---------------------------------------------------------------------
