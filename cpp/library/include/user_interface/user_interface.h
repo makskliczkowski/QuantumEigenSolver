@@ -6,586 +6,8 @@
 * DEC 2023. UNDER CONSTANT DEVELOPMENT
 * MAKSYMILIAN KLICZKOWSKI, WUST, POLAND
 ***************************************/
-#include "../../source/src/UserInterface/ui.h"
-#include <memory>
-#include <vector>
 
-#ifdef _DEBUG
-//	#define DEBUG_BINARY
-#else
-//	#define OMP_NUM_THREADS 16;
-#	include <thread>
-#	include <mutex>
-#endif
-
-// ######################### NQS ############################
-#ifndef RBMPP_H											 // #
-#	include "../NQS/rbm_pp_final.hpp"					 // #
-#endif													 // #
-#ifndef RBM_H											 // #
-#	include "../NQS/rbm_final.hpp"						 // #
-#endif													 // #
-// ##########################################################
-
-
-// ######################### MODELS #########################
-#if 1
-#ifndef ISING_H											 // #
-#	include "../models/ising.h"							 // #
-#endif // !ISING_H										 // #
-#ifndef XYZ_H											 // #
-#	include "../models/XYZ.h"							 // #
-#endif // !XYZ_H										 // #
-#ifndef HEISENBERG_KITAEV_H								 // #
-#	include "../models/heisenberg-kitaev.h"				 // #
-#endif													 // #
-// random Hamiltonians									 // #
-#ifndef QSM_H											 // #
-#	include "../models/quantum_sun.h"					 // #
-#endif													 // #
-#ifndef ROSENZWEIG_PORTER_H								 // #
-#	include "../models/rosenzweig-porter.h"				 // #
-#endif													 // #
-#ifndef ULTRAMETRIC_H									 // #
-#	include "../models/ultrametric.h"					 // #
-#endif													 // #
-#endif
-// ##########################################################
-
-// ######################## MODELS Q ########################
-#if 1
-#ifndef POWER_LAW_RANDOM_BANDED_H
-#include "../models/quadratic/PowerLawRandomBanded.h"	 // #
-#endif
-#ifndef SYK2_M_H										 // #
-#include "../models/quadratic/SYK2.h"					 // #
-#endif // !SYK2											 // #
-#ifndef FF_M_H											 // #
-#include "../models/quadratic/FreeFermions.h"			 // #
-#endif // !SYK2											 // #
-#ifndef AUBRY_ANDRE_M_H									 // #
-#include "../models/quadratic/AubryAndre.h"				 // #
-#endif // !SYK2											 // #
-#endif
-// ##########################################################
-
-// ###################### LATTICES ##########################
-#if 1													 // #
-#ifndef SQUARE_H										 // #
-#include "../../source/src/Lattices/square.h"			 // #
-#endif													 // #
-#ifndef HEXAGONAL_H										 // #
-#include "../../source/src/Lattices/hexagonal.h"		 // #
-#endif													 // #
-#ifndef HONEYCOMB_H										 // #
-#include "../../source/src/Lattices/honeycomb.h"		 // #
-#endif													 // #
-#endif													 // #
-// ##########################################################
-
-// ##################### STATISTICAL ########################
-#if 1													 // #
-#include "../algebra/quantities/measure.h"				 // #
-#endif													 // #
-// ##########################################################
-
-// ###################### LIMITS ############################
-
-#define UI_ENERGYMEAN_SUBVEC(MCSTEPS, TROUT)					int(TROUT * MCSTEPS), MCSTEPS - int(TROUT * MCSTEPS) - 1
-// --- NQS
-constexpr int UI_LIMITS_NQS_ED									= ULLPOW(26);
-constexpr int UI_LIMITS_NQS_FULLED								= ULLPOW(12);
-constexpr int UI_LIMITS_NQS_LANCZOS_STATENUM					= 100;
-
-// --- QUADRATIC
-constexpr int UI_LIMITS_QUADRATIC_COMBINATIONS					= 20;
-constexpr int UI_LIMITS_QUADRATIC_STATEFULL						= 32;
-
-// ##########################################################
-
-#define UI_CHECK_SYM(val, gen)									if(this->val##_ != -INT_MAX) syms.push_back(std::make_pair(Operators::SymGenerators::gen, this->val##_));
-
-// ##########################################################################################################################################
-
-// ############################################################## P A R A M S ###############################################################
-
-// ##########################################################################################################################################
-
-namespace UI_PARAMS 
-{
-
-	// ----------------------------------------------------------------
-
-	/*
-	* @brief Defines parameters used later for the models
-	*/
-	struct ModP 
-	{
-		// ################################## TYPE ##################################
-		
-		UI_PARAM_CREATE_DEFAULT(modTyp, MY_MODELS, MY_MODELS::ISING_M);
-		UI_PARAM_CREATE_DEFAULTV(modRanN, uint);			// number of random states
-		UI_PARAM_CREATE_DEFAULT(modRanSeed, u64, 0);		// seed for the random number generator
-		UI_PARAM_CREATE_DEFAULT(modRanNIdx, uint, 0);		// index of the random state
-		
-		// eth related
-		UI_PARAM_CREATE_DEFAULT(eth_entro, bool, false);
-		UI_PARAM_CREATE_DEFAULT(eth_susc, bool, true);
-		UI_PARAM_CREATE_DEFAULT(eth_ipr, bool, true);
-		UI_PARAM_CREATE_DEFAULT(eth_offd, bool, false);
-		UI_PARAM_CREATE_DEFAULTV(eth_end, double);
-
-		UI_PARAM_CREATE_DEFAULTD(modMidStates, double, 1.0);// states in the middle of the spectrum
-		UI_PARAM_CREATE_DEFAULTD(modEnDiff, double, 1.0);	// tolerance for the energy difference of the states in offdiagonal
-		std::vector<std::string> operators;					// operators to be calculated for the model
-
-		// ##########################################################################
-		
-		// ########################## I N T E R A C T I N G #########################
-		
-		// ##########################################################################
-
-		// ############## ISING ################
-		
-		UI_PARAM_STEP(double, J1, 1.0);			// spin exchange
-		UI_PARAM_STEP(double, hz, 1.0);			// perpendicular field
-		UI_PARAM_STEP(double, hx, 1.0);			// transverse field
-
-		// ############### XYZ #################		
-		
-		UI_PARAM_STEP(double, J2, 2.0);			// next nearest neighbors exchange
-		UI_PARAM_STEP(double, eta1, 0.5);
-		UI_PARAM_STEP(double, eta2, 0.5);
-		UI_PARAM_STEP(double, dlt1, 0.3);
-		UI_PARAM_STEP(double, dlt2, 0.3);
-
-		// ############# KITAEV ################
-
-		v_1d<double> Kx_;
-		v_1d<double> Ky_;
-		v_1d<double> Kz_;
-		void resizeKitaev(const size_t Ns)
-		{
-			this->Kx_.resize(Ns);
-			this->Ky_.resize(Ns);
-			this->Kz_.resize(Ns);
-		};
-
-		// ########### HEISENBERG ##############
-
-		v_1d<double> heiJ_;
-		v_1d<double> heiDlt_;
-		v_1d<double> heiHx_;
-		v_1d<double> heiHz_;
-
-		void resizeHeisenberg(const size_t Ns)
-		{
-			this->heiJ_.resize(Ns);
-			this->heiDlt_.resize(Ns);
-			this->heiHx_.resize(Ns);
-			this->heiHz_.resize(Ns);
-		};
-
-		// ############### QSM #################
-
-		struct qsm_t
-		{
-			UI_PARAM_CREATE_DEFAULTD(qsm_N, size_t, 1);
-			UI_PARAM_CREATE_DEFAULTD(qsm_Ntot, size_t, 1);
-			UI_PARAM_CREATE_DEFAULTD(qsm_gamma, double, 1.0);
-			UI_PARAM_CREATE_DEFAULTD(qsm_g0, double, 1.0);
-
-			UI_PARAM_CREATE_DEFAULTV(qsm_alpha, double);
-			UI_PARAM_CREATE_DEFAULTV(qsm_xi, double);
-			UI_PARAM_CREATE_DEFAULTV(qsm_h, double);
-			void resizeQSM()
-			{
-				auto _N = this->qsm_Ntot_ - this->qsm_N_;
-				if (_N < 0)
-					return;
-				this->qsm_alpha_r_ = 0;
-				this->qsm_alpha_.resize(this->qsm_Ntot_ - this->qsm_N_);
-				this->qsm_xi_r_ = 0;
-				this->qsm_xi_.resize(this->qsm_Ntot_ - this->qsm_N_);
-				this->qsm_h_r_ = 0;
-				this->qsm_h_.resize(_N);
-			};
-		} qsm;
-
-		// ######### ROSENZWEIG PORTER #########
-
-		struct rosenzweig_porter_t
-		{
-			UI_PARAM_CREATE_DEFAULTV(rp_g, double);
-			UI_PARAM_CREATE_DEFAULTD(rp_single_particle, bool, 0);
-			UI_PARAM_CREATE_DEFAULTD(rp_be_real, bool, 1);
-			UI_PARAM_CREATE_DEFAULTD(rp_g_sweep_n, int, 1);
-
-			void resizeRP()
-			{
-				this->rp_g_.resize(this->rp_g_sweep_n_);
-			};
-
-		} rosenzweig_porter;
-
-		// ############ ULTRAMETRIC ############
-
-		struct ultrametric_t
-		{
-			UI_PARAM_CREATE_DEFAULTD(um_N, size_t, 1);
-			UI_PARAM_CREATE_DEFAULTD(um_Ntot, size_t, 1);
-			UI_PARAM_CREATE_DEFAULTV(um_alpha, double);
-			UI_PARAM_CREATE_DEFAULTD(um_g, double, 1.0);
-
-			void resizeUM()
-			{
-				auto _N = this->um_Ntot_ - this->um_N_;
-				if (_N < 0)
-					return;
-				this->um_alpha_r_ = 0;
-				this->um_alpha_.resize(_N);
-			};
-		} ultrametric;
-
-		// #####################################
-		// ######### Q U A D R A T I C #########
-		// #####################################
-		
-		// for simulation
-		UI_PARAM_CREATE_DEFAULT(q_gamma, uint, 1);					// mixing quadratic states
-		UI_PARAM_CREATE_DEFAULT(q_manifold, bool, false);			// use the degenerate manifold?
-		UI_PARAM_CREATE_DEFAULT(q_manybody, bool, true);			// use the many body calculation?
-		UI_PARAM_CREATE_DEFAULT(q_randomCombNum, uint, 100);		// number of random combinations for the average (to choose from)
-		UI_PARAM_CREATE_DEFAULT(q_realizationNum, uint, 100);		// number of realizations for the average
-		UI_PARAM_CREATE_DEFAULT(q_shuffle, bool, true);				// shuffle the states?
-		UI_PARAM_CREATE_DEFAULTD(q_broad, double, 0.1);				// broadening for spectral function
-
-		// ########### AUBRY_ANDRE ############
-		
-		struct aubry_andre_t
-		{
-			UI_PARAM_STEP(double, aa_J, 1.0);						// hopping
-			UI_PARAM_STEP(double, aa_lambda, 0.5);					// modulation strength
-			UI_PARAM_STEP(double, aa_beta, (1 + std::sqrt(5)) / 2);	// phase multiplication
-			UI_PARAM_STEP(double, aa_phi, 1.0);						// phase addition
-		} aubry_andre;
-
-		// ############ POWER LAW ##############
-
-		struct power_law_random_bandwidth_t
-		{
-			UI_PARAM_CREATE_DEFAULTV(plrb_a, double);
-			// UI_PARAM_CREATE_DEFAULTD(plrb_a, double, 1.0);
-			UI_PARAM_CREATE_DEFAULTD(plrb_b, double, 1.0);
-			UI_PARAM_CREATE_DEFAULTD(plrb_mb, bool, false);
-
-		} power_law_random_bandwidth;
-
-		// -------------------------------------
-
-		// #####################################
-
-		// -------------------------------------
-		uint getRanReal(uint i) const { return i < this->modRanN_.size() ? this->modRanN_[i] : this->modRanN_[this->modRanN_.size()-1]; 	};
-		uint getRanReal() 		const { return this->modRanNIdx_ < this->modRanN_.size() ? this->modRanN_[this->modRanNIdx_] : this->modRanN_[this->modRanN_.size()-1]; };
-
-		void setDefault() 
-		{
-			UI_PARAM_SET_DEFAULT(modTyp);
-
-			// -------------------------------------
-			// default operators
-			this->operators = {"sz/L", "sz/1"};
-			this->modRanN_ = { 1 };
-
-			// -------------------------------------
-			// SPIN
-			{
-				// ising
-				{
-					UI_PARAM_SET_DEFAULT_STEP(J1);
-					UI_PARAM_SET_DEFAULT_STEP(hz);
-					UI_PARAM_SET_DEFAULT_STEP(hx);
-				}
-				// xyz
-				{
-					UI_PARAM_SET_DEFAULT_STEP(J2);
-					UI_PARAM_SET_DEFAULT_STEP(eta1);
-					UI_PARAM_SET_DEFAULT_STEP(eta2);
-					UI_PARAM_SET_DEFAULT_STEP(dlt1);
-					UI_PARAM_SET_DEFAULT_STEP(dlt2);
-				}
-				// kitaev
-				{
-					this->Kx_		= v_1d<double>(1, 1.0);
-					this->Ky_		= v_1d<double>(1, 1.0);
-					this->Kz_		= v_1d<double>(1, 1.0);
-					this->heiJ_		= v_1d<double>(1, 1.0);
-					this->heiDlt_	= v_1d<double>(1, 1.0);
-					this->heiHz_	= v_1d<double>(1, 1.0);
-					this->heiHx_	= v_1d<double>(1, 1.0);
-				}
-				// QSM
-				{
-					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_gamma);
-					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_g0);
-					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_Ntot);
-					UI_PARAM_SET_DEFAULT_STRUCT(qsm, qsm_N);
-					this->qsm.qsm_alpha_	= v_1d<double>(1, 1.0);
-					this->qsm.qsm_xi_		= v_1d<double>(1, 1.0);
-					this->qsm.qsm_h_		= v_1d<double>(1, 1.0);
-				}
-				// Rosenzweig-Porter
-				{
-					this->rosenzweig_porter.rp_g_ = v_1d<double>(1, 1.0);
-				}
-			}
-
-			// -------------------------------------
-			
-			// QUADRATIC
-			{
-				// aubry-andre
-				{
-					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_J);
-					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_lambda);
-					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_beta);
-					UI_PARAM_SET_DEFAULT_STRUCT(aubry_andre, aa_phi);
-				}
-			}
-		}
-
-		// -------------------------------------
-
-		/*
-		* @brief Check whether the model itself is complex...
-		*/
-		bool checkComplex() const
-		{
-			if (this->modTyp_ == MY_MODELS::FREE_FERMIONS_M)
-				return true;
-			return false;
-		}
-	};
-
-	// ----------------------------------------------------------------
-
-	/*
-	* @brief Defines lattice used later for the models
-	*/
-	struct LatP {
-		UI_PARAM_CREATE_DEFAULT(bc, BoundaryConditions, BoundaryConditions::PBC);
-		UI_PARAM_CREATE_DEFAULT(typ, LatticeTypes, LatticeTypes::SQ);
-		UI_PARAM_CREATE_DEFAULT(Lx, uint, 2);
-		UI_PARAM_CREATE_DEFAULT(Ly, uint, 1);
-		UI_PARAM_CREATE_DEFAULT(Lz, uint, 1);
-		UI_PARAM_CREATE_DEFAULT(dim, uint, 1);
-		// for the Hamiltonians that only use the total number of particles, not lattices!
-		UI_PARAM_CREATE_DEFAULT(Ntot, uint, 1);
-		UI_PARAM_CREATE_DEFAULTV(Ntots, int);
-
-		std::shared_ptr<Lattice> lat;
-
-		void setDefault() {
-			UI_PARAM_SET_DEFAULT(typ);
-			UI_PARAM_SET_DEFAULT(bc);
-			UI_PARAM_SET_DEFAULT(Lx);
-			UI_PARAM_SET_DEFAULT(Ly);
-			UI_PARAM_SET_DEFAULT(Lz);
-			UI_PARAM_SET_DEFAULT(dim);
-		};
-	};
-
-	// ----------------------------------------------------------------
-
-	/*
-	* @brief Defines a container for symmetry eigenvalues.
-	* @warning By default, the parameters are -maximal integer in order to tell that no symmetry is used
-	*/
-	struct SymP {
-
-		// symmetry parameters
-		UI_PARAM_CREATE_DEFAULT(S, bool, false);
-		UI_PARAM_CREATE_DEFAULT(k, int, -INT_MAX);
-		UI_PARAM_CREATE_DEFAULT(px, int, -INT_MAX);
-		UI_PARAM_CREATE_DEFAULT(py, int, -INT_MAX);
-		UI_PARAM_CREATE_DEFAULT(pz, int, -INT_MAX);
-		UI_PARAM_CREATE_DEFAULT(x, int, -INT_MAX);
-		UI_PARAM_CREATE_DEFAULT(U1, int, -INT_MAX);
-
-		// other
-		UI_PARAM_CREATE_DEFAULT(checkpoint, bool, true);
-
-		void setDefault() {
-			UI_PARAM_SET_DEFAULT(S);
-			UI_PARAM_SET_DEFAULT(k);
-			UI_PARAM_SET_DEFAULT(px);
-			UI_PARAM_SET_DEFAULT(py);
-			UI_PARAM_SET_DEFAULT(pz);
-			UI_PARAM_SET_DEFAULT(x);
-			UI_PARAM_SET_DEFAULT(U1);
-			UI_PARAM_SET_DEFAULT(checkpoint);
-		}
-
-
-		v_1d<std::pair<Operators::SymGenerators, int>> getLocGenerator() {
-			v_1d<std::pair<Operators::SymGenerators, int>> syms = {};
-			UI_CHECK_SYM(k, T);
-			UI_CHECK_SYM(px, PX);
-			UI_CHECK_SYM(py, PY);
-			UI_CHECK_SYM(pz, PZ);
-			UI_CHECK_SYM(x, R);
-			return syms;
-		}
-
-		/*
-		* @brief Checks if the symmetries make the Hamiltonian complex
-		* @param Ns lattice size
-		*/
-		bool checkComplex(int Ns) const {
-			if (this->k_ == 0 || (this->k_ == Ns / 2 && Ns % 2 == 0) || this->py_ != -INT_MAX)
-				return false;
-			return true;
-		}
-	};
-
-	// ----------------------------------------------------------------
-
-	// !TODO 
-	// Neural network quantum states params
-	struct NqsP 
-	{
-		v_1d<u64> layersDim;
-		UI_PARAM_CREATE_DEFAULT(type, NQSTYPES, NQSTYPES::RBM_T);
-		UI_PARAM_CREATE_DEFAULT(nVisible, uint, 1);
-		UI_PARAM_CREATE_DEFAULTD(nqs_nh, double, 1);
-		UI_PARAM_CREATE_DEFAULT(nLayers, uint, 2);
-		UI_PARAM_CREATE_DEFAULT(nFlips, uint, 1);
-		
-		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pinv, double, 1e-5);// pseudoinverse for the NQS
-		UI_PARAM_CREATE_DEFAULTD(nqs_tr_pc, double, 5.0);	// percentage of the samples to be used for display
-		// training
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_bs, uint, 8);		// block size for training
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_th, uint, 50);		// thermalize when training
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_mc, uint, 500);		// number of inner blocks for training - this is rather crucial - is Monte Carlo steps
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_epo, uint, 1000);	// number of samples - outer loop for training
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_rst, bool, 0);		// should I reset the state before each step?
-		// timeevolution
-		UI_PARAM_CREATE_DEFAULT(nqs_te, bool, 0);			// time evolution - do or do not? - 0 - no, 1 - yes
-		UI_PARAM_CREATE_DEFAULT(nqs_te_mc, uint, 1);		// number of samples - outer loop for time evolution
-		UI_PARAM_CREATE_DEFAULT(nqs_te_th, uint, 0);		// thermalize when time evolution
-		UI_PARAM_CREATE_DEFAULT(nqs_te_bn, uint, 100);		// number of inner blocks for time evolution
-		UI_PARAM_CREATE_DEFAULT(nqs_te_bs, uint, 4);		// block size for time evolution
-		UI_PARAM_CREATE_DEFAULT(nqs_te_rst, bool, 0);		// should I reset the state before each step?
-		UI_PARAM_CREATE_DEFAULTD(nqs_te_dt, double, 0.01);	// time step for the time evolution - initial time step
-		UI_PARAM_CREATE_DEFAULTD(nqs_te_tf, double, 1.0);	// final time for the time evolution - final time
-		UI_PARAM_CREATE_DEFAULT(nqs_te_tlog, uint, 0);		// use the logarithmic time steps? - 0 - no, > 0 - yes (use this number as the number of steps)
-		UI_PARAM_CREATE_DEFAULT(nqs_te_rk, bool, 0);		// use the Runge-Kutta method for the time evolution - 0 - Euler, 1 - Runge-Kutta (2nd order)
-		// regularization
-		UI_PARAM_CREATE_DEFAULTD(nqs_tr_reg, double, 1e-7); // regularization for the NQS SR method
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_regs, int, 0);		// regularization for the NQS SR method - scheduler
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_regp, int, 10);		// regularization for the NQS SR method - scheduler patience
-		UI_PARAM_CREATE_DEFAULTD(nqs_tr_regd, double, 0.96);// regularization for the NQS SR method - decay
-		// preconditioner
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_prec, int, 0);		// preconditioner for the NQS SR method - 0 - identity, 1 - Jacobi, 2 - Incomplete Cholesky, 3 - SSOR
-		// solver type
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_sol, int, 1);		// solver for the NQS SR method
-		UI_PARAM_CREATE_DEFAULTD(nqs_tr_tol, double, 1e-7); // solver for the NQS SR method - tolerance
-		UI_PARAM_CREATE_DEFAULT(nqs_tr_iter, int, 5000);	// solver for the NQS SR method - maximum number of iterations
-		// for collecting - excited states
-		UI_PARAM_CREATE_DEFAULT(nqs_ex_mc, uint, 1);		// number of samples - outer loop for collecting - excited states
-		UI_PARAM_CREATE_DEFAULT(nqs_ex_th, uint, 0);		// thermalize when collecting - excited states
-		UI_PARAM_CREATE_DEFAULT(nqs_ex_bn, uint, 100);		// number of inner blocks for collecting - excited states
-		UI_PARAM_CREATE_DEFAULT(nqs_ex_bs, uint, 4);		// block size for collecting - excited states
-		UI_PARAM_CREATE_DEFAULTV(nqs_ex_beta, double);		// beta for the excited states - if not set, then only the ground state is calculated
-		// for collecting
-		UI_PARAM_CREATE_DEFAULT(nqs_col_mc, uint, 1);		// number of samples - outer loop for collecting
-		UI_PARAM_CREATE_DEFAULT(nqs_col_th, uint, 0);		// thermalize when collecting
-		UI_PARAM_CREATE_DEFAULT(nqs_col_bn, uint, 100);		// number of inner blocks for collecting
-		UI_PARAM_CREATE_DEFAULT(nqs_col_bs, uint, 4);		// block size for collecting
-		UI_PARAM_CREATE_DEFAULT(nqs_col_rst, bool, 0);		// should I reset the state before each step?
-		// learning rate
-		UI_PARAM_CREATE_DEFAULT(nqs_sch, int, 0);			// learning rate scheduler - 0 - constant, 1 - exponential decay (default), 2 - step decay, 3 - cosine decay, 4 - adaptive
-		UI_PARAM_CREATE_DEFAULTD(nqs_lr, double, 1e-3);		// learning rate (initial)
-		UI_PARAM_CREATE_DEFAULTD(nqs_lrd, double, 0.96);	// learning rate decay
-		UI_PARAM_CREATE_DEFAULT(nqs_lr_pat, int, 10);		// learning rate decay pattern
-		// early stopping
-		UI_PARAM_CREATE_DEFAULT(nqs_es_pat, int, 5);		// use the early stopping
-		UI_PARAM_CREATE_DEFAULTD(nqs_es_del, double, 1e-3);	// patience for the early stopping
-		UI_PARAM_CREATE_DEFAULT(nqs_ed, bool, false);		// use the exact diagonalization for the NQS
-		// weight load directory
-		inline static const std::string _loadNQS	= ""; 
-		std::string loadNQS_								= "";
-
-		void setDefault() 
-		{
-			UI_PARAM_SET_DEFAULT(nqs_nh);
-			UI_PARAM_SET_DEFAULT(nVisible);
-			UI_PARAM_SET_DEFAULT(nLayers);
-			UI_PARAM_SET_DEFAULT(nFlips);
-			// training
-			UI_PARAM_SET_DEFAULT(nqs_tr_epo);
-			UI_PARAM_SET_DEFAULT(nqs_tr_mc);
-			UI_PARAM_SET_DEFAULT(nqs_tr_bs);
-			UI_PARAM_SET_DEFAULT(nqs_tr_th);
-			UI_PARAM_SET_DEFAULT(nqs_tr_rst);			
-			UI_PARAM_SET_DEFAULT(nqs_lr);
-			UI_PARAM_SET_DEFAULT(loadNQS);
-			// collection
-			UI_PARAM_SET_DEFAULT(nqs_col_mc);
-			UI_PARAM_SET_DEFAULT(nqs_col_th);
-			UI_PARAM_SET_DEFAULT(nqs_col_bn);
-			UI_PARAM_SET_DEFAULT(nqs_col_bs);
-			UI_PARAM_SET_DEFAULT(nqs_col_rst);
-			// time evolution
-			UI_PARAM_SET_DEFAULT(nqs_te);
-			UI_PARAM_SET_DEFAULT(nqs_te_mc);
-			UI_PARAM_SET_DEFAULT(nqs_te_th);
-			UI_PARAM_SET_DEFAULT(nqs_te_bn);
-			UI_PARAM_SET_DEFAULT(nqs_te_bs);
-			UI_PARAM_SET_DEFAULT(nqs_te_rst);
-			UI_PARAM_SET_DEFAULT(nqs_te_dt);
-			UI_PARAM_SET_DEFAULT(nqs_te_tf);
-			UI_PARAM_SET_DEFAULT(nqs_te_tlog);
-			UI_PARAM_SET_DEFAULT(nqs_te_rk);
-			// regularization
-			UI_PARAM_SET_DEFAULT(nqs_tr_reg);
-			UI_PARAM_SET_DEFAULT(nqs_tr_regs);
-			UI_PARAM_SET_DEFAULT(nqs_tr_regd);
-			UI_PARAM_SET_DEFAULT(nqs_tr_regp);
-			// preconditioner
-			UI_PARAM_SET_DEFAULT(nqs_tr_prec);
-			// solver type
-			UI_PARAM_SET_DEFAULT(nqs_tr_sol);
-			UI_PARAM_SET_DEFAULT(nqs_tr_tol);
-			UI_PARAM_SET_DEFAULT(nqs_tr_iter);
-			// early stopping
-			UI_PARAM_SET_DEFAULT(nqs_es_pat);
-			UI_PARAM_SET_DEFAULT(nqs_es_del);
-			// excited states
-			UI_PARAM_SET_DEFAULT(nqs_ex_mc);
-			UI_PARAM_SET_DEFAULT(nqs_ex_th);
-			UI_PARAM_SET_DEFAULT(nqs_ex_bn);
-			UI_PARAM_SET_DEFAULT(nqs_ex_bs);
-		}
-	};
-};
-
-// ##########################################################################################################################################
-
-// ############################################################# U I N T E R F ##############################################################
-
-// ##########################################################################################################################################
-
-// for running the complex Hamiltonian or the real one
-#define RUN_CPX_REAL(TAKE_COMPLEX, _F, _MREAL, _MCPX) if (TAKE_COMPLEX) _F(_MCPX); else _F(_MREAL);
-// default containers
-#define UI_DEF_VMAT(Type, _sizex, _sizey, _sizez) VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5)
-#define UI_DEF_VMAT_COND(Type, _sizex, _sizey, _sizez, _cond) _cond ? VMAT<Type>(_sizex, _sizey, _sizez, arma::fill::ones, -1e5) : VMAT<Type>(0, 0, 0, arma::fill::ones, -1e5)
-#define UI_DEF_MAT_D(sizex, sizey) -1e5 * arma::ones<arma::Mat<double>>(sizex, sizey)
-#define UI_DEF_MAT_D_COND(sizex, sizey, cond) cond ? arma::Mat<double>(sizex, sizey, arma::fill::ones) : arma::Mat<double>()
-#define UI_DEF_MAT_D_CONDT(sizex, sizey, cond, T) cond ? arma::Mat<T>(sizex, sizey, arma::fill::ones) : arma::Mat<T>()
-#define UI_DEF_COL_D(size) -1e5 * arma::ones<arma::Col<double>>(size)
+#include "./user_interface_par.hpp"
 
 // ##########################################################################################################################################
 
@@ -615,8 +37,8 @@ protected:
 	//std::shared_ptr<QuadraticHamiltonian<cpx>>			qhamComplex;
 
 	// ^^^^^^^^^^^^ NQS ^^^^^^^^^^^^^
-	std::shared_ptr<NQS<2, cpx>>						nqsCpx;
-	std::shared_ptr<NQS<2, double>>						nqsDouble;
+	std::shared_ptr<NQS_NS::NQS<2, cpx>>				nqsCpx;
+	std::shared_ptr<NQS_NS::NQS<2, double>>				nqsDouble;
 
 	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	void setDefaultMap()								final override;
@@ -659,6 +81,12 @@ private:
 	void quadraticSpectralFunction(std::shared_ptr<Hamiltonian<_T>>& _H);
 
 	// ##################### SPIN MODELS ###################
+
+	template <typename _T = double, typename _OpT = Operators::Operator<_T>>
+	std::pair<v_sp_t<_OpT>, strVec>
+		ui_getoperators(const size_t _Nh, bool _isquadratic = true, bool _ismanybody = true)
+			requires std::is_base_of_v<Operators::GeneralOperator<_T, typename _OpT::repType, typename _OpT::repTypeV>, _OpT> &&
+			std::is_same_v<typename _OpT::innerType, _T>;
 
 	std::pair<v_1d<std::shared_ptr<Operators::Operator<double>>>, strVec>
 		ui_eth_getoperators(const size_t _Nh, bool _isquadratic = true, bool _ismanybody = true);
@@ -714,9 +142,11 @@ private:
 	bool defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<Lattice>& _lat);
 
 	// NQS
-	template<typename _T, uint _spinModes = 2>
-	void defineNQS(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_ptr<NQS<_spinModes, _T>>& _NQS, 
-		const v_1d<std::shared_ptr<NQS<_spinModes, _T>>>& _NQSl = {}, const v_1d<double>& _beta = {});
+	template<typename _T, uint _spinModes = 2, typename _Ht = _T, typename _stateType = double>
+	void defineNQS(std::shared_ptr<Hamiltonian<_Ht>>& _H, 
+		std::shared_ptr<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQS, 
+		const v_sp_t<NQS_NS::NQS<_spinModes, _Ht, _T, _stateType>>& _NQSl = {}, 
+		const v_1d<double>& _beta = {});
 
 	// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
@@ -1404,5 +834,263 @@ inline void UI::checkETH(std::shared_ptr<Hamiltonian<_T>> _H)
 //	// bye
 //	LOGINFO(_timer.start(), "ETH CALCULATOR", 0);
 }
+
+// ##########################################################################################################################################
+
+inline std::string PREFIX(const std::string& name, const std::string& random_tag, const std::string& extension, std::string time_tag = "") {
+	if (time_tag.empty()) 
+	{
+		time_tag = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+	}
+	return name + random_tag + "_t=" + time_tag + extension;
+}
+
+namespace TimeEvo
+{
+
+	// ----------------------------------------------------------------
+	// File name prefixes
+	// ----------------------------------------------------------------
+	inline const std::string KEY_ME                      = "/ME";                        // for mean energy
+	inline const std::string KEY_EPS                     = "eps_micro";                  // for a given energy density
+	inline const std::string KEY_MEAN_LVL                = "mean_lvl_spacing";           // mean level spacing
+	inline const std::string KEY_HEIS_TIME_GAMMA         = "heis_time_gamma";            // Heisenberg time (gamma)
+	inline const std::string KEY_HEIS_TIME_AROUND_MEAN   = "heis_time_around_mean";      // Heisenberg time around mean
+	inline const std::string KEY_HEIS_TIME_AROUND_MEAN_T = "heis_time_around_mean_typ";  // Heisenberg time around mean (typical)
+	inline const std::string KEY_ENERGIES                = "energies";                   // energies
+	inline const std::string KEY_MEAN                    = "mean";                       // Tr<psi|H|psi> / N_h
+	inline const std::string KEY_MEAN_STATE              = "mean_state";                 // <psi_0|H|psi_0>
+	inline const std::string KEY_MEAN_STATE2             = "mean_state2";                // <psi_0|H|psi_0>^2
+	inline const std::string KEY_TIME                    = "time";                       // time
+	inline const std::string KEY_TIME_SHORT              = "time/short";                 // time short
+	inline const std::string KEY_TIME_MEDIUM             = "time/medium";                // time medium
+	inline const std::string KEY_TIME_MIDDLE             = "time/middle";                // time middle
+	inline const std::string KEY_TIME_LONG               = "time/long";                  // time long
+	inline const std::string KEY_ENT_ENTROPY_PREFIX      = "entanglement_entropy/";      // entanglement entropy
+	inline const std::string KEY_ENT_SITES               = "entanglement_entropy/sites"; // entanglement entropy for sites
+	inline const std::string KEY_PARTICIPATION           = "participation_entropy";      // participation entropy S_p = - sum_i (|psi_i|^4)
+	inline const std::string KEY_ENERGY_DENSITY          = "energy_density";             // energy density
+	inline const std::string KEY_REALIZATION             = "realization";                // number of realizations
+
+	inline const std::string SUFFIX_ZERO                 = "/zero";                      // for zero energy state
+	inline const std::string SUFFIX_ME                   = "/ME";                        // for mean energy state
+	inline const std::string SUFIX_BIPARTITE             = "/bipartite";               	 // for bipartite entanglement
+	inline const std::string SUFFIX_MICRO_ME             = "/micro/ME/1";                // for microcanonical ensemble
+	inline const std::string SUFFIX_MICRO_ME2            = "/micro/ME/2";                // for microcanonical ensemble squared
+	inline const std::string SUFFIX_DIAGONAL_ME          = "/diagonal/ME";               // for diagonal ensemble
+
+	// For macros/functions that require arguments, use inline constexpr functions:
+	inline std::string SUFFIX_EPS(double x)            { return "/eps=" + std::to_string(x); 				}
+	inline std::string SUFFIX_MICRO_ED(double x)       { return "/micro/eps=" + std::to_string(x) + "/1"; 	}
+	inline std::string SUFFIX_MICRO2_ED(double x)      { return "/micro/eps=" + std::to_string(x) + "/2"; 	}
+	inline std::string SUFFIX_DIAGONAL_ED(double x)    { return "/diagonal/eps=" + std::to_string(x); 		}
+
+	// File name prefixes (these require runtime variables, so keep as inline functions)
+	inline std::string STAT_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("stat", random_tag, extension, time_tag);
+	}
+	inline std::string LDOS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("ldos", random_tag, extension, time_tag);
+	}
+	inline std::string DIAG_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("diag", random_tag, extension, time_tag);
+	}
+	inline std::string EDENS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("energydens", random_tag, extension, time_tag);
+	}
+	inline std::string EVO_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("evo", random_tag, extension, time_tag);
+	}
+	inline std::string AVS_PREFIX(const std::string& random_tag, const std::string& extension, const std::string& time_tag) {
+		return PREFIX("avs", random_tag, extension, time_tag);
+	}
+
+	template <typename T>
+	struct TimeEvoParams
+	{
+		size_t _Ns;
+		size_t _Nh;
+		size_t _hs_fraction_diag        = 0;
+		bool _isQuadratic               = true;
+		bool _isManyBody                = true;
+	
+		long double _bw_est;
+		long double _dtau_est;
+		long double _heisenberg_time_est;
+		long double _thouless_est;
+		long long   _ntimes;
+		long long   _nrealiz            = 1;
+	
+		// stores the operators
+		std::vector<std::shared_ptr<Operators::Operator<double>>> _ops;
+		std::vector<std::string> _opsN;
+	
+		// stores the model info
+		std::string modelInfo;
+		std::string dir;
+		std::string randomStr;
+		std::string extension;
+		std::string time_tag;
+
+		// stores the time evolution
+		bool _uniform_time;
+		arma::Col<double> _timespace;
+	
+		// stores the check vectors
+		v_1d<double> _to_check_microcanonical_eps;
+		v_1d<double> _energy_densities;
+		v_1d<size_t> _entropies_sites;
+	
+		// ----------------------------------------------------------------
+		//! Functions
+		// ----------------------------------------------------------------
+	
+		void set_timespace()
+		{
+			if (!_uniform_time)
+			{
+				_timespace = arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), _ntimes);
+			}
+			else
+			{	
+				const long long start_short 	= 0;
+				const long long start_medium 	= _thouless_est * 1e-2;
+				const long long start_middle 	= _thouless_est * 0.5;
+				const long long start_long 		= _heisenberg_time_est * 1e-2;
+				const long long end_short 		= start_short + (_ntimes * _dtau_est);
+				const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
+				const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
+				const long long end_long 		= start_long + (_ntimes * _dtau_est);
+	
+				// Create a uniform distribution of time points
+				arma::Col<double> _short_times 	= arma::linspace(start_short, end_short, _ntimes);
+				arma::Col<double> _medium_times = arma::linspace(start_medium, end_medium, _ntimes);
+				arma::Col<double> _middle_times = arma::linspace(start_middle, end_middle, _ntimes);
+				arma::Col<double> _long_times 	= arma::linspace(start_long, end_long, _ntimes);
+				const long long _total_size		= (_short_times.size() + _medium_times.size() + _middle_times.size() + _long_times.size());
+				
+				// Combine all the time ranges
+				_timespace.set_size(_total_size);
+				_timespace.subvec(0, _short_times.size() - 1) = _short_times;
+				_timespace.subvec(_short_times.size(), _short_times.size() + _medium_times.size() - 1) = _medium_times;
+				_timespace.subvec(_short_times.size() + _medium_times.size(), _short_times.size() + _medium_times.size() + _middle_times.size() - 1) = _middle_times;
+				_timespace.subvec(_short_times.size() + _medium_times.size() + _middle_times.size(), _total_size - 1) = _long_times;
+			}
+		}
+	
+		// ----------------------------------------------------------------
+		//! Set Hamiltonian parameters
+		// ----------------------------------------------------------------
+	
+		void set_hamil_params(MY_MODELS _type, std::shared_ptr<Hamiltonian<T>> _H, size_t n_tot, size_t n_real);
+	
+		// ----------------------------------------------------------------
+		//! Containers to hold all results
+		// ----------------------------------------------------------------
+	
+		struct ResultContainers 
+		{
+			arma::Col<T> initial_state_me;                                  // [nh]
+			arma::Mat<T> initial_state_ed;                                  // [nh x n_ops]
+	
+			// level statistics
+			arma::Mat<double> mean_level_spacing;                           // [4 x n_real]
+			arma::Mat<double> energies;                                     // [nh x n_real]
+	
+			// local density of states
+			arma::Mat<double> ldos_me;                                      // [nh x n_real]
+			std::vector<arma::Mat<double>> ldos_ed;                         // [n_edens][nh x n_real]
+	
+			// energy densities
+			arma::Mat<T> energy_densities_me;                          		// [3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+			std::vector<arma::Mat<T>> energy_densities_ed;             		// [n_edens][3 x n_real] - mean energy, <state|H|state>, <state|H2|state>
+	
+			// diagonal elements
+			std::vector<arma::Mat<T>> diagonals;                            // [n_ops][nh x n_real]
+	
+			// time evolution
+			std::vector<arma::Mat<T>> time_evo_me;                          // [n_ops][n_times x n_real]
+			std::vector<arma::Col<T>> time_evo_zero_me;						// [n_ops][n_real]
+			std::vector<std::vector<arma::Mat<T>>> time_evo_ed;             // [n_edens][n_ops][n_times x n_real]
+			std::vector<std::vector<arma::Col<T>>> time_evo_zero_ed;        // [n_edens][n_ops][n_real]
+	
+			// entropies
+			arma::Mat<double> time_participation_entropy;                   // [n_times x n_real]
+			std::vector<arma::Mat<double>> time_ee;                        	// [n_sites][n_times x n_real]
+			arma::Mat<double> time_ee_bipartite;                            // [n_times x n_real]
+	
+			// microcanonical averages
+			std::vector<arma::Mat<T>> microcanonical_me;                   	// [n_ops][n_eps x n_real]
+			std::vector<arma::Mat<double>> microcanonical_me2;              // [n_ops][n_eps x n_real]
+			std::vector<std::vector<arma::Mat<T>>> microcanonical_ed;      	// [n_edens][n_ops][n_eps x n_real]
+			std::vector<std::vector<arma::Mat<double>>> microcanonical_ed2; // [n_edens][n_ops][n_eps x n_real]
+	
+			// diagonal ensembles
+			arma::Mat<double> diagonal_me;                                  // [n_ops x n_real]
+			std::vector<arma::Mat<double>> diagonal_ed;                     // [n_edens][n_ops x n_real]
+	
+			// finished realisations
+			size_t realisation_count = 0;                                   // number of realizations finished
+	
+		} _r;
+	
+		// ----------------------------------------------------------------
+	
+		void save_for_realization(size_t r);		
+	
+		// ----------------------------------------------------------------
+	
+		void allocate_result_containers();
+		
+		// ----------------------------------------------------------------
+	};
+
+	// --------------------------------------------------------------------
+
+	template <typename T>
+	void microcanonical_saver(
+		size_t r,                                            // realization index
+		size_t opi,                                          // operator index
+		const std::vector<arma::Mat<T>>& diagonals,          // diagonals[opi] is [nh × n_real]
+		const arma::Col<double>& soverlaps,                  // |<ψ|n>|² vector of length nh
+		const std::vector<uint64_t>& mins,                   // window start indices per ε - given energy density
+		const std::vector<uint64_t>& maxs,                   // window end indices per ε - given energy density
+		arma::Mat<double>& diagvals,                         // [n_ops × n_real], to write long‑time avg here (the diagonal ensemble)
+		std::vector<arma::Mat<T>>& microvals,                // [n_ops][n_eps × n_real] to save the microcanonical averages here
+		std::vector<arma::Mat<double>>& microvals2           // [n_ops][n_eps × n_real] squares of the microcanonical averages
+		);
+	
+	// --------------------------------------------------------------------
+
+	template <typename T>
+	void evolve_state(
+		size_t                                   r,                      	// realization index
+		const arma::Col<T>&                      init_state,             	// initial state vector [nh]
+		const std::shared_ptr<Hamiltonian<T>>&   H,                     	// Hamiltonian object
+		arma::Mat<double>*                       ldos,                   	// local density of states [nh x n_real] - optional
+		arma::Mat<T>*                            energydensities,        	// energy densities [3 x n_real] - optional
+		std::vector<arma::Mat<T>>*               micro,                  	// microcanonical averages [n_ops][n_eps x n_real] - optional
+		std::vector<arma::Mat<double>>*          micro2,                 	// microcanonical averages squared [n_ops][n_eps x n_real] - optional
+		arma::Mat<double>*                       diagvals,               	// diagonal ensemble [n_ops x n_real] - optional
+		const std::vector<arma::Mat<T>>&         diagonals,              	// operator diagonals [n_ops][nh x n_real]
+		std::vector<arma::Mat<T>>&               time_evo_me,            	// time evolution of operators [n_ops][n_times x n_real]
+		std::vector<arma::Col<T>>*               time_zero_me,           	// zero time value of operators [n_ops][n_real] - optional
+		std::vector<arma::Mat<double>>*          time_ee,                	// entanglement entropy [n_sites][n_times x n_real] - optional
+		arma::Mat<double>*                       time_ee_bipartite,      	// entanglement entropy bipartite [n_times x n_real] - optional
+		arma::Mat<double>*                       time_participation_entropy,// participation entropy [n_times x n_real] - optional
+		const std::vector<GeneralizedMatrix<double>>& matrices,				// operators [n_ops][nh x nh]
+		const arma::Col<double>&                 times,                  	// time grid [n_times]
+		size_t                                   Ns                = 0,  	// total number of sites
+		const std::vector<size_t>&               entropy_sites     = {},  	// sites for entanglement entropy
+		const std::vector<double>&               micro_epsilons    = {},  	// epsilons for microcanonical windows
+		bool                                     append            = false, // append values?
+		bool                                     use_log           = false, // use log of values?
+		bool                                     auto_cor          = false, // enable autocorrelation?
+		int                                      thread_num        = 1      // number of threads
+	);
+
+	// --------------------------------------------------------------------
+};
+
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

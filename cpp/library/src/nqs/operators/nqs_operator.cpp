@@ -1,6 +1,6 @@
 #include "../../../include/NQS/nqs_operator.h"
 #include <string>
-
+                                                            
 // ##########################################################################################################################################
 
 namespace Operators 
@@ -33,7 +33,9 @@ namespace Operators
 		_T _valTotal = 0.0;
 		for (const auto& [s2, _val] : this->operator()(s, a...)) {                                          // go through operator acting on the state
 			Binary::int2base(s2, this->state_, _SPIN_RBM);                                                  // set the state
-			_valTotal += _val * (this->modifiesState_ ? algebra::cast<_T>(_fun(this->state_)) : _T(1.0));   // calculate the probability ratio
+            _T _functionVal = this->modifiesState_ ? algebra::cast<_T>(_fun(this->state_)) : _T(1.0);    // calculate the probability ratio
+            // _T _functionVal = algebra::cast<_T>(_fun(this->state_));                                        // calculate the probability ratio
+            _valTotal += _val * _functionVal;                                                               // calculate the probability ratio
 		}
 		return algebra::cast<_T>(_valTotal);
 	}
@@ -68,7 +70,8 @@ namespace Operators
         for (const auto& [s2, _val] : this->operator()(s, a...))
         {
             _T _functionVal = this->modifiesState_ ? algebra::cast<_T>(_fun(s2)) : _T(1.0);  // calculate the probability ratio
-            _valTotal += _functionVal * _val;                                                // calculate the value
+            // _T _functionVal = algebra::cast<_T>(_fun(s2));                                      // calculate the probability ratio
+            _valTotal += _functionVal * _val;                                                   // calculate the value
         }
         return _valTotal;
 	}
@@ -388,12 +391,13 @@ namespace NQSAv
         _nameLocal  = _nameLocal.size() == 0 ? "op_local" : _nameLocal;
         _nameCorr   = _nameCorr.size() == 0 ? "op_corr" : _nameCorr;
         _appName    = _appName.size() == 0 ? "NQS/" : _appName;
-
+        bool _ctd   = false;
         BEGIN_CATCH_HANDLER
         {
             // save global
             for (int i = 0; i < this->opG_.size(); ++i)
             {
+                _ctd            |= true;
                 auto& _cont     = this->containersG_[i];
                 auto& _op       = this->opG_[i];
                 auto _name      = _op->getNameS();
@@ -403,7 +407,7 @@ namespace NQSAv
 					const auto M = _cont.template mean<cpx>();
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameGlobal + ext, M, _appName + "/glob/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameGlobal + ext, M, _appName + "/glob/" + _name, i > 0 || app || _ctd);
 				}
             }
         }
@@ -414,6 +418,7 @@ namespace NQSAv
             // save local
             for (int i = 0; i < this->opL_.size(); ++i)
             {
+                _ctd        |= true;
                 auto& _cont = this->containersL_[i];
                 auto& _op   = this->opL_[i];
                 auto _name  = _op->getNameS();
@@ -424,7 +429,7 @@ namespace NQSAv
 					// save!
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameLocal + ext, M, _appName + "/loc/" + _name, i > 0 || app || _ctd);
 				}
             }
         }
@@ -435,6 +440,7 @@ namespace NQSAv
             // save correlation
             for (int i = 0; i < this->opC_.size(); ++i)
             {
+                _ctd            |= true;
                 auto& _cont     = this->containersC_[i];
                 auto& _op       = this->opC_[i];
                 auto _name      = _op->getNameS();
@@ -445,7 +451,7 @@ namespace NQSAv
 					// save!
 					if (M.size() != 0)
 						for (const auto& ext : _ext)
-							saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || app);
+							saveAlgebraic(dir_, _nameCorr + ext, M, _appName + "/corr/" + _name, i > 0 || app || _ctd);
 				}
             }
         }
@@ -807,3 +813,5 @@ namespace NQSAv
 
     // ##########################################################################################################################################
 };
+
+// ##########################################################################################################################################

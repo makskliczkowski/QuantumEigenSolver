@@ -112,6 +112,10 @@ inline std::string HeisenbergKitaev<_T>::info(const strVec& skip, std::string se
 	return this->Hamiltonian<_T>::info(name, skip, sep);
 }
 
+constexpr int HEI_KIT_Z_BOND_NEI = 1;
+constexpr int HEI_KIT_X_BOND_NEI = 2;
+constexpr int HEI_KIT_Y_BOND_NEI = 0;
+
 // ##########################################################################################################################################
 
 template<typename _T>
@@ -184,11 +188,17 @@ inline HeisenbergKitaev<_T>::HeisenbergKitaev(Hilbert::HilbertSpace<_T>&& hilber
 
 // ##########################################################################################################################################
 
-/*
-* Calculate the local energy end return the corresponding vectors with the value
-* @param _cur base state index
-* @param _site lattice site
-* @param _fun function for Neural Network Quantum State whenever the state changes (after potential flip) - nondiagonal
+/**
+* @brief Calculate the local energy of the Heisenberg-Kitaev model at a given site.
+*
+* This function computes the local energy contribution of a given site in the Heisenberg-Kitaev model.
+* It takes into account the perpendicular and transverse fields, as well as interactions with nearest neighbors.
+*
+* @tparam _T The type parameter for the Heisenberg-Kitaev model.
+* @param _cur The current state represented as a 64-bit unsigned integer.
+* @param _site The site index for which the local energy is being calculated.
+* @param _fun A function that takes site indices and spin values, and returns a complex value.
+* @return The local energy as a complex value.
 */
 template <typename _T>
 cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::NQSFun _fun)
@@ -231,13 +241,13 @@ cpx HeisenbergKitaev<_T>::locEnergy(u64 _cur, uint _site, HeisenbergKitaev<_T>::
 
 			// ----------------------- KITAEV -----------------------
 			// z_bond
-			if (N_NUMBER == 0)
+			if (N_NUMBER == HEI_KIT_Z_BOND_NEI)
 				localVal		+= this->Kz[_site] * si * sj;
 			// y_bond
-			else if (N_NUMBER == 1)
+			else if (N_NUMBER == HEI_KIT_Y_BOND_NEI)
 				changedIn		+= siY * sjY * Ky[_site];
 			// x_bond
-			else if (N_NUMBER == 2)
+			else if (N_NUMBER == HEI_KIT_X_BOND_NEI)
 				changedIn		+= Operators::_SPIN_RBM * Operators::_SPIN_RBM * Kx[_site];
 
 			// apply change
@@ -287,11 +297,11 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 			changedIn			+=	Operators::_SPIN_RBM * Operators::_SPIN_RBM * this->J[_site];
 
 			// ----------------------- KITAEV -----------------------
-			if (N_NUMBER == 0) 		// z_bond
+			if (N_NUMBER == HEI_KIT_Z_BOND_NEI) 		// z_bond
 				localVal		+= this->Kz[_site] * si * sj;
-			else if (N_NUMBER == 1) // y_bond
+			else if (N_NUMBER == HEI_KIT_Y_BOND_NEI) // y_bond
 				changedIn		+= this->Ky[_site] * siY * sjY;
-			else if (N_NUMBER == 2) // x_bond
+			else if (N_NUMBER == HEI_KIT_X_BOND_NEI) // x_bond
 				changedIn		+= this->Kx[_site] * Operators::_SPIN_RBM * Operators::_SPIN_RBM;
 
 			// apply change
@@ -341,7 +351,7 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 		{
 			#ifdef _DEBUG 
 				if (_elemId == 0)
-					std::cout << nei << "[" << (N_NUMBER == 0 ? "Z" : (N_NUMBER == 1 ? "Y" : "X")) << "]" << " - ";
+					std::cout << nei << "[" << (N_NUMBER == HEI_KIT_Z_BOND_NEI ? "Z" : (N_NUMBER == HEI_KIT_Y_BOND_NEI ? "Y" : "X")) << "]" << " - ";
 			#endif
 			// --------------------- HEISENBERG ---------------------
 			// SZiSZj (diagonal elements)
@@ -360,11 +370,11 @@ inline void HeisenbergKitaev<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			this->setHElem(_elemId,	J[_site] * val_x * val_x2,	idx_x2);
 
 			// ----------------------- KITAEV -----------------------
-			if (N_NUMBER == 0) 		// z_bond
+			if (N_NUMBER == HEI_KIT_Z_BOND_NEI) 		// z_bond
 				this->setHElem(_elemId, this->Kz[_site] * algebra::real(val_z * val_z2), idx_z2);
-			else if (N_NUMBER == 1) // y_bond
+			else if (N_NUMBER == HEI_KIT_Y_BOND_NEI) // y_bond
 				this->setHElem(_elemId, this->Ky[_site] * algebra::real(val_y * val_y2), idx_y2);
-			else if (N_NUMBER == 2) // x_bond
+			else if (N_NUMBER == HEI_KIT_X_BOND_NEI) // x_bond
 				this->setHElem(_elemId, this->Kx[_site] * algebra::real(val_x * val_x2), idx_x2);
 		}
 	}
