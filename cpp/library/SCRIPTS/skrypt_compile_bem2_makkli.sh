@@ -6,7 +6,7 @@
 
 # Load necessary modules
 source /usr/local/sbin/modules.sh
-module load intel/2022b
+module load intel
 module load HDF5
 
 # Define directories and variables
@@ -53,7 +53,6 @@ icpx ./main.cpp                                                 \
         ./src/nqs/nqs_evo.cpp                                   \
         ./src/nqs/rbm/rbm.cpp                                   \
         ./src/nqs/rbm/rbm_spin.cpp                              \
-        ./src/nqs/rbmpp/rbmpp.cpp                               \
         ./src/nqs/operators/nqs_operator.cpp                    \
         ./src/operators/operator_parser.cpp                     \
         ./src/user_interface/ui_check_eth.cpp                   \
