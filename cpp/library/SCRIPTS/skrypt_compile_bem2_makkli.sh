@@ -51,6 +51,7 @@ icpx ./main.cpp                                                 \
         ./src/nqs/nqs_lower.cpp                                 \
         ./src/nqs/nqs_sampling.cpp                              \
         ./src/nqs/nqs_evo.cpp                                   \
+        ./src/nqs/nqs_inst.cpp                                  \
         ./src/nqs/rbm/rbm.cpp                                   \
         ./src/nqs/rbm/rbm_spin.cpp                              \
         ./src/nqs/operators/nqs_operator.cpp                    \
