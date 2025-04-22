@@ -660,12 +660,20 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				long double _h_freq					= SystemProperties::mean_lvl_spacing_typ(_E);
 				_p._r.mean_level_spacing(3, _r)		= 1.0 / _h_freq;
 				auto _meanlvl 						= _p._r.mean_level_spacing.col(_r);
+
+				// get trace H^2 / D 
+				long double _sigma_e				= _H->getEnergyWidth() / _p._Nh;
+				long double _bw 					= _H->getBandwidth();
+
+
 				LOGINFO(StrParser::colorize(VEQ(_min), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_max), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQP(_meanlvl(0), 10) 	+ ": mean level spacing", StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1)) 		+ ": mean level Heisenberg time", StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				// LOGINFO(StrParser::colorize(VEQ(_meanlvl(1)) 		+ ": mean level Heisenberg time", StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2)) 		+ ": mean level Heisenberg time around energy ", StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3)) 		+ ": mean level Heisenberg time around energy - typical", StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQPS(_sigma_e, 2)		+ ": energy width",  StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQPS(_bw, 2)			+ ": bandwidth",  StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 			}
 
 			// -----------------------------------------------------------------------------

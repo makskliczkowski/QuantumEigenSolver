@@ -75,9 +75,6 @@ class UltrametricModel(hamil_module.Hamiltonian):
         # storage for random blocks
         self._hamil         = None
         self._std_en        = None
-        self._H0            = None
-        # build blocks
-        self._init_H0()
         
         # set the Hamiltonian operators
         self._max_local_ch_o = 0
@@ -115,10 +112,8 @@ class UltrametricModel(hamil_module.Hamiltonian):
         with the same parameters as the original one but with different
         random blocks.
         '''
-        # initialize the Hdot
-        self._init_H0()
         # initialize the blocks
-        self._hamil = self._set_Hk(self._hamil, self._H0, backend=self._backend)
+        self._hamil = self._set_Hk(self._hamil, backend=self._backend)
 
     # ---------------------------------------------------------------
     
@@ -152,30 +147,8 @@ class UltrametricModel(hamil_module.Hamiltonian):
             raise ValueError(self._ERR_ALPHA_SIZE)
 
     # ---------------------------------------------------------------
-    
-    def _init_H0(self):
-        """
-        Initialize the central dot Hamiltonian H0 of size 2^n.
-        The Hamiltonian is a Gaussian Orthogonal Ensemble (GOE) matrix
-        with elements drawn from a normal distribution.
-        
-        The Hamiltonian is normalized by gamma/sqrt(dim+1).
-        The matrix is generated using the random_matrix function from the
-        general_python.algebra.ran_wrapper module.
-        
-        """
-        dim0 = 2**self._n
-        if np.issubdtype(self._dtype, np.complexfloating):
-            hdot  = random_matrix((dim0, dim0), typek = RMT.CUE,
-                                        backend=self._backend, dtype=self._dtype)
-        else:
-            hdot  = random_matrix((dim0, dim0), typek = RMT.GOE,
-                                        backend=self._backend, dtype=self._dtype)
-        self._H0 = (self._gamma/np.sqrt(dim0+1)) * hdot
 
-    # ---------------------------------------------------------------
-
-    def _set_Hk(self, _hedit: Array, _hdot: Array, backend = np):
+    def _set_Hk(self, _hedit: Array, backend = np):
         """
         Initialize hierarchical blocks Hk of increasing size 2^{n+k}.
         The Hamiltonians are Gaussian Orthogonal Ensemble (GOE) matrices
@@ -190,29 +163,32 @@ class UltrametricModel(hamil_module.Hamiltonian):
         # initialize the matrix
         _hedit = backend.zeros((self._nh, self._nh), dtype=self._dtype)
         
+        dim0        = 2**self._n
+        num_blocks  = 2**self._L
+        # multiplier for H0
+        mult0       = self._gamma/np.sqrt(dim0+1)
+        for i in range(num_blocks):
+            start   = i*dim0; end = (i+1)*dim0
+            R0      = random_matrix((dim0, dim0), typek=RMT.GOE,
+                                    backend=backend, dtype=self._dtype)
+            _hedit[start:end, start:end] += mult0 * R0
+        
         # set the Hamiltonian by creating blocks
         for k in range(1, self._L + 1):
             # inner dimension
-            dimk    = 2**(self._n + k)
-            self._log(f"UM: Hk[{k}] = {dimk}", lvl = 3, log = 'debug')
-            mult    = (self._gamma/np.sqrt(dimk+1)) * self._alphas[k-1]**(k) * self._J
+            dimk     = 2**(self._n + k)
+            rest     = 2**(self._L - k)
+            au_k     = self._alphas[k-1]**k
+            multk    = self._gamma * au_k / np.sqrt(dimk+1)
             
-            for i in range(0, 2**(self._L - k)):
-                # start index for the block
-                start_idx   = i * dimk
-                # end index for the block
-                end_idx     = (i + 1) * dimk
-                R           = random_matrix((dimk, dimk), typek=RMT.GOE,
-                                backend=backend, dtype=self._dtype)
-                # set the block
-                _hedit[start_idx:end_idx, start_idx:end_idx] += R * mult
-        
-        # set the H0 at each block
-        for i in range(0, 2**self._L):
-            start_idx   = i * self._dimdot
-            end_idx     = (i + 1) * self._dimdot
-            _hedit[start_idx:end_idx, start_idx:end_idx] += _hdot
-        
+            # independent blocks per diagonal
+            for j in range(rest):
+                start   = j*dimk
+                end     = (j+1)*dimk
+                Rk      = random_matrix((dimk, dimk), typek=RMT.GOE,
+                                    backend=backend, dtype=self._dtype)
+                _hedit[start:end, start:end] += multk * Rk
+
         return _hedit
     
     # ---------------------------------------------------------------
@@ -240,9 +216,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
         # initialize zero Hamiltonian container
         backend_changed = self._backend if not use_numpy else np
         self._hamil     = backend_changed.zeros((self._nh, self._nh), dtype=self._dtype)
-        self._log(f"UltrametricModel: Hamiltonian initialized.", lvl=2, log='debug')
-        self._log(f"UltrametricModel: H0 size: {self._H0.shape}", lvl=3, log='debug')
-        self._hamil     = self._set_Hk(self._hamil, self._H0, backend_changed)
+        self._hamil     = self._set_Hk(self._hamil, backend_changed)
         self._hamiltonian_validate()
         
     # ---------------------------------------------------------------

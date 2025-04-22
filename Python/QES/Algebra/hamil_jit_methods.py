@@ -109,4 +109,21 @@ def energy_width(hamil: Array):
     '''
     return np.trace(np.matmul(hamil, hamil))
 
+def gap_ratio(eigenvalues: Array):
+    '''
+    Compute the gap ratio of a set of energy eigenvalues.
+
+    Parameters
+    ----------
+    eigenvalues : array-like
+        A 1D array of energy eigenvalues.
+
+    Returns
+    -------
+    float
+        The gap ratio of the energy eigenvalues.
+    '''
+    gaps = np.diff(eigenvalues)
+    return np.mean(np.minimum(gaps[:-1], gaps[1:]) / np.maximum(gaps[:-1], gaps[1:]))
+
 # ---------------------------------------------------------------------
