@@ -862,10 +862,10 @@ namespace TimeEvo
 	inline const std::string KEY_MEAN_STATE              = "mean_state";                 // <psi_0|H|psi_0>
 	inline const std::string KEY_MEAN_STATE2             = "mean_state2";                // <psi_0|H|psi_0>^2
 	inline const std::string KEY_TIME                    = "time";                       // time
-	inline const std::string KEY_TIME_SHORT              = "time/short";                 // time short
-	inline const std::string KEY_TIME_MEDIUM             = "time/medium";                // time medium
-	inline const std::string KEY_TIME_MIDDLE             = "time/middle";                // time middle
-	inline const std::string KEY_TIME_LONG               = "time/long";                  // time long
+	inline const std::string KEY_TIME_SHORT              = "times/short";                // time short
+	inline const std::string KEY_TIME_MEDIUM             = "times/medium";               // time medium
+	inline const std::string KEY_TIME_MIDDLE             = "times/middle";               // time middle
+	inline const std::string KEY_TIME_LONG               = "times/long";                 // time long
 	inline const std::string KEY_ENT_ENTROPY_PREFIX      = "entanglement_entropy/";      // entanglement entropy
 	inline const std::string KEY_ENT_SITES               = "entanglement_entropy/sites"; // entanglement entropy for sites
 	inline const std::string KEY_PARTICIPATION           = "participation_entropy";      // participation entropy S_p = - sum_i (|psi_i|^4)
@@ -945,38 +945,7 @@ namespace TimeEvo
 		//! Functions
 		// ----------------------------------------------------------------
 	
-		void set_timespace()
-		{
-			if (!_uniform_time)
-			{
-				_timespace = arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), _ntimes);
-			}
-			else
-			{	
-				const long long start_short 	= 0;
-				const long long start_medium 	= _thouless_est * 1e-2;
-				const long long start_middle 	= _thouless_est * 0.5;
-				const long long start_long 		= _heisenberg_time_est * 1e-2;
-				const long long end_short 		= start_short + (_ntimes * _dtau_est);
-				const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
-				const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
-				const long long end_long 		= start_long + (_ntimes * _dtau_est);
-	
-				// Create a uniform distribution of time points
-				arma::Col<double> _short_times 	= arma::linspace(start_short, end_short, _ntimes);
-				arma::Col<double> _medium_times = arma::linspace(start_medium, end_medium, _ntimes);
-				arma::Col<double> _middle_times = arma::linspace(start_middle, end_middle, _ntimes);
-				arma::Col<double> _long_times 	= arma::linspace(start_long, end_long, _ntimes);
-				const long long _total_size		= (_short_times.size() + _medium_times.size() + _middle_times.size() + _long_times.size());
-				
-				// Combine all the time ranges
-				_timespace.set_size(_total_size);
-				_timespace.subvec(0, _short_times.size() - 1) = _short_times;
-				_timespace.subvec(_short_times.size(), _short_times.size() + _medium_times.size() - 1) = _medium_times;
-				_timespace.subvec(_short_times.size() + _medium_times.size(), _short_times.size() + _medium_times.size() + _middle_times.size() - 1) = _middle_times;
-				_timespace.subvec(_short_times.size() + _medium_times.size() + _middle_times.size(), _total_size - 1) = _long_times;
-			}
-		}
+		void set_timespace();
 	
 		// ----------------------------------------------------------------
 		//! Set Hamiltonian parameters
