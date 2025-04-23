@@ -50,8 +50,7 @@ namespace SystemProperties
 		inline arma::Col<std::complex<double>> time_evo(const arma::Mat<_T>& _eigenstates, 
 														const arma::Col<double>& _eigvals,
 														const _S& _overlaps, 
-														const double _time,
-														size_t _threads = 1)
+														const double _time)
 		{
 			return _eigenstates * (_overlaps % arma::exp(-cpx(0,_time) * _eigvals));
 			// arma::Col<std::complex<double>> _exp = arma::exp(-I * _time * _eigvals);		// precompute the exponential
@@ -61,6 +60,24 @@ namespace SystemProperties
 			// for (auto i = 0; i < _eigenstates.n_cols; ++i)
 				// _ret += (_exp(i) * _overlaps(i)) * _eigenstates.col(i);
 			// return _ret;
+		}
+
+		//! block time evolution
+		template <typename _T, typename _S = arma::Col<_T>>
+		inline void time_evo(const arma::Mat<_T>& _eigenstates, 
+							const arma::Col<double>& _eigvals,
+							const _S& _overlaps, 
+							const arma::Col<double>& _times,
+							arma::Mat<std::complex<double>>& _ret)
+		{
+			// _ret.resize(_eigenstates.n_rows, _times.n_elem);
+			// _ret.fill(0.0);
+			for (auto i = 0; i < _times.n_elem; ++i)
+			{
+				// calculate the phases first
+				_ret.col(i) = _overlaps % arma::exp(-cpx(0, _times(i)) * _eigvals);
+			}
+			_ret = _eigenstates * _ret;
 		}
 
 		// ---------------------------------------------------------------------------

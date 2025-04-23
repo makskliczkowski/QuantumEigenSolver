@@ -198,6 +198,8 @@ void UI::parseModel(int argc, cmdArg& argv)
 			SETOPTION(modP, eth_offd);
 			SETOPTIONVECTORRESIZET(modP, eth_end, 10, double);
 		}
+		// set the number of times 
+		SETOPTION(modP, Ntimes);
 		// set operators vector
 		this->setOption<std::string>(modP.operators, argv, "op", "sz/L", true);
 		// ---- quadratic ----

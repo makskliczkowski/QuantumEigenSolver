@@ -102,13 +102,11 @@ namespace UI_PARAMS
 		UI_PARAM_CREATE_DEFAULTD(modMidStates, double, 1.0);// states in the middle of the spectrum
 		UI_PARAM_CREATE_DEFAULTD(modEnDiff, double, 1.0);	// tolerance for the energy difference of the states in offdiagonal
 		std::vector<std::string> operators;					// operators to be calculated for the model
-
-		// ##########################################################################
 		
-		// ########################## I N T E R A C T I N G #########################
+		UI_PARAM_CREATE_DEFAULT(Ntimes, uint, 100000);		// number of time steps for the time evolution
 		
-		// ##########################################################################
-
+		//! ########################## I N T E R A C T I N G #########################
+		
 		// ############## ISING ################
 		
 		UI_PARAM_STEP(double, J1, 1.0);			// spin exchange

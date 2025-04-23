@@ -903,7 +903,7 @@ class Hamiltonian(ABC):
     #! Many body Hamiltonian matrix
     # ----------------------------------------------------------------------------------------------
 
-    def __hamiltonian_validate(self):
+    def _hamiltonian_validate(self):
         ''' Check if the Hamiltonian matrix is valid. '''
         if self._hamil is None:
             self._log("Hamiltonian matrix is not initialized.", lvl=3, color="red", log = "debug")
@@ -1134,7 +1134,7 @@ class Hamiltonian(ABC):
             #     self._hamil = self._hamil.block_until_ready()
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
-        self.__hamiltonian_validate()
+        self._hamiltonian_validate()
     
     # ----------------------------------------------------------------------------------------------
     #! Calculators
@@ -1419,7 +1419,7 @@ class Hamiltonian(ABC):
 
         # log success
         
-        self._max_local_ch              = max(self._max_local_ch_o,   max(len(op) for op in self._ops_mod_sites)    + \
+        self._max_local_ch              = max(self._max_local_ch_o, max(len(op) for op in self._ops_mod_sites)    + \
                                                                     max(len(op) for op in self._ops_mod_nosites)  + \
                                                                     max(len(op) for op in self._ops_nmod_sites)   + \
                                                                     max(len(op) for op in self._ops_nmod_nosites))

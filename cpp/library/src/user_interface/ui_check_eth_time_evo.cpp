@@ -41,13 +41,16 @@ namespace TimeEvo
 		for (size_t ei = 0; ei < n_eps; ++ei) 
 		{
 			// clamp window
-			uint64_t mn = std::min<uint64_t>(std::max<uint64_t>(mins[ei], 0), Nminus1);
-			uint64_t mx = std::min<uint64_t>(maxs[ei], Nminus1);
+			int64_t mn = std::min<int64_t>(std::max<uint64_t>(mins[ei], 0), Nminus1);
+			int64_t mx = std::min<int64_t>(maxs[ei], Nminus1);
 			if (mn >= mx) {
 				mn = mins[ei] > 0 ? mins[ei] - 1 : 0;
 				mx = maxs[ei] < Nminus1 ? maxs[ei] + 1 : Nminus1;
 			}
+			mn 			= std::min<uint64_t>(mn, Nminus1);
+			mx 			= std::min<uint64_t>(mx, Nminus1);
 			// compute microcanonical mean and mean‑square
+			LOGINFO("Microcanonical mean " + VEQ(r) + " " + VEQ(mn) + " " + VEQ(mx) + " " + VEQ(col.n_elem), LOG_TYPES::DEBUG, 4);
 			auto sub 				= col.subvec(mn, mx);
 			microvals[opi](ei, r)  	= arma::mean(sub);
 			microvals2[opi](ei, r) 	= arma::mean(arma::square(arma::abs(sub)));
@@ -105,14 +108,16 @@ namespace TimeEvo
 	) 
 	{
 		// Eigen decomposition info
-		// const size_t Nh                  	= H->getHilbertSize();	
+		const size_t nh 					= init_state.n_elem;
 		const auto& eigvecs              	= H->getEigVec();
 		const auto& eigvals              	= H->getEigVal();
 		const arma::Col<T> overlaps      	= eigvecs.t() * init_state;
 		const arma::Col<double> soverlaps	= arma::square(arma::abs(overlaps));
 		
 		// Local density of states
-		if (ldos) {
+		if (ldos) 
+		{
+			LOGINFO("Calculating LDOS for " + VEQ(r), LOG_TYPES::DEBUG, 4);
 			ldos->col(r) = SystemProperties::calculate_LDOS(eigvals, overlaps);
 		}
 		
@@ -165,19 +170,112 @@ namespace TimeEvo
 		const size_t log_stride	= std::max<size_t>(1, n_times / 10);  // every 10%
 		auto t_start   			= std::chrono::high_resolution_clock::now();
 		auto t_last    			= t_start;
+		const size_t n_block	= std::min((size_t)512, nh);
 		std::atomic<size_t> completed{0};
 #pragma omp parallel num_threads(thread_num)
 		{
 			// thread‑local workspace
-			arma::Col<std::complex<double>> st_loc(eigvecs.n_rows);
+#ifndef UI_TIMEEVO_NOBLOCKS
+			arma::Mat<std::complex<double>> st_block(eigvecs.n_rows, n_block);
+#else
+			arma::Col<std::complex<double>> st_block(eigvecs.n_rows);
+#endif
 
 #pragma omp for schedule(static)
+#ifndef UI_TIMEEVO_NOBLOCKS
+			for (size_t b0 = 0; b0 < n_times; b0 += n_block) 
+			{
+				size_t nb 			= std::min(n_block, n_times - b0);		// number of blocks
+				auto times_block 	= times.subvec(b0, b0 + nb - 1);		// time grid for the block
+				SystemProperties::TimeEvolution::time_evo(eigvecs, eigvals, overlaps, times_block, st_block);
+				
+				// go through the blocks to compute the time evolution
+				for (size_t ti = 0; ti < nb; ++ti) 
+				{
+					// start current time for the performance
+					auto st_loc 			= st_block.col(ti);
+
+					// compute the operator values for each operator
+					for (size_t opi = 0; opi < matrices.size(); ++opi) 
+					{
+						auto val_c 			= arma::as_scalar(arma::cdot(st_loc, matrices[opi] * st_loc));
+						if (auto_cor) 		val_c *= zerovals[opi];
+						auto val_c_t 		= algebra::cast<T>(val_c);
+
+						T val = 0.0;
+						if (append) 
+						{
+							if (use_log)
+								val = time_evo_me[opi](b0 + ti, r) + std::log(std::abs(val_c_t));
+							else
+								val = time_evo_me[opi](b0 + ti, r) + algebra::cast<T>(val_c_t);
+						} 
+						else 
+						{
+							if (use_log)
+								val = std::log(std::abs(val_c_t));
+							else
+								val = algebra::cast<T>(val_c_t);
+						}
+						time_evo_me[opi](b0 + ti, r) = val;
+					}
+
+					// Entropy
+					if (time_ee != nullptr) 
+					{
+						size_t iter = 0;
+						for (auto site : entropy_sites) 
+						{
+							uint64_t maskA = 1ull << (site - 1);
+							// Entanglement entropy per site
+							(*time_ee)[iter++](b0 + ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
+								st_loc, 1, Ns, maskA, DensityMatrix::RHO_METHODS::SCHMIDT, 2);
+						}
+					}
+					
+					// Bipartite entanglement entropy
+					if (time_ee_bipartite != nullptr) 
+					{
+						(*time_ee_bipartite)(b0 + ti, r) = Entropy::Entanglement::Bipartite::vonNeuman<cpx>(
+							st_loc, int(Ns / 2), Ns, (ULLPOW(int(Ns / 2))) - 1);
+					}
+					// Participation entropy
+					if (time_participation_entropy != nullptr) 
+					{
+						(*time_participation_entropy)(b0 + ti, r) = SystemProperties::information_entropy(st_loc);
+					}
+					size_t done = completed.fetch_add(1, std::memory_order_relaxed) + 1;
+					if (done % log_stride == 0) 
+					{
+#pragma omp critical
+						{
+							auto now     	= std::chrono::high_resolution_clock::now();
+							auto total   	= std::chrono::duration_cast<std::chrono::milliseconds>(now - t_start).count();
+							auto partial 	= std::chrono::duration_cast<std::chrono::milliseconds>(now - t_last).count();
+		
+							int pct 		= static_cast<int>((100.0 * done) / n_times);
+							LOGINFO("Time evolution progress: " 
+									+ std::to_string(pct) + "% ("
+									+ std::to_string(done) + "/"
+									+ std::to_string(n_times) + ")",
+									LOG_TYPES::TRACE, 4);
+		
+							LOGINFO("  since start: " + STRP(total,2) + " ms; "
+									"since last log: " + STRP(partial,2) + " ms",
+									LOG_TYPES::TRACE, 5);
+		
+							t_last = now;
+						}
+					}
+				}
+			}
+#else
 			for (size_t ti = 0; ti < n_times; ++ti) 
 			{
 	
 				// start current time for the performance
 				const double t			= times(ti);
-				st_loc 					= SystemProperties::TimeEvolution::time_evo(eigvecs, eigvals, overlaps, t, 1);
+				st_loc 					= SystemProperties::TimeEvolution::time_evo(eigvecs, eigvals, overlaps, t);
 
 				for (size_t opi = 0; opi < matrices.size(); ++opi) 
 				{
@@ -253,6 +351,7 @@ namespace TimeEvo
 					}
 				}
 			}
+#endif
 		}
 	}
 
@@ -275,6 +374,79 @@ namespace TimeEvo
 		const std::vector<GeneralizedMatrix<double>>&, const arma::Col<double>&, size_t, 
 		const std::vector<size_t>&, const std::vector<double>&, bool, bool, bool, int);
 	
+	// ---------------------------------------------------------------------
+
+	template<typename T>
+	void TimeEvoParams<T>::set_timespace()
+	{
+		if (_ntimes * _dtau_est > _heisenberg_time_est * 1000) {
+			_ntimes = static_cast<long long>(_heisenberg_time_est * 1000 / _dtau_est);
+			LOGINFO("Time evolution time grid is set to " + VEQ(_ntimes) + " points", LOG_TYPES::INFO, 4);
+		}
+
+		if (!_uniform_time)
+		{
+			_timespace = arma::logspace(-2, std::log10(_heisenberg_time_est * 1000), _ntimes);
+		}
+		else if (_Ns >= 13)
+		{	
+			// const double spacing_factor= 1.2;
+			const int    n_per_range   = _ntimes;
+	
+			// Dynamically set start times to avoid overlaps
+			const double start_short   = 0;
+			const double end_short     = start_short   + n_per_range * _dtau_est;
+	
+			const double start_medium  = _thouless_est * 1e-2;
+			const double end_medium    = start_medium  + n_per_range * _dtau_est;
+	
+			const double start_middle  = _thouless_est * 5e-1;
+			const double end_middle    = start_middle  + n_per_range * _dtau_est;
+	
+			const double start_long    = _heisenberg_time_est * 1e-2;
+			const double end_long      = start_long    + n_per_range * _dtau_est;
+	
+			// Construct time ranges
+			arma::Col<double> short_times   = arma::linspace(start_short,  end_short,  n_per_range);
+			arma::Col<double> medium_times  = arma::linspace(start_medium, end_medium, n_per_range);
+			arma::Col<double> middle_times  = arma::linspace(start_middle, end_middle, n_per_range);
+			arma::Col<double> long_times    = arma::linspace(start_long,   end_long,   n_per_range);
+	
+			// Combine them
+			_timespace = arma::join_cols(
+				arma::join_cols(short_times, medium_times),
+				arma::join_cols(middle_times, long_times)
+			);
+		}
+		else
+		{
+			// Dynamically set start times to avoid overlaps
+			const double start_short   = 0;
+			const double end_short     = start_short + (_ntimes - 1) * _dtau_est;
+			const double start_medium  = end_short + _dtau_est;
+			const double end_medium    = start_medium + (_ntimes - 1) * _dtau_est;
+			const double start_middle  = end_medium + _dtau_est;
+			const double end_middle    = start_middle + (_ntimes - 1) * _dtau_est;
+			const double start_long    = end_middle + _dtau_est;
+			const double end_long      = start_long + (_ntimes - 1) * _dtau_est;
+			
+			arma::Col<double> short_times   = arma::linspace(start_short,  end_short,  _ntimes);
+			arma::Col<double> medium_times  = arma::linspace(start_medium, end_medium, _ntimes);
+			arma::Col<double> middle_times  = arma::linspace(start_middle, end_middle, _ntimes);
+			arma::Col<double> long_times    = arma::linspace(start_long,   end_long,   _ntimes);
+
+			// Construct time ranges
+			_timespace = arma::join_cols(
+				arma::join_cols(short_times, medium_times),
+				arma::join_cols(middle_times, long_times)
+			);
+		}
+	}
+
+	// template instantiate
+	template void TimeEvoParams<double>::set_timespace();
+	template void TimeEvoParams<std::complex<double>>::set_timespace();
+
 	// ---------------------------------------------------------------------
 
 	template<typename T>
@@ -340,28 +512,22 @@ namespace TimeEvo
 		saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace, KEY_TIME, false);
 		if (_uniform_time)
 		{
+			LOGINFO("Saving time evolution in uniform time grid", LOG_TYPES::DEBUG, 4);
 			const long long start_short 	= 0;
-			const long long start_medium 	= _thouless_est * 1e-2;
-			const long long start_middle 	= _thouless_est * 0.5;
-			const long long start_long 		= _heisenberg_time_est * 1e-2;
-			const long long end_short 		= start_short + (_ntimes * _dtau_est);
-			const long long end_medium 		= start_medium + (_ntimes * _dtau_est);
-			const long long end_middle 		= start_middle + (_ntimes * _dtau_est);
-			const long long _total_size		= (_timespace.size());
-			const long long _short_size		= end_short - start_short;
-			const long long _medium_size	= end_medium - start_medium;
-			const long long _middle_size	= end_middle - start_middle;
-			// const long long _long_size		= _total_size - (_short_size + _medium_size + _middle_size);
+			const long long end_short 		= start_short + _ntimes/4 - 1;
+			const long long start_medium 	= end_short + 1;
+			const long long end_medium 		= start_medium + _ntimes/4 - 1;
+			const long long start_middle 	= end_medium + 1;
+			const long long end_middle 		= start_middle + _ntimes/4 - 1;
+			const long long start_long 		= end_middle + 1;
+			const long long end_long 		= start_long + _ntimes/4 - 1;
+			// Ensure indices do not exceed _timespace.n_elem - 1
+			const long long max_idx = static_cast<long long>(_timespace.n_elem) - 1;
 			// save times 
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_short, end_short - 1), KEY_TIME_SHORT, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_medium, end_medium - 1), KEY_TIME_MEDIUM, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_middle, end_middle - 1), KEY_TIME_MIDDLE, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_long, _total_size - 1), KEY_TIME_LONG, true);
-
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(0, _short_size - 1), KEY_TIME_SHORT, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(_short_size, _short_size + _medium_size - 1), KEY_TIME_MEDIUM, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(_short_size + _medium_size, _short_size + _medium_size + _middle_size - 1), KEY_TIME_MIDDLE, true);
-			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(_short_size + _medium_size + _middle_size, _total_size - 1), KEY_TIME_LONG, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_short, std::min(end_short, max_idx)), KEY_TIME_SHORT, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_medium, std::min(end_medium, max_idx)), KEY_TIME_MEDIUM, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_middle, std::min(end_middle, max_idx)), KEY_TIME_MIDDLE, true);
+			saveAlgebraic(dir, EVO_PREFIX(randomStr, extension, time_tag), _timespace.subvec(start_long, std::min(end_long, max_idx)), KEY_TIME_LONG, true);
 		}
 
 		//! time evolution of entropies
@@ -590,6 +756,8 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 
     TimeEvo::TimeEvoParams<_T> _p;
     _p.set_hamil_params((MY_MODELS)_H->getTypeI(), _H, this->latP.Ntot_, this->modP.getRanReal());
+	_p._energy_densities 	= this->modP.eth_end_;
+	_p._ntimes 				= this->modP.Ntimes_;
 
     //! get info
 	std::string modelInfo, dir = "ETH_MAT_TIME_EVO", randomStr, extension;
@@ -660,12 +828,20 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				long double _h_freq					= SystemProperties::mean_lvl_spacing_typ(_E);
 				_p._r.mean_level_spacing(3, _r)		= 1.0 / _h_freq;
 				auto _meanlvl 						= _p._r.mean_level_spacing.col(_r);
+
+				// get trace H^2 / D 
+				long double _sigma_e				= _H->getEnergyWidth() / _p._Nh;
+				long double _bw 					= _H->getBandwidth();
+
+
 				LOGINFO(StrParser::colorize(VEQ(_min), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_max), StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQP(_meanlvl(0), 10) 	+ ": mean level spacing", StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
-				LOGINFO(StrParser::colorize(VEQ(_meanlvl(1)) 		+ ": mean level Heisenberg time", StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
+				// LOGINFO(StrParser::colorize(VEQ(_meanlvl(1)) 		+ ": mean level Heisenberg time", StrParser::StrColors::blue), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(2)) 		+ ": mean level Heisenberg time around energy ", StrParser::StrColors::red), LOG_TYPES::TRACE, 1);
 				LOGINFO(StrParser::colorize(VEQ(_meanlvl(3)) 		+ ": mean level Heisenberg time around energy - typical", StrParser::StrColors::yellow), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQPS(_sigma_e, 2)		+ ": energy width",  StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
+				LOGINFO(StrParser::colorize(VEQPS(_bw, 2)			+ ": bandwidth",  StrParser::StrColors::green), LOG_TYPES::TRACE, 1);
 			}
 
 			// -----------------------------------------------------------------------------
@@ -718,10 +894,11 @@ void UI::checkETH_time_evo(std::shared_ptr<Hamiltonian<_T>> _H)
 				// do the same for the energy densities
 				for (int i = 0; i < _p._energy_densities.size(); ++i)
 				{
-					LOGINFO("Evolving the energy density state eps=" + STR(_p._energy_densities[i]), LOG_TYPES::TRACE, 3);
+					arma::Col<_T> _state = _p._r.initial_state_ed.col(i);
+					LOGINFO("Evolving the energy density state eps=" + STR(_p._energy_densities[i]) + "," + VEQ(i), LOG_TYPES::TRACE, 3);
 					TimeEvo::evolve_state(
 						_r,
-						arma::Col<_T>(_p._r.initial_state_ed.col(i)),
+						_state,
 						_H,
 						&_p._r.ldos_ed[i],
 						&_p._r.energy_densities_ed[i],

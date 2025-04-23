@@ -102,7 +102,7 @@ class QSM(hamil_module.Hamiltonian):
         super().__init__(hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
         
         # setup the internal variables
-        self._n     =  n                # Number of particles in the dot
+        self._n     = n                 # Number of particles in the dot
         self._gamma = gamma             # Hilbert-Schmidt norm of the coupling operator normalizer
         self._g0    = g0                # Coupling strength between the particles in the dot and the particles outside the dot
         self._nout  = 0                 # Number of particles outside the dot
@@ -110,16 +110,16 @@ class QSM(hamil_module.Hamiltonian):
         self.check_sizes(a, h, xi)      # Check the sizes of the coupling vector, random box distribution vector, and magnetic field vector       
         
         # Initialize the Hamiltonian
-        self._hdot          = None
-        self._dimin         = 0
-        self._dimout        = 0
-        self._neidot        = []
-        self._au            = None
-        self. _u            = None
-        self._name          = "Quantum Sun Model"
-        self._startns       = n
-        self._is_sparse     = True
-        self._max_local_ch  = 2
+        self._hdot                      = None
+        self._dimin                     = 0
+        self._dimout                    = 0
+        self._neidot                    = []
+        self._au                        = None
+        self. _u                        = None
+        self._name                      = "Quantum Sun Model"
+        self._startns                   = n
+        self._is_sparse                 = True
+        self._max_local_ch              = 2
         self.init_particles()
         # test the Hamiltonian and allow jit to be built - trigger the jit compilation        
         self._hamil                     = None
@@ -228,7 +228,7 @@ class QSM(hamil_module.Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def __init_hdot(self):
+    def _init_hdot(self):
         ''' Initialize the random Hamiltonian for the particles outside the dot. '''
         hdot = None
         if np.issubdtype(self._dtype, np.complexfloating):
@@ -245,7 +245,7 @@ class QSM(hamil_module.Hamiltonian):
             return hdot / np.sqrt(_norm)
         return hdot
 
-    def __init_distances(self):
+    def _init_distances(self):
         ''' Initialize the random distances for the 'free' particles. '''
         nout        = self.nout
         xi          = self._xi
@@ -255,7 +255,7 @@ class QSM(hamil_module.Hamiltonian):
         self._u     = u
         return u
     
-    def __init_a_distances(self):
+    def _init_a_distances(self):
         ''' Initialize the random distances for the 'free' particles. '''
         self._au        = self._a ** self._u
     
@@ -268,8 +268,8 @@ class QSM(hamil_module.Hamiltonian):
         self._neidot    = np.random.choice(list(range(self.n)), self.nout, replace=True)
 
         # initialize the random distances for the 'free' particles
-        self.__init_distances()
-        self.__init_a_distances()
+        self._init_distances()
+        self._init_a_distances()
 
         # log information
         self._log("alpha = [{}]".format(", ".join(f"{val:.3f}" for val in self._a)), lvl=1, log = 'debug')
@@ -277,7 +277,7 @@ class QSM(hamil_module.Hamiltonian):
         self._log("alpha^u = [{}]".format(", ".join(f"{val:.3f}" for val in self._au)), lvl=2, log = 'debug')
 
         # initialize the Hamiltonian in the dot
-        self._hdot      = self.__init_hdot()
+        self._hdot      = self._init_hdot()
         
         # based on the backend, convert the Hamiltonian to the appropriate type
         if self._backend != np:
@@ -306,7 +306,7 @@ class QSM(hamil_module.Hamiltonian):
         
         # calculate the new coupling strength
         if initialize:
-            self.__init_distances()
+            self._init_distances()
         
     def set_h(self, h, initialize = True):
         ''' Set the magnetic field vector. '''
@@ -332,8 +332,8 @@ class QSM(hamil_module.Hamiltonian):
         
         # calculate the new random distances
         if initialize:
-            self.__init_distances()
-            self.__init_a_distances()
+            self._init_distances()
+            self._init_a_distances()
             
     # ----------------------------------------------------------------------------------------------
     
