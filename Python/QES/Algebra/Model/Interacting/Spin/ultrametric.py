@@ -166,7 +166,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
         dim0        = 2**self._n
         num_blocks  = 2**self._L
         # multiplier for H0
-        mult0       = self._gamma/np.sqrt(dim0+1)
+        mult0       = self._gamma/np.sqrt(dim0 + 1)
         for i in range(num_blocks):
             start   = i*dim0; end = (i+1)*dim0
             R0      = random_matrix((dim0, dim0), typek=RMT.GOE,
@@ -179,7 +179,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
             dimk     = 2**(self._n + k)
             rest     = 2**(self._L - k)
             au_k     = self._alphas[k-1]**k
-            multk    = self._gamma * au_k / np.sqrt(dimk+1)
+            multk    = self._J * self._gamma * au_k / np.sqrt(dimk+1)
             
             # independent blocks per diagonal
             for j in range(rest):
