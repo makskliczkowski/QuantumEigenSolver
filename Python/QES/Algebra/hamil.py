@@ -637,7 +637,7 @@ class Hamiltonian(ABC):
         Works for both dense and sparse representations and for NumPy and JAX.
         """
         # Dense matrix: use nbytes if available, otherwise compute from shape.
-        self._log(f"Checking the memory used by the Hamiltonian matrix of type {type(self._hamil)}", lvl=1)
+        # self._log(f"Checking the memory used by the Hamiltonian matrix of type {type(self._hamil)}", lvl=1)
         
         if not self._is_sparse:
             if hasattr(self._hamil, "nbytes"):
@@ -1423,8 +1423,8 @@ class Hamiltonian(ABC):
                                                                     max(len(op) for op in self._ops_mod_nosites)  + \
                                                                     max(len(op) for op in self._ops_nmod_sites)   + \
                                                                     max(len(op) for op in self._ops_nmod_nosites))
-        self._log(f"Max local changes set to {self._max_local_ch}", lvl=2, color="green", log='warning')
-        self._log("Successfully set local energy functions...", lvl=2)
+        self._log(f"Max local changes set to {self._max_local_ch}", lvl=2, color="green", log='debug')
+        self._log("Successfully set local energy functions...", lvl=2, log ='debug')
 
     def _local_energy_test(self, k_map = 0, i = 0):
         '''
