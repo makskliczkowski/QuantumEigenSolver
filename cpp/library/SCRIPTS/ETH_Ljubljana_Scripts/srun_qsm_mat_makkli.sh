@@ -18,7 +18,7 @@ cd ${RUN_DIR}
 if [ "$FUN" -le 45 ]; then
     lustredir=/home/makkli4548/mylustre/DATA_FIDELITY/
 else
-    lustredir=/home/makkli4548/mylustre/DATA_TIME/
+    lustredir=/home/makkli4548/mylustre/DATA_TIME_UNIFORM/
 fi
 mkdir -p ${lustredir}
 
@@ -60,7 +60,7 @@ echo "module load HDF5" >> ${a}
 echo >> ${a}
 echo "cd ${RUN_DIR}" >> ${a}
 echo >> ${a}
-echo "${RUN_DIR}/qsolver -Ntot ${Ns} -plrb_mb 1 -Ntots ${Ns} -op 'Sx/0-1;Sz/0' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -checkpoint 0 -fun ${FUN} ${PARS} -th ${CPU} -dir ${lustredir}/ >& ${LOGDIR}/log${b}.log" >> ${a}
+echo "${RUN_DIR}/qsolver -Ntimes 100000 -Ntot ${Ns} -plrb_mb 1 -Ntots ${Ns} -op 'Sx/0-1;Sz/0' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.2' -eth_offd 1 -checkpoint 0 -fun ${FUN} ${PARS} -th ${CPU} -dir ${lustredir}/ >& ${LOGDIR}/log${b}.log" >> ${a}
 # echo "${RUN_DIR}/qsolver.o -Ntot ${Ns} -plrb_mb 1 -Ntots 7 -op 'Sz/L;Sz/0;Sx/0;Sz/0-1;Sz/0-1-2;Sz/0-1-2-3;Sz/1:Lm3:1;Sz/0-1:Lm3:1' -eth_entro 1 -eth_ipr 1 -eth_susc 1 -eth_end '0.1;0.2;0.3;0.4' -eth_offd 1 -fun ${FUN} ${PARS} -th ${CPU} -dir \${SAVDIR}/ >& ${LOGDIR}/log_${b}.log" >> ${a}
 echo >> ${a}
 # echo "rsync -a --ignore-existing --remove-source-files \${SAVDIR}/* ${lustredir}" >> ${a}
