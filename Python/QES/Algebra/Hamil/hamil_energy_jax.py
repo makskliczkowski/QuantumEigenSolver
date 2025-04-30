@@ -55,7 +55,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 from typing import Tuple, Optional, List, Callable, Union
-from Algebra.hamil_energy_helper import unpack_operator_terms, flatten_operator_terms
+from Python.QES.Algebra.Hamil.hamil_energy_helper import unpack_operator_terms, flatten_operator_terms
 
 ################################################################################
 

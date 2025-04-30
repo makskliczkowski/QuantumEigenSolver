@@ -23,13 +23,13 @@ from functools import partial
 import time
 
 ###################################################################################################
-from Algebra.hilbert import HilbertSpace, set_operator_elem
+from Algebra.hilbert import HilbertSpace, set_operator_elem, Logger
 from Algebra.Operator.operator import Operator, OperatorTypeActing, create_add_operator
 from Algebra.Operator.operator_matrix import operator_create_np
-from Algebra.hamil_types import *
-from Algebra.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
+from Python.QES.Algebra.Hamil.hamil_types import *
+from Python.QES.Algebra.Hamil.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
 ###################################################################################################
-
+import Python.QES.Algebra.Hamil.hamil_jit_methods as hjm
 ###################################################################################################
 from general_python.algebra.ran_wrapper import random_vector
 from general_python.algebra.utils import JAX_AVAILABLE, get_backend, ACTIVE_INT_TYPE
@@ -41,7 +41,7 @@ if JAX_AVAILABLE:
     import jax.lax as lax
     import jax.numpy as jnp
     from jax.experimental.sparse import BCOO, CSR
-    from Algebra.hamil_energy import local_energy_jax_wrap
+    from Python.QES.Algebra.Hamil.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
 else:
     import jax
@@ -133,8 +133,8 @@ class Hamiltonian(ABC):
                 is_sparse       : bool  =   True,                
                 dtype                   =   None,
                 backend         : str   =   'default',
-                
                 # logger and other kwargs
+                logger          : Optional[Logger] = None,
                 **kwargs):
         """
         Initialize the Hamiltonian class.
@@ -154,6 +154,8 @@ class Hamiltonian(ABC):
             Data type for the Hamiltonian matrix elements. If None, inferred from Hilbert space or backend.
         backend : str, optional
             Computational backend to use ('default', 'np', 'jax', etc.). Default is 'default'.
+        logger : Logger, optional
+            Logger class, may be inherited from the Hilbert space
         **kwargs
             Additional keyword arguments, such as 'ns' (number of sites/modes), or 'lattice' for further customization.
 
@@ -193,54 +195,45 @@ class Hamiltonian(ABC):
             # if the number of sites is not provided, raise an error
             raise ValueError(Hamiltonian._ERR_NS_NOT_PROVIDED)
         
-        if self._is_manybody:
-            # do many-body Hamiltonian
-            
-            if self._hilbert_space is None:
-                # try to infer from lattice or number of sites
-                if self._lattice is None:
-                    # if the lattice is not provided, create Hilbert space from number of sites
-                    self._ns            = self._ns
-                    if self._ns is None:
-                        raise ValueError(Hamiltonian._ERR_NS_NOT_PROVIDED)
-                self._hilbert_space = HilbertSpace(ns = self._ns, lattice = self._lattice,
-                                        is_manybody = self._is_manybody,
-                                        dtype = self._dtype, backend = self._backendstr, **kwargs)
-            else:
+        if self._hilbert_space is None:
+            # try to infer from lattice or number of sites
+            if self._lattice is None:
+                # if the lattice is not provided, create Hilbert space from number of sites
+                self._ns = self._lattice._ns
+                if self._ns is None:
+                    raise ValueError(Hamiltonian._ERR_NS_NOT_PROVIDED)
+            self._hilbert_space = HilbertSpace(ns       = self._ns,
+                                            lattice     = self._lattice,
+                                            is_manybody = self._is_manybody,
+                                            dtype       = self._dtype,
+                                            backend     = self._backendstr,
+                                            logger      = logger,
+                                            **kwargs)
+        else:
+            # otherwise proceed 
+            if self._is_manybody:
                 if not self._hilbert_space._is_many_body:
                     raise ValueError(Hamiltonian._ERR_MODE_MISMATCH)
+                self._hamil_sp = None
+            else:
+                if not self._hilbert_space._is_quadratic:
+                    raise ValueError(Hamiltonian._ERR_MODE_MISMATCH)
+                self._hamil = None
+        
+        if self._hilbert_space.get_Ns() != self._ns:
+            raise ValueError(f"Ns mismatch: {self._hilbert_space.get_Ns()} != {self._ns}")
                 
-                if self._hilbert_space.get_Ns() != self._ns:
-                    raise ValueError(f"Ns mismatch: {self._hilbert_space.get_Ns()} != {self._ns}")
-                
-                # if the Hilbert space is provided, get the number of sites
-                self._lattice       = self._hilbert_space.get_lattice()
-                self._ns            = self._hilbert_space.get_Ns()
-                
+        # if the Hilbert space is provided, get the number of sites
+        self._lattice       = self._hilbert_space.get_lattice()
                     
-            if self._dtype is None:
-                self._dtype = self._hilbert_space.dtype
-            self._nh        = self._hilbert_space.get_Nh()
-            self._logger    = self._hilbert_space.logger
-            self._hamil_sp  = None
-        else:
-            # do non-interacting Hamiltonian
-            
-            
-            if self._ns is None:
-                # try to infer from lattice
-                self._lattice   = kwargs.get("lattice", None)
-                if self._lattice is None:
-                    raise ValueError(Hamiltonian._ERR_NEED_LATTICE)
-                else:
-                    self._ns = self._lattice.ns
-            
-            # Effective Hilbert space consists of all possible nodes
-            self._nh        = self._ns
-            
-        #! other properties
-        self._startns       = 0 # for starting hamil calculation
+        if self._dtype is None:
+            self._dtype     = self._hilbert_space.dtype
+        self._nh            = self._hilbert_space.get_Nh()
         self._logger        = self._hilbert_space.logger
+        
+        #! other properties
+        self._startns       = 0 # for starting hamil calculation (potential loop over sites)
+        self._logger        = self._hilbert_space.logger if logger is None else logger
         
         # for the Hamiltonian matrix properties, and energy properties    
         self._av_en_idx     = 0
@@ -315,6 +308,7 @@ class Hamiltonian(ABC):
         Clears the Hamiltonian matrix.
         '''
         self._hamil      = None
+        self._hamil_sp   = None
         self._eig_vec    = None
         self._eig_val    = None
         self._krylov     = None
@@ -833,35 +827,53 @@ class Hamiltonian(ABC):
         '''
         self._log("Initializing the Hamiltonian matrix...", lvl = 2, log = "debug")
         
-        jax_maybe_avail = JAX_AVAILABLE and self._backend != np
+        jax_maybe_avail = self._is_jax
         if jax_maybe_avail and use_numpy:
             self._log("JAX is available but NumPy is forced...", lvl = 3)
         
-        if self.sparse:
-            self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
+        if self._is_quadratic:
+            # Initialize Quadratic Matrix (_hamil_sp)
+            # Shape determined by subclass, assume (Ns, Ns) for now
+            ham_shape = getattr(self, '_hamil_sp_shape', (self._ns, self._ns))
+            self._log(f"Initializing Quadratic Hamiltonian structure {ham_shape} (Sparse={self.sparse})...", lvl=3, log="debug")
             
-            # --------------------------------------------------------------------------------------
-            
-            if not jax_maybe_avail or use_numpy:
-                self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3, log = "debug")
-                self._hamil = sp.sparse.csr_matrix((self._nh, self._nh), dtype = self._dtype)
+            if self.sparse:
+                if self._is_numpy:
+                    self._hamil_sp = sp.sparse.csr_matrix(ham_shape, dtype=self._dtype)
+                else:
+                    indices         = self._backend.zeros((0, 2), dtype=ACTIVE_INT_TYPE)
+                    data            = self._backend.zeros((0,), dtype=self._dtype)
+                    self._hamil_sp  = BCOO((data, indices), shape=ham_shape)
             else:
-                self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
-                # Create an empty sparse Hamiltonian matrix using JAX's BCOO format
-                indices     = self._backend.zeros((0, 2), dtype=ACTIVE_INT_TYPE)
-                data        = self._backend.zeros((0,), dtype=self._dtype)
-                self._hamil = BCOO((data, indices), shape=(self._nh, self._nh))
-                
-            # --------------------------------------------------------------------------------------
-            
+                self._hamil_sp      = self._backend.zeros(ham_shape, dtype=self._dtype)
+            self._hamil = None
         else:
-            self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3, log = "debug")
-            if not JAX_AVAILABLE or self._backend == np:
-                self._hamil     = self._backend.zeros((self._nh, self._nh), dtype=self._dtype)
+            if self.sparse:
+                self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
+                
+                # --------------------------------------------------------------------------------------
+                
+                if not jax_maybe_avail or use_numpy:
+                    self._log("Initializing the Hamiltonian matrix as a CSR sparse matrix...", lvl = 3, log = "debug")
+                    self._hamil = sp.sparse.csr_matrix((self._nh, self._nh), dtype = self._dtype)
+                else:
+                    self._log("Initializing the Hamiltonian matrix as a sparse matrix...", lvl = 3, log = "debug")
+                    # Create an empty sparse Hamiltonian matrix using JAX's BCOO format
+                    indices     = self._backend.zeros((0, 2), dtype=ACTIVE_INT_TYPE)
+                    data        = self._backend.zeros((0,), dtype=self._dtype)
+                    self._hamil = BCOO((data, indices), shape=(self._nh, self._nh))
+                    
+                # --------------------------------------------------------------------------------------
+                
             else:
-                # do not initialize the Hamiltonian matrix
-                self._hamil     = None
-        self._log("Hamiltonian matrix initialized.", lvl = 3, color = "green", log = "debug")
+                self._log("Initializing the Hamiltonian matrix as a dense matrix...", lvl = 3, log = "debug")
+                if not JAX_AVAILABLE or self._backend == np:
+                    self._hamil     = self._backend.zeros((self._nh, self._nh), dtype=self._dtype)
+                else:
+                    # do not initialize the Hamiltonian matrix
+                    self._hamil     = None
+        self._log(f"Hamiltonian matrix initialized and it's {'many-body' if self._is_manybody else 'quadratic'}",
+                    lvl = 3, color = "green", log = "debug")
     
     # ----------------------------------------------------------------------------------------------
     
@@ -887,17 +899,6 @@ class Hamiltonian(ABC):
             return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
         else:
             raise ValueError(self._ERR_COUP_VEC_SIZE)
-    
-    # ----------------------------------------------------------------------------------------------
-    #! Single particle Hamiltonian matrix
-    # ----------------------------------------------------------------------------------------------
-    
-    def _hamiltonian_single_particle(self):
-        '''
-        Generates the Hamiltonian matrix whenever the Hamiltonian is single-particle. 
-        '''
-        #!TODO implement this through the Hilbert space!
-        pass
     
     # ----------------------------------------------------------------------------------------------
     #! Many body Hamiltonian matrix
@@ -934,7 +935,10 @@ class Hamiltonian(ABC):
         '''
         Transforms the Hamiltonian matrix to the backend.
         '''
-        self._hamil     = linalg.transform_backend(self._hamil, self._is_sparse, self._backend)
+        if self._is_manybody:
+            self._hamil     = linalg.transform_backend(self._hamil, self._is_sparse, self._backend)
+        else:
+            self._hamil_sp  = linalg.transform_backend(self._hamil_sp, self._is_sparse, self._backend)
         self._eig_val   = linalg.transform_backend(self._eig_val, False, self._backend)
         self._eig_vec   = linalg.transform_backend(self._eig_vec, False, self._backend)
         self._krylov    = linalg.transform_backend(self._krylov, False, self._backend)
@@ -944,16 +948,32 @@ class Hamiltonian(ABC):
 
     def build(self, verbose: bool = False, use_numpy: bool = False):
         '''
-        Builds the Hamiltonian matrix.
+        Builds the Hamiltonian matrix. It checks the internal masks 
+        wheter it's many-body or quadratic...
         
         Args:
-            verbose (bool) : A flag to indicate whether to print the progress of the build.
+            verbose (bool) :
+                A flag to indicate whether to print the progress of the build.
+            use_numpy (bool) :
+                Force numpy usage.
+            
         '''
         if verbose:
-            self._log("Building the Hamiltonian matrix...", lvl = 1)
-            
+            self._log(f"Building Hamiltonian (Type: {'Many-Body' if self._is_many_body else 'Quadratic'})...",
+                    lvl=1, color = 'orange')
+        
+        if self._is_many_body:
+            # Ensure operators/local energy functions are defined
+            if self._loc_energy_int_fun is None and self._loc_energy_np_fun is None and self._loc_energy_jax_fun is None:
+                self._log("Local energy functions not set, attempting to set them via _set_local_energy_operators...", lvl=2, log="debug")
+                try:
+                    self._set_local_energy_operators()  # Should be implemented by MB subclass
+                    self._set_local_energy_functions()  
+                except Exception as e:
+                    raise RuntimeError(f"Failed to set up operators/local energy functions: {e}")
+        
         ################################
-        # Initialize the Hamiltonian
+        #! Initialize the Hamiltonian
         ################################
         init_start = time.perf_counter()
         try:
@@ -973,7 +993,10 @@ class Hamiltonian(ABC):
         ################################
         ham_start = time.perf_counter()
         try:
-            self._hamiltonian(use_numpy)
+            if self._is_manybody:
+                self._hamiltonian(use_numpy)
+            else:
+                self._hamiltonian_quadratic()
         except Exception as e:
             raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_BUILD} : {str(e)}") from e
 
@@ -1087,16 +1110,23 @@ class Hamiltonian(ABC):
         
         Note: This method may be overridden by subclasses to provide a more efficient implementation
         '''
+        
+        if not self._is_manybody:
+            raise ValueError(Hamiltonian._ERR_MODE_MISMATCH)
+        
         if self._hilbert_space is None or self._nh == 0:
             raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
 
+        if self._loc_energy_int_fun is None and (use_numpy or self._is_numpy):
+            raise RuntimeError("MB build requires local energy functions (_loc_energy_int_fun).")
+        
         # -----------------------------------------------------------------------------------------
         matrix_type = "sparse" if self.sparse else "dense"
         self._log(f"Calculating the {matrix_type} Hamiltonian matrix...", lvl=1, color="blue", log = 'debug')
         # -----------------------------------------------------------------------------------------
         
         # Check if JAX is available and the backend is not NumPy
-        jax_maybe_av = JAX_AVAILABLE and self._backend != np
+        jax_maybe_av = self._is_jax
         
         # Choose implementation based on backend availability.sym_eig_py
         if not jax_maybe_av or use_numpy:
@@ -1114,27 +1144,20 @@ class Hamiltonian(ABC):
             )
         else:
             raise ValueError("JAX not yet implemented for the build...")
-            self._log("Calculating the Hamiltonian matrix using JAX...", lvl=2, log = 'info')
-
-            # Choose the correct local energy function for JAX.
-            # local_fun = jit(self.loc_energy_int_jax) if self._is_sparse else self.loc_energy_ham
-
-            # Calculate the Hamiltonian matrix using the JAX implementation.
-            # self._hamil = hamiltonian_functional_jax(
-            #     self._ns,
-            #     self._hilbert_space,
-            #     loc_energy          = local_fun,
-            #     is_sparse           = self._is_sparse,
-            #     max_local_changes   = self._max_local_ch,
-            #     start               = self._startns,
-            #     dtype               = self._dtype)
-            
-            # # Ensure the computation completes.
-            # if not self._is_sparse:
-            #     self._hamil = self._hamil.block_until_ready()
 
         # Check if the Hamiltonian matrix is calculated and valid using various backend checks
         self._hamiltonian_validate()
+    
+    # ----------------------------------------------------------------------------------------------
+    #! Single particle Hamiltonian matrix
+    # ----------------------------------------------------------------------------------------------
+    
+    def _hamiltonian_quadratic(self, use_numpy : bool = False):
+        '''
+        Generates the Hamiltonian matrix whenever the Hamiltonian is single-particle. 
+        This method needs to be implemented by the subclasses.
+        '''
+        pass
     
     # ----------------------------------------------------------------------------------------------
     #! Calculators
@@ -1306,6 +1329,9 @@ class Hamiltonian(ABC):
         # if isinstance(operator, Callable):
             # if the operator is callable, we try to create the operator from it
             # raise ValueError("The operator is callable, but it should be an Operator object. TODO: implement this...")
+    
+        if not self._is_many_body:
+            raise TypeError("Method 'add' is intended for Many-Body Hamiltonians to define local energy terms.")
         
         # check if the sites are provided, if one sets the operator, we would put it at a given site
         i           = 0 if (sites is None or len(sites) == 0) else sites[0]
@@ -1362,6 +1388,10 @@ class Hamiltonian(ABC):
                 - self._local_ops: a list of local operator tuples for each site.
             - JAX version is set only if the flag JAX_AVAILABLE is True.
         """
+        
+        if not self._is_manybody:
+            self._log("Skipping local energy function setup for Quadratic Hamiltonian.", log='debug')
+            return
         
         # set the integer functions
         try:

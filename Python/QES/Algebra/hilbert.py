@@ -79,30 +79,71 @@ class HilbertSpace(ABC):
     }
     
     def __init__(self,
+                # core definition - elements to define the modes
+                ns          : Union[int, None]                  = None,
+                lattice     : Union[Lattice, None]              = None,
+                nh          : Union[int, None]                  = None,
+                # mode specificaton
+                is_manybody : bool                              = True,
+                part_conserv: Optional[bool]                    = True,
+                # local space properties - for many body
+                nhl         : Optional[int]                     = 2,
+                nhint       : Optional[int]                     = 1,
                 sym_gen     : Union[dict, None]                 = None,
                 global_syms : Union[List[GlobalSymmetry], None] = None,
                 gen_mapping : bool                              = False,
+                # general parameters
                 state_type  : str                               = "integer",
-                single_part : bool                              = False,
                 backend     : str                               = 'default',
                 dtype                                           = np.float64,
+                logger      : Optional[Logger]                  = None,
                 **kwargs):
         """
-        Initialize the Hilbert space. 
+        Initializes a HilbertSpace object with specified system and local space properties, symmetries, and backend configuration.
         
-        Args:
-            sym_gen (dict)      : A dictionary of symmetry generators {operator : value}.
-            global_syms (list)  : A list of global symmetries {operator : value}.
-            gen_mapping (bool)  : A flag to generate the mapping of the representatives to the original states - this 
-                                means that a map between a current index (state) and a representative index is created.
-            ns (int)            : The number of sites in the system.
-            nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
-            single_particle     : A flag to indicate if the system is a single-particle system (default is False).
-            state_type (str)    : The type of the state representation - integer or numpy.ndarray (default is 'integer').
-            backend (str)       : The backend to use for the Hilbert space (default is 'default').
-            lattice (Lattice)   : The lattice object to use for the Hilbert space.
+        Parameters:
+            ns (Union[int, None], optional):
+                Number of sites in the system. If not provided, inferred from `lattice` or `nh`.
+            lattice (Union[Lattice, None], optional):
+                Lattice object defining the system structure. If provided, `ns` is set from `lattice.ns`.
+            nh (Union[int, None], optional):
+                Full Hilbert space dimension. Used if neither `ns` nor `lattice` is provided.
+            is_manybody (bool, optional):
+                Flag indicating if the system is many-body. Default is True.
+            nhl (Optional[int], optional):
+                Local Hilbert space dimension (per site). Default is 2.
+            nhint (Optional[int], optional):
+                Number of internal modes per site (e.g., fermions, bosons). Default is 1.
+            sym_gen (Union[dict, None], optional):
+                Dictionary specifying symmetry generators. Default is None.
+            global_syms (Union[List[GlobalSymmetry], None], optional): 
+                List of global symmetry objects. Default is None.
+            gen_mapping (bool, optional):
+                Whether to generate state mapping based on symmetries. Default is False.
+            state_type (str, optional):
+                Type of state representation (e.g., "integer"). Default is "integer".
+            backend (str, optional):
+                Backend to use for vectors and matrices. Default is 'default'.
+            dtype (optional):
+                Data type for Hilbert space arrays. Default is np.float64.
+            logger (Optional[Logger], optional):
+                Logger instance for logging. Default is None.
+            **kwargs:
+                Additional keyword arguments, such as 'threadnum' (number of threads to use).
+        Raises:
+            ValueError: If provided arguments do not match expected types or required parameters are missing.
+        Notes:
+            - If both `ns` and `lattice` are None, and `nh` is provided, `ns` is inferred from `nh` and `nhl`.
+            - Initializes symmetry groups, state mappings, and backend configuration.
+            - Sets up logging and threading options.
         """
         
+        self._logger        = logger if logger is not None else get_global_logger()
+        # initialize the backend for the vectors and matrices
+        self._backend, self._backend_str, self._state_type = self.reset_backend(backend, state_type)
+        self._dtype         = dtype if dtype is not None else self._backend.float64
+        self._is_many_body  = is_manybody
+        self._is_quadratic  = not is_manybody
         
         # check if the arguments match the requirements
         if not isinstance(sym_gen, dict) and sym_gen is not None:
@@ -114,69 +155,84 @@ class HilbertSpace(ABC):
         
         # handle the system physical size dimension - distinguish between the number of sites and the lattice object
         # if the lattice object is provided, the number of sites is calculated from the lattice object
-        if "ns" in kwargs and "lattice" not in kwargs:
-            self._ns        = kwargs.get('ns', 1)       # number of sites in the system
-            self._lattice   = None                      # lattice object
-            self._nhfull    = None                      # full Hilbert space dimension
-            self._nh        = None
-        elif "lattice" in kwargs:
-            self._lattice   = kwargs.get('lattice')     # lattice object provided
-            self._ns        = self._lattice.ns          # number of sites in the system
-            self._nhfull    = None                      # full Hilbert space dimension
-            self._nh        = None
-        elif "nh" in kwargs:
-            self._ns        = None                      # number of sites in the system
-            self._nhfull    = kwargs.get('nh')          # full Hilbert space dimension
-            self._nh        = self._nhfull
+        if ns is not None:
+            self._ns        = ns
+            self._lattice   = lattice
+            if self._lattice is not None and self._lattice.ns != ns:
+                self._log(f"Warning: The number of sites in the lattice ({self._lattice.ns}) is different than the number of sites provided ({ns}).",
+                            lvl = 1, color = 'yellow', log = 'info')
+        elif lattice is not None:
+            self._ns        = lattice.ns
+            self._lattice   = lattice
+        elif nh is not None and self._is_many_body:
+            try:
+                self._ns        = int(math.log(nh, nhl))
+                if nhl**(self._ns * nhl) < nh:
+                    raise ValueError(HilbertSpace._ERRORS["ns"])
+                self._log(f"Inferred Ns={self._ns} from Nh={nh} and Nhl={nhl}", log='info', lvl=2)
+            except ValueError as e:
+                raise ValueError(f"Cannot infer Ns from Nh={nh}, Nhl={nhl}. Provide Ns or Lattice. Error: {e}")
+        elif nh is not None and self._is_quadratic:
+            self._ns        = nh                        # Assume Nh directly represents Ns for simple quadratic
+            self._lattice   = None
+            self._log(f"Assuming Ns={self._ns} from provided Nh={nh} in quadratic mode.", log='info', lvl=2)
         else:
-            self._ns        = None                      # number of sites in the system
-        # handle local Hilbert space properties
-        self._nhl   = kwargs.get('nhl', 2)              # local Hilbert space dimension
-        self._nhint = kwargs.get('nhint', 1)            # number of modes (fermions, bosons, etc. on each site)
-        self._single_part = single_part                 # single particle system flag
+            raise ValueError(HilbertSpace._ERRORS["ns"])
         
-        # Check if ns is obtainable from the nh if it is None
-        if self._ns is None and self._nh is not None:
-            if self._nh is not None:
-                if not self._single_part:
-                    # switch between the base of logarithm based on the local Hilbert space dimension
-                    self._ns = int(math.log(self._nhfull, self._nhl))
-                else:
-                    self._ns = self._nhfull // self._nhl
-            else:
-                raise ValueError(HilbertSpace._ERRORS["ns"])
+        # set locals
+        self._nhl           = nhl
+        self._nhint         = nhint
+        # Nhfull: Potential full many-body space size
+        try:
+            self._nhfull    = self._nhl**(self._nhint * self._ns) if self._ns > 0 else 0
+        except OverflowError:
+            self._nhfull    = float('inf')
+            self._log(f"Warning: Full Hilbert space size NhFull exceeds standard limits (Ns={self._ns}, Nhl={self._nhl}).", log='warning', lvl=0)
 
-        # initialize the backend for the vectors and matrices
-        self._backend, self._backend_str, self._state_type = self.reset_backend(backend, state_type)
-        
-        # initialize the Hilbert space properties like the full Hilbert space dimension, normalization, symmetry group, etc.
-        if self._nhfull is None:
-            if self._single_part:
-                self._nhfull    = self._ns * self._nhl              # single particle system Hilbert space dimension (each site has its own Hilbert space)
-            else:
-                self._nhfull    = self._nhl ** (self._nhint * self._ns) # full Hilbert space dimension
-            # may be edited later by modifying the symmetry group
-            self._nh            = self._nhfull                      # Hilbert space dimension
-        
+        # Nh: Effective dimension of the *current* representation
+        # Initial estimate:
+        if self._is_quadratic:
+            # For quadratic, the "dimension" is often Ns (or 2Ns if pairing)
+            # We'll set it initially to Ns, can be adjusted later if needed (e.g., for Bogoliubov)
+            self._nh = self._ns
+            self._log(f"Initialized HilbertSpace in quadratic mode: Ns={self._ns}, effective Nh={self._nh}.",
+                        log='debug', lvl=1, color='green')
+        else: # Many-body
+            # If symmetries will be applied, Nh will be reduced later.
+            # Start with the full size, potentially reduced by global syms only initially.
+            self._nh = self._nhfull
+            self._log(f"Initialized HilbertSpace in many-body mode: Ns={self._ns}, Nhl={self._nhl}, initial Nh={self._nh} (potentially reducible).",
+                        color = 'green', log='debug', lvl=1)
+    
+        #! Initialize the symmetries
+        self._normalization         = []                            # normalization of the states - how to return to the representative
+        self._sym_group             = []
+        self._sym_group_sec         = []
+        self._global_syms           = global_syms if global_syms is not None else []
+        self._particle_conserving   = part_conserv
+    
         # initialize the properties of the Hilbert space
-        self._normalization = []                                    # normalization of the states
-        self._sym_group     = []                                    # symmetry group - stores the operators themselves
-        self._sym_group_sec = []                                    # symmetry group - stores the names and the values of the operators
-        self._mapping       = []                                    # mapping of the states
+        self._mapping       = None
+        self._reprmap       = None                                  # mapping of the representatives (vector of tuples (state, representative value))
+        self._fullmap       = None                                  # mapping of the full Hilbert space
+        
         self._getmapping_fun= None                                  # function to get the mapping of the states
-        self._reprmap       = []                                    # mapping of the representatives (vector of tuples (state, representative value))
-        self._fullmap       = []                                    # mapping of the full Hilbert space
         # setup the logger instance for the Hilbert space
-        self._logger        = get_global_logger()                   # logger instance
         self._threadnum     = kwargs.get('threadnum', 1)            # number of threads to use
         
-        # handle the data type of the Hilbert space
-        self._dtype         = dtype if dtype is not None else np.float64 # data type of the Hilbert space
-
-                
-        # handle symmetries - save the global symmetries and initialize the mapping
-        self._global_syms   = global_syms                           # global symmetries
-        self._init_mapping(sym_gen, gen_mapping)                    # initialize the mapping
+        if self._is_many_body and (sym_gen or self._global_syms):
+            if gen_mapping:
+                self._log("Explicitly requested immediate mapping generation.", log='debug', lvl=2)
+            self._init_mapping(sym_gen, gen_mapping=gen_mapping)    # gen_mapping True here enables reprmap
+        elif self._is_quadratic:
+            self._log("Quadratic mode: Skipping symmetry mapping generation.", log='debug', lvl=2)
+            # Ensure mapping attributes are None
+            self._mapping       = None
+            self._normalization = None
+            self._reprmap        = None
+            # Setup sym group if generators provided, but don't build map
+            if sym_gen:
+                self._gen_sym_group(sym_gen) #!TODO: How to define this?
         
         if self._sym_group == []:
             self._sym_group = [operator_identity(self._backend)]
@@ -202,9 +258,7 @@ class HilbertSpace(ABC):
         
         statetype = HilbertSpace.reset_statetype(state_type, _backend)
         return _backend, _backend_str, statetype
-    
-    # --------------------------------------------------------------------------------------------------
-    
+        
     @staticmethod
     def reset_statetype(state_type : str, backend):
         """
@@ -217,13 +271,12 @@ class HilbertSpace(ABC):
             return int
         return backend.array
         
-    # --------------------------------------------------------------------------------------------------
-    
     def reset_local_symmetries(self):
         """
         Reset the local symmetries of the Hilbert space.
         """
-        self._sym_group = []
+        self._log("Reseting the local symmetries. Can be now recreated.", lvl = 2, log = 'debug')
+        self._sym_group     = []
         self._sym_group_sec = []
     
     # --------------------------------------------------------------------------------------------------
@@ -258,14 +311,12 @@ class HilbertSpace(ABC):
         self._logger.say(msg, log = log, lvl = lvl)
     
     ####################################################################################################
-    
-    # Generate the symmetry group and all properties of the generation
-    
+    #! Generate the symmetry group and all properties of the generation
     ####################################################################################################
     
     #! Translation related
         
-    def __gen_sym_group_check_t(self, sym_gen : list) -> (list, Tuple[bool, bool], Tuple[Operator, LatticeDirection]):
+    def _gen_sym_group_check_t(self, sym_gen : list) -> (list, Tuple[bool, bool], Tuple[Operator, LatticeDirection]):
         '''
         Helper function to check the translation symmetry. This function is used to check the translation symmetry.
         It gets the translation generator and checks if it satisfies the symmetry conditions. If the translation
@@ -276,6 +327,14 @@ class HilbertSpace(ABC):
         Returns:
             list, tuple : A list of symmetry generators and a tuple of flags (has_translation, has_cpx_translation).
         '''
+        if self._lattice is None:
+            has_translation = any(g[0].has_translation() for g in sym_gen if hasattr(g,'__len__') and len(g)>0)
+            if has_translation:
+                self._log("Warning: Translation symmetry requested but no Lattice provided. Ignoring translation.", log='warning', lvl=1)
+            # Remove translation generators if found
+            sym_gen_out = [g for g in sym_gen if not (hasattr(g,'__len__') and len(g)>0 and g[0].has_translation())]
+            return sym_gen_out, (False, False), (None, LatticeDirection.X)
+        
         has_cpx_translation = False
         has_translation     = False
         t                   = None  
@@ -315,7 +374,7 @@ class HilbertSpace(ABC):
                 self._log("Translation in complex sector...", lvl = 2, color = 'blue')
         return sym_gen, (has_translation, has_cpx_translation), (t, direction)
 
-    def __gen_sym_apply_t(self, sym_gen_op : list, t : Optional[Operator] = None, direction : LatticeDirection = LatticeDirection.X):
+    def _gen_sym_apply_t(self, sym_gen_op : list, t : Optional[Operator] = None, direction : LatticeDirection = LatticeDirection.X):
         """
         Apply the translation symmetry.
         """
@@ -323,9 +382,9 @@ class HilbertSpace(ABC):
             self._log("Adding translation to symmetry group combinations.", lvl = 2, color = 'yellow')
             
             # check the direction
-            size = self._lattice.lx if direction == LatticeDirection.X else 1
-            size = self._lattice.ly if direction == LatticeDirection.Y else size
-            size = self._lattice.lz if direction == LatticeDirection.Z else size
+            size        = self._lattice.lx if direction == LatticeDirection.X else 1
+            size        = self._lattice.ly if direction == LatticeDirection.Y else size
+            size        = self._lattice.lz if direction == LatticeDirection.Z else size
             sym_get_out = sym_gen_op.copy()
             sym_gen_in  = sym_gen_op.copy()
             t_in        = t
@@ -340,7 +399,7 @@ class HilbertSpace(ABC):
 
     #! Global symmetries related
     
-    def __gen_sym_group_check_u1(self) -> (bool, float):
+    def _gen_sym_group_check_u1(self) -> (bool, float):
         """
         Check if a U(1) global symmetry is present.
         Returns (has_U1, U1_value).
@@ -352,7 +411,7 @@ class HilbertSpace(ABC):
 
     #! Removers for the symmetry generators
 
-    def __gen_sym_remove_reflection(self, sym_gen : list, has_cpx_translation : bool):
+    def _gen_sym_remove_reflection(self, sym_gen : list, has_cpx_translation : bool):
         """
         Helper function to remove reflections from the symmetry generators if the complex translation is present.
         
@@ -365,7 +424,7 @@ class HilbertSpace(ABC):
             self._log("Removed reflection symmetry from the symmetry generators.", lvl = 2, color = 'blue')
         return sym_gen
     
-    def __gen_sym_remove_parity(self, sym_gen : list, has_u1 : bool, has_u1_sec : float):
+    def _gen_sym_remove_parity(self, sym_gen : list, has_u1 : bool, has_u1_sec : float):
         """
         If U(1) is present but the system is not at half-filling (or has odd size),
         remove parity generators in the X and/or Y directions.
@@ -385,7 +444,7 @@ class HilbertSpace(ABC):
         return sym_gen
     
     #! Printer
-    def __gen_sym_print(self, t: Optional[Operator] = None) -> None:
+    def _gen_sym_print(self, t: Optional[Operator] = None) -> None:
         """
         Print the symmetry group.
 
@@ -430,16 +489,16 @@ class HilbertSpace(ABC):
         #! globals - check the global symmetries
         
         # Check global U(1) symmetry.
-        has_u1, u1_val              = self.__gen_sym_group_check_u1()
+        has_u1, u1_val              = self._gen_sym_group_check_u1()
         
         # process translation symmetries
-        sym_gen, (_, has_cpx_t), (t, direction) = self.__gen_sym_group_check_t(sym_gen)
+        sym_gen, (_, has_cpx_t), (t, direction) = self._gen_sym_group_check_t(sym_gen)
         
         # remove reflections from the symmetry generators if the complex translation is present
-        sym_gen                     = self.__gen_sym_remove_reflection(sym_gen, has_cpx_t)
+        sym_gen                     = self._gen_sym_remove_reflection(sym_gen, has_cpx_t)
 
         # check the existence of the parity when U(1) is present
-        sym_gen                     = self.__gen_sym_remove_parity(sym_gen, has_u1, u1_val)
+        sym_gen                     = self._gen_sym_remove_parity(sym_gen, has_u1, u1_val)
         
         # save all again for convenience
         for gen, sec in sym_gen:
@@ -465,9 +524,9 @@ class HilbertSpace(ABC):
                 self._sym_group.append(operator_in)
         
         # apply the translation symmetry
-        self._sym_group = self.__gen_sym_apply_t(self._sym_group, t, direction)
+        self._sym_group = self._gen_sym_apply_t(self._sym_group, t, direction)
 
-        self.__gen_sym_print(t)
+        self._gen_sym_print(t)
     
     # --------------------------------------------------------------------------------------------------
     
@@ -480,6 +539,16 @@ class HilbertSpace(ABC):
             gen (list)         : A list of symmetry generators.
             gen_mapping (bool) : A flag to generate the mapping of the representatives to the original states.
         """
+        if not self._is_many_body:
+            self._log("Skipping mapping initialization in quadratic mode.", log='debug', lvl=2)
+            return
+        if not gen and not self._global_syms:
+            self._log("No symmetries provided, mapping is trivial (identity).", log='debug', lvl=2)
+            self._nh            = self._nhfull
+            self._mapping       = None
+            self._normalization = None
+            return
+        
         t0 = time.time()
         
         self._gen_sym_group(gen)    # generate the symmetry group
@@ -580,6 +649,18 @@ class HilbertSpace(ABC):
         Returns:
             bool: The flag for modifying the Hilbert space.
         """
+        if self._is_quadratic:
+            return False
+        
+        if self._mapping is None and (self._sym_group or self._global_syms):
+            # Symmetries exist but mapping not generated, assume it *will* modify
+            # This might be slightly inaccurate if symmetries don't reduce the space
+            return True
+        elif self._mapping is not None:
+            return self._nh != self._nhfull
+        else: # No symmetries, no modification
+            return False
+        
         return self._nh != self._nhfull
     
     @property
@@ -611,7 +692,6 @@ class HilbertSpace(ABC):
             int: The number of sites in the system.
         """
         return self._ns
-    
     
     def get_Ns(self):
         """
@@ -789,6 +869,16 @@ class HilbertSpace(ABC):
     # --------------------------------------------------------------------------------------------------
     
     @property
+    def quadratic(self):
+        return self._is_quadratic
+    
+    @property
+    def many_body(self):
+        return self._is_many_body
+    
+    # --------------------------------------------------------------------------------------------------
+    
+    @property
     def logger(self):
         """
         Return the logger instance.
@@ -819,37 +909,30 @@ class HilbertSpace(ABC):
     ####################################################################################################
     
     def __str__(self):
-        """
-        Return a string representation of the Hilbert space.
-        
-        Returns:
-            str: A string representation of the Hilbert space.
-        """
-        if self._nhfull == self._nhl ** (self._nhint * self._ns):
-            return (
-                f"Produced the full Hilbert space - no symmetries are used. Spin modes = {self._nhl}\n"
-                f"Number of lattice sites (Ns) = {self._ns}\n"
-                f"Hilbert space size (Nh) = {self._nhfull}\n"
-            )
-        elif self._nhfull <= 0:
-            return "No states in the Hilbert space"
-        else:
-            info = (f"Reduced Hilbert space using symmetries.\n"
-                    f"Spin modes = {self._nhl}\n"
-                    f"Number of sites (Ns) = {self._ns}\n"
-                    f"Local Hilbert space dimension = {self._nhl}\n"
-                    f"Full Hilbert space size (NhFull) = {self._nhfull}\n"
-                    f"Reduced Hilbert space size (Nh) = {len(self._mapping)}\n"
-                    f"Number of symmetry sectors = {len(self._sym_group)}\n")
-            if self.check_global_symmetry():
-                info += "Global symmetries used:\n"
-                for sym in self._global_syms:
-                    info += f" - {sym.get_name_str()} with value {sym.get_val()}\n"
-            else:
-                info += "No global symmetries applied.\n"
-            info += "Local symmetry operators applied.\n" if self._sym_group else "No local symmetry operators applied.\n"
-            return info
-    
+        """ Return a string representation of the Hilbert space. """
+        mode = "Many-Body" if self._is_many_body else "Quadratic"
+        info = f"Mode: {mode}\n"
+        info += f"Ns (sites/modes): {self._ns}\n"
+        if self._is_many_body:
+            info    += f"Nhl (local dim): {self._nhl}\n"
+            info    += f"NhFull (potential MB size): {self._nhfull}\n"
+
+        if self._mapping is not None:
+            info    += f"Reduced Hilbert space size (Nh): {self._nh}\n"
+            info    += f"Number of symmetry operators considered: {len(self._sym_group)}\n"
+        elif self._is_many_body:
+            info    += f"Effective Hilbert space size (Nh): {self._nh} (Full space, no reduction applied)\n"
+        else: # Quadratic
+            info    += f"Effective Hilbert space size (Nh): {self._nh} (Quadratic basis size)\n"
+
+        gs_info     = [f"{g.get_name_str()}={g.get_val()}" for g in self._global_syms]
+        if gs_info:
+            info += f"Global Symmetries: {', '.join(gs_info)}\n"
+        ls_info     = [f"{g}={sec}" for g, sec in self._sym_group_sec]
+        if ls_info:
+            info += f"Local Symmetries: {', '.join(ls_info)}\n"
+        return info
+
     def __repr__(self):
         sym_info = self.get_sym_info()
         base = "Single particle" if self._single_part else "Many body"
