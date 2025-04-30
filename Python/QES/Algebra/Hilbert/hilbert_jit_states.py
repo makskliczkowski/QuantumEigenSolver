@@ -13,12 +13,17 @@ from typing import Union, Optional, Callable
 
 #! jax
 import Algebra.Hilbert.hilbert_jit_states_jax as jnp
+import general_python.algebra.utils.pfaffian as pfaffian
 
 ####################################################################################################
 #! NUMBA METHODS
 ####################################################################################################
 
 if True:
+    
+    #############################################################################
+    #! Slater determinants
+    #############################################################################
     
     @njit(cache=True)
     def calculate_slater_det(sp_eigvecs         : np.ndarray,   # (Ns x Norb) matrix of eigenvectors
@@ -62,8 +67,8 @@ if True:
         
         $$ M _{jk} = <i_j|q_k> = <0|a_j b_k^\dagger |0> = <0|a_j \sum _{x} U_{xk} a_x^\dagger |0> = U_{jk}$$
         
-        and therefore the matrix row is simply given by Row[j] = U[occupied_sites[j], occupied_orbitals],
-        where occupied_sites are the sites that are occupied in the Fock state (\vec{x}) and 
+        and therefore the matrix row is simply given by Row[j] = U[occupied_orbitals[j], occupied_orbitals],
+        where occupied_orbitals are the sites that are occupied in the Fock state (\vec{x}) and 
         occupied_orbitals are the orbitals that are occupied in the Fock state original product state
         with given energy eigenvalues $\Pi _i b_i^\dagger |0>$.
         
@@ -97,7 +102,7 @@ if True:
         # Efficiently count set bits (number of particles in Fock state)
         if isinstance(org_basis_state, (int, np.integer)):
             # Integer bitmask case
-            occupied_sites      = np.empty(n_particles, dtype=np.int64)
+            occupied_orbitals      = np.empty(n_particles, dtype=np.int64)
             n_particles_fock    = 0
             idx_count           = 0
             temp_basis          = int(org_basis_state)
@@ -106,14 +111,14 @@ if True:
                     n_particles_fock += 1
                     # Avoid buffer overflow if more bits are set than n_particles
                     if idx_count < n_particles:
-                        occupied_sites[idx_count] = i
+                        occupied_orbitals[idx_count] = i
                     idx_count += 1
         elif isinstance(org_basis_state, np.ndarray):
             # Array case (assume boolean or 0/1 int)
             basis_state         = org_basis_state.astype(np.bool_) if org_basis_state.dtype != np.bool_ else org_basis_state
             n_particles_fock    = np.sum(basis_state)
             if n_particles_fock == n_particles:
-                occupied_sites  = np.flatnonzero(basis_state)
+                occupied_orbitals  = np.flatnonzero(basis_state)
                 
         # Check if the number of particles in the Fock state matches the number of occupied orbitals
         # This is a necessary condition for the determinant to be non-zero.
@@ -126,13 +131,13 @@ if True:
             return 1.0
 
         # Find indices of occupied sites
-        occupied_sites = np.flatnonzero(basis_state)
+        occupied_orbitals = np.flatnonzero(basis_state)
 
         # Construct the Slater Matrix M (N x N)
         slater_matrix = np.empty((n_particles, n_particles), dtype=sp_eigvecs.dtype)
         for j in range(n_particles):
             # Get the index of the occupied site
-            site_j = occupied_sites[j]
+            site_j = occupied_orbitals[j]
             
             # Fill the j-th row of the Slater matrix
             slater_matrix[j, :] = sp_eigvecs[site_j, 1]
@@ -150,14 +155,17 @@ if True:
         return det
     
     #############################################################################
+    #! Bogolubov - de'Gennes - a BCS-like state amplitudes
+    #############################################################################
     
     @njit(cache=True)
     def calculate_bcs_amp(f_mat                     : np.ndarray,   # (ns x ns) pairing matrix f = v u^{-1}
-                        occupied_sites              : np.ndarray,   # length 2N
-                        pfaffian_function           : Callable
+                        occupied_orbitals           : np.ndarray,   # length 2N
+                        org_basis_state,
+                        pfaffian_function           : Callable = pfaffian.Pfaffian._pfaffian_parlett_reid
                         ):
         """
-        Returns Psi(x) = Pf[f_{ij}] for occupied_sites i,j.
+        Returns Psi(x) = Pf[f_{ij}] for occupied_orbitals i,j.
         
         The Pfaffian is computed using the antisymmetrized matrix f_{ij} = v_{ij} u^{-1}_{ij}.
         The function takes the pairing matrix f and the occupied sites as input.
@@ -166,7 +174,7 @@ if True:
             f_mat (np.ndarray):
                 2D array of the pairing matrix f_{ij} = v_{ij} u^{-1}_{ij}.
                 The shape is (ns, ns), where ns is the number of sites/modes.
-            occupied_sites (np.ndarray):
+            occupied_orbitals (np.ndarray):
                 1D array of integer indices of the occupied sites.
                 The length should be 2N, where N is the number of particles.
             pfaffian_function (Callable):
@@ -175,20 +183,37 @@ if True:
             complex or float:
                 The value of the coefficient Psi(x) = Pf[f_{ij}].     
         """
-        N2      = occupied_sites.size
+        N2      = occupied_orbitals.size
         #!TODO: Test this and implement further...
         
         # extract 2N×2N antisymmetric submatrix
         F_sub   = np.empty((N2, N2), dtype=f_mat.dtype)
         for p in range(N2):
-            ip = occupied_sites[p]
+            ip = occupied_orbitals[p]
             for q in range(N2):
-                F_sub[p, q] = f_mat[ip, occupied_sites[q]]
+                F_sub[p, q] = f_mat[ip, occupied_orbitals[q]]
         # compute Pfaffian via skew‐symmetric elimination
-        return pfaffian_function(F_sub)
+        return pfaffian_function(F_sub, F_sub.shape[0])
     
     #############################################################################
     #! Permanents
     #############################################################################
     
-    
+    @njit(cache=True)
+    def calculate_permament(sp_eigvecs          : np.ndarray,   # (Ns x Norb) matrix of eigenvectors
+                            occupied_orbitals   : np.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {α_k}.
+                            org_basis_state     : Union[int, np.ndarray]):
+        return 1.0
+
+    #############################################################################
+    #! Many body state through summation
+    #############################################################################
+
+    @njit
+    def many_body_state(sp_eigvecs              : np.ndarray,
+                        occupied_orbitals       : np.ndarray,
+                        nh                      : int,
+                        many_body_map_fun       : Optional[Callable] = None):
+        
+        
+#################################################################################

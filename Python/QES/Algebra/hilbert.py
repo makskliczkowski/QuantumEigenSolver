@@ -876,6 +876,10 @@ class HilbertSpace(ABC):
     def many_body(self):
         return self._is_many_body
     
+    @property
+    def particle_conserving(self):
+        return self._particle_conserving
+    
     # --------------------------------------------------------------------------------------------------
     
     @property

@@ -94,6 +94,26 @@ if JAX_AVAILABLE:
             lambda: compute_det(sp_eigvecs, occupied_orbitals, basis_state_mask)
         )
         return det_result
+    
+    #############################################################################
+    #! Bogolubov - de'Gennes - a BCS-like state amplitudes
+    #############################################################################
+    
+    def calculate_bcs_amp_jax(f_mat                 : jnp.ndarray,   # (ns x ns) pairing matrix f = v u^{-1}
+                        occupied_sites              : jnp.ndarray,   # length 2N
+                        pfaffian_function           : Callable
+                        ):
+        pass
+    
+    #############################################################################
+    #! Permanents
+    #############################################################################
+    
+    @jax.jit
+    def calculate_permament_jax(sp_eigvecs          : jnp.ndarray,   # (Ns x Norb) matrix of eigenvectors
+                            occupied_orbitals       : jnp.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {α_k}.
+                            org_basis_state         : Union[int, jnp.ndarray]):
+        return 1.0
 else:
     def calculate_slater_det_jax(sp_eigvecs         : np.ndarray,
                                 occupied_orbitals   : np.ndarray,
@@ -105,4 +125,15 @@ else:
         """
         raise ImportError("JAX is not available. Cannot compute Slater determinant.")
     
+    def calculate_bcs_amp_jax(f_mat                 : np.ndarray,   # (ns x ns) pairing matrix f = v u^{-1}
+                        occupied_sites              : np.ndarray,   # length 2N
+                        pfaffian_function           : Callable
+                        ):
+        pass
+    
+    def calculate_permament_jax(sp_eigvecs          : np.ndarray,   # (Ns x Norb) matrix of eigenvectors
+                            occupied_orbitals       : np.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {α_k}.
+                            org_basis_state         : Union[int, np.ndarray]):
+        return 1.0
+        
 #######################################################################

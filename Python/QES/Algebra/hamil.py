@@ -23,7 +23,7 @@ from functools import partial
 import time
 
 ###################################################################################################
-from Algebra.hilbert import HilbertSpace, set_operator_elem, Logger
+from Algebra.hilbert import HilbertSpace, set_operator_elem, Logger, Lattice
 from Algebra.Operator.operator import Operator, OperatorTypeActing, create_add_operator
 from Algebra.Operator.operator_matrix import operator_create_np
 from Python.QES.Algebra.Hamil.hamil_types import *
