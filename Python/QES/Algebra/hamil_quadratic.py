@@ -146,6 +146,7 @@ class QuadraticHamiltonian(Hamiltonian):
         # Store quadratic terms (hopping, pairing, onsite)
         self._quadratic_terms       = [] # List to store term info [(type, sites, value), ...]
         self._name                  = f"QuadraticHamiltonian(Ns={self._ns})"
+        self._mb_calculator         = self._many_body_state_calculator()
         
     #!TODO: Add term adding such as in many-body?
 
@@ -429,10 +430,39 @@ class QuadraticHamiltonian(Hamiltonian):
                 mb_energy   += self._eig_val[idx_plus] - self._eig_val[idx_minus]
         return mb_energy
 
-    def get_many_body_state(self,
+    ###########################################################################
+
+    def _many_body_state_calculator(self):
+        '''
+        Returns the function to calculate the many-body coefficients from
+        '''
+        #! Select Calculation Function
+        calculator      = None
+        if self._isfermions:
+            if self._particle_conserving:
+                if self._is_numpy:
+                    calculator = calculate_slater_det
+                else:
+                    calculator = calculate_slater_det_jax
+            else:
+                if self._is_numpy:
+                    calculator = calculate_bcs_amp
+                else:
+                    calculator = calculate_bcs_amp_jax
+        elif self._isbosons:
+            if self._is_numpy:
+                calculator = calculate_permament
+            else:
+                calculator = calculate_permament_jax
+        else: # Should not happen
+            raise TypeError("Unknown particle type setting.")
+        return calculator
+
+    def many_body_state(self,
                             occupied_orbitals       : Union[List[int], np.ndarray],
                             target_basis            : str                       = 'sites',
-                            many_body_hs            : Optional[HilbertSpace]    = None
+                            many_body_hs            : Optional[HilbertSpace]    = None,
+                            batch_size              = 1
                             ):
         """
         Constructs the Many-Body state vector in a specified basis using Slater
@@ -461,31 +491,9 @@ class QuadraticHamiltonian(Hamiltonian):
         if not self._particle_conserving and self._isbosons:
             raise NotImplementedError("Bosonic transformation for non-particle conserving (BdG) case not implemented.")
 
-        #! Select Calculation Function
-        calculator      = None
-        backend_str     = self.backend
-        if self._isfermions:
-            if self._particle_conserving:
-                if self._is_numpy:
-                    calculator = calculate_slater_det
-                else:
-                    calculator = calculate_slater_det_jax
-            else:
-                if self._is_numpy:
-                    calculator = calculate_bcs_amp
-                else:
-                    calculator = calculate_bcs_amp_jax
-        elif self._isbosons:
-            if self._is_numpy:
-                calculator = calculate_permament
-            else:
-                calculator = calculate_permament_jax
-        else: # Should not happen
-            raise TypeError("Unknown particle type setting.")
-
         #! Check the calculator function
-        if calculator is None:
-            raise RuntimeError(f"Calculation function for {'fermions' if self._isfermions else 'bosons'} on backend '{backend_str}' not available/imported.")
+        if self._calculator is None:
+            raise RuntimeError(f"Calculation function for {'fermions' if self._isfermions else 'bosons'}.")
 
         #! Prepare Inputs
         # Use Ns (number of sites) for basis state representation size
@@ -494,12 +502,12 @@ class QuadraticHamiltonian(Hamiltonian):
         sp_eigvecs_arr  = self._backend.asarray(self.eig_vec)
         # Occupied orbitals: ensure correct backend array type
         occ_orb_arr     = self._backend.asarray(occupied_orbitals, dtype=self._dtypeint)
-
+        #!TODO: Finish!
+        
         #! Determine Target Basis
         # (Logic remains the same as previous refinement using many_body_hilbert_space)
         use_representatives = False
-        target_hs = many_body_hs
-        target_basis_states_np = None # Store numpy version for numba if needed
+        target_hs           = many_body_hs
 
         if target_hs is not None:
              if not target_hs._is_many_body: raise ValueError("Target HilbertSpace must be many-body.")
