@@ -21,7 +21,6 @@ from typing import List, Tuple, Union, Optional, Callable
 from abc import ABC
 from functools import partial
 import time
-from tabulate import tabulate
 
 ###################################################################################################
 from Algebra.hilbert import HilbertSpace, set_operator_elem
@@ -39,6 +38,7 @@ import general_python.algebra.linalg as linalg
 if JAX_AVAILABLE:
     from Algebra.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
+    
 ###################################################################################################
 
 if JAX_AVAILABLE:
@@ -52,111 +52,111 @@ if JAX_AVAILABLE:
 #! Pure (functional) Hamiltonian update functions.
 ###################################################################################################
 
-if JAX_AVAILABLE:
-    import Algebra.hamil_jit_methods as hjm
+# if JAX_AVAILABLE:
+#     import Algebra.hamil_jit_methods as hjm
     
-    def _hamiltonian_functional_jax_sparse( ns                  : int,
-                                            hilbert_space       : HilbertSpace,
-                                            max_local_changes   : int,
-                                            loc_energy, start=0):
-        """
-        JAX version: Functional Hamiltonian construction (SPARSE).
-        Parameters:
-        - ns (int)         : The number of sites.
-        - hilbert_space    : The Hilbert space. Provides the mapping of the Hilbert space.
-        - loc_energy       : The local energy function. Must be callable with the following signature:
-                                loc_energy(k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
-        - max_local_changes: The maximum number of local changes.
-        - start            : The starting index for the update (default is 0).
-        """
+#     def _hamiltonian_functional_jax_sparse( ns                  : int,
+#                                             hilbert_space       : HilbertSpace,
+#                                             max_local_changes   : int,
+#                                             loc_energy, start=0):
+#         """
+#         JAX version: Functional Hamiltonian construction (SPARSE).
+#         Parameters:
+#         - ns (int)         : The number of sites.
+#         - hilbert_space    : The Hilbert space. Provides the mapping of the Hilbert space.
+#         - loc_energy       : The local energy function. Must be callable with the following signature:
+#                                 loc_energy(k, k_map, i) -> Tuple[List[int], List[int], List[ham.dtype]]
+#         - max_local_changes: The maximum number of local changes.
+#         - start            : The starting index for the update (default is 0).
+#         """
         
-        # get the number of elements in the Hilbert space
-        nh          = hilbert_space.Nh      # number of elements in the Hilbert space
-        _start      = int(start)            # starting index for the inner parameter loop
-        _ns         = int(ns)               # number of modes (parameters)
-        elems       = jnp.arange(_start, _ns, dtype=jnp.int32) # ns is rather small
+#         # get the number of elements in the Hilbert space
+#         nh          = hilbert_space.Nh      # number of elements in the Hilbert space
+#         _start      = int(start)            # starting index for the inner parameter loop
+#         _ns         = int(ns)               # number of modes (parameters)
+#         elems       = jnp.arange(_start, _ns, dtype=jnp.int32) # ns is rather small
         
-        # jax.debug.print("elems: {}", elems)
-        # Preallocate arrays for indices and values.
-        max_est     = nh * max_local_changes * (ns - start)
-        max_est_in  = max_local_changes * (ns - start)
-        all_rows    = jnp.full((max_est,), 0, dtype=jnp.int64)
-        all_cols    = jnp.full((max_est,), 0, dtype=jnp.int64)
-        all_vals    = jnp.full((max_est,), 0.0, dtype=hilbert_space.dtype)
-        current_nnz = 0
-        batch_size  = 1024 if nh > 1024 else nh // 2**4
-        # jax.debug.print("batch_size: {}", batch_size) 
+#         # jax.debug.print("elems: {}", elems)
+#         # Preallocate arrays for indices and values.
+#         max_est     = nh * max_local_changes * (ns - start)
+#         max_est_in  = max_local_changes * (ns - start)
+#         all_rows    = jnp.full((max_est,), 0, dtype=jnp.int64)
+#         all_cols    = jnp.full((max_est,), 0, dtype=jnp.int64)
+#         all_vals    = jnp.full((max_est,), 0.0, dtype=hilbert_space.dtype)
+#         current_nnz = 0
+#         batch_size  = 1024 if nh > 1024 else nh // 2**4
+#         # jax.debug.print("batch_size: {}", batch_size) 
         
-        for batch_start in range(0, nh, batch_size):
-            batch_end = min(nh, batch_start + batch_size)
-            unique_cols_batch, summed_vals_batch, counts_batch = process_matrix_batch_jax(
-                loc_energy, batch_start, batch_end, hilbert_space, elems, max_est_in
-            )
-            # For each row in the batch, extract only the valid (unpadded) entries.
-            for i in range(unique_cols_batch.shape[0]):
-                count       = int(counts_batch[i])
-                row_idx     = batch_start + i
-                valid_cols  = unique_cols_batch[i, :count]
-                valid_vals  = summed_vals_batch[i, :count]
-                row_ids     = jnp.full(valid_cols.shape, row_idx, dtype=jnp.int32)
+#         for batch_start in range(0, nh, batch_size):
+#             batch_end = min(nh, batch_start + batch_size)
+#             unique_cols_batch, summed_vals_batch, counts_batch = process_matrix_batch_jax(
+#                 loc_energy, batch_start, batch_end, hilbert_space, elems, max_est_in
+#             )
+#             # For each row in the batch, extract only the valid (unpadded) entries.
+#             for i in range(unique_cols_batch.shape[0]):
+#                 count       = int(counts_batch[i])
+#                 row_idx     = batch_start + i
+#                 valid_cols  = unique_cols_batch[i, :count]
+#                 valid_vals  = summed_vals_batch[i, :count]
+#                 row_ids     = jnp.full(valid_cols.shape, row_idx, dtype=jnp.int32)
 
-                # Calculate the slice to insert into pre-allocated arrays
-                insert_slice    = slice(current_nnz, current_nnz + count)
-                all_rows        = all_rows.at[insert_slice].set(row_ids)
-                all_cols        = all_cols.at[insert_slice].set(valid_cols)
-                all_vals        = all_vals.at[insert_slice].set(valid_vals)
-                current_nnz     += count
+#                 # Calculate the slice to insert into pre-allocated arrays
+#                 insert_slice    = slice(current_nnz, current_nnz + count)
+#                 all_rows        = all_rows.at[insert_slice].set(row_ids)
+#                 all_cols        = all_cols.at[insert_slice].set(valid_cols)
+#                 all_vals        = all_vals.at[insert_slice].set(valid_vals)
+#                 current_nnz     += count
                 
-        # Trim the pre-allocated arrays to the actual number of non-zero elements
-        all_rows    = all_rows[:current_nnz]
-        all_cols    = all_cols[:current_nnz]
-        all_vals    = all_vals[:current_nnz]
-        # Stack row and column indices to form a (2, nnz) array.
-        indices     = jnp.stack([all_rows, all_cols], axis=1)
-        return BCOO((all_vals, indices), shape=(nh, nh))
+#         # Trim the pre-allocated arrays to the actual number of non-zero elements
+#         all_rows    = all_rows[:current_nnz]
+#         all_cols    = all_cols[:current_nnz]
+#         all_vals    = all_vals[:current_nnz]
+#         # Stack row and column indices to form a (2, nnz) array.
+#         indices     = jnp.stack([all_rows, all_cols], axis=1)
+#         return BCOO((all_vals, indices), shape=(nh, nh))
     
-    @partial(jit, static_argnames=('ns', 'hilbert_space', 'loc_energy', 'start', 'dtype'))
-    def _hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
-        """
-        JAX version: Functional Hamiltonian construction (DENSE).
-        Parameters:
-        - ns (int)         : The number of sites.
-        - hilbert_space    : The Hilbert space.
-        - loc_energy       : The local energy function.
-        - start            : The starting index for the update (default is 0).
-        - dtype            : The data type of the Hamiltonian matrix.
-        """
+#     @partial(jit, static_argnames=('ns', 'hilbert_space', 'loc_energy', 'start', 'dtype'))
+#     def _hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, start=0, dtype=None):
+#         """
+#         JAX version: Functional Hamiltonian construction (DENSE).
+#         Parameters:
+#         - ns (int)         : The number of sites.
+#         - hilbert_space    : The Hilbert space.
+#         - loc_energy       : The local energy function.
+#         - start            : The starting index for the update (default is 0).
+#         - dtype            : The data type of the Hamiltonian matrix.
+#         """
         
-        # get the number of elements in the Hilbert space
-        nh      = jnp.int64(hilbert_space.Nh)
-        _start  = jnp.int64(start)
+#         # get the number of elements in the Hilbert space
+#         nh      = jnp.int64(hilbert_space.Nh)
+#         _start  = jnp.int64(start)
         
-        def outer_loop_body(ham, k):
-            k_map = hilbert_space[k]
+#         def outer_loop_body(ham, k):
+#             k_map = hilbert_space[k]
 
-            def inner_loop_body(ham, i):
-                ham = loc_energy(ham, hilbert_space, k, k_map, i)
-                return ham, None
+#             def inner_loop_body(ham, i):
+#                 ham = loc_energy(ham, hilbert_space, k, k_map, i)
+#                 return ham, None
 
-            ham, _  = lax.scan(inner_loop_body, ham, jnp.arange(_start, ns))
-            return ham, None
+#             ham, _  = lax.scan(inner_loop_body, ham, jnp.arange(_start, ns))
+#             return ham, None
 
-        init_ham    = jnp.zeros((nh, nh), dtype=dtype)
-        ham, _      = lax.scan(outer_loop_body, init_ham, jnp.arange(0, nh))
-        return ham
+#         init_ham    = jnp.zeros((nh, nh), dtype=dtype)
+#         ham, _      = lax.scan(outer_loop_body, init_ham, jnp.arange(0, nh))
+#         return ham
 
-    def hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, max_local_changes: int, 
-            is_sparse: bool, start=0, dtype=None):
-        """
-        JAX version: Functional Hamiltonian construction.  Dispatcher.
-        """
-        if dtype is None:
-            dtype = hilbert_space.dtype
+#     def hamiltonian_functional_jax(ns: int, hilbert_space: HilbertSpace, loc_energy, max_local_changes: int, 
+#             is_sparse: bool, start=0, dtype=None):
+#         """
+#         JAX version: Functional Hamiltonian construction.  Dispatcher.
+#         """
+#         if dtype is None:
+#             dtype = hilbert_space.dtype
         
-        if is_sparse:
-            return _hamiltonian_functional_jax_sparse(ns, hilbert_space, max_local_changes, loc_energy, start)
-        else:
-            return _hamiltonian_functional_jax(ns, hilbert_space, loc_energy, start, dtype)
+#         if is_sparse:
+#             return _hamiltonian_functional_jax_sparse(ns, hilbert_space, max_local_changes, loc_energy, start)
+#         else:
+#             return _hamiltonian_functional_jax(ns, hilbert_space, loc_energy, start, dtype)
     
     # ----------------------------------------------------------------------------------------------
 
@@ -178,6 +178,7 @@ class Hamiltonian(ABC):
     _ERR_HAMILTONIAN_INITIALIZATION = "An error occurred during Hamiltonian initialization."
     _ERR_HAMILTONIAN_BUILD          = "An error occurred during Hamiltonian build."
     _ERR_HILBERT_SPACE_NOT_PROVIDED = "The Hilbert space must be provided."
+    _ERR_NEED_LATTICE               = "The lattice must be provided."
     _ERR_COUP_VEC_SIZE              = "The coupling vector size is invalid."
     
     _ERRORS = {
@@ -222,10 +223,11 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     def __init__(self,
-                hilbert_space   : HilbertSpace,
+                hilbert_space   : Optional[HilbertSpace],
                 is_sparse       : bool  =   True,
                 dtype                   =   None,
                 backend         : str   =   'default',
+                is_manybody     : bool  =   True,
                 **kwargs):
         '''
         Initialize the Hamiltonian class.
@@ -234,6 +236,8 @@ class Hamiltonian(ABC):
             hilbert_space (HilbertSpace)    : The Hilbert space of the system.
             is_sparse (bool)                : A flag to indicate whether the Hamiltonian is sparse or not.
             dtype (data-type)               : The data type of the Hamiltonian matrix.
+            backend (str)                   : The backend to use. Default is 'default'.
+            is_manybody (bool)              : A flag to indicate whether the Hamiltonian is many-body or not.
             **kwargs                        : Additional arguments.
         '''
         
@@ -241,25 +245,57 @@ class Hamiltonian(ABC):
         self._is_jax        = JAX_AVAILABLE and self._backend != np
         self._is_numpy      = not self._is_jax
         self._is_sparse     = is_sparse
+        self._is_manybody   = is_manybody
+        self._is_quadratic  = not is_manybody
+        self._dtype         = dtype
         
         # get the backend, scipy, and random number generator for the backend
         self._dtypeint      = self._backend.int64
-        self._hilbert_space = hilbert_space
-        self._dtype         = dtype if dtype is not None else self._hilbert_space.dtype
-        if self._hilbert_space is None:
-            self._lattice   = kwargs.get("lattice", None)
-            if self._lattice is None and kwargs.get('ns', None) is None:
-                raise ValueError(Hamiltonian._ERR_HILBERT_SPACE_NOT_PROVIDED)
-            # otherwise do that
-            if self._lattice is not None:
-                self._hilbert_space = HilbertSpace(lattice = self._lattice)
+        self._hilbert_space = hilbert_space             # Hilbert space of the system, if any
+        self._lattice       = None                      # lattice associated with the Hamiltonian, if any
+        self._ns            = kwargs.get('ns', None)    # number of sites/modes    
+        
+        if self._is_manybody:
+            # do many-body Hamiltonian            
+            if self._hilbert_space is None:
+                # try to infer from lattice or number of sites
+                self._lattice   = kwargs.get("lattice", None)
+                if self._lattice is None:
+                    self._ns            = self._lattice.ns
+                    self._hilbert_space = HilbertSpace(lattice = self._lattice,
+                                            dtype = self._dtype, backend = self._backendstr)
+                elif self._ns is not None:
+                    # if the lattice is not provided, but the number of sites is
+                    self._hilbert_space = HilbertSpace(ns = self._ns, dtype = self._dtype,
+                                            backend = self._backendstr)
             else:
-                self._hilbert_space = HilbertSpace(ns = kwargs.get('ns', None))
+                # if the Hilbert space is provided, get the number of sites
+                self._lattice       = self._hilbert_space.get_lattice()
+                self._nh            = self._hilbert_space.get_Nh()
+                self._ns            = self._hilbert_space.get_Ns()
+                if self._dtype is None:
+                    self._dtype     = self._hilbert_space.dtype
+            self._nh        = self._hilbert_space.get_Nh()
+            self._logger    = self._hilbert_space.logger
+        else:
+            # do non-interacting Hamiltonian
+            if self._hilbert_space is not None:
+                # Warn or use Ns from it? Let's prioritize 'ns' kwarg or lattice
+                if self._ns is None: 
+                    self._ns = self._hilbert_space.get_Ns()
                     
-        # get the lattice and the number of sites
-        self._lattice       = self._hilbert_space.get_lattice()
-        self._nh            = self._hilbert_space.get_Nh()
-        self._ns            = self._hilbert_space.get_Ns()
+            if self._ns is None:
+                # try to infer from lattice
+                self._lattice   = kwargs.get("lattice", None)
+                if self._lattice is None:
+                    raise ValueError(Hamiltonian._ERR_NEED_LATTICE)
+                else:
+                    self._ns = self._lattice.ns
+            
+            # Effective Hilbert space consists of all possible nodes
+            self._nh        = self._ns
+            
+        #! other properties
         self._startns       = 0 # for starting hamil calculation
         self._logger        = self._hilbert_space.logger
         
