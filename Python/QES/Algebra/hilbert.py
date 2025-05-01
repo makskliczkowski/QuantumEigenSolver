@@ -19,7 +19,7 @@ from typing import Union, Optional, Callable, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # already imported from general_python
-from Python.QES.Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE
+from Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE
 ####################################################################################################
 from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
@@ -35,7 +35,10 @@ from Algebra.symmetries import choose, translation
 #! WRAPPER FOR JIT AND NUMBA
 ####################################################################################################
 
-from Python.QES.Algebra.Hilbert.hilbert_jit_methods import get_mapping, find_repr_int, find_representative_int, get_matrix_element, jitted_find_repr_int, jitted_get_mapping, jitted_get_matrix_element
+from Algebra.Hilbert.hilbert_jit_methods import (
+    get_mapping, find_repr_int, find_representative_int, get_matrix_element,
+    jitted_find_repr_int, jitted_get_mapping, jitted_get_matrix_element
+)   
 
 if JAX_AVAILABLE:
     import jax.numpy as jnp
@@ -873,7 +876,15 @@ class HilbertSpace(ABC):
         return self._is_quadratic
     
     @property
+    def is_quadratic(self):
+        return self._is_quadratic
+    
+    @property
     def many_body(self):
+        return self._is_many_body
+    
+    @property
+    def is_many_body(self):
         return self._is_many_body
     
     @property

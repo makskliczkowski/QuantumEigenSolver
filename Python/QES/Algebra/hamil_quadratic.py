@@ -30,20 +30,29 @@ class QuadraticTerm(Enum):
     
 ##############################################################################
 
-from Algebra.hamil import Hamiltonian, HilbertSpace, Lattice, JAX_AVAILABLE
+from Algebra.hamil import Hamiltonian, HilbertSpace, Lattice, JAX_AVAILABLE, Logger, Array
 from Algebra.Hilbert.hilbert_jit_states import (
     calculate_slater_det,
-    calculate_bcs_amp,
-    calculate_permament
+    bogolubov_decompose,
+    pairing_matrix,
+    calculate_bogoliubov_amp,
+    calculate_bogoliubov_amp_exc,
+    calculate_bosonic_gaussian_amp,
+    calculate_permanent,
+    many_body_state_full,
+    many_body_state_mapping,
+    nrg_particle_conserving,
+    nrg_bdg,
+    
 )
 if JAX_AVAILABLE:
     import jax 
     import jax.numpy as jnp
     from jax.experimental.sparse import BCOO
     from Algebra.Hilbert.hilbert_jit_states_jax import (
-    calculate_slater_det_jax,
-    calculate_bcs_amp_jax,
-    calculate_permament_jax
+    calculate_slater_det_jax,                               # for calculating fermionic states
+    calculate_bcs_amp_jax,                                  # for calculating BCS-like states
+    calculate_permament_jax                                 # for calculating permanent states
     )
 else:
     jax                         = None
@@ -56,20 +65,71 @@ else:
 ##############################################################################
 
 class QuadraticHamiltonian(Hamiltonian):
-    """
-    Specialized Hamiltonian for non-interacting (quadratic) systems.
-    Builds and diagonalizes a smaller Ns x Ns (or 2Ns x 2Ns) matrix.
-    Provides methods related to single-particle spectrum and transformations.
-    
-    The standard Ns x Ns matrix is used for particle-conserving systems, while
-    the 2Ns x 2Ns matrix is used for non-particle-conserving systems (BdG).
-    
-    This class will provide the following functionalities:
-    - Add quadratic terms (hopping, pairing, onsite).
-    - Build the Hamiltonian matrix from the added terms.
-    - Diagonalize the Hamiltonian matrix.
-    - Calculate many-body energy from single-particle eigenvalues.
-    - Provide methods to retrieve eigenvalues and eigenvectors of the Hamiltonian.
+    r"""
+    QuadraticHamiltonian: Specialized Hamiltonian for non-interacting (quadratic) quantum systems.
+
+    This class represents Hamiltonians of the general quadratic form:
+        .. math::
+
+            H = \sum_{i,j} \left[ h_{ij} c_i^\dagger c_j + \Delta_{ij} c_i^\dagger c_j^\dagger + \Delta_{ij}^* c_j c_i \right]
+
+    where:
+        - :math:`h_{ij}` encodes onsite energies and hopping amplitudes,
+        - :math:`\Delta_{ij}` encodes pairing (superconducting) terms,
+        - :math:`c_i^\dagger`, :math:`c_j` are creation/annihilation operators (fermionic or bosonic).
+
+    For particle-conserving systems (:math:`\Delta_{ij}=0`), the Hamiltonian reduces to:
+        .. math::
+
+            H = \sum_{i,j} h_{ij} c_i^\dagger c_j
+
+    and is represented by an :math:`N_s \times N_s` matrix.
+
+    For non-particle-conserving systems (e.g., Bogoliubov–de Gennes, BdG), the Hamiltonian is:
+        .. math::
+
+            H = \frac{1}{2} \Psi^\dagger H_\mathrm{BdG} \Psi
+
+    with
+
+        .. math::
+
+            \Psi = (c_1, \ldots, c_{N_s}, c_1^\dagger, \ldots, c_{N_s}^\dagger)^T,
+
+            H_\mathrm{BdG} = \begin{bmatrix} h & \Delta \\ \Delta^\dagger & -h^T \end{bmatrix}
+
+    and is represented by a :math:`2N_s \times 2N_s` matrix.
+
+    Features:
+    - Add quadratic terms (onsite, hopping, pairing) using a flexible interface.
+    - Build the Hamiltonian matrix from the stored terms, supporting both dense and sparse representations.
+    - Diagonalize the Hamiltonian to obtain single-particle eigenvalues and eigenvectors.
+    - Compute many-body energies and wavefunctions for Slater determinants (fermions), permanents (bosons), and Bogoliubov vacua (superconductors).
+    - Support for both NumPy and JAX backends for high-performance and differentiable computations.
+
+    Mathematical background:
+    - For fermions, the ground state of a quadratic Hamiltonian is a Slater determinant (particle-conserving) or a Bogoliubov vacuum (BdG).
+    - For bosons, the ground state is a permanent (particle-conserving) or a Gaussian state (BdG).
+    - Diagonalization yields the single-particle spectrum, which determines the many-body ground state and excitations.
+
+    References:
+    - Altland, A., & Simons, B. (2010). "Condensed Matter Field Theory" (2nd ed.), Cambridge University Press.
+    - Blaizot, J.-P., & Ripka, G. (1986). "Quantum Theory of Finite Systems", MIT Press.
+    - Peschel, I., & Eisler, V. (2009). "Reduced density matrices and entanglement entropy in free lattice models", J. Phys. A: Math. Theor. 42, 504003.
+    - See also: https://en.wikipedia.org/wiki/Bogoliubov–de_Gennes_equations
+
+    --------------------------------------------------------------------
+    Key properties used in this class:
+    - self._isfermions            : bool        # True for fermions, False for bosons
+    - self._isbosons              : bool        # True for bosons, False for fermions
+    - self._particle_conserving   : bool        # True if particle number is conserved
+    - self._is_numpy              : bool        # True for NumPy backend, False for JAX
+    - self._ns                    : int         # Number of sites/modes
+    - self._dtype                 : np.dtype    # Matrix/vector precision
+    - self._U                     : ndarray     # (ns × n_orb) eigenvectors (fermions, N-conserving)
+    - self._F                     : ndarray     # (ns × ns) pairing matrix (fermions, BdG)
+    - self._Ub                    : ndarray     # (ns × N_qp) columns of u (for excitations)
+    - self._G                     : ndarray     # (ns × ns) pairing matrix (bosons, BdG)
     """
     
     def __init__(self,
@@ -130,223 +190,166 @@ class QuadraticHamiltonian(Hamiltonian):
         if self._hilbert_space.particle_conserving != particle_conserving:
             raise self._ERR_MODE_MISMATCH
         
+        if self._is_sparse:
+            raise NotImplementedError("Sparse matrix support not implemented yet. TODO: implement sparse matrix handling.")
+        
         # Determine shape based on conservation (simple case)
         # BdG case (not particle conserving) needs 2Ns x 2Ns and different term handling.
         if not particle_conserving:
             self._log("Warning: particle_conserving=False implies BdG Hamiltonian structure. Ensure _build_quadratic handles 2Nsx2Ns matrix and pairing terms correctly.",
                     log='warning')
-            self._hamil_sp_size     = 2 * ns
+            self._hamil_sp_size         = 2 * ns
         else:
-            self._hamil_sp_size     = ns
+            self._hamil_sp_size         = ns
         
         # Set matrix shape
-        self._hamil_sp_shape        = (self._hamil_sp_size, self._hamil_sp_size)
-        self._dtypeint              = self._backend.int32 if self.ns < 2**32 - 1 else self._backend.int64
+        self._hamil_sp_shape            = (self._hamil_sp_size, self._hamil_sp_size)
+        self._dtypeint                  = self._backend.int32 if self.ns < 2**32 - 1 else self._backend.int64
 
         # Store quadratic terms (hopping, pairing, onsite)
-        self._quadratic_terms       = [] # List to store term info [(type, sites, value), ...]
-        self._name                  = f"QuadraticHamiltonian(Ns={self._ns})"
-        self._mb_calculator         = self._many_body_state_calculator()
+        self._name                      = f"QuadraticHamiltonian(Ns={self._ns},{'BdG' if not self._particle_conserving else 'N-conserving'})"
+        self._mb_calculator             = self._many_body_state_calculator()
         
-    #!TODO: Add term adding such as in many-body?
+        # for storing the pairing terms (Bogoliubov-de Gennes terms when not conserving particles)
+        self._F                         = None
+        self._G                         = None
+        self._U                         = None
+        self._V                         = None
+        self._occupied_orbitals_cached  = None
+        self._mb_calculator             = self._many_body_state_calculator()
 
     ##########################################################################
     #! Build the Hamiltonian
     ##########################################################################
 
-    def _add_term(self,
+    def _invalidate_cache(self):
+        """Wipe eigenvalues, eigenvectors, cached many-body calculator."""
+        self._eig_val           = None
+        self._eig_vec           = None
+        self._mb_calculator     = self._many_body_state_calculator()
+
+    def add_term(self,
                 term_type   : QuadraticTerm,
-                sites       : Union[Tuple, int],
-                value       : Union[float, complex]):
+                sites       : tuple[int, ...] | list[int] | int,
+                value       : complex,
+                remove      : bool = False):
         """
-        Note:
-            Is only for testing purposes probably
-        
-        Adds a quadratic term definition to be used during build.
-        Hamiltonian is generally of this type:
-            $$
-            H = \sum _i h_i c_i+c_i + \sum _{i != j} t_{ij} c_i^+ c_j 
-                + \sum _{i,j} \Delta _{ij} [c_i^+] c_i^+] + \Delta _{ij}^* c_jc_i]
-            $$
-        Args:
-            term_type (str):
-                Type of term ('onsite', 'hopping', 'pairing').
-            sites (List[int]):
-                List of site indices involved (1 for onsite, 2 for hopping/pairing).
-                Indices must be in the range [0, ns-1].
-            value (complex):
-                Strength/value of the term (e.g., onsite energy, hopping amplitude, pairing gap).
+        Adds a quadratic term to the Hamiltonian or pairing matrix.
+
+        Parameters
+        ----------
+        term_type : QuadraticTerm
+            The type of quadratic term to add. Must be one of QuadraticTerm.Onsite,
+            QuadraticTerm.Hopping, or QuadraticTerm.Pairing.
+        sites : tuple[int, ...] | list[int] | int
+            The site indices involved in the term. For Onsite, a single index is required.
+            For Hopping and Pairing, two indices are required.
+        value : complex
+            The coefficient of the term to be added.
+
+        Raises
+        ------
+        ValueError
+            If the number of site indices does not match the requirements for the term type.
+        TypeError
+            If the term_type is not recognized.
+
+        Notes
+        -----
+        - For Onsite terms, adds `value` to the diagonal element of the Hamiltonian matrix.
+        - For Hopping terms, adds `value` to the off-diagonal elements and ensures Hermiticity.
+        - For Pairing terms, modifies the pairing matrix according to particle statistics.
+            If the system is particle-conserving, pairing terms are ignored.
+        - Logs the operation and invalidates cached eigensystem and many-body states.
         """
-                
-        # Validate term type and number of sites
-        expected_sites = term_type.mode_num
-        
-        if len(sites) != expected_sites:
-            raise ValueError(f"Term type '{term_type}' requires {expected_sites} site(s), got {len(sites)}: {sites}.")
-        
-        # Validate site indices
-        if any(s < 0 or s >= self._ns for s in sites):
-            raise IndexError(f"Site index out of bounds [0, {self._ns-1}] in term: {term_type}, {sites}")
-        
-        # Validate pairing term based on conservation flag
-        if term_type == QuadraticTerm.Pairing and self._particle_conserving:
-            self._log(f"Warning: Adding 'pairing' term {sites} while particle_conserving=True. Term will be ignored during build.", log='warning')
-        if term_type != QuadraticTerm.Pairing and not self._particle_conserving:
-            # Hopping/onsite terms are handled differently in BdG matrix construction
-            pass # Logic is handled in _build_quadratic
+        xp      = self._backend
+        if isinstance(sites, int):
+            sites = (sites,)
+        val     = -value if remove else value
+        valc    = val.conjugate() if isinstance(val, (complex, np.complex)) else val
 
-        # Store term definition
-        self._quadratic_terms.append({'type': term_type, 'sites': sites, 'value': value}) # Store value as complex
-        self._log(f"Added term: {term_type}, sites={sites}, value={value:.4g}", lvl=3, log='debug')
+        if term_type is QuadraticTerm.Onsite:
+            if len(sites) != 1:
+                raise ValueError("Onsite term needs one index")
+            i                       = sites[0]
+            self._hamil_sp[i, i]   += val
+        elif term_type is QuadraticTerm.Hopping:
+            if len(sites) != 2:
+                raise ValueError("Hopping term needs two indices")
+            i, j                    = sites
+            self._hamil_sp[i, j]   += val
+            self._hamil_sp[j, i]   += valc
+        elif term_type is QuadraticTerm.Pairing:
+            if self._particle_conserving:
+                self._log("Pairing ignored: particle_conserving=True", lvl=2, log='warning')
+                return
+            if len(sites) != 2:
+                raise ValueError("Pairing term needs two indices")
+            i, j                    = sites
+            if self._isfermions: # antisymmetric
+                self._delta_sp[i, j]   +=  value
+                self._delta_sp[j, i]   += -value
+            else: # bosons: symmetric
+                self._delta_sp[i, j]   +=  value
+                self._delta_sp[j, i]   +=  value
+        else:
+            raise TypeError(term_type)
+        self._log(f"add_term: {term_type.name} {sites} {value:+.4g}", lvl=3, log='debug')
 
-        # Invalidate existing matrix if terms are added after build
-        if self.hamil is not None:
-            self.clear()
+    def set_single_particle_matrix(self, H: Array):
+        if not self._particle_conserving:
+            raise RuntimeError("Use set_bdg_matrices for non-conserving case")
+        if H.shape != (self._ns, self._ns):
+            raise ValueError(f"shape mismatch, expected {(self._ns, self._ns)}")
+        self._hamil_sp = H
+        self._invalidate_cache()
+        self._log(f"set_single_particle_matrix: {H.shape}", lvl=3, log='debug')
 
-    #!TODO: Optimize this BS
+    def set_bdg_matrices(self, K: np.ndarray, Delta: np.ndarray):
+        """
+        Set the Bogoliubov-de Gennes (BdG) matrices for the Hamiltonian.
+
+        Parameters
+        ----------
+        K : np.ndarray
+            The single-particle (kinetic) Hamiltonian matrix. Must be a square matrix of shape (self._ns, self._ns).
+        Delta : np.ndarray
+            The pairing (superconducting gap) matrix. Must be a square matrix of shape (self._ns, self._ns).
+
+        Raises
+        ------
+        RuntimeError
+            If the Hamiltonian is particle-conserving (i.e., self._particle_conserving is True).
+        ValueError
+            If the shapes of K or Delta do not match (self._ns, self._ns).
+
+        Notes
+        -----
+        This method is only applicable for non-particle-conserving Hamiltonians (i.e., when self._particle_conserving is False).
+        After setting the matrices, the internal cache is invalidated.
+        """
+
+        if self._particle_conserving:
+            raise RuntimeError("BdG matrices only for particle_conserving=False")
+        
+        if K.shape != (self._ns, self._ns) or Delta.shape != (self._ns, self._ns):
+            raise ValueError("shape mismatch")
+        
+        self._hamil_sp[:]   = K
+        self._delta_sp[:]   = Delta
+        self._invalidate_cache()
+        self._log(f"set_bdg_matrices: {K.shape}, {Delta.shape}", lvl=3, log='debug')
+        
     def _hamiltonian_quadratic(self, use_numpy: bool = False):
-        """ 
-        Builds the quadratic Hamiltonian matrix from the stored terms. 
-        This is a general purpose method for convenience, otherwise, 
-        we will allow to set the matrices differently - much faster
-        """
-        self._log(f"Building quadratic matrix ({self._hamil_sp_shape}, Sparse={self.sparse})...", lvl=1, color="blue")
-        backend             = np if use_numpy or self._is_numpy else self._backend
+        '''
+        Generates the Hamiltonian matrix whenever the Hamiltonian is single-particle. 
+        This method needs to be implemented by the subclasses.
+        '''
+        #!TODO: To be overriden by others
+        pass
 
-        # empty
-        if not self._quadratic_terms:
-            self._log("No quadratic terms added. Resulting Hamiltonian matrix will be zero.", log='warning')
-            self.init(use_numpy=use_numpy)
-            return
-
-        rows, cols, data    = [], [], []
-
-        #! Populate COO lists based on terms
-        for term in self._quadratic_terms:
-            term_type       = term['type']
-            sites           = term['sites']
-            value           = term['value']
-
-            try:
-                if self._particle_conserving:
-                    #! Particle Conserving Case (Ns x Ns Matrix)
-                    if term_type == 'onsite':
-                        i = sites[0]
-                        rows.append(i)
-                        cols.append(i)
-                        data.append(value)
-                    elif term_type == 'hopping': 
-                        # t_ij c_i^dagger c_j + h.c.
-                        i, j = sites[0], sites[1]
-                        rows.append(i)
-                        cols.append(j)
-                        data.append(value) # H_ij = t_ij
-                        if i != j:
-                            rows.append(j) 
-                            cols.append(i)
-                            # H_ji = t_ij^*
-                            data.append(value.conjugate())
-                else:
-                    #! Non-Particle Conserving Case (BdG: 2Ns x 2Ns Matrix)
-                    Ns = self._ns
-                    if term_type == QuadraticTerm.Onsite:
-                        # mu_i c_i^dagger c_i
-                        i = sites[0]
-                        # H_hop block: H[i, i] = mu_i
-                        rows.append(i)
-                        cols.append(i)
-                        data.append(value)
-                        
-                        # H_hop^T block: H[N+i, N+i] = -mu_i (diagonal is real)
-                        rows.append(i + Ns)
-                        cols.append(i + Ns)
-                        data.append(-value)
-                        
-                    elif term_type == QuadraticTerm.Hopping:
-                        # t_ij c_i^dagger c_j + h.c.
-                        i, j = sites[0], sites[1]
-                        # H_hop block: H[i, j] = t_ij, H[j, i] = t_ij^*
-                        rows.append(i)
-                        cols.append(j)
-                        data.append(value)
-                        if i != j: 
-                            rows.append(j)
-                            cols.append(i)
-                            data.append(value.conjugate())
-                        # -H_hop^T block:   H[N+i, N+j] = -H_hop[j, i] = -t_ij^*
-                        #                   H[N+j, N+i] = -H_hop[i, j] = -t_ij
-                        rows.append(i + Ns)
-                        cols.append(j + Ns)
-                        data.append(-value.conjugate())
-                        if i != j: 
-                            rows.append(j + Ns)
-                            cols.append(i + Ns)
-                            data.append(-value)
-                    elif term_type == QuadraticTerm.Pairing:
-                        # Delta_ij c_i c_j + Delta_ij^* c_j^dagger c_i^dagger
-                        # Assume input 'value' is Delta_ij. We need antisymmetry Delta_ji = -Delta_ij.
-                        i, j = sites[0], sites[1]
-                        # Delta block (top right): H[i, N+j] = Delta_ij
-                        rows.append(i)
-                        cols.append(j + Ns)
-                        data.append(value)
-                        if i != j: 
-                            rows.append(j)
-                            cols.append(i + Ns)
-                            # Delta_ji = -Delta_ij
-                            data.append(-value)
-                        # Delta^dagger block (bottom left): H[N+j, i] = Delta_ij^* (from h.c. of Delta_ij c_i c_j)
-                        # Note the index swap for dagger block element definition H[N+row, col]
-                        rows.append(j + Ns)
-                        cols.append(i)
-                        # Delta_ji^* = (-Delta_ij)^*
-                        data.append(value.conjugate()) 
-                        if i != j:
-                            rows.append(i + Ns)
-                            cols.append(j)
-                            # Delta_ij^* = (-Delta_ji)^*
-                            data.append(-value.conjugate())
-            except IndexError:
-                # This should ideally not happen due to initial checks in add_term
-                self._log(f"Internal Error: Index out of bounds processing term {term}", log='error')
-                raise
-
-        #! Create Matrix from COO data
-        try:
-            coo_data        = backend.asarray(data, dtype=self._dtype)
-            idx_dtype       = np.int32 if self._hamil_sp_size < 2**31 else np.int64
-            jax_idx_dtype   = jnp.int32 if JAX_AVAILABLE and self._hamil_sp_size < 2**31 else jnp.int64
-
-            if self.sparse:
-                if backend == np:
-                    coo_rows_np     = np.array(rows, dtype=idx_dtype)
-                    coo_cols_np     = np.array(cols, dtype=idx_dtype)
-                    self._hamil_sp  = sp.sparse.csr_matrix((coo_data, (coo_rows_np, coo_cols_np)), shape=self._hamil_sp_shape)
-                    self._log(f"Built sparse quadratic matrix (CSR) with {self._hamil_sp.nnz} non-zeros.", lvl=2, log='debug')
-                else: 
-                    # JAX BCOO
-                    coo_rows_jax    = backend.asarray(rows, dtype=jax_idx_dtype)
-                    coo_cols_jax    = backend.asarray(cols, dtype=jax_idx_dtype)
-                    indices         = backend.stack([coo_rows_jax, coo_cols_jax], axis=1)
-                    # --- Build dense and convert for simplicity/robustness in JAX sparse ---
-                    self._log("Building JAX sparse matrix via dense intermediate to handle potential duplicate COO entries.", log='debug')
-                    H_dense         = backend.zeros(self._hamil_sp_shape, dtype=self._dtype)
-                    H_dense         = H_dense.at[coo_rows_jax, coo_cols_jax].add(coo_data)
-                    self._hamil_sp  = BCOO.fromdense(H_dense)
-                    self._log(f"Built sparse quadratic matrix (BCOO) via dense intermediate with {self._hamil_sp.nse} non-zeros.", lvl=2, log='debug')
-            else: # Dense
-                H               = backend.zeros(self._hamil_sp_shape, dtype=self._dtype)
-                coo_rows_be     = backend.asarray(rows, dtype=jax_idx_dtype if backend == jnp else idx_dtype)
-                coo_cols_be     = backend.asarray(cols, dtype=jax_idx_dtype if backend == jnp else idx_dtype)
-                H               = H.at[coo_rows_be, coo_cols_be].add(coo_data)
-                self._hamil_sp  = H
-                self._log("Built dense quadratic matrix.", lvl=2, log='debug')
-
-        except Exception as e:
-            self._log(f"Error during quadratic matrix final construction: {e}", log='error', color='red')
-            self._hamil_sp      = None
-            raise RuntimeError(f"Failed to construct quadratic matrix: {e}") from e
-
+    ###########################################################################
+    #! Diagonalization
     ###########################################################################
     
     def diagonalize(self, verbose: bool = False, **kwargs):
@@ -367,7 +370,9 @@ class QuadraticHamiltonian(Hamiltonian):
             self._calculate_av_en()
 
     ###########################################################################
-
+    #! UNUSED METHODS
+    ###########################################################################
+    
     def _set_local_energy_operators(self):
         """ Not applicable for standard quadratic Hamiltonians built from terms. """
         if self._is_quadratic:
@@ -376,7 +381,9 @@ class QuadraticHamiltonian(Hamiltonian):
             raise NotImplementedError("ManyBody Hamiltonian subclass must implement _set_local_energy_operators.")
 
     ###########################################################################
-
+    #! Many-Body Energy Calculation
+    ###########################################################################
+    
     def many_body_energy(self, occupied_orbitals: Union[List[int], np.ndarray]) -> float:
         """
         Calculates the total energy of a many-body state defined by occupying
@@ -395,190 +402,162 @@ class QuadraticHamiltonian(Hamiltonian):
         if self.eig_val is None:
             raise ValueError("Single-particle eigenvalues not calculated. Call diagonalize() first.")
 
-        occ_indices_arr     = self._backend.asarray(occupied_orbitals, dtype=self._dtypeint)
-        num_eigvals         = self.eig_val.shape[0]
+        occ = np.asarray(occupied_orbitals, dtype=self._dtypeint)
+        if occ.ndim != 1:
+            raise ValueError("occupied_orbitals must be 1-D")
+        e   = 0.0
+        
+        if self._is_jax:
+            occ     = jnp.asarray(occ, dtype=self._dtypeint)
+            vmax    = self._eigvals.shape[0]
 
-        if self._backend.any(occ_indices_arr < 0) or self._backend.any(occ_indices_arr >= num_eigvals):
-            raise IndexError(f"Occupied orbital index out of bounds [0, {num_eigvals-1}].")
+            def _check_bounds(x):
+                if int(jnp.min(x)) < 0 or int(jnp.max(x)) >= vmax:
+                    raise IndexError("orbital index out of bounds")
+                return x
+            occ = _check_bounds(occ)
 
-        if self._particle_conserving:
-            return self._backend.sum(self.eig_val[occ_indices_arr])
+            if self._particle_conserving:
+                e = jnp.sum(self._eigvals[occ])
+            else:
+                if int(jnp.max(occ)) >= self._ns:
+                    raise IndexError("BdG index must be in 0…Ns-1")
+                mid = self._ns - 1
+                e   = jnp.sum(self._eigvals[mid + occ + 1] -
+                            self._eigvals[mid - occ])
         else:
-            # BdG case: Eigenvalues come in pairs (+E_gamma, -E_gamma) sorted around 0.
-            # Energy is sum of occupied *positive* quasiparticle energies E_gamma.
-            # occupied_orbitals refer to indices 0..Ns-1 (positive energies)
-            #   occupied_orbitals are indices k=0..Ns-1 referring to the
-            #   positive energy quasiparticle states E_k (which are typically eig_val[Ns+k]).
-            #   Ns = self._ns
-            # positive_energy_indices = Ns + occ_indices_arr # Indices from Ns to 2Ns-1
-            # if self._backend.any(positive_energy_indices >= num_eigvals):
-            #      raise IndexError("Occupied BdG quasiparticle index implies index >= 2Ns.")
-            # mb_energy = self._backend.sum(self.eig_val[positive_energy_indices])
+            vmax = self._eigvals.shape[0]
+            if occ.min() < 0 or occ.max() >= vmax:
+                raise IndexError("orbital index out of bounds")
 
-            Ns              = self._ns
-            middle_idx      = Ns - 1            # Index corresponding to "zero energy" or boundary
-            mb_energy       = 0.0
-            for i in occ_indices_arr:
-                idx_plus    = middle_idx + i + 1
-                idx_minus   = middle_idx - i
-
-                # Check bounds
-                if not (0 <= idx_plus < num_eigvals and 0 <= idx_minus < num_eigvals):
-                    raise IndexError(f"BdG occupied index {i} leads to out-of-bounds eigenvalue access.")
-                
-                # Sum E_i + E_{-i}
-                mb_energy   += self._eig_val[idx_plus] - self._eig_val[idx_minus]
-        return mb_energy
+            if self._particle_conserving:
+                e = nrg_particle_conserving(self._eigvals, occ)
+            else:
+                if occ.max() >= self._ns:
+                    raise IndexError("BdG index must be in 0…Ns-1 (positive branch)")
+                e = nrg_bdg(self._eigvals, self._ns, occ)
+        return float(e) + self._constant_offset
 
     ###########################################################################
-
+    #! Many-Body State Calculation
+    ###########################################################################
+    
     def _many_body_state_calculator(self):
-        '''
-        Returns the function to calculate the many-body coefficients from
-        '''
-        #! Select Calculation Function
-        calculator      = None
+        """
+        Return a function object that implements
+
+            ψ = calc(matrix_arg, basis_state_int, ns)
+        together with the constant `matrix_arg` it needs.
+
+        The closure is JIT-compatible with Numba (`nopython=True`) when
+        `self._is_numpy` is True; otherwise the returned function calls the
+        JAX variant of the same kernel.
+        
+        The function is used to calculate the many-body state vector
+        in the Fock basis (or other specified basis) from the single-particle
+        eigenvectors and the occupied orbitals.
+        """
+
+        #! Fermions
         if self._isfermions:
             if self._particle_conserving:
-                if self._is_numpy:
-                    calculator = calculate_slater_det
-                else:
-                    calculator = calculate_slater_det_jax
-            else:
-                if self._is_numpy:
-                    calculator = calculate_bcs_amp
-                else:
-                    calculator = calculate_bcs_amp_jax
-        elif self._isbosons:
-            if self._is_numpy:
-                calculator = calculate_permament
-            else:
-                calculator = calculate_permament_jax
-        else: # Should not happen
-            raise TypeError("Unknown particle type setting.")
-        return calculator
+                #! Slater determinant needs (U, α_k) - U is the matrix of eigenvectors
+                if not hasattr(self, "_occupied_orbitals_cached"):
+                    raise RuntimeError( "call many_body_state(...) with "
+                                        "`occupied_orbitals` first.")
+                occ = self._occupied_orbitals_cached
 
+                if self._is_numpy:
+                    calc = lambda U, st, _ns: calculate_slater_det(U, occ, st, _ns)
+                else:
+                    calc = lambda U, st, _ns: calculate_slater_det_jax(U, occ, st, _ns)
+                return calc, self._eig_vec
+            else:
+                #! Bogoliubov vacuum / Pfaffian
+                if self._is_numpy:
+                    if self._F is None:
+                        if self._U is None or self._V is None:
+                            self._U, self._V, _ = bogolubov_decompose(self._eig_val, self._eig_vec)
+                        self._F = pairing_matrix(self._U, self._V)
+                    calc                    = lambda F, st, _ns: calculate_bogoliubov_amp(F, st, _ns)
+                else:
+                    raise NotImplementedError("JAX Bogoliubov vacuum calculation not implemented.")
+                    # calc = lambda F, st, _ns: calculate_bogoliubov_amp_jax(F, st, _ns)
+                return calc, self._F
+
+        #! Bosons 
+        if self._isbosons:
+            if self._particle_conserving:
+                #! Permanent / Gaussian state
+                if self._is_numpy:
+                    calc = lambda G, st, _ns: calculate_permanent(G, st, _ns)
+                else:
+                    calc = lambda G, st, _ns: calculate_permament_jax(G, st, _ns)
+                return calc, self._eig_vec
+            else:
+                #! Gaussian squeezed vacuum / Hafnian
+                if self._is_numpy:
+                    if self._G is None:
+                        if self._U is None or self._V is None:
+                            self._U, self._V, _ = bogolubov_decompose(self._eig_val, self._eig_vec)
+                        self._G = pairing_matrix(self._eig_val, self._eig_vec)
+                        
+                    calc = lambda G, st, _ns: calculate_bosonic_gaussian_amp(G, st, _ns)
+                else:
+                    raise NotImplementedError("JAX Bosonic Gaussian state calculation not implemented.")
+                return calc, self._G
+    
     def many_body_state(self,
-                            occupied_orbitals       : Union[List[int], np.ndarray],
-                            target_basis            : str                       = 'sites',
-                            many_body_hs            : Optional[HilbertSpace]    = None,
-                            batch_size              = 1
-                            ):
+                        occupied_orbitals : Union[list[int], np.ndarray] | None = None,
+                        target_basis      : str                                 = "sites",
+                        many_body_hs      : Optional[HilbertSpace]              = None):
         """
-        Constructs the Many-Body state vector in a specified basis using Slater
-        determinants (fermions) or permanents (bosons).
+        Return the coefficient vector `|Ψ〉` in the *computational* basis.
 
-        Args:
-            occupied_orbitals (list/array):
-                Indices (0 to Ns-1 or 0 to 2Ns-1 for BdG)
-                of the occupied single-particle orbitals or quasiparticles.
-            target_basis (str):
-                The basis for the output vector ('sites' for Fock). (Default: 'sites')
-            many_body_hs (Optional[HilbertSpace]):
-                Target Many-Body HilbertSpace object. Required if using a symmetry-reduced basis.
-                If None, assumes the full Fock space over Ns sites.
+        Parameters
+        ----------
+        occupied_orbitals
+            For **particle-conserving fermions/bosons**: list/array of α_k.
+            Ignored otherwise.
+        target_basis
+            Currently only `"sites"` is supported.
+        many_body_hs
+            If provided, must expose mapping → 1-D np.ndarray`.
+            The output vector is ordered according to that mapping.
+            If `None`, a full vector of length `2**ns` is produced.
+        batch_size
+            If >0, the Fock space is processed in slices of that length
+            to keep peak memory low.  `0` (default) disables batching.
 
-        Returns:
-            np.ndarray:
-                state vector in the target MB basis (NumPy or JAX array).
+        Returns
+        -------
+        np.ndarray
+            Coefficient vector `ψ(x)`.
         """
-        if target_basis.lower() != 'sites':
-            raise NotImplementedError("Currently only supports transformation to site ('Fock') basis.")
-        
-        if self.eig_vec is None:
-            raise ValueError("Single-particle eigenvectors not calculated. Call diagonalize() first.")
-        
-        if not self._particle_conserving and self._isbosons:
-            raise NotImplementedError("Bosonic transformation for non-particle conserving (BdG) case not implemented.")
+        if target_basis != "sites":
+            raise NotImplementedError("Only the site/bitstring basis "
+                                    "is implemented for now.")
 
-        #! Check the calculator function
-        if self._calculator is None:
-            raise RuntimeError(f"Calculation function for {'fermions' if self._isfermions else 'bosons'}.")
+        #! cache α_k for later reuse (Slater path)
+        if occupied_orbitals is not None:
+            self._occupied_orbitals_cached = np.ascontiguousarray(occupied_orbitals,dtype=self._dtypeint)
 
-        #! Prepare Inputs
-        # Use Ns (number of sites) for basis state representation size
-        ns_sites        = self._ns
-        # Eigenvectors: use sp_eig_vec property which points to self._eig_vec
-        sp_eigvecs_arr  = self._backend.asarray(self.eig_vec)
-        # Occupied orbitals: ensure correct backend array type
-        occ_orb_arr     = self._backend.asarray(occupied_orbitals, dtype=self._dtypeint)
-        #!TODO: Finish!
-        
-        #! Determine Target Basis
-        # (Logic remains the same as previous refinement using many_body_hilbert_space)
-        use_representatives = False
-        target_hs           = many_body_hs
+        #! obtain (calculator, matrix_arg)
+        calculator, matrix_arg = self._many_body_state_calculator()
 
-        if target_hs is not None:
-             if not target_hs._is_many_body: raise ValueError("Target HilbertSpace must be many-body.")
-             if target_hs.get_Ns() != ns_sites: raise ValueError(f"Ns mismatch: QuadH Ns={ns_sites}, Target MB HS Ns={target_hs.get_Ns()}.")
-             if target_hs.mapping is not None: # Use reduced basis
-                  use_representatives = True
-                  target_basis_states = target_hs.mapping # These are representative states (int)
-                  target_size = target_hs.get_Nh()
-                  self._log(f"Constructing MB state in reduced basis (Nh={target_size}).", log='debug')
-             else: # Use full basis filtered by global symmetries
-                   full_map_list = target_hs.get_full_map_int() # Returns list or None
-                   if full_map_list is None: # Assume full space if no global syms
-                       target_size = target_hs.get_Nh_full()
-                       target_basis_states = self._backend.arange(target_size, dtype=self._dtypeint)
-                   else:
-                       target_basis_states = self._backend.asarray(full_map_list, dtype=self._dtypeint)
-                       target_size = len(target_basis_states)
-                   self._log(f"Constructing MB state in full basis satisfying global symmetries (Size={target_size}).", log='debug')
-        else: # Assume full Fock space over ns_sites
-             target_size = 2**ns_sites
-             if target_size > 1e7: # Warning for large spaces
-                  self._log(f"Warning: Constructing state in full Fock space (Ns={ns_sites}, NhFull={target_size}). This may be slow/memory intensive.", log='warning')
-             target_basis_states = self._backend.arange(target_size, dtype=self._dtypeint) # Iterate all ints
-             self._log(f"Constructing MB state in full Fock basis (NhFull={target_size}).", log='debug')
+        #! choose mapping / dimensions
+        ns           = self._ns
+        dtype        = getattr(self, "_dtype", np.complex128)
 
-        # --- Perform Calculation (Vectorized or Loop) ---
-        mb_state_vector_unnorm : np.ndarray # Type hint
-        if self._is_jax:
-             if not _HAS_JAX_HELPERS: raise RuntimeError("JAX helpers not available.")
-             self._log("Using JAX vmap for state construction.", log='debug')
-             # JAX calculator expects ns as static arg if jitted that way
-             vmap_calculator = jax.vmap(calculator, in_axes=(None, None, 0, None))
-             mb_state_vector_unnorm = vmap_calculator(sp_eigvecs_arr, occ_orb_arr, target_basis_states, ns_sites)
-        else: # NumPy
-             if not _HAS_NUMBA_HELPERS: raise RuntimeError("NumPy/Numba helpers not available.")
-             self._log("Using NumPy loop for state construction.", log='debug')
-             mb_state_vector_unnorm = np.zeros(target_size, dtype=np.complex128)
-             # Convert target_basis_states to NumPy for Numba loop if it's not already
-             target_basis_states_np = np.asarray(target_basis_states)
-             sp_eigvecs_np = np.asarray(sp_eigvecs_arr) # Ensure NumPy array for Numba
-             occ_orb_np = np.asarray(occ_orb_arr)       # Ensure NumPy array for Numba
+        if many_body_hs is None or not many_body_hs.modifies:
+            return many_body_state_full(matrix_arg, calculator, ns, dtype)
+        else:            
+            mapping = many_body_hs.mapping
+            return many_body_state_mapping(matrix_arg,
+                                        calculator,
+                                        mapping,
+                                        ns,
+                                        dtype)
+        return None # should not be reached
 
-             for i in range(target_size):
-                 basis_int_scalar = target_basis_states_np[i].item() # Use item() for scalar
-                 amplitude = calculator(sp_eigvecs_np, occ_orb_np, basis_int_scalar, ns_sites)
-                 mb_state_vector_unnorm[i] = amplitude
-             # Convert back to backend array if needed (though usually stays np here)
-             # mb_state_vector_unnorm = self._backend.asarray(mb_state_vector_unnorm)
-
-
-        # --- Normalization & Symmetry Adjustment ---
-        self._log("Normalizing generated many-body state...", log='debug')
-        norm_sq = self._backend.sum(self._backend.abs(mb_state_vector_unnorm)**2)
-        norm_factor = self._backend.sqrt(norm_sq)
-        # Avoid division by zero/NaN
-        mb_state_vector = self._backend.where(norm_factor > 1e-14,
-                                              mb_state_vector_unnorm / norm_factor,
-                                              self._backend.zeros_like(mb_state_vector_unnorm))
-
-        if use_representatives and target_hs.normalization is not None:
-             self._log("Applying symmetry normalization factor...", log='debug')
-             norms_hs = target_hs.normalization # Should match target_size
-             # Divide by sqrt(orbit_size) = norm_hs
-             safe_norms = self._backend.where(self._backend.abs(norms_hs) > 1e-14, norms_hs, 1.0)
-             mb_state_vector = mb_state_vector / safe_norms
-             # Re-normalize after applying symmetry factors (optional but recommended)
-             norm_sq_final = self._backend.sum(self._backend.abs(mb_state_vector)**2)
-             norm_factor_final = self._backend.sqrt(norm_sq_final)
-             mb_state_vector = self._backend.where(norm_factor_final > 1e-14,
-                                                   mb_state_vector / norm_factor_final,
-                                                   self._backend.zeros_like(mb_state_vector))
-
-        self._log("Many-body state construction complete.", log='debug')
-        return mb_state_vector
+    ##########################################################################

@@ -32,7 +32,7 @@ from Python.QES.Algebra.Hamil.hamil_energy import local_energy_int_wrap, local_e
 import Python.QES.Algebra.Hamil.hamil_jit_methods as hjm
 ###################################################################################################
 from general_python.algebra.ran_wrapper import random_vector
-from general_python.algebra.utils import JAX_AVAILABLE, get_backend, ACTIVE_INT_TYPE
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, ACTIVE_INT_TYPE, Array
 import general_python.algebra.linalg as linalg
 
 if JAX_AVAILABLE:
@@ -166,11 +166,12 @@ class Hamiltonian(ABC):
         """
         
         self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian._set_backend(backend)
-        self._is_jax        = JAX_AVAILABLE and self._backend != np
-        self._is_numpy      = not self._is_jax
-        self._is_sparse     = is_sparse
-        self._is_manybody   = is_manybody
-        self._is_quadratic  = not is_manybody
+        self._is_jax                = JAX_AVAILABLE and self._backend != np
+        self._is_numpy              = not self._is_jax
+        self._is_sparse             = is_sparse
+        self._is_manybody           = is_manybody
+        self._is_quadratic          = not is_manybody
+        self._particle_conserving   = False
         
         # get the backend, scipy, and random number generator for the backend
         self._dtypeint      = self._backend.int64
@@ -229,7 +230,6 @@ class Hamiltonian(ABC):
         if self._dtype is None:
             self._dtype     = self._hilbert_space.dtype
         self._nh            = self._hilbert_space.get_Nh()
-        self._logger        = self._hilbert_space.logger
         
         #! other properties
         self._startns       = 0 # for starting hamil calculation (potential loop over sites)
@@ -244,7 +244,15 @@ class Hamiltonian(ABC):
         
         # for the matrix representation of the Hamiltonian
         self._hamil         = None  # will store the Hamiltonian matrix with Nh x Nh full Hilbert space
-        self._hamil_sp      = None  # will store Ns x Ns (2Ns x 2Ns for BdG) matrix for quadratic Hamiltonian
+        
+        #! single particle Hamiltonian info
+        self._hamil_sp          = None  # will store Ns x Ns (2Ns x 2Ns for BdG) matrix for quadratic Hamiltonian
+        self._delta_sp          = None
+        self._constant_offset   = 0.0
+        self._isfermions        = True
+        self._isbosons          = False
+        
+        #! general Hamiltonian info
         self._eig_vec       = None
         self._eig_val       = None
         self._krylov        = None
@@ -263,13 +271,13 @@ class Hamiltonian(ABC):
         
     # ----------------------------------------------------------------------------------------------
     
-    def _log(self, msg : str, log = 'info', lvl : int = 0, color : str = "white"):
+    def _log(self, msg : str, log : str = 'info', lvl : int = 0, color : str = "white"):
         """
         Log the message.
         
         Args:
             msg (str) : The message to log.
-            log (int) : The logging level. Default is 'info'.
+            log (str) : The logging level. Default is 'info'.
             lvl (int) : The level of the message.
         """
         msg = f"[{self._name}] {msg}"
@@ -280,22 +288,41 @@ class Hamiltonian(ABC):
         Returns the string representation of the Hamiltonian class.
         
         Returns:
-            str : The string representation of the Hamiltonian class.
+            str :
+                The string representation of the Hamiltonian class.
         '''
-        return f"Hamiltonian with {self._nh} elements and {self._ns} modes."
+        return f"{'Quadratic' if self._is_quadratic else ''} Hamiltonian with {self._nh} elements and {self._ns} modes."
     
     def __repr__(self):
-        '''
-        Returns the detailed string representation of the Hamiltonian class.
+        """
+        Returns a detailed string representation of the Hamiltonian instance.
 
-        Provides information about the number of elements and modes, whether a Hilbert space is provided,
-        details about the associated lattice, and the computational backend.
-        '''
-        hilbert_info = "with HilbertSpace" if self._hilbert_space is not None else "without HilbertSpace"
-        lattice_info = f"on lattice {self._lattice}" if self._lattice is not None else "without lattice"
-        backend_info = f"using backend {self._backendstr}"
-        return (f"Hamiltonian: {self._nh} elements, {self._ns} modes, "
-            f"{hilbert_info}, {lattice_info}, {backend_info}.")
+        Includes:
+            - Hamiltonian type (Many-Body or Quadratic)
+            - Number of Hilbert space elements (Nh)
+            - Number of modes/sites (Ns)
+            - Hilbert space and lattice info
+            - Computational backend and dtype
+            - Sparsity and memory usage (if available)
+        """
+        htype           = "Many-Body" if self._is_manybody else "Quadratic"
+        hilbert_info    = (
+                    f"HilbertSpace(Nh={self._nh})"
+                    if self._hilbert_space is not None
+                    else ""
+                    )
+        lattice_info    = (
+                    f"Lattice({self._lattice})"
+                    if self._lattice is not None
+                    else ""
+                    )
+        backend_info    = f"backend='{self._backendstr}', dtype={self._dtype}"
+        sparse_info     = "sparse" if self._is_sparse else "dense"
+
+        return (
+            f"<{htype} Hamiltonian | Nh={self._nh}, Ns={self._ns}, "
+            f"{hilbert_info}, {lattice_info}, {backend_info}, {sparse_info}>"
+        )
     
     # ----------------------------------------------------------------------------------------------
     
@@ -309,6 +336,8 @@ class Hamiltonian(ABC):
         '''
         self._hamil      = None
         self._hamil_sp   = None
+        self._delta_sp   = None
+        self._constant_sp= None
         self._eig_vec    = None
         self._eig_val    = None
         self._krylov     = None
@@ -380,6 +409,27 @@ class Hamiltonian(ABC):
         return self.sparse
 
     @property
+    def particle_conserving(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is particle conserving or not.
+        '''
+        return self._particle_conserving if not self._is_manybody else None
+    
+    @property
+    def is_particle_conserving(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is particle conserving or not.
+        '''
+        return self._particle_conserving if not self._is_manybody else None
+    
+    @property
+    def is_bdg(self):
+        '''
+        Returns a flag indicating whether the Hamiltonian is Bogoliubov-de Gennes (BdG) or not.
+        '''
+        return self.particle_conserving
+
+    @property
     def max_local_changes(self):
         '''
         Returns the maximum number of local changes.
@@ -403,7 +453,7 @@ class Hamiltonian(ABC):
         '''
         self._name = name
     
-    # --- LATTICE BASED
+    #! LATTICE BASED
     
     @property
     def ns(self):
@@ -426,7 +476,7 @@ class Hamiltonian(ABC):
         '''
         return self._lattice
     
-    # --- HILBERT BASED
+    #! HILBERT BASED
     
     @property
     def modes(self):
@@ -449,14 +499,14 @@ class Hamiltonian(ABC):
         '''
         return self._hilbert_space.get_Nh()
     
-    # --- EIGENVALUES AND EIGENVECTORS
+    #! EIGENVALUES AND EIGENVECTORS
     
     @property
     def hamil(self):
         '''
         Returns the Hamiltonian matrix.
         '''
-        return self._hamil if self._is_manybody else self._hamil_sp
+        return self._hamil
     
     @hamil.setter
     def hamil(self, hamil):
@@ -466,11 +516,59 @@ class Hamiltonian(ABC):
         Args:
             hamil : The Hamiltonian matrix.
         '''
-        if self._is_manybody:
-            self._hamil = hamil
-        else:
-            self._hamil_sp = hamil
-            
+        self._hamil = hamil
+    
+    @property
+    def hamil_sp(self):
+        '''
+        Returns the single-particle Hamiltonian matrix.
+        '''
+        return self._hamil_sp
+    
+    @hamil_sp.setter
+    def hamil_sp(self, hamil_sp):
+        '''
+        Sets the single-particle Hamiltonian matrix.
+        
+        Args:
+            hamil_sp : The single-particle Hamiltonian matrix.
+        '''
+        self._hamil_sp = hamil_sp
+        
+    @property
+    def delta_sp(self):
+        '''
+        Returns the delta matrix of the single-particle Hamiltonian.
+        '''
+        return self._delta_sp
+    
+    @delta_sp.setter
+    def delta_sp(self, delta_sp):
+        '''
+        Sets the delta matrix of the single-particle Hamiltonian.
+        
+        Args:
+            delta_sp : The delta matrix of the single-particle Hamiltonian.
+        '''
+        self._delta_sp = delta_sp
+    
+    @property
+    def constant_sp(self):
+        '''
+        Returns the constant matrix of the single-particle Hamiltonian.
+        '''
+        return self._constant_sp
+    
+    @constant_sp.setter
+    def constant_sp(self, constant_sp):
+        '''
+        Sets the constant matrix of the single-particle Hamiltonian.
+        
+        Args:
+            constant_sp : The constant matrix of the single-particle Hamiltonian.
+        '''
+        self._constant_sp = constant_sp
+    
     @property
     def eig_vec(self):
         '''
@@ -492,7 +590,7 @@ class Hamiltonian(ABC):
         '''
         return self._krylov
     
-    # --- ENERGY PROPERTIES
+    #! ENERGY PROPERTIES
     
     @property
     def av_en(self):
@@ -529,7 +627,7 @@ class Hamiltonian(ABC):
         Distinguish between JAX and NumPy/SciPy. 
         '''
         
-        target_hamiltonian: np.ndarray = self.hamil    
+        target_hamiltonian: np.ndarray = self.hamil
     
         if JAX_AVAILABLE and self._backend != np:
             if isinstance(target_hamiltonian, BCOO):
@@ -597,7 +695,7 @@ class Hamiltonian(ABC):
         '''
         return self._loc_energy_jax_fun
     
-    # ----------------------------------------------------------------------------------------------
+    #! ----------------------------------------------------------------------------------------------
     
     def get_loc_energy_arr_fun(self, backend: str = 'default'):
         '''
@@ -621,12 +719,13 @@ class Hamiltonian(ABC):
         Works for both dense and sparse representations and for NumPy and JAX.
         """
         
-        matrix_to_check = self.hamil
+        matrix_to_check = self.hamil if (self._is_manybody) else self.hamil_sp
         if matrix_to_check is None:
             raise ValueError(Hamiltonian._ERR_HAMILTONIAN_NOT_AVAILABLE)
         
         # Dense matrix: use nbytes if available, otherwise compute from shape.
         # self._log(f"Checking the memory used by the Hamiltonian matrix of type {type(self._hamil)}", lvl=1)
+        memory = 0
         
         if not self._is_sparse:
             if hasattr(matrix_to_check, "nbytes"):
@@ -647,7 +746,6 @@ class Hamiltonian(ABC):
                             memory += arr.nbytes
                         else:
                             memory += int(np.prod(arr.shape)) * arr.dtype.itemsize
-                return memory
             elif self._is_jax:
                 # For JAX sparse matrices (e.g. BCOO), we assume they have data and indices attributes.
                 data_arr        = matrix_to_check.data
@@ -660,10 +758,11 @@ class Hamiltonian(ABC):
                     indices_bytes = indices_arr.nbytes
                 else:
                     indices_bytes = int(np.prod(indices_arr.shape)) * indices_arr.dtype.itemsize
-                return data_bytes + indices_bytes
+                memory = data_bytes + indices_bytes
             else:
                 return 0 # Unknown type, return 0
-        
+        return memory if self._is_manybody else 2 * memory # for BdG Hamiltonian
+
     @property
     def h_memory_gb(self):
         """
@@ -813,6 +912,31 @@ class Hamiltonian(ABC):
         self._log("Converting the Hamiltonian matrix to a sparse matrix... Run build...", lvl = 1)
         self.clear()
     
+        # ----------------------------------------------------------------------------------------------
+    
+    def _set_some_coupling(self, coupling: Union[list, np.ndarray, float, complex, int, str]) -> Array:
+        '''
+        Distinghuishes between different initial values for the coupling and returns it.
+        One distinguishes between:
+            - a full vector of a correct size
+            - single value 
+            - random string
+        ---
+        Parameters:
+            - coupling : some coupling to be set
+        ---
+        Returns:
+            array to be used latter with corresponding couplings
+        '''
+        if isinstance(coupling, list) and len(coupling) == self.ns:
+            return self._backend.array(coupling)
+        elif isinstance(coupling, (float, int, complex)):
+            return DummyVector(coupling)
+        elif isinstance(coupling, str):
+            return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
+        else:
+            raise ValueError(self._ERR_COUP_VEC_SIZE)
+    
     # ----------------------------------------------------------------------------------------------
     
     def init(self, use_numpy : bool = False):
@@ -823,7 +947,8 @@ class Hamiltonian(ABC):
         matrix.
         
         Parameters:
-            use_numpy (bool) : A flag indicating whether to use NumPy or JAX.
+            use_numpy (bool):
+                A flag indicating whether to use NumPy or JAX.
         '''
         self._log("Initializing the Hamiltonian matrix...", lvl = 2, log = "debug")
         
@@ -844,8 +969,10 @@ class Hamiltonian(ABC):
                     indices         = self._backend.zeros((0, 2), dtype=ACTIVE_INT_TYPE)
                     data            = self._backend.zeros((0,), dtype=self._dtype)
                     self._hamil_sp  = BCOO((data, indices), shape=ham_shape)
+                    self._delta_sp  = BCOO((data, indices), shape=ham_shape)
             else:
                 self._hamil_sp      = self._backend.zeros(ham_shape, dtype=self._dtype)
+                self._delta_sp      = self._backend.zeros(ham_shape, dtype=self._dtype)
             self._hamil = None
         else:
             if self.sparse:
@@ -876,69 +1003,48 @@ class Hamiltonian(ABC):
                     lvl = 3, color = "green", log = "debug")
     
     # ----------------------------------------------------------------------------------------------
-    
-    def _set_some_coupling(self, coupling: Union[list, np.ndarray, float, complex, int, str]):
-        '''
-        Distinghuishes between different initial values for the coupling and returns it.
-        One distinguishes between:
-            - a full vector of a correct size
-            - single value 
-            - random string
-        ---
-        Parameters:
-            - coupling : some coupling to be set
-        ---
-        Returns:
-            array to be used latter with corresponding couplings
-        '''
-        if isinstance(coupling, list) and len(coupling) == self.ns:
-            return self._backend.array(coupling)
-        elif isinstance(coupling, (float, int, complex)):
-            return self._backend.array([coupling] * self.ns)
-        elif isinstance(coupling, str):
-            return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
-        else:
-            raise ValueError(self._ERR_COUP_VEC_SIZE)
-    
-    # ----------------------------------------------------------------------------------------------
     #! Many body Hamiltonian matrix
     # ----------------------------------------------------------------------------------------------
 
     def _hamiltonian_validate(self):
         ''' Check if the Hamiltonian matrix is valid. '''
-        if self._hamil is None:
+        
+        matrix_to_check = self._hamil if (self._is_manybody) else self._hamil_sp
+        
+        if matrix_to_check is None:
             self._log("Hamiltonian matrix is not initialized.", lvl=3, color="red", log = "debug")
         else:
             valid   = False
             # For dense matrices (NumPy/JAX ndarray) which have the 'size' attribute.
-            if hasattr(self._hamil, "size"):
-                if self._hamil.size > 0:
+            if hasattr(matrix_to_check, "size"):
+                if matrix_to_check.size > 0:
                     valid = True
             # For SciPy sparse matrices: check the number of nonzero elements.
-            elif hasattr(self._hamil, "nnz"):
-                if self._hamil.nnz > 0:
+            elif hasattr(matrix_to_check, "nnz"):
+                if matrix_to_check.nnz > 0:
                     valid = True
             # For JAX sparse matrices (e.g., BCOO): verify if the data array has entries.
-            elif hasattr(self._hamil, "data") and hasattr(self._hamil, "indices"):
-                if self._hamil.data.shape[0] > 0:
+            elif hasattr(matrix_to_check, "data") and hasattr(matrix_to_check, "indices"):
+                if matrix_to_check.data.shape[0] > 0:
                     valid = True
             
             if valid:
                 self._log("Hamiltonian matrix calculated and valid.", lvl=3, color="green", log = "debug")
             else:
                 self._log("Hamiltonian matrix calculated but empty or invalid.", lvl=3, color="red", log = "debug")
-                self._hamil = None
-
-    # ----------------------------------------------------------------------------------------------
+                matrix_to_check = None
 
     def _transform_to_backend(self):
         '''
         Transforms the Hamiltonian matrix to the backend.
         '''
         if self._is_manybody:
-            self._hamil     = linalg.transform_backend(self._hamil, self._is_sparse, self._backend)
+            self._hamil = linalg.transform_backend(self._hamil, self._is_sparse, self._backend)
         else:
-            self._hamil_sp  = linalg.transform_backend(self._hamil_sp, self._is_sparse, self._backend)
+            self._hamil_sp = linalg.transform_backend(self._hamil_sp, self._is_sparse, self._backend)
+            if self._particle_conserving:
+                self._delta_sp = linalg.transform_backend(self._delta_sp, self._is_sparse, self._backend)
+
         self._eig_val   = linalg.transform_backend(self._eig_val, False, self._backend)
         self._eig_vec   = linalg.transform_backend(self._eig_vec, False, self._backend)
         self._krylov    = linalg.transform_backend(self._krylov, False, self._backend)
@@ -959,8 +1065,7 @@ class Hamiltonian(ABC):
             
         '''
         if verbose:
-            self._log(f"Building Hamiltonian (Type: {'Many-Body' if self._is_many_body else 'Quadratic'})...",
-                    lvl=1, color = 'orange')
+            self._log(f"Building Hamiltonian (Type: {'Many-Body' if self._is_many_body else 'Quadratic'})...", lvl=1, color = 'orange')
         
         if self._is_many_body:
             # Ensure operators/local energy functions are defined
@@ -980,26 +1085,33 @@ class Hamiltonian(ABC):
             self.init(use_numpy)
         except Exception as e:
             raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_INITIALIZATION} : {str(e)}") from e
-    
+        
+        if self._is_quadratic:
+            if hasattr(self._hamil_sp, "block_until_ready"):
+                self._hamil_sp = self._hamil_sp.block_until_ready()
+                
+            if hasattr(self._delta_sp, "block_until_ready"):
+                self._delta_sp = self._delta_sp.block_until_ready()
+
         if hasattr(self._hamil, "block_until_ready"):
             self._hamil = self._hamil.block_until_ready()
-            
+        
+        # initialize duration
         init_duration = time.perf_counter() - init_start
         if verbose:
             self._log(f"Initialization completed in {init_duration:.6f} seconds", lvl = 2)
         
         ################################
-        # Build the Hamiltonian matrix
-        ################################
+        #! Build the Hamiltonian matrix
+        ################################§
         ham_start = time.perf_counter()
         try:
             if self._is_manybody:
                 self._hamiltonian(use_numpy)
             else:
-                self._hamiltonian_quadratic()
+                self._hamiltonian_quadratic(use_numpy)
         except Exception as e:
             raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_BUILD} : {str(e)}") from e
-
         ham_duration = time.perf_counter() - ham_start
         if self._hamil is not None and self._hamil.size > 0:
             if verbose:
@@ -1170,7 +1282,6 @@ class Hamiltonian(ABC):
         
         if self._eig_val is None or self._eig_val.size == 0:
             raise ValueError(Hamiltonian._ERR_EIGENVALUES_NOT_AVAILABLE)
-        
         self._av_en     = self._backend.mean(self._eig_val)
         self._min_en    = self._backend.min(self._eig_val)
         self._max_en    = self._backend.max(self._eig_val)
@@ -1221,6 +1332,23 @@ class Hamiltonian(ABC):
         backend     = self._backend if not isinstance(self._hamil, np.ndarray) and not sp.sparse.isspmatrix(self._hamil) else np
         if verbose:
             self._log(f"Diagonalization started using ({method})...", lvl = 1)
+            
+        if self._is_quadratic:
+            if self.particle_conserving:
+                self._log("Diagonalizing the quadratic Hamiltonian matrix without BdG...", lvl = 2, log = 'debug')
+                self._hamil = self._hamil_sp
+            else:
+                self._log("Diagonalizing the quadratic Hamiltonian matrix with BdG...", lvl = 2, log = 'debug')
+                if self._isfermions:
+                    self._hamil = backend.block([   [ self._hamil_sp, self._delta_sp ],
+                                                    [-self._delta_sp.conj(), -self._hamil_sp.conj().T ]])
+        else:  # bosons – use ΣH to make it Hermitian
+            sigma = backend.block([ [backend.eye(self.ns), backend.zeros_like(self._hamil)  ],
+                                    [backend.zeros_like(self._hamil), -backend.eye(self.ns) ]])
+            self._hamil = sigma @ backend.block([[ self._hamil_sp,  self._delta_sp          ],
+                                    [self._delta_sp.conj().T, self._hamil_sp.conj().T       ]])
+        
+        # try to diagonalize the Hamiltonian matrix
         try:
             if self._is_sparse or method.lower() in ["lanczos", "shift-invert"]:
                 self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, method, backend, **kwargs)
