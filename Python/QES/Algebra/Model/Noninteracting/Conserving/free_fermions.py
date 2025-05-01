@@ -6,7 +6,6 @@ email   : maksymilian.kliczkowski@pwr.edu.pl
 date    : 2025-05-01
 """
 
-from __future__ import annotations
 import numpy as np
 import numba
 from typing import Optional, Union
