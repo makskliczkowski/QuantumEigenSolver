@@ -15,11 +15,11 @@ import numpy as np
 from numba import njit, jit
 from abc import ABC
 from itertools import combinations
-from typing import Union, Optional, Callable, List
+from typing import Union, Optional, Callable, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # already imported from general_python
-from Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE
+from Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, maybe_jit
 ####################################################################################################
 from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
@@ -41,6 +41,7 @@ from Algebra.Hilbert.hilbert_jit_methods import (
 )   
 
 if JAX_AVAILABLE:
+    import jax
     import jax.numpy as jnp
     
     @jax.jit

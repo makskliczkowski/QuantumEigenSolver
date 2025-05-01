@@ -26,10 +26,10 @@ import time
 from Algebra.hilbert import HilbertSpace, set_operator_elem, Logger, Lattice
 from Algebra.Operator.operator import Operator, OperatorTypeActing, create_add_operator
 from Algebra.Operator.operator_matrix import operator_create_np
-from Python.QES.Algebra.Hamil.hamil_types import *
-from Python.QES.Algebra.Hamil.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
+from Algebra.Hamil.hamil_types import *
+from Algebra.Hamil.hamil_energy import local_energy_int_wrap, local_energy_np_wrap
 ###################################################################################################
-import Python.QES.Algebra.Hamil.hamil_jit_methods as hjm
+import Algebra.Hamil.hamil_jit_methods as hjm
 ###################################################################################################
 from general_python.algebra.ran_wrapper import random_vector
 from general_python.algebra.utils import JAX_AVAILABLE, get_backend, ACTIVE_INT_TYPE, Array
@@ -41,7 +41,7 @@ if JAX_AVAILABLE:
     import jax.lax as lax
     import jax.numpy as jnp
     from jax.experimental.sparse import BCOO, CSR
-    from Python.QES.Algebra.Hamil.hamil_energy import local_energy_jax_wrap
+    from Algebra.Hamil.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
 else:
     import jax
@@ -200,7 +200,6 @@ class Hamiltonian(ABC):
             # try to infer from lattice or number of sites
             if self._lattice is None:
                 # if the lattice is not provided, create Hilbert space from number of sites
-                self._ns = self._lattice._ns
                 if self._ns is None:
                     raise ValueError(Hamiltonian._ERR_NS_NOT_PROVIDED)
             self._hilbert_space = HilbertSpace(ns       = self._ns,

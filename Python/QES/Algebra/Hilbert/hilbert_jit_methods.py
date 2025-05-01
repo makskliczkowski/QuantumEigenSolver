@@ -15,7 +15,7 @@ import numba
 _INT_BINARY_REPR       = 2**6
 _SYM_NORM_THRESHOLD    = 1e-12
 from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE, binary_search_numpy
-from general_python.algebra.utils import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, Array
+from general_python.algebra.utils import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, Array, maybe_jit
 
 
 ####################################################################################################

@@ -172,14 +172,13 @@ class QuadraticHamiltonian(Hamiltonian):
         """
         
         # Call base class init, explicitly setting is_many_body=False
-        super().__init__(is_many_body   =   False,
+        super().__init__(is_manybody    =   False,
                         ns              =   ns,
                         lattice         =   lattice,
                         hilbert_space   =   hilbert_space,
                         is_sparse       =   is_sparse,
                         dtype           =   dtype,
                         backend         =   backend,
-                        logger          =   logger
                         **kwargs)
 
         # setup the arguments first
@@ -208,6 +207,7 @@ class QuadraticHamiltonian(Hamiltonian):
 
         # Store quadratic terms (hopping, pairing, onsite)
         self._name                      = f"QuadraticHamiltonian(Ns={self._ns},{'BdG' if not self._particle_conserving else 'N-conserving'})"
+        self._occupied_orbitals_cached  = None
         self._mb_calculator             = self._many_body_state_calculator()
         
         # for storing the pairing terms (Bogoliubov-de Gennes terms when not conserving particles)
@@ -215,7 +215,6 @@ class QuadraticHamiltonian(Hamiltonian):
         self._G                         = None
         self._U                         = None
         self._V                         = None
-        self._occupied_orbitals_cached  = None
         self._mb_calculator             = self._many_body_state_calculator()
 
     ##########################################################################
@@ -403,13 +402,16 @@ class QuadraticHamiltonian(Hamiltonian):
             raise ValueError("Single-particle eigenvalues not calculated. Call diagonalize() first.")
 
         occ = np.asarray(occupied_orbitals, dtype=self._dtypeint)
+        if occ.shape[0] == 0:
+            return 0.0
+        
         if occ.ndim != 1:
             raise ValueError("occupied_orbitals must be 1-D")
         e   = 0.0
         
         if self._is_jax:
             occ     = jnp.asarray(occ, dtype=self._dtypeint)
-            vmax    = self._eigvals.shape[0]
+            vmax    = self._eig_val.shape[0]
 
             def _check_bounds(x):
                 if int(jnp.min(x)) < 0 or int(jnp.max(x)) >= vmax:
@@ -418,24 +420,24 @@ class QuadraticHamiltonian(Hamiltonian):
             occ = _check_bounds(occ)
 
             if self._particle_conserving:
-                e = jnp.sum(self._eigvals[occ])
+                e = jnp.sum(self._eig_val[occ])
             else:
                 if int(jnp.max(occ)) >= self._ns:
                     raise IndexError("BdG index must be in 0…Ns-1")
                 mid = self._ns - 1
-                e   = jnp.sum(self._eigvals[mid + occ + 1] -
-                            self._eigvals[mid - occ])
+                e   = jnp.sum(self._eig_val[mid + occ + 1] -
+                            self._eig_val[mid - occ])
         else:
-            vmax = self._eigvals.shape[0]
+            vmax = self._eig_val.shape[0]
             if occ.min() < 0 or occ.max() >= vmax:
                 raise IndexError("orbital index out of bounds")
 
             if self._particle_conserving:
-                e = nrg_particle_conserving(self._eigvals, occ)
+                e = nrg_particle_conserving(self._eig_val, occ)
             else:
                 if occ.max() >= self._ns:
                     raise IndexError("BdG index must be in 0…Ns-1 (positive branch)")
-                e = nrg_bdg(self._eigvals, self._ns, occ)
+                e = nrg_bdg(self._eig_val, self._ns, occ)
         return float(e) + self._constant_offset
 
     ###########################################################################

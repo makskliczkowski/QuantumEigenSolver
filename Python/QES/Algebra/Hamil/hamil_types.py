@@ -7,8 +7,9 @@ Date: 2025-02-01
 '''
 
 from enum import Enum, unique
+import numba
 
-# --- ED limits (using hexadecimal where applicable)
+# ED limits (using hexadecimal where applicable)
 UI_LIMITS_MAXFULLED             = 0x40000
 UI_LIMITS_MAXPRINT              = 0x8
 UI_LIMITS_SI_STATENUM           = 100
@@ -79,6 +80,7 @@ def check_dense(model: Hamiltonians) -> bool:
 
 ################################################################################
 
+# @numba.experimental.jitclass
 class DummyVector:
     """
     A dummy vector-like object that mimics a constant vector of length `ns` with all elements equal to `val`.
@@ -173,3 +175,10 @@ class DummyVector:
         if isinstance(other, DummyVector):
             return (self.val == other.val) and (self.ns == other.ns)
         return False
+    
+    def to_array(self, dtype=None, backend=None):
+        """
+        Convert the DummyVector to a numpy array.
+        """
+        backend = backend if backend is not None else __import__('numpy')
+        return backend.full(self.ns, self.val, dtype=dtype)

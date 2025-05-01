@@ -18,7 +18,7 @@ from Algebra.hamil_quadratic import QuadraticHamiltonian, JAX_AVAILABLE, Array
 # ---------------------------------------------------------------------
 
 @numba.njit
-def _free_fermions_spectrum(ns: int, t: float) -> tuple[np.ndarray, np.ndarray]:
+def _free_fermions_spectrum(ns: int, t) -> tuple[np.ndarray, np.ndarray]:
     """
     Analytic spectrum of the free fermion model.
 
@@ -116,7 +116,7 @@ class FreeFermions(QuadraticHamiltonian):
                 ns                  : int,
                 t                   : Union[Array, float]   = 1.0,
                 constant_offset     : float                 = 0.0,
-                dtype               : Optional[_np.dtype]   = None,
+                dtype               : Optional[np.dtype]    = None,
                 backend             : str                   = "default",
                 logger              = None):
         super().__init__(ns                     = ns,
@@ -142,10 +142,11 @@ class FreeFermions(QuadraticHamiltonian):
     # -----------------------------------------------------------------
     
     def _set_free_spectrum(self):
+        t = self._t.to_array(float, self._backend)
         if self._is_jax:
-            self._eig_val, self._eig_vec = _free_fermions_spectrum_jax(self._ns, jnp.asarray(self._t))
+            self._eig_val, self._eig_vec = _free_fermions_spectrum_jax(self._ns, jnp.asarray(t))
         else:
-            self._eig_val, self._eig_vec = _free_fermions_spectrum(self._ns, self._t)
+            self._eig_val, self._eig_vec = _free_fermions_spectrum(self._ns, t)
 
     # -----------------------------------------------------------------
     #! override parent diagonalisation (nothing to diagonalise)
@@ -201,3 +202,9 @@ class FreeFermions(QuadraticHamiltonian):
                                 "arbitrary hopping matrices.")
 
     # -----------------------------------------------------------------
+    
+    def __repr__(self):
+        return f"FreeFermions(ns={self._ns}, t={self._t[0]}, constant_offset={self._constant_offset})"
+    
+    def __str__(self):
+        return f"FreeFermions: {self._ns} sites, t={self._t[0]}, constant_offset={self._constant_offset}"
