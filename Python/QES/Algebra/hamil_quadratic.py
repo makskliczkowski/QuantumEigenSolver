@@ -12,6 +12,8 @@ from typing import List, Tuple, Union, Optional, Callable
 from enum import Enum, unique
 from abc import ABC
 from functools import partial
+from scipy.special import comb
+from itertools import combinations
 
 ##############################################################################
 
@@ -62,6 +64,155 @@ else:
     calculate_bcs_amp_jax       = None
     calculate_permament_jax     = None
 
+##############################################################################
+
+class QuadraticSelection:
+    '''
+    A utility class for generating and manipulating selections of orbitals, commonly used in quantum chemistry and physics applications. Provides methods to compute the number of possible orbital selections, generate all possible combinations, and randomly select subsets of orbitals.
+    
+    Methods
+        all_orbitals_size(n, k)
+            Calculate the number of ways to choose k orbitals from n available orbitals (binomial coefficient).
+        all_orbitals(n, k)
+            Generate all possible combinations of k orbitals from a set of n orbitals or a given array-like collection.
+        ran_orbitals(n, k)
+            Randomly select k orbitals from a set of n orbitals or a given array-like collection.
+    
+    - If `n` is an integer, orbitals are indexed from 0 to n-1.
+    - If `n` is array-like, its elements are treated as the set of available orbitals.
+    '''
+    def all_orbitals_size(n, k):
+        """
+        Calculate the number of ways to choose k orbitals from n available orbitals.
+
+        This function returns the binomial coefficient "n choose k", representing the number
+        of possible selections of k orbitals from a total of n orbitals.
+
+        Args:
+            n (int): The total number of available orbitals.
+            k (int): The number of orbitals to select.
+
+        Returns:
+            int: The number of possible combinations (binomial coefficient).
+
+        Example:
+            >>> all_orbitals(4, 2)
+            6
+        """
+        return comb(n, k, exact=True)
+
+    def all_orbitals(n, k):
+        """
+        Generate all possible combinations of orbitals.
+        Parameters
+        ----------
+        n : int or array-like
+            If int, the number of orbitals (orbitals are indexed from 0 to n-1).
+            If array-like, the collection of orbitals to choose from.
+        k : int
+            The number of orbitals to select in each combination.
+        Returns
+        -------
+        iterator
+            An iterator over tuples, each containing a unique combination of k orbitals.
+        Notes
+        -----
+        If `n` is an integer, combinations are generated from the range [0, n).
+        If `n` is array-like, combinations are generated from the elements of `n`.
+        """
+        
+        if isinstance(n, (int, np.integer)):
+            arange = np.arange(0, n, dtype = np.int64)
+            return arange, combinations(arange, k)
+        else:
+            return n, combinations(n, k)
+
+    def ran_orbitals(n, k):
+        """
+        Generate a set of orbital indices and randomly select a subset.
+
+        Parameters
+        ----------
+        n : int or array-like
+            If int, defines the range of orbital indices from 0 to n-1.
+            If array-like, treated as the set of available orbital indices.
+        k : int
+            Number of orbitals to randomly select.
+
+        Returns
+        -------
+        arange : numpy.ndarray
+            Array of orbital indices.
+        selected : numpy.ndarray
+            Array of randomly selected orbital indices of length k.
+
+        Notes
+        -----
+        If `n` is an integer, the function creates an array of indices from 0 to n-1.
+        If `n` is array-like, it is used directly as the set of indices.
+        """
+        if isinstance(n, (int, np.integer)):
+            arange = np.arange(0, n, dtype=np.int64)
+        else:
+            arange = np.array(n, dtype=np.int64)
+        selected = np.random.choice(arange, k, replace=False)
+        return arange, selected
+
+    def haar_random_coeff(gamma : int,
+                        *,
+                        rng     : np.random.Generator | None = None,
+                        dtype   = np.complex128) -> np.ndarray:
+        r"""
+        Return a length-gamma complex vector distributed with the **Haar
+        measure** on the unit sphere (i.e. what you get from the first
+        column of a Haar-random unitary).
+
+        Parameters
+        ----------
+        gamma : int
+            Dimension of states to mix.
+        rng : numpy.random.Generator, optional
+            Random-number generator to use. `np.random.default_rng()` is the
+            default; pass your own for reproducibility.
+        dtype : np.dtype, default=np.complex128
+            Precision of the returned coefficients.
+
+        Notes
+        -----
+        * **Mathematical equivalence** - Drawing
+        $$\psi_i = x_i + i y_i \\ (x_i,y_i\\sim 𝒩(0,1))$$
+        and normalising,  
+        $$\\psi/\\lVert\\psi\\rVert$$  
+        gives exactly the same distribution as the first column of a Haar
+        unitary (see, e.g., Mezzadri 2006).
+        * If SciPy ≥ 1.4 is available we use `scipy.stats.unitary_group.rvs`
+        (QR‑based) instead, but the Gaussian trick is used as a fallback and
+        is typically faster.
+
+        Examples
+        --------
+        >>> gen_random_state_coefficients(4) # doctest: +ELLIPSIS
+        array([ 0.44...+0.05...j, -0.40...-0.11...j,  0.63...+0.48...j,
+                0.16...+0.29...j])
+        """
+        if gamma < 1:
+            raise ValueError("`gamma` must be at least 1.")
+        if gamma == 1:
+            return np.ones(1, dtype=dtype)
+
+        rng = np.random.default_rng() if rng is None else rng
+
+        #! fast path: SciPy’s true Haar unitary, if available
+        try:
+            from scipy.stats import unitary_group
+            return unitary_group.rvs(gamma, random_state=rng).astype(dtype)[:, 0]
+        except Exception:
+            # fall back to Gaussian normalise trick  (still Haar-correct)
+            z   = rng.normal(size=gamma) + 1j * rng.normal(size=gamma)
+            z   = z.astype(dtype, copy=False)
+            z  /= np.linalg.norm(z)
+            return z
+        
 ##############################################################################
 
 class QuadraticHamiltonian(Hamiltonian):
@@ -512,7 +663,8 @@ class QuadraticHamiltonian(Hamiltonian):
     def many_body_state(self,
                         occupied_orbitals : Union[list[int], np.ndarray] | None = None,
                         target_basis      : str                                 = "sites",
-                        many_body_hs      : Optional[HilbertSpace]              = None):
+                        many_body_hs      : Optional[HilbertSpace]              = None,
+                        resulting_state   : Optional[np.ndarray]                = None):
         """
         Return the coefficient vector `|Ψ〉` in the *computational* basis.
 
@@ -552,7 +704,7 @@ class QuadraticHamiltonian(Hamiltonian):
         dtype        = getattr(self, "_dtype", np.complex128)
 
         if many_body_hs is None or not many_body_hs.modifies:
-            return many_body_state_full(matrix_arg, calculator, ns, dtype)
+            return many_body_state_full(matrix_arg, calculator, ns, resulting_state, dtype=dtype)
         else:            
             mapping = many_body_hs.mapping
             return many_body_state_mapping(matrix_arg,

@@ -25,7 +25,7 @@ from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
 from general_python.common.flog import get_global_logger, Logger
 if JAX_AVAILABLE:
     from general_python.algebra.utils import pad_array_jax
-from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE, binary_search_numpy
+from general_python.common.binary import bin_search
 ####################################################################################################
 from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity, OperatorFunction
 from Algebra.globals import GlobalSymmetry
@@ -1104,7 +1104,7 @@ class HilbertSpace(ABC):
             rep, _ = self._find_repr_int(j)
             if rep == j:
                 n = self._find_sym_norm_int(j)
-                if abs(n) > __SYM_NORM_THRESHOLD:
+                if abs(n) > 1e-7:
                     map_threaded.append(j)
                     norm_threaded.append(n)
         return map_threaded, norm_threaded
@@ -1132,23 +1132,23 @@ class HilbertSpace(ABC):
                     
             # if the global symmetries are not satisfied, skip the state
             if not global_checker:
-                self._reprmap.append((__BAD_BINARY_SEARCH_STATE, 0.0))
+                self._reprmap.append((bin_search._BAD_BINARY_SEARCH_STATE, 0.0))
                 continue
             
             mapping_size    = len(self._mapping)
-            idx             = binary_search(self._mapping, 0, mapping_size - 1, j)
-            if idx != __BAD_BINARY_SEARCH_STATE and idx < mapping_size:
+            idx             = bin_search.binary_search(self._mapping, 0, mapping_size - 1, j)
+            if idx != bin_search._BAD_BINARY_SEARCH_STATE and idx < mapping_size:
                 self._reprmap.append((idx, 1.0))
                 continue
             
             # find the representative
             rep, sym_eig    = self.find_repr(j)
-            idx             = binary_search(self._mapping, 0, mapping_size - 1, rep)
-            if idx != __BAD_BINARY_SEARCH_STATE and idx < mapping_size:
+            idx             = bin_search.binary_search(self._mapping, 0, mapping_size - 1, rep)
+            if idx != bin_search._BAD_BINARY_SEARCH_STATE and idx < mapping_size:
                 sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
                 self._reprmap.append((idx, np.conj(sym_eigc)))
             else:
-                self._reprmap.append((__BAD_BINARY_SEARCH_STATE, 0.0))
+                self._reprmap.append((bin_search._BAD_BINARY_SEARCH_STATE, 0.0))
     
     # --------------------------------------------------------------------------------------------------
     

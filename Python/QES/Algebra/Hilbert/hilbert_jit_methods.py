@@ -14,7 +14,7 @@ import numba
 #! private
 _INT_BINARY_REPR       = 2**6
 _SYM_NORM_THRESHOLD    = 1e-12
-from general_python.common.binary import binary_search, __BAD_BINARY_SEARCH_STATE, binary_search_numpy
+from general_python.common.binary import bin_search
 from general_python.algebra.utils import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, Array, maybe_jit
 
 
@@ -116,15 +116,15 @@ if True:
         
         # find the representative already in the mapping (can be that the matrix element already 
         # represents the representative state)
-        idx = binary_search_numpy(_mapping, 0, mapping_size - 1, _state)
+        idx = bin_search.binary_search_numpy(_mapping, 0, mapping_size - 1, _state)
         
-        if idx != __BAD_BINARY_SEARCH_STATE:
+        if idx != bin_search._BAD_BINARY_SEARCH_STATE:
             return (idx, _normalization[idx] / _normalization_beta)
         
         # otherwise, we need to find the representative by acting on the state with the symmetry operators
         # and finding the one that gives the smallest value - standard procedure
         idx, sym_eig = find_repr_int(_state, _sym_group, _reprmap)
-        if idx != __BAD_BINARY_SEARCH_STATE:
+        if idx != bin_search._BAD_BINARY_SEARCH_STATE:
             sym_eigc = sym_eig.conjugate() if hasattr(sym_eig, "conjugate") else sym_eig
             return (idx, _normalization[idx] / _normalization_beta * sym_eigc)
         

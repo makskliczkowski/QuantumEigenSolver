@@ -44,7 +44,11 @@ def _popcount(x: int) -> int:
         >>> _popcount(7)
         3  # (7 in binary is 0b111)
     """
-    return x.bit_count()
+    cnt = 0
+    while x:
+        x   &= x - 1
+        cnt += 1
+    return cnt
 
 @njit(cache=True)
 def _extract_occupied(ns    : int,
@@ -166,10 +170,10 @@ def calculate_slater_det(sp_eigvecs         : np.ndarray,
     # ------------------------------------------------------------------
     # Sites occupied in the original Fock state
     # ------------------------------------------------------------------
-    n_part  = occupied_orbitals.shape[0]
+    n_part = occupied_orbitals.shape[0]
     if isinstance(org_basis_state, (int, np.integer)):
         temp    = int(org_basis_state)
-        n_fock  = temp.bit_count()
+        n_fock  = _popcount(temp)
     else:
         n_fock  = int(np.sum(org_basis_state))
 
@@ -189,14 +193,16 @@ def calculate_slater_det(sp_eigvecs         : np.ndarray,
     row = 0
 
     if isinstance(org_basis_state, (int, np.integer)):
-        temp               = int(org_basis_state)
-        while temp:                                           # iterate set bits
-            lsb            = temp & -temp                     # lowest set bit
-            site           = lsb.bit_length() - 1
+        temp = int(org_basis_state)
+        for i in range(ns):
+            if not (temp >> i) & 1:
+                continue
+            site = i
             for col in range(n_part):
                 M[row, col] = sp_eigvecs[site, occupied_orbitals[col]]
-            row           += 1
-            temp          ^= lsb                              # clear that bit
+            row += 1
+            if row == n_part:
+                break
     else:                                                     # array / 0-1
         for site in range(ns):
             if not (org_basis_state[site] > 0):
@@ -206,7 +212,11 @@ def calculate_slater_det(sp_eigvecs         : np.ndarray,
             row           += 1
             if row == n_part:                                 # filled
                 break
-
+    
+    #! eiggen
+    eigvals = np.linalg.eigvals(M)
+    return np.prod(eigvals)
+    
     #! determinant
     sign, logdet = np.linalg.slogdet(M)
     return 0.0 if sign == 0 else sign * np.exp(logdet)
@@ -632,7 +642,7 @@ def many_body_state_mapping(matrix_arg          : Array,
 #! Full Hilbert–space version (loops over all integers)
 # ###########################################################################
 
-@njit(cache=True, parallel=True)
+# @njit(cache=True, parallel=True)
 def _fill_full_space(matrix_arg : Array,
                     calculator  : Callable[[Array, int, int], complex],
                     ns          : int,
@@ -650,8 +660,10 @@ def _fill_full_space(matrix_arg : Array,
         None: The function modifies the `result` array in place.
     """
     nh = result.size
+    # for st in range(nh):
     for st in prange(nh):
-        result[st] = calculator(matrix_arg, st, ns)
+        val         = calculator(matrix_arg, st, ns)
+        result[st]  = val
 
 def many_body_state_full(matrix_arg : Array,
                         calculator  : Callable[[Array, int, int], complex],
