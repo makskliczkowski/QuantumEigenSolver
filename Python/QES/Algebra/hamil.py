@@ -359,6 +359,13 @@ class Hamiltonian(ABC):
         return self._dtype
     
     @property
+    def dtypeint(self):
+        '''
+        Returns the data type of the Hamiltonian matrix.
+        '''
+        return self._dtypeint
+    
+    @property
     def inttype(self):
         ''' Integer types for the model '''
         return self._dtypeint

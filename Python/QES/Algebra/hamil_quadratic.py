@@ -14,6 +14,8 @@ from abc import ABC
 from functools import partial
 from scipy.special import comb
 from itertools import combinations
+from collections import defaultdict
+from scipy.stats import unitary_group
 
 ##############################################################################
 
@@ -43,6 +45,7 @@ from Algebra.Hilbert.hilbert_jit_states import (
     calculate_permanent,
     many_body_state_full,
     many_body_state_mapping,
+    many_body_state_closure,
     nrg_particle_conserving,
     nrg_bdg,
     
@@ -63,6 +66,8 @@ else:
     calculate_slater_det_jax    = None
     calculate_bcs_amp_jax       = None
     calculate_permament_jax     = None
+
+from general_python.common.binary import int2base, base2int, extract as Extractor
 
 ##############################################################################
 
@@ -127,7 +132,7 @@ class QuadraticSelection:
         else:
             return n, combinations(n, k)
 
-    def ran_orbitals(n, k):
+    def ran_orbitals(n, k, rng=None):
         """
         Generate a set of orbital indices and randomly select a subset.
 
@@ -155,8 +160,63 @@ class QuadraticSelection:
             arange = np.arange(0, n, dtype=np.int64)
         else:
             arange = np.array(n, dtype=np.int64)
-        selected = np.random.choice(arange, k, replace=False)
+        selected = rng.choice(arange, k, replace=False) if rng else np.random.choice(arange, k, replace=False)
         return arange, selected
+
+    def mask_orbitals(ns        : int, 
+                    n_occupation: Union[int, float] = 0.5,
+                    *,
+                    ordered     : bool = True, 
+                    rng         : Optional[np.random.Generator] = None,
+                    return_b    : bool = False) -> dict:
+        """
+        Generate a mask of occupied orbitals based on the number of orbitals and the occupation fraction.
+        Parameters
+        ----------
+        n : int
+            Total number of orbitals.
+        n_occupation : int or float
+            Number of occupied orbitals or fraction of occupied orbitals.
+            If `n_occupation` is a float, it should be in the range [0, 1].
+        ordered : bool
+            If True, the mask will be ordered (0s followed by 1s).
+            If False, the mask will be randomly shuffled.
+        rng : numpy.random.Generator or None
+            Random number generator for shuffling the mask.
+            If None, uses the default random generator.
+        Returns
+            dict
+                Dictionary with keys 'mask_a' (occupied orbitals in subsystem a)
+                and 'mask_b' (occupied orbitals in subsystem b - if applicable).
+        """
+        if n_occupation < 0:
+            raise ValueError("`n_occupation` must be non-negative.")
+        elif n_occupation > ns:
+            raise ValueError("`n_occupation` must be less than or equal to `ns`.")
+        elif 0 < n_occupation < 1:
+            n_occupation = int(n_occupation * ns)
+            ordered                 = True
+
+        out_dict = {}
+        if ordered:
+            mask_a  = np.arange(n_occupation)
+        else:    
+            mask_a  = np.sort(rng.choice(np.arange(ns), n_occupation, replace=False))
+            
+        out_dict['mask_a']      = mask_a
+        out_dict['mask_a_1h']   = Extractor.to_one_hot(mask_a, ns)
+        out_dict['mask_a_int']  = base2int(out_dict['mask_a_1h'], spin=False, spin_value=1)
+        if return_b:
+            mask_b                  = np.setdiff1d(np.arange(ns), mask_a)
+            out_dict['mask_b']      = mask_b
+            out_dict['mask_b_1h']   = Extractor.to_one_hot(mask_b, ns)
+            out_dict['mask_b_int']  = base2int(out_dict['mask_b_1h'], spin=False, spin_value=1)
+            out_dict['order']       = tuple(mask_a) + tuple(mask_b)
+        return out_dict
+        
+    # ------------------------------------------------------------------------
+    #! Haar random coefficients
+    # ------------------------------------------------------------------------
 
     def haar_random_coeff(gamma : int,
                         *,
@@ -212,7 +272,112 @@ class QuadraticSelection:
             z   = z.astype(dtype, copy=False)
             z  /= np.linalg.norm(z)
             return z
+
+    def haar_random_unitary(gamma   : int,
+                            *,
+                            rng     : np.random.Generator | None = None,
+                            dtype   = np.complex128) -> np.ndarray:
+        r"""
+        Generate a Haar-random unitary matrix of shape (gamma, gamma).
+
+        Parameters
+        ----------
+        gamma : int
+            Dimension of the unitary matrix.
+        rng : numpy.random.Generator, optional
+            Random number generator (default: np.random.default_rng()).
+        dtype : np.dtype, default=np.complex128
+            Desired complex dtype.
+
+        Returns
+        -------
+        np.ndarray
+            Haar-distributed unitary matrix of shape (gamma, gamma).
+
+        Notes
+        -----
+        If SciPy ≥ 1.4 is available, uses `scipy.stats.unitary_group.rvs`,
+        which samples unitaries via QR decomposition with Haar measure
+        (Mezzadri 2006). Otherwise, performs the QR-based method manually.
+
+        Reference
+        ---------
+        Mezzadri, F. (2006). How to generate random matrices from the classical groups.
+        Notices of the AMS, 54(5), 592–604.
+
+        Examples
+        --------
+        >>> U = haar_random_unitary(4)
+        >>> np.allclose(U.conj().T @ U, np.eye(4))
+        True
+        """
         
+        if gamma < 1:
+            raise ValueError("`gamma` must be at least 1.")
+
+        rng = np.random.default_rng() if rng is None else rng
+
+        try:
+            return unitary_group.rvs(gamma, random_state=rng).astype(dtype)
+        except Exception:
+            # Fallback: generate complex Ginibre matrix and QR-decompose
+            z      = rng.normal(size=(gamma, gamma)) + 1j * rng.normal(size=(gamma, gamma))
+            z      = z.astype(dtype, copy=False)
+            q, r   = np.linalg.qr(z)
+            # Normalize phases to ensure uniqueness
+            d      = np.diag(r)
+            ph     = d / np.abs(d)
+            q     *= ph[np.newaxis, :]
+            return q
+
+    # ------------------------------------------------------------------------
+    #! Energy concerned
+    # ------------------------------------------------------------------------
+    
+    def bin_energies(sorted_energies, digits: int = 10):
+        """
+        Groups indices of sorted energies by their rounded values.
+        
+        Args:
+            sorted_energies (list[tuple[int, float]]):
+                A list of (index, energy) pairs, sorted by energy.
+            digits (int):
+                Number of decimal digits for rounding - used for 
+                binning the energies to avoid floating point errors.
+        
+        Returns:
+            dict[float, list[int]]:
+                Dictionary mapping rounded energy to list of indices.
+        """
+        binned = defaultdict(list)
+        for idx, energy in sorted_energies:
+            key = round(energy, digits)
+            binned[key].append(idx)
+        return dict(binned)
+    
+    def man_energies(binned_energies, dtype: np.dtype = np.int32):
+        """
+        Calculates the number of elements in each energy manifold from a dictionary of binned energies.
+        Args:
+            binned_energies (dict):
+                A dictionary where keys represent energy bins and values are lists of items in each bin.
+            dtype (np.dtype, optional):
+                The desired data type for the output array of manifold sizes. Defaults to np.int32.
+        Returns:
+            tuple:
+                - energy_manifolds (dict): A dictionary mapping each energy bin to the number of items in that bin.
+                - energy_manifold_values (np.ndarray): An array containing the number of items in each energy bin, in the order of iteration.
+        """
+        
+        energy_manifolds        = {}
+        energy_manifold_values  = []
+        for k, v in binned_energies.items():
+            n                   = len(v)
+            energy_manifolds[k] = n
+            energy_manifold_values.append(n)
+        energy_manifold_values = np.array(energy_manifold_values, dtype=dtype)
+        return energy_manifolds, energy_manifold_values
+    
 ##############################################################################
 
 class QuadraticHamiltonian(Hamiltonian):
@@ -519,6 +684,45 @@ class QuadraticHamiltonian(Hamiltonian):
             # Recalculate energy stats if offset was applied
             self._calculate_av_en()
 
+    def prepare_transformation(self, mask_a_idx: np.ndarray):
+        """
+        Prepares the transformation matrix for a given mask of occupied orbitals.
+
+        Args:
+            mask_a_idx (np.ndarray):
+                The mask of occupied orbitals (1 for occupied, 0 for unoccupied).
+
+        Returns:
+            np.ndarray: The transformation matrix.
+        """
+        # mask_b_idx = np.logical_not(mask_a_idx)
+        # mask_a_sum = np.sum(mask_a_idx)
+        # mask_b_sum = np.sum(mask_b_idx)
+        # mask_2_use = mask_a_idx if mask_a_sum < mask_b_sum else mask_b_idx
+        
+        if self._particle_conserving:
+            # mask_b_idx  =   np.logical_not(mask_a_idx)
+            # mask_a_nonz =   np.nonzero(mask_a_idx)[0]
+            # mask_b_nonz =   np.nonzero(mask_b_idx)[0]
+            # order       =   tuple(mask_a_nonz) + tuple(mask_b_nonz)
+            # print(mask_a_nonz, mask_b_nonz, order)
+            # Wprime      =   self._eig_vec[:, order]
+            # W_A         =   Wprime[:, :mask_a_nonz.shape[0]]
+            # W_A_CT      =   W_A.conj().T
+            # return Wprime, W_A, W_A_CT
+            W       =   self._eig_vec
+            W_A     = W[:, mask_a_idx]
+            W_A_CT  = W_A.conj().T
+            return W, W_A, W_A_CT
+        else:
+            raise NotImplementedError("BdG transformation not implemented yet.")
+            W       = self._eig_vec
+            W_A     = W[:, mask_a_idx]
+            W_B     = W[:, ~mask_a_idx]
+            W_A_CT  = W_A.conj().T
+            W_B_CT  = W_B.conj().T
+            return W, W_A, W_B, W_A_CT, W_B_CT
+        
     ###########################################################################
     #! UNUSED METHODS
     ###########################################################################
@@ -534,7 +738,7 @@ class QuadraticHamiltonian(Hamiltonian):
     #! Many-Body Energy Calculation
     ###########################################################################
     
-    def many_body_energy(self, occupied_orbitals: Union[List[int], np.ndarray]) -> float:
+    def many_body_energy(self, occupied_orbitals: Union[int, List[int], np.ndarray]) -> float:
         """
         Calculates the total energy of a many-body state defined by occupying
         single-particle orbitals (or quasiparticle orbitals for BdG).
@@ -551,7 +755,9 @@ class QuadraticHamiltonian(Hamiltonian):
         
         if self.eig_val is None:
             raise ValueError("Single-particle eigenvalues not calculated. Call diagonalize() first.")
-
+        if isinstance(occupied_orbitals, int):
+            occupied_orbitals = int2base(occupied_orbitals, self._ns, spin=False, spin_value=1, backend=self._backend).astype(self._dtypeint)
+            
         occ = np.asarray(occupied_orbitals, dtype=self._dtypeint)
         if occ.shape[0] == 0:
             return 0.0
@@ -591,6 +797,71 @@ class QuadraticHamiltonian(Hamiltonian):
                 e = nrg_bdg(self._eig_val, self._ns, occ)
         return float(e) + self._constant_offset
 
+    def many_body_energies(self, n_occupation: Union[float, int] = 0.5, 
+                    nh: Optional[int] = None, use_combinations: bool = False) -> dict[int, float]:
+        '''
+        Returns a dictionary of many-body energies for all possible
+        configurations of occupied orbitals.
+        
+        The keys are integers representing the configuration of occupied orbitals,
+        and the values are the corresponding many-body energies.
+        The function iterates over all possible configurations of occupied orbitals
+        and calculates the many-body energy for each configuration.
+        
+        Parameters
+        ----------
+        n_occupation : float or int
+            The number of occupied orbitals. If a float, it is interpreted as a fraction
+            of the total number of sites (ns). If an int, it is the exact number of
+            occupied orbitals.
+        nh : int, optional
+            The number of configurations to consider. If None, it defaults to 2^ns.    
+        use_combinations : bool
+            If True, use combinations to generate occupied orbitals.
+            If False, use a loop over all possible configurations.
+            This is useful for large systems where the number of configurations
+            is too large to handle with combinations.
+        Returns
+        -------
+        dict[int, float]
+            A dictionary where the keys are integers representing the configuration
+            of occupied orbitals and the values are the corresponding many-body energies.
+        Notes
+        -----
+        - The function uses the `int2base` function to convert integers to binary
+        representations of occupied orbitals.
+        - The function uses the `many_body_energy` method to calculate the energy         
+        '''
+        
+        if 0 < n_occupation < 1:
+            n_occupation = int(self._ns * n_occupation)
+        elif n_occupation > self._ns:
+            raise ValueError("n_occupation must be less than or equal to the number of sites.")
+        elif n_occupation < 0:
+            raise ValueError("n_occupation must be greater than or equal to 0.")
+        
+        if nh is None:
+            nh = 2**self._ns
+        
+        # what is faster?
+        many_body_energies = {}
+        #! 1. Loop over all possible configurations of occupied orbitals
+        if not use_combinations:
+            for i in range(nh):
+                occupied_orbitals       = int2base(i, self._ns, spin=False, spin_value=1).astype(self._dtypeint)
+                occupied_orbitals       = np.nonzero(occupied_orbitals)[0]
+                if len(occupied_orbitals) != n_occupation:
+                    continue
+                many_body_energies[i]   = self.many_body_energy(occupied_orbitals)
+            return many_body_energies
+        #! 2. Use combinations
+        else:
+            all_combinations        = QuadraticSelection.all_orbitals(self._ns, n_occupation)
+            for i, occupied_orbitals in enumerate(all_combinations[1]):
+                occupied_orbitals       = np.array(occupied_orbitals, dtype=self._dtypeint)
+                many_body_energies[i]   = self.many_body_energy(occupied_orbitals)        
+            return many_body_energies
+
     ###########################################################################
     #! Many-Body State Calculation
     ###########################################################################
@@ -621,7 +892,9 @@ class QuadraticHamiltonian(Hamiltonian):
                 occ = self._occupied_orbitals_cached
 
                 if self._is_numpy:
-                    calc = lambda U, st, _ns: calculate_slater_det(U, occ, st, _ns)
+                    calc = many_body_state_closure (
+                            calculator_func = calculate_slater_det,
+                            matrix_arg      = occ)
                 else:
                     calc = lambda U, st, _ns: calculate_slater_det_jax(U, occ, st, _ns)
                 return calc, self._eig_vec
@@ -632,7 +905,7 @@ class QuadraticHamiltonian(Hamiltonian):
                         if self._U is None or self._V is None:
                             self._U, self._V, _ = bogolubov_decompose(self._eig_val, self._eig_vec)
                         self._F = pairing_matrix(self._U, self._V)
-                    calc                    = lambda F, st, _ns: calculate_bogoliubov_amp(F, st, _ns)
+                    calc = lambda F, st, _ns: calculate_bogoliubov_amp(F, st, _ns)
                 else:
                     raise NotImplementedError("JAX Bogoliubov vacuum calculation not implemented.")
                     # calc = lambda F, st, _ns: calculate_bogoliubov_amp_jax(F, st, _ns)
@@ -692,10 +965,14 @@ class QuadraticHamiltonian(Hamiltonian):
             raise NotImplementedError("Only the site/bitstring basis "
                                     "is implemented for now.")
 
-        #! cache α_k for later reuse (Slater path)
-        if occupied_orbitals is not None:
-            self._occupied_orbitals_cached = np.ascontiguousarray(occupied_orbitals,dtype=self._dtypeint)
-
+        # If new occupied_orbitals are provided, or the cached state is missing (e.g., after cache invalidation)
+        if occupied_orbitals is not None or self._occupied_orbitals_cached is None:
+            if isinstance(occupied_orbitals, (list, np.integer)):
+                # transform to array
+                self._occupied_orbitals_cached = int2base(occupied_orbitals, self._ns, spin=False, backend=self._backend).astype(self._dtypeint)
+            else:
+                self._occupied_orbitals_cached = np.ascontiguousarray(occupied_orbitals, dtype=self._dtypeint)
+        
         #! obtain (calculator, matrix_arg)
         calculator, matrix_arg = self._many_body_state_calculator()
 
@@ -715,3 +992,5 @@ class QuadraticHamiltonian(Hamiltonian):
         return None # should not be reached
 
     ##########################################################################
+    
+##############################################################################

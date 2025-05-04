@@ -15,6 +15,7 @@ from typing import Union, Optional, Callable, Tuple
 import Algebra.Hilbert.hilbert_jit_states_jax as jnp
 from general_python.algebra.utilities import pfaffian as pfaffian
 from general_python.algebra.utilities import hafnian as hafnian
+from general_python.common.binary import int2binstr, check_int_l
 
 # Signature: pfaff(A, n)    (antisymmetric, even n)
 PfFunc              = Callable[[Array, int], Union[float, complex]]
@@ -24,7 +25,7 @@ HfFunc              = Callable[[Array], Union[float, complex]]
 CallableCoefficient = Callable[[Array, Array, Union[int, Array], int], Union[float, complex]]
 
 _TOLERANCE          = 1e-10
-
+_USE_EIGEN          = True
 ####################################################################################################
 #! NUMBA METHODS
 ####################################################################################################
@@ -91,11 +92,65 @@ def _extract_occupied(ns    : int,
 #! Slater determinants
 #############################################################################
 
-@njit(cache=True)
+@njit(cache=True, inline='always')
+def _slater_from_mask(U, occ, mask, ns, use_eigen=_USE_EIGEN):
+    n_fock  = _popcount(mask)
+    N       = occ.shape[0]
+    
+    if n_fock != N:
+        return 0.0
+    # print(f"{mask}/{2**ns} : ", int2binstr(mask, ns))
+    M       = np.empty((N, N), dtype=U.dtype)
+    row     = 0
+    for site in range(ns):
+        if not check_int_l(mask, site, ns):
+            continue
+        for col in range(N):
+            M[row, col] = U[occ[col], site]
+        row += 1
+        # if row == N:
+        #     break
+    #! eiggen
+    if use_eigen:
+        eigvals = np.linalg.eigvals(M)
+        return np.prod(eigvals)
+    #! determinant
+    sign, logdet = np.linalg.slogdet(M)
+    return 0.0 if sign == 0 else sign * np.exp(logdet)
+
+@njit(cache=True, inline='always')
+def _slater_from_vec(U, occ, vec, ns, use_eigen=_USE_EIGEN):
+    n_fock  = vec.sum()
+    N       = occ.shape[0]
+    
+    if n_fock != N:
+        return 0.0
+    
+    M       = np.empty((N, N), dtype=U.dtype)
+    row     = 0
+    for site in range(ns):
+        if vec[site] == 0:
+            continue
+        for col in range(N):
+            M[row, col] = U[occ[col], site]
+        row += 1
+        if row == N:
+            break
+        
+    #! eiggen
+    if use_eigen:
+        eigvals = np.linalg.eigvals(M)
+        return np.prod(eigvals)
+    #! determinant
+    sign, logdet = np.linalg.slogdet(M)
+    return 0.0 if sign == 0 else sign * np.exp(logdet)
+
+@njit(cache=True, inline='always')
 def calculate_slater_det(sp_eigvecs         : np.ndarray,
                         occupied_orbitals   : np.ndarray,
                         org_basis_state     : Union[int, np.ndarray],
-                        ns                  : int):
+                        ns                  : int,
+                        use_eigen           : bool = False):
     r"""
     Compute the amplitude of an $N$-fermion Slater determinant that
     connects a Fock basis state expressed in *site* operators with a
@@ -167,59 +222,11 @@ def calculate_slater_det(sp_eigvecs         : np.ndarray,
         returns ``1.0`` for the vacuum state.
     """
 
-    # ------------------------------------------------------------------
-    # Sites occupied in the original Fock state
-    # ------------------------------------------------------------------
-    n_part = occupied_orbitals.shape[0]
     if isinstance(org_basis_state, (int, np.integer)):
-        temp    = int(org_basis_state)
-        n_fock  = _popcount(temp)
-    else:
-        n_fock  = int(np.sum(org_basis_state))
-
-    # ------------------------------------------------------------------
-    if n_fock != n_part:
-        return 0.0
-    if n_part == 0:
-        return 1.0
-
-    # ------------------------------------------------------------------
-    #! Construct the Matrix M
-    #! M_{jk} = U_{x_j \alpha_k}
-    #! where x_j is the j-th occupied site in the original Fock state
-    #! and \alpha_k is the k-th occupied orbital in the product state
-    # ------------------------------------------------------------------
-    M   = np.empty((n_part, n_part), dtype=sp_eigvecs.dtype)
-    row = 0
-
-    if isinstance(org_basis_state, (int, np.integer)):
-        temp = int(org_basis_state)
-        for i in range(ns):
-            if not (temp >> i) & 1:
-                continue
-            site = i
-            for col in range(n_part):
-                M[row, col] = sp_eigvecs[site, occupied_orbitals[col]]
-            row += 1
-            if row == n_part:
-                break
-    else:                                                     # array / 0-1
-        for site in range(ns):
-            if not (org_basis_state[site] > 0):
-                continue
-            for col in range(n_part):
-                M[row, col] = sp_eigvecs[site, occupied_orbitals[col]]
-            row           += 1
-            if row == n_part:                                 # filled
-                break
-    
-    #! eiggen
-    eigvals = np.linalg.eigvals(M)
-    return np.prod(eigvals)
-    
-    #! determinant
-    sign, logdet = np.linalg.slogdet(M)
-    return 0.0 if sign == 0 else sign * np.exp(logdet)
+        return _slater_from_mask(sp_eigvecs, occupied_orbitals, org_basis_state, ns, use_eigen)
+    elif isinstance(org_basis_state, np.ndarray):
+        return _slater_from_vec(sp_eigvecs, occupied_orbitals, org_basis_state, ns, use_eigen)
+    return 0.0
 
 #############################################################################
 #! Bogolubov - de'Gennes - no particle number conservation
@@ -567,7 +574,7 @@ def calculate_permanent(sp_eigvecs          : np.ndarray,   # U matrix (Ns x Nor
 #! Many body state through summation
 #############################################################################
 
-@njit(cache=True, parallel=True)
+# @njit(cache=True, parallel=True)
 def _fill_batched_space(   matrix_arg               : np.ndarray,            
                             calculator_func         : CallableCoefficient,   
                             target_basis_states     : Array,
@@ -642,7 +649,7 @@ def many_body_state_mapping(matrix_arg          : Array,
 #! Full Hilbert–space version (loops over all integers)
 # ###########################################################################
 
-# @njit(cache=True, parallel=True)
+# @njit(cache=True, fastmath=True)
 def _fill_full_space(matrix_arg : Array,
                     calculator  : Callable[[Array, int, int], complex],
                     ns          : int,
@@ -660,16 +667,15 @@ def _fill_full_space(matrix_arg : Array,
         None: The function modifies the `result` array in place.
     """
     nh = result.size
-    # for st in range(nh):
-    for st in prange(nh):
-        val         = calculator(matrix_arg, st, ns)
-        result[st]  = val
+    for st in range(nh):
+        st          = np.int64(st)
+        result[st]  = calculator(matrix_arg, st, ns)
 
-def many_body_state_full(matrix_arg : Array,
-                        calculator  : Callable[[Array, int, int], complex],
-                        ns          : int,
-                        resulting_s : Optional[Array] = None,
-                        dtype       = np.complex128) -> Array:
+def many_body_state_full(matrix_arg     : Array,
+                        calculator      : Callable[[Array, int, int], complex],
+                        ns              : int,
+                        resulting_s     : Optional[Array] = None,
+                        dtype           = np.complex128) -> Array:
     """
     Generates the full many-body quantum state vector for a system with `ns` sites.
 
@@ -680,6 +686,11 @@ def many_body_state_full(matrix_arg : Array,
     calculator : Callable[[Array, int, int], complex]
         A function that computes the amplitude for a given basis state, taking the matrix_arg,
         the basis index, and the number of sites as arguments.
+    resulting_s : Optional[Array], default=None
+        If provided, this array will be filled with the resulting state vector.
+        If None, a new array will be created.
+        The size of the resulting_s array must match the expected size (2**ns).
+        If the size does not match, a ValueError will be raised.
     ns : int
         Number of sites (qubits, spins, etc.) in the system.
     dtype : data-type, optional
@@ -695,12 +706,40 @@ def many_body_state_full(matrix_arg : Array,
     if resulting_s is not None:
         if resulting_s.size != nh:
             raise ValueError(f"resulting_s must be of size {nh}, but got {resulting_s.size}")
-        out         = resulting_s.astype(dtype)
+        out         = resulting_s.astype(dtype, copy=False)
     else:
-        # pre-allocate the output array
         out         = np.empty(nh, dtype=dtype)
+    
     _fill_full_space(matrix_arg, calculator, ns, out)
     return out
+
+def many_body_state_closure(calculator_func: Callable[[Array, int, int], Union[float, complex]],
+                            matrix_arg: Optional[Array] = None) -> Callable[[int], Union[float, complex]]:
+    """
+    Creates a closure function that computes the amplitude for a given basis state.
+
+    Args:
+        matrix_arg (Array):
+            Input array or matrix to be used by the calculator function.
+        calculator_func (Callable[[Array, int, int], Union[float, complex]]):
+            Function that computes the value for each state, given `matrix_arg`, the state index, and `ns`.
+    Returns:
+        Callable[[int], Union[float, complex]]:
+            A function that takes a single integer argument (the state index) and returns the computed amplitude.
+    """
+    
+    if matrix_arg is not None:
+        const = matrix_arg
+        # @njit(inline='always')
+        def closure(U: Array, state: int, ns: int):
+            return calculator_func(U, const, state, ns)
+        return closure
+
+    # no extra constant
+    @njit(inline='always', cache=True)
+    def closure(U: Array, state: int, ns: int):
+        return calculator_func(U, state, ns)
+    return closure
 
 ############################################################################
 

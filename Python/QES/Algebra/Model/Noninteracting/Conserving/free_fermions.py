@@ -208,3 +208,5 @@ class FreeFermions(QuadraticHamiltonian):
     
     def __str__(self):
         return f"FreeFermions: {self._ns} sites, t={self._t[0]}, constant_offset={self._constant_offset}"
+    
+# ---------------------------------------------------------------------
