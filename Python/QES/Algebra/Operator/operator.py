@@ -39,6 +39,10 @@ if JAX_AVAILABLE:
     import jax.numpy as jnp
     from jax import jit, vmap
     from jax.experimental import sparse
+else:
+    jax = None
+    jnp = None
+    
 
 ####################################################################################################
 
@@ -96,6 +100,7 @@ class GlobalSymmetries(Enum):
 
 ####################################################################################################
 #! Distinguish type of function
+####################################################################################################
 
 def op_func_wrapper(op_func: Callable, *args: Any) -> Callable:
     """
@@ -116,6 +121,133 @@ def op_func_wrapper(op_func: Callable, *args: Any) -> Callable:
     else:
         # Otherwise, return a new function that calls op_func with the fixed extra arguments.
         return lambda k: op_func(k, *args)
+
+####################################################################################################
+#! Constants
+####################################################################################################
+
+_SCALARS = (int, float, complex,
+            np.integer, np.floating, np.complexfloating)
+if JAX_AVAILABLE:
+    _SCALARS += (jnp.integer, jnp.floating, jnp.complexfloating)
+
+####################################################################################################
+#! OperatorFunction
+####################################################################################################
+
+def _make_mul_int_njit(f_int, g_int, self_modifies):
+    """
+    Factory: returns an `@numba.njit`‑compiled (f∘g)_int kernel.
+    Falls back to a pure‑Python loop if compilation fails.
+    """
+    try:
+        @numba.njit(cache=True)
+        def mul_int(state, *args):
+            g_state, g_coeff = g_int(state, *args)
+            g_state, g_coeff = OperatorFunction._normalize_result_np(g_state, g_coeff)
+
+            n = g_state.shape[0]
+            res_states = np.empty_like(g_state)
+            res_values = np.empty(n, dtype=np.complex128)
+
+            for k in range(n):
+                f_state, f_coeff = f_int(g_state[k], *args)
+                f_state, f_coeff = OperatorFunction._normalize_result_np(
+                    f_state, f_coeff
+                )
+                if self_modifies:
+                    res_states[k] = g_state[k]
+                    res_values[k] = g_coeff[k] * f_coeff[0]
+                else:
+                    res_states[k] = f_state[0]
+                    res_values[k] = g_coeff[k] * f_coeff[0]
+
+            return res_states, res_values
+
+        # make sure compilation really succeeded (forces type inference)
+        mul_int.compile("int64(int64)")
+        return mul_int
+
+    except numba.TypingError:
+        print("Numba compilation failed. Falling back to Python.")
+        def mul_int(state, *args):
+            return state, np.array(1.0)
+        return mul_int
+
+def _make_mul_np_njit(f_np, g_np, self_modifies):
+    """
+    Same idea as `_make_mul_int_njit`, but for NumPy‑array wave‑functions.
+    Returns an `njit` kernel, otherwise a python fallback.
+    """
+    try:
+        @numba.njit(cache=True)
+        def mul_np(state, *args):
+            g_state, g_coeff = g_np(state, *args)
+            g_state, g_coeff = OperatorFunction._normalize_result_np(g_state, g_coeff)
+
+            n = g_state.shape[0]
+            res_states = np.empty_like(g_state)
+            res_values = np.empty(n, dtype=np.complex128)
+
+            for k in range(n):
+                f_state, f_coeff = f_np(g_state[k], *args)
+                f_state, f_coeff = OperatorFunction._normalize_result_np(
+                    f_state, f_coeff
+                )
+
+                if self_modifies:
+                    res_states[k] = g_state[k]
+                    res_values[k] = g_coeff[k] * f_coeff[0]
+                else:
+                    res_states[k] = f_state[0]
+                    res_values[k] = g_coeff[k] * f_coeff[0]
+
+            return res_states, res_values
+        # force compilation for common signature
+        return mul_np
+    except numba.TypingError:
+        print("Numba compilation failed. Falling back to Python.")
+        def mul_np(state, *args):
+            return state, np.array(1.0)
+        return mul_np
+
+def _make_mul_jax(f_jax, g_jax, self_modifies):
+    if JAX_AVAILABLE:
+        try:
+            @jax.jit
+            def mul_jax(s, *args):
+                s_g, v_g = g_jax(s, *args)
+                s_g, v_g = OperatorFunction._normalize_result_jax(s_g, v_g)
+
+                def body(carry, inp):
+                    sg, vg = inp
+                    s_self, v_self = f_jax(sg, *args)
+                    s_self, v_self = OperatorFunction._normalize_result_jax(s_self, v_self)
+
+                    if self_modifies:
+                        ss  = sg
+                        val = vg * v_self[0]
+                        return (carry[0].append(ss), carry[1].append(val)), None
+                    else:
+                        # take only the first branch of s_self/v_self for simplicity;
+                        # extend here if you need full superpositions.
+                        ss  = s_self[0]
+                        val = vg * v_self[0]
+                        return (carry[0].append(ss), carry[1].append(val)), None
+
+                init = ([], [])
+                (states, vals), _ = jax.lax.scan(body, init, (s_g, v_g))
+                return jnp.asarray(states), jnp.asarray(vals)
+            
+        except jax.errors.JAXTypeError:
+            print("JAX compilation failed. Falling back to Python.")
+            def mul_jax(state, *args):
+                return state, np.array(1.0)
+    else:
+        print("JAX not available. Falling back to Python.")
+        def mul_jax(*_args, **_kwargs):
+            raise RuntimeError("JAX not available in this environment")
+    return mul_jax
 
 ####################################################################################################
 
@@ -194,7 +326,9 @@ class OperatorFunction:
         self._fun_jax           = fun_jax
         self._modifies_state    = modifies_state            # flag for the operator that modifies the state
         self._necessary_args    = int(necessary_args)       # number of necessary arguments for the operator function
-
+        self._acting_type       = OperatorTypeActing.Global if self._necessary_args == 0 else \
+                                OperatorTypeActing.Local if self._necessary_args == 1 else \
+                                OperatorTypeActing.Correlation if self._necessary_args == 2 else OperatorTypeActing.Global
     # -----------
     
     def _apply_global(self, s: Union[int, np.ndarray]) -> List[Tuple[Optional[Union[int]], Union[float, complex]]]:
@@ -396,6 +530,8 @@ class OperatorFunction:
         values = jnp.atleast_1d(values)
         return states, values
     
+    # ----------
+
     def _pack_result(self, norm_result):
         """
         Pack a normalized list of (state, value) pairs into a tuple of two NumPy arrays.
@@ -456,88 +592,37 @@ class OperatorFunction:
     # Composition: f * g  (i.e. (f * g)(s) = f(g(s)) )
     # =========================================================================
     
-    def __mul__(self, other: Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
+    def __mul__(self, 
+                other: Union[float, 'OperatorFunction']) -> 'OperatorFunction':
 
-        if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
+        #! path for scalar multiplication
+        if isinstance(other, _SCALARS):
             return self._multiply_const(other)
-            
+        
         if not isinstance(other, OperatorFunction):
-            raise TypeError(f"Unsupported multiplication with type {type(other)}")
+            return NotImplemented
         
-        other_modifies  = other.modifies_state
-        new_args        = max(self._necessary_args, other._necessary_args)
+        #! acting consistency check
+        if self._acting_type != other._acting_type:
+            raise ValueError(
+                f"Operator acting type mismatch: {self._acting_type} vs {other._acting_type}"
+            )
+        new_args = max(self._necessary_args, other._necessary_args)
+        modifies = self._modifies_state or other._modifies_state        
         
+        #! Check if the operator modifies the state
+        
+        #--------
         # Compose as: (f * g)(s) = f(g(s))
-        #! Integer version
-        def mul_int(s, *args):
-            # Get intermediate result from operator 'other'
-            s_g, v_g    = other.fun(s, *args)
-            s_g, v_g    = OperatorFunction._normalize_result_np(s_g, v_g)
-            n           = s_g.shape[0]
+        #--------
+        
+        return OperatorFunction(_make_mul_int_njit(self._fun_int, other._fun_int, modifies),
+                                _make_mul_np_njit(self._fun_np, other._fun_np, modifies),
+                                _make_mul_jax(self._fun_jax, other._fun_jax, modifies),
+                                modifies_state=modifies,
+                                necessary_args=new_args,
+                                acting_type=self._acting_type)
             
-            # Preallocate result arrays
-            res_states  = np.empty((n, s_g.shape[1]), dtype=s.dtype)
-            res_values  = np.empty(n, dtype=np.complex128)
-            
-            # Loop over each intermediate state.
-            for i in range(n):
-                # Apply self to each intermediate state.
-                s_self, v_self = self._fun_int(s_g[i], *args)
-                s_self, v_self = OperatorFunction._normalize_result_np(s_self, v_self)
-                if self._modifies_state:
-                    # Expect a single pair from self.
-                    res_states[i, :] = s_g[i]   # keep state from g(s)
-                    res_values[i] = v_g[i] * v_self[0]
-                else:
-                    # If self does not modify state, assume multiple pairs;
-                    # here we simply take the first pair for simplicity.
-                    res_states[i, :]    = s_self[0]
-                    res_values[i]       = v_g[i] * v_self[0]
-            return res_states, res_values
-
-        # --- NumPy version ---
-        def mul_np(s, *args):
-            s_g, v_g = other._fun_np(s, *args)
-            s_g, v_g = OperatorFunction._normalize_result_np(s_g, v_g)
-            n = s_g.shape[0]
-            res_states = []
-            res_values = []
-            for i in range(n):
-                s_self, v_self = self._fun_np(s_g[i], *args)
-                s_self, v_self = OperatorFunction._normalize_result_np(s_self, v_self)
-                if self._modifies_state:
-                    res_states.append(s_g[i])
-                    res_values.append(v_g[i] * v_self[0])
-                else:
-                    for j in range(s_self.shape[0]):
-                        res_states.append(s_self[j])
-                        res_values.append(v_g[i] * v_self[j])
-            return np.array(res_states), np.array(res_values)
-
-        # --- JAX version ---
-        def mul_jax(s, *args):
-            s_g, v_g    = other._fun_jax(s, *args)
-            s_g, v_g    = OperatorFunction._normalize_result_jax(s_g, v_g)
-            n = s_g.shape[0]
-            # For JAX, we use a Python loop wrapped in jax.lax.map.
-            def body(i):
-                s_self, v_self = self._fun_jax(s_g[i], args)
-                s_self, v_self = OperatorFunction._normalize_result_jax(s_self, v_self)
-                if self._modifies_state:
-                    return s_g[i], v_g[i] * v_self[0]
-                else:
-                    return s_self[0], v_g[i] * v_self[0]
-            result = jax.lax.map(body, jnp.arange(n))
-            # result is a tuple of two arrays; we stack them accordingly.
-            res_states = jnp.stack([x[0] for x in result])
-            res_values = jnp.stack([x[1] for x in result])
-            return res_states, res_values
-        # if JAX_AVAILABLE:
-            # mul_jax = jax.jit(mul_jax)
-
-        return OperatorFunction(mul_int, mul_np, mul_jax,
-                                modifies_state=self._modifies_state or other._modifies_state,
-                                necessary_args=new_args)
     # -----------
     
     def __rmul__(self, other: Union[int, float, complex, np.int64, np.float64, np.complex128, 'OperatorFunction']):
@@ -560,71 +645,29 @@ class OperatorFunction:
         OperatorFunction
             A new operator function representing the reverse composition.
         """
-        if isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
+        #! path for scalar multiplication
+        if isinstance(other, _SCALARS):
             return self._multiply_const(other)
-        
-        # Ensure that other is an OperatorFunction.
         if not isinstance(other, OperatorFunction):
-            raise TypeError("Unsupported reverse multiplication with type {}".format(type(other)))
-        
+            return NotImplemented
+        #! acting consistency check
+        if self._acting_type != other._acting_type:
+            raise ValueError(
+                f"Operator acting type mismatch: {self._acting_type} vs {other.acting_type}"
+            )
         new_args = max(self._necessary_args, other._necessary_args)
-
-        def rmul_int(s, *args):
-            s_self, v_self = self._fun_int(s, *args)
-            s_self, v_self = OperatorFunction._normalize_result_np(s_self, v_self)
-            n = s_self.shape[0]
-            res_states = np.empty((n, s_self.shape[1]), dtype=s.dtype)
-            res_values = np.empty(n, dtype=np.complex128)
-            for i in range(n):
-                s_other, v_other = other._fun_int(s_self[i], *args)
-                s_other, v_other = OperatorFunction._normalize_result_np(s_other, v_other)
-                if other._modifies_state:
-                    res_states[i, :] = s_self[i]
-                    res_values[i] = v_self[i] * v_other[0]
-                else:
-                    res_states[i, :] = s_other[0]
-                    res_values[i] = v_self[i] * v_other[0]
-            return res_states, res_values
-
-        def rmul_np(s, *args):
-            s_self, v_self = self._fun_np(s, *args)
-            s_self, v_self = OperatorFunction._normalize_result_np(s_self, v_self)
-            n = s_self.shape[0]
-            res_states = []
-            res_values = []
-            for i in range(n):
-                s_other, v_other = other._fun_np(s_self[i], *args)
-                s_other, v_other = OperatorFunction._normalize_result_np(s_other, v_other)
-                if other._modifies_state:
-                    res_states.append(s_self[i])
-                    res_values.append(v_self[i] * v_other[0])
-                else:
-                    for j in range(s_other.shape[0]):
-                        res_states.append(s_other[j])
-                        res_values.append(v_self[i] * v_other[j])
-            return np.array(res_states), np.array(res_values)
-
-        def rmul_jax(s, *args):
-            s_self, v_self = self._fun_jax(s, *args)
-            s_self, v_self = OperatorFunction._normalize_result_jax(s_self, v_self)
-            n = s_self.shape[0]
-            def body(i):
-                s_other, v_other = other._fun_jax(s_self[i], *args)
-                s_other, v_other = OperatorFunction._normalize_result_jax(s_other, v_other)
-                if other._modifies_state:
-                    return s_self[i], v_self[i] * v_other[0]
-                else:
-                    return s_other[0], v_self[i] * v_other[0]
-            result = jax.lax.map(body, jnp.arange(n))
-            res_states = jnp.stack([x[0] for x in result])
-            res_values = jnp.stack([x[1] for x in result])
-            return res_states, res_values
-        # if JAX_AVAILABLE:
-            # rmul_jax = jax.jit(rmul_jax)
-
+        modifies = self._modifies_state or other._modifies_state
+        #! Check if the operator modifies the state
+        #--------
+        # Compose as: (f * g)(s) = f(g(s))
+        #--------
+        rmul_int = _make_mul_int_njit(self._fun_int, other._fun_int, modifies)
+        rmul_np  = _make_mul_np_njit(self._fun_np, other._fun_np, modifies)
+        rmul_jax = _make_mul_jax(self._fun_jax, other._fun_jax, modifies)
         return OperatorFunction(rmul_int, rmul_np, rmul_jax,
                                 modifies_state=self._modifies_state or other._modifies_state,
                                 necessary_args=new_args)
+    
     # -----------
     
     def __getitem__(self, other):
@@ -700,7 +743,7 @@ class OperatorFunction:
             necessary_args=max(self._necessary_args, other._necessary_args)
         )
 
-        
+    
     # -----------
     #! Subtraction
     # -----------
@@ -792,7 +835,7 @@ class OperatorFunction:
                                 necessary_args=self._necessary_args)
     
     # -----------
-    
+
 ####################################################################################################
 
 @unique
@@ -1584,7 +1627,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
     else:
         assert ns is not None, "Either lattice or ns must be provided."
     
-    sites_jnp = jnp.array(sites, dtype = jnp.int32) if sites is not None and JAX_AVAILABLE else sites
+    sites_jnp = jnp.array(sites, dtype = jnp.int64) if sites is not None and JAX_AVAILABLE else sites
     
     # Global operator: the operator acts on a specified set of sites (or all if sites is None)
     if type_act == OperatorTypeActing.Global or sites is not None:
@@ -1593,9 +1636,9 @@ def create_operator(type_act        : int | OperatorTypeActing,
         if sites is None or len(sites) == 0:
             sites = list(range(ns))
         sites           = tuple(sites) if isinstance(sites, list) else sites
-        sites_np        = np.array(sites, dtype = np.int32)
+        sites_np        = np.array(sites, dtype = np.int64)
         if JAX_AVAILABLE:
-            sites_jnp   = jnp.array(sites, dtype = jnp.int32)
+            sites_jnp   = jnp.array(sites, dtype = jnp.int64)
         else:
             sites_jnp   = sites_np
         
@@ -1630,18 +1673,20 @@ def create_operator(type_act        : int | OperatorTypeActing,
     # Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
     elif type_act == OperatorTypeActing.Local:
         
-        # @numba.njit
+        @numba.njit(inline="always")
         def fun_int(state, i):
-            return op_func_int(state, ns, [i], *extra_args)
+            sites_1 = np.array([i], dtype=np.int32)
+            return op_func_int(state, ns, sites_1, *extra_args)
         
-        @numba.njit
+        @numba.njit(inline="always")
         def fun_np(state, i):
-            return op_func_np(state, i, *extra_args)
+            sites_1 = np.array([i], dtype=np.int32)
+            return op_func_np(state, sites_1, *extra_args)
         
         if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state, i):
-                sites_jnp = jnp.array([i], dtype = jnp.int32)
+                sites_jnp = jnp.array([i], dtype = jnp.int64)
                 return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i):
@@ -1660,18 +1705,20 @@ def create_operator(type_act        : int | OperatorTypeActing,
     # Correlation operator: the operator acts on a pair of sites.
     elif type_act == OperatorTypeActing.Correlation:
         
-        # @numba.njit
+        @numba.njit
         def fun_int(state, i, j):
-            return op_func_int(state, ns, [i, j], *extra_args)
+            sites_2 = np.array([i, j], dtype=np.int32)
+            return op_func_int(state, ns, sites_2, *extra_args)
         
         @numba.njit
         def fun_np(state, i, j):
-            return op_func_np(state, (i, j), *extra_args)
+            sites_2 = np.array([i, j], dtype=np.int32)
+            return op_func_np(state, sites_2, *extra_args)
         
         if JAX_AVAILABLE:
             @partial(jax.jit)
             def fun_jnp(state, i, j):
-                sites_jnp = jnp.array([i, j], dtype = jnp.int32)
+                sites_jnp = jnp.array([i, j], dtype = jnp.int64)
                 return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i, j):

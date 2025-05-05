@@ -132,24 +132,34 @@ from general_python.common.binary import BACKEND_REPR as _SPIN, BACKEND_DEF_SPIN
 import general_python.common.binary as _binary
 
 if JAX_AVAILABLE:
-    from Algebra.Operator.operators_spinless_fermions_jax import c_dag_jnp, c_jnp, c_k_jnp, c_k_dag_jnp
-
+    from Algebra.Operator.operators_spinless_fermions_jax import c_dag_jnp, c_jnp, c_k_jnp, c_k_dag_jnp, n_jax, n_int_jax
+else:
+    c_dag_jnp = c_jnp = c_k_jnp = c_k_dag_jnp = n_jax = n_jax_int = None
 
 _DEFAULT_INT    = DEFAULT_NP_INT_TYPE
 _DEFAULT_FLOAT  = DEFAULT_NP_FLOAT_TYPE
-_SPIN           = 1.0
 _bit            = _binary.check_int
 _flip           = _binary.flip_int
 
 @numba.njit(inline="always")
-def _popcount_mask(x: int, mask_bits: int) -> int:
-    """Return number of 1-bits in x & mask_bits."""
-    return numba.cgutils.int_popcount(x & mask_bits) # LLVM popcnt
+def _popcount_mask(x, mask_bits):
+    """
+    Return the Hamming weight of `x & mask_bits`.
+    """
+    v     = x & mask_bits
+    count = 0
+
+    # Kernighan trick: clear the least‑significant set bit each iteration
+    while v:
+        v &= v - 1
+        count += 1
+
+    return count
 
 ###############################################################################
 #! Jordan-Wigner sign  (-1)^{#occupied to the *left* of site}
 #   * we use the convention that the creation operators are ordered from right to left
-#   * $i_1 < i_2 < \ldots < i_n$ and $c_{i_m}^\dagger \cdots c_{i_1}^\dagger |0\rangle$
+#   * $i_1 < i_2 < \ldots < i_n$ and $c_{i_1}^\dagger \cdots c_{i_m}^\dagger |0\rangle$
 #   * then, to count how many fermions from site k one needs to pass through, we need to count
 #     the number of fermions to the left of $i_1$, $i_2$, and so on until $i_k$.
 #   * we use the reverse order of the sites as oposed to the binary representation
@@ -184,9 +194,9 @@ def f_parity_np(state: np.ndarray, site: int) -> float:
 
 @numba.njit
 def c_dag_int_np(state      : int,
-                 ns         : int,
-                 site       : int,
-                 prefactor  : float = 1.0):
+                ns          : int,
+                sites       : List[int],
+                prefactor   : float = 1.0):
     """
     Applies the creation operator (c†) for spinless fermions on a given site of an integer-represented Fock state.
     Parameters
@@ -195,8 +205,8 @@ def c_dag_int_np(state      : int,
         The integer representation of the Fock state.
     ns : int
         The total number of sites.
-    site : int
-        The site index (0-based, leftmost site is 0).
+    sites : List[int]
+        The list of site indices (0-based, leftmost site is 0).
     prefactor : float, optional
         A prefactor to multiply the resulting coefficient (default is 1.0).
     Returns
@@ -223,27 +233,33 @@ def c_dag_int_np(state      : int,
     """
     
     # position of the site in the integer representation
-    pos   = ns - 1 - site
     
-    # check the bit to see whether even bother to flip
-    if _bit(state, pos):                         # already occupied → annihilation
-        coeff_val = 0.0
-        new_state = state
-    else:
-        sign      = f_parity_int(state, ns, site)
-        new_state = _flip(state, pos)
-        coeff_val = sign * prefactor
+    new_state = state
+    coeff_val = 1.0
 
-    out_state  = np.empty(1, dtype=_DEFAULT_INT)
-    out_coeff  = np.empty(1, dtype=_DEFAULT_FLOAT)
-    out_state[0] = new_state
-    out_coeff[0] = coeff_val
+    for site in sites:
+        pos = ns - 1 - site
+
+        # occupancy check on the *current* state
+        if _bit(new_state, pos):
+            coeff_val = 0.0
+            new_state = state         # revert to input
+            break
+
+        sign        = f_parity_int(new_state, ns, site)
+        new_state   = _flip(new_state, pos)
+        coeff_val  *= sign
+        
+    out_state       = np.empty(1, dtype=_DEFAULT_INT)
+    out_coeff       = np.empty(1, dtype=_DEFAULT_FLOAT)
+    out_state[0]    = new_state
+    out_coeff[0]    = coeff_val
     return out_state, out_coeff
 
 @numba.njit
 def c_int_np(state       : int,
              ns          : int,
-             site        : int,
+             sites       : int,
              prefactor   : float = 1.0):
     """
     Applies the annihilation operator (c) for spinless fermions on a given site of a basis state represented as an integer.
@@ -271,21 +287,25 @@ def c_int_np(state       : int,
     """
 
     # position of the site in the integer representation
-    pos = ns - 1 - site
     
-    # check the bit to see whether even bother to flip
-    if _bit(state, pos) == 0:                    # empty → 0
-        coeff_val = 0.0
-        new_state = state
-    else:
-        sign      = f_parity_int(state, ns, site)
-        new_state = _flip(state, pos)
-        coeff_val = sign * prefactor
-
-    out_state  = np.empty(1, dtype=_DEFAULT_INT)
-    out_coeff  = np.empty(1, dtype=_DEFAULT_FLOAT)
-    out_state[0] = new_state
-    out_coeff[0] = coeff_val
+    new_state = state
+    coeff_val = 1.0
+    for site in sites:
+        pos = ns - 1 - site
+        # occupancy check on the *current* state
+        if _bit(state, pos) == 0:
+            coeff_val = 0.0
+            new_state = state
+            break
+        
+        sign        = f_parity_int(new_state, ns, pos)
+        new_state   = _flip(new_state, pos)
+        coeff_val  *= sign * prefactor
+    
+    out_state       = np.empty(1, dtype=_DEFAULT_INT)
+    out_coeff       = np.empty(1, dtype=_DEFAULT_FLOAT)
+    out_state[0]    = new_state
+    out_coeff[0]    = coeff_val
     return out_state, out_coeff
 
 ###############################################################################
@@ -294,7 +314,7 @@ def c_int_np(state       : int,
 
 @numba.njit
 def c_dag_np(state      : np.ndarray,
-             site       : int,
+             sites      : np.ndarray,
              prefactor  : float = 1.0):
     """
     Applies the fermionic creation operator (c†) at a given site to a spinless fermion state.
@@ -303,8 +323,8 @@ def c_dag_np(state      : np.ndarray,
     ----------
     state : np.ndarray
         The occupation number representation of the fermionic state (1D array of 0s and 1s).
-    site : int
-        The site index at which to apply the creation operator.
+    sites : np.ndarray
+        The site indices at which to apply the creation operator.
     prefactor : float, optional
         A multiplicative prefactor to apply to the resulting amplitude (default is 1.0).
 
@@ -320,15 +340,18 @@ def c_dag_np(state      : np.ndarray,
     -----
     This function modifies the input state in-place. The sign is determined by the fermionic parity up to the given site.
     """
-    if state[site] > 0: # occupied
-        return state, 0.0
-    sign        = f_parity_np(state, site)
-    state[site] = 1
-    return state, sign * prefactor
+    sign = 1.0
+    for site in sites:
+        if state[site] > 0: # already occupied
+            return state, 0.0
+        sign       *= f_parity_np(state, site)
+        state[site] = 1
+    n_sites = sites.shape[0]
+    return state, sign * prefactor**n_sites
 
 @numba.njit
 def c_np(state       : np.ndarray,
-         site        : int,
+         sites       : np.ndarray,
          prefactor   : float = 1.0):
     """
     Applies the annihilation operator (c) to a spinless fermion state at a given site.
@@ -337,8 +360,8 @@ def c_np(state       : np.ndarray,
     ----------
     state : np.ndarray
         The occupation number representation of the fermionic state (1 for occupied, 0 for unoccupied).
-    site : int
-        The site index at which to apply the annihilation operator.
+    sites : int
+        The sites indices at which to apply the annihilation operator.
     prefactor : float, optional
         A multiplicative prefactor to apply to the result (default is 1.0).
 
@@ -355,11 +378,13 @@ def c_np(state       : np.ndarray,
     The function uses the Jordan-Wigner transformation convention, where the sign is determined
     by the parity of occupied sites to the left of the target site.
     """
-    if state[site] == 0:
-        return state, 0.0
-    sign        = f_parity_np(state, site)
-    state[site] = 0
-    return state, sign * prefactor
+    for site in sites:
+        if state[site] == 0:
+            return state, 0.0
+        sign        = f_parity_np(state, site)
+        state[site] = 0
+    n_sites = sites.shape[0]
+    return state, sign * prefactor**n_sites
 
 ###############################################################################
 #!  Momentum-space fermionic operator  c_k and c_k†
@@ -548,30 +573,68 @@ def c_k_dag_np(state       : np.ndarray,
             out_coeff[:index] / np.sqrt(max(index, 1)))
 
 ###############################################################################
+#! Number of fermions
+###############################################################################
+
+@numba.njit
+def n_int_np(state     : int,
+             ns        : int,
+             sites     : List[int],
+             prefactor : float = 1.0):
+
+    coeff_val = 1.0
+    for site in sites:
+        pos = ns - 1 - site
+        if _bit(state, pos) == 0:   # site unoccupied ⇒ result = 0
+            coeff_val = 0.0
+            break
+
+    n_sites        = len(sites)
+    out_state      = np.empty(1, dtype=_DEFAULT_INT)
+    out_coeff      = np.empty(1, dtype=_DEFAULT_FLOAT)
+    out_state[0]   = state
+    out_coeff[0]   = coeff_val * prefactor**n_sites
+    return out_state, out_coeff
+
+
+@numba.njit
+def n_np(state      : np.ndarray,
+         sites      : np.ndarray,
+         prefactor  : float = 1.0):
+    coeff_val = 1.0
+    for site in sites:
+        if state[site] == 0:        # unoccupied ⇒ zero immediately
+            coeff_val = 0.0
+            break
+
+    n_sites = sites.shape[0]
+    return state, coeff_val * prefactor**n_sites
+
+###############################################################################
 #! Public dispatch helpers  (match your σ-operator API)
 ###############################################################################
 
 def c_dag(state       : Union[int, np.ndarray],
           ns          : int,
-          site        : int,
+          sites       : int,
           prefactor   : float = 1.0):
     """Creation operator dispatcher."""
     if isinstance(state, (int, np.integer)):
-        return c_dag_int_np(int(state), ns, site, prefactor)
+        return c_dag_int_np(int(state), ns, sites, prefactor)
     if isinstance(state, np.ndarray):
-        return c_dag_np(state, site, prefactor)
-    return c_dag_jnp(state, ns, site, prefactor)
+        return c_dag_np(state, sites, prefactor)
+    return c_dag_jnp(state, ns, sites, prefactor)
 
 def c(state          : Union[int, np.ndarray],
       ns             : int,
-      site           : int,
+      sites          : int,
       prefactor      : float = 1.0):
     """Annihilation operator dispatcher."""
     if isinstance(state, (int, np.integer)):
-        return c_int_np(int(state), ns, site, prefactor)
+        return c_int_np(int(state), ns, sites, prefactor)
     if isinstance(state, np.ndarray):
-        return c_np(state, site, prefactor)
-    return c_jnp(state, ns, site, prefactor)
+        return c_np(state, sites, prefactor)
+    return c_jnp(state, ns, sites, prefactor)
 
 def c_k(state        : Union[int, np.ndarray],
         ns           : int,
@@ -600,6 +663,19 @@ def c_k_dag(state     : Union[int, np.ndarray],
     if isinstance(state, np.ndarray):
         return c_k_dag_np(state, sites, k, prefactor)
     return c_k_dag_jnp(state, ns, sites, k, prefactor)
+
+def n(state      : Union[int, np.ndarray],
+    ns           : int,
+    sites        : Optional[List[int]],
+    prefactor    : float = 1.0):
+    """Number operator dispatcher."""
+    if sites is None:
+        sites = list(range(ns))
+    if isinstance(state, (int, np.integer)):
+        return n_int_np(int(state), ns, sites, prefactor)
+    if isinstance(state, np.ndarray):
+        return n_np(state, sites, prefactor)
+    raise TypeError(f"Unsupported type for state: {type(state)}")
 
 ##############################################################################
 #! Factory for the operator
@@ -691,6 +767,27 @@ def ckdag(  k         : float,
         extra_args  = (k, prefactor),
         name        = f"ckdag(k={k:.3g})",
         modifies    = True
+    )
+
+def n( lattice      : Optional[Lattice]     = None,
+        ns          : Optional[int]         = None,
+        type_act    : OperatorTypeActing    = OperatorTypeActing.Local,
+        sites       : Optional[List[int]]   = None,
+        prefactor   : float                 = 1.0) -> Operator:
+    """
+    Factory for the fermionic number operator n_i.
+    """
+    return create_operator(
+        type_act    = type_act,
+        op_func_int = n_int_np,
+        op_func_np  = n_np,
+        op_func_jnp = n_jax if JAX_AVAILABLE else None,
+        lattice     = lattice,
+        ns          = ns,
+        sites       = sites,
+        extra_args  = (prefactor,),
+        name        = "n",
+        modifies    = False
     )
 
 ##############################################################################

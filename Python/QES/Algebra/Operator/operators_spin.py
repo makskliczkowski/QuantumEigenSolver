@@ -271,7 +271,7 @@ def sigma_y_int(state       : int,
         return sigma_y_int_np(state, ns, sites, spin_value)
     return sigma_y_int_np_real(state, ns, sites, spin_value)
 
-# @numba.njit
+@numba.njit
 def sigma_y_np_real(state       : np.ndarray,
                     sites       : Union[List[int], None],
                     spin_value  : float = _SPIN):
@@ -909,7 +909,7 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
     
     return create_operator(
         type_act    = type_act,
-        op_func_int = sigma_x_int,
+        op_func_int = sigma_x_int_np,
         op_func_np  = sigma_x_np,
         op_func_jnp = sigma_x_jnp if JAX_AVAILABLE else None,
         lattice     = lattice,
@@ -1009,7 +1009,7 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
     
     return create_operator(
         type_act    = type_act,
-        op_func_int = sigma_z_int,
+        op_func_int = sigma_z_int_np,
         op_func_np  = sigma_z_np,
         op_func_jnp = sigma_z_jnp if JAX_AVAILABLE else None,
         lattice     = lattice,
