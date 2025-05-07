@@ -326,9 +326,10 @@ def sigma_y_np(state        : np.ndarray,
     out     = state.copy()
     for site in sites:
         # For NumPy arrays, we use the site index directly.
-        factor  =   (2.0 * _binary.check_arr_np(state, site) - 1.0) * 1.0j * spin_value
+        factor  =   (2.0 * _binary.check_arr_np(state, site) - 1.0) * 1.0j * spin_value if spin else \
+                    _binary.check_arr_np(state, site) * 1.0j * spin_value
         coeff   *=  factor
-        out     =   _binary.flip_array_np_spin(out, k=site)
+        out     =   _binary.flip_array_np_spin(out, k=site) if spin else _binary.flip_array_np_nspin(out, k=site)
     return out, coeff
 
 def sigma_y(state,
@@ -504,13 +505,14 @@ def sigma_plus_np(state         : np.ndarray,
     σ⁺ |state⟩ on a NumPy array representation (0/1 occupation).
     """
     coeff = 1.0
+    out   = state.copy()
     for site in sites:
-        bit = _binary.check_arr_np(state, site)
+        bit     = _binary.check_arr_np(out, site)
         if bit == 1: # annihilation
-            return state, 0.0
-        _binary.flip_arr_np(state, site) # 0 → 1
-        coeff *= spin_value
-    return state, coeff
+            return out, 0.0
+        out     = _binary.flip_array_np_nspin(out, site) if not spin else _binary.flip_array_np_spin(out, site)
+        coeff  *= spin_value
+    return out, coeff
 
 def sigma_plus(state,
             ns          : int,
@@ -630,11 +632,11 @@ def sigma_minus(state,
 # -----------------------------------------------------------------------------
 
 @numba.njit
-def _sigma_pm_int_core(state     : int,
-                       ns        : int,
-                       sites     : List[int],
-                       start_up  : bool,
-                       spin_val  : float):
+def _sigma_pm_int_core(state        : int,
+                        ns          : int,
+                        sites       : List[int],
+                        start_up    : bool,
+                        spin_val    : float):
     """
     Core for σ_pm / σ_mp alternating flips on integer states.
     start_up = True  → even  = σ⁺ , odd = σ⁻
@@ -643,15 +645,15 @@ def _sigma_pm_int_core(state     : int,
     new_state = state
     coeff     = 1.0
     for i, site in enumerate(sites):
-        pos  = ns - 1 - site
-        bit  = _binary.check_int(new_state, pos)
-        need_up = (i % 2 == 0) == start_up     # True ⇒ need σ⁺ here
+        pos     = ns - 1 - site
+        bit     = _binary.check_int(new_state, pos)
+        need_up = (i % 2 == 0) == start_up
 
-        if need_up:            # σ⁺
+        if need_up: # σ⁺
             if bit == 1:
                 return new_state, 0.0
             new_state = _binary.flip_int(new_state, pos)
-        else:                  # σ⁻
+        else: # σ⁻
             if bit == 0:
                 return new_state, 0.0
             new_state = _binary.flip_int(new_state, pos)
@@ -721,7 +723,7 @@ def _sigma_pm_np_core(state    : np.ndarray,
         else:
             if bit == 0:
                 return state, 0.0
-        _binary.flip_arr_np(state, site)
+        _binary.flip_array_np_spin(state, site)
         coeff *= spin_val
     return state, coeff
 
@@ -953,12 +955,15 @@ def sig_y( lattice     : Optional[Lattice]     = None,
     """
     
     np_fun  = sigma_y_np
-    int_fun = sigma_y_int
+    int_fun = sigma_y_int_np
     if type_act == OperatorTypeActing.Global:
         if sites is not None and len(sites) % 2 == 1:
             np_fun  = sigma_y_np_real
             int_fun = sigma_y_int_np_real
-            
+    elif type_act == OperatorTypeActing.Correlation:
+        np_fun  = sigma_y_np_real
+        int_fun = sigma_y_int_np_real
+    
     return create_operator(
         type_act    = type_act,
         op_func_int = int_fun,

@@ -23,7 +23,7 @@ import copy
 import time
 import numpy as np
 import numba
-from abc import ABC, abstractmethod
+from abc import ABC
 from enum import Enum, auto, unique
 from typing import Optional, Callable, Union, Iterable, Any
 from typing import Union, Tuple, List               # type hints for the functions and methods

@@ -1,117 +1,106 @@
-"""
-file        : Algebra/Operator/operators_spinless_fermions.py
+r"""
+Spinless Fermion Operators
+==========================
 
-This module implements spin operators for quantum systems.
-It provides functionality to create and anihilate fermions, as well as to
-compute the number of fermions in a given state.
+This module implements creation, annihilation, and number operators for spinless fermions,
+as well as their momentum-space versions. It provides efficient routines for acting on
+Fock basis states represented as integers or NumPy arrays.
 
-\section{Local Fock basis}
+Overview
+--------
 
-For a chain of $N_s$ spinless fermionic modes we label sites from the \emph{left},
-$i=0,1,\dots,N_s-1$.
-The on-site occupation number
-\[
-  n_i = c_i^\dagger c_i \in\{0,1\}
-\]
+For a chain of :math:`N_s` spinless fermionic modes, sites are labeled from the left,
+:math:`i = 0, 1, \ldots, N_s-1`. The on-site occupation number
+
+.. math::
+
+    n_i = c_i^\dagger c_i \in \{0, 1\}
+
 defines the computational Fock basis
-\[
-  \bigl|\,\mathbf{n}\bigr\rangle
-  =
-  \bigl|\,n_0\,n_1\ldots n_{N_s-1}\bigr\rangle.
-\]
 
-\paragraph{Integer encoding.}
+.. math::
+
+    |\mathbf{n}\rangle = |n_0\, n_1\, \ldots\, n_{N_s-1}\rangle.
+
+Integer Encoding
+----------------
+
 A basis vector is encoded as a non-negative integer
-\[
-  s(\mathbf{n})
-  =
-  \sum_{i=0}^{N_s-1} n_i\,2^{N_s-1-i},
-\]
-so that bit~$N_s-1-i$ of $s$ stores $n_i$.
-The \verb|popcount| (Hamming weight) of $s$ equals
-$\sum_i n_i$.
 
-%------------------------------------------------------------------------------
-\section{Canonical anticommutation relations}
+.. math::
+
+    s(\mathbf{n}) = \sum_{i=0}^{N_s-1} n_i\,2^{N_s-1-i},
+
+so that bit :math:`N_s-1-i` of :math:`s` stores :math:`n_i`.
+The Hamming weight (``popcount``) of :math:`s` equals :math:`\sum_i n_i`.
+
+Canonical Anticommutation Relations
+-----------------------------------
 
 Creation and annihilation operators obey
-\begin{equation}
-  \{c_i,c_j\}=0,\qquad
-  \{c_i^\dagger,c_j^\dagger\}=0,\qquad
-  \{c_i,c_j^\dagger\}=\delta_{ij}.
-  \label{eq:car}
-\end{equation}
 
-%------------------------------------------------------------------------------
-\section{Jordan-Wigner phase (fermionic sign)}
+.. math::
+
+    \{c_i, c_j\} = 0, \qquad
+    \{c_i^\dagger, c_j^\dagger\} = 0, \qquad
+    \{c_i, c_j^\dagger\} = \delta_{ij}.
+
+Jordan-Wigner Phase (Fermionic Sign)
+------------------------------------
 
 Because fermions anticommute, the operator must “pass through’’
-all modes to its left before acting.
-Define the parity operator up to (but not including) site~$i$
-\[
-  \mathcal P_i
-  =
-  (-1)^{\displaystyle\sum_{j=0}^{i-1} n_j}.
-\]
+all modes to its left before acting. Define the parity operator up to (but not including) site :math:`i`:
+
+.. math::
+
+    \mathcal{P}_i = (-1)^{\sum_{j=0}^{i-1} n_j}
+
 With the integer representation this is
-\[
-  \mathcal P_i(s)
-  =
-  (-1)^{\mathrm{popcount}\!\bigl(s \,\&\, \bigl[(1\!\ll\! (N_s-i))-1\bigr]\bigr)}.
-\]
 
-%------------------------------------------------------------------------------
-\section{Action on a basis state}
+.. math::
 
-\begin{align}
-  c_i^\dagger\,
-  \bigl|\,\mathbf{n}\bigr\rangle
-  &=
-  \mathcal P_i(\mathbf n)\;
-  (1-n_i)\;
-  \bigl|\,n_0\!\ldots 1_i\!\ldots n_{N_s-1}\bigr\rangle,
-  \label{eq:create}\\[4pt]
-  c_i\,
-  \bigl|\,\mathbf{n}\bigr\rangle
-  &=
-  \mathcal P_i(\mathbf n)\;
-  n_i\;
-  \bigl|\,n_0\!\ldots 0_i\!\ldots n_{N_s-1}\bigr\rangle.
-  \label{eq:annih}
-\end{align}
-If the occupation constraint $(1-n_i)$ or $n_i$ vanishes, the
-state is annihilated.
+    \mathcal{P}_i(s) = (-1)^{\mathrm{popcount}\left(s\,\&\,\left[(1\ll(N_s-i))-1\right]\right)}
 
-%------------------------------------------------------------------------------
-\section{Momentum-space operator}
+Action on a Basis State
+-----------------------
 
-For any subset $S\subseteq\{0,\dots,N_s-1\}$ we define
-\[
-  c_k
-  =
-  \frac{1}{\sqrt{|S|}}
-  \sum_{i\in S} e^{-ik i}\,c_i,
-  \qquad k\in[0,2\pi).
-\]
-Acting on a basis state gives a superposition
-with amplitudes
-\[
-  \langle\mathbf n|\,
-  c_k\,
-  |\mathbf n\rangle
-  =
-  \frac{1}{\sqrt{|S|}}
-  \sum_{i\in S}
-        \mathcal P_i(\mathbf n)\;
-        n_i\;
-        e^{-ik i}.
-\]
+.. math::
 
+    c_i^\dagger\,|\mathbf{n}\rangle &= \mathcal{P}_i(\mathbf{n})\,(1-n_i)\,|n_0\ldots 1_i\ldots n_{N_s-1}\rangle \\
+    c_i\,|\mathbf{n}\rangle &= \mathcal{P}_i(\mathbf{n})\,n_i\,|n_0\ldots 0_i\ldots n_{N_s-1}\rangle
 
+If the occupation constraint :math:`(1-n_i)` or :math:`n_i` vanishes, the state is annihilated.
 
-Author      : Maksymilian Kliczkowski, WUST, Poland
-Date        : May 2025
-Version     : 1.0
+Momentum-Space Operator
+-----------------------
+
+For any subset :math:`S \subseteq \{0, \ldots, N_s-1\}` we define
+
+.. math::
+
+    c_k = \frac{1}{\sqrt{|S|}} \sum_{i\in S} e^{-ik i}\,c_i, \qquad k\in[0,2\pi).
+
+Acting on a basis state gives a superposition with amplitudes
+
+.. math::
+
+    \langle\mathbf{n}|\,c_k\,|\mathbf{n}\rangle =
+    \frac{1}{\sqrt{|S|}} \sum_{i\in S} \mathcal{P}_i(\mathbf{n})\,n_i\,e^{-ik i}
+
+Author
+------
+
+Maksymilian Kliczkowski, WUST, Poland
+
+Date
+----
+
+May 2025
+
+Version
+-------
+
+1.0
 """
 
 import math
@@ -121,8 +110,6 @@ from typing import List, Union, Optional, Callable
 
 ################################################################################
 from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGenerators, create_operator
-################################################################################
-
 ################################################################################
 
 from general_python.common.tests import GeneralAlgebraicTest

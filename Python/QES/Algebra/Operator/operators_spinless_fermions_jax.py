@@ -344,7 +344,7 @@ if JAX_AVAILABLE:
     def n_jax(state     : jnp.ndarray,
             sites     : jnp.ndarray,
             prefactor : float = 1.0):
-        """
+        r"""
         Number operator acting on a **JAX occupation vector** (0/1, immutable).
 
         Parameters
