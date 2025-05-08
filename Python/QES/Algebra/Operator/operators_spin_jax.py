@@ -187,7 +187,7 @@ if JAX_AVAILABLE:
             new_state = _binary.flip_int_traced_jax(state_val, pos)
             return (new_state, coeff * factor)
 
-        final_state, final_coeff = lax.fori_loop(0, len(sites), body, (state, 1.0 + 0j))
+        final_state, final_coeff = lax.fori_loop(0, sites_arr.shape[0], body, (state, 1.0 + 0j))
         return final_state, final_coeff
 
     @partial(jax.jit, static_argnums=(2,))
@@ -335,263 +335,342 @@ if JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 #! Sigma-Plus (σ⁺) operator
 # -----------------------------------------------------------------------------
+if JAX_AVAILABLE:
+    
+    @jax.jit
+    def sigma_plus_int_jnp(state, 
+                        ns          : int, 
+                        sites       : Union[List[int], None], 
+                        spin        : bool = BACKEND_DEF_SPIN,
+                        spin_value  : float = _SPIN):
+        """
+        Apply the raising operator σ⁺ on an integer state (JAX version).
+        """
+        sites = jnp.array(sites)
+        def body(i, carry):
+            curr_state, curr_coeff  = carry
+            pos                     = ns - 1 - sites[i]
+            bitmask                 = jnp.left_shift(1, pos)
+            condition               = (curr_state & bitmask) > 0
+            new_state               = lax.cond(condition,
+                                        lambda _: curr_state,
+                                        lambda _: _binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
+                                        operand=None)
+            new_coeff = lax.cond(condition,
+                                    lambda _: 0.0,
+                                    lambda _: curr_coeff * spin_value,
+                                    operand = None)
+            return (new_state, new_coeff)
+        init = (state, 1.0)
+        final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+        return final_state, final_coeff
 
-@jax.jit
-def sigma_plus_int_jnp(state, 
-                    ns          : int, 
-                    sites       : Union[List[int], None], 
-                    spin        : bool = BACKEND_DEF_SPIN,
-                    spin_value  : float = _SPIN):
-    """
-    Apply the raising operator σ⁺ on an integer state (JAX version).
-    """
-    sites = jnp.array(sites)
-    def body(i, carry):
-        curr_state, curr_coeff  = carry
-        pos                     = ns - 1 - sites[i]
-        bitmask                 = jnp.left_shift(1, pos)
-        condition               = (curr_state & bitmask) > 0
-        new_state               = lax.cond(condition,
-                                    lambda _: curr_state,
-                                    lambda _: _binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
-                                    operand=None)
-        new_coeff = lax.cond(condition,
-                                lambda _: 0.0,
-                                lambda _: curr_coeff * spin_value,
-                                operand = None)
-        return (new_state, new_coeff)
-    init = (state, 1.0)
-    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
-    return final_state, final_coeff
-
-@jax.jit
-def sigma_plus_jnp(state,
-                    ns          : int,
-                    sites       : Union[List[int], None],
-                    spin        : bool = BACKEND_DEF_SPIN,
-                    spin_value  : float = _SPIN):
-    """
-    σ⁺ on a JAX array state.
-    Uses lax.fori_loop.
-    """
-    coeff = 1.0
-    def body_fun(i, state_val):
-        state_in, coeff_in  = state_val
-        site                = sites[i]
-        if _binary.check_arr_jax(state_in, site):
-            return state_in, coeff_in
-        new_state = _binary.flip_array_jax_spin(state_in, site) if spin else _binary.flip_array_jax_nspin(state_in, site)
-        new_coeff = coeff_in * spin_value
-        return new_state, new_coeff
-    new_state, coeff = lax.fori_loop(0, len(sites), body_fun, (state, coeff))
-    return new_state, coeff
+    @jax.jit
+    def sigma_plus_jnp(state,
+                        sites       : Union[List[int], None],
+                        spin        : bool = BACKEND_DEF_SPIN,
+                        spin_value  : float = _SPIN):
+        """
+        σ⁺ on a JAX array state.
+        Uses lax.fori_loop.
+        """
+        def body_fun(i, state_val):
+            state_in, coeff_in  = state_val
+            site                = sites[i]
+            coeff_new           = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                                                lambda _: 0.0,
+                                                lambda _: coeff_in * spin_value,
+                                                operand=None)
+            new_state           = jax.lax.cond(spin,
+                                                lambda _: _binary.flip_array_jax_spin(state_in, site),
+                                                lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                                operand=None)
+            return new_state, coeff_new
+        new_state, coeff = lax.fori_loop(0, len(sites), body_fun, (state, 1.0))
+        return new_state, coeff
 
 # -----------------------------------------------------------------------------
 #! Sigma-Minus (σ⁻) operator
 # -----------------------------------------------------------------------------
 
-@jax.jit
-def sigma_minus_int_jnp(state, 
-                        ns, 
-                        sites, 
+if JAX_AVAILABLE:
+    
+    @jax.jit
+    def sigma_minus_int_jnp(state, 
+                            ns, 
+                            sites, 
+                            spin        : bool = BACKEND_DEF_SPIN,
+                            spin_value  : float = _SPIN):
+        sites_arr = jnp.array(sites)
+        def body(i, carry):
+            curr_state, curr_coeff = carry
+            pos         = ns - 1 - sites_arr[i]
+            bitmask     = jnp.left_shift(1, pos)
+            condition   = (curr_state & bitmask) > 0
+            new_state   = lax.cond(condition,
+                                    lambda _: _binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
+                                    lambda _: curr_state,
+                                    operand=None)
+            new_coeff   = lax.cond(condition,
+                                    lambda _: curr_coeff * spin_value,
+                                    lambda _: 0.0,
+                                    operand=None)
+            return (new_state, new_coeff)
+        init = (state, 1.0)
+        final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+        return final_state, final_coeff
+
+    @jax.jit
+    def sigma_minus_jnp(state,
+                        sites       : Union[List[int], None],
                         spin        : bool = BACKEND_DEF_SPIN,
                         spin_value  : float = _SPIN):
-    sites = jnp.array(sites)
-    def body(i, carry):
-        curr_state, curr_coeff = carry
-        pos         = ns - 1 - sites[i]
-        bitmask     = jnp.left_shift(1, pos)
-        condition   = (curr_state & bitmask) > 0
-        new_state   = lax.cond(condition,
-                                lambda _: _binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
-                                lambda _: curr_state,
-                                operand=None)
-        new_coeff   = lax.cond(condition,
-                                lambda _: curr_coeff * spin_value,
-                                lambda _: 0.0,
-                                operand=None)
-        return (new_state, new_coeff)
-    init = (state, 1.0)
-    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
-    return final_state, final_coeff
-
-@jax.jit
-def sigma_minus_jnp(state,
-                    ns          : int,
-                    sites       : Union[List[int], None],
-                    spin        : bool = BACKEND_DEF_SPIN,
-                    spin_value  : float = _SPIN):
-    """
-    σ⁻ on a JAX array state.
-    """
-    def body_fun(i, state_val):
-        state_in, coeff_in  = state_val
-        site                = sites[i]
-        if not _binary.check_arr_jax(state_in, site):
-            return state_in, coeff_in
-        new_state = _binary.flip_array_jax_spin(state_in, site) if spin else _binary.flip_array_jax_nspin(state_in, site)
-        return new_state, coeff_in * spin_value
-    new_state, coeff = lax.fori_loop(0, len(sites), body_fun, (state, 1.0))
-    return new_state, coeff
+        """
+        σ⁻ on a JAX array state.
+        """
+        def body_fun(i, state_val):
+            state_in, coeff_in  = state_val
+            site                = sites[i]
+            coeff_new           = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                                                lambda _: 0.0,
+                                                lambda _: coeff_in * spin_value,
+                                                operand=None)
+            new_state           = jax.lax.cond(spin,
+                                                lambda _: _binary.flip_array_jax_spin(state_in, site),
+                                                lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                                operand=None)
+            return new_state, coeff_new
+        new_state, coeff = lax.fori_loop(0, len(sites), body_fun, (state, 1.0))
+        return new_state, coeff
 
 # -----------------------------------------------------------------------------
 #! Sigma_pm (σ⁺ then σ⁻) operator
 # -----------------------------------------------------------------------------
 
-@jax.jit
-def sigma_pm_jnp(state, ns, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
-    if sites is None:
-        sites = list(range(ns))
-    coeff = 1.0
-    def body_fun(i, state_val):
-        site = sites[i]
-        pos  = ns - 1 - site
-        if i % 2 == 0:
-            if _binary.check_arr_jax(state_val, pos):
-                return state_val
-            new_state = _binary.flip_array_jax_spin(state_val, pos) if spin else _binary.flip_array_jax_nspin(state_val, pos)
-        else:
-            if not _binary.check_arr_jax(state_val, pos):
-                return state_val
-            new_state = _binary.flip_array_jax_spin(state_val, pos) if spin else _binary.flip_array_jax_nspin(state_val, pos)
-        return new_state
-    new_state = lax.fori_loop(0, len(sites), body_fun, state)
-    return new_state, coeff
+if JAX_AVAILABLE:
+    
+    @jax.jit
+    def sigma_pm_jnp(state, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
+        coeff = 1.0
+        
+        def flip_func(state_val, pos):
+            return jax.lax.cond(
+                spin,
+                lambda _: _binary.flip_array_jax_spin(state_val, pos),
+                lambda _: _binary.flip_array_jax_nspin(state_val, pos),
+                operand=None
+            )
+        
+        def body_fun(i, state_val):
+            site = sites[i]
+            pos  = site
 
-@jax.jit
-def sigma_pm_int_jnp(state, ns, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
-    sites = jnp.array(sites)
-    def body(i, carry):
-        curr_state, curr_coeff = carry
-        pos = ns - 1 - sites[i]
-        bitmask = jnp.left_shift(1, pos)
-        even_branch = lax.cond((curr_state & bitmask) == 0,
-                               lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
-                                          curr_coeff * spin_value),
-                               lambda _: (curr_state, 0.0),
-                               operand=None)
-        odd_branch = lax.cond((curr_state & bitmask) > 0,
-                              lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
-                                         curr_coeff * spin_value),
-                              lambda _: (curr_state, 0.0),
-                              operand=None)
-        new_state, new_coeff = even_branch if (i % 2 == 0) else odd_branch
-        return (new_state, new_coeff)
-    init = (state, 1.0)
-    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
-    return final_state, final_coeff
+            def even_branch(_):
+            # If bit is set, return state_val; else flip
+                return jax.lax.cond(
+                    _binary.check_arr_jax(state_val, pos),
+                    lambda _: state_val,
+                    lambda _: flip_func(state_val, pos),
+                    operand=None
+                )
+
+            def odd_branch(_):
+            # If bit is not set, return state_val; else flip
+                return jax.lax.cond(
+                    _binary.check_arr_jax(state_val, pos),
+                    lambda _: flip_func(state_val, pos),
+                    lambda _: state_val,
+                    operand=None
+                )
+
+            return jax.lax.cond(
+                (i % 2) == 0,
+                even_branch,
+                odd_branch,
+                operand=None
+                )
+
+        new_state = lax.fori_loop(0, len(sites), body_fun, state)
+        return new_state, coeff
+
+    @jax.jit
+    def sigma_pm_int_jnp(state, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
+        sites = jnp.array(sites)
+        def body(i, carry):
+            curr_state, curr_coeff  = carry
+            pos                     = sites[i]
+            bitmask                 = jnp.left_shift(1, pos)
+            even_branch             = lax.cond((curr_state & bitmask) == 0,
+                                lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
+                                            curr_coeff * spin_value),
+                                lambda _: (curr_state, 0.0),
+                                operand=None)
+            odd_branch              = lax.cond((curr_state & bitmask) > 0,
+                                lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos),
+                                            curr_coeff * spin_value),
+                                lambda _: (curr_state, 0.0),
+                                operand=None)
+            new_state, new_coeff = even_branch if (i % 2 == 0) else odd_branch
+            return (new_state, new_coeff)
+        init = (state, 1.0)
+        final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+        return final_state, final_coeff
 
 # -----------------------------------------------------------------------------
 #! Sigma_mp (σ⁻ then σ⁺) operator
 # -----------------------------------------------------------------------------
 
-@jax.jit
-def sigma_mp_int_jnp(state, ns, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
-    sites = jnp.array(sites)
-    def body(i, carry):
-        curr_state, curr_coeff = carry
-        pos = ns - 1 - sites[i]
-        bitmask = jnp.left_shift(1, pos)
-        even_branch = lax.cond((curr_state & bitmask) > 0,
-                               lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos), curr_coeff * spin_value),
-                               lambda _: (curr_state, 0.0),
-                               operand=None)
-        odd_branch = lax.cond((curr_state & bitmask) == 0,
-                              lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos), curr_coeff * spin_value),
-                              lambda _: (curr_state, 0.0),
-                              operand=None)
-        new_state, new_coeff = even_branch if (i % 2 == 0) else odd_branch
-        return (new_state, new_coeff)
-    init = (state, 1.0)
-    final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
-    return final_state, final_coeff
+if JAX_AVAILABLE:
 
-@jax.jit
-def sigma_mp_jnp(state,
-                ns      : int,
-                sites   : Union[List[int], None],
-                spin    : bool = BACKEND_DEF_SPIN,
-                spin_value : float = _SPIN):
-    """
-    Alternating operator (σ⁻ then σ⁺) on a JAX array state.
-    """
-    coeff = 1.0
-    def body_fun(i, state_val):
-        site = sites[i]
-        pos  = ns - 1 - site
-        if i % 2 == 0:
-            if not _binary.check_arr_jax(state_val, pos):
-                return state_val
-            new_state = _binary.flip_array_jax_spin(state_val, pos) if spin else _binary.flip_array_jax_nspin(state_val, pos)
-        else:
-            if _binary.check_arr_jax(state_val, pos):
-                return state_val
-            new_state = _binary.flip_array_jax_spin(state_val, pos) if spin else _binary.flip_array_jax_nspin(state_val, pos)
-        return new_state
-    new_state = lax.fori_loop(0, len(sites), body_fun, state)
-    return new_state, coeff
+    @jax.jit
+    def sigma_mp_int_jnp(state, sites, spin: bool = BACKEND_DEF_SPIN, spin_value: float = _SPIN):
+        sites = jnp.array(sites)
+        def body(i, carry):
+            curr_state, curr_coeff  = carry
+            pos                     = sites[i]
+            bitmask                 = jnp.left_shift(1, pos)
+            even_branch             = lax.cond((curr_state & bitmask) > 0,
+                                lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos), curr_coeff * spin_value),
+                                lambda _: (curr_state, 0.0),
+                                operand=None)
+            odd_branch              = lax.cond((curr_state & bitmask) == 0,
+                                lambda _: (_binary.flip_int_traced_jax(curr_state, pos) if spin else _binary.flip_int_traced_jax(curr_state, pos), curr_coeff * spin_value),
+                                lambda _: (curr_state, 0.0),
+                                operand=None)
+            new_state, new_coeff    = even_branch if (i % 2 == 0) else odd_branch
+            return (new_state, new_coeff)
+        init = (state, 1.0)
+        final_state, final_coeff = lax.fori_loop(0, len(sites), body, init)
+        return final_state, final_coeff
+
+    @jax.jit
+    def sigma_mp_jnp(state,
+                    sites   : Union[List[int], None],
+                    spin    : bool = BACKEND_DEF_SPIN,
+                    spin_value : float = _SPIN):
+        """
+        Alternating operator (σ⁻ then σ⁺) on a JAX array state.
+        """
+        def body_fun(i, state_val):
+            state_in, coeff_in = state_val
+            site = sites[i]
+            def even_branch(_):
+                # σ⁻: only act if bit is set
+                coeff_new = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                                         lambda _: coeff_in * spin_value,
+                                         lambda _: 0.0,
+                                         operand=None)
+                new_state = jax.lax.cond(spin,
+                                         lambda _: _binary.flip_array_jax_spin(state_in, site),
+                                         lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                         operand=None)
+                return new_state, coeff_new
+
+            def odd_branch(_):
+                # σ⁺: only act if bit is not set
+                coeff_new = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                                         lambda _: 0.0,
+                                         lambda _: coeff_in * spin_value,
+                                         operand=None)
+                new_state = jax.lax.cond(spin,
+                                         lambda _: _binary.flip_array_jax_spin(state_in, site),
+                                         lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                         operand=None)
+                return new_state, coeff_new
+
+            new_state, coeff_new = jax.lax.cond(
+                (i % 2) == 0,
+                even_branch,
+                odd_branch,
+                operand=None
+            )
+            return new_state, coeff_new
+        new_state, coeff = lax.fori_loop(0, len(sites), body_fun, (state, 1.0))
+        return new_state, coeff
 
 # -----------------------------------------------------------------------------
 #! Sigma-K (σₖ) operator
 # -----------------------------------------------------------------------------
 
-@jax.jit
-def sigma_k_int_jnp(state, 
-                    ns          : int, 
-                    sites       : Union[List[int], None], 
-                    k           : float, 
-                    spin        : bool = BACKEND_DEF_SPIN, 
-                    spin_value  : float = _SPIN):
-    
-    sites = jnp.asarray(sites)
-    def body(i, total):
-        site    = sites[i]
-        pos     = ns - 1 - site
-        bitmask = jnp.left_shift(1, pos)
-        factor  = lax.cond((state & bitmask) > 0,
-                        lambda _: 1j,
-                        lambda _: -1.0,
-                        operand=None)
-        return total + factor * math.exp(1j * k * site)
-    total   = lax.fori_loop(0, len(sites), body, 0.0+0j)
-    norm    = math.sqrt(len(sites)) if len(sites) > 0 else 1.0
-    return state, total / norm
+if JAX_AVAILABLE:
+    @jax.jit
+    def sigma_k_int_jnp(state, 
+                        ns          : int, 
+                        sites       : Union[List[int], None], 
+                        k           : float, 
+                        spin        : bool = BACKEND_DEF_SPIN, 
+                        spin_value  : float = _SPIN):
+        
+        sites = jnp.asarray(sites)
+        def body(i, total):
+            site    = sites[i]
+            pos     = ns - 1 - site
+            bitmask = jnp.left_shift(1, pos)
+            factor  = lax.cond((state & bitmask) > 0,
+                            lambda _: 1j,
+                            lambda _: -1.0,
+                            operand=None)
+            return total + factor * math.exp(1j * k * site)
+        total   = lax.fori_loop(0, len(sites), body, 0.0+0j)
+        norm    = math.sqrt(len(sites)) if len(sites) > 0 else 1.0
+        return state, total / norm
 
-@jax.jit
-def sigma_k_jnp(state,
-                ns          : int,
-                sites       : Union[List[int], None],
-                k           : float,
-                spin        : bool = BACKEND_DEF_SPIN,
-                spin_value  : float = _SPIN):
-    """
-    Compute the Fourier-transformed spin operator (σₖ) on a JAX array state.
-    Uses lax.fori_loop.
-    Parameters:
-        state (np.ndarray) :
-            The state to apply the operator to.
-        ns (int) :
-            The number of spins in the system.
-        sites (list of int or None) :
-            The sites to apply the operator to. If None, apply to all sites.
-        k (float) :
-            The wave vector for the Fourier transform.
-        spin (bool) :
-            If True, use the spin convention for flipping the bits.
-        spin_value (float) :
-            The value to multiply the state by when flipping the bits.
-    Returns:
-        tuple: (state, coeff) where state is unchanged and coeff is the accumulated coefficient.
-    """
-    total = 0.0 + 0j
-    def body_fun(i, total_val):
-        site    = sites[i]
-        pos     = site
-        bit     = _binary.check_arr_jax(state, pos)
-        factor  = (2 * bit - 1.0) * spin_value if spin else spin_value * bit
-        return total_val + factor * math.exp(1j * k * site)
-    total   = lax.fori_loop(0, len(sites), body_fun, total)
-    norm    = math.sqrt(len(sites)) if sites else 1.0
-    return state, total / norm
+    @jax.jit
+    def sigma_k_jnp(state,
+                    ns          : int,
+                    sites       : Union[List[int], None],
+                    k           : float,
+                    spin        : bool = BACKEND_DEF_SPIN,
+                    spin_value  : float = _SPIN):
+        """
+        Compute the Fourier-transformed spin operator (σₖ) on a JAX array state.
+        Uses lax.fori_loop.
+        Parameters:
+            state (np.ndarray) :
+                The state to apply the operator to.
+            ns (int) :
+                The number of spins in the system.
+            sites (list of int or None) :
+                The sites to apply the operator to. If None, apply to all sites.
+            k (float) :
+                The wave vector for the Fourier transform.
+            spin (bool) :
+                If True, use the spin convention for flipping the bits.
+            spin_value (float) :
+                The value to multiply the state by when flipping the bits.
+        Returns:
+            tuple: (state, coeff) where state is unchanged and coeff is the accumulated coefficient.
+        """
+        total = 0.0 + 0j
+        def body_fun(i, total_val):
+            site    = sites[i]
+            pos     = site
+            bit     = _binary.check_arr_jax(state, pos)
+            factor  = (2 * bit - 1.0) * spin_value if spin else spin_value * bit
+            return total_val + factor * math.exp(1j * k * site)
+        total   = lax.fori_loop(0, len(sites), body_fun, total)
+        norm    = math.sqrt(len(sites)) if sites else 1.0
+        return state, total / norm
 
 # -----------------------------------------------------------------------------
+
+if not JAX_AVAILABLE:
+    sigma_x_int_jnp = None
+    sigma_x_jnp = None
+    sigma_y_int_jnp = None
+    sigma_y_jnp = None
+    sigma_z_int_jnp = None
+    sigma_z_jnp = None
+    sigma_plus_int_jnp = None
+    sigma_plus_jnp = None
+    sigma_minus_int_jnp = None
+    sigma_minus_jnp = None
+    sigma_pm_jnp = None
+    sigma_mp_jnp = None
+    sigma_k_int_jnp = None
+    sigma_k_jnp = None
+    sigma_pm_int_jnp = None
+    sigma_mp_int_jnp = None
+    sigma_k_int_jnp = None
+    sigma_k_jnp = None
+    

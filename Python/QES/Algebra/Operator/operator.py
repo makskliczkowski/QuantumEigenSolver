@@ -37,11 +37,11 @@ from general_python.lattices import Lattice
 if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    from jax import jit, vmap
     from jax.experimental import sparse
 else:
-    jax = None
-    jnp = None
+    jax     = None
+    jnp     = None
+    sparse  = None
     
 
 ####################################################################################################
@@ -103,151 +103,311 @@ class GlobalSymmetries(Enum):
 ####################################################################################################
 
 def op_func_wrapper(op_func: Callable, *args: Any) -> Callable:
-    """
-    Wrap an operator function by fixing extra arguments so that the resulting function
-    has the signature f(k) -> (rows, values), where op_func is assumed to have signature
-    (k, *args) -> (rows, values).
-
+    '''
+    Wraps the operator function to handle different argument counts.
     Parameters:
-        op_func (Callable): The operator function.
-        *args (Any): Additional arguments to fix in the operator function.
-
-    Returns:
-        Callable: A function of one argument (k) that calls op_func(k, *args).
-    """
+        op_func (Callable):
+            The operator function to be wrapped.
+        *args (Any):
+            Additional arguments to be passed to the operator function.
+    '''
     if op_func.__code__.co_argcount == 1:
-        # If op_func takes only one argument, no wrapping is needed.
         return op_func
     else:
-        # Otherwise, return a new function that calls op_func with the fixed extra arguments.
         return lambda k: op_func(k, *args)
 
 ####################################################################################################
 #! Constants
 ####################################################################################################
 
-_SCALARS = (int, float, complex,
-            np.integer, np.floating, np.complexfloating)
-if JAX_AVAILABLE:
-    _SCALARS += (jnp.integer, jnp.floating, jnp.complexfloating)
+_PYTHON_SCALARS = (int, float, complex, np.number)
+
+@unique
+class OperatorTypeActing(Enum):
+    """
+    Enumerates the types of operators acting on the system.
+    """
+    
+    Global      = auto()    # Global operator - acts on the whole system (does not need additional arguments).
+    Local       = auto()    # Local operator - acts on the local physical space (needs additional argument - 1).
+    Correlation = auto()    # Correlation operator - acts on the correlation space (needs additional argument - 2).
+    # -----------
+    
+    def is_global(self):
+        """
+        Check if the operator is a global operator.
+        """
+        return self == OperatorTypeActing.Global
+        
+    def is_local(self):
+        """
+        Check if the operator is a local operator.
+        """
+        return self == OperatorTypeActing.Local
+        
+    def is_correlation(self):
+        """
+        Check if the operator is a correlation operator.
+        """
+        return self == OperatorTypeActing.Correlation
 
 ####################################################################################################
 #! OperatorFunction
 ####################################################################################################
 
-def _make_mul_int_njit(f_int, g_int, self_modifies):
-    """
-    Factory: returns an `@numba.njit`‑compiled (f∘g)_int kernel.
-    Falls back to a pure‑Python loop if compilation fails.
-    """
+def _make_mul_int_njit(outer_op_fun, inner_op_fun):
     try:
-        @numba.njit(cache=True)
-        def mul_int(state, *args):
-            g_state, g_coeff = g_int(state, *args)
-            g_state, g_coeff = OperatorFunction._normalize_result_np(g_state, g_coeff)
+        
+        # Numba compilation for integer states
+        # @numba.njit(cache=True)
+        def mul_int_impl(state, *args):
+            #! g(s)
+            g_states_raw, g_coeffs_raw  = inner_op_fun(state, *args)
+            g_states, g_coeffs          = _normalize_result_np(g_states_raw, g_coeffs_raw)
+            # g_states: (N_g, D), g_coeffs: (N_g,)
 
-            n = g_state.shape[0]
-            res_states = np.empty_like(g_state)
-            res_values = np.empty(n, dtype=np.complex128)
+            if g_states.shape[0] == 0:
+                return np.empty((0, g_states.shape[1]), dtype=g_states.dtype), np.empty((0,), dtype=g_coeffs.dtype)
 
-            for k in range(n):
-                f_state, f_coeff = f_int(g_state[k], *args)
-                f_state, f_coeff = OperatorFunction._normalize_result_np(
-                    f_state, f_coeff
-                )
-                if self_modifies:
-                    res_states[k] = g_state[k]
-                    res_values[k] = g_coeff[k] * f_coeff[0]
-                else:
-                    res_states[k] = f_state[0]
-                    res_values[k] = g_coeff[k] * f_coeff[0]
+            #! Accumulate results from f(g(s))
+            res_states_list = []
+            res_values_list = []
 
-            return res_states, res_values
+            for k in range(g_states.shape[0]):
+                #! f(g_state_k)
+                f_states_raw_k, f_coeffs_raw_k  = outer_op_fun(g_states[k], *args)
+                f_states_k, f_coeffs_k          = _normalize_result_np(f_states_raw_k, f_coeffs_raw_k)
+                # f_states_k: (N_f, D), f_coeffs_k: (N_f,)
 
-        # make sure compilation really succeeded (forces type inference)
-        mul_int.compile("int64(int64)")
-        return mul_int
-
-    except numba.TypingError:
-        print("Numba compilation failed. Falling back to Python.")
-        def mul_int(state, *args):
-            return state, np.array(1.0)
-        return mul_int
-
-def _make_mul_np_njit(f_np, g_np, self_modifies):
-    """
-    Same idea as `_make_mul_int_njit`, but for NumPy‑array wave‑functions.
-    Returns an `njit` kernel, otherwise a python fallback.
-    """
-    try:
-        @numba.njit(cache=True)
-        def mul_np(state, *args):
-            g_state, g_coeff = g_np(state, *args)
-            g_state, g_coeff = OperatorFunction._normalize_result_np(g_state, g_coeff)
-
-            n = g_state.shape[0]
-            res_states = np.empty_like(g_state)
-            res_values = np.empty(n, dtype=np.complex128)
-
-            for k in range(n):
-                f_state, f_coeff = f_np(g_state[k], *args)
-                f_state, f_coeff = OperatorFunction._normalize_result_np(
-                    f_state, f_coeff
-                )
-
-                if self_modifies:
-                    res_states[k] = g_state[k]
-                    res_values[k] = g_coeff[k] * f_coeff[0]
-                else:
-                    res_states[k] = f_state[0]
-                    res_values[k] = g_coeff[k] * f_coeff[0]
-
-            return res_states, res_values
-        # force compilation for common signature
-        return mul_np
-    except numba.TypingError:
-        print("Numba compilation failed. Falling back to Python.")
-        def mul_np(state, *args):
-            return state, np.array(1.0)
-        return mul_np
-
-def _make_mul_jax(f_jax, g_jax, self_modifies):
-    if JAX_AVAILABLE:
-        try:
-            @jax.jit
-            def mul_jax(s, *args):
-                s_g, v_g = g_jax(s, *args)
-                s_g, v_g = OperatorFunction._normalize_result_jax(s_g, v_g)
-
-                def body(carry, inp):
-                    sg, vg = inp
-                    s_self, v_self = f_jax(sg, *args)
-                    s_self, v_self = OperatorFunction._normalize_result_jax(s_self, v_self)
-
-                    if self_modifies:
-                        ss  = sg
-                        val = vg * v_self[0]
-                        return (carry[0].append(ss), carry[1].append(val)), None
-                    else:
-                        # take only the first branch of s_self/v_self for simplicity;
-                        # extend here if you need full superpositions.
-                        ss  = s_self[0]
-                        val = vg * v_self[0]
-                        return (carry[0].append(ss), carry[1].append(val)), None
-
-                init = ([], [])
-                (states, vals), _ = jax.lax.scan(body, init, (s_g, v_g))
-                return jnp.asarray(states), jnp.asarray(vals)
+                for l in range(f_states_k.shape[0]):
+                    res_states_list.append(f_states_k[l])
+                    res_values_list.append(g_coeffs[k] * f_coeffs_k[l])
             
-        except jax.errors.JAXTypeError:
-            print("JAX compilation failed. Falling back to Python.")
-            def mul_jax(state, *args):
-                return state, np.array(1.0)
-    else:
-        print("JAX not available. Falling back to Python.")
-        def mul_jax(*_args, **_kwargs):
-            raise RuntimeError("JAX not available in this environment")
-    return mul_jax
+            if not res_states_list:
+                return np.empty((0, g_states.shape[1]), dtype=g_states.dtype), np.empty((0,), dtype=g_coeffs.dtype)
+            return np.array(res_states_list), np.array(res_values_list)
+
+        # Test compilation (optional, Numba does it on first call)
+        # mul_int_impl.compile("int64(int64,)") # Example signature for a global op
+        return mul_int_impl
+    except Exception as e: # Catch Numba errors
+        print(f"Numba compilation failed for _make_mul_int_njit: {e}. Falling back to Python.")
+        def mul_int_fallback(state, *args):
+            # Basic python loop, similar logic but without Numba types
+            g_states_raw, g_coeffs_raw = inner_op_fun(state, *args)
+            # Manual normalization if _normalize_result_np is not Numba-friendly for raw Python lists
+            g_s_list, g_c_list = [], []
+            if isinstance(g_states_raw, Iterable) and not isinstance(g_states_raw, (str, bytes)): # Check if iterable but not string/bytes
+                if len(g_states_raw) > 0 and isinstance(g_states_raw[0], Iterable): # list of states
+                     g_s_list.extend(g_states_raw)
+                     g_c_list.extend(g_coeffs_raw)
+                else: # single state or list of scalar states
+                     g_s_list.append(g_states_raw) # E.g. [1,2,3] state vector
+                     g_c_list.append(g_coeffs_raw) # Single coeff
+            else: # single scalar state
+                g_s_list.append([g_states_raw]) # treat as scalar state
+                g_c_list.append(g_coeffs_raw)
+
+
+            res_s_list, res_v_list = [], []
+            for i in range(len(g_s_list)):
+                gs, gc = g_s_list[i], g_c_list[i]
+                fs_raw, fc_raw = outer_op_fun(gs, *args)
+                # Similar normalization for fs_raw, fc_raw
+                fs_list_branch, fc_list_branch = [], [] # Handle f's potential branching
+                # ... (complex to fully replicate normalize + branching here)
+                # Simplified: assume f returns one state/coeff or [state],[coeff]
+                if isinstance(fs_raw, Iterable) and not isinstance(fs_raw, (str, bytes)):
+                    fs_list_branch.extend(fs_raw)
+                    fc_list_branch.extend(fc_raw)
+                else:
+                    fs_list_branch.append(fs_raw)
+                    fc_list_branch.append(fc_raw)
+
+                for j in range(len(fs_list_branch)):
+                    res_s_list.append(fs_list_branch[j])
+                    res_v_list.append(gc * fc_list_branch[j])
+            return res_s_list, res_v_list # Return lists for Python fallback
+        return mul_int_fallback
+
+def _make_mul_np_njit(outer_op_fun, inner_op_fun):
+
+    def mul_np_pure_python(state_np, *args_np):
+        g_states_np, g_coeffs_np = inner_op_fun(state_np, *args_np) # Expected to return np arrays
+        g_states_np, g_coeffs_np = _normalize_result_np(g_states_np, g_coeffs_np)
+
+        if g_states_np.shape[0] == 0:
+            return np.empty((0, g_states_np.shape[1]), dtype=g_states_np.dtype), np.empty((0,), dtype=g_coeffs_np.dtype)
+
+        all_f_states_list = []
+        all_f_coeffs_list = []
+
+        for k in range(g_states_np.shape[0]):
+            f_s_k_np, f_c_k_np = outer_op_fun(g_states_np[k], *args_np)
+            f_s_k_np, f_c_k_np = _normalize_result_np(f_s_k_np, f_c_k_np)
+            
+            all_f_states_list.append(f_s_k_np)
+            all_f_coeffs_list.append(g_coeffs_np[k, np.newaxis] * f_c_k_np) # Ensure broadcast
+
+        if not all_f_states_list:
+            return np.empty((0, g_states_np.shape[1]), dtype=g_states_np.dtype), np.empty((0,), dtype=g_coeffs_np.dtype)
+        
+        final_states = np.concatenate(all_f_states_list, axis=0)
+        final_coeffs = np.concatenate(all_f_coeffs_list, axis=0)
+        return final_states, final_coeffs
+    
+    #! Attempt Numba compilation; if it fails, use the pure Python/NumPy version.
+    try:
+        return _make_mul_int_njit(outer_op_fun, inner_op_fun) 
+    except Exception as e:
+        print("Numba compilation failed for _make_mul_np_njit. Falling back to pure NumPy version: ", e)
+        return mul_np_pure_python
+
+def _make_mul_jax_vmap(outer_op_fun_jax, inner_op_fun_jax):
+
+    if not JAX_AVAILABLE:
+        return None 
+        
+    if outer_op_fun_jax is None or inner_op_fun_jax is None:
+        return None
+
+    @jax.jit
+    def mul_jax_impl(s_initial, *args_for_ops): # args_for_ops are runtime args like site index
+        #! g(s)
+        g_s_array, g_c_array = inner_op_fun_jax(s_initial, *args_for_ops)
+        g_s_array, g_c_array = _normalize_result_jax(g_s_array, g_c_array)
+        # g_s_array: (N_g, D), g_c_array: (N_g,)
+
+        if g_s_array.shape[0] == 0:
+            state_dim = g_s_array.shape[1] if g_s_array.ndim == 2 and g_s_array.shape[1] > 0 else \
+                        (s_initial.shape[-1] if s_initial.ndim > 0 else 0)
+            if state_dim == 0 and g_s_array.ndim == 2:
+                state_dim = g_s_array.shape[1]
+            return jnp.empty((0, state_dim), dtype=g_s_array.dtype), jnp.empty((0,), dtype=g_c_array.dtype)
+
+        #! Define a function to process one output of g_jax: applies f and combines coeffs
+        def process_one_g_branch(g_state_single, g_coeff_single):
+            # f(g_state_single)
+            f_states_branch, f_coeffs_branch    = outer_op_fun_jax(g_state_single, *args_for_ops)
+            f_states_branch, f_coeffs_branch    = _normalize_result_jax(f_states_branch, f_coeffs_branch)
+            # f_states_branch: (N_f, D), f_coeffs_branch: (N_f,)
+            combined_coeffs_branch              = g_coeff_single * f_coeffs_branch
+            return f_states_branch, combined_coeffs_branch
+            
+        # Use jax.vmap to apply `process_one_g_branch` to all outputs of `g_jax`
+        # This maps over the first axis (branches) of g_s_array and g_c_array.
+        all_f_states_stacked, all_combined_coeffs_stacked = jax.vmap(process_one_g_branch, in_axes=(0, 0))(g_s_array, g_c_array)
+
+        # Flatten these results
+        final_D         = all_f_states_stacked.shape[-1]
+        final_states    = all_f_states_stacked.reshape(-1, final_D)
+        final_coeffs    = all_combined_coeffs_stacked.reshape(-1)
+        return final_states, final_coeffs
+    
+    try:
+        # Example call to force compilation and catch errors early (optional)
+        # This requires knowing typical shapes and dtypes for s_initial and args_for_ops
+        # For instance, if s_initial is (D,) and args_for_ops is empty for global ops:
+        # test_state = jnp.zeros((1,), dtype=jnp.float32) # Or a more representative state
+        # if necessary_args == 0: mul_jax_impl.lower(test_state).compile()
+        # elif necessary_args == 1: mul_jax_impl.lower(test_state, 0).compile()
+        # This is complex to generalize here. JAX will compile on first actual call.
+        pass
+    except jax.errors.JAXTypeError as e:
+        print(f"JAX compilation failed for _make_mul_jax_vmap: {e}. JAX operations will not be available for this composed operator.")
+        return None
+    return mul_jax_impl
+
+####################################################################################################
+#! Normalization functions
+####################################################################################################
+
+# @numba.njit(cache=True)
+def _normalize_result_np(states_raw, values_raw):
+    states_arr_in = np.asarray(states_raw)
+    values_arr_in = np.asarray(values_raw, dtype=np.float64)
+
+    values_out = np.atleast_1d(values_arr_in)
+    current_states_dtype = states_arr_in.dtype
+
+    # Determine the shape and content of states_out based on states_arr_in.ndim
+    # Each branch *must* produce a 2D states_out.
+
+    if states_arr_in.ndim == 0: # Scalar input
+        # Output: (1, 1) array
+        out_shape = (1, 1)
+        states_out = np.empty(out_shape, dtype=current_states_dtype)
+        states_out[0, 0] = states_arr_in.item()
+    elif states_arr_in.ndim == 1: # 1D input array
+        num_input_states_elements = states_arr_in.shape[0]
+        num_values = values_out.shape[0]
+
+        if num_input_states_elements == 0: # Empty 1D array (e.g. from states_raw=[])
+            out_shape = (0, 1) # Consistent (0,1) for empty list of scalars
+            states_out = np.empty(out_shape, dtype=current_states_dtype)
+        elif num_input_states_elements == num_values:
+            # N scalar states. Output: (N, 1) array
+            out_shape = (num_input_states_elements, 1)
+            states_out = np.empty(out_shape, dtype=current_states_dtype)
+            for i in range(num_input_states_elements):
+                states_out[i, 0] = states_arr_in[i]
+        else:
+            # Single vector state of D elements, to be repeated num_values times.
+            # Output: (num_values, D) array
+            state_dimension_D = num_input_states_elements
+            if num_values > 0 : # Only create if there are values to map to
+                out_shape = (num_values, state_dimension_D)
+                states_out = np.empty(out_shape, dtype=current_states_dtype)
+                for i in range(num_values):
+                    states_out[i, :] = states_arr_in # Assign 1D array to each row
+            else: # num_values is 0
+                out_shape = (0, state_dimension_D if state_dimension_D > 0 else 1)
+                states_out = np.empty(out_shape, dtype=current_states_dtype)
+
+    elif states_arr_in.ndim == 2: # 2D input array
+        # Assume it's already (N,D). Output: (N,D) array (a copy).
+        # Numba needs to know shape has 2 elements.
+        if len(states_arr_in.shape) == 2: # Guard
+             rows, cols = states_arr_in.shape
+             states_out = np.empty((rows, cols), dtype=current_states_dtype)
+             for r in range(rows):
+                 for c in range(cols):
+                     states_out[r,c] = states_arr_in[r,c]
+        else: # Should not happen if ndim == 2
+             states_out = np.empty((0,1), dtype=current_states_dtype) # Fallback 2D
+
+    else: # ndim > 2 or size == 0 but ndim is weird (e.g. ndim > 0 for empty)
+        # This includes states_arr_in.size == 0 if not caught by ndim 1 branch (e.g. np.empty((0,5)))
+        if states_arr_in.size == 0 :
+             # Determine a sensible default number of columns for empty 2D array
+             # If states_arr_in.ndim > 1, use its last dim, else 1.
+             cols_for_empty = 1
+             if states_arr_in.ndim > 1 and states_arr_in.shape[-1] >=0 : # shape[-1] could be 0 for (X,0)
+                 cols_for_empty = states_arr_in.shape[-1]
+             if cols_for_empty == 0 and states_arr_in.ndim <=1: # Avoid (0,0) if it was from 1D empty
+                 cols_for_empty = 1
+
+             states_out = np.empty((0, cols_for_empty), dtype=current_states_dtype)
+        else: # ndim > 2 and not empty
+             # Fallback for >2D: make it an empty (0,1) 2D array.
+             # Or attempt states_arr_in.reshape(-1, states_arr_in.shape[-1]) if feeling brave
+             states_out = np.empty((0, 1), dtype=current_states_dtype)
+        
+    return states_out, values_out
+
+@jax.jit
+def _normalize_result_jax(states, values):
+    """For the JAX backend: ensure states is 2D and values is 1D."""
+    states = jnp.asarray(states) # Input should already be jax array for jax functions
+    values = jnp.asarray(values)
+    
+    # If states is a scalar, make it (1,1)
+    if states.ndim == 0:
+        states = states.reshape(1, 1) 
+
+    states = jnp.atleast_2d(states)
+    values = jnp.atleast_1d(values)
+    return states, values
 
 ####################################################################################################
 
@@ -304,6 +464,7 @@ class OperatorFunction:
     
     _ERR_INVALID_ARG_NUMBER     = "Invalid number of arguments for the operator function. Expected {}, got {}."
     _ERR_WRONG_MULTIPLICATION   = "Invalid multiplication with type {}."
+
     # -----------
     
     def __init__(self,
@@ -321,14 +482,15 @@ class OperatorFunction:
             represented as integers or numpy arrays or JAX arrays. This enables the user to define
             any operator that can be applied to the state. The function shall return a list of pairs (state, value).
         """
-        self._fun_int           = fun_int
-        self._fun_np            = fun_np
-        self._fun_jax           = fun_jax
-        self._modifies_state    = modifies_state            # flag for the operator that modifies the state
-        self._necessary_args    = int(necessary_args)       # number of necessary arguments for the operator function
-        self._acting_type       = OperatorTypeActing.Global if self._necessary_args == 0 else \
-                                OperatorTypeActing.Local if self._necessary_args == 1 else \
-                                OperatorTypeActing.Correlation if self._necessary_args == 2 else OperatorTypeActing.Global
+        self._fun_int           =   fun_int
+        self._fun_np            =   fun_np
+        self._fun_jax           =   fun_jax
+        self._modifies_state    =   modifies_state            # flag for the operator that modifies the state
+        self._necessary_args    =   int(necessary_args)       # number of necessary arguments for the operator function
+        self._acting_type       =   OperatorTypeActing.Global       if self._necessary_args == 0 else \
+                                    OperatorTypeActing.Local        if self._necessary_args == 1 else \
+                                    OperatorTypeActing.Correlation  if self._necessary_args == 2 else OperatorTypeActing.Global
+    
     # -----------
     
     def _apply_global(self, s: Union[int, np.ndarray]) -> List[Tuple[Optional[Union[int]], Union[float, complex]]]:
@@ -345,7 +507,7 @@ class OperatorFunction:
         """
         
         # If the state is a JAX array, use the JAX function
-        if isinstance(s, jnp.ndarray) and self._fun_jax is not None:
+        if JAX_AVAILABLE and isinstance(s, jnp.ndarray) and self._fun_jax is not None:
             return self._fun_jax(s)
         # If the state is a NumPy array, use the NumPy function
         elif isinstance(s, (np.ndarray, List)) and self._fun_np is not None:
@@ -369,7 +531,7 @@ class OperatorFunction:
         """
         
         # If the state is a JAX array, use the JAX function
-        if isinstance(s, jnp.ndarray) and self._fun_jax is not None:
+        if JAX_AVAILABLE and isinstance(s, jnp.ndarray) and self._fun_jax is not None:
             return self._fun_jax(s, i)
         # If the state is a NumPy array, use the NumPy function
         elif isinstance(s, np.ndarray) and self._fun_np is not None:
@@ -394,7 +556,7 @@ class OperatorFunction:
             (or None if not applicable) and its corresponding value.
         """
         # If the state is a JAX array, use the JAX function
-        if isinstance(s, jnp.ndarray) and self._fun_jax is not None:
+        if JAX_AVAILABLE and isinstance(s, jnp.ndarray) and self._fun_jax is not None:
             # If the state is a JAX array, use the JAX function
             return self._fun_jax(s, i, j)
         elif isinstance(s, np.ndarray) and self._fun_np is not None:
@@ -514,36 +676,7 @@ class OperatorFunction:
     # -----------
     #! Composition
     # -----------
-    
-    @staticmethod
-    def _normalize_result_np(states, values):
-        """For the NumPy backend: ensure states is 2D and values is 1D."""
-        if states.ndim == 1:
-            states = states.reshape(1, -1)
-            values = np.atleast_1d(values)
-        return states, values
-
-    @staticmethod
-    def _normalize_result_jax(states, values):
-        """For the JAX backend: ensure states is 2D and values is 1D."""
-        states = jnp.atleast_2d(states)
-        values = jnp.atleast_1d(values)
-        return states, values
-    
-    # ----------
-
-    def _pack_result(self, norm_result):
-        """
-        Pack a normalized list of (state, value) pairs into a tuple of two NumPy arrays.
-        Returns:
-            (states, values) where states is a 2D np.array and values is a 1D np.array.
-        """
-        states_list = [st for st, _ in norm_result]
-        values_list = [val for _, val in norm_result]
-        return np.array(states_list), np.array(values_list)
-    
-    # ----------
-    
+        
     def _multiply_const(self, constant):
         """
         Multiply the operator by a constant value.
@@ -565,63 +698,86 @@ class OperatorFunction:
                 OperatorFunction: A new instance of OperatorFunction encapsulating the modified functions,
                                                     along with metadata about state modifications and necessary arguments.
         """
+        
+        if JAX_AVAILABLE and isinstance(constant, jax.Array):
+            pass
+        elif isinstance(constant, np.ndarray):  # Numpy array scalar
+            constant = constant.item()          # Convert to Python scalar
+        
         def mul_int(s, *args):
             st, val = self._fun_int(s, *args)
-            return st, val * constant
+            return st, np.array(val) * constant # Ensure val is array for broadcasting
 
-        # ------
-
-        # @numba.njit
+        @numba.njit(cache=True)
         def mul_np(s, *args):
-            st, val = self._fun_np(s, *args)
-            return st, val * constant
-
-        # ------
+            st, val = self._fun_np(s, *args)    # Assume fun_np returns (np.array, np.array)
+            return st, val * constant 
         
-        def mul_jax(s, *args):
-            st, val = self._fun_jax(s, *args)
-            return st, val * constant
-        if JAX_AVAILABLE:
-            mul_jax = jax.jit(mul_jax)
+        mul_jax_defined = False
+        if JAX_AVAILABLE and self._fun_jax is not None:
             
-        return OperatorFunction(mul_int, mul_np, mul_jax,
+            @jax.jit
+            def mul_jax_impl(s_jax, *args_jax):
+                st_jax, val_jax = self._fun_jax(s_jax, *args_jax)
+                return st_jax, val_jax * constant
+            mul_jax         = jax.jit(mul_jax_impl)
+            mul_jax_defined = True
+        else:
+            mul_jax         = None
+
+        return OperatorFunction(mul_int, mul_np, mul_jax if mul_jax_defined else None,
                         modifies_state=self._modifies_state,
                         necessary_args=self._necessary_args)
         
     # =========================================================================
-    # Composition: f * g  (i.e. (f * g)(s) = f(g(s)) )
+    #! Composition: f * g  (i.e. (f * g)(s) = f(g(s)) )
     # =========================================================================
     
-    def __mul__(self, 
-                other: Union[float, 'OperatorFunction']) -> 'OperatorFunction':
+    def __mul__(self, other: Union[float, 'OperatorFunction']) -> 'OperatorFunction':
 
-        #! path for scalar multiplication
-        if isinstance(other, _SCALARS):
+        is_python_scalar    = isinstance(other, _PYTHON_SCALARS)
+        is_jax_scalar       = False
+        if JAX_AVAILABLE:
+            is_jax_scalar   = isinstance(other, jax.Array) and other.ndim == 0
+        
+        if is_python_scalar or is_jax_scalar:
             return self._multiply_const(other)
         
         if not isinstance(other, OperatorFunction):
-            return NotImplemented
-        
-        #! acting consistency check
+            return NotImplementedError("Incompatible operator function")
+
+        #! Type consistency check for operator composition f * g (self is f, other is g)
         if self._acting_type != other._acting_type:
-            raise ValueError(
-                f"Operator acting type mismatch: {self._acting_type} vs {other._acting_type}"
-            )
-        new_args = max(self._necessary_args, other._necessary_args)
-        modifies = self._modifies_state or other._modifies_state        
+            raise ValueError(f"Operator acting type mismatch for composition: {self._acting_type} (f) vs {other._acting_type} (g)")
         
-        #! Check if the operator modifies the state
+        # The composed operator (f*g) modifies state if f modifies g's output, or if g modifies initial state.
+        # If f is diagonal (modifies_state=False), it doesn't change g's state structure.
+        # If f can change state (modifies_state=True), it can change g's output state.
+        composed_modifies_state = self._modifies_state or other._modifies_state
         
-        #--------
-        # Compose as: (f * g)(s) = f(g(s))
-        #--------
+        # Number of arguments for the composed operator
+        # This is correct due to the acting_type check ensuring they are compatible.
+        composed_necessary_args = self._necessary_args 
+        #? or max(self._necessary_args, other._necessary_args)
+
+        # Create composed functions: (f * g)(s) = f(g(s))
+        # self._fun_xxx is f, other._fun_xxx is g
         
-        return OperatorFunction(_make_mul_int_njit(self._fun_int, other._fun_int, modifies),
-                                _make_mul_np_njit(self._fun_np, other._fun_np, modifies),
-                                _make_mul_jax(self._fun_jax, other._fun_jax, modifies),
-                                modifies_state=modifies,
-                                necessary_args=new_args,
-                                acting_type=self._acting_type)
+        # Note on branching: Current _make_mul_int/np_njit take f_coeff[0], f_state[0].
+        # This means if f (self) branches, only its first branch is propagated.
+        # The new _make_mul_jax_vmap handles branching in f.
+        
+        composed_fun_int = _make_mul_int_njit(self._fun_int, other._fun_int)
+        composed_fun_np  = _make_mul_np_njit(self._fun_np, other._fun_np)
+        composed_fun_jax = _make_mul_jax_vmap(self._fun_jax, other._fun_jax) if JAX_AVAILABLE else None
+        
+        return OperatorFunction(
+            composed_fun_int,
+            composed_fun_np,
+            composed_fun_jax,
+            modifies_state=composed_modifies_state,
+            necessary_args=composed_necessary_args
+        )
             
     # -----------
     
@@ -645,29 +801,38 @@ class OperatorFunction:
         OperatorFunction
             A new operator function representing the reverse composition.
         """
-        #! path for scalar multiplication
-        if isinstance(other, _SCALARS):
-            return self._multiply_const(other)
+        is_python_scalar    = isinstance(other, _PYTHON_SCALARS)
+        is_jax_scalar       = False
+        if JAX_AVAILABLE:
+            is_jax_scalar   = isinstance(other, jax.Array) and other.ndim == 0
+
+        if is_python_scalar or is_jax_scalar:
+            return self._multiply_const(other) 
+        
         if not isinstance(other, OperatorFunction):
-            return NotImplemented
-        #! acting consistency check
-        if self._acting_type != other._acting_type:
-            raise ValueError(
-                f"Operator acting type mismatch: {self._acting_type} vs {other.acting_type}"
-            )
-        new_args = max(self._necessary_args, other._necessary_args)
-        modifies = self._modifies_state or other._modifies_state
-        #! Check if the operator modifies the state
-        #--------
-        # Compose as: (f * g)(s) = f(g(s))
-        #--------
-        rmul_int = _make_mul_int_njit(self._fun_int, other._fun_int, modifies)
-        rmul_np  = _make_mul_np_njit(self._fun_np, other._fun_np, modifies)
-        rmul_jax = _make_mul_jax(self._fun_jax, other._fun_jax, modifies)
-        return OperatorFunction(rmul_int, rmul_np, rmul_jax,
-                                modifies_state=self._modifies_state or other._modifies_state,
-                                necessary_args=new_args)
-    
+            return NotImplementedError("Incompatible operator function")
+
+        # For other * self (g * f), where g is `other`, f is `self`
+        if other._acting_type != self._acting_type:
+            raise ValueError(f"Operator acting type mismatch for composition: {other._acting_type} (g) vs {self._acting_type} (f)")
+        
+        composed_modifies_state = other._modifies_state or self._modifies_state
+        composed_necessary_args = self._necessary_args # From check, same as other._necessary_args
+
+        # Create composed functions: (g * f)(s) = g(f(s))
+        # other._fun_xxx is g, self._fun_xxx is f
+        composed_fun_int = _make_mul_int_njit(other._fun_int, self._fun_int)
+        composed_fun_np  = _make_mul_np_njit(other._fun_np, self._fun_np)
+        composed_fun_jax = _make_mul_jax_vmap(other._fun_jax, self._fun_jax) if JAX_AVAILABLE else None
+
+        return OperatorFunction(
+            composed_fun_int,
+            composed_fun_np,
+            composed_fun_jax,
+            modifies_state=composed_modifies_state,
+            necessary_args=composed_necessary_args
+        )
+
     # -----------
     
     def __getitem__(self, other):
@@ -699,14 +864,14 @@ class OperatorFunction:
         """
         # Pure Python / NumPy version.
         def add_int(s, *args):
-            result_f            = np.array(self(s, *args))
-            result_g            = np.array(other(s, *args))
+            result_f                = np.array(self(s, *args))
+            result_g                = np.array(other(s, *args))
             # Extract states and values.
-            states_f, values_f  = result_f[:, 0], result_f[:, 1]
-            states_g, values_g  = result_g[:, 0], result_g[:, 1]
+            states_f, values_f      = result_f[:, 0], result_f[:, 1]
+            states_g, values_g      = result_g[:, 0], result_g[:, 1]
             # Combine results.
-            combined_states     = np.concatenate([states_f, states_g])
-            combined_values     = np.concatenate([values_f, values_g])
+            combined_states         = np.concatenate([states_f, states_g])
+            combined_values         = np.concatenate([values_f, values_g])
             # Get unique states and sum the corresponding values.
             unique_states, indices  = np.unique(combined_states, return_inverse=True)
             summed_values           = np.zeros_like(unique_states, dtype=complex)
@@ -799,7 +964,7 @@ class OperatorFunction:
     #! Wrapping
     # -----------
     
-    def wrap(self, *args):
+    def wrap(self, *fixed_args):
         """
         Wraps the operator functions with additional fixed arguments, returning a new OperatorFunction
         that encapsulates integer, numpy, and (if available) JAX implementations.
@@ -819,58 +984,26 @@ class OperatorFunction:
                 from the current operator instance.
         """
         
+        new_necessary_args = self._necessary_args - len(fixed_args)
+        if new_necessary_args < 0:
+            raise ValueError("Too many arguments provided for wrapping.")
+
+        def wrap_int(s, *runtime_args):
+            return self._fun_int(s, *(fixed_args + runtime_args))
         
-        def wrap_int(s, *more_args):
-            return self._fun_int(s, *(args + more_args))
-        def wrap_np(s, *more_args):
-            return self._fun_np(s, *(args + more_args))
-        def wrap_jax(s, *more_args):
-            return self._fun_jax(s, *(args + more_args))
+        def wrap_np(s, *runtime_args):
+            return self._fun_np(s, *(fixed_args + runtime_args))
         
-        if JAX_AVAILABLE:
-            wrap_jax = jax.jit(wrap_jax)
-        
-        return OperatorFunction(wrap_int, wrap_np, wrap_jax,
+        wrapped_fun_jax = None
+        if JAX_AVAILABLE and self._fun_jax is not None:
+            def wrap_jax_impl(s_jax, *runtime_args_jax):
+                return self._fun_jax(s_jax, *(fixed_args + runtime_args_jax))
+            wrapped_fun_jax = jax.jit(wrap_jax_impl)
+
+        return OperatorFunction(wrap_int, wrap_np, wrapped_fun_jax,
                                 modifies_state=self._modifies_state,
-                                necessary_args=self._necessary_args)
-    
-    # -----------
+                                necessary_args=new_necessary_args)
 
-####################################################################################################
-
-@unique
-class OperatorTypeActing(Enum):
-    """
-    Enumerates the types of operators acting on the system.
-    """
-    
-    Global      = auto()    # Global operator - acts on the whole system (does not need additional arguments).
-    Local       = auto()    # Local operator - acts on the local physical space (needs additional argument - 1).
-    Correlation = auto()    # Correlation operator - acts on the correlation space (needs additional argument - 2).
-    # -----------
-    
-    def is_global(self):
-        """
-        Check if the operator is a global operator.
-        """
-        return self == OperatorTypeActing.Global
-    
-    # -----------
-    
-    def is_local(self):
-        """
-        Check if the operator is a local operator.
-        """
-        return self == OperatorTypeActing.Local
-    
-    # -----------
-    
-    def is_correlation(self):
-        """
-        Check if the operator is a correlation operator.
-        """
-        return self == OperatorTypeActing.Correlation
-    
     # -----------
 
 ####################################################################################################
@@ -880,8 +1013,34 @@ class Operator(ABC):
     A class to represent a general operator acting on a Hilbert space.
     
     Attributes:
+        - op_fun (OperatorFunction):
+            The operator function that defines the operator.
+        - fun_int (Callable):
+            The function defining the operator for integer states.
+        - fun_np (Optional[Callable]):
+            The function defining the operator for NumPy array states.
+        - fun_jnp (Optional[Callable]):
+            The function defining the operator for JAX array states.
+        - eigval (float):
+            The eigenvalue of the operator.
+        - lattice (Optional[Lattice]):
+            The lattice object representing the physical system.
+        - ns (Optional[int]):
+            The number of sites in the system.
+        - typek (Optional[SymmetryGenerators]):
+            The symmetry generators of the operator.
+        - name (str):
+            The name of the operator.
+        - modifies (bool):
+            Flag for the operator that modifies the state.
+        - quadratic (bool):
+            Flag for the quadratic operator.
+        - backend (str):
+            The backend for the operator (default is 'default').
+        - backend_sp (str):
+            The backend for the operator (default is 'default').
     """
-    
+
     _INVALID_OPERATION_TYPE_ERROR = "Invalid type for function. Expected a callable function."
     _INVALID_SYSTEM_SIZE_PROVIDED = "Invalid system size provided. Number of sites or a lattice object must be provided."
     _INVALID_FUNCTION_NONE        = "Invalid number of necessary arguments for the operator function."
@@ -906,23 +1065,37 @@ class Operator(ABC):
         Initialize the GeneralOperator object.
         
         Args:
-            Ns (int)            : The number of sites in the system.
-            Nhl (int)           : The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
-            Nhint (int)         : The number of modes (fermions, bosons, etc. on each site).
-            lattice (Lattice)   : The lattice object.
-            name (str)          : The name of the operator.
-            type (str)          : The type of the operator.
-            eigval              : The eigenvalue of the operator (default is 1.0).
-            quadratic (bool)    : Flag for the quadratic operator.
-            acton (bool)        : Flag for the action of the operator on the local physical space.
-            modifies (bool)     : Flag for the operator that modifies the state.
-            backend (str)       : The backend for the operator - for using linear algebra libraries, not integer representation.
-            
-            Important arguments:
-            - fun (Callable | OperatorFunction) : The function that defines the operator - it shall take a state 
-                (or a list of states) and return the transformed state (or a list of states). States can be 
-                represented as integers or numpy arrays or JAX arrays. This enables the user to define
-                any operator that can be applied to the state. The function shall return a list of pairs (state, value).
+            Ns (int) :
+                The number of sites in the system.
+            Nhl (int) :
+                The local Hilbert space dimension - 2 for spin-1/2, 4 for spin-1, etc (default is 2).
+            Nhint (int) :
+                The number of modes (fermions, bosons, etc. on each site).
+            lattice (Lattice)   :
+                The lattice object.
+            name (str)          :
+                The name of the operator.
+            type (str)          :
+                The type of the operator.
+            eigval              :
+                The eigenvalue of the operator (default is 1.0).
+            quadratic (bool)    :
+                Flag for the quadratic operator.
+            acton (bool)        :
+                Flag for the action of the operator on the local physical space.
+            modifies (bool)     :
+                Flag for the operator that modifies the state.
+            backend (str)       :
+                The backend for the operator (default is 'default').
+            fun_int (callable)  :
+                The function that defines the operator - it shall take a state (or a list of states) 
+                and return the transformed state (or a list of states). States can be represented as 
+                integers or numpy arrays or JAX arrays. This enables the user to define any operator 
+                that can be applied to the state. The function shall return a list of pairs (state, value).
+            fun_np (callable)   :
+                The function that defines the operator for NumPy arrays.
+            fun_jnp (callable)  :
+                The function that defines the operator for JAX arrays.
         """
         
         # handle the system phyisical size dimension and the lattice
@@ -951,7 +1124,7 @@ class Operator(ABC):
         self._acton         = kwargs.get('acton', False)            # flag for the action of the operator on the local physical space
         self._modifies      = modifies                              # flag for the operator that modifies the state
         self._matrix_fun    = None                                  # the function that defines the matrix form of the operator - if not provided, the matrix is generated from the function fun
-        self._necessary_args= 0                                     # number of necessary arguments for the operator function
+        self._necessary_args= kwargs.get("necessary_args", 0)       # number of necessary arguments for the operator function
         self._fun           = None                                  # the function that defines the operator - it is set to None if not provided
         self._init_functions(op_fun, fun_int, fun_np, fun_jnp)      # initialize the operator function
     
@@ -959,8 +1132,8 @@ class Operator(ABC):
         """
         String representation of the operator.
         """
-        return f"Operator({self._name}, eigval={self._eigval}, type={self._type.name})"
-    
+        return f"Operator({self._name}, type_acting={self.type_acting.name}, eigval={self._eigval}, type={self._type.name})"
+        
     #################################
     #! Initialize functions
     #################################
@@ -1056,12 +1229,9 @@ class Operator(ABC):
     
     def __imul__(self, scalar):
         """ *= Operator for a general operator """
-        
         self._fun = self._fun * scalar
         return self
-    
-    # -------------------------------
-    
+        
     def __itruediv__(self, scalar):
         """ /= Operator with Division by Zero Check """
         
@@ -1075,63 +1245,52 @@ class Operator(ABC):
     
     # -------------------------------
     
-    def __rmul__(self, other):
-        """
-        Right multiplication of the operator by another operator or a scalar.
-        In particular for an operator O and a scalar s, the operation O * s is defined.
-        """
-        
-        if isinstance(other, Operator):
-            name        = f"{self._name} * {other._name}"
-            function_m  = self._fun * other._fun
-        elif isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
-            name = f"{self._name} * {other}"
-            function_m  = self._fun * other
-        else:
-            raise ValueError(f"Invalid type for multiplication.{type(other)}")
-        
-        return Operator(
-            op_fun      = function_m,
-            eigval      = self._eigval,
-            lattice     = self._lattice,
-            ns          = self._ns,
-            typek       = self._type,
-            name        = name,
-            modifies    = self._modifies,
-            quadratic   = self._quadratic,
-            acton       = self._acton,
-            backend     = self._backend_str,
-            **self.__dict__)
-    
-    # -------------------------------
-    
     def __mul__(self, other):
-        """
-        Multiplication of the operator by another operator or a scalar.
-        In particular for an operator O and a scalar s, the operation s * O is defined.
-        """
-        
+        new_kwargs = self.__dict__.copy()
+        new_kwargs.pop('_fun', None)    # Remove _fun, it will be new
+        new_kwargs.pop('_name', None)   # Remove _name, it will be new
+        new_kwargs.pop('_eigval', None) # Eigval handled separately or combined if meaningful
+
         if isinstance(other, Operator):
-            name            = f"{self._name} * {other._name}"
-            function_m      = other._fun * self._fun
-        elif isinstance(other, (int, float, complex, np.int64, np.float64, np.complex128)):
-            name = f"{self._name} * {other}"
-            function_m      = other * self._fun
+            new_fun                 = self._fun * other._fun
+            #! If eigvals are simple scalars, product makes sense.
+            new_eigval              = self._eigval * other._eigval 
+            new_name                = f"({self._name} * {other._name})"
+            # Modifies state is handled by OperatorFunction composition
+            # Quadratic, acton etc. might need rules for combining
+            # For now, inherit from self, or define combination rules
+            new_kwargs['quadratic'] = self._quadratic or other._quadratic #? what to do here?
+        elif isinstance(other, _PYTHON_SCALARS) or (JAX_AVAILABLE and isinstance(other, jax.Array) and other.ndim == 0):
+            new_fun                 = self._fun * other
+            new_eigval              = self._eigval * other
+            new_name                = f"({self._name} * {other})"
         else:
-            raise ValueError(f"Invalid type for multiplication.{type(other)}")
+            return NotImplementedError("Incompatible operator function")
+        return Operator(op_fun=new_fun, name=new_name, eigval=new_eigval,
+                        ns=new_kwargs['_ns'],
+                        lattice=new_kwargs['_lattice'], modifies=new_kwargs['_modifies'],
+                        backend=new_kwargs['_backend'], **new_kwargs)
         
-        return Operator(
-            op_fun      = function_m,
-            eigval      = self._eigval,
-            lattice     = self._lattice,
-            ns          = self._ns,
-            typek       = self._type,
-            name        = name,
-            modifies    = self._modifies,
-            quadratic   = self._quadratic,
-            acton       = self._acton,
-            backend     = self._backend_str,
-            **self.__dict__)
+
+    def __rmul__(self, other):
+        new_kwargs = self.__dict__.copy()
+        new_kwargs.pop('_fun', None)
+        new_kwargs.pop('_name', None)
+        new_kwargs.pop('_eigval', None)
+
+        if isinstance(other, _PYTHON_SCALARS) or (JAX_AVAILABLE and isinstance(other, jax.Array) and other.ndim == 0):
+            new_fun     = other * self._fun # OperatorFunction scalar rmul (same as mul)
+            new_eigval  = other * self._eigval
+            new_name    = f"({other} * {self._name})"
+        elif isinstance(other, Operator):
+            new_fun     = other._fun * self._fun
+            #! If eigvals are simple scalars, product makes sense.
+            new_eigval  = other._eigval * self._eigval
+            new_name    = f"({other._name} * {self._name})"
+        else:
+            return NotImplementedError("Incompatible operator function")
+        
+        return Operator(op_fun=new_fun, name=new_name, eigval=new_eigval, **new_kwargs)
     
     # -------------------------------
     
@@ -1149,9 +1308,7 @@ class Operator(ABC):
         else:
             raise ValueError(f"Invalid type for multiplication.{type(scalar)}")
         return None
-    
-    # -------------------------------
-    
+        
     def __rtruediv__(self, scalar):
         """
         Division of a scalar by the operator.
@@ -1163,8 +1320,7 @@ class Operator(ABC):
         else:
             raise ValueError(f"Invalid type for multiplication.{type(scalar)}")
         return None
-    # -------------------------------
-    
+        
     #################################
     #! Setters and Getters
     #################################
@@ -1454,6 +1610,8 @@ class Operator(ABC):
         """
         Generate the matrix form of the operator without Hilbert space.
         """
+        from Algebra.hilbert import HilbertSpace
+        
         # create a dummy Hilbert space for convenience
         dummy_hilbert = HilbertSpace(nh = dim, backend = self._backend)
         dummy_hilbert.log("Calculating the Hamiltonian matrix using JAX...", lvl = 2)
@@ -1577,8 +1735,10 @@ def create_operator(type_act        : int | OperatorTypeActing,
     """
     Create a general operator that distinguishes the type of operator action (global, local, correlation)
     and wraps the provided operator functions for int, NumPy, and JAX. The operator functions must have
-    the signature: (state, *args) -> (new_state, op_value) for global or (state, site, *args) for local,
-    and (state, site1, site2, *args) for correlation.
+    the signature:
+        - (state, *args) -> (new_state, op_value) for global
+        - or (state, site, *args) for local,
+        - and (state, site1, site2, *args) for correlation.
     
     ---
     Note:
@@ -1621,15 +1781,20 @@ def create_operator(type_act        : int | OperatorTypeActing,
         Operator:
             An operator object with fun_int, fun_np, fun_jnp methods appropriately wrapped.
     """
-    # Ensure we know ns.
+    
+    # Ensure we know ns - the number of sites or modes for the operator
     if lattice is not None:
         ns = lattice.ns
     else:
         assert ns is not None, "Either lattice or ns must be provided."
     
-    sites_jnp = jnp.array(sites, dtype = jnp.int64) if sites is not None and JAX_AVAILABLE else sites
+    # Convert sites to JAX array if JAX is available
+    if JAX_AVAILABLE:
+        sites_jnp = jnp.array(sites, dtype = jnp.int64) if sites is not None and JAX_AVAILABLE else sites
+    else:
+        sites_jnp = sites
     
-    # Global operator: the operator acts on a specified set of sites (or all if sites is None)
+    #! Global operator: the operator acts on a specified set of sites (or all if sites is None)
     if type_act == OperatorTypeActing.Global or sites is not None:
         
         # If sites is None, we act on all sites.
@@ -1642,7 +1807,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         else:
             sites_jnp   = sites_np
         
-        # @numba.njit
+        @numba.njit
         def fun_int(state):
             return op_func_int(state, ns, sites, *extra_args)
         
@@ -1670,15 +1835,15 @@ def create_operator(type_act        : int | OperatorTypeActing,
                         typek   = SymmetryGenerators.Other,
                         modifies= modifies)
     
-    # Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
+    #! Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
     elif type_act == OperatorTypeActing.Local:
         
-        @numba.njit(inline="always")
+        # @numba.njit
         def fun_int(state, i):
             sites_1 = np.array([i], dtype=np.int32)
             return op_func_int(state, ns, sites_1, *extra_args)
         
-        @numba.njit(inline="always")
+        @numba.njit
         def fun_np(state, i):
             sites_1 = np.array([i], dtype=np.int32)
             return op_func_np(state, sites_1, *extra_args)
@@ -1702,7 +1867,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
                         typek   = SymmetryGenerators.Other,
                         modifies= modifies)
     
-    # Correlation operator: the operator acts on a pair of sites.
+    #! Correlation operator: the operator acts on a pair of sites.
     elif type_act == OperatorTypeActing.Correlation:
         
         @numba.njit
@@ -1716,7 +1881,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             return op_func_np(state, sites_2, *extra_args)
         
         if JAX_AVAILABLE:
-            @partial(jax.jit)
+            @jax.jit
             def fun_jnp(state, i, j):
                 sites_jnp = jnp.array([i, j], dtype = jnp.int64)
                 return op_func_jnp(state, sites_jnp, *extra_args)
