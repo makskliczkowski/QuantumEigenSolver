@@ -38,6 +38,7 @@ if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax.experimental import sparse
+    
 else:
     jax     = None
     jnp     = None
@@ -1801,7 +1802,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         if sites is None or len(sites) == 0:
             sites = list(range(ns))
         sites           = tuple(sites) if isinstance(sites, list) else sites
-        sites_np        = np.array(sites, dtype = np.int64)
+        sites_np        = np.array(sites, dtype = np.int32)
         if JAX_AVAILABLE:
             sites_jnp   = jnp.array(sites, dtype = jnp.int64)
         else:
@@ -1817,7 +1818,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         
         if JAX_AVAILABLE:
             @jax.jit
-            def fun_jnp(state):
+            def fun_jnp(state, sites):
                 return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state):
@@ -1851,7 +1852,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state, i):
-                sites_jnp = jnp.array([i], dtype = jnp.int64)
+                sites_jnp   = jnp.array([i], dtype = jnp.int32)
                 return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i):
@@ -1883,7 +1884,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
         if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state, i, j):
-                sites_jnp = jnp.array([i, j], dtype = jnp.int64)
+                sites_jnp = jnp.array([i, j], dtype = jnp.int32)
                 return op_func_jnp(state, sites_jnp, *extra_args)
         else:
             def fun_jnp(state, i, j):
@@ -1951,6 +1952,100 @@ def create_add_operator(operator: Operator, multiplier: Union[float, int, comple
     # create the operator tuple
     return (operator, sites_arg, multiplier)
 
+####################################################################################################
+#! Operator shape
+####################################################################################################
+
+@numba.njit
+def ensure_operator_output_shape_numba(state_out : np.ndarray, coeff_out : np.ndarray):
+    r"""
+    Ensure (state, coeff) output is 2D-batched: (N, L), (N,)
+    where N is the number of states and L is the dimension of the state.
+    Using Numba for JIT compilation.
+    
+    Parameters:
+        state_out (jnp.ndarray):
+        The output state array.
+        coeff_out (jnp.ndarray):
+        The output coefficient array.
+    Returns:
+        Tuple[jnp.ndarray, jnp.ndarray]:
+        A tuple containing the reshaped state and coefficient arrays.
+        With the first dimension being the number of states that the operator returns
+        and the second dimension being the dimension of the state.
+        This corresponds to matrix elements of the operator:
+        .. math::
+            \{\, |s'\rangle,\ \langle s'|O|s\rangle\,\}
+    """
+    if state_out.ndim == 1:
+        state_out = state_out.reshape(1, state_out.shape[0])
+    if coeff_out.ndim == 0:
+        coeff_out = np.array([coeff_out])
+    return state_out, coeff_out
+
+if JAX_AVAILABLE:
+    @jax.jit
+    def ensure_operator_output_shape_jax(state_out  : jnp.ndarray,
+                                        coeff_out   : jnp.ndarray):
+        r"""
+        Ensure (state, coeff) output is 2D-batched: (N, L), (N,)
+        where N is the number of states and L is the dimension of the state.
+        Using JAX for JIT compilation.
+
+        Parameters:
+            state_out (jnp.ndarray):
+            The output state array.
+            coeff_out (jnp.ndarray):
+            The output coefficient array.
+        Returns:
+            Tuple[jnp.ndarray, jnp.ndarray]:
+            A tuple containing the reshaped state and coefficient arrays.
+            With the first dimension being the number of states that the operator returns
+            and the second dimension being the dimension of the state.
+            This corresponds to matrix elements of the operator:
+            .. math::
+                \{\, |s'\rangle,\ \langle s'|O|s\rangle\,\}
+        """
+        # Convert scalars to arrays
+        state_out = jnp.atleast_1d(state_out)
+        coeff_out = jnp.atleast_1d(coeff_out)
+
+        # Handle scalar state (single integer)
+        if state_out.ndim == 1 and coeff_out.shape[0] == 1:
+            state_out = state_out.reshape(1, -1)  # (1, 1) or (1, L)
+        elif state_out.ndim == 2:
+            # already batched: do nothing
+            pass
+        else:
+            raise ValueError("Unsupported state_out shape for JAX.")
+
+        return state_out, coeff_out
+else:
+    def ensure_operator_output_shape_jax(state_out  : np.ndarray,
+                                        coeff_out   : np.ndarray):
+        r"""
+        Ensure (state, coeff) output is 2D-batched: (N, L), (N,)
+        where N is the number of states and L is the dimension of the state.
+        Using JAX for JIT compilation.
+
+        Parameters:
+            state_out (jnp.ndarray):
+            The output state array.
+            coeff_out (jnp.ndarray):
+            The output coefficient array.
+        Returns:
+            Tuple[jnp.ndarray, jnp.ndarray]:
+            A tuple containing the reshaped state and coefficient arrays.
+            With the first dimension being the number of states that the operator returns
+            and the second dimension being the dimension of the state.
+            This corresponds to matrix elements of the operator:
+            .. math::
+                \{\, |s'\rangle,\ \langle s'|O|s\rangle\,\}
+        """
+        return ensure_operator_output_shape_numba(state_out, coeff_out)
+
+####################################################################################################
+#! Test the operator
 ####################################################################################################
 
 def test_operators(op,
@@ -2093,4 +2188,6 @@ def test_operators(op,
         display(df)    
     return df
 
-#####################################################################################################
+###################################################################################################
+#! End of file
+###################################################################################################
