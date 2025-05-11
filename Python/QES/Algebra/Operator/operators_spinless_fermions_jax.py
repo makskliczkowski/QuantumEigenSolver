@@ -49,6 +49,7 @@ from typing import List, Union, Optional, Callable, Sequence
 from functools import partial
 
 from general_python.algebra.utils import JAX_AVAILABLE, Array, DEFAULT_JP_FLOAT_TYPE, DEFAULT_JP_CPX_TYPE, DEFAULT_JP_INT_TYPE
+from Algebra.Operator.operator import ensure_operator_output_shape_jax
 import general_python.common.binary as _binary
 
 if JAX_AVAILABLE:
@@ -121,7 +122,8 @@ if JAX_AVAILABLE:
             coeff  *= pref ** n_sites
             return (jnp.array([new_state], dtype=_DEFAULT_INT),
                     jnp.array([coeff],     dtype=_DEFAULT_FLOAT))
-
+        # st, coeff = lax.cond(any_occ, _abort, _apply, operand=None)
+        # return ensure_operator_output_shape_jax(st, coeff)
         return lax.cond(any_occ, _abort, _apply, operand=None)
     
     @jit
@@ -151,7 +153,8 @@ if JAX_AVAILABLE:
             coeff  *= pref ** n_sites
             return (jnp.array([new_state], dtype=_DEFAULT_INT),
                     jnp.array([coeff],     dtype=_DEFAULT_FLOAT))
-
+        # st, coeff = lax.cond(any_empty, _abort, _apply, operand=None)
+        # return ensure_operator_output_shape_jax(st, coeff)
         return lax.cond(any_empty, _abort, _apply, operand=None)
     
     @jit
@@ -180,8 +183,9 @@ if JAX_AVAILABLE:
             n_sites = sites.shape[0]
             coeff  *= pref ** n_sites
             return new_state, coeff
-
-        return lax.cond(any_occ, _abort, _apply, operand=None)
+        st, coeff = lax.cond(any_occ, _abort, _apply, operand=None)
+        return ensure_operator_output_shape_jax(st, coeff)
+        # return lax.cond(any_occ, _abort, _apply, operand=None)
 
     @jit
     def c_jnp(state : jnp.ndarray,
@@ -205,8 +209,9 @@ if JAX_AVAILABLE:
             n_sites = sites.shape[0]
             coeff  *= pref ** n_sites
             return new_state, coeff
-
-        return lax.cond(any_empty, _abort, _apply, operand=None)
+        
+        st, coeff = lax.cond(any_empty, _abort, _apply, operand=None)
+        return ensure_operator_output_shape_jax(st, coeff)
     
     # ========================================================================
     #! JAX vectorised operators
@@ -299,7 +304,8 @@ if JAX_AVAILABLE:
         coeffs         = coeffs * (1.0 - bits)                            # only empty
 
         norm           = jnp.sqrt(jnp.maximum(jnp.count_nonzero(coeffs), 1))
-        return new_states, coeffs / norm
+        return ensure_operator_output_shape_jax(new_states, coeffs / norm)
+        # return new_states, coeffs / norm
 
     # ========================================================================
     
@@ -367,7 +373,8 @@ if JAX_AVAILABLE:
         """
         occ_prod  = jnp.prod(state[sites], dtype=_DEFAULT_FLOAT)
         coeff_val = occ_prod * (prefactor ** sites.size)
-        return state, coeff_val
+        return ensure_operator_output_shape_jax(state, coeff_val)
+        # return state, coeff_val
     
 else:
     jax = jnp = lax = jit = None

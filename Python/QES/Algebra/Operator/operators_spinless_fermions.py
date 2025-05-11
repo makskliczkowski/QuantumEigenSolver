@@ -109,7 +109,10 @@ import numba
 from typing import List, Union, Optional, Callable
 
 ################################################################################
-from Algebra.Operator.operator import Operator, OperatorTypeActing, SymmetryGenerators, create_operator
+from Algebra.Operator.operator import (
+    Operator, OperatorTypeActing, SymmetryGenerators, create_operator,
+    ensure_operator_output_shape_numba
+)
 ################################################################################
 
 from general_python.common.tests import GeneralAlgebraicTest
@@ -223,7 +226,7 @@ def c_dag_int_np(state      : int,
     
     new_state = state
     coeff_val = 1.0
-
+    
     for site in sites:
         pos = ns - 1 - site
 
@@ -235,12 +238,12 @@ def c_dag_int_np(state      : int,
 
         sign        = f_parity_int(new_state, ns, site)
         new_state   = _flip(new_state, pos)
-        coeff_val  *= sign
+        coeff_val  *= sign * prefactor
         
     out_state       = np.empty(1, dtype=_DEFAULT_INT)
     out_coeff       = np.empty(1, dtype=_DEFAULT_FLOAT)
     out_state[0]    = new_state
-    out_coeff[0]    = coeff_val
+    out_coeff[0]    = coeff_val 
     return out_state, out_coeff
 
 @numba.njit
@@ -284,8 +287,7 @@ def c_int_np(state       : int,
             coeff_val = 0.0
             new_state = state
             break
-        
-        sign        = f_parity_int(new_state, ns, pos)
+        sign        = f_parity_int(new_state, ns, site)
         new_state   = _flip(new_state, pos)
         coeff_val  *= sign * prefactor
     
@@ -327,14 +329,19 @@ def c_dag_np(state      : np.ndarray,
     -----
     This function modifies the input state in-place. The sign is determined by the fermionic parity up to the given site.
     """
-    sign = 1.0
+    sign    = 1.0
+    coeff   = np.ones(1, dtype=_DEFAULT_FLOAT)
+    out     = state.copy()
     for site in sites:
-        if state[site] > 0: # already occupied
-            return state, 0.0
-        sign       *= f_parity_np(state, site)
-        state[site] = 1
-    n_sites = sites.shape[0]
-    return state, sign * prefactor**n_sites
+        if out[site] > 0: # already occupied
+            coeff *= 0.0
+            break
+        sign       *= f_parity_np(out, site)
+        out[site]   = 1
+    n_sites  = sites.shape[0]
+    coeff   *= sign * prefactor**n_sites
+    return ensure_operator_output_shape_numba(out, coeff)
+    # return state, sign * prefactor**n_sites
 
 @numba.njit
 def c_np(state       : np.ndarray,
@@ -365,13 +372,19 @@ def c_np(state       : np.ndarray,
     The function uses the Jordan-Wigner transformation convention, where the sign is determined
     by the parity of occupied sites to the left of the target site.
     """
+    
+    coeff   = np.ones(1, dtype=_DEFAULT_FLOAT)
+    out     = state.copy()
     for site in sites:
-        if state[site] == 0:
-            return state, 0.0
-        sign        = f_parity_np(state, site)
-        state[site] = 0
-    n_sites = sites.shape[0]
-    return state, sign * prefactor**n_sites
+        if out[site] == 0:
+            coeff *= 0.0
+            break
+        sign        = f_parity_np(out, site)
+        out[site] = 0
+    n_sites  = sites.shape[0]
+    coeff   *= sign * prefactor**n_sites
+    return ensure_operator_output_shape_numba(out, coeff)
+    # return state, sign * prefactor**n_sites
 
 ###############################################################################
 #!  Momentum-space fermionic operator  c_k and c_k†
@@ -452,16 +465,17 @@ def c_k_np(state       : np.ndarray,
             continue
 
         tmp_state     = state.copy()
-        tmp_state, c  = c_np(tmp_state, i, prefactor)   # local c_i
+        tmp_state, c  = c_np(tmp_state, i, prefactor) # local c_i
         if c == 0.0:
             continue
 
         out_state[index, :] = tmp_state
         out_coeff[index]    = c * np.exp(-1j * k * i)
         index              += 1
-
-    return (out_state[:index],
-            out_coeff[:index] / np.sqrt(max(index, 1)))
+    return ensure_operator_output_shape_numba(out_state[:index],
+            out_coeff[:index] / np.sqrt(np.max(index, 1)))    
+    # return (out_state[:index],
+    #         out_coeff[:index] / np.sqrt(max(index, 1)))
 
 @numba.njit
 def c_k_dag_int_np(state      : int,
@@ -555,9 +569,10 @@ def c_k_dag_np(state       : np.ndarray,
         out_state[index, :] = tmp_state
         out_coeff[index]    = c * np.exp(1j * k * i)
         index              += 1
-
-    return (out_state[:index],
-            out_coeff[:index] / np.sqrt(max(index, 1)))
+    return ensure_operator_output_shape_numba(out_state[:index],
+            out_coeff[:index] / np.sqrt(np.max(index, 1)))
+    # return (out_state[:index],
+            # out_coeff[:index] / np.sqrt(max(index, 1)))
 
 ###############################################################################
 #! Number of fermions
@@ -583,19 +598,20 @@ def n_int_np(state     : int,
     out_coeff[0]   = coeff_val * prefactor**n_sites
     return out_state, out_coeff
 
-
 @numba.njit
 def n_np(state      : np.ndarray,
          sites      : np.ndarray,
          prefactor  : float = 1.0):
-    coeff_val = 1.0
+    coeff_val   = np.ones(1, dtype=_DEFAULT_FLOAT)
+    out         = state.copy()
     for site in sites:
-        if state[site] == 0:        # unoccupied ⇒ zero immediately
-            coeff_val = 0.0
+        if out[site] == 0:        # unoccupied ⇒ zero immediately
+            coeff_val = np.zeros(1, dtype=_DEFAULT_FLOAT)
             break
 
     n_sites = sites.shape[0]
-    return state, coeff_val * prefactor**n_sites
+    return ensure_operator_output_shape_numba(out, coeff_val * prefactor**n_sites)
+    # return state, coeff_val * prefactor**n_sites
 
 ###############################################################################
 #! Public dispatch helpers  (match your σ-operator API)

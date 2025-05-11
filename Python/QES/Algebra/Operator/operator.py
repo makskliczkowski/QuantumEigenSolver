@@ -23,9 +23,12 @@ import copy
 import time
 import numpy as np
 import numba
+import numbers
+
+#####################################################################################################
 from abc import ABC
 from enum import Enum, auto, unique
-from typing import Optional, Callable, Union, Iterable, Any
+from typing import Optional, Callable, Union, Iterable, Sequence, Any
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 ####################################################################################################
@@ -152,117 +155,144 @@ class OperatorTypeActing(Enum):
         """
         return self == OperatorTypeActing.Correlation
 
+    def __eq__(self, other):
+        """
+        Compare OperatorTypeActing with another OperatorTypeActing or with an integer.
+        """
+        if isinstance(other, OperatorTypeActing):
+            return super().__eq__(other)
+        elif isinstance(other, int):
+            return self.value == other
+        return NotImplemented
+
 ####################################################################################################
 #! OperatorFunction
 ####################################################################################################
 
-def _make_mul_int_njit(outer_op_fun, inner_op_fun):
+@numba.njit(cache=True)
+def _empty_result_int():
+    return np.empty(0, dtype=np.int64), np.empty(0, dtype=np.float64)
+
+####################################################################################################
+
+def _make_mul_int_njit(outer_op_fun, inner_op_fun, allocator_m=2):
+    """
+    Creates a Numba-jitted function that composes two operator functions acting on integer-based quantum states.
+    This function returns a compiled implementation that, given a quantum state and additional arguments, applies
+    `inner_op_fun` to the state, then applies `outer_op_fun` to each resulting state, combining the coefficients
+    appropriately. The result is a tuple of arrays containing the resulting states and their corresponding coefficients.
+    If Numba compilation fails, a fallback implementation returning an empty result is provided.
+    Args:
+        outer_op_fun (callable):
+            A function that takes a state and additional arguments, returning a tuple of
+            (states, coefficients) as 1D numpy arrays.
+        inner_op_fun (callable): 
+            A function with the same signature as `outer_op_fun`, applied first.
+    Returns:
+        callable:
+            A function with signature (state, *args) -> (states, coefficients), where `states` is a 1D numpy
+            array of int64 and `coefficients` is a 1D numpy array of float64.
+    """
     try:
+        # if not isinstance(outer_op_fun, numba.core.registry.CPUDispatcher) or not isinstance(inner_op_fun, numba.core.registry.CPUDispatcher):
+            # raise TypeError("Both outer_op_fun and inner_op_fun must be @numba.njit-compiled functions")
         
-        # Numba compilation for integer states
-        # @numba.njit(cache=True)
+        @numba.njit(cache=True)
         def mul_int_impl(state, *args):
-            #! g(s)
-            g_states_raw, g_coeffs_raw  = inner_op_fun(state, *args)
-            g_states, g_coeffs          = _normalize_result_np(g_states_raw, g_coeffs_raw)
-            # g_states: (N_g, D), g_coeffs: (N_g,)
-
+            g_states, g_coeffs = inner_op_fun(state, *args)
             if g_states.shape[0] == 0:
-                return np.empty((0, g_states.shape[1]), dtype=g_states.dtype), np.empty((0,), dtype=g_coeffs.dtype)
+                return np.empty(0, dtype=np.int64), np.empty(0, dtype=np.float64)
 
-            #! Accumulate results from f(g(s))
-            res_states_list = []
-            res_values_list = []
+            total_estimate  = g_states.shape[0] * allocator_m
+            res_states      = np.empty(total_estimate, dtype=np.int64)
+            res_coeffs      = np.empty(total_estimate, dtype=g_coeffs.dtype)
+            count           = 0
 
             for k in range(g_states.shape[0]):
-                #! f(g_state_k)
-                f_states_raw_k, f_coeffs_raw_k  = outer_op_fun(g_states[k], *args)
-                f_states_k, f_coeffs_k          = _normalize_result_np(f_states_raw_k, f_coeffs_raw_k)
-                # f_states_k: (N_f, D), f_coeffs_k: (N_f,)
+                g_state_k   = g_states[k]
+                g_coeff_k   = g_coeffs[k]
+                f_states_k, f_coeffs_k = outer_op_fun(g_state_k, *args)
 
                 for l in range(f_states_k.shape[0]):
-                    res_states_list.append(f_states_k[l])
-                    res_values_list.append(g_coeffs[k] * f_coeffs_k[l])
-            
-            if not res_states_list:
-                return np.empty((0, g_states.shape[1]), dtype=g_states.dtype), np.empty((0,), dtype=g_coeffs.dtype)
-            return np.array(res_states_list), np.array(res_values_list)
+                    if count >= res_states.shape[0]:
+                        new_size = res_states.shape[0] * 2
+                        tmp_s = np.empty(new_size, dtype=np.int64)
+                        tmp_c = np.empty(new_size, dtype=np.float64)
+                        tmp_s[:count] = res_states[:count]
+                        tmp_c[:count] = res_coeffs[:count]
+                        res_states = tmp_s
+                        res_coeffs = tmp_c
 
-        # Test compilation (optional, Numba does it on first call)
-        # mul_int_impl.compile("int64(int64,)") # Example signature for a global op
+                    res_states[count] = f_states_k[l]
+                    res_coeffs[count] = g_coeff_k * f_coeffs_k[l]
+                    count += 1
+
+            return res_states[:count], res_coeffs[:count]
+
         return mul_int_impl
     except Exception as e: # Catch Numba errors
         print(f"Numba compilation failed for _make_mul_int_njit: {e}. Falling back to Python.")
+        
         def mul_int_fallback(state, *args):
-            # Basic python loop, similar logic but without Numba types
-            g_states_raw, g_coeffs_raw = inner_op_fun(state, *args)
-            # Manual normalization if _normalize_result_np is not Numba-friendly for raw Python lists
-            g_s_list, g_c_list = [], []
-            if isinstance(g_states_raw, Iterable) and not isinstance(g_states_raw, (str, bytes)): # Check if iterable but not string/bytes
-                if len(g_states_raw) > 0 and isinstance(g_states_raw[0], Iterable): # list of states
-                     g_s_list.extend(g_states_raw)
-                     g_c_list.extend(g_coeffs_raw)
-                else: # single state or list of scalar states
-                     g_s_list.append(g_states_raw) # E.g. [1,2,3] state vector
-                     g_c_list.append(g_coeffs_raw) # Single coeff
-            else: # single scalar state
-                g_s_list.append([g_states_raw]) # treat as scalar state
-                g_c_list.append(g_coeffs_raw)
-
-
-            res_s_list, res_v_list = [], []
-            for i in range(len(g_s_list)):
-                gs, gc = g_s_list[i], g_c_list[i]
-                fs_raw, fc_raw = outer_op_fun(gs, *args)
-                # Similar normalization for fs_raw, fc_raw
-                fs_list_branch, fc_list_branch = [], [] # Handle f's potential branching
-                # ... (complex to fully replicate normalize + branching here)
-                # Simplified: assume f returns one state/coeff or [state],[coeff]
-                if isinstance(fs_raw, Iterable) and not isinstance(fs_raw, (str, bytes)):
-                    fs_list_branch.extend(fs_raw)
-                    fc_list_branch.extend(fc_raw)
-                else:
-                    fs_list_branch.append(fs_raw)
-                    fc_list_branch.append(fc_raw)
-
-                for j in range(len(fs_list_branch)):
-                    res_s_list.append(fs_list_branch[j])
-                    res_v_list.append(gc * fc_list_branch[j])
-            return res_s_list, res_v_list # Return lists for Python fallback
+            return _empty_result_int()
         return mul_int_fallback
 
-def _make_mul_np_njit(outer_op_fun, inner_op_fun):
+def _make_mul_np_njit(outer_op_fun, inner_op_fun, allocator_m=2):
+    """
+    Creates a function that applies two operator functions in sequence to a given state,
+    efficiently handling the allocation of output arrays for states and coefficients.
+    Parameters
+    ----------
+    outer_op_fun : callable
+        A function that takes a state and additional arguments, and returns a tuple of
+        (states, coefficients) as NumPy arrays. This function is applied after `inner_op_fun`.
+    inner_op_fun : callable
+        A function that takes a state and additional arguments, and returns a tuple of
+        (states, coefficients) as NumPy arrays. This function is applied first.
+    allocator_m : int, optional
+        A multiplier used to estimate the maximum number of output states for pre-allocation.
+        Default is 2.
+    Returns
+    -------
+    mul_np_impl : callable
+        A function that takes a state (as a NumPy array) and additional arguments, applies
+        `inner_op_fun` followed by `outer_op_fun` to each resulting state, and returns a tuple:
+        (resulting_states, resulting_coefficients), both as NumPy arrays.
+    Notes
+    -----
+    - If the number of resulting states exceeds the pre-allocated size, the function will
+      stop processing further states to avoid overflow.
+    - If Numba compilation is intended but fails, the function falls back to a pure NumPy implementation.
+    - The function assumes that the input state is a 1D NumPy array.
+    """
+    
+    def mul_np_impl(state_np, *args_np):
+        g_states, g_coeffs = inner_op_fun(state_np, *args_np)  # (M, D), (M,)
+        if g_states.shape[0] == 0:
+            return np.empty((0, state_np.shape[0]), dtype=state_np.dtype), np.empty((0,), dtype=g_coeffs.dtype)
 
-    def mul_np_pure_python(state_np, *args_np):
-        g_states_np, g_coeffs_np = inner_op_fun(state_np, *args_np) # Expected to return np arrays
-        g_states_np, g_coeffs_np = _normalize_result_np(g_states_np, g_coeffs_np)
+        max_est     = g_states.shape[0] * allocator_m
+        state_dim   = state_np.shape[0]  # assumes 1D input
+        res_states  = np.empty((max_est, state_dim), dtype=state_np.dtype)
+        res_coeffs  = np.empty((max_est,), dtype=g_coeffs.dtype)
+        count       = 0
 
-        if g_states_np.shape[0] == 0:
-            return np.empty((0, g_states_np.shape[1]), dtype=g_states_np.dtype), np.empty((0,), dtype=g_coeffs_np.dtype)
-
-        all_f_states_list = []
-        all_f_coeffs_list = []
-
-        for k in range(g_states_np.shape[0]):
-            f_s_k_np, f_c_k_np = outer_op_fun(g_states_np[k], *args_np)
-            f_s_k_np, f_c_k_np = _normalize_result_np(f_s_k_np, f_c_k_np)
-            
-            all_f_states_list.append(f_s_k_np)
-            all_f_coeffs_list.append(g_coeffs_np[k, np.newaxis] * f_c_k_np) # Ensure broadcast
-
-        if not all_f_states_list:
-            return np.empty((0, g_states_np.shape[1]), dtype=g_states_np.dtype), np.empty((0,), dtype=g_coeffs_np.dtype)
-        
-        final_states = np.concatenate(all_f_states_list, axis=0)
-        final_coeffs = np.concatenate(all_f_coeffs_list, axis=0)
-        return final_states, final_coeffs
+        for k in range(g_states.shape[0]):
+            f_states_k, f_coeffs_k = outer_op_fun(g_states[k], *args_np)
+            for j in range(f_states_k.shape[0]):
+                if count >= max_est:
+                    break
+                res_states[count] = f_states_k[j]
+                res_coeffs[count] = g_coeffs[k] * f_coeffs_k[j]
+                count            += 1
+        return res_states[:count], res_coeffs[:count]
     
     #! Attempt Numba compilation; if it fails, use the pure Python/NumPy version.
     try:
-        return _make_mul_int_njit(outer_op_fun, inner_op_fun) 
+        return mul_np_impl
     except Exception as e:
         print("Numba compilation failed for _make_mul_np_njit. Falling back to pure NumPy version: ", e)
-        return mul_np_pure_python
+        return lambda state_np, *args_np: np.empty((0, state_np.shape[0]), dtype=state_np.dtype), np.empty((0,), dtype=np.float64)
 
 def _make_mul_jax_vmap(outer_op_fun_jax, inner_op_fun_jax):
 
@@ -272,38 +302,19 @@ def _make_mul_jax_vmap(outer_op_fun_jax, inner_op_fun_jax):
     if outer_op_fun_jax is None or inner_op_fun_jax is None:
         return None
 
-    @jax.jit
-    def mul_jax_impl(s_initial, *args_for_ops): # args_for_ops are runtime args like site index
-        #! g(s)
-        g_s_array, g_c_array = inner_op_fun_jax(s_initial, *args_for_ops)
-        g_s_array, g_c_array = _normalize_result_jax(g_s_array, g_c_array)
-        # g_s_array: (N_g, D), g_c_array: (N_g,)
+    @partial(jax.jit, static_argnums=())
+    def mul_jax_impl(state_initial, *args):
+        g_states, g_coeffs = inner_op_fun_jax(state_initial, *args)  # (M, D), (M,)
 
-        if g_s_array.shape[0] == 0:
-            state_dim = g_s_array.shape[1] if g_s_array.ndim == 2 and g_s_array.shape[1] > 0 else \
-                        (s_initial.shape[-1] if s_initial.ndim > 0 else 0)
-            if state_dim == 0 and g_s_array.ndim == 2:
-                state_dim = g_s_array.shape[1]
-            return jnp.empty((0, state_dim), dtype=g_s_array.dtype), jnp.empty((0,), dtype=g_c_array.dtype)
+        def apply_outer(state, coeff):
+            f_states, f_coeffs = outer_op_fun_jax(state, *args)  # (K, D), (K,)
+            return f_states, coeff * f_coeffs
 
-        #! Define a function to process one output of g_jax: applies f and combines coeffs
-        def process_one_g_branch(g_state_single, g_coeff_single):
-            # f(g_state_single)
-            f_states_branch, f_coeffs_branch    = outer_op_fun_jax(g_state_single, *args_for_ops)
-            f_states_branch, f_coeffs_branch    = _normalize_result_jax(f_states_branch, f_coeffs_branch)
-            # f_states_branch: (N_f, D), f_coeffs_branch: (N_f,)
-            combined_coeffs_branch              = g_coeff_single * f_coeffs_branch
-            return f_states_branch, combined_coeffs_branch
-            
-        # Use jax.vmap to apply `process_one_g_branch` to all outputs of `g_jax`
-        # This maps over the first axis (branches) of g_s_array and g_c_array.
-        all_f_states_stacked, all_combined_coeffs_stacked = jax.vmap(process_one_g_branch, in_axes=(0, 0))(g_s_array, g_c_array)
+        # g_states: (M, D), g_coeffs: (M,)
+        f_states, f_coeffs = jax.vmap(apply_outer, in_axes=(0, 0))(g_states, g_coeffs)
 
-        # Flatten these results
-        final_D         = all_f_states_stacked.shape[-1]
-        final_states    = all_f_states_stacked.reshape(-1, final_D)
-        final_coeffs    = all_combined_coeffs_stacked.reshape(-1)
-        return final_states, final_coeffs
+        s_dim = f_states.shape[-1]
+        return f_states.reshape(-1, s_dim), f_coeffs.reshape(-1)
     
     try:
         # Example call to force compilation and catch errors early (optional)
@@ -318,97 +329,6 @@ def _make_mul_jax_vmap(outer_op_fun_jax, inner_op_fun_jax):
         print(f"JAX compilation failed for _make_mul_jax_vmap: {e}. JAX operations will not be available for this composed operator.")
         return None
     return mul_jax_impl
-
-####################################################################################################
-#! Normalization functions
-####################################################################################################
-
-# @numba.njit(cache=True)
-def _normalize_result_np(states_raw, values_raw):
-    states_arr_in = np.asarray(states_raw)
-    values_arr_in = np.asarray(values_raw, dtype=np.float64)
-
-    values_out = np.atleast_1d(values_arr_in)
-    current_states_dtype = states_arr_in.dtype
-
-    # Determine the shape and content of states_out based on states_arr_in.ndim
-    # Each branch *must* produce a 2D states_out.
-
-    if states_arr_in.ndim == 0: # Scalar input
-        # Output: (1, 1) array
-        out_shape = (1, 1)
-        states_out = np.empty(out_shape, dtype=current_states_dtype)
-        states_out[0, 0] = states_arr_in.item()
-    elif states_arr_in.ndim == 1: # 1D input array
-        num_input_states_elements = states_arr_in.shape[0]
-        num_values = values_out.shape[0]
-
-        if num_input_states_elements == 0: # Empty 1D array (e.g. from states_raw=[])
-            out_shape = (0, 1) # Consistent (0,1) for empty list of scalars
-            states_out = np.empty(out_shape, dtype=current_states_dtype)
-        elif num_input_states_elements == num_values:
-            # N scalar states. Output: (N, 1) array
-            out_shape = (num_input_states_elements, 1)
-            states_out = np.empty(out_shape, dtype=current_states_dtype)
-            for i in range(num_input_states_elements):
-                states_out[i, 0] = states_arr_in[i]
-        else:
-            # Single vector state of D elements, to be repeated num_values times.
-            # Output: (num_values, D) array
-            state_dimension_D = num_input_states_elements
-            if num_values > 0 : # Only create if there are values to map to
-                out_shape = (num_values, state_dimension_D)
-                states_out = np.empty(out_shape, dtype=current_states_dtype)
-                for i in range(num_values):
-                    states_out[i, :] = states_arr_in # Assign 1D array to each row
-            else: # num_values is 0
-                out_shape = (0, state_dimension_D if state_dimension_D > 0 else 1)
-                states_out = np.empty(out_shape, dtype=current_states_dtype)
-
-    elif states_arr_in.ndim == 2: # 2D input array
-        # Assume it's already (N,D). Output: (N,D) array (a copy).
-        # Numba needs to know shape has 2 elements.
-        if len(states_arr_in.shape) == 2: # Guard
-             rows, cols = states_arr_in.shape
-             states_out = np.empty((rows, cols), dtype=current_states_dtype)
-             for r in range(rows):
-                 for c in range(cols):
-                     states_out[r,c] = states_arr_in[r,c]
-        else: # Should not happen if ndim == 2
-             states_out = np.empty((0,1), dtype=current_states_dtype) # Fallback 2D
-
-    else: # ndim > 2 or size == 0 but ndim is weird (e.g. ndim > 0 for empty)
-        # This includes states_arr_in.size == 0 if not caught by ndim 1 branch (e.g. np.empty((0,5)))
-        if states_arr_in.size == 0 :
-             # Determine a sensible default number of columns for empty 2D array
-             # If states_arr_in.ndim > 1, use its last dim, else 1.
-             cols_for_empty = 1
-             if states_arr_in.ndim > 1 and states_arr_in.shape[-1] >=0 : # shape[-1] could be 0 for (X,0)
-                 cols_for_empty = states_arr_in.shape[-1]
-             if cols_for_empty == 0 and states_arr_in.ndim <=1: # Avoid (0,0) if it was from 1D empty
-                 cols_for_empty = 1
-
-             states_out = np.empty((0, cols_for_empty), dtype=current_states_dtype)
-        else: # ndim > 2 and not empty
-             # Fallback for >2D: make it an empty (0,1) 2D array.
-             # Or attempt states_arr_in.reshape(-1, states_arr_in.shape[-1]) if feeling brave
-             states_out = np.empty((0, 1), dtype=current_states_dtype)
-        
-    return states_out, values_out
-
-@jax.jit
-def _normalize_result_jax(states, values):
-    """For the JAX backend: ensure states is 2D and values is 1D."""
-    states = jnp.asarray(states) # Input should already be jax array for jax functions
-    values = jnp.asarray(values)
-    
-    # If states is a scalar, make it (1,1)
-    if states.ndim == 0:
-        states = states.reshape(1, 1) 
-
-    states = jnp.atleast_2d(states)
-    values = jnp.atleast_1d(values)
-    return states, values
 
 ####################################################################################################
 
@@ -491,6 +411,28 @@ class OperatorFunction:
         self._acting_type       =   OperatorTypeActing.Global       if self._necessary_args == 0 else \
                                     OperatorTypeActing.Local        if self._necessary_args == 1 else \
                                     OperatorTypeActing.Correlation  if self._necessary_args == 2 else OperatorTypeActing.Global
+        self._dispatch          =   self._apply_local if self._necessary_args == 1 else \
+                                    self._apply_correlation if self._necessary_args == 2 else \
+                                    self._apply_global if self._necessary_args == 0 else self._apply_any
+    
+    # -----------
+    
+    def _choose_apply(self, s: Union[int, np.ndarray]) -> Callable:
+        """
+        Choose the appropriate function to apply based on the type of state and arguments.
+        
+        Parameters:
+            s (int or np.ndarray):
+                The state to which the operator is applied.
+        Returns:
+            A callable function that applies the operator to the state.
+        """
+        if isinstance(s, jnp.ndarray):
+            return self._fun_jax
+        elif isinstance(s, np.ndarray):
+            return self._fun_np
+        else:
+            return self._fun_int
     
     # -----------
     
@@ -569,6 +511,28 @@ class OperatorFunction:
     
     # -----------
     
+    def _apply_any(self, s: Union[int, np.ndarray], *args) -> List[Tuple[Optional[Union[int]], Union[float, complex]]]:
+        """
+        Apply the operator function to a given state.
+
+        Parameters:
+            s (int or np.ndarray or jnp.ndarray): 
+                The state to which the operator is applied.
+            args:
+                Additional arguments for the operator. The number of arguments must equal self._necessary_args.
+
+        Returns:
+            A list of tuples (state, value), where each tuple contains the transformed state 
+            (or None if not applicable) and its corresponding value.
+        """
+        if isinstance(s, jnp.ndarray) and self._fun_jax is not None:
+            result = self._fun_jax(s, *args)
+        elif isinstance(s, np.ndarray) and self._fun_np is not None:
+            result = self._fun_np(s, *args)
+        else:
+            result = self._fun_int(s, *args)
+        return result
+    
     def apply(self, s: Union[int, np.ndarray], *args) -> List[Tuple[Optional[Union[int]], Union[float, complex]]]:
         """
         Apply the operator function to a given state.
@@ -590,22 +554,8 @@ class OperatorFunction:
         if len(args) != self._necessary_args:
             raise ValueError(self._ERR_INVALID_ARG_NUMBER.format(self._necessary_args, len(args)))
         
-        result = None
-        
         # apply the operator function based on the number of necessary arguments
-        if self._necessary_args == 0:
-            result = self._apply_global(s)
-        elif self._necessary_args == 1:
-            result = self._apply_local(s, args[0])
-        elif self._necessary_args == 2:
-            result = self._apply_correlation(s, args[0], args[1])
-        else:
-            if isinstance(s, jnp.ndarray) and self._fun_jax is not None:
-                result = self._fun_jax(s, *args)
-            elif isinstance(s, np.ndarray) and self._fun_np is not None:
-                result = self._fun_np(s, *args)
-            else:
-                result = self._fun_int(s, *args)
+        result = self._dispatch(s, *args)
 
         if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], (int, np.ndarray, jnp.ndarray)):
             return result
@@ -1789,24 +1739,14 @@ def create_operator(type_act        : int | OperatorTypeActing,
     else:
         assert ns is not None, "Either lattice or ns must be provided."
     
-    # Convert sites to JAX array if JAX is available
-    if JAX_AVAILABLE:
-        sites_jnp = jnp.array(sites, dtype = jnp.int64) if sites is not None and JAX_AVAILABLE else sites
-    else:
-        sites_jnp = sites
-    
     #! Global operator: the operator acts on a specified set of sites (or all if sites is None)
-    if type_act == OperatorTypeActing.Global or sites is not None:
+    if type_act == OperatorTypeActing.Global.value or sites is not None:
         
         # If sites is None, we act on all sites.
         if sites is None or len(sites) == 0:
             sites = list(range(ns))
         sites           = tuple(sites) if isinstance(sites, list) else sites
         sites_np        = np.array(sites, dtype = np.int32)
-        if JAX_AVAILABLE:
-            sites_jnp   = jnp.array(sites, dtype = jnp.int64)
-        else:
-            sites_jnp   = sites_np
         
         @numba.njit
         def fun_int(state):
@@ -1815,11 +1755,18 @@ def create_operator(type_act        : int | OperatorTypeActing,
         @numba.njit
         def fun_np(state):
             return op_func_np(state, sites_np, *extra_args)
-        
+
         if JAX_AVAILABLE:
+            
+            static_sites = tuple(int(i) for i in sites)
+            
+            @partial(jax.jit, static_argnums=(1,))
+            def closed(state, static_sites):
+                return op_func_jnp(state, static_sites)
+            
             @jax.jit
-            def fun_jnp(state, sites):
-                return op_func_jnp(state, sites_jnp, *extra_args)
+            def fun_jnp(state):
+                return closed(state, static_sites)
         else:
             def fun_jnp(state):
                 return state, 0.0
@@ -1837,9 +1784,9 @@ def create_operator(type_act        : int | OperatorTypeActing,
                         modifies= modifies)
     
     #! Local operator: the operator acts on one specific site. The returned functions expect an extra site argument.
-    elif type_act == OperatorTypeActing.Local:
+    elif type_act == OperatorTypeActing.Local.value:
         
-        # @numba.njit
+        @numba.njit
         def fun_int(state, i):
             sites_1 = np.array([i], dtype=np.int32)
             return op_func_int(state, ns, sites_1, *extra_args)
@@ -1852,8 +1799,11 @@ def create_operator(type_act        : int | OperatorTypeActing,
         if JAX_AVAILABLE:
             @jax.jit
             def fun_jnp(state, i):
-                sites_jnp   = jnp.array([i], dtype = jnp.int32)
-                return op_func_jnp(state, sites_jnp, *extra_args)
+                sites_jnp = jnp.array([i], dtype = jnp.int32)
+                return op_func_jnp(state, sites_jnp)
+                # sites_jnp = tuple([i])
+                # op = make_op_jnp([i])
+                # return op(state)
         else:
             def fun_jnp(state, i):
                 return state, 0.0
@@ -1869,7 +1819,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
                         modifies= modifies)
     
     #! Correlation operator: the operator acts on a pair of sites.
-    elif type_act == OperatorTypeActing.Correlation:
+    elif type_act == OperatorTypeActing.Correlation.value:
         
         @numba.njit
         def fun_int(state, i, j):
@@ -1885,7 +1835,9 @@ def create_operator(type_act        : int | OperatorTypeActing,
             @jax.jit
             def fun_jnp(state, i, j):
                 sites_jnp = jnp.array([i, j], dtype = jnp.int32)
-                return op_func_jnp(state, sites_jnp, *extra_args)
+                return op_func_jnp(state, sites_jnp)
+                # op = make_op_jnp([i, j])
+                # return op(state)
         else:
             def fun_jnp(state, i, j):
                 return state, 0.0
@@ -1957,31 +1909,28 @@ def create_add_operator(operator: Operator, multiplier: Union[float, int, comple
 ####################################################################################################
 
 @numba.njit
-def ensure_operator_output_shape_numba(state_out : np.ndarray, coeff_out : np.ndarray):
-    r"""
-    Ensure (state, coeff) output is 2D-batched: (N, L), (N,)
-    where N is the number of states and L is the dimension of the state.
-    Using Numba for JIT compilation.
-    
-    Parameters:
-        state_out (jnp.ndarray):
-        The output state array.
-        coeff_out (jnp.ndarray):
-        The output coefficient array.
-    Returns:
-        Tuple[jnp.ndarray, jnp.ndarray]:
-        A tuple containing the reshaped state and coefficient arrays.
-        With the first dimension being the number of states that the operator returns
-        and the second dimension being the dimension of the state.
-        This corresponds to matrix elements of the operator:
-        .. math::
-            \{\, |s'\rangle,\ \langle s'|O|s\rangle\,\}
+def ensure_operator_output_shape_numba(state_out: np.ndarray, coeff_out: np.ndarray):
     """
-    if state_out.ndim == 1:
-        state_out = state_out.reshape(1, state_out.shape[0])
-    if coeff_out.ndim == 0:
-        coeff_out = np.array([coeff_out])
-    return state_out, coeff_out
+    Ensure output is consistently 2D for states and 1D for coefficients.
+    Works only when inputs already have correct shape or are known to be 1D scalars.
+    """
+    # if isinstance(coeff_out, (int, float, complex, np.int8, np.int16, np.int32, np.int64, np.float32, np.float64, np.complex64, np.complex128)):
+    #     coeff_out = np.array([coeff_out])
+    
+    if state_out.ndim == 1 and coeff_out.ndim == 1:
+        out_state = state_out.reshape(1, state_out.shape[0])
+        out_coeff = coeff_out
+    elif state_out.ndim == 1 and coeff_out.ndim == 0:
+        out_state = state_out.reshape(1, state_out.shape[0])
+        out_coeff = np.empty(1, dtype=coeff_out.dtype)
+        out_coeff[0] = coeff_out
+    elif state_out.ndim == 2 and coeff_out.ndim == 1:
+        out_state = state_out
+        out_coeff = coeff_out
+    else:
+        raise ValueError("Unsupported shape combination in ensure_operator_output_shape_numba")
+
+    return out_state, out_coeff
 
 if JAX_AVAILABLE:
     @jax.jit
@@ -2044,9 +1993,252 @@ else:
         """
         return ensure_operator_output_shape_numba(state_out, coeff_out)
 
+# ##################################################################################################
+
+def initial_states(ns       : int,
+                display     : bool                  = False, 
+                int_state   : Optional[int]         = None,
+                np_state    : Optional[np.ndarray]  = None) -> tuple:
+    '''
+    Create initial states for testing the operator. It generates:
+        - int_state: a random integer state (int) in the range [0, 2**ns)
+        - np_state: a random NumPy state (np.ndarray) of size ns
+        - jnp_state: a random JAX state (jnp.ndarray) of size ns
+    The function also checks if the integer state is out of bounds and generates a random state if necessary.
+    The function returns the generated states as a tuple.
+    Parameters:
+        ns (int):
+            The number of sites in the system.
+        display (bool):
+            Whether to display the generated states.
+        int_state (Optional[int]):
+            The integer state to be used. If None, a random state is generated.
+        np_state (Optional[np.ndarray]):
+            The NumPy state to be used. If None, a random state is generated.
+    Returns:
+        tuple:
+            A tuple containing the generated states:
+            - int_state: a random integer state (int) in the range [0, 2**ns)
+            - np_state: a random NumPy state (np.ndarray) of size ns
+            - jnp_state: a random JAX state (jnp.ndarray) of size ns
+    '''
+    import QES.general_python.common.binary as _bin_mod
+    from general_python.common.display import display_state
+    
+    #! Take the integer state as input
+    int_state = np.random.randint(0, 2**(ns%64), dtype=np.int32) if int_state is None else int_state
+    
+    #! Check the integer state whether it is out of bounds
+    if np_state is None:
+        if ns >= 64:
+            np_state  = np.random.randint(0, 2, size=ns).astype(np.float32)
+        else:
+            np_state  = _bin_mod.int2base_np(int_state, size = ns, value_true=1, value_false=0).astype(np.float32)
+    
+    if JAX_AVAILABLE:
+        jnp_state = jnp.array(np_state, dtype=jnp.float32) if np_state is not None else None
+    else:
+        jnp_state = None
+    
+    if display:
+        display_state(int_state, ns,    label = "Integer state")
+        display_state(np_state,  ns,    label = "NumPy state")
+        display_state(jnp_state, ns,    label = "JAX state")
+        
+    return int_state, np_state, jnp_state
+
 ####################################################################################################
 #! Test the operator
 ####################################################################################################
+
+def _dispatch(op    : Operator,
+            state   : Union[int, np.ndarray],
+            lat     : Lattice,
+            is_int  : bool,
+            to_bin  : Optional[Callable[[int, int], str]] = None,
+            lab     : Optional[str] = None,
+            *, 
+            i=None, j=None, sites=None, just_time=False):
+    """
+    Call *op* with the right signature and send its first output to
+    `display_operator_action`.
+    
+    Parameters
+    ----------
+    op : Operator
+        The operator acting on the state.
+    state : int | np.ndarray
+        The state on which the operator acts.
+    lat : Lattice 
+        The lattice object providing the number of sites.
+    is_int : bool
+        Whether the state is an integer or not.
+    to_bin : Callable[[int, int], str], optional
+        Function to convert integer to binary string.
+    lab : str, optional
+        The label for the operator.
+    i : int, optional
+        The first site index for the operator.
+    j : int, optional
+        The second site index for the operator.
+    just_time : bool, default = False
+        If True, only measure the time taken for the operation without
+        displaying the results. This is useful for benchmarking.
+    Returns
+    -------
+    Tuple[Union[int, np.ndarray], float]
+        The new state and the coefficient after applying the operator.
+    Notes
+    -----
+    * The function dispatches the operator call based on the type of operator
+        (global, local, or correlation) and the type of state (integer or array).
+    * The function also handles the display of the operator action using
+        `display_operator_action` if `just_time` is False.
+    * The function returns the new state and the coefficient after applying
+        the operator.
+    * The function uses `numba` for JIT compilation to speed up the operator
+        application.
+    * The function handles both NumPy and JAX arrays for the state.
+    * The function uses `jnp` for JAX arrays if available.
+    """
+    if not just_time:
+        from QES.general_python.common.display import display_operator_action
+    
+    state_act = state
+    # call signature depends on OperatorTypeActing
+    if i is None:                        # Global operator
+        st_out, coeff = op(state_act)
+    elif j is None:                      # Local operator
+        if is_int:
+            st_out, coeff = op(state_act, i)
+        elif isinstance(state_act, (np.ndarray)):
+            sites         = np.array([i])
+            st_out, coeff = op(state_act, *sites)
+        elif isinstance(state_act, (jnp.ndarray)):
+            sites         = jnp.array([i])
+            st_out, coeff = op(state_act, sites[0])
+    else:                                # Correlation operator
+        if is_int:
+            st_out, coeff = op(state_act, i, j)
+        elif isinstance(state_act, (np.ndarray)):
+            sites         = np.array([i, j])
+            st_out, coeff = op(state_act, *sites)
+        elif isinstance(state_act, (jnp.ndarray)):
+            sites         = jnp.array([i, j])
+            st_out, coeff = op(state_act, sites[0], sites[1])
+            
+    #! choose what to show depending on state representation
+    new_state = st_out
+    new_coeff = coeff
+    if not just_time:
+        site_lbl = ''
+        if i is not None:
+            site_lbl = str(i)
+        if j is not None:
+            site_lbl += f",{j}"
+        if sites is not None:
+            site_lbl = ",".join(map(str, sites))
+
+        display_operator_action(f"\\quad \\quad {lab}",
+                                site_lbl,
+                                state,
+                                lat.ns,
+                                new_state,
+                                new_coeff,
+                                to_bin = to_bin)
+    return new_state, new_coeff
+
+def test_operator_on_state(op           : Union[Operator, Sequence[Operator]],
+                        lat             : Lattice,
+                        state           : Union[int, np.ndarray, jnp.ndarray],
+                        *,
+                        ns              : Optional[int] = None,
+                        op_acting       : "OperatorTypeActing" = OperatorTypeActing.Local,
+                        op_label        = None,
+                        to_bin          = None,
+                        just_time       = False,
+                        sites           : Optional[List[int]] = None,
+                        ) -> None:
+    r"""
+    Pretty-print the action of *one or several* lattice operators
+    on a basis state or wave-function.
+
+    Parameters
+    ----------
+    op : Operator or sequence[Operator]
+        The operator(s) Ô acting on 0, 1, or 2 sites.
+    lat : Lattice
+        Provides the number of sites ``lat.ns`` = :math:`N_s`.
+    ns : int, optional
+        Number of sites.  If *None*, uses ``lat.ns``.
+    state : int | np.ndarray | jax.numpy.ndarray
+        *Basis state* (integer encoding) or *wave-function* :math:`|\psi\rangle`.
+    op_acting : OperatorTypeActing, default = ``Local``
+        How Ô acts: Local (Ôᵢ), Correlation (Ôᵢⱼ), or Global (Ô).
+    op_label : str | sequence[str], optional
+        LaTeX label(s).  If *None*, uses ``op.name`` for every operator.
+    to_bin : Callable[[int, int], str], optional
+        Integer → binary-string formatter.  Defaults to
+        ``lambda k,L: format(k, f'0{L}b')``.
+    just_time : bool, default = False
+        If True, only measure the time taken for the operation without
+        displaying the results.  This is useful for benchmarking.
+
+    Notes
+    -----
+    * For **integer states** we reproduce the coefficient table you had before.
+    * For **array states** (NumPy / JAX) we show only the *first* non-zero
+        coefficient returned by the operator.  Adjust if you need more detail.
+    """
+    
+    from QES.general_python.common.timer import Timer
+    if not just_time:
+        from IPython.display import Math, display
+        from QES.general_python.common.display import (
+            display_state,
+            prepare_labels
+        )
+
+    # ------------------------------------------------------------------
+    ops      = (op,) if not isinstance(op, Sequence) else tuple(op)
+    is_int   = isinstance(state, (numbers.Integral, int, np.integer)) 
+    ns       = lat.ns if ns is None else ns
+    labels   = prepare_labels(ops, op_label) if not just_time else [''] * len(ops)
+    
+    # ------------------------------------------------------------------
+    
+    if not just_time:
+        display_state(state,
+                    ns,
+                    label   = f"Initial integer state (Ns={ns})",
+                    to_bin  = to_bin,
+                    verbose = not just_time)
+
+    # ------------------------------------------------------------------
+    with Timer(verbose=True, precision='us', name="Operator action"):
+        for cur_op, lab in zip(ops, labels):
+            if not just_time:
+                display(Math(fr"\text{{Operator: }} {lab}, \text{{typeacting}}: {op_acting}"))
+            
+            if op_acting == OperatorTypeActing.Local.value:
+                for i in range(ns):
+                    if not just_time: 
+                        display(Math(fr"\quad \text{{Site index: }} {i}"))
+                    s, c = _dispatch(cur_op, state, lat, is_int, to_bin, lab, i=i, just_time=just_time)
+
+            elif op_acting == OperatorTypeActing.Correlation.value:
+                for i in range(ns):
+                    for j in range(ns):
+                        if not just_time:
+                            display(Math(fr"\text{{Site indices: }} {i}, {j}"))
+                        s, c = _dispatch(cur_op, state, lat, is_int, to_bin, lab, i=i, j=j, just_time=just_time)
+
+            elif op_acting == OperatorTypeActing.Global.value:
+                s, c = _dispatch(cur_op, state, lat, is_int, to_bin, lab, just_time=just_time, sites=sites)
+            else:
+                raise ValueError(f"Operator acting type {op_acting!r} not supported.")
+
+# --------------------------------------------------------------------------------------------------
 
 def test_operators(op,
                 state,
@@ -2188,6 +2380,6 @@ def test_operators(op,
         display(df)    
     return df
 
-###################################################################################################
+####################################################################################################
 #! End of file
-###################################################################################################
+####################################################################################################
