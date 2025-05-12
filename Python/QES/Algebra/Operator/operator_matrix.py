@@ -22,7 +22,7 @@ import Algebra.hilbert as Hilbert
 ####################################################################################################
 #! Numpy operator setup
 
-def _operator_create_np_inner_loop_no_hilbert(ranges = None):
+def _operator_create_np_inner_loop_no_hilbert():
     ''' 
     Inner loop to update the matrix elements - go through all basis states
     - when hilbert is not used or not modifies 
@@ -31,32 +31,17 @@ def _operator_create_np_inner_loop_no_hilbert(ranges = None):
     Returns:
         _inner_loop (function): The inner loop function.
     '''
-    if ranges is not None:
-        # @njit(fastmath=True)
-        def inner_k(k, local_funct, cols, rows, data, data_idx):
-            # Loop over the sites (modes).
-            for i in ranges:
-                # Get the new rows and data from the local function.
-                new_rows, new_data                  = local_funct(k, i)
-                num_new                             = len(new_rows)
-                rows[data_idx : data_idx + num_new] = new_rows
-                data[data_idx : data_idx + num_new] = new_data
-                # Set the column indices for these new elements.
-                cols[data_idx : data_idx + num_new] = k
-                data_idx += num_new
-            return data_idx
-    else:
-        # @njit(fastmath=True)
-        def inner_k(k, local_funct, cols, rows, data, data_idx):
-            # Get the new rows and data from the local function.
-            new_rows, new_data                  = local_funct(k)
-            num_new                             = len(new_rows)
-            rows[data_idx : data_idx + num_new] = new_rows
-            data[data_idx : data_idx + num_new] = new_data
-            # Set the column indices for these new elements.
-            cols[data_idx : data_idx + num_new] = k
-            data_idx += num_new
-            return data_idx
+    # @njit(fastmath=True)
+    def inner_k(k, local_funct, cols, rows, data, data_idx):
+        # Get the new rows and data from the local function.
+        new_rows, new_data                  = local_funct(k)
+        num_new                             = len(new_rows)
+        rows[data_idx : data_idx + num_new] = new_rows
+        data[data_idx : data_idx + num_new] = new_data
+        # Set the column indices for these new elements.
+        cols[data_idx : data_idx + num_new] = k
+        data_idx                           += num_new
+        return data_idx
     # @njit(fastmath=True)
     def _inner_loop(local_funct, nh: int, cols, rows, data, data_idx):
         # Loop over all basis states.
@@ -65,7 +50,7 @@ def _operator_create_np_inner_loop_no_hilbert(ranges = None):
         return data_idx
     return _inner_loop
 
-def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges = None):
+def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert is not None and hilbert.modifies:
@@ -95,32 +80,17 @@ def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges
                 data[data_idx + j] = new_data[j] * sym_eig
             return data_idx + num_new
         
-        if ranges is None:
-            @njit(fastmath=True)
-            def _inner_k(k, local_funct, cols, rows, data, data_idx):
-                # Get the mapping for the current basis state
-                k_map                               = _get_mapping(k)
-                # Get the new rows and data from the local function.
-                new_rows, new_data                  = local_funct(k_map)
-                num_new                             = len(new_rows)
-                data_idx                            = _update_data(num_new, new_rows, new_data, k, k_map, rows, data, data_idx)
-                # Set the column indices for these new elements.
-                cols[data_idx - num_new : data_idx] = k
-                return data_idx
-        else:
-            @njit(fastmath=True)
-            def _inner_k(k, local_funct, cols, rows, data, data_idx):
-                # Get the mapping for the current basis state
-                k_map                               = _get_mapping(k)
-                # Loop over the sites (modes).
-                for i in ranges:
-                    # Get the new rows and data from the local function.
-                    new_rows, new_data                  = local_funct(k_map, i)
-                    num_new                             = len(new_rows)
-                    data_idx                            = _update_data(num_new, new_rows, new_data, k, k_map, rows, data, data_idx)
-                    # Set the column indices for these new elements.
-                    cols[data_idx - num_new : data_idx] = k
-                return data_idx
+        @njit(fastmath=True)
+        def _inner_k(k, local_funct, cols, rows, data, data_idx):
+            # Get the mapping for the current basis state
+            k_map                               = _get_mapping(k)
+            # Loop over the sites (modes).
+            new_rows, new_data                  = local_funct(k_map)
+            num_new                             = len(new_rows)
+            data_idx                            = _update_data(num_new, new_rows, new_data, k, k_map, rows, data, data_idx)
+            # Set the column indices for these new elements.
+            cols[data_idx - num_new : data_idx] = k
+            return data_idx
             
         # create the inner loop function
         def _inner_loop(local_funct, nh, cols, rows, data, data_idx):
@@ -129,7 +99,7 @@ def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges
                 data_idx = _inner_k(k, local_funct, cols, rows, data, data_idx)
             return data_idx
         return _inner_loop
-    return _operator_create_np_inner_loop_no_hilbert(ranges)
+    return _operator_create_np_inner_loop_no_hilbert()
 
 def operator_create_np_sparse(  ns                  : int,
                                 hilbert             : Hilbert.HilbertSpace,
@@ -160,10 +130,8 @@ def operator_create_np_sparse(  ns                  : int,
     
     nh          = hilbert.Nh                                # The number of basis states
     if ns is not None and ns > 0:
-        ranges      = range(start if start > 0 else 0, ns)  # The ranges for the inner loop
         max_inner   = max_local_changes * (ns - start)      # The maximum number of inner loop iterations
     else:
-        ranges      = None
         max_inner   = max_local_changes
         
     #! The maximum number of non-zero elements
@@ -177,11 +145,10 @@ def operator_create_np_sparse(  ns                  : int,
     data_idx    = 0
     
     # Inner loop is now a separate Numba function for clarity and potential reuse
-    _inner_loop = _operator_create_np_sparse_inner_loop(hilbert, ranges)
+    _inner_loop = _operator_create_np_sparse_inner_loop(hilbert)
 
     # Call the Numba-accelerated inner loop
-    data_idx = _inner_loop(local_funct=local_fun, nh=nh,
-            cols=cols, rows=rows, data=data, data_idx=data_idx)
+    data_idx    = _inner_loop(local_funct=local_fun, nh=nh, cols=cols, rows=rows, data=data, data_idx=data_idx)
     data        = data[:data_idx]
     rows        = rows[:data_idx]
     cols        = cols[:data_idx]
@@ -192,25 +159,17 @@ def operator_create_np_sparse(  ns                  : int,
 #! Numpy DENSE operator setup
 #####################################################################################################
 
-def _operator_create_np_dense_inner_loop_no_hilbert(ranges = None):
+def _operator_create_np_dense_inner_loop_no_hilbert():
     ''' Inner loop to update the matrix elements - go through all basis states
     - when hilbert is not used or not modifies 
     '''
-    if ranges is None:
-        # @njit(fastmath=True)
-        def _inner_k(k, local_funct, matrix):
-            # Get the new rows and data from the local function.
-            new_rows, new_data  = local_funct(k)
-            matrix[new_rows, k] += new_data
-    else:
-        # @njit(fastmath=True)
-        def _inner_k(k, local_funct, matrix):
-            # Loop over the sites (modes).
-            for i in ranges:
-                # Get the new rows and data from the local function.
-                new_rows, new_data  = local_funct(k, i)
-                matrix[new_rows, k] += new_data
     
+    # @njit(fastmath=True)
+    def _inner_k(k, local_funct, matrix):
+        # Get the new rows and data from the local function.
+        new_rows, new_data  = local_funct(k)
+        matrix[new_rows, k] += new_data
+
     # @njit(fastmath=True)
     def _inner_loop(local_funct, nh, matrix):
         # Loop over all basis states.
@@ -220,7 +179,7 @@ def _operator_create_np_dense_inner_loop_no_hilbert(ranges = None):
         return matrix
     return _inner_loop
 
-def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges = None):
+def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert.modifies:
@@ -246,27 +205,17 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges 
             for j in range(num_new):
                 (new_row, _), sym_eig   =   _get_matrix_elem(k, new_rows[j], k_map)
                 matrix[new_row, k]      +=  new_data[j] * sym_eig
-        
-        if ranges is None:
-            # @njit(fastmath=True)
-            def _inner_k(k, local_funct, matrix):
-                # Get the mapping for the current basis state
-                k_map               = _get_mapping(k)
+
+        # @njit(fastmath=True)
+        def _inner_k(k, local_funct, matrix):
+            # Get the mapping for the current basis state
+            k_map                   = _get_mapping(k)
+            # Loop over the sites (modes).
+            for i in ranges:
                 # Get the new rows and data from the local function.
-                new_rows, new_data  = local_funct(k_map)
+                new_rows, new_data  = local_funct(k_map, i)
                 num_new             = len(new_rows)
                 _update_data(num_new, new_rows, new_data, k, k_map, matrix)
-        else:
-            # @njit(fastmath=True)
-            def _inner_k(k, local_funct, matrix):
-                # Get the mapping for the current basis state
-                k_map                   = _get_mapping(k)
-                # Loop over the sites (modes).
-                for i in ranges:
-                    # Get the new rows and data from the local function.
-                    new_rows, new_data  = local_funct(k_map, i)
-                    num_new             = len(new_rows)
-                    _update_data(num_new, new_rows, new_data, k, k_map, matrix)
         
         # @njit(fastmath=True)
         def _inner_loop(local_funct, nh, matrix):
@@ -275,10 +224,8 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges 
                 _inner_k(k, local_funct, matrix)
             return matrix
         return _inner_loop
-    return _operator_create_np_dense_inner_loop_no_hilbert(ranges)
+    return _operator_create_np_dense_inner_loop_no_hilbert()
         
-    # @jit(forceobj=True, fastmath=True)
-    
 def operator_create_np_dense(ns                     : int,
                     hilbert_space                   : Hilbert.HilbertSpace,
                     local_fun                       : Callable,
@@ -302,16 +249,11 @@ def operator_create_np_dense(ns                     : int,
 
     if dtype is None:
         dtype = hilbert_space.dtype
-    # Define the ranges for the inner loop
-    if ns is not None and ns > 0:
-        ranges  = range(start if start > 0 else 0, ns)
-    else:
-        ranges  = None
-        
+    
     # Dense matrix creation (can also be optimized with Numba)
     nh          = hilbert_space.Nh
     matrix      = np.zeros((nh, nh), dtype=dtype)
-    _inner_loop = _operator_create_np_dense_inner_loop(hilbert_space, ranges)
+    _inner_loop = _operator_create_np_dense_inner_loop(hilbert_space)
     _inner_loop(local_funct=local_fun, nh=nh, matrix=matrix)
     return matrix
 

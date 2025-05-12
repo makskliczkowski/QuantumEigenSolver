@@ -1333,9 +1333,10 @@ class Hamiltonian(ABC):
         - self._eig_val: Eigenvalues.
         - self._eig_vec: Eigenvectors.
         """
-        diag_start  = time.perf_counter()
-        method      = kwargs.get("method", "standard")
-        backend     = self._backend if not isinstance(self._hamil, np.ndarray) and not sp.sparse.isspmatrix(self._hamil) else np
+        diag_start          = time.perf_counter()
+        method              = kwargs.get("method", "standard")
+        kwargs['method']    = method
+        backend             = self._backend if not isinstance(self._hamil, np.ndarray) and not sp.sparse.isspmatrix(self._hamil) else np
         if verbose:
             self._log(f"Diagonalization started using ({method})...", lvl = 1)
             
@@ -1358,7 +1359,7 @@ class Hamiltonian(ABC):
         # try to diagonalize the Hamiltonian matrix
         try:
             if self._is_sparse or method.lower() in ["lanczos", "shift-invert"]:
-                self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, method, backend, **kwargs)
+                self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, backend, **kwargs)
             else:
                 self._eig_val, self._eig_vec = linalg.eigh(self._hamil, backend, **kwargs)
         except Exception as e:

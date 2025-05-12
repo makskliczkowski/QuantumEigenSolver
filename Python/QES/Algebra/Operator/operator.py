@@ -1833,7 +1833,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             @jax.jit
             def fun_jnp(state, i):
                 sites_jnp = jnp.array([i], dtype = jnp.int32)
-                return op_func_jnp(state, sites_jnp)
+                return op_func_jnp(state, sites_jnp, *extra_args)
                 # sites_jnp = tuple([i])
                 # op = make_op_jnp([i])
                 # return op(state)
@@ -1868,7 +1868,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             @jax.jit
             def fun_jnp(state, i, j):
                 sites_jnp = jnp.array([i, j], dtype = jnp.int32)
-                return op_func_jnp(state, sites_jnp)
+                return op_func_jnp(state, sites_jnp, *extra_args)
                 # op = make_op_jnp([i, j])
                 # return op(state)
         else:
