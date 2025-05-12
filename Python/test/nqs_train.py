@@ -60,7 +60,8 @@ if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax import jit
-    jax.config.update('jax_platform_name', 'cpu')
+    # jax.config.update('jax_platform_name', 'cpu')
+    jax.config.update('jax_log_compiles', True)
 else:
     jax     = None
     jnp     = None
