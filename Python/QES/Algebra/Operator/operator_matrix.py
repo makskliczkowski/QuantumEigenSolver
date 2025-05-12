@@ -60,7 +60,7 @@ def _operator_create_np_inner_loop_no_hilbert(ranges = None):
     # @njit(fastmath=True)
     def _inner_loop(local_funct, nh: int, cols, rows, data, data_idx):
         # Loop over all basis states.
-        for k in np.arange(nh):
+        for k in prange(nh):
             data_idx = inner_k(k, local_funct, cols, rows, data, data_idx)
         return data_idx
     return _inner_loop
@@ -125,7 +125,7 @@ def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace, ranges
         # create the inner loop function
         def _inner_loop(local_funct, nh, cols, rows, data, data_idx):
             # Loop over all basis states.
-            for k in np.arange(nh):
+            for k in range(nh):
                 data_idx = _inner_k(k, local_funct, cols, rows, data, data_idx)
             return data_idx
         return _inner_loop
@@ -158,15 +158,15 @@ def operator_create_np_sparse(  ns                  : int,
     if hilbert is None:
         raise ValueError('Hilbert space is None!')
     
-    nh          = hilbert.Nh                            # The number of basis states
+    nh          = hilbert.Nh                                # The number of basis states
     if ns is not None and ns > 0:
-        ranges      = np.arange(start if start > 0 else 0, ns, dtype=DEFAULT_NP_INT_TYPE)
+        ranges      = range(start if start > 0 else 0, ns)  # The ranges for the inner loop
         max_inner   = max_local_changes * (ns - start)      # The maximum number of inner loop iterations
     else:
         ranges      = None
         max_inner   = max_local_changes
         
-    # The maximum number of non-zero elements
+    #! The maximum number of non-zero elements
     max_nnz     = nh * max_inner
     dtype       = dtype if dtype is not None else hilbert.dtype
         
@@ -214,7 +214,7 @@ def _operator_create_np_dense_inner_loop_no_hilbert(ranges = None):
     # @njit(fastmath=True)
     def _inner_loop(local_funct, nh, matrix):
         # Loop over all basis states.
-        for k in np.arange(nh):
+        for k in range(nh):
             # Loop over the sites (modes).
             _inner_k(k, local_funct, matrix)
         return matrix
@@ -271,7 +271,7 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace, ranges 
         # @njit(fastmath=True)
         def _inner_loop(local_funct, nh, matrix):
             # Loop over all basis states.
-            for k in np.arange(nh):
+            for k in prange(nh):
                 _inner_k(k, local_funct, matrix)
             return matrix
         return _inner_loop
@@ -304,7 +304,7 @@ def operator_create_np_dense(ns                     : int,
         dtype = hilbert_space.dtype
     # Define the ranges for the inner loop
     if ns is not None and ns > 0:
-        ranges  = np.arange(start if start > 0 else 0, ns, dtype=DEFAULT_NP_INT_TYPE)
+        ranges  = range(start if start > 0 else 0, ns)
     else:
         ranges  = None
         

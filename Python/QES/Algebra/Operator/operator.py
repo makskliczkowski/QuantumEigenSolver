@@ -42,11 +42,53 @@ if JAX_AVAILABLE:
     import jax.numpy as jnp
     from jax.experimental import sparse
     
-else:
-    jax     = None
-    jnp     = None
-    sparse  = None
+    def make_jax_operator_closure(
+        op_func         : Callable,
+        sites           : Sequence[int],
+        *static_args    : Any,
+        **static_kwargs : Any) -> Callable:
+        """
+        Create a JAX-compiled closure with fixed `sites`, args, and kwargs.
+        All additional parameters are assumed to be static (compile-time constants).
+
+        Parameters
+        ----------
+        op_func : Callable
+            The operator function to compile. Must accept (state, sites, *args, **kwargs).
+        sites : Sequence[int]
+            List or tuple of site indices to be treated as static.
+        *static_args : Any
+            Additional positional arguments to fix.
+        **static_kwargs : Any
+            Additional keyword arguments to fix.
+
+        Returns
+        -------
+        Callable[[jnp.ndarray], Tuple[jnp.ndarray, jnp.ndarray]]
+            A JIT-compiled function accepting only `state`.
+        """
+        static_sites = tuple(int(i) for i in sites)
+        kwarg_keys   = tuple(sorted(static_kwargs))
+        kwarg_vals   = tuple(static_kwargs[k] for k in kwarg_keys)
+
+        @partial(jax.jit, static_argnums=range(1, 1 + 1 + len(static_args) + len(kwarg_vals)))
+        def op_func_jax(state, static_sites_, *args_and_kwargs):
+            args        = args_and_kwargs[:len(static_args)]
+            kwargs_vals = args_and_kwargs[len(static_args):]
+            kwargs      = dict(zip(kwarg_keys, kwargs_vals))
+            return op_func(state, static_sites_, *args, **kwargs)
+
+        #! Precompile the full closure with static args fixed
+        def compiled_op(state):
+            return op_func_jax(state, static_sites, *static_args, *kwarg_vals)
+
+        return jax.jit(compiled_op)
     
+else:
+    jax                         = None
+    jnp                         = None
+    sparse                      = None
+    make_jax_operator_closure   = lambda op_func, sites, *args, **kwargs: op_func
 
 ####################################################################################################
 
@@ -1757,16 +1799,7 @@ def create_operator(type_act        : int | OperatorTypeActing,
             return op_func_np(state, sites_np, *extra_args)
 
         if JAX_AVAILABLE:
-            
-            static_sites = tuple(int(i) for i in sites)
-            
-            @partial(jax.jit, static_argnums=(1,))
-            def closed(state, static_sites):
-                return op_func_jnp(state, static_sites)
-            
-            @jax.jit
-            def fun_jnp(state):
-                return closed(state, static_sites)
+            fun_jnp = make_jax_operator_closure(op_func_jnp, sites, *extra_args)
         else:
             def fun_jnp(state):
                 return state, 0.0

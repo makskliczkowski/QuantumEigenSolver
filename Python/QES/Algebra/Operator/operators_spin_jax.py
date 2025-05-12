@@ -109,15 +109,11 @@ if JAX_AVAILABLE:
         final_state, final_coeff = lax.fori_loop(0, num_sites, body, init)
         return ensure_operator_output_shape_jax(final_state, final_coeff)
 
-    def _sigma_x_body(state, sites, spin, spin_value):
-        """
-        Core logic for applying σₓ operator.
-        Accepts JAX state and site list; returns (state, coeff).
-        Not jitted. Called inside jitted wrappers.
-        """
+    # @partial(jax.jit, static_argnums=(1, 2, 3))
+    def sigma_x_jnp(state, sites, spin=BACKEND_DEF_SPIN, spin_value=_SPIN):
         sites_arr = jnp.asarray(sites)
         coeff     = spin_value ** sites_arr.shape[0]
-
+        # jax.debug.print("🔧 Compiling my_func for shape: {}", sites_arr.shape)
         def body(i, current_state):
             pos = sites_arr[i]
             return _flip_func(current_state, pos, spin)
@@ -125,16 +121,7 @@ if JAX_AVAILABLE:
         new_state = jax.lax.fori_loop(0, sites_arr.shape[0], body, state)
         return ensure_operator_output_shape_jax(new_state, coeff)
 
-    @partial(jax.jit, static_argnums=(2, 3))
-    def sigma_x_jnp(state, sites, spin=BACKEND_DEF_SPIN, spin_value=_SPIN):
-        return _sigma_x_body(state, sites, spin, spin_value)
-
     @partial(jax.jit, static_argnums=(1, 2, 3))
-    def sigma_x_int_static_jnp(state, sites, spin=BACKEND_DEF_SPIN, spin_value=_SPIN):
-        # jax.debug.print("🔧 Compiling my_func for shape: {}", sites)
-        return _sigma_x_body(state, sites, spin, spin_value)
-
-    @partial(jax.jit, static_argnums=(2, 3))
     def sigma_x_inv_jnp(state,
                         sites       : Union[List[int], None],
                         spin        : bool = BACKEND_DEF_SPIN,
@@ -154,13 +141,6 @@ if JAX_AVAILABLE:
                 A list of site indices to flip.
         """
         return sigma_x_jnp(state, sites, spin, spin_value)
-    
-    @partial(jax.jit, static_argnums=(1, 2, 3))
-    def sigma_x_inv_static_jnp(state,
-                        sites       : Union[List[int], None],
-                        spin        : bool = BACKEND_DEF_SPIN,
-                        spin_value  : float = _SPIN):
-        return sigma_x_int_static_jnp(state, sites, spin, spin_value)
     
 # -----------------------------------------------------------------------------
 #! Sigma-Y (σᵧ) operator
@@ -237,7 +217,6 @@ if JAX_AVAILABLE:
             tuple: (new_state, coeff) where new_state is the state after applying the operator
                 and coeff is the accumulated coefficient.
         """
-        # iscpx       = sites.shape[0] % 2 == 1
         sites_arr   = jnp.asarray(sites)
         coeff       = 1.0 + 0j
 
@@ -273,16 +252,18 @@ if JAX_AVAILABLE:
                     operand=None)
             return coeff * factor
         coeff = lax.fori_loop(0, len(sites), body, 1.0)
-        
-        # apply the sign if 1j * 1j = -1 for even but not twice even 
-        # coeff = lax.cond(
-        #     iscpx,
-        #     lambda c: c,
-        #     lambda c: jnp.real(c),
-        #     coeff
-        # )
-        
         return ensure_operator_output_shape_jax(new_state, coeff)
+
+    def sigma_y_real_jnp(state,
+                        sites       : Union[List[int], None],
+                        spin        : bool = BACKEND_DEF_SPIN,
+                        spin_value  : float = _SPIN):
+        """
+        Apply the Pauli-Y (σᵧ) operator on a JAX array state.
+        Corresponds to the adjoint operation.
+        """
+        state, coeff = sigma_y_jnp(state, sites, spin, spin_value)
+        return state, coeff.real
 
     # @partial(jax.jit, static_argnums=(2, 3))
     def sigma_y_inv_jnp(state,
@@ -742,6 +723,7 @@ if JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 
 if JAX_AVAILABLE:
+    
     @jax.jit
     def sigma_k_int_jnp(state, 
                         ns          : int, 
@@ -806,6 +788,41 @@ if JAX_AVAILABLE:
             operand=None
         )
         return ensure_operator_output_shape_jax(state, total / norm)
+
+# -----------------------------------------------------------------------------
+#! Sigma-Total (σₜ) operator
+# -----------------------------------------------------------------------------
+
+if JAX_AVAILABLE:
+    # @partial(jax.jit, static_argnums=(1, 2, 3))
+    def sigma_z_total_jnp(state,
+                        sites       : Union[List[int], None],
+                        spin        : bool = BACKEND_DEF_SPIN,
+                        spin_value  : float = _SPIN):
+        """
+        σₜ on a JAX array state.
+        """
+        sites_arr   = jnp.asarray(sites)
+        coeff       = jnp.sum(state[sites_arr]) * spin_value
+        return ensure_operator_output_shape_jax(state, coeff)
+
+    def sigma_z_total_int_jnp(state,
+                            sites       : Union[List[int], None],
+                            spin        : bool = BACKEND_DEF_SPIN,
+                            spin_value  : float = _SPIN):
+        """
+        σₜ on a JAX array state.
+        """
+        sites_arr   = jnp.asarray(sites)
+        coeff       = 0.0
+        def body(i, coeff):
+            pos     = sites_arr[i]
+            bitmask = jnp.left_shift(1, pos)
+            bit     = (state & bitmask) > 0
+            factor  = 2 * bit - 1.0
+            return coeff + factor * spin_value
+        coeff = lax.fori_loop(0, len(sites), body, coeff)
+        return ensure_operator_output_shape_jax(state, coeff)
 
 # -----------------------------------------------------------------------------
 

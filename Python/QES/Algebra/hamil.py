@@ -440,7 +440,7 @@ class Hamiltonian(ABC):
         '''
         Returns the maximum number of local changes.
         '''
-        return self._max_local_ch if self._is_many_body else 2
+        return self._max_local_ch if self._is_manybody else 2
 
     @property
     def name(self):
@@ -1071,9 +1071,9 @@ class Hamiltonian(ABC):
             
         '''
         if verbose:
-            self._log(f"Building Hamiltonian (Type: {'Many-Body' if self._is_many_body else 'Quadratic'})...", lvl=1, color = 'orange')
+            self._log(f"Building Hamiltonian (Type: {'Many-Body' if self._is_manybody else 'Quadratic'})...", lvl=1, color = 'orange')
         
-        if self._is_many_body:
+        if self._is_manybody:
             # Ensure operators/local energy functions are defined
             if self._loc_energy_int_fun is None and self._loc_energy_np_fun is None and self._loc_energy_jax_fun is None:
                 self._log("Local energy functions not set, attempting to set them via _set_local_energy_operators...", lvl=2, log="debug")
@@ -1340,19 +1340,20 @@ class Hamiltonian(ABC):
             self._log(f"Diagonalization started using ({method})...", lvl = 1)
             
         if self._is_quadratic:
-            if self.particle_conserving:
-                self._log("Diagonalizing the quadratic Hamiltonian matrix without BdG...", lvl = 2, log = 'debug')
-                self._hamil = self._hamil_sp
-            else:
-                self._log("Diagonalizing the quadratic Hamiltonian matrix with BdG...", lvl = 2, log = 'debug')
-                if self._isfermions:
-                    self._hamil = backend.block([   [ self._hamil_sp, self._delta_sp ],
-                                                    [-self._delta_sp.conj(), -self._hamil_sp.conj().T ]])
-        else:  # bosons – use ΣH to make it Hermitian
-            sigma = backend.block([ [backend.eye(self.ns), backend.zeros_like(self._hamil)  ],
-                                    [backend.zeros_like(self._hamil), -backend.eye(self.ns) ]])
-            self._hamil = sigma @ backend.block([[ self._hamil_sp,  self._delta_sp          ],
-                                    [self._delta_sp.conj().T, self._hamil_sp.conj().T       ]])
+            if True:
+                if self.particle_conserving:
+                    self._log("Diagonalizing the quadratic Hamiltonian matrix without BdG...", lvl = 2, log = 'debug')
+                    self._hamil = self._hamil_sp
+                else:
+                    self._log("Diagonalizing the quadratic Hamiltonian matrix with BdG...", lvl = 2, log = 'debug')
+                    if self._isfermions:
+                        self._hamil = backend.block([   [ self._hamil_sp, self._delta_sp ],
+                                                        [-self._delta_sp.conj(), -self._hamil_sp.conj().T ]])
+            else:  # bosons – use ΣH to make it Hermitian
+                sigma = backend.block([ [backend.eye(self.ns), backend.zeros_like(self._hamil)  ],
+                                        [backend.zeros_like(self._hamil), -backend.eye(self.ns) ]])
+                self._hamil = sigma @ backend.block([[ self._hamil_sp,  self._delta_sp          ],
+                                        [self._delta_sp.conj().T, self._hamil_sp.conj().T       ]])
         
         # try to diagonalize the Hamiltonian matrix
         try:
@@ -1464,7 +1465,7 @@ class Hamiltonian(ABC):
             # if the operator is callable, we try to create the operator from it
             # raise ValueError("The operator is callable, but it should be an Operator object. TODO: implement this...")
     
-        if not self._is_many_body:
+        if not self._is_manybody:
             raise TypeError("Method 'add' is intended for Many-Body Hamiltonians to define local energy terms.")
         
         # check if the sites are provided, if one sets the operator, we would put it at a given site
@@ -1534,11 +1535,11 @@ class Hamiltonian(ABC):
             operators_nmod_int          =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_nmod_sites[i]] for i in range(self.ns)]
             operators_nmod_int_nsites   =  [[(op.int, sites, vals) for (op, sites, vals) in self._ops_nmod_nosites[i]] for i in range(self.ns)]
             self._loc_energy_int_fun    = local_energy_int_wrap(self.ns,
-                                                    _op_mod_sites=operators_mod_int,
-                                                    _op_mod_nosites=operators_mod_int_nsites,
-                                                    _op_nmod_sites=operators_nmod_int,
-                                                    _op_nmod_nosites=operators_nmod_int_nsites,
-                                                    dtype=self._dtype)
+                                                    _op_mod_sites       = operators_mod_int,
+                                                    _op_mod_nosites     = operators_mod_int_nsites,
+                                                    _op_nmod_sites      = operators_nmod_int,
+                                                    _op_nmod_nosites    = operators_nmod_int_nsites,
+                                                    dtype               = self._dtype)
         
         except Exception as e:
             self._log(f"Failed to set integer local energy functions: {e}", lvl=3, color="red", log='error')

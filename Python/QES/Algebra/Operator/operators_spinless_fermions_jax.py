@@ -157,7 +157,7 @@ if JAX_AVAILABLE:
         # return ensure_operator_output_shape_jax(st, coeff)
         return lax.cond(any_empty, _abort, _apply, operand=None)
     
-    @jit
+    # @jit
     def c_dag_jnp(state: jnp.ndarray,
                   sites: jnp.ndarray,
                   pref : float = 1.0):
@@ -187,7 +187,7 @@ if JAX_AVAILABLE:
         return ensure_operator_output_shape_jax(st, coeff)
         # return lax.cond(any_occ, _abort, _apply, operand=None)
 
-    @jit
+    # @jit
     def c_jnp(state : jnp.ndarray,
             sites   : jnp.ndarray,
             pref    : float = 1.0):
@@ -267,7 +267,7 @@ if JAX_AVAILABLE:
     
     f_parity_np_vec = jax.vmap(f_parity_np_jnp, in_axes=(None, 0))
 
-    @jit
+    # @jit
     def c_k_jnp(state    : jnp.ndarray,
                 sites    : jnp.ndarray,
                 k        : float,
@@ -287,7 +287,7 @@ if JAX_AVAILABLE:
         norm           = jnp.sqrt(jnp.maximum(jnp.count_nonzero(coeffs), 1))
         return new_states, coeffs / norm
 
-    @jit
+    # @jit
     def c_k_dag_jnp(state  : jnp.ndarray,
                     sites  : jnp.ndarray,
                     k      : float,
@@ -346,7 +346,7 @@ if JAX_AVAILABLE:
         return jnp.asarray([state_arr], dtype=_DEFAULT_INT), jnp.asarray([coeff_val],
                                                                         dtype=_DEFAULT_FLOAT)
 
-    @jax.jit
+    # @jax.jit
     def n_jax(state     : jnp.ndarray,
             sites     : jnp.ndarray,
             prefactor : float = 1.0):

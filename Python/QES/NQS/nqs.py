@@ -1352,10 +1352,10 @@ class NQS(MonteCarloSolver):
         return new_params, mean_energy, std_energy, None
 
     def train(self,
-              nsteps: int = 1,
-              verbose: bool = False,
-              use_sr: bool = True,
-              **kwargs) -> list:
+            nsteps  : int = 1,
+            verbose : bool = False,
+            use_sr  : bool = True,
+            **kwargs) -> list:
         """
         Train the NQS solver for a specified number of steps.
 
@@ -1370,14 +1370,10 @@ class NQS(MonteCarloSolver):
         energies = []
         for step in range(nsteps):
             if self._isjax:
-                self._state, mean_energy, std_energy, _ = self.train_step_jax(
-                    state=self._state,
-                    sampler=self._sampler,
-                    hamiltonian=self._hamiltonian,
-                    batch_size=self._batch_size,
-                    use_sr=use_sr,
-                    reg=kwargs.get('reg', 1e-7),
-                    lr=kwargs.get('lr', 1e-2))
+                pass
+                # self._state, mean_energy, std_energy, _ = self.single_step_jax(
+                #         params      = self._net.get_params(),
+                #         configs     = 
             else:
                 self._params, mean_energy, std_energy, _ = self.train_step_np(
                     params=self._params,

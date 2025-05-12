@@ -224,7 +224,7 @@ class HilbertSpace(ABC):
         # setup the logger instance for the Hilbert space
         self._threadnum     = kwargs.get('threadnum', 1)            # number of threads to use
         
-        if self._is_many_body and (sym_gen or self._global_syms):
+        if self._is_many_body:
             if gen_mapping:
                 self._log("Explicitly requested immediate mapping generation.", log='debug', lvl=2)
             self._init_mapping(sym_gen, gen_mapping=gen_mapping)    # gen_mapping True here enables reprmap
@@ -551,6 +551,7 @@ class HilbertSpace(ABC):
             self._nh            = self._nhfull
             self._mapping       = None
             self._normalization = None
+            self._modifies      = False
             return
         
         t0 = time.time()
@@ -656,15 +657,12 @@ class HilbertSpace(ABC):
         if self._is_quadratic:
             return False
         
-        if self._mapping is None and (self._sym_group or self._global_syms):
-            # Symmetries exist but mapping not generated, assume it *will* modify
-            # This might be slightly inaccurate if symmetries don't reduce the space
-            return True
+        if self._mapping is None:
+            return False
         elif self._mapping is not None:
             return self._nh != self._nhfull
-        else: # No symmetries, no modification
+        else:
             return False
-        
         return self._nh != self._nhfull
     
     @property

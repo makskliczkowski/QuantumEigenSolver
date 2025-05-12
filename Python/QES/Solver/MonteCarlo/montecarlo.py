@@ -218,7 +218,7 @@ class MonteCarloSolver(Solver):
             str: A formatted string representing the object.
         """
 
-        return f"[{self._replica}] I am a {self.__class__.__name__} object with {self._info} at β = {self._beta : .2f}."
+        return f"[{self._replica_idx}] I am a {self.__class__.__name__} object with {self._info} at β = {self._beta : .2f}."
     
     # ----------------
     
@@ -353,7 +353,7 @@ class MonteCarloSolver(Solver):
         '''
         Returns the replica index.
         '''
-        return self._replica
+        return self._replica_idx
     
     @property
     def acc_rate(self):
@@ -420,7 +420,7 @@ class MonteCarloSolver(Solver):
         '''
         Set the replica index.
         '''
-        self._replica = value
+        self._replica_idx = value
     
     # ----------------
     

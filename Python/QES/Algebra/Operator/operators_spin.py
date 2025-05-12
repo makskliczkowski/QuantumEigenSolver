@@ -45,9 +45,9 @@ if JAX_AVAILABLE:
     import Algebra.Operator.operators_spin_jax as jaxpy
     import jax.numpy as jnp
     # sigma x
-    from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp, sigma_x_int_static_jnp, sigma_x_inv_static_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp
     # sigma y
-    from Algebra.Operator.operators_spin_jax import sigma_y_int_jnp, sigma_y_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_y_int_jnp, sigma_y_jnp, sigma_y_real_jnp
     # sigma z
     from Algebra.Operator.operators_spin_jax import sigma_z_int_jnp, sigma_z_jnp
     # sigma plus
@@ -60,15 +60,17 @@ if JAX_AVAILABLE:
     from Algebra.Operator.operators_spin_jax import sigma_mp_int_jnp, sigma_mp_jnp
     # sigma k
     from Algebra.Operator.operators_spin_jax import sigma_k_int_jnp, sigma_k_jnp
+    # sigma z total
+    from Algebra.Operator.operators_spin_jax import sigma_z_total_int_jnp, sigma_z_total_jnp
 else:
-    sigma_x_int_jnp     = sigma_x_jnp       = None
-    sigma_y_int_jnp     = sigma_y_jnp       = None
-    sigma_z_int_jnp     = sigma_z_jnp       = None
-    sigma_plus_int_jnp  = sigma_plus_jnp    = None
-    sigma_minus_int_jnp = sigma_minus_jnp   = None
-    sigma_pm_int_jnp    = sigma_pm_jnp      = None
-    sigma_mp_int_jnp    = sigma_mp_jnp      = None
-    sigma_k_int_jnp     = sigma_k_jnp       = None
+    sigma_x_int_jnp     = sigma_x_jnp       = lambda s, v       : None
+    sigma_y_int_jnp     = sigma_y_jnp       = lambda s, v       : None
+    sigma_z_int_jnp     = sigma_z_jnp       = lambda s, v       : None
+    sigma_plus_int_jnp  = sigma_plus_jnp    = lambda s, v       : None
+    sigma_minus_int_jnp = sigma_minus_jnp   = lambda s, v       : None
+    sigma_pm_int_jnp    = sigma_pm_jnp      = lambda s, v       : None
+    sigma_mp_int_jnp    = sigma_mp_jnp      = lambda s, v       : None
+    sigma_k_int_jnp     = sigma_k_jnp       = lambda s, v, k    : None
 
 ################################################################################
 #! Standard Pauli matrices
@@ -484,6 +486,59 @@ def sigma_z(state,
         return sigma_z_np(state, sites, spin, spin_value)
     return sigma_z_jnp(state, ns, sites, spin, spin_value)
 
+# -----------------------------------------------------------------------------
+#! Sigma-Z total (σ_z total) operator
+# -----------------------------------------------------------------------------
+
+@numba.njit
+def sigma_z_total_int_np(state        : int,
+                          ns          : int,
+                          sites       : Union[List[int], None],
+                          spin        : bool  = BACKEND_DEF_SPIN,
+                          spin_value  : float = _SPIN):
+    """
+    σ_z total on an integer state.
+    For each site, if the bit at (ns-1-site) is set then multiply by spin_value; else by -spin_value.
+    The state is unchanged.
+    """
+    if sites is None:
+        sites = list(range(ns))
+    values          = np.sum(sigma_z_int_np(state, ns, [site], spin, spin_value)[1] for site in sites)
+    out_state       = np.empty(1, dtype=DEFAULT_NP_INT_TYPE)
+    out_state[0]    = state
+    # return ensure_operator_output_shape_numba(out_state, out_coeff)
+    return out_state, values
+
+@numba.njit
+def sigma_z_total_np(state      : np.ndarray,
+                    sites       : Union[List[int], None],
+                    spin        : bool  = BACKEND_DEF_SPIN,
+                    spin_value  : float = _SPIN):
+    """
+    σ_z total on a NumPy array state.
+    Parameters
+    ----------
+    state : np.ndarray
+        The state to apply the operator to.
+    sites : list of int or None
+        The sites to apply the operator to. If None, apply to all sites.
+    spin_value : float, optional
+        The value to multiply the state by when flipping the bits.
+    Returns
+    -------
+    np.ndarray
+        The state after applying the operator.
+    float
+        The coefficient after applying the operator.
+    """
+    if sites is None:
+        sites = list(range(state.shape[0]))
+    coeff   = np.zeros(1, dtype=DEFAULT_NP_FLOAT_TYPE)
+    for site in sites:
+        bit     = _binary.check_arr_np(state, site)
+        coeff  += (2 * bit - 1.0) * spin_value
+    return ensure_operator_output_shape_numba(state, coeff)
+        
 # -----------------------------------------------------------------------------
 #! Sigma-Plus (σ⁺) operator
 # -----------------------------------------------------------------------------
@@ -944,20 +999,11 @@ def sig_x(  lattice     : Optional[Lattice]     = None,
     Operator
         The σₓ operator.    
     """
-    if JAX_AVAILABLE:
-        # only sites fun
-        if type_act == OperatorTypeActing.Global:
-            jnp_fun = partial(sigma_x_int_static_jnp, spin=spin, spin_value=spin_value)
-        else:
-            jnp_fun = partial(sigma_x_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
-        
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_x_int_np,
         op_func_np  = sigma_x_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_x_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1000,20 +1046,17 @@ def sig_y( lattice     : Optional[Lattice]     = None,
     
     np_fun  = sigma_y_np
     int_fun = sigma_y_int_np
-    
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_y_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
+    jnp_fun = sigma_y_jnp
     
     if type_act == OperatorTypeActing.Global:
         if sites is not None and len(sites) % 2 == 1:
             np_fun  = sigma_y_np_real
             int_fun = sigma_y_int_np_real
+            jnp_fun = sigma_y_real_jnp
     elif type_act == OperatorTypeActing.Correlation:
         np_fun  = sigma_y_np_real
         int_fun = sigma_y_int_np_real
+        jnp_fun = sigma_y_real_jnp
     
     return create_operator(
         type_act    = type_act,
@@ -1062,17 +1105,11 @@ def sig_z(  lattice     : Optional[Lattice]     = None,
         The σₓ operator.
     """
     
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_z_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
-    
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_z_int_np,
         op_func_np  = sigma_z_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_z_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1094,16 +1131,11 @@ def sig_p(  lattice     : Optional[Lattice]     = None,
     """
     Factory for the spin‑raising operator σ⁺.
     """
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_plus_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_plus_int_np,
         op_func_np  = sigma_plus_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_plus_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1125,18 +1157,12 @@ def sig_m(  lattice     : Optional[Lattice]     = None,
     """
     Factory for the spin‑lowering operator σ⁻.
     """
-    
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_minus_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
-    
+
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_minus_int_np,
         op_func_np  = sigma_minus_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_minus_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1158,17 +1184,12 @@ def sig_pm( lattice     : Optional[Lattice]     = None,
     """
     Factory for the alternating operator: even‑indexed sites σ⁺, odd‑indexed σ⁻.
     """
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_pm_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
-    
+
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_pm_int_np,
         op_func_np  = sigma_pm_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_pm_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1190,17 +1211,12 @@ def sig_mp( lattice     : Optional[Lattice]     = None,
     """
     Factory for the alternating operator: even‑indexed sites σ⁻, odd‑indexed σ⁺.
     """
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_mp_jnp, spin=spin, spin_value=spin_value)
-    else:
-        jnp_fun = None
-    
+
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_mp_int_np,
         op_func_np  = sigma_mp_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_mp_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1225,17 +1241,12 @@ def sig_k(  k           : float,
 
         σₖ = (1/√N)\,\sum_{i∈\text{sites}} σ_z(i)\,e^{\,ik i}.
     """
-    if JAX_AVAILABLE:
-        # only sites fun
-        jnp_fun = partial(sigma_k_jnp, spin=spin, spin_value=spin_value, k=k)
-    else:
-        jnp_fun = None
-    
+
     return create_operator(
         type_act    = type_act,
         op_func_int = sigma_k_int_np,
         op_func_np  = sigma_k_np,
-        op_func_jnp = jnp_fun,
+        op_func_jnp = sigma_k_jnp,
         lattice     = lattice,
         ns          = ns,
         sites       = sites,
@@ -1243,7 +1254,35 @@ def sig_k(  k           : float,
         name        = f"Sk(k={k:.3g})",
         modifies    = False # σₖ leaves the state unchanged
     )
+
+# -----------------------------------------------------------------------------
+#! Factory function for sigma-total (σ_total)
+# -----------------------------------------------------------------------------
+
+def sig_z_total( lattice     : Optional[Lattice]     = None,
+                ns          : Optional[int]         = None,
+                type_act    : OperatorTypeActing    = OperatorTypeActing.Global,
+                sites       : Optional[List[int]]   = None,
+                spin        : bool                  = BACKEND_DEF_SPIN,
+                spin_value  : float                 = _SPIN) -> Operator:
+    """
+    Factory for the total spin operator in the z-direction.
+    This operator is the sum of all σ_z operators acting on the specified sites.
+    """
     
+    return create_operator(
+        type_act    = type_act,
+        op_func_int = sigma_z_total_int_np,
+        op_func_np  = sigma_z_total_np,
+        op_func_jnp = sigma_z_total_jnp,
+        lattice     = lattice,
+        ns          = ns,
+        sites       = sites,
+        extra_args  = (spin, spin_value),
+        name        = "Sz_total",
+        modifies    = False # σ_total leaves the state unchanged
+    )
+
 # -----------------------------------------------------------------------------
 #! Finalize
 # -----------------------------------------------------------------------------

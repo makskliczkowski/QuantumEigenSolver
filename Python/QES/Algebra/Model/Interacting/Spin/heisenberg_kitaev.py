@@ -56,6 +56,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                 dlt                 : Union[List[float], None, float]       = 1.0,
                 dtype               : type                                  = np.float32,
                 backend             : str                                   = "default",
+                logger              : Optional['Logger']                    = None,
                 **kwargs):
         '''
         Constructor for the QSM Hamiltonian.
@@ -90,7 +91,8 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         
         # Initialize the Hamiltonian
         self._lattice                   = lattice
-        super().__init__(hilbert_space, lattice=lattice, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
+        super().__init__(is_manybody=True, hilbert_space=hilbert_space, lattice=lattice, is_sparse=True,
+                         dtype=dtype, backend=backend, logger=logger, **kwargs)
 
         # Initialize the Hamiltonian
         if hilbert_space is None:
