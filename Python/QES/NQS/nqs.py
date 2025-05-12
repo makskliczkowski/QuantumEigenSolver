@@ -1106,6 +1106,34 @@ class NQS(MonteCarloSolver):
     #####################################
     
     @staticmethod
+    def wrap_single_step_jax(        
+            apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
+            local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
+            flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
+            use_sr                      : bool,                         # Flag to use Stochastic Reconfiguration to compute d_par
+            sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
+            sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
+            sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
+            batch_size                  : Optional[int]         = None, # Batch size for evaluation
+        ):
+        
+        @jax.jit
+        def wrapped(params, configs, configs_ansatze, probabilities):
+            return NQS.single_step_jax(params,
+                                    configs,
+                                    configs_ansatze,
+                                    probabilities,
+                                    apply_fn,
+                                    local_energy_fun,
+                                    flat_grad_fun,
+                                    use_sr,
+                                    sr_precond_apply_fun,
+                                    sr_solve_linalg_fun,
+                                    sr_options,
+                                    batch_size)
+        return wrapped
+        
+    @staticmethod
     @partial(jax.jit, static_argnames=("apply_fn",
                                     "local_energy_fun",
                                     "flat_grad_fun", 
@@ -1115,23 +1143,24 @@ class NQS(MonteCarloSolver):
                                     "sr_options",
                                     "batch_size"))
     def single_step_jax(
-        # Dynamic Inputs (Data & State)
-        params                      : Any,                          # Current PyTree parameters
-        configs                     : jnp.ndarray,                  # Batch of sampled configurations (N_samples, ...shape)
-        configs_ansatze             : jnp.ndarray,                  # Batch of sampled ansatze (N_samples, ...)
-        probabilities               : jnp.ndarray,                  # Batch of sampled probabilities (N_samples, ...)
-        # Static Inputs (Functions & Config)
-        apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
-        local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
-        flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
-        # Static for Stochastic Reconfiguration (SR)
-        use_sr                      : bool,                         # Flag to use Stochastic Reconfiguration to compute d_par
-        sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
-        sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
-        sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
-        batch_size                  : Optional[int]         = None, # Batch size for evaluation
-        # Static for Evaluation
-    ) -> Tuple[Any, NQSStepInfo]: # Returns (flat_update_vector, metrics)
+            # Dynamic Inputs (Data & State)
+            params                      : Any,                          # Current PyTree parameters
+            configs                     : jnp.ndarray,                  # Batch of sampled configurations (N_samples, ...shape)
+            configs_ansatze             : jnp.ndarray,                  # Batch of sampled ansatze (N_samples, ...)
+            probabilities               : jnp.ndarray,                  # Batch of sampled probabilities (N_samples, ...)
+            # Static Inputs (Functions & Config)
+            apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
+            local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
+            flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
+            # Static for Stochastic Reconfiguration (SR)
+            use_sr                      : bool,                         # Flag to use Stochastic Reconfiguration to compute d_par
+            sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
+            sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
+            sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
+            batch_size                  : Optional[int]         = None, # Batch size for evaluation
+            t                           : Optional[float]       = None, # Time for the jax 
+            # Static for Evaluation
+        ) -> Tuple[Any, NQSStepInfo]: # Returns (flat_update_vector, metrics)
         """
         Performs a single training step for Neural Quantum States (NQS) using JAX.
         This function computes the local energies, gradients, and the parameter update vector (d_par).
@@ -1299,58 +1328,6 @@ class NQS(MonteCarloSolver):
         # The caller (NQS class) handles scaling by -lr (or i * dt for TDVP) and applying the update.
         return d_par_flat, metrics, (shapes, sizes, iscpx)
 
-    @staticmethod
-    def train_step_np(
-            params: Any,
-            sampler: Sampler,
-            hamiltonian: Hamiltonian,
-            batch_size: int,
-            use_sr: bool = True,
-            optimizer: Optional[Callable] = None,
-            reg: float = 1e-7,
-            lr: float = 1e-2) -> Tuple[Any, float, float, Any]:
-        """
-        Perform a single training step using NumPy.
-
-        Parameters:
-            params: The current model parameters.
-            sampler: The sampler to generate configurations and probabilities.
-            hamiltonian: The Hamiltonian to compute local energies.
-            batch_size: The batch size for sampling and evaluation.
-            use_sr: Whether to use stochastic reconfiguration.
-            optimizer: Optional optimizer function to update parameters.
-            reg: Regularization parameter for SR.
-            lr: Learning rate for parameter updates.
-
-        Returns:
-            Updated parameters, mean energy, energy standard deviation, and additional info.
-        """
-        # Sampling step
-        (states, logprobas), (configs, configs_ansatze), probabilities = sampler.sample(num_samples=batch_size)
-
-        # Evaluate local energies
-        local_energies = hamiltonian.local_energy(states, params)
-        mean_energy = np.mean(local_energies)
-        std_energy = np.std(local_energies)
-
-        # Compute gradients
-        grads = np.gradient(lambda p: np.mean(hamiltonian.local_energy(states, p)))(params)
-
-        if use_sr:
-            # Stochastic Reconfiguration
-            centered_grads = grads - np.mean(grads, axis=0)
-            fisher_matrix = np.matmul(centered_grads.T, centered_grads) / batch_size
-            forces = np.matmul(centered_grads.T, local_energies - mean_energy) / batch_size
-            update_step = np.linalg.solve(fisher_matrix + reg * np.eye(fisher_matrix.shape[0]), forces)
-        else:
-            # Standard gradient descent
-            update_step = -lr * grads
-
-        # Update parameters
-        new_params = {k: params[k] + update_step[k] for k in params}
-
-        return new_params, mean_energy, std_energy, None
-
     def train(self,
             nsteps  : int = 1,
             verbose : bool = False,
@@ -1485,7 +1462,7 @@ class NQS(MonteCarloSolver):
         '''
         Update the NQS solver after state modification.
         '''
-        
+    
     def unupdate(self, **kwargs):
         '''
         Unupdate the NQS solver after state modification.

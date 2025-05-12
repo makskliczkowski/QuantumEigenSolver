@@ -16,8 +16,8 @@ from Algebra.Operator.operator import Operator, GlobalSymmetries
 
 # from general Python modules
 from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
-from general_python.common.binary import rotate_left, rotate_right, flip_all, rev, rotate_left_ax, popcount, BACKEND_DEF_SPIN, BACKEND_REPR
-from general_python.algebra.utils import get_backend as __backend, DEFAULT_BACKEND, maybe_jit
+from general_python.common.binary import rotate_left, rotate_right, flip_all, rev, rotate_left_ax, popcount
+from general_python.algebra.utils import get_backend
 
 class GlobalSymmetry(ABC):
     """
@@ -54,7 +54,7 @@ class GlobalSymmetry(ABC):
         
         if isinstance(backend, str):
             self._backend_str   = backend
-            self._backend       = __backend(backend)
+            self._backend       = get_backend(backend)
         else:
             self._backend_str   = 'np' if backend == np else 'jax'
             self._backend       = backend

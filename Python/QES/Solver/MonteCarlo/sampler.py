@@ -128,7 +128,7 @@ if JAX_AVAILABLE:
             jnp.ndarray: The proposed flipped state(s).
         '''
         idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size)[0]
-        return Binary.flip_array_jax_spin(state, idx)
+        return Binary.jaxpy.flip_array_jax_spin(state, idx)
 
     @partial(jax.jit, static_argnums=(2,))
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
@@ -147,7 +147,7 @@ if JAX_AVAILABLE:
         '''
         if state.ndim == 1:
             idx = randint_jax(key=rng_k, shape=(num,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)
-            return Binary.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
+            return Binary.jaxpy.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
         else:
             batch_size  = state.shape[0]
             state_size  = state.shape[1]
@@ -156,7 +156,7 @@ if JAX_AVAILABLE:
             # Use vmap to apply index generation and flipping per state
             def flip_single_state(single_state, key):
                 idx     = randint_jax(key=key, shape=(num,), low=0, high=state_size, dtype=DEFAULT_JP_INT_TYPE)
-                return Binary.flip_array_jax_multi(single_state, idx, spin=Binary.BACKEND_DEF_SPIN)
+                return Binary.jaxpy.flip_array_jax_multi(single_state, idx, spin=Binary.BACKEND_DEF_SPIN)
 
             return jax.vmap(flip_single_state)(state, keys)
 

@@ -59,8 +59,8 @@ if JAX_AVAILABLE:
     _DEFAULT_INT    = DEFAULT_JP_INT_TYPE
     _DEFAULT_FLOAT  = DEFAULT_JP_FLOAT_TYPE
     _DEFAULT_CPX    = DEFAULT_JP_CPX_TYPE
-    _flip_jnp       = _binary.flip_int_traced_jax
-    _bit_jnp        = _binary.check_int_traced_jax
+    _flip_jnp       = _binary.jaxpy.flip_int_traced_jax
+    _bit_jnp        = _binary.jaxpy.check_int_traced_jax
     
     @jit
     def _popcount_mask_jnp(x: jnp.int64, mask_bits: jnp.int64) -> jnp.int64:

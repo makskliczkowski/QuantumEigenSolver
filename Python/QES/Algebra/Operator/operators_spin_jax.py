@@ -52,8 +52,8 @@ if JAX_AVAILABLE:
     def _flip_func(state_val, pos, spin: bool):
         return jax.lax.cond(
             spin,
-            lambda _: _binary.flip_array_jax_spin(state_val, pos),
-            lambda _: _binary.flip_array_jax_nspin(state_val, pos),
+            lambda _: _binary.jaxpy.flip_array_jax_spin(state_val, pos),
+            lambda _: _binary.jaxpy.flip_array_jax_nspin(state_val, pos),
             operand = None
         )
 else:
@@ -100,7 +100,7 @@ if JAX_AVAILABLE:
             # sites is static, so extract the site.
             site                    = ns - 1 + sites[i]
             # flip is assumed to be a JAX-compatible function that flips the bit at position pos.
-            new_state               = _binary.flip_int_traced_jax(curr_state, site)
+            new_state               = _binary.jaxpy.flip_int_traced_jax(curr_state, site)
             new_coeff               = curr_coeff * spin_value
             return (new_state, new_coeff)
 
@@ -185,7 +185,7 @@ if JAX_AVAILABLE:
                                     lambda _: 1j * spin_value,
                                     lambda _: -1j * spin_value,
                                 operand=None)
-            new_state           = _binary.flip_int_traced_jax(state_val, pos)
+            new_state           = _binary.jaxpy.flip_int_traced_jax(state_val, pos)
             return (new_state, coeff * factor)
 
         final_state, final_coeff = lax.fori_loop(0, sites_arr.shape[0], body, (state, 1.0 + 0j))
@@ -245,7 +245,7 @@ if JAX_AVAILABLE:
         
         def body(i, coeff):
             site    = sites_arr[i]
-            bit     = _binary.check_arr_jax(state, site)
+            bit     = _binary.jaxpy.check_arr_jax(state, site)
             factor  = lax.cond(bit,
                         lambda _: 1j * spin_value,
                         lambda _: -1j * spin_value,
@@ -379,7 +379,7 @@ if JAX_AVAILABLE:
         sites       = jnp.asarray(sites)
         # jax.debug.print("🔧 Compiling my_func for shape: {}", sites.shape)
         for site in sites:
-            bit     =   _binary.check_arr_jax(state, site)
+            bit     =   _binary.jaxpy.check_arr_jax(state, site)
             factor  =   jax.lax.cond(bit,
                                     lambda _: spin_value,
                                     lambda _: -spin_value,
@@ -440,7 +440,7 @@ if JAX_AVAILABLE:
                 pos         = ns - 1 - sites[i]
                 bitmask     = jnp.left_shift(1, pos)
                 condition   = (curr_state & bitmask) > 0
-                new_state   = _binary.flip_int_traced_jax(curr_state, pos)
+                new_state   = _binary.jaxpy.flip_int_traced_jax(curr_state, pos)
                 new_coeff   = lax.cond(condition,
                             lambda _: 0.0,
                             lambda _: curr_coeff * spin_value,
@@ -471,13 +471,13 @@ if JAX_AVAILABLE:
                 return state_in, coeff_in
 
             def compute_branch(_):
-                coeff_new = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                coeff_new = jax.lax.cond(_binary.jaxpy.check_arr_jax(state_in, site),
                             lambda _: 0.0,
                             lambda _: coeff_in * spin_value,
                             operand=None)
                 new_state = jax.lax.cond(spin,
-                            lambda _: _binary.flip_array_jax_spin(state_in, site),
-                            lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                            lambda _: _binary.jaxpy.flip_array_jax_spin(state_in, site),
+                            lambda _: _binary.jaxpy.flip_array_jax_nspin(state_in, site),
                             operand=None)
                 return new_state, coeff_new
             return jax.lax.cond(coeff_in == 0.0, skip_branch, compute_branch, operand=None)
@@ -508,7 +508,7 @@ if JAX_AVAILABLE:
                 pos         = ns - 1 - sites_arr[i]
                 bitmask     = jnp.left_shift(1, pos)
                 condition   = (curr_state & bitmask) > 0
-                new_state   = _binary.flip_int_traced_jax(curr_state, pos)
+                new_state   = _binary.jaxpy.flip_int_traced_jax(curr_state, pos)
                 new_coeff   = lax.cond(condition,
                                         lambda _: curr_coeff * spin_value,
                                         lambda _: 0.0,
@@ -535,13 +535,13 @@ if JAX_AVAILABLE:
                 return state_in, coeff_in
             def compute_branch(_):
                 site                = sites_arr[i]
-                coeff_new           = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                coeff_new           = jax.lax.cond(_binary.jaxpy.check_arr_jax(state_in, site),
                                                     lambda _: 0.0,
                                                     lambda _: coeff_in * spin_value,
                                                     operand=None)
                 new_state           = jax.lax.cond(spin,
-                                                    lambda _: _binary.flip_array_jax_spin(state_in, site),
-                                                    lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                                    lambda _: _binary.jaxpy.flip_array_jax_spin(state_in, site),
+                                                    lambda _: _binary.jaxpy.flip_array_jax_nspin(state_in, site),
                                                     operand=None)
                 return new_state, coeff_new
             return jax.lax.cond(coeff_in == 0.0, skip_branch, compute_branch, operand=None)
@@ -566,7 +566,7 @@ if JAX_AVAILABLE:
             def even_branch(_):
             # If bit is set, return state_val; else flip
                 return jax.lax.cond(
-                    _binary.check_arr_jax(state_val, pos),
+                    _binary.jaxpy.check_arr_jax(state_val, pos),
                     lambda _: state_val,
                     lambda _: _flip_func(state_val, pos, spin),
                     operand = None
@@ -575,7 +575,7 @@ if JAX_AVAILABLE:
             def odd_branch(_):
             # If bit is not set, return state_val; else flip
                 return jax.lax.cond(
-                    _binary.check_arr_jax(state_val, pos),
+                    _binary.jaxpy.check_arr_jax(state_val, pos),
                     lambda _: _flip_func(state_val, pos, spin),
                     lambda _: state_val,
                     operand=None
@@ -684,25 +684,25 @@ if JAX_AVAILABLE:
                 site                = sites_arr[i]
                 def even_branch(_):
                     # σ⁻: only act if bit is set
-                    coeff_new = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                    coeff_new = jax.lax.cond(_binary.jaxpy.check_arr_jax(state_in, site),
                                             lambda _: coeff_in * spin_value,
                                             lambda _: 0.0,
                                             operand=None)
                     new_state = jax.lax.cond(spin,
-                                            lambda _: _binary.flip_array_jax_spin(state_in, site),
-                                            lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                            lambda _: _binary.jaxpy.flip_array_jax_spin(state_in, site),
+                                            lambda _: _binary.jaxpy.flip_array_jax_nspin(state_in, site),
                                             operand=None)
                     return new_state, coeff_new
 
                 def odd_branch(_):
                     # σ⁺: only act if bit is not set
-                    coeff_new = jax.lax.cond(_binary.check_arr_jax(state_in, site),
+                    coeff_new = jax.lax.cond(_binary.jaxpy.check_arr_jax(state_in, site),
                                             lambda _: 0.0,
                                             lambda _: coeff_in * spin_value,
                                             operand=None)
                     new_state = jax.lax.cond(spin,
-                                            lambda _: _binary.flip_array_jax_spin(state_in, site),
-                                            lambda _: _binary.flip_array_jax_nspin(state_in, site),
+                                            lambda _: _binary.jaxpy.flip_array_jax_spin(state_in, site),
+                                            lambda _: _binary.jaxpy.flip_array_jax_nspin(state_in, site),
                                             operand=None)
                     return new_state, coeff_new
 
@@ -776,7 +776,7 @@ if JAX_AVAILABLE:
         sites_arr   = jnp.asarray(sites)
         def body_fun(i, total_val):
             pos     = sites_arr[i]
-            bit     = _binary.check_arr_jax(state, pos)
+            bit     = _binary.jaxpy.check_arr_jax(state, pos)
             factor  = (2 * bit - 1.0) * spin_value
             return total_val + factor * jnp.exp(1j * k * pos)
         total   = lax.fori_loop(0, len(sites), body_fun, total)
