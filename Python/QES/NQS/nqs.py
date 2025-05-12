@@ -366,7 +366,16 @@ class NQS(MonteCarloSolver):
         
             # get the parameter slices and names
             self._params_slice_metadata = net_utils.jaxpy.prepare_unflatten_metadata_from_leaf_info(self._params_leaf_info)
-    
+            
+            # get the sizes
+            self._params_sizes          = [slice_info.size for slice_info in self._params_slice_metadata]
+            
+            # get the shapes
+            self._params_shapes         = [slice_info.shape for slice_info in self._params_slice_metadata]
+            
+            # get the info about the type
+            self._params_iscpx          = [slice_info.is_complex for slice_info in self._params_slice_metadata]
+            
             # get the total size of the parameters
             self._params_total_size     = self._params_slice_metadata[-1].start + self._params_slice_metadata[-1].size if self._params_slice_metadata else 0
     
@@ -1036,12 +1045,12 @@ class NQS(MonteCarloSolver):
     #####################################
     #! UPDATE PARAMETERS
     #####################################
-    
-    def transform_flat_params(self, flat_params: jnp.ndarray,
-                            shapes,
-                            sizes,
-                            is_cpx,
-                            ) -> Any:
+        
+    def transform_flat_params(self,
+                            flat_params : jnp.ndarray,
+                            shapes      : list,
+                            sizes       : list,
+                            is_cpx      : bool) -> Any:
         """
         Transform a flat parameter vector into a PyTree structure.
 
@@ -1049,6 +1058,12 @@ class NQS(MonteCarloSolver):
         ----------
         flat_params : jnp.ndarray
             The flat parameter vector to transform.
+        shapes : list
+            The shapes of the original parameters.
+        sizes : list
+            The sizes of the original parameters.
+        is_cpx : bool
+            Whether the parameters are complex.
 
         Returns
         -------
@@ -1105,8 +1120,24 @@ class NQS(MonteCarloSolver):
     #! TRAINING OVERRIDES
     #####################################
     
-    @staticmethod
-    def wrap_single_step_jax(        
+    def _sample_for_shapes(self, *args, **kwargs):
+        """
+        Sample a configuration to get the shapes of the parameters.
+        This is used to initialize the shapes of the parameters.
+        """
+        #! Sample the configurations
+        (_, _), (configs, configs_ansatze), probabilities = self._sampler.sample()
+        #! Get the shapes of the parameters
+        _, _, (shapes, sizes, iscpx) = NQS.single_step_jax(
+                self._net.get_params(),
+                configs,
+                configs_ansatze,
+                probabilities,
+                *args, **kwargs)
+        return shapes, sizes, iscpx
+    
+    def wrap_single_step_jax(     
+            self,   
             apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
             local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
             flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
@@ -1117,8 +1148,22 @@ class NQS(MonteCarloSolver):
             batch_size                  : Optional[int]         = None, # Batch size for evaluation
         ):
         
+        #! Sample the configurations
+        shapes, sizes, iscpx = self._sample_for_shapes(apply_fn,
+                local_energy_fun, flat_grad_fun, use_sr, sr_precond_apply_fun,
+                sr_solve_linalg_fun, sr_options, batch_size, 0)
+        
+        #! Prepare the function for JIT compilation
+        tree_def    = self._params_tree_def
+        flat_size   = self._params_total_size
+        slices      = net_utils.jaxpy.prepare_slice_info(shapes, sizes, iscpx)
+        
         @jax.jit
-        def wrapped(params, configs, configs_ansatze, probabilities):
+        def wrapped(y, t, configs, configs_ansatze, probabilities, int_step = 0):
+            if isinstance(y, jnp.ndarray):
+                params = net_utils.jaxpy.transform_flat_params_jit(y, tree_def, slices, flat_size)
+            else:
+                params = y
             return NQS.single_step_jax(params,
                                     configs,
                                     configs_ansatze,
@@ -1130,7 +1175,8 @@ class NQS(MonteCarloSolver):
                                     sr_precond_apply_fun,
                                     sr_solve_linalg_fun,
                                     sr_options,
-                                    batch_size)
+                                    batch_size,
+                                    t)
         return wrapped
         
     @staticmethod
@@ -1210,7 +1256,6 @@ class NQS(MonteCarloSolver):
         """
         
         batch_size          = batch_size if batch_size is not None else 1
-
         #! 1. Compute Local Energy
         (v, means, stds) = NQS.evaluate_fun_jax(
             func            = local_energy_fun,
@@ -1549,13 +1594,27 @@ class NQS(MonteCarloSolver):
     
     #! Parameters
     
-    def get_params(self) -> Any:
+    def get_params(self, unravel: bool = False) -> Any:
         """Returns the current parameters from the network object."""
-        return self._net.get_params()
-
-    def set_params(self, new_params: Any):
+        params = self._net.get_params()
+        if unravel:
+            return jnp.concatenate([p.ravel() for p in tree_flatten(params)[0]])
+        return params
+    
+    def set_params(self, new_params: Any, shapes: list = None, sizes: list = None, iscpx: bool = False):
         """Sets new parameters in the network object."""
-        self._net.set_params(new_params)
+        params = new_params
+        # check if the parameters are provided
+        if params is None:
+            params = self._net.get_params()
+        elif isinstance(params, jnp.ndarray):
+            shapes = shapes if shapes is not None else self._params_shapes
+            sizes  = sizes if sizes is not None else self._params_sizes
+            iscpx  = iscpx if iscpx is not None else self._params_is_cpx
+            params = self.transform_flat_params(params, shapes, sizes, iscpx)
+
+        # set the parameters
+        self._net.set_params(params)
     
     #####################################
 

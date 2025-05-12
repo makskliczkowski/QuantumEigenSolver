@@ -1000,9 +1000,11 @@ class MCSampler(Sampler):
             else:
                 # For NumPy backend, bind the RNG to the updater.
                 self._upd_fun = _propose_random_flip_np
-    
-        self._logprob_fact = logprob_fact
-        self._logprobas = None # Will store log prob of current states
+
+        if self._isjax:
+            self._static_sample_fun = self.get_sampler_jax(num_samples=self._numsamples, num_chains=self._numchains)
+        else:
+            self._static_sample_fun = self.get_sampler_np(num_samples=self._numsamples, num_chains=self._numchains)
     
     #####################################################################
     
@@ -1839,11 +1841,8 @@ class MCSampler(Sampler):
         current_proposed        = self._num_proposed
         current_accepted        = self._num_accepted
         reinitialized_for_call  = False
-
-        current_states          = self._states
-        current_proposed        = self._num_proposed
-        current_accepted        = self._num_accepted
-        reinitialized_for_call  = False
+        
+        #! check if one needs to reconfigure the sampler
         if used_num_chains != self._numchains:
             print(f"Warning: Running sample with {used_num_chains} chains (instance default is {self._numchains}). State reinitialized for this call.")
             initstate_template  = self._initstate
@@ -1861,6 +1860,18 @@ class MCSampler(Sampler):
                 current_accepted    = np.zeros(used_num_chains, dtype=DEFAULT_NP_INT_TYPE)
             reinitialized_for_call = True
         
+        if reinitialized_for_call:
+            print(f"Reinitialized sampler with {used_num_chains} chains.")
+            self._states            = current_states
+            self._num_proposed      = current_proposed
+            self._num_accepted      = current_accepted
+            self._numsamples        = used_num_samples
+            self._numchains         = used_num_chains
+            if self._isjax:
+                self._static_sample_fun = self.get_sampler_jax(self._numsamples, self._numchains)
+            else:
+                self._static_sample_fun = self.get_sampler_np(self._numsamples, self._numchains)
+                
         # check the parameters - if not given, use the current parameters
         current_params = None
         if parameters is not None:
@@ -1871,48 +1882,30 @@ class MCSampler(Sampler):
             current_params = self._net.params
         elif hasattr(self._net, 'get_params'):
             current_params = self._net.get_params()
-        
-        net_callable, current_params = self._set_net_callable(self._net)
+        net_callable = self._net_callable
 
         if self._isjax:
             if not isinstance(self._rng_k, jax.Array):
                 raise TypeError(f"Sampler's RNG key is invalid: {type(self._rng_k)}")
 
-            # Call the static, JIT-compiled function
-            final_state_tuple, samples_tuple, probs = MCSampler._static_sample_jax(
-                # Initial State (Dynamic)
+            #! Call the function that is static and JIT-compiled
+            final_state_tuple, samples_tuple, probs = self._static_sample_fun(
                 states_init             = current_states,
                 rng_k_init              = self._rng_k,
-                num_proposed_init       = current_proposed,
-                num_accepted_init       = current_accepted,
-                # Network/Model (Dynamic)
                 params                  = current_params,
-                # Configuration (Static Args)
-                num_samples             = used_num_samples,
-                num_chains              = used_num_chains,
-                total_therm_updates     = self._total_therm_updates, # Based on instance settings
-                updates_per_sample      = self._updates_per_sample,  # Based on instance settings
-                shape                   = self._shape,
-                # Configuration (Dynamic Values)
-                mu                      = self._mu,
-                beta                    = self._beta,
-                logprob_fact            = self._logprob_fact,
-                # Function References (Static Args) - Pass the static base methods
-                update_proposer         = self._upd_fun, # The configured update function instance
-                log_proba_fun_base      = MCSampler._logprob_jax,
-                accept_config_fun_base  = MCSampler._acceptance_probability_jax,
-                net_callable_fun        = self._net_callable
+                num_proposed_init       = current_proposed,
+                num_accepted_init       = current_accepted
             )
         
-            # Update Instance State (JAX)
+            #! Update Instance State (JAX)
             final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_state_tuple
-            self._rng_k                 = final_rng_k
-            # if not reinitialized_for_call:
-            self._states                = final_states
-            self._logprobas             = final_logprobas
-            self._num_proposed          = final_num_proposed
-            self._num_accepted          = final_num_accepted
-
+            if not reinitialized_for_call:
+                self._states            = final_states
+                self._logprobas         = final_logprobas
+                self._num_proposed      = final_num_proposed
+                self._num_accepted      = final_num_accepted
+                self._rng_k             = final_rng_k
+                
             final_state_info            = (self._states, self._logprobas)
             return final_state_info, samples_tuple, probs
         else:
@@ -2077,31 +2070,26 @@ class MCSampler(Sampler):
                 (final_state_tuple, samples_tuple, probs_normalized)
             """
             # Default initial counters to zero if not provided
-            if num_proposed_init is None:
-                num_proposed_init = jnp.zeros(static_num_chains, dtype=int_dtype)
-            if num_accepted_init is None:
-                num_accepted_init = jnp.zeros(static_num_chains, dtype=int_dtype)
+            _num_proposed_init = jnp.zeros(static_num_chains, dtype=int_dtype) if num_proposed_init is None else num_proposed_init
+            _num_accepted_init = jnp.zeros(static_num_chains, dtype=int_dtype) if num_accepted_init is None else num_accepted_init
 
             # Validate shapes of inputs relative to static_num_chains
             if states_init.shape[0] != static_num_chains:
                 raise ValueError(f"states_init first dimension ({states_init.shape[0]}) must match static num_chains ({static_num_chains})")
-            if num_proposed_init.shape != (static_num_chains,):
-                raise ValueError(f"num_proposed_init shape ({num_proposed_init.shape}) must match ({static_num_chains},)")
-            if num_accepted_init.shape != (static_num_chains,):
-                raise ValueError(f"num_accepted_init shape ({num_accepted_init.shape}) must match ({static_num_chains},)")
+            if _num_proposed_init.shape != (static_num_chains,):
+                raise ValueError(f"num_proposed_init shape ({_num_proposed_init.shape}) must match ({static_num_chains},)")
+            if _num_accepted_init.shape != (static_num_chains,):
+                raise ValueError(f"num_accepted_init shape ({_num_accepted_init.shape}) must match ({static_num_chains},)")
 
             # Call the partially applied core function
             final_state_tuple, samples_tuple, probs = partial_sampler(
                 states_init         =   states_init,
                 rng_k_init          =   rng_k_init,
-                num_proposed_init   =   num_proposed_init.astype(int_dtype),
-                num_accepted_init   =   num_accepted_init.astype(int_dtype),
+                num_proposed_init   =   _num_proposed_init.astype(int_dtype),
+                num_accepted_init   =   _num_accepted_init.astype(int_dtype),
                 params              =   params
             )
-            final_states, final_logprobas, final_rng_k, final_num_proposed, final_num_accepted = final_state_tuple
-            # Update Instance State (JAX)
-            final_state_info        = (self._states, self._logprobas)
-            return final_state_info, samples_tuple, probs
+            return final_state_tuple, samples_tuple, probs
         return wrapped_sampler
     
     def get_sampler_np(self, num_samples: Optional[int] = None, num_chains: Optional[int] = None) -> Callable:
