@@ -59,7 +59,6 @@ logger.title("Starting NQS Sampler Test Script...", 50, '#', lvl = 0)
 if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    from jax import jit
     # jax.config.update('jax_platform_name', 'cpu')
     jax.config.update('jax_log_compiles', True)
 else:
