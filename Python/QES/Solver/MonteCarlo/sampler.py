@@ -39,7 +39,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto, unique
 
 # from algebra
-from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY, Array
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE
 from general_python.algebra.ran_wrapper import choice, randint, uniform, randint_np, randint_jax
 from general_python.common.directories import Directories
@@ -114,6 +114,7 @@ class SolverInitState(Enum):
 #########################################################################
 
 if JAX_AVAILABLE:
+    
     @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         r'''Propose `num` random flips of a state using JAX.
@@ -127,35 +128,26 @@ if JAX_AVAILABLE:
         Returns:
             jnp.ndarray: The proposed flipped state(s).
         '''
-        idx = randint_jax(key=rng_k, shape=(1,), low=0, high=state.size)[0]
+        idx = randint_jax(key=rng_k, shape = (), low=0, high=state.size)
         return Binary.jaxpy.flip_array_jax_spin(state, idx)
 
-    @partial(jax.jit, static_argnums=(2,))
-    def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num = 1):
-        r'''Propose `num` random flips of a state using JAX.
-
-        Parameters:
-            state (jnp.ndarray):
-                The state array (or batch of states).
-            rng_k (jax.random.PRNGKey):
-                The random key for JAX.
-            num (int):
-                The number of flips to propose per state. Must be static for JIT.
-
-        Returns:
-            jnp.ndarray: The proposed flipped state(s).
-        '''
+    @partial(jax.jit, static_argnames=("num",))
+    def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num: int = 1):
+        """
+        Propose `num` random flips on a state or batch of states using JAX.
+        If `state` is 1D → flip single state.
+        If `state` is 2D → flip batch of states independently.
+        """
         if state.ndim == 1:
-            idx = randint_jax(key=rng_k, shape=(num,), low=0, high=state.size, dtype=DEFAULT_JP_INT_TYPE)
+            idx = randint_jax(rng_k, shape=(num,), minval=0, maxval=state.size, dtype=DEFAULT_JP_INT_TYPE)
             return Binary.jaxpy.flip_array_jax_multi(state, idx, spin=Binary.BACKEND_DEF_SPIN)
+
         else:
-            batch_size  = state.shape[0]
-            state_size  = state.shape[1]
-            # Generate indices for each state in the batch
-            keys        = random_jp.split(rng_k, batch_size)
-            # Use vmap to apply index generation and flipping per state
+            batch_size, state_size  = state.shape
+            keys                    = jax.random.split(rng_k, batch_size)
+
             def flip_single_state(single_state, key):
-                idx     = randint_jax(key=key, shape=(num,), low=0, high=state_size, dtype=DEFAULT_JP_INT_TYPE)
+                idx = randint_jax(key, shape=(num,), minval=0, maxval=state_size, dtype=DEFAULT_JP_INT_TYPE)
                 return Binary.jaxpy.flip_array_jax_multi(single_state, idx, spin=Binary.BACKEND_DEF_SPIN)
 
             return jax.vmap(flip_single_state)(state, keys)
@@ -191,7 +183,7 @@ def _propose_random_flip_np(state: np.ndarray, rng: np.random.Generator):
         state[i]    = Binary.flip_array_np_spin(state[i], idx)
     return state
 
-def propose_random_flip(state: 'array-like', backend = 'default',
+def propose_random_flip(state: Array, backend = 'default',
                         rng = None, rng_k = None, num = 1):
     """
     Propose a random flip of a state.
@@ -555,7 +547,7 @@ class Sampler(ABC):
                 Number of samples to generate per chain *after* thermalization.
             numchains (int):
                 Number of parallel Markov chains.
-            initstate ('array-like' or str or SolverInitState or int):
+            initstate (Array or str or SolverInitState or int):
                 Initial state configuration specification. Can be an array, an integer state index,
                 a predefined string ('RND', 'F_UP', 'F_DN', 'AF'), or a SolverInitState enum. Defaults to 'RND'.
             backend (str):
@@ -956,7 +948,7 @@ class MCSampler(Sampler):
                 Number of samples to collect per chain *after* thermalization.
             numchains (int):
                 Number of parallel Markov chains.
-            initstate ('array-like' or str or SolverInitState or int):
+            initstate (Array or str or SolverInitState or int):
                 Initial state specification (see Sampler docs). Defaults to 'RND'.
             backend (str):
                 Computational backend ('numpy', 'jax', 'default').
@@ -1088,6 +1080,10 @@ class MCSampler(Sampler):
         Returns:
             jnp.ndarray: The acceptance probability(ies).
         '''
+        delta = jnp.real(candidate_val) - jnp.real(current_val)
+        # ratio = jnp.exp(jnp.clip(beta * mu * delta, a_max=30.0)) # prevent overflow
+        ratio = jnp.exp(beta * mu * delta)
+        return jnp.minimum(ratio, 1.0)
         log_acceptance_ratio = beta * mu * (jnp.real(candidate_val) - jnp.real(current_val))
         return jnp.exp(log_acceptance_ratio)
     
@@ -1161,6 +1157,7 @@ class MCSampler(Sampler):
     ###################################################################
     
     @partial(jax.jit, static_argnames=('net_callable',))
+    # @jax.jit
     def _logprob_jax(x, net_callable, net_params=None):
         r'''
         Calculate log probability :math:`\log \psi(s)` using JAX.
@@ -1176,7 +1173,9 @@ class MCSampler(Sampler):
         Returns:
             jnp.ndarray: The real part of log probabilities for the batch.
         '''
-        batched_log_psi = jax.vmap(lambda s: net_callable(net_params, s))(x)
+        def apply_net(s):
+            return net_callable(net_params, s)
+        batched_log_psi = jax.vmap(apply_net)(x)
         return jnp.real(batched_log_psi)
     
     @staticmethod
@@ -1291,9 +1290,7 @@ class MCSampler(Sampler):
         num_chains = chain_init.shape[0]
 
         # Define the single-step function *inside* so it closes over the arguments
-        # like params, update_proposer, log_proba_fun, etc.
         def _sweep_chain_jax_step_inner(carry, _):
-            # Unpack the carry
             chain_in, current_val_in, rng_k_in, num_proposed_in, num_accepted_in = carry
             
             # jax.debug.print("chain_in: {}", chain_in.shape)
@@ -1317,13 +1314,10 @@ class MCSampler(Sampler):
             if logprobas_new.ndim == current_val_in.ndim + 1:
                 logprobas_new = jnp.squeeze(logprobas_new, axis=-1)
 
-            # Calculate acceptance probabilities (using accept_config_fun)
+            #! Calculate acceptance probabilities (using accept_config_fun)
             acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta, mu)
             uniform_draw            = random_jp.uniform(new_rng_k, shape=(num_chains,))
             accepted                = uniform_draw < acc_probability
-        
-            num_proposed_out        = num_proposed_in + 1
-            num_accepted_out        = num_accepted_in + accepted.astype(num_accepted_in.dtype)
             
             accepted_expanded       = accepted[:, None]
             new_chain_final         = jnp.where(accepted_expanded, new_chain, chain_in)
@@ -1338,7 +1332,7 @@ class MCSampler(Sampler):
                 # return jax.lax.select(acc, new, old)
             # new_carry_states        = jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
             # new_carry_vals          = jnp.where(accepted, logprobas_new, current_val_in)
-            new_carry = (new_chain_final, new_val_final, new_rng_k, num_proposed_out, num_accepted_out)
+            new_carry = (new_chain_final, new_val_final, new_rng_k, num_proposed_in + 1, num_accepted_in + accepted.astype(num_accepted_in.dtype))
             return new_carry, None        
         
         # Initial carry contains only the dynamic state passed into this function
@@ -1445,12 +1439,12 @@ class MCSampler(Sampler):
         return chain, current_val, num_proposed, num_accepted
 
     def _sweep_chain(self,
-                    chain               : 'array-like',
-                    logprobas           : 'array-like',
-                    rng_k               : 'array-like',
-                    num_proposed        : 'array-like',
-                    num_accepted        : 'array-like',
-                    params              : 'array-like',
+                    chain               : Array,
+                    logprobas           : Array,
+                    rng_k               : Array,
+                    num_proposed        : Array,
+                    num_accepted        : Array,
+                    params              : Array,
                     update_proposer     : Callable,
                     log_proba_fun       : Callable,
                     accept_config_fun   : Callable,
@@ -1528,11 +1522,11 @@ class MCSampler(Sampler):
                                     'update_proposer', 'log_proba_fun',
                                     'accept_config_fun', 'net_callable_fun'))
     def _generate_samples_jax(
-        states_init         : 'array-like',
-        logprobas_init      : 'array-like',
-        rng_k_init          : 'array-like',
-        num_proposed_init   : 'array-like',
-        num_accepted_init   : 'array-like',
+        states_init         : Array,
+        logprobas_init      : Array,
+        rng_k_init          : Array,
+        num_proposed_init   : Array,
+        num_accepted_init   : Array,
         params              : Any,
         num_samples         : int,
         total_therm_updates : int,
@@ -1698,10 +1692,10 @@ class MCSampler(Sampler):
             beta                : float,
             logprob_fact        : float,
             # --- Function References (Static) ---
-            update_proposer     : Callable,
-            log_proba_fun_base  : Callable,     # e.g., MCSampler._logprob_jax
-            accept_config_fun_base: Callable,   # e.g., MCSampler._acceptance_probability_jax
-            net_callable_fun    : Callable
+            update_proposer         : Callable,
+            log_proba_fun_base      : Callable,     # e.g., MCSampler._logprob_jax
+            accept_config_fun_base  : Callable,     # e.g., MCSampler._acceptance_probability_jax
+            net_callable_fun        : Callable
         ):
         r'''
         Static, JIT-compiled core logic for MCMC sampling in JAX. 
@@ -1748,11 +1742,10 @@ class MCSampler(Sampler):
                 The network callable.
         '''
         logprobas_init = log_proba_fun_base(states_init, net_callable_fun, params)
-        if logprobas_init.ndim > 1:
-            logprobas_init = jnp.squeeze(logprobas_init, axis=-1)
+        logprobas_init = jnp.squeeze(logprobas_init, axis=-1) if logprobas_init.ndim > 1 else logprobas_init
 
         #! Phase 1: Thermalization
-        final_carry = MCSampler._run_mcmc_steps_jax(
+        states_therm, logprobas_therm, rng_k_therm, _, _ = MCSampler._run_mcmc_steps_jax(
             chain_init          =   states_init,
             current_val_init    =   logprobas_init,
             rng_k_init          =   rng_k_init,
@@ -1767,11 +1760,8 @@ class MCSampler(Sampler):
             mu                  =   mu,
             beta                =   beta
         )
-        # Unpack thermalized state (we ignore counters for brevity)
-        states_therm, logprobas_therm, rng_k_therm, _, _ = final_carry
 
-        #! Phase 2: Sampling
-        
+        #! Phase 2: Sampling    
         def sample_scan_body(carry, _):
             # Run a fixed number of updates per sample and update the chain carry.
             new_carry = MCSampler._run_mcmc_steps_jax(
@@ -1802,21 +1792,77 @@ class MCSampler(Sampler):
         configs_flat        = collected_samples.reshape((-1,) + shape)
         
         # Evaluate the network in a fully batched (vectorized) manner to obtain log_ψ.
-        batched_log_ansatz  = jax.vmap(lambda conf: net_callable_fun(params, conf))(configs_flat)
+        net_apply           = lambda conf: net_callable_fun(params, conf)
+        batched_log_ansatz  = jax.vmap(net_apply)(configs_flat)
 
         # Compute the importance weights.
         log_prob_exponent    = (1.0 / logprob_fact - mu)
         probs                = jnp.exp(log_prob_exponent * jnp.real(batched_log_ansatz))
         total_samples        = num_samples * num_chains
-        norm_factor          = jnp.where(jnp.sum(probs) > 1e-10, jnp.sum(probs), 1e-10)
-        probs_normalized     = (probs / norm_factor) * total_samples
+        norm_factor          = jnp.maximum(jnp.sum(probs), 1e-10)
+        probs_normalized     = probs / norm_factor * total_samples
 
-        # Prepare the final output tuples.
-        final_state_tuple   = final_carry  # Contains the final chain state and updated counters.
-        samples_tuple       = (configs_flat, batched_log_ansatz)
-        return final_state_tuple, samples_tuple, probs_normalized
+        return final_carry, (configs_flat, batched_log_ansatz), probs_normalized
     
     ###################################################################
+    
+    def _sample_reinitialize(self, used_num_chains, used_num_samples):
+        '''
+        Reinitialize the sampler with the given parameters.
+        Parameters:
+            current_states:
+                The current states of the chains
+            current_proposed:
+                The current number of proposed states
+            current_accepted:
+                The current number of accepted states
+            used_num_chains:
+                The number of chains to use
+            used_num_samples:
+                The number of samples to generate
+        '''
+        self._numchains         = used_num_chains
+        self._numsamples        = used_num_samples
+        self.reset()
+        current_states          = self._states
+        current_proposed        = self._num_proposed
+        current_accepted        = self._num_accepted
+        if self._isjax:
+            self._static_sample_fun = self.get_sampler_jax(self._numsamples, self._numchains)
+        else:
+            self._static_sample_fun = self.get_sampler_np(self._numsamples, self._numchains)
+        return current_states, current_proposed, current_accepted
+    
+    def _sample_callable(self, parameters=None):
+        """
+        Prepares and returns a callable network function along with the current set of parameters.
+
+        Parameters:
+            parameters (optional):
+                An explicit set of parameters to use. If not provided, the method attempts to retrieve
+                parameters from the internal state or network object.
+
+        Returns:
+            tuple:
+                A tuple containing:
+                - net_callable: The callable network function.
+                - current_params: The parameters to be used with the network function.
+
+        Notes:
+            The method prioritizes the provided `parameters` argument. If not given, it attempts to retrieve parameters
+            from the internal `_parameters` attribute, the network's `params` attribute, or the network's `get_params()` method.
+        """
+        current_params = None
+        if parameters is not None:
+            current_params = parameters
+        elif self._parameters is not None:
+            current_params = self._net.get_params()
+        elif hasattr(self._net, 'params'):
+            current_params = self._net.params
+        elif hasattr(self._net, 'get_params'):
+            current_params = self._net.get_params()
+        net_callable = self._net_callable
+        return net_callable, current_params
     
     def sample(self, parameters=None, num_samples=None, num_chains=None):
         '''
@@ -1845,44 +1891,11 @@ class MCSampler(Sampler):
         #! check if one needs to reconfigure the sampler
         if used_num_chains != self._numchains:
             print(f"Warning: Running sample with {used_num_chains} chains (instance default is {self._numchains}). State reinitialized for this call.")
-            initstate_template  = self._initstate
-            if self._isjax:
-                if not isinstance(initstate_template, jnp.ndarray):
-                    initstate_template = jnp.array(initstate_template)
-                current_states      = jnp.repeat(initstate_template[jnp.newaxis, ...], used_num_chains, axis=0)
-                current_proposed    = jnp.zeros(used_num_chains, dtype=DEFAULT_JP_INT_TYPE)
-                current_accepted    = jnp.zeros(used_num_chains, dtype=DEFAULT_JP_INT_TYPE)
-            else:
-                if not isinstance(initstate_template, np.ndarray):
-                    initstate_template = np.array(initstate_template)
-                current_states      = np.stack([initstate_template.copy() for _ in range(used_num_chains)], axis=0)
-                current_proposed    = np.zeros(used_num_chains, dtype=DEFAULT_NP_INT_TYPE)
-                current_accepted    = np.zeros(used_num_chains, dtype=DEFAULT_NP_INT_TYPE)
-            reinitialized_for_call = True
-        
-        if reinitialized_for_call:
-            print(f"Reinitialized sampler with {used_num_chains} chains.")
-            self._states            = current_states
-            self._num_proposed      = current_proposed
-            self._num_accepted      = current_accepted
-            self._numsamples        = used_num_samples
-            self._numchains         = used_num_chains
-            if self._isjax:
-                self._static_sample_fun = self.get_sampler_jax(self._numsamples, self._numchains)
-            else:
-                self._static_sample_fun = self.get_sampler_np(self._numsamples, self._numchains)
-                
+            reinitialized_for_call                              = True
+            current_states, current_proposed, current_accepted  = self._sample_reinitialize(used_num_chains, used_num_samples)
+            
         # check the parameters - if not given, use the current parameters
-        current_params = None
-        if parameters is not None:
-            current_params = parameters
-        elif self._parameters is not None:
-            current_params = self._net.get_params()
-        elif hasattr(self._net, 'params'):
-            current_params = self._net.params
-        elif hasattr(self._net, 'get_params'):
-            current_params = self._net.get_params()
-        net_callable = self._net_callable
+        net_callable, current_params = self._sample_callable(parameters)
 
         if self._isjax:
             if not isinstance(self._rng_k, jax.Array):
@@ -2022,7 +2035,7 @@ class MCSampler(Sampler):
         # Use provided sample/chain counts or instance defaults
         static_num_samples  = num_samples if num_samples is not None else self._numsamples
         static_num_chains   = num_chains if num_chains is not None else self._numchains
-
+        
         # Gather arguments to be baked in (partial application)
         # Configuration values from self
         baked_args = {
@@ -2074,19 +2087,19 @@ class MCSampler(Sampler):
             _num_accepted_init = jnp.zeros(static_num_chains, dtype=int_dtype) if num_accepted_init is None else num_accepted_init
 
             # Validate shapes of inputs relative to static_num_chains
-            if states_init.shape[0] != static_num_chains:
-                raise ValueError(f"states_init first dimension ({states_init.shape[0]}) must match static num_chains ({static_num_chains})")
-            if _num_proposed_init.shape != (static_num_chains,):
-                raise ValueError(f"num_proposed_init shape ({_num_proposed_init.shape}) must match ({static_num_chains},)")
-            if _num_accepted_init.shape != (static_num_chains,):
-                raise ValueError(f"num_accepted_init shape ({_num_accepted_init.shape}) must match ({static_num_chains},)")
+            # if states_init.shape[0] != static_num_chains:
+            #     raise ValueError(f"states_init first dimension ({states_init.shape[0]}) must match static num_chains ({static_num_chains})")
+            # if _num_proposed_init.shape != (static_num_chains,):
+            #     raise ValueError(f"num_proposed_init shape ({_num_proposed_init.shape}) must match ({static_num_chains},)")
+            # if _num_accepted_init.shape != (static_num_chains,):
+            #     raise ValueError(f"num_accepted_init shape ({_num_accepted_init.shape}) must match ({static_num_chains},)")
 
             # Call the partially applied core function
             final_state_tuple, samples_tuple, probs = partial_sampler(
                 states_init         =   states_init,
                 rng_k_init          =   rng_k_init,
-                num_proposed_init   =   _num_proposed_init.astype(int_dtype),
-                num_accepted_init   =   _num_accepted_init.astype(int_dtype),
+                num_proposed_init   =   _num_proposed_init,
+                num_accepted_init   =   _num_accepted_init,
                 params              =   params
             )
             return final_state_tuple, samples_tuple, probs

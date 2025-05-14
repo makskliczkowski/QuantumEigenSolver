@@ -11,7 +11,7 @@ import inspect
 import numba
 
 # typing and other imports
-from typing import Union, Tuple, Union, Callable, Optional, Any, NamedTuple
+from typing import Union, Tuple, Union, Callable, Optional, Any, NamedTuple, List
 from functools import partial
 
 # from general_python imports
@@ -202,7 +202,10 @@ class NQS(MonteCarloSolver):
         #! set the lower states
         #######################################
         
-        self._lower_states      = NQSLowerStates(lower_states, lower_betas, self) if lower_states is not None else None
+        if lower_states is not None and lower_betas is not None:
+            self._lower_states_manager = NQSLowerStates(lower_states, lower_betas, self)
+        else:
+            self._lower_states_manager = NQSLowerStates([], [], self)
         
         #######################################
         #! state modifier (for later)
@@ -342,9 +345,9 @@ class NQS(MonteCarloSolver):
         neural network by calling its `force_init` method.
         """
         
-        self._initialized       = False
+        self._initialized = False
         self._net.force_init()
-        
+    
     # ---
     
     def _init_param_metadata(self):
@@ -358,6 +361,7 @@ class NQS(MonteCarloSolver):
         if self._params_tree_def is None and self._isjax:
         
             current_params              = self._net.get_params()
+            
             # get the parameter tree definition
             _, self._params_tree_def    = tree_flatten(current_params)
                         
@@ -410,11 +414,14 @@ class NQS(MonteCarloSolver):
         if self._analytic:
             
             # Get analytical function handle from the network object
-
+            self.log(f"Analytical gradient function check...", log='info', lvl = 2, color = 'blue')
+            
             analytical_pytree_fun, _ = self._net.get_gradient(use_jax=True)
             if analytical_pytree_fun is None:
                 raise ValueError("Analytical gradient selected but network did not provide grad_func.")
-
+            
+            self.log(f"Analytical gradient function provided.", log='info', lvl = 2, color = 'blue')
+            
     # ---
 
     def _init_functions(self):
@@ -544,7 +551,7 @@ class NQS(MonteCarloSolver):
             return None
     
     #####################################
-    #! EVALUATION OF THE ANSATZ BATCHED
+    #! EVALUATION OF THE ANSATZ BATCHED (\psi(s))
     #####################################
     
     def eval_jax(self, states, batch_size = None, params = None):
@@ -674,9 +681,9 @@ class NQS(MonteCarloSolver):
         Returns:
             The result of the function evaluation, either batched or unbatched, depending on the value of `batch_size`.
         """
-        if batch_size is None:
+        if batch_size is None or batch_size == 1:
             funct_in = net_utils.jaxpy.apply_callable_jax
-            return funct_in(func, states, probabilities, logproba_in, logproba_fun, parameters)       
+            return funct_in(func, states, probabilities, logproba_in, logproba_fun, parameters)
         else:
             funct_in = net_utils.jaxpy.apply_callable_batched_jax
             return funct_in(func            = func,
@@ -859,7 +866,7 @@ class NQS(MonteCarloSolver):
         
         # check if the functions are provided
         if functions is None or len(functions) == 0:
-            functions   = [self._local_en_func]
+            functions = [self._local_en_func]
         
         # check if the states and psi are provided
         states, ansatze = None, None
@@ -893,8 +900,8 @@ class NQS(MonteCarloSolver):
                                         batch_size      = batch_size) for f in functions]
         else:
             # get other parameters from kwargs
-            num_samples = kwargs.get('num_samples', None)
-            num_chains  = kwargs.get('num_chains', None)
+            num_samples = kwargs.get('num_samples', self._sampler.num_samples)
+            num_chains  = kwargs.get('num_chains', self._sampler.numchains)
             
             # otherwise, we shall use the sampler
             (states, ansatze), probabilities, output    = \
@@ -1341,11 +1348,12 @@ class NQS(MonteCarloSolver):
                 # or it might fail compilation if types/shapes mismatch.
                 # A robust implementation might need more careful error handling.
                 # jax.debug.print("SR solver failed: {e}", e=e)
-                d_par_flat                  = jnp.full_like(forces, jnp.nan)    # NaN vector to indicate failure
+                d_par_flat                  = jnp.full_like(x0_sr, jnp.nan)     # NaN vector to indicate failure
                 sr_info['executed']         = True
                 sr_info['converged']        = False                             # Indicate failure
                 sr_info['iterations']       = -1
                 failed                      = True
+                print(f"SR solver failed: {e}")
         else:
             #! Center gradients and energies
             centered_loss           = sr.loss_centered_jax(v, means)
@@ -1468,7 +1476,6 @@ class NQS(MonteCarloSolver):
     
     #####################################
     #! STATE MODIFIER
-    #!TODO: Add the state modifier
     #####################################
     
     @property
@@ -1628,81 +1635,143 @@ class NQS(MonteCarloSolver):
         return super().swap(other)
     
 #########################################
+#! NQS Lower States
+#########################################
 
 class NQSLowerStates:
-    """
-    Class to manage lower states information for Neural Quantum State (NQS) solvers.
-
-    Lower states are used in both energy and gradient estimations for excited states.
-    They are instrumental when modifying the Hamiltonian:
-        H' = H + Σ β_i P_i   where   P_i = |f_i><f_i| / ⟨f_i|f_i⟩
-    The probability ratios derived from the lower states are utilized to adjust the energy
-    estimation and the gradient computation defined as:
-        ⟨Δ_k* E_loc⟩ - ⟨Δ_k*⟩ ⟨E_loc⟩ + additional lower state corrections
-
-    This class encapsulates the lower states, their associated penalty betas, and provides
-    interface methods to access and manipulate these values in relation to a parent NQS solver.
-    """
-    #!TODO: Finish!
-
     def __init__(self,
-                lower_states    : list,
-                lower_betas     : list,
-                parent          : NQS):
-        """
-        Initialize the lower states container.
+                lower_nqs_instances     : List[NQS],        # List of NQS objects for lower states
+                lower_betas             : List[float],      # Penalty terms beta_i
+                parent_nqs              : NQS):             # The NQS object for the current excited state
+        
+        if len(lower_nqs_instances) != len(lower_betas):
+            raise ValueError("Number of lower NQS instances must match number of betas.")
 
-        Parameters:
-            lower_states (list): List of lower state configurations.
-            lower_betas (list): List of penalty beta values corresponding to each lower state.
-            parent (NQS): The parent NQS solver instance.
-        """
-        self._lower_states  = lower_states
-        self._lower_betas   = lower_betas
-        self._parent        = parent
-        self._isset         = bool(lower_states)
-        
-        # containers for the lower states training
-        
-    
+        self._lower_nqs = lower_nqs_instances
+        self._lower_betas = jnp.array(lower_betas) # Use JAX array for betas
+        self._parent_nqs = parent_nqs
+        self._num_lower_states = len(lower_nqs_instances)
+        self._is_set = self._num_lower_states > 0
+
+        if not self._is_set:
+            return
+
+        # Store apply functions and parameters for each lower state
+        self._lower_apply_fns = [nqs.ansatz for nqs in self._lower_nqs]
+        self._lower_params = [nqs.get_params() for nqs in self._lower_nqs]
+
+        # Placeholder for ratios - these would be computed during the excited state's MC sampling
+        # Shape: (num_lower_states, num_samples_excited_state)
+        self._ratios_psi_exc_div_psi_lower = None # Psi_W / Psi_W_j (current excited / lower_j)
+        self._ratios_psi_lower_div_psi_exc = None # Psi_W_j / Psi_W (lower_j / current excited)
+
+        # The C++ code has `train_lower_` for MC parameters for sampling *within* lower states.
+        # For the JAX implementation, this might translate to parameters for sampling
+        # from each P(s) ~ |psi_lower_j(s)|^2 if needed for <Psi_W / Psi_W_j>_j terms.
+        # This part is complex as it implies separate MC runs or combined sampling.
+
     @property
-    def lower_states(self) -> list:
-        """Return the list of lower state configurations."""
-        return self._lower_states
-    
+    def is_set(self) -> bool:
+        return self._is_set
+
     @property
-    def lower_betas(self) -> list:
-        """Return the list of penalty beta values for the lower states."""
+    def num_lower_states(self) -> int:
+        return self._num_lower_states
+
+    @property
+    def lower_betas(self) -> jnp.ndarray:
         return self._lower_betas
-    
-    @property
-    def parent(self) -> NQS:
-        """Return the parent NQS solver instance."""
-        return self._parent
-    
-    @property
-    def isset(self) -> bool:
-        """Return True if lower states have been set, False otherwise."""
-        return self._isset
-    
-    def __len__(self) -> int:
-        """Return the number of lower states."""
-        return len(self._lower_states)
-    
-    def __getitem__(self, index: int) -> Tuple[np.ndarray, float]:
-        """
-        Retrieve the lower state configuration and its beta value at a given index.
 
-        Parameters:
-            index (int): Index of the lower state.
+    def get_lower_state_ansatz_val(self, lower_idx: int, states: jnp.ndarray) -> jnp.ndarray:
+        """Computes log(psi_lower_j(s)) for a given lower state j and batch of states s."""
+        if not self._is_set or lower_idx >= self._num_lower_states:
+            raise IndexError("Lower state index out of bounds.")
+        apply_fn = self._lower_apply_fns[lower_idx]
+        params = self._lower_params[lower_idx]
+        return apply_fn(params, states) # Assumes apply_fn returns log_psi
+
+    # --- Methods to compute quantities needed for excited state ---
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _compute_log_psi_ratios_for_single_lower_state(self,
+                                                       lower_idx: int,
+                                                       excited_log_psi_s: jnp.ndarray,
+                                                       states_s: jnp.ndarray) -> jnp.ndarray:
+        """
+        Computes log( Psi_excited(s) / Psi_lower_j(s) ) for all samples s.
+        excited_log_psi_s: log amplitudes of the current excited state for the samples.
+        states_s: the sampled configurations.
+        """
+        log_psi_lower_j_s = self.get_lower_state_ansatz_val(lower_idx, states_s)
+        return excited_log_psi_s - log_psi_lower_j_s # log(A/B) = logA - logB
+
+    def compute_all_log_psi_ratios(self,
+                                   excited_log_psi_s: jnp.ndarray, # log psi_exc(s_i) for N_samples
+                                   states_s: jnp.ndarray           # configurations s_i (N_samples, n_visible)
+                                   ) -> Tuple[jnp.ndarray, jnp.ndarray]:
+        """
+        Computes log_ratio_exc_div_lower = log(Psi_exc(s) / Psi_lower_j(s)) and
+                 log_ratio_lower_div_exc = log(Psi_lower_j(s) / Psi_exc(s))
+        for all lower states j and all samples s.
 
         Returns:
-            Tuple[np.ndarray, float]: A tuple containing the lower state configuration and its beta value.
+            Tuple of JAX arrays:
+            - log_ratios_exc_div_lower (num_lower_states, num_samples)
+            - log_ratios_lower_div_exc (num_lower_states, num_samples)
         """
-        if index < 0 or index >= len(self._lower_states):
-            raise IndexError("Index out of range for lower states.")
-        return self._lower_states[index], self._lower_betas[index]
+        if not self.is_set:
+            return jnp.array([]), jnp.array([])
+
+        all_log_ratios_exc_div_lower = []
+        for j in range(self.num_lower_states):
+            log_ratios_j = self._compute_log_psi_ratios_for_single_lower_state(j, excited_log_psi_s, states_s)
+            all_log_ratios_exc_div_lower.append(log_ratios_j)
+
+        log_ratios_exc_div_lower_arr = jnp.stack(all_log_ratios_exc_div_lower, axis=0)
+        log_ratios_lower_div_exc_arr = -log_ratios_exc_div_lower_arr # log(B/A) = -log(A/B)
+
+        return log_ratios_exc_div_lower_arr, log_ratios_lower_div_exc_arr
+
+    # The C++ `collectLowerEnergy` seems to sample from P_j(s) = |psi_j(s)|^2
+    # and then computes < P_exc(s) >_j where P_exc is |psi_exc(s')/psi_exc(s)|^2 * <s|H_proj|s'>.
+    # This is intricate. For JAX, we'll likely compute everything using samples from P_exc(s).
+    # The energy penalty term H_i = beta_i * |f_i><f_i| / <f_i|f_i> becomes
+    # E_penalty_i(s) = beta_i * sum_s' <s| |f_i><f_i| |s'> / <f_i|f_i> * (psi_exc(s')/psi_exc(s))
+    #                = beta_i * |<s|f_i>|^2 / <f_i|f_i> * (psi_exc(f_i)/psi_exc(s))
+    # If f_i is a single configuration, <s|f_i> = delta_s,f_i.
+    # More generally, if f_i is a known wavefunction psi_lower_i:
+    # E_penalty_i(s) = beta_i * |psi_lower_i(s)|^2 / <|psi_lower_i|^2> * (sum_s' psi_lower_i(s')^* psi_exc(s') / (psi_lower_i(s)^* psi_exc(s)))
+    # This simplifies to: beta_i * |psi_lower_i(s) / psi_exc(s)|^2. (Assuming <|psi_lower_i|^2> = 1 after normalization)
+    # This is the local energy contribution from the penalty term for state i.
+    # E_penalty_local(s) = sum_i beta_i * |psi_lower_i(s) / psi_exc(s)|^2
+    #                  = sum_i beta_i * exp(2 * Re[log(psi_lower_i(s)) - log(psi_exc(s))])
+
+    @partial(jax.jit, static_argnums=(0,))
+    def compute_local_penalty_energies(self,
+                                       log_psi_exc_s: jnp.ndarray, # (N_samples,)
+                                       states_s: jnp.ndarray       # (N_samples, n_visible)
+                                       ) -> jnp.ndarray:           # (N_samples,)
+        """
+        Computes the local energy contribution from all penalty terms for each sample.
+        E_penalty_local(s) = sum_i beta_i * |psi_lower_i(s) / psi_exc(s)|^2
+        """
+        if not self.is_set:
+            return jnp.zeros_like(log_psi_exc_s)
+
+        _, log_ratios_lower_div_exc = self.compute_all_log_psi_ratios(log_psi_exc_s, states_s)
+        # log_ratios_lower_div_exc has shape (num_lower_states, N_samples)
+
+        # |psi_lower_i(s) / psi_exc(s)|^2 = exp(2 * Re[log_ratios_lower_div_exc_i(s)])
+        abs_sq_ratios = jnp.exp(2 * jnp.real(log_ratios_lower_div_exc)) # (num_lower_states, N_samples)
+
+        # Multiply by betas and sum over lower states
+        # betas shape (num_lower_states,), need to reshape for broadcasting
+        penalties_per_lower_state = self._lower_betas[:, None] * abs_sq_ratios # (num_lower_states, N_samples)
+        total_local_penalty = jnp.sum(penalties_per_lower_state, axis=0) # (N_samples,)
+        return total_local_penalty
     
+#########################################
+#! TESTS
 #########################################
 
 def test_net_ansatz(nqs: NQS, nsamples = 10):
