@@ -27,7 +27,7 @@ Functions:
 import numpy as np
 import numba
 import scipy as sp
-from numba import jit, njit, prange
+from numba import prange
 from typing import Union, Tuple, Callable, Optional, Any
 from functools import partial
 
@@ -41,8 +41,7 @@ from enum import Enum, auto, unique
 # from algebra
 from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY, Array
 from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE
-from general_python.algebra.ran_wrapper import choice, randint, uniform, randint_np, randint_jax
-from general_python.common.directories import Directories
+from general_python.algebra.ran_wrapper import choice, randint_np, randint_jax
 import general_python.common.binary as Binary
 
 # from hilbert
@@ -54,8 +53,8 @@ if JAX_AVAILABLE:
     import jax.numpy as jnp
     import jax.random as random_jp
 else:
-    jax         = None
     import numpy as jnp
+    jax         = None
     random_jp   = None
 
 #########################################################################
