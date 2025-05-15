@@ -77,18 +77,8 @@ if JAX_AVAILABLE:
     import general_python.ml.net_impl.interface_net_flax as net_flax
 
 # schedulers and preconditioners and solvers
-import general_python.algebra.solvers.stochastic_rcnfg as sr
-import general_python.algebra.preconditioners as precond_mod
 import general_python.ml.schedulers as scheduler_mod
 import general_python.algebra.solvers as solvers_mod
-
-class NQSStepInfo(NamedTuple):
-    mean_energy     : Array
-    std_energy      : Array
-    failed          : Optional[bool] = None
-    sr_converged    : Optional[bool] = None
-    sr_executed     : Optional[bool] = None
-    sr_iterations   : Optional[int]  = None
 
 #########################################
 
@@ -199,15 +189,6 @@ class NQS(MonteCarloSolver):
         self._nvisible2         = self._nvisible**2
         
         #######################################
-        #! set the lower states
-        #######################################
-        
-        if lower_states is not None and lower_betas is not None:
-            self._lower_states_manager = NQSLowerStates(lower_states, lower_betas, self)
-        else:
-            self._lower_states_manager = NQSLowerStates([], [], self)
-        
-        #######################################
         #! state modifier (for later)
         #######################################
         
@@ -269,12 +250,18 @@ class NQS(MonteCarloSolver):
             self.log(f"Preconditioner not used: {e}", log='error', lvl = 2, color = 'red')
         
         self._lr_scheduler      = kwargs.get('lr_scheduler', None)
-        self._reg_scheduler     = kwargs.get('reg_scheduler', None)
-        
-        self._stochastic_reconf = sr.StochasticReconfiguration(None, self._backend)
-        
+        self._reg_scheduler     = kwargs.get('reg_scheduler', None)        
         self._init_functions()
         self._initialized       = True
+        
+        #######################################
+        #! set the lower states
+        #######################################
+        
+        if lower_states is not None and lower_betas is not None:
+            self._lower_states_manager = NQSLower(lower_states, lower_betas, self)
+        else:
+            self._lower_states_manager = NQSLower([], [], self)
         
     #####################################
     #! NETWORK
@@ -693,7 +680,7 @@ class NQS(MonteCarloSolver):
                             logproba_fun    = logproba_fun,
                             parameters      = parameters,
                             batch_size      = batch_size)
-            
+    
     @staticmethod
     def evaluate_fun_np(func          : Callable,
                         states        : np.ndarray,
@@ -1003,8 +990,7 @@ class NQS(MonteCarloSolver):
         '''
         
         # The dtype (complex/real) depends on single_sample_flat_grad_fun
-        gradients_batch, shapes, sizes, is_cpx = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states,
-                                                single_sample_flat_grad_fun, batch_size)
+        gradients_batch, shapes, sizes, is_cpx = net_utils.jaxpy.compute_gradients_batched(net_apply, params, states, single_sample_flat_grad_fun, batch_size)
         return gradients_batch, shapes, sizes, is_cpx
     
     @staticmethod
@@ -1133,14 +1119,23 @@ class NQS(MonteCarloSolver):
         This is used to initialize the shapes of the parameters.
         """
         #! Sample the configurations
-        (_, _), (configs, configs_ansatze), probabilities = self._sampler.sample()
+        numchains   = self._sampler.numchains
+        numsamples  = self._sampler.numsamples
+        params      = self.get_params()
+        (_, _), (configs, configs_ansatze), probabilities = self._sampler.sample(params)
+                                                                    # num_chains=1, num_samples=1)
+        
         #! Get the shapes of the parameters
         _, _, (shapes, sizes, iscpx) = NQS.single_step_jax(
-                self._net.get_params(),
+                params,
                 configs,
                 configs_ansatze,
                 probabilities,
                 *args, **kwargs)
+        
+        #! Set the number of chains and samples
+        self._sampler.set_numchains(numchains)
+        self._sampler.set_numsamples(numsamples)
         return shapes, sizes, iscpx
     
     def wrap_single_step_jax(     
@@ -1148,24 +1143,19 @@ class NQS(MonteCarloSolver):
             apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
             local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
             flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
-            use_sr                      : bool,                         # Flag to use Stochastic Reconfiguration to compute d_par
-            sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
-            sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
-            sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
-            batch_size                  : Optional[int]         = None, # Batch size for evaluation
+            batch_size                  : int
         ):
         
         #! Sample the configurations
-        shapes, sizes, iscpx = self._sample_for_shapes(apply_fn,
-                local_energy_fun, flat_grad_fun, use_sr, sr_precond_apply_fun,
-                sr_solve_linalg_fun, sr_options, batch_size, 0)
-        
+        shapes, sizes, iscpx = self._sample_for_shapes(apply_fn, 
+                                        local_energy_fun, flat_grad_fun, batch_size=self._batch_size, t=0)
+        batch_size  = batch_size if batch_size is not None else self._batch_size
         #! Prepare the function for JIT compilation
         tree_def    = self._params_tree_def
         flat_size   = self._params_total_size
         slices      = net_utils.jaxpy.prepare_slice_info(shapes, sizes, iscpx)
         
-        @jax.jit
+        @partial(jax.jit, static_argnames=('t',))
         def wrapped(y, t, configs, configs_ansatze, probabilities, int_step = 0):
             if isinstance(y, jnp.ndarray):
                 params = net_utils.jaxpy.transform_flat_params_jit(y, tree_def, slices, flat_size)
@@ -1178,42 +1168,32 @@ class NQS(MonteCarloSolver):
                                     apply_fn,
                                     local_energy_fun,
                                     flat_grad_fun,
-                                    use_sr,
-                                    sr_precond_apply_fun,
-                                    sr_solve_linalg_fun,
-                                    sr_options,
-                                    batch_size,
-                                    t)
+                                    batch_size  =   batch_size,
+                                    t           =   t)
         return wrapped
         
     @staticmethod
-    @partial(jax.jit, static_argnames=("apply_fn",
+    @partial(jax.jit, static_argnames=(
+                                    "apply_fn",
                                     "local_energy_fun",
-                                    "flat_grad_fun", 
-                                    "sr_solve_linalg_fun",
-                                    "sr_precond_apply_fun",
-                                    "use_sr", 
-                                    "sr_options",
-                                    "batch_size"))
+                                    "flat_grad_fun",
+                                    "batch_size",
+                                    "t"
+                                    ))
     def single_step_jax(
             # Dynamic Inputs (Data & State)
-            params                      : Any,                          # Current PyTree parameters
-            configs                     : jnp.ndarray,                  # Batch of sampled configurations (N_samples, ...shape)
-            configs_ansatze             : jnp.ndarray,                  # Batch of sampled ansatze (N_samples, ...)
-            probabilities               : jnp.ndarray,                  # Batch of sampled probabilities (N_samples, ...)
+            params                      : Any,                              # Current PyTree parameters
+            configs                     : jnp.ndarray,                      # Batch of sampled configurations (N_samples, ...shape)
+            configs_ansatze             : jnp.ndarray,                      # Batch of sampled ansatze (N_samples, ...)
+            probabilities               : jnp.ndarray,                      # Batch of sampled probabilities (N_samples, ...)
             # Static Inputs (Functions & Config)
-            apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
-            local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
-            flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
-            # Static for Stochastic Reconfiguration (SR)
-            use_sr                      : bool,                         # Flag to use Stochastic Reconfiguration to compute d_par
-            sr_precond_apply_fun        : Optional[Callable]    = None, # Preconditioner function for SR solver
-            sr_solve_linalg_fun         : Optional[Callable]    = None, # Linalg solver function for SR solver
-            sr_options                  : Optional[sr.SRParams] = None, # Dict with options like 'tol', 'maxiter' for SR solver
-            batch_size                  : Optional[int]         = None, # Batch size for evaluation
-            t                           : Optional[float]       = None, # Time for the jax 
-            # Static for Evaluation
-        ) -> Tuple[Any, NQSStepInfo]: # Returns (flat_update_vector, metrics)
+            apply_fn                    : Callable,                         # Network apply function: apply_fn(params, state) -> log_psi
+            local_energy_fun            : Callable,                         # Computes local energy: local_energy_fun(state, params) -> E_loc
+            flat_grad_fun               : Callable,                         # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
+            # Static for evaluation
+            batch_size                  : Optional[int]             = None, # Batch size for evaluation
+            t                           : Optional[float]           = None, # Time for the jax,
+        ) -> Tuple[Array, Array]:
         """
         Performs a single training step for Neural Quantum States (NQS) using JAX.
         This function computes the local energies, gradients, and the parameter update vector (d_par).
@@ -1232,23 +1212,6 @@ class NQS(MonteCarloSolver):
                 Function to compute local energy `E_loc = local_energy_fun(states, params)`. Static.
             flat_grad_fun (Callable):
                 Function to compute flattened gradient for one sample. Static.
-            use_sr (bool):
-                Flag to use Stochastic Reconfiguration (SR) for computing the parameter update vector.
-            sr_options (Optional[sr.SRParams], optional):
-                Options for the SR solver, such as tolerance (`tol`), maximum iterations (`maxiter`), 
-                and regularization (`reg`). Defaults to None.
-
-            Tuple[Any, TrainStepInfo]:
-                - d_par_flat (jnp.ndarray): The computed flat parameter update vector. 
-                    It has the same dtype as the parameters (complex if parameters are complex).
-                  The caller is responsible for applying this update (e.g., scaling by -lr or i * dt).
-                - TrainStepInfo: A named tuple containing metrics:
-                    - mean_energy (float): Mean of the local energies.
-                    - std_energy (float): Standard deviation of the local energies.
-                    - sr_info (dict): Information about the SR solver, including:
-                        - 'executed' (bool): Whether SR was executed.
-                        - 'converged' (bool or None): Whether the SR solver converged (if executed).
-                        - 'iterations' (int or None): Number of iterations taken by the SR solver (if executed).
         Notes:
             - If `use_sr` is True, the SR solver computes the parameter update vector by solving the linear system:
                 S * d_par = F,
@@ -1262,125 +1225,33 @@ class NQS(MonteCarloSolver):
             ValueError: If `use_sr` is True but no SR solver function is provided in `sr_options`.
         """
         
-        batch_size          = batch_size if batch_size is not None else 1
+        batch_size = batch_size if batch_size is not None else 1
+        
         #! 1. Compute Local Energy
         (v, means, stds) = NQS.evaluate_fun_jax(
-            func            = local_energy_fun,
-            states          = configs,
-            probabilities   = probabilities,
-            logproba_in     = configs_ansatze,
-            logproba_fun    = apply_fn,
-            parameters      = params,
-            batch_size      = batch_size
-        )
-        
-        #! 2. Calculate Metrics
-        mean_energy         = means
-        std_energy          = stds
+                func            = local_energy_fun,
+                states          = configs,
+                probabilities   = probabilities,
+                logproba_in     = configs_ansatze,
+                logproba_fun    = apply_fn,
+                parameters      = params,
+                batch_size      = batch_size
+            )
 
-        #! 3. Compute Gradients (O_k = ∇ log ψ)
+        #! 2. Compute Gradients (O_k = ∇ log ψ)
         # The output `flat_grads` will have the dtype determined by single_sample_flat_grad_fun
         # For complex NQS, this is typically complex. Shape: (batch_size, n_params_flat)
         flat_grads, shapes, sizes, iscpx = NQS.grad_jax(
-            net_apply                   = apply_fn,
-            params                      = params,
-            states                      = configs,
-            single_sample_flat_grad_fun = flat_grad_fun,
-            batch_size                  = batch_size)
-        # Check if gradients have expected complex type if parameters are complex
-        # This check should ideally happen outside JIT, but can be useful during debugging
-        # if params_are_complex and not jnp.iscomplexobj(flat_grads):
-        #    # jax.debug.print("Warning: Expected complex gradients but got real.")
-        #    # Fallback or cast if necessary, though this indicates an issue upstream
-        #    flat_grads = flat_grads.astype(DEFAULT_JP_CPX_TYPE)
+                            net_apply                   = apply_fn,
+                            params                      = params,
+                            states                      = configs,
+                            single_sample_flat_grad_fun = flat_grad_fun,
+                            batch_size                  = batch_size)
 
-        d_par_flat          = None
-        sr_info             = {}
-        failed              = False
-        #! 4. Determine Parameter Update Vector (d_par_flat)
-        if use_sr and sr_options is not None:
-            # SR Calculation: 
-            #   Solves S * d_par    = F
-            #   F_k                 = < O_k^* (E_loc - <E>) >
-            #   S_{k',k}            = < O_{k'}^* O_k > - < O_{k'}^* > < O_k > = < ΔO_{k'}^* ΔO_k >
-            #   where 
-            #       ΔO_k            = O_k - <O_k>
-            #       <E>             = mean(E_loc, axis=0)
-            #       <O_k>           = mean(O_k, axis=0)
-            #   Note:
-            #       The Fisher matrix S is computed using the centered gradients (ΔO_k).
-            #       It is done via a matrix multiplication of the centered gradients with their conjugate transpose.
-            #       The forces vector F is computed using the centered energies (E_loc - <E>).
-            
-            if sr_solve_linalg_fun is None:
-                raise ValueError("`sr_solver_func` must be provided when `use_sr` is True.")
+        return (v, means, stds), flat_grads, (shapes, sizes, iscpx)
 
-            #! Use the stochastic reconfiguration function
-            x0_sr           = jnp.zeros_like(flat_grads[0])         # Initial guess for d_par
-            solver_fun      = sr_solve_linalg_fun
-            precond_fun     = sr_precond_apply_fun
-            sr_reg          = sr_options.reg if sr_options else 1e-7
-            sr_tol          = sr_options.tol if sr_options else 1e-5
-            sr_maxiter      = sr_options.maxiter if sr_options else 300
-            sr_use_minsr    = sr_options.min_sr if sr_options else False
-            sr_form_s       = sr_options.solver_form_s if sr_options else False
-            
-            try:
-                #! TODO: add option to regularize the Fisher matrix here
-                solver_result   = sr.solve_jax(
-                        solve_func      = solver_fun,               # to solve the linear system S * d_par = F
-                        loss            = v,                        # loss function - local energy
-                        var_deriv       = flat_grads,               # gradient vector - derivative of the ansatz
-                        min_sr          = sr_use_minsr,             # use the minimum stochastic reconfiguration
-                        x0              = x0_sr,                    # initial guess
-                        precond_apply   = precond_fun,              # corrected to use the preconditioner function
-                        maxiter         = sr_maxiter,               # maximum number of iterations
-                        tol             = sr_tol)                   # tolerance for convergence
-                d_par_flat                  = solver_result.x
-                sr_info['executed']         = True
-                sr_info['converged']        = solver_result.converged
-                sr_info['iterations']       = solver_result.iterations
-            except Exception as e:
-                # How to handle solver failure within JIT?
-                # Option 1: Return NaN/Inf vector (checked outside)
-                # Option 2: Use jax.experimental.checkify (more complex)
-                # For now, let JAX handle the exception during trace time if possible,
-                # or it might fail compilation if types/shapes mismatch.
-                # A robust implementation might need more careful error handling.
-                # jax.debug.print("SR solver failed: {e}", e=e)
-                d_par_flat                  = jnp.full_like(x0_sr, jnp.nan)     # NaN vector to indicate failure
-                sr_info['executed']         = True
-                sr_info['converged']        = False                             # Indicate failure
-                sr_info['iterations']       = -1
-                failed                      = True
-                print(f"SR solver failed: {e}")
-        else:
-            #! Center gradients and energies
-            centered_loss           = sr.loss_centered_jax(v, means)
-            centered_grads          = sr.derivatives_centered_jax(flat_grads, jnp.mean(flat_grads, axis=0))
-
-            # Compute Force Vector F_k = mean(conj(ΔO_k) * (E_loc - <E>))
-            # Note: Using conj(centered_grads) matches the typical definition F_k = < ΔO_k^* E_loc >
-            forces                  = jnp.mean(jnp.conj(centered_grads) * centered_loss[:, None], axis=0) # Shape: (n_params_flat,)
-            d_par_flat              = forces # Return the force vector directly
-            sr_info['executed']     = False
-            sr_info['converged']    = None
-            sr_info['iterations']   = None
-
-        #! 5. Prepare Outputs
-        metrics = NQSStepInfo(
-            mean_energy     =   mean_energy,
-            std_energy      =   std_energy,
-            failed          =   failed,
-            sr_executed     =   sr_info['executed'],
-            sr_converged    =   sr_info['converged'],
-            sr_iterations   =   sr_info['iterations'],
-        )
-
-        # Return the FLAT update vector (complex if params are complex) and metrics
-        # The caller (NQS class) handles scaling by -lr (or i * dt for TDVP) and applying the update.
-        return d_par_flat, metrics, (shapes, sizes, iscpx)
-
+    #####################################
+    
     def train(self,
             nsteps  : int = 1,
             verbose : bool = False,
@@ -1424,55 +1295,15 @@ class NQS(MonteCarloSolver):
     #! LOG_PROBABILITY_RATIO
     #####################################
     
-    def _log_probability_ratio(self, v1, v2 = None, **kwargs) -> Union[np.float64, jnp.float64, float, complex]:
-        '''
-        Compute the log probability ratio between two configurations.
-
-        Parameters:
-            v1: The initial state vector.
-            v2: The secondary state vector (optional). If not provided, the current state is assumed.
-            kwargs: Additional arguments for model-specific behavior.
-
-        Returns:
-            The log probability ratio as a numeric or complex value.
-
-        Note:
-            This method is intended to be implemented in derived classes since the model-specific details vary.
-            In the context of the Metropolis-Hastings algorithm, the acceptance probability for a transition s → s'
-            is given by:
-
-            A(s', s) = min [1, (P(s') / P(s)) * (r(s' → s) / r(s → s'))]
-
-            where the ratio r(s' → s) can be chosen such that it cancels out non-essential factors (e.g., setting r(s' → s)=1),
-            simplifying the acceptance criterion. Typically, one computes:
-
-            P_flip = || <ψ|s'> / <ψ|s> ||^2
-
-            where <ψ|s> represents the wave function amplitude for state s. The derived implementation should compute
-            the new <ψ|s'> efficiently.
-        '''
-    
-    def log_probability_ratio(self, v1, v2 = None, **kwargs) -> Union[np.float64, jnp.float64, float, complex]:
-        '''
-        Compute the log probability ratio.
-        Parameters:
-            v1: First vector.
-            v2      : Second vector (optional) - if not provided - current
-                        state is used.
-            kwargs  : Additional arguments.
-        '''
-        base_ratio = self._log_probability_ratio(v1, v2, **kwargs)
-        return self._log_probability_ratio(v1, v2, **kwargs) + (0)
-    
-    def probability_ratio(self, v1, v2 = None, **kwargs):
-        '''
-        Compute the probability ratio.
-        Parameters:
-            v1: First vector.
-            v2      : Second vector (optional) - if not provided - current state is used.
-            kwargs  : Additional arguments.
-        '''
-        return self._backend.exp(self.log_probability_ratio(v1, v2, **kwargs))
+    @staticmethod
+    def log_prob_ratio( top_log_ansatz   :   Callable,
+                        top_params,
+                        bot_log_ansatz   :   Callable,
+                        bot_params,
+                        states           :   jnp.ndarray):
+        top_log = top_log_ansatz(top_params, states)
+        bot_log = bot_log_ansatz(bot_params, states)
+        return top_log - bot_log
     
     #####################################
     #! STATE MODIFIER
@@ -1532,7 +1363,7 @@ class NQS(MonteCarloSolver):
         #! TODO: Add the weights setter
         pass
     
-    def update_weights(self, f: Optional[Union['array-like', float]] = None, **kwargs):
+    def update_weights(self, f: Optional[Union[Array, float]] = None, **kwargs):
         '''
         Update the weights of the NQS solver.
         '''
@@ -1638,38 +1469,85 @@ class NQS(MonteCarloSolver):
 #! NQS Lower States
 #########################################
 
-class NQSLowerStates:
+class NQSLower:
     def __init__(self,
-                lower_nqs_instances     : List[NQS],        # List of NQS objects for lower states
-                lower_betas             : List[float],      # Penalty terms beta_i
-                parent_nqs              : NQS):             # The NQS object for the current excited state
-        
+                lower_nqs_instances     : List[NQS],                # List of NQS objects for lower states
+                lower_betas             : List[float],              # Penalty terms beta_i
+                parent_nqs              : NQS):
+
         if len(lower_nqs_instances) != len(lower_betas):
             raise ValueError("Number of lower NQS instances must match number of betas.")
-
-        self._lower_nqs = lower_nqs_instances
-        self._lower_betas = jnp.array(lower_betas) # Use JAX array for betas
-        self._parent_nqs = parent_nqs
-        self._num_lower_states = len(lower_nqs_instances)
-        self._is_set = self._num_lower_states > 0
+        
+        self._backend               = parent_nqs.backend
+        self._isjax                 = parent_nqs.isjax
+        
+        # assert that all are the same backend
+        if not all([nqs.backend == parent_nqs.backend for nqs in lower_nqs_instances]):
+            raise ValueError("All lower NQS instances must have the same backend as the parent NQS.")
+        
+        self._parent_nqs                    = parent_nqs
+        self._parent_apply_fn               = parent_nqs.ansatz
+        self._parent_params                 = parent_nqs.get_params()                               # will likely be updated during training
+        self._parent_evaluate               = parent_nqs.evaluate_fun_jax if self._isjax else parent_nqs.evaluate_fun_np
+        self._log_p_ratio_fn                = parent_nqs.log_prob_ratio        
+        
+        #! handle the lower states
+        self._lower_nqs             = lower_nqs_instances
+        self._lower_betas           = self._backend.array(lower_betas)
+        self._num_lower_states      = len(lower_nqs_instances)
+        self._is_set                = self._num_lower_states > 0
 
         if not self._is_set:
             return
 
         # Store apply functions and parameters for each lower state
-        self._lower_apply_fns = [nqs.ansatz for nqs in self._lower_nqs]
-        self._lower_params = [nqs.get_params() for nqs in self._lower_nqs]
+        self._lower_apply_fns       = [nqs.ansatz for nqs in self._lower_nqs]               # this is static as it is not updated during training
+        self._lower_params          = [nqs.get_params() for nqs in self._lower_nqs]         # this is static as it is not updated during training
+        if self._isjax:
+            self._lower_evaluate    = [nqs.evaluate_fun_jax for nqs in self._lower_nqs]     # this is static as it is not updated during training
+        else:
+            self._lower_evaluate    = [nqs.evaluate_fun_np for nqs in self._lower_nqs]
 
-        # Placeholder for ratios - these would be computed during the excited state's MC sampling
+        #! Placeholder for ratios - these would be computed during the excited state's MC sampling
         # Shape: (num_lower_states, num_samples_excited_state)
-        self._ratios_psi_exc_div_psi_lower = None # Psi_W / Psi_W_j (current excited / lower_j)
-        self._ratios_psi_lower_div_psi_exc = None # Psi_W_j / Psi_W (lower_j / current excited)
+        self._ratios_psi_exc_div_psi_lower = None       # Psi_W / Psi_W_j (current excited / lower_j)
+        self._ratios_psi_lower_div_psi_exc = None       # Psi_W_j / Psi_W (lower_j / current excited)
 
         # The C++ code has `train_lower_` for MC parameters for sampling *within* lower states.
         # For the JAX implementation, this might translate to parameters for sampling
         # from each P(s) ~ |psi_lower_j(s)|^2 if needed for <Psi_W / Psi_W_j>_j terms.
         # This part is complex as it implies separate MC runs or combined sampling.
 
+    def get_p_ratio_wrapper(self, lower_idx: int):
+        """
+        Wrapper to compute log(Psi_1 / Psi_2) for a given lower state.
+        """
+        
+        if 0 <= lower_idx < self._num_lower_states:
+            # compute log(Psi_exc / Psi_lower_j)
+            ansatz_top = self._parent_apply_fn
+            params_top = self._parent_nqs.get_params()          # not static - will be updated during training
+            
+            ansatz_low = self._lower_apply_fns[lower_idx]
+            params_low = self._lower_params[lower_idx]
+        else:
+            # reverse order - compute log(Psi_lower_j / Psi_exc)
+            ansatz_top = self._lower_apply_fns[lower_idx]
+            params_top = self._lower_params[lower_idx]
+
+            ansatz_low = self._parent_apply_fn
+            params_low = self._parent_nqs.get_params()          # not static - will be updated during training
+
+        @jax.jit
+        def wrapme(states):
+            log_ratio = self._log_p_ratio_fn(ansatz_top, params_top, ansatz_low, params_low, states)
+            return jnp.exp(log_ratio)
+        return wrapme
+
+    ######################################
+    #! Properties and Getters
+    ######################################
+    
     @property
     def is_set(self) -> bool:
         return self._is_set
@@ -1769,7 +1647,7 @@ class NQSLowerStates:
         penalties_per_lower_state = self._lower_betas[:, None] * abs_sq_ratios # (num_lower_states, N_samples)
         total_local_penalty = jnp.sum(penalties_per_lower_state, axis=0) # (N_samples,)
         return total_local_penalty
-    
+
 #########################################
 #! TESTS
 #########################################
