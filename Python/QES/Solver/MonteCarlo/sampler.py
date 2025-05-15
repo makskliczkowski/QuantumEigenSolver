@@ -115,7 +115,7 @@ class SolverInitState(Enum):
 
 if JAX_AVAILABLE:
     
-    @jax.jit
+    # @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         r'''Propose `num` random flips of a state using JAX.
 
@@ -131,7 +131,7 @@ if JAX_AVAILABLE:
         idx = randint_jax(key=rng_k, shape = (), low=0, high=state.size)
         return Binary.jaxpy.flip_array_jax_spin(state, idx)
 
-    @partial(jax.jit, static_argnames=("num",))
+    # @partial(jax.jit, static_argnames=("num",))
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num: int = 1):
         """
         Propose `num` random flips on a state or batch of states using JAX.
@@ -1058,7 +1058,7 @@ class MCSampler(Sampler):
     ###################################################################
     
     @staticmethod
-    @jax.jit
+    # @jax.jit
     def _acceptance_probability_jax(current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
         r'''
         Calculate the Metropolis-Hastings acceptance probability using JAX.
@@ -1156,7 +1156,7 @@ class MCSampler(Sampler):
     #! LOG PROBABILITY
     ###################################################################
     
-    @partial(jax.jit, static_argnames=('net_callable',))
+    # @partial(jax.jit, static_argnames=('net_callable',))
     # @jax.jit
     def _logprob_jax(x, net_callable, net_params=None):
         r'''

@@ -9,6 +9,8 @@
 import numpy as np
 import inspect
 import numba
+import h5py
+import json
 
 # typing and other imports
 from typing import Union, Tuple, Union, Callable, Optional, Any, NamedTuple, List
@@ -193,6 +195,7 @@ class NQS(MonteCarloSolver):
         #######################################
         
         self._modifier          = None
+        self._modifier_func     = None
         
         #######################################
         #! handle the network
@@ -1329,14 +1332,50 @@ class NQS(MonteCarloSolver):
         '''
         self._modifier = None
         self.log("State modifier unset.", log='info', lvl = 2, color = 'blue')
+        
+        # reset the ansatz function
+        self._ansatz_func, self._params = self._net.get_apply(self._isjax)
     
     def set_modifier(self, modifier: Union[Operator, OperatorFunction], **kwargs):
         '''
         Set the state modifier.
         '''
+        
+        #! The modifier should be an inverse mapping - for a given state, it shall return all the states that lead to it 
+        #! through the application of the operator.
         self._modifier = modifier
         self.log(f"State modifier set to {modifier}.", log='info', lvl = 2, color = 'blue')
-
+        
+        if isinstance(modifier, Operator):
+            if self._isjax and hasattr(modifier, 'jax'):
+                self._modifier_func = modifier.jax
+            elif hasattr(modifier, 'npy'):
+                self._modifier_func = modifier.npy
+            else:
+                raise ValueError("The operator does not have a JAX or NumPy implementation.")
+        else:
+            self._modifier_func = modifier
+        model_callable, self._params = self._net.get_apply(self._isjax)
+        # it modifies this ansatz function, one needs to recompile and take it
+        def _ansatz_func(params, x):
+            # log_psi = model_callable(params, x)
+            mod_app     = self._modifier_func(x)
+            # st        : (M, *shape)
+            # weights   : (M,)
+            # compute log ψ for each
+            st, val     = mod_app
+            log_psi_mod = jax.vmap(lambda s: model_callable(params, s))(st)
+            # multiply by the value
+            log_psi_mod = log_psi_mod + jnp.log(val)
+            # now return the sum simply - this shall be sum of ansatzes but they are logarithmic
+            # so we need to multiply them log(x_1) + log(x_2) = log(x_1 * x_2)
+            return jnp.prod(log_psi_mod, axis=0)
+        
+        if self._isjax:
+            self._ansatz_func = jax.jit(_ansatz_func)
+        else:
+            self._ansatz_func = _ansatz_func
+    
     #####################################
     #! UPDATES
     #####################################
@@ -1355,25 +1394,116 @@ class NQS(MonteCarloSolver):
     #! WEIGHTS
     #####################################
     
-    def set_weights(self, **kwargs):
-        '''
+    def set_weights(self, weights: dict = None, file_path: str = None, fmt: str = "h5"):
+        """
         Set the weights of the NQS solver.
-        '''
-        
-        #! TODO: Add the weights setter
-        pass
+
+        Args:
+            weights:
+                dict of parameter arrays to set.
+            file_path:
+                path to load weights from ('.h5' or '.json').
+            fmt:
+                format of file ('h5' or 'json').
+        """
+        if file_path:
+            self._params = self.load_weights(file_path, fmt)
+        elif weights is not None:
+            self._params = weights
+        else:
+            raise ValueError("Provide either weights dict or file_path.")
+        self.set_params(self._params)
     
-    def update_weights(self, f: Optional[Union[Array, float]] = None, **kwargs):
-        '''
+    def update_weights(self, f: any = None, weights: dict = None):
+        """
         Update the weights of the NQS solver.
-        '''
-        pass
+
+        Args:
+            f: scalar multiplier, callable, or None. If scalar, multiplies all params by f.
+               If callable, applies f(param) to each param.
+            weights: dict of same structure; added elementwise to current params.
+        """
+        # apply function f
+        if f is not None:
+            if isinstance(f, (int, float)):
+                self._params = jax.tree_map(lambda x: x * f, self._params)
+            elif callable(f):
+                self._params = jax.tree_map(lambda x: f(x), self._params)
+            else:
+                raise ValueError("f must be a number or a callable.")
+        # add weights
+        if weights is not None:
+            self._params = jax.tree_multimap(lambda x, y: x + y, self._params, weights)
+        self._net.set_params(self._params)
     
-    def save_weights(self, dir = None, name = "weights"):
-        return super().save_weights(dir, name)
+    def save_weights(self, file_path: str, fmt: str = "h5") -> str:
+        """
+        Save current weights to disk.
+
+        Args:
+            file_path: destination path (without extension).
+            fmt: 'h5' or 'json'.
+        Returns:
+            Full path of saved file.
+        """
+        path = file_path + (".h5" if fmt == "h5" else ".json")
+        if fmt == "h5":
+            with h5py.File(path, "w") as f:
+                for k, v in self._params.items():
+                    f.create_dataset(k, data=jax.device_get(v))
+        elif fmt == "json":
+            serial = {k: jax.device_get(v).tolist() for k, v in self._params.items()}
+            with open(path, "w") as f:
+                json.dump(serial, f)
+        else:
+            raise ValueError("Unsupported format: {}".format(fmt))
+        return path
     
-    def load_weights(self, dir = None, name = "weights"):
-        return super().load_weights(dir, name)
+    def load_weights(self, file_path: str, fmt: str = "h5") -> dict:
+        """
+        Load weights from disk.
+
+        Args:
+            file_path: path to file (with extension).
+            fmt: 'h5' or 'json'.
+        Returns:
+            Dict of parameter arrays.
+        """
+        path = file_path
+        if fmt == "h5":
+            with h5py.File(path, "r") as f:
+                loaded = {k: jnp.array(f[k][()]) for k in f.keys()}
+        elif fmt == "json":
+            with open(path, "r") as f:
+                data = json.load(f)
+            loaded = {k: jnp.array(v) for k, v in data.items()}
+        else:
+            raise ValueError("Unsupported format: {}".format(fmt))
+        return loaded
+    
+    #####################################
+    
+    def get_params(self, unravel: bool = False) -> Any:
+        """Returns the current parameters from the network object."""
+        params = self._net.get_params()
+        if unravel:
+            return jnp.concatenate([p.ravel() for p in tree_flatten(params)[0]])
+        return params
+    
+    def set_params(self, new_params: Any, shapes: list = None, sizes: list = None, iscpx: bool = False):
+        """Sets new parameters in the network object."""
+        params = new_params
+        # check if the parameters are provided
+        if params is None:
+            params = self._net.get_params()
+        elif isinstance(params, jnp.ndarray):
+            shapes = shapes if shapes is not None else self._params_shapes
+            sizes  = sizes if sizes is not None else self._params_sizes
+            iscpx  = iscpx if iscpx is not None else self._params_is_cpx
+            params = self.transform_flat_params(params, shapes, sizes, iscpx)
+
+        # set the parameters
+        self._net.set_params(params)
     
     #####################################
     #! GETTERS AND PROPERTIES
@@ -1429,30 +1559,6 @@ class NQS(MonteCarloSolver):
         Return the local energy function.
         '''
         return self._local_en_func
-    
-    #! Parameters
-    
-    def get_params(self, unravel: bool = False) -> Any:
-        """Returns the current parameters from the network object."""
-        params = self._net.get_params()
-        if unravel:
-            return jnp.concatenate([p.ravel() for p in tree_flatten(params)[0]])
-        return params
-    
-    def set_params(self, new_params: Any, shapes: list = None, sizes: list = None, iscpx: bool = False):
-        """Sets new parameters in the network object."""
-        params = new_params
-        # check if the parameters are provided
-        if params is None:
-            params = self._net.get_params()
-        elif isinstance(params, jnp.ndarray):
-            shapes = shapes if shapes is not None else self._params_shapes
-            sizes  = sizes if sizes is not None else self._params_sizes
-            iscpx  = iscpx if iscpx is not None else self._params_is_cpx
-            params = self.transform_flat_params(params, shapes, sizes, iscpx)
-
-        # set the parameters
-        self._net.set_params(params)
     
     #####################################
 
