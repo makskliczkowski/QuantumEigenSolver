@@ -225,7 +225,7 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
             for nn_idx in range(nn_forward_num):
                 j_neighbor = lattice.get_nn_forward(i, num=nn_idx)
 
-                if j_neighbor < 0:
+                if j_neighbor < 0 or j_neighbor >= self.ns or np.isnan(j_neighbor):
                     self._log(f"Skipping invalid neighbor for site {i}, nn_idx {nn_idx}", lvl=3, log='debug')
                     continue
 

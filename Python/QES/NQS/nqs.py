@@ -1240,7 +1240,6 @@ class NQS(MonteCarloSolver):
                 parameters      = params,
                 batch_size      = batch_size
             )
-
         #! 2. Compute Gradients (O_k = ∇ log ψ)
         # The output `flat_grads` will have the dtype determined by single_sample_flat_grad_fun
         # For complex NQS, this is typically complex. Shape: (batch_size, n_params_flat)

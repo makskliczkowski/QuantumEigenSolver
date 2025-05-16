@@ -40,7 +40,7 @@ from enum import Enum, auto, unique
 
 # from algebra
 from general_python.algebra.utils import JAX_AVAILABLE, get_backend, DEFAULT_JP_INT_TYPE, DEFAULT_BACKEND_KEY, Array
-from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE
+from general_python.algebra.utils import DEFAULT_NP_INT_TYPE, DEFAULT_NP_FLOAT_TYPE, distinguish_type
 from general_python.algebra.ran_wrapper import choice, randint_np, randint_jax
 import general_python.common.binary as Binary
 
@@ -114,7 +114,7 @@ class SolverInitState(Enum):
 
 if JAX_AVAILABLE:
     
-    # @jax.jit
+    @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         r'''Propose `num` random flips of a state using JAX.
 
@@ -130,7 +130,7 @@ if JAX_AVAILABLE:
         idx = randint_jax(key=rng_k, shape = (), low=0, high=state.size)
         return Binary.jaxpy.flip_array_jax_spin(state, idx)
 
-    # @partial(jax.jit, static_argnames=("num",))
+    @partial(jax.jit, static_argnames=("num",))
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num: int = 1):
         """
         Propose `num` random flips on a state or batch of states using JAX.
@@ -524,6 +524,7 @@ class Sampler(ABC):
                 numchains   : int                               = 1,
                 initstate   : Union[np.ndarray, jnp.ndarray]    = None,
                 backend     : str                               = 'default',
+                statetype   : Union[np.dtype, jnp.dtype]        = None,
                 **kwargs
             ):
         """
@@ -551,6 +552,8 @@ class Sampler(ABC):
                 a predefined string ('RND', 'F_UP', 'F_DN', 'AF'), or a SolverInitState enum. Defaults to 'RND'.
             backend (str):
                 Computational backend ('numpy', 'jax', or 'default'). 'default' chooses JAX if available.
+            statetype (Union[np.dtype, jnp.dtype]):
+                Type of the state (e.g., np.float32, jnp.float32). Not used in the provided code.
             **kwargs:
                 Additional arguments passed to `_state_distinguish` for state generation (e.g., `modes`, `mode_repr`).
 
@@ -586,15 +589,17 @@ class Sampler(ABC):
             raise SamplerErrors(SamplerErrors.NOT_HAVING_RNG)
         
         is_valid_rng_k = (
-            self._rng_k is not None and             
-            isinstance(self._rng_k, jax.Array) and
-            self._rng_k.shape == (2,) and           
+            self._rng_k is not None             and             
+            isinstance(self._rng_k, jax.Array)  and
+            self._rng_k.shape == (2,)           and           
             self._rng_k.dtype == jnp.uint32         
         )
+        
+        #! check the RNG key, whether it is a valid JAX PRNGKey
         if not is_valid_rng_k:
             key_info = f"Value: {self._rng_k}, Type: {type(self._rng_k)}"
             if isinstance(self._rng_k, jax.Array):
-                key_info += f", Shape: {self._rng_k.shape}, Dtype: {self._rng_k.dtype}"
+                key_info += f", Shape: {self._rng_k.shape}, dtype: {self._rng_k.dtype}"
             raise TypeError(f"Sampler's RNG key (self._rng_k) is not a valid JAX PRNGKey. {key_info}")
     
         # check JAX
@@ -606,6 +611,7 @@ class Sampler(ABC):
         
         # set the backend
         self._backendstr    = 'np' if not self._isjax else 'jax'
+        self._statetype     = distinguish_type(statetype, 'numpy' if not self._isjax else 'jax')
         
         # handle the Hilbert space - may control state initialization
         self._hilbert       = hilbert
@@ -625,6 +631,7 @@ class Sampler(ABC):
             'mode_repr' : self._mode_repr
         }
         self._initstate_t   = initstate
+        self._isint         = isinstance(initstate, (int, np.integer, jnp.integer))
         self.set_initstate(self._initstate_t, **state_kwargs)
         
         # proposed state
@@ -765,7 +772,7 @@ class Sampler(ABC):
 
         if initstate is None:
             initstate = SolverInitState.RND 
-        
+
         # handle the initial state
         if initstate is None or isinstance(initstate, (str, SolverInitState)):
             try:
@@ -778,15 +785,17 @@ class Sampler(ABC):
                                         backend =   current_bcknd_str,
                                         rng     =   self._rng,
                                         rng_k   =   self._rng_k)
+                    if not self._isint:
+                        self._initstate = self._initstate.astype(self._statetype)
                 else:
                     raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
             except Exception as e:
                 raise ValueError(f"Failed to set initial state: {e}") from e
         else:
             if isinstance(initstate, np.ndarray) and self._isjax:
-                self._initstate = jnp.array(initstate)
+                self._initstate = jnp.array(initstate).astype(self._statetype)
             elif isinstance(initstate, jnp.ndarray) and not self._isjax:
-                self._initstate = np.array(initstate)
+                self._initstate = np.array(initstate).astype(self._statetype)
             else:
                 self._initstate = initstate
         self.set_chains(self._initstate, self._numchains)
@@ -813,6 +822,8 @@ class Sampler(ABC):
             self._states = jnp.stack([jnp.array(initstate)] * numchains, axis=0)
         else:
             self._states = np.stack([np.array(initstate.copy())] * numchains, axis=0)
+        if not self._isint:
+            self._states = self._states.astype(self._statetype)
     
     # ---
     
@@ -900,19 +911,20 @@ class MCSampler(Sampler):
                 net,
                 shape       : Tuple[int, ...],
                 rng,
-                rng_k                               = None,
-                upd_fun     : Optional[Callable]    = None,
-                mu          : float                 = 2.0,
-                beta        : float                 = 1.0,
-                therm_steps : int                   = 100,
-                sweep_steps : int                   = 100,
-                seed                                = None,
-                hilbert     : HilbertSpace          = None,
-                numsamples  : int                   = 1,
-                numchains   : int                   = 1,
-                initstate                           = None,
-                backend     : str                   = 'default',
-                logprob_fact: float                 = 0.5,
+                rng_k                                       = None,
+                upd_fun     : Optional[Callable]            = None,
+                mu          : float                         = 2.0,
+                beta        : float                         = 1.0,
+                therm_steps : int                           = 100,
+                sweep_steps : int                           = 100,
+                seed                                        = None,
+                hilbert     : HilbertSpace                  = None,
+                numsamples  : int                           = 1,
+                numchains   : int                           = 1,
+                initstate                                   = None,
+                backend     : str                           = 'default',
+                logprob_fact: float                         = 0.5,
+                statetype   : Union[np.dtype, jnp.dtype]    = None,
                 **kwargs):
         r"""
         Initialize the MCSampler.
@@ -955,12 +967,14 @@ class MCSampler(Sampler):
                 Factor used in calculating importance sampling weights, often :math:`1/\mu`.
                 The probability is calculated as :math:`\exp((\frac{1}{\text{logprob_fact}} - \mu) \text{Re}(\log\psi(s)))`.
                 Default 0.5 corresponds to Born rule :math:`|\psi|^2` when :math:`\mu=1`. Needs careful setting based on :math:`\mu`.
+            statetype (Union[np.dtype, jnp.dtype]):
+                Type of the state (e.g., np.float32, jnp.float32, np.int32).
             **kwargs:
                 Additional arguments for the base Sampler class (e.g., `modes`, `mode_repr`).
         """
         
         super().__init__(shape, upd_fun, rng, rng_k, seed, hilbert,
-                numsamples, numchains, initstate, backend, **kwargs)
+                numsamples, numchains, initstate, backend, statetype, **kwargs)
         
         if net is None:
             raise ValueError("A network (or callable) must be provided for evaluation.")
@@ -1057,7 +1071,7 @@ class MCSampler(Sampler):
     ###################################################################
     
     @staticmethod
-    # @jax.jit
+    @jax.jit
     def _acceptance_probability_jax(current_val, candidate_val, beta: float = 1.0, mu: float = 2.0):
         r'''
         Calculate the Metropolis-Hastings acceptance probability using JAX.
@@ -1079,10 +1093,10 @@ class MCSampler(Sampler):
         Returns:
             jnp.ndarray: The acceptance probability(ies).
         '''
-        delta = jnp.real(candidate_val) - jnp.real(current_val)
+        delta   = jnp.real(candidate_val) - jnp.real(current_val)
         # ratio = jnp.exp(jnp.clip(beta * mu * delta, a_max=30.0)) # prevent overflow
-        ratio = jnp.exp(beta * mu * delta)
-        return jnp.minimum(ratio, 1.0)
+        ratio   = jnp.exp(beta * mu * delta)
+        return ratio
         log_acceptance_ratio = beta * mu * (jnp.real(candidate_val) - jnp.real(current_val))
         return jnp.exp(log_acceptance_ratio)
     
@@ -1150,13 +1164,13 @@ class MCSampler(Sampler):
                 return self._acceptance_probability_jax(current_val, candidate_val, beta=use_beta, mu=mu)
         else:
             return self._acceptance_probability_np(current_val, candidate_val, beta=use_beta, mu=mu)
-        
+    
     ###################################################################
     #! LOG PROBABILITY
     ###################################################################
     
-    # @partial(jax.jit, static_argnames=('net_callable',))
-    # @jax.jit
+    @staticmethod
+    @partial(jax.jit, static_argnames=('net_callable',))
     def _logprob_jax(x, net_callable, net_params=None):
         r'''
         Calculate log probability :math:`\log \psi(s)` using JAX.
@@ -1235,22 +1249,18 @@ class MCSampler(Sampler):
     ###################################################################
     
     @staticmethod
-    @partial(jax.jit, static_argnames=('steps', 'update_proposer',
-                                    'log_proba_fun', 'accept_config_fun',
-                                    'net_callable_fun'))
     def _run_mcmc_steps_jax(chain_init,
                             current_val_init,
                             rng_k_init,
                             num_proposed_init,
                             num_accepted_init,
                             params,
+                            # static args
                             steps               : int,
                             update_proposer     : Callable,
-                            log_proba_fun       : Callable,
-                            accept_config_fun   : Callable,
                             net_callable_fun    : Callable,
-                            mu                  : float,
-                            beta                : float = 1.0):
+                            mu                  : float     = 2.0,
+                            beta                : float     = 1.0):
         r'''
         Runs multiple MCMC steps using lax.scan. JIT-compiled.
         The single-step logic is defined internally via closure.
@@ -1271,10 +1281,6 @@ class MCSampler(Sampler):
                 Number of MCMC steps to perform.
             update_proposer (Callable):
                 Function that proposes a new state.
-            log_proba_fun (Callable):
-                Function to compute log probabilities.
-            accept_config_fun (Callable):
-                Function to compute acceptance probabilities.
             net_callable_fun (Callable):
                 The network callable.
             mu (float):
@@ -1286,60 +1292,56 @@ class MCSampler(Sampler):
                 Final chain states, log-probabilities, updated random key,
         '''
 
-        num_chains = chain_init.shape[0]
-
+        num_chains          = chain_init.shape[0]
+        logproba_fun        = jax.vmap(lambda x: jnp.real(net_callable_fun(params, x)), in_axes=(0,))
+        proposer_fn         = jax.vmap(update_proposer, in_axes=(0, 0))
+        
+        # Split the key only once to generate proposal keys for all chains + one carry key
+        total_keys          = steps * (num_chains + 1)
+        keys_flat           = jax.random.split(rng_k_init, total_keys)
+        keys                = keys_flat.reshape(steps, num_chains + 1, 2)
+        
+        # return chain_init, current_val_init, rng_k_init, num_proposed_init, num_accepted_init
+        
         # Define the single-step function *inside* so it closes over the arguments
-        def _sweep_chain_jax_step_inner(carry, _):
-            chain_in, current_val_in, rng_k_in, num_proposed_in, num_accepted_in = carry
-            
-            # jax.debug.print("chain_in: {}", chain_in.shape)
-            # jax.debug.print("current_val_in: {}", current_val_in.shape)
-            # jax.debug.print("rng_k_in: {}", rng_k_in.shape)
-            # jax.debug.print("num_proposed_in: {}", num_proposed_in.shape)
-            # jax.debug.print("num_accepted_in: {}", num_accepted_in.shape)
-            # return carry, None
-            # Split the key only once to generate proposal keys for all chains + one carry key
-            keys                    = random_jp.split(rng_k_in, num_chains + 1)
-            proposal_keys           = keys[:-1]
-            new_rng_k               = keys[-1]
-            
+        def _sweep_chain_jax_step_inner(carry, step_idx):
+            chain_in, current_val_in, num_proposed_in, num_accepted_in = carry
+            step_keys               = keys[step_idx]                        # shape [num_chains+1, 2]
+            prop_keys               = step_keys[:num_chains]                # [num_chains, 2]
+            next_key                = step_keys[num_chains]                 # [2]
+        
             #! Single MCMC update step logic
             # Propose update
-            new_chain               = jax.vmap(update_proposer, in_axes=(0, 0))(chain_in, proposal_keys)
-            if new_chain.ndim == chain_in.ndim + 1:
-                new_chain = jnp.squeeze(new_chain, axis=-1)
-                
-            logprobas_new           = log_proba_fun(new_chain, net_callable=net_callable_fun, net_params=params)
-            if logprobas_new.ndim == current_val_in.ndim + 1:
-                logprobas_new = jnp.squeeze(logprobas_new, axis=-1)
+            new_chain               = proposer_fn(chain_in, prop_keys)      # [num_chains, state_shape]
+            new_val                 = logproba_fun(new_chain)[:, 0]         # [num_chains]
+    
+            #! Calculate the log-probability of the new state - like MCSampler._logprob_jax
+            delta                   = new_val - current_val_in              # [num_chains]
+            ratio                   = jnp.exp(beta * mu * delta)            # [num_chains]
 
             #! Calculate acceptance probabilities (using accept_config_fun)
-            acc_probability         = accept_config_fun(current_val_in, logprobas_new, beta, mu)
-            uniform_draw            = random_jp.uniform(new_rng_k, shape=(num_chains,))
-            accepted                = uniform_draw < acc_probability
-            
-            accepted_expanded       = accepted[:, None]
-            new_chain_final         = jnp.where(accepted_expanded, new_chain, chain_in)
-            new_val_final           = jnp.where(accepted, logprobas_new, current_val_in)
-            # jax.debug.print("accepted: {}", accepted.shape)
-            # jax.debug.print("chain in: {}", chain_in.shape)
-            # jax.debug.print("new_chain: {}", new_chain.shape)
-            # jax.debug.print("logprobas_new: {}", logprobas_new.shape)
-            # jax.debug.print("current_val_in: {}", current_val_in.shape)
-            # return carry, None
-            # def update(acc, old, new):
-                # return jax.lax.select(acc, new, old)
-            # new_carry_states        = jax.vmap(update, in_axes=(0, 0, 0))(accepted, chain_in, new_chain)
-            # new_carry_vals          = jnp.where(accepted, logprobas_new, current_val_in)
-            new_carry = (new_chain_final, new_val_final, new_rng_k, num_proposed_in + 1, num_accepted_in + accepted.astype(num_accepted_in.dtype))
-            return new_carry, None        
+            u                       = jax.random.uniform(next_key, shape=(num_chains,))
+            keep                    = u < ratio                             # [num_chains]  
+            # broadcast accept mask over state dims
+            mask                    = keep.reshape((num_chains,) + (1,) * (chain_in.ndim - 1)) 
+            # accept/reject updates
+            chain_out               = jnp.where(mask, new_chain, chain_in)  
+            val_out                 = jnp.where(keep, new_val, current_val_in)
+            proposed_out            = num_proposed_in + 1
+            accepted_out            = num_accepted_in + keep.astype(num_accepted_in.dtype)
+            new_carry               = (chain_out, val_out, proposed_out, accepted_out)
+            return new_carry, step_idx + 1
         
         # Initial carry contains only the dynamic state passed into this function
-        initial_carry   = (chain_init, current_val_init, rng_k_init, num_proposed_init, num_accepted_init)
-
+        initial_carry       = (chain_init, current_val_init, num_proposed_init, num_accepted_init)
+        
         # Call lax.scan with the inner step function
-        final_carry, _  = jax.lax.scan(_sweep_chain_jax_step_inner, initial_carry, None, length=steps)
-        return final_carry
+        final_carry, _  = jax.lax.scan(_sweep_chain_jax_step_inner, initial_carry, jnp.arange(steps))
+        final_key       = keys[-1, num_chains] # last key is the carry key
+        
+        # Unpack the final carry
+        final_chain, final_val, final_proposed, final_accepted = final_carry
+        return final_chain, final_val, final_key, final_proposed, final_accepted
     
     @staticmethod
     @numba.njit
@@ -1517,9 +1519,6 @@ class MCSampler(Sampler):
     ###################################################################
     
     @staticmethod
-    @partial(jax.jit, static_argnames=('num_samples', 'total_therm_updates', 'updates_per_sample',
-                                    'update_proposer', 'log_proba_fun',
-                                    'accept_config_fun', 'net_callable_fun'))
     def _generate_samples_jax(
         states_init         : Array,
         logprobas_init      : Array,
@@ -1527,6 +1526,7 @@ class MCSampler(Sampler):
         num_proposed_init   : Array,
         num_accepted_init   : Array,
         params              : Any,
+        # static arguments:
         num_samples         : int,
         total_therm_updates : int,
         updates_per_sample  : int,
@@ -1534,8 +1534,6 @@ class MCSampler(Sampler):
         beta                : float,
         # Pass the actual function objects needed:
         update_proposer     : Callable,
-        log_proba_fun       : Callable,
-        accept_config_fun   : Callable,
         net_callable_fun    : Callable):
         '''
         JIT-compiled function for thermalization and sample collection using MCMC.
@@ -1555,8 +1553,6 @@ class MCSampler(Sampler):
             steps               =       total_therm_updates,
             # Pass the functions through:
             update_proposer     =       update_proposer,
-            log_proba_fun       =       log_proba_fun,
-            accept_config_fun   =       accept_config_fun,
             net_callable_fun    =       net_callable_fun,
             mu                  =       mu,
             beta                =       beta
@@ -1578,8 +1574,6 @@ class MCSampler(Sampler):
                     params              =   params,
                     steps               =   updates_per_sample,
                     update_proposer     =   update_proposer,
-                    log_proba_fun       =   log_proba_fun,
-                    accept_config_fun   =   accept_config_fun,
                     net_callable_fun    =   net_callable_fun,
                     mu                  =   mu,
                     beta                =   beta
@@ -1668,10 +1662,6 @@ class MCSampler(Sampler):
     ###################################################################
     
     @staticmethod
-    @partial(jax.jit, static_argnames=(
-        'num_samples', 'num_chains', 'total_therm_updates', 'updates_per_sample', 'shape',
-        'update_proposer', 'log_proba_fun_base', 'accept_config_fun_base',
-        'net_callable_fun'))
     def _static_sample_jax(
             # --- Initial State (Dynamic) ---
             states_init         : jnp.ndarray,
@@ -1686,15 +1676,12 @@ class MCSampler(Sampler):
             total_therm_updates : int,
             updates_per_sample  : int,
             shape               : Tuple[int,...],
-            # --- Configuration (Dynamic Values) ---
             mu                  : float,
             beta                : float,
             logprob_fact        : float,
             # --- Function References (Static) ---
-            update_proposer         : Callable,
-            log_proba_fun_base      : Callable,     # e.g., MCSampler._logprob_jax
-            accept_config_fun_base  : Callable,     # e.g., MCSampler._acceptance_probability_jax
-            net_callable_fun        : Callable
+            update_proposer     : Callable,
+            net_callable_fun    : Callable
         ):
         r'''
         Static, JIT-compiled core logic for MCMC sampling in JAX. 
@@ -1740,7 +1727,12 @@ class MCSampler(Sampler):
             net_callable_fun (Callable):
                 The network callable.
         '''
-        logprobas_init = log_proba_fun_base(states_init, net_callable_fun, params)
+        
+        def _logproba_fun_base(params, states):
+            ''' is the same as MCSampler._logprob_jax '''
+            return jnp.real(net_callable_fun(params, states))
+
+        logprobas_init = jax.vmap(_logproba_fun_base, in_axes=(None, 0))(params, states_init)
         logprobas_init = jnp.squeeze(logprobas_init, axis=-1) if logprobas_init.ndim > 1 else logprobas_init
 
         #! Phase 1: Thermalization
@@ -1753,8 +1745,6 @@ class MCSampler(Sampler):
             params              =   params,
             steps               =   total_therm_updates,
             update_proposer     =   update_proposer,
-            log_proba_fun       =   log_proba_fun_base,
-            accept_config_fun   =   accept_config_fun_base,
             net_callable_fun    =   net_callable_fun,
             mu                  =   mu,
             beta                =   beta
@@ -1772,8 +1762,6 @@ class MCSampler(Sampler):
                 params                = params,
                 steps                 = updates_per_sample,
                 update_proposer       = update_proposer,
-                log_proba_fun         = log_proba_fun_base,
-                accept_config_fun     = accept_config_fun_base,
                 net_callable_fun      = net_callable_fun,
                 mu                    = mu,
                 beta                  = beta
@@ -2045,10 +2033,7 @@ class MCSampler(Sampler):
             "updates_per_sample"        : self._updates_per_sample,
             "shape"                     : self._shape,
             "update_proposer"           : self._upd_fun,
-            "log_proba_fun_base"        : MCSampler._logprob_jax,
-            "accept_config_fun_base"    : MCSampler._acceptance_probability_jax,
             "net_callable_fun"          : self._net_callable,
-            # Dynamic Config (but fixed for this partial function)
             "mu"                        : self._mu,
             "beta"                      : self._beta,
             "logprob_fact"              : self._logprob_fact,
@@ -2189,7 +2174,7 @@ class SamplerType(Enum):
             raise ValueError(f"Invalid SamplerType: {s}") from None
     
 #######################################################################
-        
+
 def get_sampler(typek: Union[str, SamplerType, Sampler], *args, **kwargs) -> Sampler:
     """
     Get a sampler of the given type.

@@ -35,7 +35,7 @@ class TDVPStepInfo(NamedTuple):
 #################################################################
 
 class TDVP:
-    '''
+    r'''
     This class implements the Time-Dependent Variational Principle (TDVP) for quantum systems.
     
     In principle, it is used to calculate the time evolution (or imaginary time evolution) of a quantum state.

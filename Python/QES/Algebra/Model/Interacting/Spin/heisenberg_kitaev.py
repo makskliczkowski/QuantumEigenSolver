@@ -26,9 +26,9 @@ from general_python.lattices.honeycomb import HoneycombLattice
 #! DEFINE CONSTANTS
 # ----------------------------------------------------------------------------------------
 
-HEI_KIT_Z_BOND_NEI = 1
-HEI_KIT_Y_BOND_NEI = 2
-HEI_KIT_X_BOND_NEI = 0
+HEI_KIT_X_BOND_NEI = 2
+HEI_KIT_Y_BOND_NEI = 1
+HEI_KIT_Z_BOND_NEI = 0
 
 ##########################################################################################
 #! HAMILTONIAN CLASS
@@ -267,7 +267,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                 nei = lattice.get_nn_forward(i, num=nn)
 
                 # check the direction of the bond
-                if nei < 0:
+                if nei < 0 or np.isnan(nei):
                     continue
                 
                 # Heisenberg - value of SzSz (multiplier)
