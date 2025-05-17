@@ -134,6 +134,7 @@ class TDVP:
         # Helper storage
         self._e_local_mean   = None
         self._e_local_var    = None
+        self._solution       = None     # solution of the TDVP equation
         self._f0             = None     # force vector obtained from the covariance of loss and derivative
         self._s0             = None     # Fisher matrix obtained from the covariance of derivatives
         self._n_samples      = None     # number of samples
@@ -313,7 +314,13 @@ class TDVP:
         '''
         return sr.derivatives_centered_jax(deriv, deriv.mean(axis=0)) if self.is_jax else sr.derivatives_centered(deriv, deriv.mean(axis=0))
     
-    def get_tdvp_standard(self, loss, log_deriv, minsr : Optional[bool] = False):
+    def get_tdvp_standard(self, 
+                        loss, 
+                        log_deriv,
+                        betas               : Optional[Array] = None,
+                        r_psi_low_ov_exc    : Optional[Array] = None,
+                        r_psi_exc_ov_low    : Optional[Array] = None,
+                        minsr               : Optional[bool]  = False):
         '''
         Get the standard TDVP loss and derivative.
         
@@ -336,7 +343,16 @@ class TDVP:
         minsr               = self.use_minsr if minsr is None else minsr
         
         if self.is_jax:
-            loss_c, var_deriv_c, var_deriv_c_h, self._n_samples, self._full_size = sr.solve_jax_prepare(loss, log_deriv)
+            
+            #! centered loss and derivative
+            if betas is None:
+                (loss_c, var_deriv_c, 
+                var_deriv_c_h, self._n_samples,
+                self._full_size) = sr.solve_jax_prepare(loss, log_deriv)
+            else:
+                (loss_c, var_deriv_c, 
+                var_deriv_c_h, self._n_samples,
+                self._full_size) = sr.solve_jax_prepare_modified_ratios(loss, log_deriv, betas, r_psi_low_ov_exc, r_psi_exc_ov_low)
             
             # for minsr, it is unnecessary to calculate the force vector, do it anyway for now
             self._f0 = sr.gradient_jax(var_deriv_c_h, loss_c, self._n_samples)
@@ -375,15 +391,25 @@ class TDVP:
             **kwargs
         ):
         
-        self._f0, self._s0, (tdvp)  = self.get_tdvp_standard(e_loc, log_deriv, minsr=self.use_minsr)
-        f                           = self._f0
-        s                           = self._s0
+        #! obtain the loss and covariance without the preprocessor
+        self._f0, self._s0, (tdvp)  = self.get_tdvp_standard(e_loc,
+                                            log_deriv, 
+                                            betas               = betas,
+                                            r_psi_low_ov_exc    = r_psi_low_ov_exc,
+                                            r_psi_exc_ov_low    = r_psi_exc_ov_low,
+                                            minsr               = self.use_minsr)
+        f = self._f0
+        s = self._s0
+        
+        # jax block until ready
+        if hasattr(f, 'block_until_ready'):
+            f.block_until_ready()
+        if hasattr(self._s0, 'block_until_ready'):
+            self._s0.block_until_ready()
+            
+        #! handle the solver
         solve_func                  = self.sr_solve_lin_fn
         loss_c, vd_c, vd_c_h, _, _  = tdvp
-        
-        if betas is not None and len(betas) > 0:
-            # self._f0 = self._f0 + betas * (r_psi_low_ov_exc - r_psi_exc_ov_low)
-            pass
         
         #! handle the preprocessor
         if self.use_minsr:
@@ -394,12 +420,24 @@ class TDVP:
             mat_s                   = vd_c
             mat_s_p                 = vd_c_h
             vec_b                   = f
-            
-        if self._x0 is None:
+        
+        #! handle the initial guess - use the previous solution
+        use_old_result              = kwargs.get('use_old_result', False)
+        if use_old_result:
+            self._x0 = self._solution
+        
+        #! handle the initial guess
+        if self._x0 is None or self._x0.shape != vec_b.shape:
             self._x0 = jnp.zeros_like(vec_b)
         
+        #! prepare the rhs
         vec_b = vec_b * self.rhs_prefact
         
+        #! precondition the S matrices?
+        if True:
+            #!TODO:
+            pass
+    
         #! solve the linear system
         if self.sr_solve_lin_t == solvers.SolverForm.GRAM.value:
             solution = solve_func(s             =   mat_s,
@@ -436,7 +474,9 @@ class TDVP:
             
         if self.use_minsr:
             solution = jnp.matmul(vd_c_h, solution)
-                
+        
+        #! save the solution
+        self._solution = solution
         return solution
     
     def __call__(self, net_params, t, *, est_fn, configs, configs_ansatze, probabilities, **kwargs):

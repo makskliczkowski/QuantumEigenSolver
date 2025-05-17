@@ -224,38 +224,30 @@ class NQS(MonteCarloSolver):
         self._params_leaf_info          = None  # leaf information for the parameters - useful for the gradients
         self._params_tree_def           = None  # tree definition for the parameters, meaning the structure of the parameters
         self._params_total_size         = None  # total size of the parameters
+        #! ------------------------------------
         self._flat_grad_fun             = None  # function to calculate the gradients (returns a flat vector)
         self._dict_grad_type            = None  # dictionary with the type of gradients (real/imaginary)
         self._init_gradients()
         self._init_param_metadata()
         
         #######################################
-        #! handle the functions for the ansatz
+        #! handle the functions for the ansatz - we will store them not to recompile them
         #######################################
         
-        self._params            = None
-        self._local_en_func     = None  # function to calculate the local energy (Callable[state])
-        self._ansatz_func       = None  # function to calculate the ansatz for a given state (using net, Callable[state, params])
-        self._eval_func         = None  # function to batch evaluate the ansatz (Callable[states, ansatz, params])
-        self._apply_func        = None  # function to apply callable with the ansatz
-        # set the gradient function
-        self._grad_func         = None
+        self._params                    = None  # parameters of the network 
+        self._local_en_func             = None  # function to calculate the local energy (Callable[state])
+        self._ansatz_func               = None  # function to calculate the ansatz for a given state (using net, Callable[state, params])
+        self._eval_func                 = None  # function to batch evaluate the ansatz (Callable[states, ansatz, params])
+        self._apply_func                = None  # function to apply callable with the ansatz (Callable[states, ansatz, params])
+        # set the gradient function if needed
+        self._grad_func                 = None
         
         #######################################
         #! handle the optimizer
         #######################################
         
-        try:
-            self._preconditioner = precond_mod.choose_precond(
-                precond_id              = kwargs.get('preconditioner', None),
-                backend                 = self._backend)
-        except Exception as e:
-            self.log(f"Preconditioner not used: {e}", log='error', lvl = 2, color = 'red')
-        
-        self._lr_scheduler      = kwargs.get('lr_scheduler', None)
-        self._reg_scheduler     = kwargs.get('reg_scheduler', None)        
         self._init_functions()
-        self._initialized       = True
+        self._initialized               = True
         
         #######################################
         #! set the lower states
@@ -411,7 +403,7 @@ class NQS(MonteCarloSolver):
                 raise ValueError("Analytical gradient selected but network did not provide grad_func.")
             
             self.log(f"Analytical gradient function provided.", log='info', lvl = 2, color = 'blue')
-            
+    
     # ---
 
     def _init_functions(self):
@@ -428,7 +420,7 @@ class NQS(MonteCarloSolver):
         if self._isjax:
             # ansatz evaluation function already JITted
             self._eval_func             = net_utils.jaxpy.eval_batched_jax
-            self._apply_func            = net_utils.jaxpy.apply_callable_batched_jax
+            self._apply_func            = net_utils.jaxpy.apply_callable_batched_jax if self._batch_size > 1 else net_utils.jaxpy.apply_callable_jax
         else:
             # ansatz evaluation function already compiled
             self._eval_func             = net_utils.numpy.eval_batched_np

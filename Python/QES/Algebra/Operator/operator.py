@@ -993,9 +993,11 @@ class OperatorFunction:
                 return self._fun_jax(s_jax, *(fixed_args + runtime_args_jax))
             wrapped_fun_jax = jax.jit(wrap_jax_impl)
 
-        return OperatorFunction(wrap_int, wrap_np, wrapped_fun_jax,
-                                modifies_state=self._modifies_state,
-                                necessary_args=new_necessary_args)
+        return OperatorFunction(wrap_int, 
+                                wrap_np,
+                                wrapped_fun_jax,
+                                modifies_state  =   self._modifies_state,
+                                necessary_args  =   new_necessary_args)
 
     # -----------
 
@@ -1576,7 +1578,14 @@ class Operator(ABC):
     #! Generate matrix form of the operator
     #################################
     
-    def _matrix_no_hilbert_np(self, dim: int, is_sparse: bool, wrapped_funct, dtype, max_loc_upd:int = 1):
+    def _matrix_no_hilbert_np(self, 
+                            dim             : int, 
+                            is_sparse       : bool, 
+                            wrapped_funct, 
+                            dtype, 
+                            max_loc_upd     : int = 1,
+                            verbose         : bool = False,
+                            **kwargs) -> np.ndarray | sparse.COO | sparse.CSR:
         """
         Generate the matrix form of the operator without Hilbert space.
         """
@@ -1584,19 +1593,22 @@ class Operator(ABC):
         from Algebra.hilbert import HilbertSpace
         from Algebra.Operator.operator_matrix import operator_create_np
         
-        dummy_hilbert = HilbertSpace(nh = dim, backend = self._backend)
-        dummy_hilbert.log("Calculating the Hamiltonian matrix using NumPy...", lvl = 2, log = 'debug')
+        dummy_hilbert   = HilbertSpace(nh = dim, backend = self._backend)
+        if verbose:
+            dummy_hilbert.log("Calculating the Hamiltonian matrix using NumPy...", lvl = 2)
+
         # calculate the time to create the matrix
-        t1 = time.time()
-        matrix = operator_create_np(ns      = None, 
-                        hilbert_space       = dummy_hilbert,
-                        local_fun           = wrapped_funct,
-                        max_local_changes   = max_loc_upd,
-                        is_sparse           = is_sparse,
-                        start               = None,
-                        dtype               = dtype)
-        time_taken = time.time() - t1
-        dummy_hilbert.log(f"Time taken to create the matrix {self._name}: {time_taken:.2f} seconds", lvl=2, log = 'debug')
+        t1              = time.time()
+        matrix          = operator_create_np(ns                 = None, 
+                                            hilbert_space       = dummy_hilbert,
+                                            local_fun           = wrapped_funct,
+                                            max_local_changes   = max_loc_upd,
+                                            is_sparse           = is_sparse,
+                                            start               = None,
+                                            dtype               = dtype)
+        time_taken      = time.time() - t1
+        if verbose:
+            dummy_hilbert.log(f"Time taken to create the matrix {self._name}: {time_taken:.2e} seconds", lvl=2)
         return matrix
         
     def _matrix_no_hilbert_jax(self, dim: int, is_sparse: bool, wrapped_funct, dtype, max_loc_upd:int = 1):
@@ -1611,7 +1623,8 @@ class Operator(ABC):
         #!TODO: Implement the JAX version of the matrix function
         return None
         
-    def matrix(self, matrix_type : str, *args, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
+    def matrix(self, *args, dim = None, matrix_type = 'sparse',
+            hilbert_1 = None, hilbert_2 = None, use_numpy: bool = True, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
         """
         Generates the matrix representation of the operator.
 
@@ -1623,33 +1636,31 @@ class Operator(ABC):
         :return: The matrix representation of the operator.
         """
         
-        hilbert_1   = kwargs.get('hilbert_1', None)     # first Hilbert space
-        hilbert_2   = kwargs.get('hilbert_2', None)     # second Hilbert space
-        
         # check the dimension of the matrix
-        dim1, dim2      = None, None
-        matrix_hilbert  = 'None'
+        dim1, dim2          = None, None
+        matrix_hilbert      = 'None'
         if hilbert_1 is not None and hilbert_2 is not None:
-            dim1, dim2  = hilbert_1.nh, hilbert_2.nh
-            matrix_hilbert = 'double'
+            dim1, dim2      = hilbert_1.nh, hilbert_2.nh
+            matrix_hilbert  = 'double'
         elif hilbert_1 is not None and hilbert_2 is None:
-            dim1, dim2  = hilbert_1.nh, hilbert_1.nh
-            matrix_hilbert = 'single'
+            dim1, dim2      = hilbert_1.nh, hilbert_1.nh
+            matrix_hilbert  = 'single'
         elif hilbert_1 is None and hilbert_2 is not None:
-            hilbert_1   = hilbert_2
-            dim1, dim2  = hilbert_2.nh, hilbert_2.nh
-            matrix_hilbert = 'single'
+            hilbert_1       = hilbert_2
+            dim1, dim2      = hilbert_2.nh, hilbert_2.nh
+            matrix_hilbert  = 'single'
         else:
-            dim         = kwargs.get('dim', None)
             if dim is None:
                 raise ValueError("Dimension or at least one Hilbert space must be provided.")
-            dim1, dim2  = dim, dim
-            matrix_hilbert = 'None'
+            dim1, dim2      = dim, dim
+            matrix_hilbert  = 'None'
 
+        verbose      = kwargs.get('verbose', False)
+        
         # check if there are functions from the Hilbert space
-        use_numpy    = kwargs.get('use_numpy', False)
         jax_maybe_av = JAX_AVAILABLE and self._backend != np
         is_sparse    = (matrix_type == 'sparse')
+        use_numpy    = use_numpy or (not jax_maybe_av)
         
         # check if the matrix function is provided and skips kwargs if unnecessary
         if self._matrix_fun is not None:
@@ -1667,7 +1678,7 @@ class Operator(ABC):
         if matrix_hilbert == 'None':
             # maximum local updates - how many states does the operator create - for sparse
             if not jax_maybe_av or use_numpy:
-                return self._matrix_no_hilbert_np(dim1, is_sparse, wrapped_fun, dtype, max_loc_upd)
+                return self._matrix_no_hilbert_np(dim1, is_sparse, wrapped_fun, dtype, max_loc_upd, verbose, **kwargs)
             else:
                 return self._matrix_no_hilbert_jax(dim1, is_sparse, wrapped_fun, dtype, max_loc_upd)
         # Case2: one Hilbert space provided

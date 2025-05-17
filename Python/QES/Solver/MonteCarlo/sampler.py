@@ -772,21 +772,40 @@ class Sampler(ABC):
 
         if initstate is None:
             initstate = SolverInitState.RND 
-
+            
+        different_initials = kwargs.get('different', False)
+        
         # handle the initial state
         if initstate is None or isinstance(initstate, (str, SolverInitState)):
             try:
                 current_bcknd_str = 'jax' if self._isjax else 'numpy'
                 if self._hilbert is None or True:
-                    self._initstate = _state_distinguish(initstate,
-                                        modes   =   kwargs.get('modes', 2),
-                                        hilbert =   self._hilbert,
-                                        shape   =   self._shape,
-                                        backend =   current_bcknd_str,
-                                        rng     =   self._rng,
-                                        rng_k   =   self._rng_k)
-                    if not self._isint:
-                        self._initstate = self._initstate.astype(self._statetype)
+                    if different_initials:
+                        self._states = self._backend.stack([
+                                _state_distinguish(initstate,
+                                    modes   =   kwargs.get('modes', 2),
+                                    hilbert =   self._hilbert,
+                                    shape   =   self._shape,
+                                    backend =   current_bcknd_str,
+                                    rng     =   self._rng,
+                                    rng_k   =   self._rng_k)
+                                for _ in range(self._numchains)
+                            ], axis=0)
+                        self._initstate = self._states[0]
+                        if not self._isint:
+                            self._initstate = self._initstate.astype(self._statetype)
+                            self._states = self._states.astype(self._statetype)
+                        return
+                    else:
+                        self._initstate = _state_distinguish(initstate,
+                                            modes   =   kwargs.get('modes', 2),
+                                            hilbert =   self._hilbert,
+                                            shape   =   self._shape,
+                                            backend =   current_bcknd_str,
+                                            rng     =   self._rng,
+                                            rng_k   =   self._rng_k)
+                        if not self._isint:
+                            self._initstate = self._initstate.astype(self._statetype)
                 else:
                     raise NotImplementedError(SamplerErrors.NOT_IMPLEMENTED_ERROR)
             except Exception as e:
