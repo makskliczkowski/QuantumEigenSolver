@@ -107,29 +107,48 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
 
     # ----------------------------------------------------------------------------------------------
 
-    def __repr__(self):
-        """ Returns a concise string representation of the TFIM model. """
-        sep     = ", "
-        prec    = 3
+    def __repr__(self) -> str:
+        """
+        Concise, human-readable description of the TFIM instance.
 
-        def param_str(param_name, values):
-            if values and isinstance(values, list) and len(values) > 0:
-                # Check if all elements are the same
-                is_uniform = all(np.isclose(x, values[0]) for x in values)
-                if is_uniform:
-                    return f"{param_name}={values[0]:.{prec}f}"
-                else:
-                    return f"{param_name}=[...]" # Indicate non-uniform list
-            elif isinstance(values, (float, int)): # Handle scalar case
-                return f"{param_name}={values:.{prec}f}"
+        Examples
+        --------
+        >>> print(tfim)
+        TFIM(Ns=32, J=1.000, hx=0.300)
+        >>> print(tfim) # site-dependent h_x
+        TFIM(Ns=32, J=1.000, hx=[min=-0.200, max=0.300])
+        """
+        prec   = 3
+        sep    = ", "
+        tol    = 1e-10                      # tolerance for “all equal”
+
+        # helpers
+        def _fmt_scalar(name, val):
+            return f"{name}={val:.{prec}f}"
+
+        def _fmt_array(name, arr):
+            arr = np.asarray(arr, dtype=float)
+            if arr.size == 0:
+                return f"{name}=[]"
+            if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
+                return _fmt_scalar(name, float(arr.flat[0]))
             else:
-                return f"{param_name}=?" # Unknown state
+                return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
 
-        info_str    =   f"TFIM(Ns={self.ns}"
-        info_str    +=  sep + param_str("J", self._j)
-        info_str    +=  sep + param_str("hx", self._hx)
-        info_str    +=  ")"
-        return info_str
+        # fields
+        parts = [f"TFIM(Ns={self.ns}"]
+
+        # Exchange J
+        parts.append(
+            _fmt_scalar("J", self._j) if np.isscalar(self._j) else _fmt_array("J", self._j)
+        )
+
+        # Transverse field h_x
+        parts.append(
+            _fmt_scalar("hx", self._hx) if np.isscalar(self._hx) else _fmt_array("hx", self._hx)
+        )
+
+        return sep.join(parts) + ")"
 
     def __str__(self):
         ''' Returns a user-friendly string representation. '''

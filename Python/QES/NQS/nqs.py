@@ -6,6 +6,7 @@
 '''
 '''
 
+import os
 import numpy as np
 import inspect
 import numba
@@ -13,13 +14,14 @@ import h5py
 import json
 
 # typing and other imports
-from typing import Union, Tuple, Union, Callable, Optional, Any, NamedTuple, List
+from typing import Union, Tuple, Union, Callable, Optional, Any, Sequence, List
 from functools import partial
 
 # from general_python imports
 from general_python.algebra.utils import JAX_AVAILABLE, Array
 from general_python.algebra.ran_wrapper import choice, randint, uniform
 from general_python.common.directories import Directories
+from general_python.common.timer import timeit
 import general_python.ml.networks as Networks
 import general_python.common.binary as Binary
 
@@ -225,7 +227,7 @@ class NQS(MonteCarloSolver):
         self._params_tree_def           = None  # tree definition for the parameters, meaning the structure of the parameters
         self._params_total_size         = None  # total size of the parameters
         #! ------------------------------------
-        self._flat_grad_fun             = None  # function to calculate the gradients (returns a flat vector)
+        self._flat_grad_func             = None  # function to calculate the gradients (returns a flat vector)
         self._dict_grad_type            = None  # dictionary with the type of gradients (real/imaginary)
         self._init_gradients()
         self._init_param_metadata()
@@ -246,7 +248,7 @@ class NQS(MonteCarloSolver):
         #! handle the optimizer
         #######################################
         
-        self._init_functions()
+        self._init_functions(batch_size=self._batch_size)
         self._initialized               = True
         
         #######################################
@@ -378,7 +380,7 @@ class NQS(MonteCarloSolver):
         based on the properties of the system, such as whether the system is complex-valued,
         uses JAX for computation, employs analytic gradients, or is holomorphic.
         Attributes:
-            self._flat_grad_fun : A function for computing gradients in a flattened format.
+            self._flat_grad_func : A function for computing gradients in a flattened format.
             self._dict_grad_type: A dictionary specifying the type of gradients to be used.
         Dependencies:
             - net_utils.decide_grads: A utility function that selects the gradient computation
@@ -390,7 +392,7 @@ class NQS(MonteCarloSolver):
             - self._holomorphic: Boolean indicating if the system is holomorphic.
         """
 
-        self._flat_grad_fun, self._dict_grad_type = net_utils.decide_grads(iscpx=self._iscpx,
+        self._flat_grad_func, self._dict_grad_type = net_utils.decide_grads(iscpx=self._iscpx,
                             isjax=self._isjax, isanalytic=self._analytic, isholomorphic=self._holomorphic)
         
         if self._analytic:
@@ -401,26 +403,36 @@ class NQS(MonteCarloSolver):
             analytical_pytree_fun, _ = self._net.get_gradient(use_jax=True)
             if analytical_pytree_fun is None:
                 raise ValueError("Analytical gradient selected but network did not provide grad_func.")
-            
+            # self._flat_grad_func = net_utils.jaxpy.get_analytical_gradient_function(analytical_pytree_fun, self._params_tree_def)
             self.log(f"Analytical gradient function provided.", log='info', lvl = 2, color = 'blue')
     
     # ---
 
-    def _init_functions(self):
+    def _init_functions(self, batch_size: Optional[int] = None):
         '''
         Initialize the functions for the gradient and network evaluation.
         1. Check if the backend is JAX or NumPy.
         2. If so, set the evaluation and gradient functions to the appropriate JAX or NumPy functions.
         '''
         
-        # set the evaluation function
-        self._ansatz_func, self._params = self._net.get_apply(use_jax=self._isjax)
-        self._grad_func, self._params   = self._net.get_gradient(use_jax=self._isjax)
+        #! set the batch size
+        self._batch_size = batch_size if batch_size is not None else self._batch_size
+        
+        #! set the evaluation function, look for the ansatz function and it's modifier
+        if not self.modified:
+            self._ansatz_func, self._params = self._net.get_apply(use_jax=self._isjax)
+        else:
+            self._ansatz_func, self._params = self._net.get_apply_modified(use_jax=self._isjax)
+        #! gradient is unchanged with modifier
+        self._grad_func, self._params = self._net.get_gradient(use_jax=self._isjax)
         
         if self._isjax:
             # ansatz evaluation function already JITted
-            self._eval_func             = net_utils.jaxpy.eval_batched_jax
-            self._apply_func            = net_utils.jaxpy.apply_callable_batched_jax if self._batch_size > 1 else net_utils.jaxpy.apply_callable_jax
+            self._eval_func             = jax.jit(net_utils.jaxpy.eval_batched_jax, static_argnums=(0, 1))
+            if self._batch_size > 1:
+                self._apply_func        = jax.jit(net_utils.jaxpy.apply_callable_batched_jax, static_argnums=(0, 4, 6))
+            else:
+                self._apply_func        = jax.jit(net_utils.jaxpy.apply_callable_jax, static_argnums=(0, 4))
         else:
             # ansatz evaluation function already compiled
             self._eval_func             = net_utils.numpy.eval_batched_np
@@ -1023,12 +1035,12 @@ class NQS(MonteCarloSolver):
         
         if self._isjax:
             if not self._analytic:
-                return self.grad_jax(self._ansatz_func, params, states, self._flat_grad_fun, batch_size)
-            return self.grad_jax(self._grad_func, params, states, self._flat_grad_fun, batch_size)
+                return self.grad_jax(self._ansatz_func, params, states, self._flat_grad_func, batch_size)
+            return self.grad_jax(self._grad_func, params, states, self._flat_grad_func, batch_size)
         
         if not self._analytic:
-            return self.grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_fun)
-        return self.grad_np(self._grad_func, params, batch_size, states, self._flat_grad_fun)
+            return self.grad_np(self._ansatz_func, params, batch_size, states, self._flat_grad_func)
+        return self.grad_np(self._grad_func, params, batch_size, states, self._flat_grad_func)
     
     #####################################
     #! UPDATE PARAMETERS
@@ -1121,7 +1133,7 @@ class NQS(MonteCarloSolver):
                                                                     # num_chains=1, num_samples=1)
         
         #! Get the shapes of the parameters
-        _, _, (shapes, sizes, iscpx) = NQS.single_step_jax(
+        _, _, (shapes, sizes, iscpx) = NQS._single_step_jax(
                 params,
                 configs,
                 configs_ansatze,
@@ -1132,50 +1144,9 @@ class NQS(MonteCarloSolver):
         self._sampler.set_numchains(numchains)
         self._sampler.set_numsamples(numsamples)
         return shapes, sizes, iscpx
-    
-    def wrap_single_step_jax(     
-            self,   
-            apply_fn                    : Callable,                     # Network apply function: apply_fn(params, state) -> log_psi
-            local_energy_fun            : Callable,                     # Computes local energy: local_energy_fun(state, params) -> E_loc
-            flat_grad_fun               : Callable,                     # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
-            batch_size                  : int
-        ):
-        
-        #! Sample the configurations
-        shapes, sizes, iscpx = self._sample_for_shapes(apply_fn, 
-                                        local_energy_fun, flat_grad_fun, batch_size=self._batch_size, t=0)
-        batch_size  = batch_size if batch_size is not None else self._batch_size
-        #! Prepare the function for JIT compilation
-        tree_def    = self._params_tree_def
-        flat_size   = self._params_total_size
-        slices      = net_utils.jaxpy.prepare_slice_info(shapes, sizes, iscpx)
-        
-        @partial(jax.jit, static_argnames=('t',))
-        def wrapped(y, t, configs, configs_ansatze, probabilities, int_step = 0):
-            if isinstance(y, jnp.ndarray):
-                params = net_utils.jaxpy.transform_flat_params_jit(y, tree_def, slices, flat_size)
-            else:
-                params = y
-            return NQS.single_step_jax(params,
-                                    configs,
-                                    configs_ansatze,
-                                    probabilities,
-                                    apply_fn,
-                                    local_energy_fun,
-                                    flat_grad_fun,
-                                    batch_size  =   batch_size,
-                                    t           =   t)
-        return wrapped
         
     @staticmethod
-    @partial(jax.jit, static_argnames=(
-                                    "apply_fn",
-                                    "local_energy_fun",
-                                    "flat_grad_fun",
-                                    "batch_size",
-                                    "t"
-                                    ))
-    def single_step_jax(
+    def _single_step_jax(
             # Dynamic Inputs (Data & State)
             params                      : Any,                              # Current PyTree parameters
             configs                     : jnp.ndarray,                      # Batch of sampled configurations (N_samples, ...shape)
@@ -1185,9 +1156,11 @@ class NQS(MonteCarloSolver):
             apply_fn                    : Callable,                         # Network apply function: apply_fn(params, state) -> log_psi
             local_energy_fun            : Callable,                         # Computes local energy: local_energy_fun(state, params) -> E_loc
             flat_grad_fun               : Callable,                         # Computes grad O_k: fun(apply_fn, params, state) -> flat_grad
+            apply_fun                   : Callable,                         # Function to evaluate the local energy
             # Static for evaluation
             batch_size                  : Optional[int]             = None, # Batch size for evaluation
             t                           : Optional[float]           = None, # Time for the jax,
+            int_step                    : Optional[int]             = 0,    # Step for the
         ) -> Tuple[Array, Array]:
         """
         Performs a single training step for Neural Quantum States (NQS) using JAX.
@@ -1223,26 +1196,89 @@ class NQS(MonteCarloSolver):
         batch_size = batch_size if batch_size is not None else 1
         
         #! 1. Compute Local Energy
-        (v, means, stds) = NQS.evaluate_fun_jax(
-                func            = local_energy_fun,
-                states          = configs,
-                probabilities   = probabilities,
-                logproba_in     = configs_ansatze,
-                logproba_fun    = apply_fn,
-                parameters      = params,
-                batch_size      = batch_size
-            )
+        (v, means, stds) = apply_fun(func            = local_energy_fun,
+                                    states          = configs,
+                                    sample_probas   = probabilities,
+                                    logprobas_in    = configs_ansatze,
+                                    logproba_fun    = apply_fn,
+                                    parameters      = params,
+                                    batch_size      = batch_size)
+        
         #! 2. Compute Gradients (O_k = ∇ log ψ)
         # The output `flat_grads` will have the dtype determined by single_sample_flat_grad_fun
         # For complex NQS, this is typically complex. Shape: (batch_size, n_params_flat)
-        flat_grads, shapes, sizes, iscpx = NQS.grad_jax(
+        flat_grads, shapes, sizes, iscpx = net_utils.jaxpy.compute_gradients_batched(
                             net_apply                   = apply_fn,
                             params                      = params,
                             states                      = configs,
                             single_sample_flat_grad_fun = flat_grad_fun,
                             batch_size                  = batch_size)
-
+        
         return (v, means, stds), flat_grads, (shapes, sizes, iscpx)
+
+    def wrap_single_step_jax(self, batch_size: Optional[int] = None):
+        """
+        Wraps the single-step JAX function for use in optimization or sampling routines.
+        This method prepares and returns a JIT-compiled function that performs a single optimization or sampling step
+        using the neural quantum state (NQS) ansatz and associated functions. It handles parameter transformation,
+        function initialization, and batching.
+        Args:
+            batch_size (Optional[int]): The batch size to use for sampling configurations. If not provided,
+                the default batch size (`self._batch_size`) is used.
+        Returns:
+            Callable: A JIT-compiled function with the signature:
+                wrapped(y, t, configs, configs_ansatze, probabilities, int_step=0)
+            where:
+                - y: Flat parameter vector.
+                - t: Current step or time (used as a static argument for JIT).
+                - configs: Sampled configurations.
+                - configs_ansatze: Ansatz-specific configurations.
+                - probabilities: Probability weights for the configurations.
+                - int_step: (Optional) Integer step counter (default: 0).
+        Notes:
+            - The returned function automatically transforms flat parameters into the required tree structure.
+            - All necessary NQS functions are (re)initialized to ensure correct compilation.
+            - This wrapper is intended for use in iterative algorithms such as VMC or optimization loops.
+        """
+        
+        batch_size                  = batch_size if batch_size is not None else self._batch_size
+        
+        #! reinitialize the functions - it may happen that they recompile but that doesn't matter
+        self._init_functions(batch_size=batch_size)
+        apply_fn                    = self._ansatz_func
+        local_energy_fun            = self._local_en_func
+        flat_grad_fun               = self._flat_grad_func
+        apply_fun                   = self._apply_func
+        
+        #! Sample the configurations
+        # self._init_param_metadata()
+        shapes, sizes, iscpx        = self._sample_for_shapes(apply_fn, local_energy_fun, flat_grad_fun, apply_fun, batch_size=self._batch_size, t=0)
+        # shapes, sizes, iscpx = self._params_shapes, self._params_sizes, self._params_iscpx
+        tree_def, flat_size, slices = self._params_tree_def, self._params_total_size, net_utils.jaxpy.prepare_slice_info(shapes, sizes, iscpx)
+
+        #! Create the function to be used
+        single_step_jax = partial(
+                    NQS._single_step_jax,
+                    apply_fn            =   apply_fn,
+                    local_energy_fun    =   local_energy_fun,
+                    flat_grad_fun       =   flat_grad_fun,
+                    apply_fun           =   apply_fun,
+                    batch_size          =   batch_size
+                )
+        
+        @partial(jax.jit, static_argnames=('t',))
+        def wrapped(y, t, configs, configs_ansatze, probabilities, int_step = 0):
+            # if isinstance(y, jnp.ndarray):
+            params = net_utils.jaxpy.transform_flat_params_jit(y, tree_def, slices, flat_size)
+            # else:
+            #     params = y
+            return single_step_jax(params,
+                                    configs,
+                                    configs_ansatze,
+                                    probabilities,
+                                    t               = t,
+                                    int_step        = int_step)
+        return wrapped
 
     #####################################
     
@@ -1350,18 +1386,22 @@ class NQS(MonteCarloSolver):
         # it modifies this ansatz function, one needs to recompile and take it
         def _ansatz_func(params, x):
             # log_psi = model_callable(params, x)
-            mod_app     = self._modifier_func(x)
+            # If x is a batch of states, apply modifier to each state using jax.lax.map
+            def apply_mod(s):
+                return self._modifier_func(s)
+            # Returns (st, val) for each s in x
+            st, val = jax.lax.map(apply_mod, x)
+
             # st        : (M, *shape)
             # weights   : (M,)
             # compute log ψ for each
-            st, val     = mod_app
-            log_psi_mod = jax.vmap(lambda s: model_callable(params, s))(st)
+            log_psi_mod = jax.vmap(lambda s: model_callable(params, s))(st)[:, 0]
             # multiply by the value
-            log_psi_mod = log_psi_mod + jnp.log(val)
+            log_psi_mod = log_psi_mod + jnp.log(val.astype(log_psi_mod.dtype))
             # now return the sum simply - this shall be sum of ansatzes but they are logarithmic
             # so we need to multiply them log(x_1) + log(x_2) = log(x_1 * x_2)
-            return jnp.prod(log_psi_mod, axis=0)
-        
+            return jnp.array([jnp.prod(log_psi_mod, axis=0)])
+
         if self._isjax:
             self._ansatz_func = jax.jit(_ansatz_func)
         else:
@@ -1528,6 +1568,34 @@ class NQS(MonteCarloSolver):
         '''
         return self._params_total_size
     
+    @property
+    def nvisible(self):
+        '''
+        Return the number of visible units in the neural network.
+        '''
+        return self._nvisible
+    
+    @property
+    def size(self):
+        '''
+        Return the size of the neural network.
+        '''
+        return self._size
+    
+    @property
+    def batch_size(self):
+        '''
+        Return the batch size.
+        '''
+        return self._batch_size
+    
+    @property
+    def backend(self):
+        '''
+        Return the backend used for the neural network.
+        '''
+        return self._backend
+    
     #! Callers
     
     @property
@@ -1542,7 +1610,7 @@ class NQS(MonteCarloSolver):
         '''
         Return the flat gradient function.
         '''
-        return self._flat_grad_fun
+        return self._flat_grad_func
     
     @property
     def local_energy(self):
@@ -1561,6 +1629,161 @@ class NQS(MonteCarloSolver):
     
     def swap(self, other):
         return super().swap(other)
+    
+    #####################################
+    
+    def __repr__(self):
+        return f"NQS(ansatz={self._net},sampler={self._sampler},backend={self._backend_str})"
+    
+    def __str__(self):
+        return f"NQS(ansatz={self._net},sampler={self._sampler},backend={self._backend_str})"    
+
+    #####################################
+    
+    def eval_observables(
+        self,
+        operators      : Sequence,                          # list of AttrAccess wrappers (sig_z, sig_x, …)
+        true_values    : Optional[Sequence[float]] = None,  # same length or None
+        *,
+        n_chains       : int,
+        n_samples      : int,
+        batch_size     : int,
+        logger,
+        get_energy     : bool = False,
+        plot           : bool = False,
+        **plot_kwargs):
+        """
+        Sample once from `nqs` and evaluate a set of observables.
+
+        Returns
+        -------
+        results : dict
+            keys: operator objects (as given); values: dict(mean, std, raw)
+        energy  : dict | None
+            mean/std/raw for local energy if `energy_fun` is provided
+        timings : dict
+            elapsed times for 'sample', 'observables', and 'energy' phases
+        """
+        from general_python.common.plot import Plotter
+        
+        timings = {}
+        params  = self.get_params()
+        true_en = plot_kwargs.get('true_en', None)
+
+        #! 1) sampling
+        ((_,_), (configs, configs_ans), probs), timings['sample'] = timeit(self.sample, num_chains=n_chains, num_samples=n_samples)
+
+
+        #! 2) observables
+        results = {}
+        for i, op in enumerate(operators):
+            (vals, mu, sig), timings_op = timeit(
+                self.evaluate_fun_jax,
+                func           = op.jax,
+                states         = configs,
+                probabilities  = probs,
+                logproba_in    = configs_ans,
+                logproba_fun   = self.ansatz,
+                parameters     = params,
+                batch_size     = batch_size,
+            )
+            timings[f"obs_{i}"]     = timings_op
+            results[op]             = dict(raw=vals, mean=mu, std=sig)
+            color                   = ["red","blue","green","orange","purple","brown"][i%6]
+            logger.info(f"{op}: ⟨O⟩ = ({mu:.4f}) ± ({sig:.4f})  (N={len(vals)})", color=color)
+
+            #! compare to true value
+            if true_values is not None and true_values[i] is not None:
+                ref = true_values[i]
+                rel = abs(mu-ref)/abs(ref)*100
+                logger.info(f"ref = {ref:.4f} - rel.err = {rel:.2f} %", lvl=2)
+
+        #! 3) energy (optional)
+        energy = None
+        if get_energy:
+            (e_vals, e_mu, e_sig), timings['energy'] = timeit(
+                self.evaluate_fun_jax,
+                func           = self.local_energy,
+                states         = configs,
+                probabilities  = probs,
+                logproba_in    = configs_ans,
+                logproba_fun   = self.ansatz,
+                parameters     = params,
+                batch_size     = batch_size,
+            )
+            energy = dict(raw=e_vals, mean=e_mu, std=e_sig)
+            logger.info(f"Energy: E = ({e_mu:.4e}) ± ({e_sig:.4f}) (N={len(e_vals)})", color='cyan')
+            if true_en is not None:
+                rel = abs(e_mu-true_en)/abs(true_en)*100
+                logger.info(f"ref = {true_en:.4e} - rel.err = {rel:.2f} %", lvl=2)
+
+        #! 4) optional quick-look plot
+        if plot:
+            bins    = plot_kwargs.get('bins', 50)
+            n_ops   = len(operators)
+            fig, ax = Plotter.get_subplots(
+                nrows       = n_ops + (energy is not None),
+                ncols       = 1,
+                figsize     = (4, 1.5*(n_ops+1)),
+                dpi         = 120,
+            )
+
+            for i, op in enumerate(operators):
+                vals            = np.real(np.asarray(results[op]['raw']))
+                mean            = np.nanmean(vals)
+                std             = np.nanstd(vals)
+                binsin          = 30
+                hist, binsin    = np.histogram(vals, bins=binsin, density=True)
+                ax[i].hist(vals, bins=binsin, density=True, color='gray', alpha=0.7)
+                ax[i].stairs(hist, binsin, color='gray', alpha=0.7)
+                Plotter.vline(ax[i], mean, color='k', lw=1, label=f'$\\bar O ={mean:.3f}$')
+                if true_values is not None and true_values[i] is not None:
+                    Plotter.vline(ax[i], true_values[i], color='r', lw=1, alpha=0.5, label=f'$O_{{\\rm true}}={true_values[i]:.3f}$')
+                # minmaxop    = (mean - std, mean + std)
+                minmaxop    = None
+                Plotter.set_ax_params(ax[i], ylabel=r'$P(\langle O \rangle)$', xlim=minmaxop, yscale='log')
+                Plotter.set_legend(ax[i], fontsize=8)
+
+            if energy is not None:
+                idx             = -1
+                vals            = np.real(np.asarray(energy['raw']))
+                mean            = np.mean(vals)
+                std             = np.std(vals)
+                minimum         = np.min(vals)
+                maximum         = np.max(vals)
+                binsin          = min(len(vals)//10, bins)
+                hist, binsin    = np.histogram(vals, bins=binsin, density=True)
+                ax[idx].stairs(hist, binsin, color='gray', alpha=0.7)
+                Plotter.vline(ax[idx], mean, color='k', lw=1, label=f'$\\bar E ={mean:.3e}$')
+                if true_en is not None:
+                    Plotter.vline(ax[idx], true_en, color='r', lw=1, alpha=0.5, label=f'$E_{{\\rm true}}={true_en:.3e}$')
+                Plotter.set_ax_params(ax[idx], xlabel=r'$\langle O \rangle$', ylabel=r'$P(\langle E_{\rm loc} \rangle)$', xlim=None, yscale='log')
+                if mean > (minimum + maximum) / 2:
+                    axin = ax[idx].inset_axes([0.2, 0.2, 0.3, 0.4])
+                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper left')
+                else:
+                    axin = ax[idx].inset_axes([0.6, 0.2, 0.3, 0.4])
+                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper right')
+                axin.scatter(np.arange(len(vals)), vals, s=0.5, color='gray', alpha=0.7)
+                if true_en is not None:
+                    Plotter.hline(axin, true_en, color='r', lw=1, alpha=0.5, label=f'$ref={true_en:.3e}$')
+                Plotter.set_ax_params(axin, xlim=(0, len(vals)), yscale='linear', ylabel=r'$\langle E_{\rm loc} \rangle$')
+                Plotter.set_label_cords(axin, which='x', inX=0.5, inY=1.2)
+                
+            fig.suptitle(f"Sampled observables (N={len(configs)})", fontsize=10)
+            fig.tight_layout()
+            directory = os.path.join(os.curdir, 'data', 'nqs_train', 'figs')
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            fig.savefig(os.curdir + '/data/nqs_train/figs/obs.png', dpi=300)
+        for k, v in timings.items():
+            if isinstance(v, float):
+                logger.info(f"{k}: {v:.2e} s", color='green')
+            else:
+                logger.info(f"{k}: {v:.2e} s", color='blue')
+        return results, energy, timings
+
+    #####################################
     
 #########################################
 #! NQS Lower States
@@ -1657,13 +1880,26 @@ class NQSLower:
     def lower_betas(self) -> jnp.ndarray:
         return self._lower_betas
 
+    ######################################
+    #! Getters
+    ######################################
+
     def get_lower_state_ansatz_val(self, lower_idx: int, states: jnp.ndarray) -> jnp.ndarray:
-        """Computes log(psi_lower_j(s)) for a given lower state j and batch of states s."""
+        """
+        Computes log(psi_lower_j(s)) for a given lower state j and batch of states s.
+        
+        lower_idx:
+            index of the lower state.
+        states: 
+            batch of sampled configurations.
+        Returns:
+            log(psi_lower_j(s)) for all samples s.
+        """
         if not self._is_set or lower_idx >= self._num_lower_states:
             raise IndexError("Lower state index out of bounds.")
-        apply_fn = self._lower_apply_fns[lower_idx]
-        params = self._lower_params[lower_idx]
-        return apply_fn(params, states) # Assumes apply_fn returns log_psi
+        apply_fn    = self._lower_apply_fns[lower_idx]
+        params      = self._lower_params[lower_idx]
+        return apply_fn(params, states)
 
     # --- Methods to compute quantities needed for excited state ---
 

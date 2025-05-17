@@ -114,7 +114,7 @@ class SolverInitState(Enum):
 
 if JAX_AVAILABLE:
     
-    @jax.jit
+    # @jax.jit
     def _propose_random_flip_jax(state: jnp.ndarray, rng_k):
         r'''Propose `num` random flips of a state using JAX.
 
@@ -130,7 +130,7 @@ if JAX_AVAILABLE:
         idx = randint_jax(key=rng_k, shape = (), low=0, high=state.size)
         return Binary.jaxpy.flip_array_jax_spin(state, idx)
 
-    @partial(jax.jit, static_argnames=("num",))
+    # @partial(jax.jit, static_argnames=("num",))
     def _propose_random_flips_jax(state: jnp.ndarray, rng_k, num: int = 1):
         """
         Propose `num` random flips on a state or batch of states using JAX.
@@ -525,6 +525,7 @@ class Sampler(ABC):
                 initstate   : Union[np.ndarray, jnp.ndarray]    = None,
                 backend     : str                               = 'default',
                 statetype   : Union[np.dtype, jnp.dtype]        = None,
+                makediffer  : bool                              = False,
                 **kwargs
             ):
         """
@@ -612,6 +613,7 @@ class Sampler(ABC):
         # set the backend
         self._backendstr    = 'np' if not self._isjax else 'jax'
         self._statetype     = distinguish_type(statetype, 'numpy' if not self._isjax else 'jax')
+        self._makediffer    = makediffer
         
         # handle the Hilbert space - may control state initialization
         self._hilbert       = hilbert
@@ -628,7 +630,8 @@ class Sampler(ABC):
         self._mode_repr     = kwargs.get('mode_repr', Binary.BACKEND_REPR)
         state_kwargs        = {
             'modes'     : self._modes,
-            'mode_repr' : self._mode_repr
+            'mode_repr' : self._mode_repr,
+            'different' : self._makediffer,
         }
         self._initstate_t   = initstate
         self._isint         = isinstance(initstate, (int, np.integer, jnp.integer))
@@ -644,7 +647,7 @@ class Sampler(ABC):
         if self._upd_fun is None:
             if self._isjax:
                 # Bind RNG arguments to the JAX updater and then wrap with JIT.
-                self._upd_fun = _propose_random_flip_jax
+                self._upd_fun = jax.jit(_propose_random_flip_jax)
             else:
                 # Use the Numba version (potentially parallelized)
                 # Note:
@@ -944,6 +947,7 @@ class MCSampler(Sampler):
                 backend     : str                           = 'default',
                 logprob_fact: float                         = 0.5,
                 statetype   : Union[np.dtype, jnp.dtype]    = None,
+                makediffer  : bool                          = False,
                 **kwargs):
         r"""
         Initialize the MCSampler.
@@ -993,7 +997,7 @@ class MCSampler(Sampler):
         """
         
         super().__init__(shape, upd_fun, rng, rng_k, seed, hilbert,
-                numsamples, numchains, initstate, backend, statetype, **kwargs)
+                numsamples, numchains, initstate, backend, statetype, makediffer, **kwargs)
         
         if net is None:
             raise ValueError("A network (or callable) must be provided for evaluation.")

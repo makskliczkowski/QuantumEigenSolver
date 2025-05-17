@@ -412,7 +412,7 @@ if JAX_AVAILABLE:
         Returns:
             tuple: (state, coeff) where state is unchanged and coeff is the accumulated coefficient.
         """
-        return sigma_z_jnp(state, sites, spin, -spin_value)        
+        return sigma_z_jnp(state, sites, spin, spin_value)        
 
 # -----------------------------------------------------------------------------
 #! Sigma-Plus (σ⁺) operator
@@ -788,6 +788,37 @@ if JAX_AVAILABLE:
             operand=None
         )
         return ensure_operator_output_shape_jax(state, total / norm)
+
+    def sigma_k_inv_jnp(state,
+                        sites       : Union[List[int], None],
+                        k           : float,
+                        spin        : bool = BACKEND_DEF_SPIN,
+                        spin_value  : float = _SPIN):
+        """
+        Apply the inverse
+        of the Fourier-transformed spin operator (σₖ) on a JAX array state.
+        Corresponds to the adjoint operation.
+        <s|O|s'> = <s'|O†|s>
+        
+        meaning that we want to find all the states s' that lead to the state s.
+        Parameters:
+            state (np.ndarray) :
+                The state to apply the operator to.
+            ns (int) :
+                The number of spins in the system.
+            sites (list of int or None) :
+                The sites to apply the operator to. If None, apply to all sites.
+            k (float) :
+                The wave vector for the Fourier transform.
+            spin (bool) :
+                If True, use the spin convention for flipping the bits.
+            spin_value (float) :
+                The value to multiply the state by when flipping the bits.
+        Returns:
+            tuple: (state, coeff) where state is unchanged and coeff is the accumulated coefficient.
+        """
+        # with different sign
+        return sigma_k_jnp(state, sites, k, spin, spin_value)
 
 # -----------------------------------------------------------------------------
 #! Sigma-Total (σₜ) operator

@@ -45,11 +45,11 @@ if JAX_AVAILABLE:
     import Algebra.Operator.operators_spin_jax as jaxpy
     import jax.numpy as jnp
     # sigma x
-    from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp, sigma_x_inv_jnp
     # sigma y
-    from Algebra.Operator.operators_spin_jax import sigma_y_int_jnp, sigma_y_jnp, sigma_y_real_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_y_int_jnp, sigma_y_jnp, sigma_y_real_jnp, sigma_y_inv_jnp
     # sigma z
-    from Algebra.Operator.operators_spin_jax import sigma_z_int_jnp, sigma_z_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_z_int_jnp, sigma_z_jnp, sigma_z_inv_jnp
     # sigma plus
     from Algebra.Operator.operators_spin_jax import sigma_plus_int_jnp, sigma_plus_jnp
     # sigma minus
@@ -59,7 +59,7 @@ if JAX_AVAILABLE:
     # sigma mp
     from Algebra.Operator.operators_spin_jax import sigma_mp_int_jnp, sigma_mp_jnp
     # sigma k
-    from Algebra.Operator.operators_spin_jax import sigma_k_int_jnp, sigma_k_jnp
+    from Algebra.Operator.operators_spin_jax import sigma_k_int_jnp, sigma_k_jnp, sigma_k_inv_jnp
     # sigma z total
     from Algebra.Operator.operators_spin_jax import sigma_z_total_int_jnp, sigma_z_total_jnp
 else:
