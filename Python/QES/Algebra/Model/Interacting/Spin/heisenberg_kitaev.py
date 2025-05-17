@@ -152,7 +152,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         HeiKit(Ns=16, J=1.000, Kx=0.200, Ky=0.200, Kz=0.000, dlt=1.000,
                 hz[min=-0.500, max=0.300], hx=0.000, sym=U1 CBC)
         """
-        prec   = 3          # decimal places
+        prec   = 1          # decimal places
         tol    = 1e-10      # equality tolerance for “uniform” check
         sep    = ", "       # parameter separator
 
@@ -179,13 +179,16 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
             fmt("Kx",  self._kx),
             fmt("Ky",  self._ky),
             fmt("Kz",  self._kz),
+            "\n",
             fmt("dlt", self._dlt),
             fmt("hz",  self._hz),
             fmt("hx",  self._hx),
         ]
 
         # symmetry / boundary info from HilbertSpace object
-        parts.append(self.hilbert_space.get_sym_info().strip())
+        hilbert_info = self.hilbert_space.get_sym_info().strip()
+        if len(hilbert_info) > 0:
+            parts.append(hilbert_info)
         parts.append(str(self.lattice.bc))
 
         return sep.join(parts) + ")"
