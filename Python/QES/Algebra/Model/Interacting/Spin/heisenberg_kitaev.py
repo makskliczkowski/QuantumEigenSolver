@@ -98,7 +98,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         if hilbert_space is None:
             if self.ns is None:
                 raise ValueError(self._ERR_EITHER_HIL_OR_NS)
-            hilbert_space = hilbert_module.HilbertSpace(ns=self.ns, backend=backend, dtype=dtype, nhl=2) 
+            self._hilbert_space = hilbert_module.HilbertSpace(ns=self.ns, backend=backend, dtype=dtype, nhl=2) 
         
         # setup the fields
         self._hx                        = hx
@@ -154,7 +154,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         """
         prec   = 1          # decimal places
         tol    = 1e-10      # equality tolerance for “uniform” check
-        sep    = ", "       # parameter separator
+        sep    = ","        # parameter separator
 
         def _fmt_scalar(name, val):
             return f"{name}={val:.{prec}f}"
@@ -179,8 +179,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
             fmt("Kx",  self._kx),
             fmt("Ky",  self._ky),
             fmt("Kz",  self._kz),
-            "\n",
-            fmt("dlt", self._dlt),
+            fmt("\ndlt", self._dlt),
             fmt("hz",  self._hz),
             fmt("hx",  self._hx),
         ]
