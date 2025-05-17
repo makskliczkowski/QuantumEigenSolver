@@ -268,7 +268,7 @@ class NQSTrainer:
         solve           = self.timings["solve"].sum()
         gradient        = self.timings["gradient"].sum()
         tot             = samp + step + upd
-        self.logger.info(f"Time breakdown (s):", color="blue", lvl=0)
+        self.logger.info("Time breakdown (s):", color="blue", lvl=0)
         self.logger.info(f"- sampling: {samp:.2e} ({samp / tot * 100:.1f}%)", lvl=1)
         self.logger.info(f"- compute : {step:.2e} ({step / tot * 100:.1f}%)", lvl=1)
         self.logger.info(f"- update  : {upd:.2e} ({upd / tot * 100:.1f}%)", lvl=1)
@@ -297,7 +297,14 @@ class NQSTrainer:
                                         figsize     = (4, 5),
                                         dpi         = 150,
                                         sharex      = True)
-        axin        = ax[0].inset_axes([0.6, 0.35, 0.38, 0.3], zorder=10)
+        max_all     = np.nanmax(np.real(self.history))
+        min_all     = np.nanmin(np.real(self.history))
+        inset_up    = last_mean > (max_all - min_all) / 3
+        
+        if inset_up:
+            axin    = ax[0].inset_axes([0.6, 0.3, 0.38, 0.3], zorder=10)
+        else:
+            axin    = ax[0].inset_axes([0.6, 0.02, 0.38, 0.3], zorder=10)
         ax          = [ax[0], axin, ax[1]]
         
         #! energies
@@ -321,20 +328,25 @@ class NQSTrainer:
         ymin        = np.min(energies - energies_std)
         ymax        = np.max(energies + energies_std)
         ymargin     = 0.05 * (ymax - ymin)
-        xlim        = (0, x[-1])
+        xlim        = (1, x[-1])
         ylim        = (ymin - ymargin, ymax + ymargin)
         Plotter.set_legend(ax[0], loc="upper right", fontsize=8, frameon=True)
-        Plotter.set_ax_params(ax[0], title=f"GS train {self.nqs._hamiltonian}", ylabel=r"$E/N_s$", yscale='symlog', ylim=ylim, xlim=xlim, fontsize=8)
+        Plotter.set_ax_params(ax[0], ylabel=r"$E/N_s$", yscale='symlog', ylim=ylim, xlim=xlim, fontsize=8, xscale='log')
         Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
-
+        ax[0].set_title(f"GS train {self.nqs._hamiltonian}", fontsize=8)
+        
         #! std
-        xlim        = (0, x[-1])
+        xlim        = (1, x[-1])
         Plotter.plot(ax[1], x=x, y=energies_std, marker="o", markersize=0.5, lw=1)
-        Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$", xlabel="Epoch", yscale='log', xlim=xlim)
+        Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$", xlabel="$i$", yscale='log', xlim=xlim, xscale='log')
         Plotter.set_tickparams(ax[1], maj_tick_l=2, min_tick_l=1)
+        if not inset_up:
+            Plotter.set_label_cords(ax[1], which='x', inX=0.5, inY=1.1)
+            Plotter.set_ax_params(ax[1], which='x', tickPos='top', scale='log')
+            ax[1].set_xticklabels([])
 
         #! epoch times
-        xlim        = (0, x[-1] + 1)
+        xlim        = (1, x[-1] + 1)
         Plotter.plot(ax[2], x=np.arange(len(epoch_times)), y=epoch_times,
                     markersize=0.5, lw=1, color=next(colorsCycle), label="epoch")
         Plotter.plot(ax[2], x=np.arange(len(sample_times)), y=sample_times, ls=next(linestylesCycle),
@@ -349,9 +361,9 @@ class NQSTrainer:
                     markersize=0.5, lw=1, alpha=0.5, label="prepare", color=next(colorsCycle))
         Plotter.plot(ax[2], x=np.arange(len(solve_times)), y=solve_times, ls=next(linestylesCycle),
                     markersize=0.5, lw=1, alpha=0.5, label="solve", color=next(colorsCycle))
-        Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$", yscale='log', xlim=xlim)
+        Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$", yscale='log', xlim=xlim, xscale='log')
         Plotter.set_tickparams(ax[2], maj_tick_l=2, min_tick_l=1)
-        Plotter.set_legend(ax[2], loc="lower right", fontsize=8, frameon=True)
+        Plotter.set_legend(ax[2], loc="upper right", fontsize=8, frameon=True)
         fig.tight_layout()
 
         if savedir is not None:

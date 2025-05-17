@@ -1731,12 +1731,12 @@ class NQS(MonteCarloSolver):
             for i, op in enumerate(operators):
                 vals            = np.real(np.asarray(results[op]['raw']))
                 mean            = np.nanmean(vals)
-                std             = np.nanstd(vals)
+                # std             = np.nanstd(vals)
                 binsin          = 30
                 hist, binsin    = np.histogram(vals, bins=binsin, density=True)
                 ax[i].hist(vals, bins=binsin, density=True, color='gray', alpha=0.7)
                 ax[i].stairs(hist, binsin, color='gray', alpha=0.7)
-                Plotter.vline(ax[i], mean, color='k', lw=1, label=f'$\\bar O ={mean:.3f}$')
+                Plotter.vline(ax[i], mean, color='k', lw=1, label=f'{op}$ = {mean:.3f}$')
                 if true_values is not None and true_values[i] is not None:
                     Plotter.vline(ax[i], true_values[i], color='r', lw=1, alpha=0.5, label=f'$O_{{\\rm true}}={true_values[i]:.3f}$')
                 # minmaxop    = (mean - std, mean + std)
