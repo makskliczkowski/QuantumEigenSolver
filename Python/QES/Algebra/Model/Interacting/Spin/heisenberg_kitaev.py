@@ -138,38 +138,57 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
     
     # ----------------------------------------------------------------------------------------------
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
-        Returns a string representation of the model.
+        Human-readable, single-line description of the HeiKit Hamiltonian.
+
+        Examples
+        --------
+        - uniform couplings
+        HeiKit(Ns=16, J=1.000, Kx=0.200, Ky=0.200, Kz=0.000, dlt=1.000,
+                hz=0.300, hx=0.000, sym=U1 PBC)
+
+        - site-dependent fields
+        HeiKit(Ns=16, J=1.000, Kx=0.200, Ky=0.200, Kz=0.000, dlt=1.000,
+                hz[min=-0.500, max=0.300], hx=0.000, sym=U1 CBC)
         """
-        sep     = ","
-        prec    = 3
+        prec   = 3          # decimal places
+        tol    = 1e-10      # equality tolerance for “uniform” check
+        sep    = ", "       # parameter separator
 
-        def param_str(param_name, values):
-            # Check that the list is non-empty and uniform.
-            if values and all(x == values[0] for x in values):
-                # Format the common value using the desired precision.
-                return f"{param_name}={values[0]:.{prec}f}"
-            else:
-                return f"{param_name}=r"
+        def _fmt_scalar(name, val):
+            return f"{name}={val:.{prec}f}"
 
-        # Build the representation string.
-        info_str = f"{sep}heikit,Ns={self.Ns}"
-        info_str += sep + param_str("J", self.J)
-        info_str += sep + param_str("Kx", self.Kx)
-        info_str += sep + param_str("Ky", self.Ky)
-        info_str += sep + param_str("Kz", self.Kz)
-        info_str += sep + param_str("dlt", self.delta)
-        info_str += sep + param_str("hz", self.hz)
-        info_str += sep + param_str("hx", self.hx)
+        def _fmt_array(name, arr):
+            arr = np.asarray(arr, dtype=float)
+            if arr.size == 0:
+                return f"{name}=[]"
+            if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
+                return _fmt_scalar(name, float(arr.flat[0]))
+            return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
 
-        # Append symmetry information from the hilbertSpace.
-        info_str += self.hilbertSpace.getSymInfo()
-        info_str += sep + str(self.hilbertSpace.getBC())
+        def fmt(name, value):
+            """Choose scalar vs array formatter."""
+            return _fmt_scalar(name, value) if np.isscalar(value) else _fmt_array(name, value)
 
-        # If this class inherits from a Hamiltonian base class that further augments info,
-        # you might call that method here. For now, we simply return the constructed string.
-        return info_str
+        # string
+        parts = [f"HeiKit(Ns={self.ns}"]
+
+        parts += [
+            fmt("J",   self._j),
+            fmt("Kx",  self._kx),
+            fmt("Ky",  self._ky),
+            fmt("Kz",  self._kz),
+            fmt("dlt", self._dlt),
+            fmt("hz",  self._hz),
+            fmt("hx",  self._hx),
+        ]
+
+        # symmetry / boundary info from HilbertSpace object
+        parts.append(self.hilbert_space.get_sym_info().strip())
+        parts.append(str(self.lattice.bc))
+
+        return sep.join(parts) + ")"
 
     # ----------------------------------------------------------------------------------------------
     
