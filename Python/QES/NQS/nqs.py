@@ -239,6 +239,7 @@ class NQS(MonteCarloSolver):
         self._params                    = None  # parameters of the network 
         self._local_en_func             = None  # function to calculate the local energy (Callable[state])
         self._ansatz_func               = None  # function to calculate the ansatz for a given state (using net, Callable[state, params])
+        self._ansatz_mod_func           = None  # function to calculate the ansatz for a given state (using net, Callable[state, params])
         self._eval_func                 = None  # function to batch evaluate the ansatz (Callable[states, ansatz, params])
         self._apply_func                = None  # function to apply callable with the ansatz (Callable[states, ansatz, params])
         # set the gradient function if needed
@@ -422,7 +423,7 @@ class NQS(MonteCarloSolver):
         if not self.modified:
             self._ansatz_func, self._params = self._net.get_apply(use_jax=self._isjax)
         else:
-            self._ansatz_func, self._params = self._net.get_apply_modified(use_jax=self._isjax)
+            self._ansatz_func, self._params = self.ansatz_modified, self._net.get_params()
         #! gradient is unchanged with modifier
         self._grad_func, self._params = self._net.get_gradient(use_jax=self._isjax)
         
@@ -1117,7 +1118,7 @@ class NQS(MonteCarloSolver):
             self._net.set_params(new_params)
     
     #####################################
-    #! TRAINING OVERRIDES
+    #! TRAINING/EVO OVERRIDES - SINGLE STEP
     #####################################
     
     def _sample_for_shapes(self, *args, **kwargs):
@@ -1353,6 +1354,13 @@ class NQS(MonteCarloSolver):
         '''
         return self._modifier is not None
     
+    @property
+    def ansatz_modified(self):
+        '''
+        Return the ansatz function with the modifier applied.
+        '''
+        return self._ansatz_mod_func
+    
     def unset_modifier(self):
         '''
         Unset the state modifier.
@@ -1363,6 +1371,25 @@ class NQS(MonteCarloSolver):
         # reset the ansatz function
         self._ansatz_func, self._params = self._net.get_apply(self._isjax)
     
+    def _set_modifier_func(self):
+        '''
+        Set the state modifier function.
+        '''
+        if self._modifier is None:
+            self.log("State modifier is None. Cannot set the function.", log='error', lvl = 2, color = 'red')
+            return
+
+        if isinstance(self._modifier, Operator):
+            if self._isjax and hasattr(self._modifier, 'jax'):
+                self._modifier_func = self._modifier.jax
+            elif hasattr(self._modifier, 'npy'):
+                self._modifier_func = self._modifier.npy
+            else:
+                raise ValueError("The operator does not have a JAX or NumPy implementation.")
+        else:
+            self._modifier_func = self._modifier
+        self.log(f"State modifier function set to {self._modifier}.", log='info', lvl = 2, color = 'blue')
+
     def set_modifier(self, modifier: Union[Operator, OperatorFunction], **kwargs):
         '''
         Set the state modifier.
@@ -1371,41 +1398,61 @@ class NQS(MonteCarloSolver):
         #! The modifier should be an inverse mapping - for a given state, it shall return all the states that lead to it 
         #! through the application of the operator.
         self._modifier = modifier
-        self.log(f"State modifier set to {modifier}.", log='info', lvl = 2, color = 'blue')
+        self._set_modifier_func()
         
-        if isinstance(modifier, Operator):
-            if self._isjax and hasattr(modifier, 'jax'):
-                self._modifier_func = modifier.jax
-            elif hasattr(modifier, 'npy'):
-                self._modifier_func = modifier.npy
-            else:
-                raise ValueError("The operator does not have a JAX or NumPy implementation.")
-        else:
-            self._modifier_func = modifier
+        #! get the ansatz function without the modifier
         model_callable, self._params = self._net.get_apply(self._isjax)
+        
         # it modifies this ansatz function, one needs to recompile and take it
-        def _ansatz_func(params, x):
-            # log_psi = model_callable(params, x)
-            # If x is a batch of states, apply modifier to each state using jax.lax.map
-            def apply_mod(s):
-                return self._modifier_func(s)
-            # Returns (st, val) for each s in x
-            st, val = jax.lax.map(apply_mod, x)
+        def _ansatz_func_jax(params, x):
+            """
+            Args
+            ----
+            params : pytree - network parameters
+            x      : (..., N_dim) - either a single state (N_dim,) or a batch (N_sample, N_dim)
 
-            # st        : (M, *shape)
-            # weights   : (M,)
-            # compute log ψ for each
-            log_psi_mod = jax.vmap(lambda s: model_callable(params, s))(st)[:, 0]
-            # multiply by the value
-            log_psi_mod = log_psi_mod + jnp.log(val.astype(log_psi_mod.dtype))
-            # now return the sum simply - this shall be sum of ansatzes but they are logarithmic
-            # so we need to multiply them log(x_1) + log(x_2) = log(x_1 * x_2)
-            return jnp.array([jnp.prod(log_psi_mod, axis=0)])
+            Returns
+            -------
+            ansatz : (N_sample,) or () - product of network x modifier for every sample
+            """
+            x           = jnp.atleast_2d(x)     # (B, N_dim);  B = 1 for a single state
+            B           = x.shape[0]            
+            
+            #! obtain all modified states & weights
+            #    st  : (B, M, N_dim)
+            #    w   : (B, M)
+            st, w       = jax.vmap(self._modifier_func)(x)
+            M           = st.shape[1]                                               # number of modified states
+            #! flatten (B * M) so we can call the network once
+            st_flat     = st.reshape(-1, st.shape[-1])                              # (B·M, N_dim)
+            log_psi     = jax.vmap(lambda s: model_callable(params, s))(st_flat)    # (B·M,)
+            #! reshape the log_psi to (B, M)
+            log_psi_r   = log_psi.reshape(B, -1)                                    # (B, M)
+            log_psi_r  += jnp.log(w.astype(log_psi_r.dtype))
 
+            #! exponentiate the log_psi to combine the weights
+            def _many_mods(lpr): # lpr: (B, M)
+                return jnp.log(jnp.sum(jnp.exp(lpr), axis=1))                       # (B,)
+            
+            def _one_mod(lpr):
+                return lpr[:, 0]                                                    # (B,)
+            
+            ansatz = jax.lax.cond(
+                M > 1,
+                _many_mods,
+                _one_mod,
+                log_psi_r
+            )
+            return ansatz
+        
         if self._isjax:
-            self._ansatz_func = jax.jit(_ansatz_func)
+            self._ansatz_mod_func = jax.jit(_ansatz_func_jax)
         else:
-            self._ansatz_func = _ansatz_func
+            self.log("JAX backend is not available. Cannot set the ansatz function.", log='error', lvl = 2, color = 'red')
+            self._ansatz_mod_func = model_callable
+        
+        #! set the ansatz function to the modified one
+        self._ansatz_func = self._ansatz_mod_func
     
     #####################################
     #! UPDATES
@@ -1639,6 +1686,8 @@ class NQS(MonteCarloSolver):
         return f"NQS(ansatz={self._net},sampler={self._sampler},backend={self._backend_str})"    
 
     #####################################
+    #! Some additional functions for evaluation
+    #####################################
     
     def eval_observables(
         self,
@@ -1651,7 +1700,7 @@ class NQS(MonteCarloSolver):
         logger,
         get_energy     : bool = False,
         plot           : bool = False,
-        plot_kwargs,
+        plot_kwargs    : dict = {},
         **kwargs):
         """
         Sample once from `nqs` and evaluate a set of observables.

@@ -256,10 +256,10 @@ class NQSTrainer:
         self.logger.info(f"Saved parameters to {filename}", color="green", lvl=1)
 
     def report_gs(self, 
-                eigv    : float               =   None, 
-                last_n  : Union[float, int]   =   15,
-                savedir : str                 =   None,
-                plot_kw : dict                =   {},
+                eigv        : float               =   None, 
+                last_n      : Union[float, int]   =   15,
+                savedir     : str                 =   None,
+                plot_kwargs : dict                =   {},
                 ):
         """
         Print time breakdown and plot energy, std, epoch times.
@@ -297,7 +297,7 @@ class NQSTrainer:
         last_time       = np.nanmean(epoch_times[-self._last_size(last_n):])
 
         # plotting
-        if plot_kw is not None:
+        if plot_kwargs is not None:
             fig, ax     = Plotter.get_subplots(nrows    = 2,
                                             ncols       = 1,
                                             figsize     = (4, 5),
@@ -308,9 +308,9 @@ class NQSTrainer:
             inset_up    = last_mean > (max_all - min_all) / 3
             
             if inset_up:
-                axin    = ax[0].inset_axes(plot_kw.get("inset_axes", [0.6, 0.3, 0.38, 0.3]), zorder=10)
+                axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.6, 0.3, 0.38, 0.3]), zorder=10)
             else:
-                axin    = ax[0].inset_axes(plot_kw.get("inset_axes", [0.2, 0.02, 0.38, 0.3]), zorder=10)
+                axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.2, 0.02, 0.38, 0.3]), zorder=10)
             ax          = [ax[0], axin, ax[1]]
             
             #! energies
@@ -336,26 +336,26 @@ class NQSTrainer:
             ymargin     = 0.05 * (ymax - ymin)
             xlim        = (1, x[-1])
             ylim        = (ymin - ymargin, ymax + ymargin)
-            ylim        = plot_kw.get("ylim_0", ylim)
-            Plotter.set_legend(ax[0], loc=plot_kw.get("legend_loc_0", "upper right"),
-                            fontsize=plot_kw.get("fontsize", 8), frameon=True, framealpha=0.8)
+            ylim        = plot_kwargs.get("ylim_0", ylim)
+            Plotter.set_legend(ax[0], loc=plot_kwargs.get("legend_loc_0", "upper right"),
+                            fontsize=plot_kwargs.get("fontsize", 8), frameon=True, framealpha=0.8)
             Plotter.set_ax_params(ax[0], 
                             ylabel      =   r"$E/N_s$",
-                            yscale      =   plot_kw.get("yscale_0", 'symlog'),
-                            xscale      =   plot_kw.get("xscale_0", 'log'),
+                            yscale      =   plot_kwargs.get("yscale_0", 'symlog'),
+                            xscale      =   plot_kwargs.get("xscale_0", 'log'),
                             ylim        =   ylim,
                             xlim        =   xlim,
-                            fontsize    =   plot_kw.get("fontsize", 8))
+                            fontsize    =   plot_kwargs.get("fontsize", 8))
             Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
             Plotter.set_annotate_letter(ax[0], iter=0,
-                                        fontsize=plot_kw.get("fontsize", 8),
-                                        x = plot_kw.get("annotate_x", 0.1),
-                                        y = plot_kw.get("annotate_y", 0.1))
+                                        fontsize=plot_kwargs.get("fontsize", 8),
+                                        x = plot_kwargs.get("annotate_x", 0.1),
+                                        y = plot_kwargs.get("annotate_y", 0.1))
             ax[0].set_title(f"GS train {self.nqs._hamiltonian}", fontsize=8)
             
             #! std
             xlim        = (1, x[-1])
-            ylim        = plot_kw.get("ylim_1", None)
+            ylim        = plot_kwargs.get("ylim_1", None)
             Plotter.plot(ax[1], x=x, y=energies_std, marker="o", markersize=0.5, lw=1)
             Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$",
                             xlabel="$i$", yscale='log',
@@ -369,7 +369,7 @@ class NQSTrainer:
 
             #! epoch times
             xlim        = (1, x[-1] + 1)
-            ylim        = plot_kw.get("ylim_2", None)
+            ylim        = plot_kwargs.get("ylim_2", None)
             Plotter.plot(ax[2], x=np.arange(len(epoch_times)), y=epoch_times,
                         markersize=0.5, lw=1, color=next(colorsCycle), label="epoch")
             Plotter.plot(ax[2], x=np.arange(len(sample_times)), y=sample_times, ls=next(linestylesCycle),
@@ -385,16 +385,16 @@ class NQSTrainer:
             Plotter.plot(ax[2], x=np.arange(len(solve_times)), y=solve_times, ls=next(linestylesCycle),
                         markersize=0.5, lw=1, alpha=0.5, label="solve", color=next(colorsCycle))
             Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$",
-                            xscale=plot_kw.get("xscale_2", 'log'),
-                            yscale=plot_kw.get("yscale_2", 'log'),
+                            xscale=plot_kwargs.get("xscale_2", 'log'),
+                            yscale=plot_kwargs.get("yscale_2", 'log'),
                             xlim=xlim, ylim=ylim)
             Plotter.set_tickparams(ax[2], maj_tick_l=2, min_tick_l=1)
-            Plotter.set_legend(ax[2], loc=plot_kw.get("legend_loc_2", "upper right"),
-                            fontsize=plot_kw.get("fontsize", 8), frameon=True, framealpha=0.8)
+            Plotter.set_legend(ax[2], loc=plot_kwargs.get("legend_loc_2", "upper right"),
+                            fontsize=plot_kwargs.get("fontsize", 8), frameon=True, framealpha=0.8)
             Plotter.set_annotate_letter(ax[2], iter=1, 
-                                        fontsize=plot_kw.get("fontsize", 8),
-                                        x = plot_kw.get("annotate_x", 0.1),
-                                        y = plot_kw.get("annotate_y", 0.1))
+                                        fontsize=plot_kwargs.get("fontsize", 8),
+                                        x = plot_kwargs.get("annotate_x", 0.1),
+                                        y = plot_kwargs.get("annotate_y", 0.1))
             fig.tight_layout()
 
             if savedir is not None:
