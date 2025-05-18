@@ -255,7 +255,12 @@ class NQSTrainer:
             json.dump(params, f, indent=4)
         self.logger.info(f"Saved parameters to {filename}", color="green", lvl=1)
 
-    def report_gs(self, eigv=None, last_n: Union[float, int] = 15, savedir = None):
+    def report_gs(self, 
+                eigv    : float               =   None, 
+                last_n  : Union[float, int]   =   15,
+                savedir : str                 =   None,
+                plot_kw : dict                =   {},
+                ):
         """
         Print time breakdown and plot energy, std, epoch times.
         """
@@ -292,111 +297,138 @@ class NQSTrainer:
         last_time       = np.nanmean(epoch_times[-self._last_size(last_n):])
 
         # plotting
-        fig, ax     = Plotter.get_subplots(nrows    = 2,
-                                        ncols       = 1,
-                                        figsize     = (4, 5),
-                                        dpi         = 150,
-                                        sharex      = True)
-        max_all     = np.nanmax(np.real(self.history))
-        min_all     = np.nanmin(np.real(self.history))
-        inset_up    = last_mean > (max_all - min_all) / 3
-        
-        if inset_up:
-            axin    = ax[0].inset_axes([0.6, 0.3, 0.38, 0.3], zorder=10)
-        else:
-            axin    = ax[0].inset_axes([0.6, 0.02, 0.38, 0.3], zorder=10)
-        ax          = [ax[0], axin, ax[1]]
-        
-        #! energies
-        x           = np.arange(len(energies))
-        Plotter.plot(ax[0], x=x, y=energies, marker="o", markersize=0.5, lw=1)
-        Plotter.hline(ax[0], val=last_mean, lw=0.5, ls=':', label=f"Mean {last_mean:.3e}")
-        # Plot upper and lower std limits at each epoch
-        
-        if eigv is not None:
-            Plotter.hline(ax[0], val=eigv / self.nqs.size, color='r', linestyle="--", lw=0.5, label=f"GS {eigv/self.nqs.size:.3e}")
-
-        #! fill between
-        ax[0].fill_between(
-            x,
-            energies - energies_std,
-            energies + energies_std,
-            color   = "gray",
-            alpha   = 0.2,
-            label   = r"$\pm \sigma_E$",
-        )
-        ymin        = np.min(energies - energies_std)
-        ymax        = np.max(energies + energies_std)
-        ymargin     = 0.05 * (ymax - ymin)
-        xlim        = (1, x[-1])
-        ylim        = (ymin - ymargin, ymax + ymargin)
-        Plotter.set_legend(ax[0], loc="upper right", fontsize=8, frameon=True)
-        Plotter.set_ax_params(ax[0], ylabel=r"$E/N_s$", yscale='symlog', ylim=ylim, xlim=xlim, fontsize=8, xscale='log')
-        Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
-        ax[0].set_title(f"GS train {self.nqs._hamiltonian}", fontsize=8)
-        
-        #! std
-        xlim        = (1, x[-1])
-        Plotter.plot(ax[1], x=x, y=energies_std, marker="o", markersize=0.5, lw=1)
-        Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$", xlabel="$i$", yscale='log', xlim=xlim, xscale='log')
-        Plotter.set_tickparams(ax[1], maj_tick_l=2, min_tick_l=1)
-        if not inset_up:
-            Plotter.set_label_cords(ax[1], which='x', inX=0.5, inY=1.1)
-            Plotter.set_ax_params(ax[1], which='x', tickPos='top', scale='log')
-            ax[1].set_xticklabels([])
-
-        #! epoch times
-        xlim        = (1, x[-1] + 1)
-        Plotter.plot(ax[2], x=np.arange(len(epoch_times)), y=epoch_times,
-                    markersize=0.5, lw=1, color=next(colorsCycle), label="epoch")
-        Plotter.plot(ax[2], x=np.arange(len(sample_times)), y=sample_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="sample", color=next(colorsCycle))
-        Plotter.plot(ax[2], x=np.arange(len(step_times)), y=step_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="step", color=next(colorsCycle))
-        Plotter.plot(ax[2], x=np.arange(len(update_times)), y=update_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="update", color=next(colorsCycle))
-        Plotter.plot(ax[2], x=np.arange(len(grad_times)), y=grad_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="gradient", color=next(colorsCycle))
-        Plotter.plot(ax[2], x=np.arange(len(prepare_times)), y=prepare_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="prepare", color=next(colorsCycle))
-        Plotter.plot(ax[2], x=np.arange(len(solve_times)), y=solve_times, ls=next(linestylesCycle),
-                    markersize=0.5, lw=1, alpha=0.5, label="solve", color=next(colorsCycle))
-        Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$", yscale='log', xlim=xlim, xscale='log')
-        Plotter.set_tickparams(ax[2], maj_tick_l=2, min_tick_l=1)
-        Plotter.set_legend(ax[2], loc="upper right", fontsize=8, frameon=True)
-        fig.tight_layout()
-
-        if savedir is not None:
-            #! create the directory
-            os.makedirs(savedir, exist_ok=True)
+        if plot_kw is not None:
+            fig, ax     = Plotter.get_subplots(nrows    = 2,
+                                            ncols       = 1,
+                                            figsize     = (4, 5),
+                                            dpi         = 150,
+                                            sharex      = True)
+            max_all     = np.nanmax(np.real(self.history))
+            min_all     = np.nanmin(np.real(self.history))
+            inset_up    = last_mean > (max_all - min_all) / 3
             
-            # save figure
-            fig_path = os.path.join(savedir, "gs_train.png")
-            fig.savefig(fig_path, dpi=150, bbox_inches='tight')
-            self.logger.info(f"Saved figure to '{fig_path}' and JSON to '{savedir}'.")
+            if inset_up:
+                axin    = ax[0].inset_axes(plot_kw.get("inset_axes", [0.6, 0.3, 0.38, 0.3]), zorder=10)
+            else:
+                axin    = ax[0].inset_axes(plot_kw.get("inset_axes", [0.2, 0.02, 0.38, 0.3]), zorder=10)
+            ax          = [ax[0], axin, ax[1]]
+            
+            #! energies
+            x           = np.arange(len(energies))
+            Plotter.plot(ax[0], x=x, y=energies, marker="o", markersize=0.5, lw=1)
+            Plotter.hline(ax[0], val=last_mean, lw=0.5, ls=':', label=f"Mean {last_mean:.3e}")
+            # Plot upper and lower std limits at each epoch
+            
+            if eigv is not None:
+                Plotter.hline(ax[0], val=eigv / self.nqs.size, color='r', linestyle="--", lw=0.5, label=f"GS {eigv/self.nqs.size:.3e}")
 
-            # prepare JSON data
-            info_path   = os.path.join(savedir, "gs_train_info.json")
-            self._save_json({
-                                "gs_energy":   last_mean,
-                                "gs_std":      last_std,
-                                "epoch_time":  last_time,
-                                "n_points":    len(energies),
-                                "history":     list(self.history),
-                                "lr_history":  list(self.lr_history),
-                                "reg_history": list(self.reg_history),
-                            }, info_path)
-            try:
-                params_path = os.path.join(savedir, "gs_train_params.json")
-                params_nqs  = self.nqs.get_params(unravel=True)
-                # transform jax to numpy
-                params_nqs  = list(np.array(params_nqs))
-                self._save_json({'params': params_nqs}, params_path)
-            except Exception as e:
-                self.logger.warning(f"Failed to save parameters: {e}")
-                self.logger.warning("Parameters are not saved.")
-                self.logger.warning("You can save them manually using `nqs.get_params()`.", color="red", lvl=1)
-        return fig, ax
+            #! fill between
+            ax[0].fill_between(
+                x,
+                energies - energies_std,
+                energies + energies_std,
+                color   = "gray",
+                alpha   = 0.2,
+                label   = r"$\pm \sigma_E$",
+            )
+            ymin        = np.min(energies - energies_std)
+            ymax        = np.max(energies + energies_std)
+            ymargin     = 0.05 * (ymax - ymin)
+            xlim        = (1, x[-1])
+            ylim        = (ymin - ymargin, ymax + ymargin)
+            ylim        = plot_kw.get("ylim_0", ylim)
+            Plotter.set_legend(ax[0], loc=plot_kw.get("legend_loc_0", "upper right"),
+                            fontsize=plot_kw.get("fontsize", 8), frameon=True, framealpha=0.8)
+            Plotter.set_ax_params(ax[0], 
+                            ylabel      =   r"$E/N_s$",
+                            yscale      =   plot_kw.get("yscale_0", 'symlog'),
+                            xscale      =   plot_kw.get("xscale_0", 'log'),
+                            ylim        =   ylim,
+                            xlim        =   xlim,
+                            fontsize    =   plot_kw.get("fontsize", 8))
+            Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
+            Plotter.set_annotate_letter(ax[0], iter=0,
+                                        fontsize=plot_kw.get("fontsize", 8),
+                                        x = plot_kw.get("annotate_x", 0.1),
+                                        y = plot_kw.get("annotate_y", 0.1))
+            ax[0].set_title(f"GS train {self.nqs._hamiltonian}", fontsize=8)
+            
+            #! std
+            xlim        = (1, x[-1])
+            ylim        = plot_kw.get("ylim_1", None)
+            Plotter.plot(ax[1], x=x, y=energies_std, marker="o", markersize=0.5, lw=1)
+            Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$",
+                            xlabel="$i$", yscale='log',
+                            xlim=xlim, ylim=ylim,
+                            xscale='log')
+            Plotter.set_tickparams(ax[1], maj_tick_l=2, min_tick_l=1)
+            if not inset_up:
+                Plotter.set_label_cords(ax[1], which='x', inX=0.5, inY=1.1)
+                Plotter.set_ax_params(ax[1], which='x', tickPos='top', scale='log')
+                ax[1].set_xticklabels([])
+
+            #! epoch times
+            xlim        = (1, x[-1] + 1)
+            ylim        = plot_kw.get("ylim_2", None)
+            Plotter.plot(ax[2], x=np.arange(len(epoch_times)), y=epoch_times,
+                        markersize=0.5, lw=1, color=next(colorsCycle), label="epoch")
+            Plotter.plot(ax[2], x=np.arange(len(sample_times)), y=sample_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="sample", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(step_times)), y=step_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="step", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(update_times)), y=update_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="update", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(grad_times)), y=grad_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="gradient", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(prepare_times)), y=prepare_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="prepare", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(solve_times)), y=solve_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="solve", color=next(colorsCycle))
+            Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$",
+                            xscale=plot_kw.get("xscale_2", 'log'),
+                            yscale=plot_kw.get("yscale_2", 'log'),
+                            xlim=xlim, ylim=ylim)
+            Plotter.set_tickparams(ax[2], maj_tick_l=2, min_tick_l=1)
+            Plotter.set_legend(ax[2], loc=plot_kw.get("legend_loc_2", "upper right"),
+                            fontsize=plot_kw.get("fontsize", 8), frameon=True, framealpha=0.8)
+            Plotter.set_annotate_letter(ax[2], iter=1, 
+                                        fontsize=plot_kw.get("fontsize", 8),
+                                        x = plot_kw.get("annotate_x", 0.1),
+                                        y = plot_kw.get("annotate_y", 0.1))
+            fig.tight_layout()
+
+            if savedir is not None:
+                #! create the directory
+                os.makedirs(savedir, exist_ok=True)
+                
+                # save figure
+                fig_path = os.path.join(savedir, "gs_train.png")
+                fig.savefig(fig_path, dpi=150, bbox_inches='tight')
+                self.logger.info(f"Saved figure to '{fig_path}' and JSON to '{savedir}'.")
+
+                # prepare JSON data
+                info_path   = os.path.join(savedir, "gs_train_info.json")
+                self._save_json({
+                                    "gs_energy":   last_mean,
+                                    "gs_std":      last_std,
+                                    "epoch_time":  last_time,
+                                    "n_points":    len(energies),
+                                    "history":     list(self.history),
+                                    "lr_history":  list(self.lr_history),
+                                    "reg_history": list(self.reg_history),
+                                }, info_path)
+                try:
+                    params_path = os.path.join(savedir, "gs_train_params.json")
+                    params_nqs  = self.nqs.get_params(unravel=True)
+                    # transform jax to numpy
+                    params_nqs  = list(np.array(params_nqs))
+                    self._save_json({'params': params_nqs}, params_path)
+                except Exception as e:
+                    self.logger.warning(f"Failed to save parameters: {e}")
+                    self.logger.warning("Parameters are not saved.")
+                    self.logger.warning("You can save them manually using `nqs.get_params()`.", color="red", lvl=1)
+            return fig, ax
+        return None, None
     
     # ------------------------------------------------------
     

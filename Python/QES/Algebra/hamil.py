@@ -19,7 +19,6 @@ import numpy as np
 import scipy as sp
 from typing import List, Tuple, Union, Optional, Callable
 from abc import ABC
-from functools import partial
 import time
 
 ###################################################################################################
@@ -125,16 +124,17 @@ class Hamiltonian(ABC):
     
     def __init__(self,
                 # concerns the definition of the system type
-                is_manybody     : bool  =   True,                # True for many-body Hamiltonian, False for non-interacting
-                hilbert_space   : Optional[HilbertSpace] = None, # Required if is_manybody=True
-                ns              : Optional[int] = None,          # Number of sites/modes (if not provided, will be inferred from hilbert_space or lattice)
-                lattice         : Optional[Union[str, List[int]]] = None, # Alternative way to specify ns and get the Hilbert space
+                is_manybody     : bool                      = True,         # True for many-body Hamiltonian, False for non-interacting
+                hilbert_space   : Optional[HilbertSpace]    = None,         # Required if is_manybody=True
+                ns              : Optional[int]             = None,         # Number of sites/modes (if not provided, will be inferred from hilbert_space or lattice)
+                lattice         : Optional[Union[str, List[int]]] = None,   # Alternative way to specify ns and get the Hilbert space
                 # concerns the matrix and computation
-                is_sparse       : bool  =   True,                
-                dtype                   =   None,
-                backend         : str   =   'default',
+                is_sparse       : bool                      = True,         # True for sparse matrix, False for dense matrix    
+                dtype                                       = None,         # Data type for the Hamiltonian matrix elements (if None, inferred from hilbert_space or backend)
+                backend         : str                       = 'default',
                 # logger and other kwargs
-                logger          : Optional[Logger] = None,
+                use_forward     : bool                      = False,
+                logger          : Optional[Logger]          = None,
                 **kwargs):
         """
         Initialize the Hamiltonian class.
@@ -172,6 +172,7 @@ class Hamiltonian(ABC):
         self._is_manybody           = is_manybody
         self._is_quadratic          = not is_manybody
         self._particle_conserving   = False
+        self._use_forward           = use_forward
         
         # get the backend, scipy, and random number generator for the backend
         self._dtypeint      = self._backend.int64
@@ -935,9 +936,9 @@ class Hamiltonian(ABC):
             array to be used latter with corresponding couplings
         '''
         if isinstance(coupling, list) and len(coupling) == self.ns:
-            return self._backend.array(coupling)
+            return self._backend.array(coupling, dtype=self._dtype)
         elif isinstance(coupling, (float, int, complex)):
-            return DummyVector(coupling)
+            return DummyVector(coupling, backend=self._backend).astype(self._dtype)
         elif isinstance(coupling, str):
             return random_vector(self.ns, coupling, backend=self._backend, dtype=self._dtype)
         else:
@@ -1617,7 +1618,60 @@ class Hamiltonian(ABC):
             self._log(f"{self._name} test_jax({input_vec}): idx={idx}, vals={val}", lvl = 2, log = 'debug')
     
     # ----------------------------------------------------------------------------------------------
+    #! Other helpers
     
+    @staticmethod
+    def _fmt_scalar(name, val, prec=1):
+        """
+        Formats a scalar value with a given name and precision.
+
+        Args:
+            name (str):
+                The name to display alongside the value.
+            val (float):
+                The scalar value to format.
+            prec (int, optional):
+                The number of decimal places to display. Defaults to 1.
+
+        Returns:
+            str: A formatted string in the form 'name=value' with the specified precision.
+        """
+        return f"{name}={val:.{prec}f}"
+
+    @staticmethod
+    def _fmt_array(name, arr, prec=1, tol=1e-6):
+        """
+        Formats a NumPy array or DummyVector into a concise string representation for display.
+        Parameters:
+            name (str):
+                The name to prefix the formatted output.
+            arr (array-like or DummyVector):
+                The array or vector to format.
+            prec (int, optional):
+                Number of decimal places for min/max values. Default is 1.
+            tol (float, optional):
+                Tolerance for determining if all elements are equal. Default is 1e-6.
+        Returns:
+            str: A formatted string representing the array:
+                - If arr is a DummyVector, returns a scalar format.
+                - If arr is empty, returns 'name=[]'.
+                - If all elements are (approximately) equal, returns a scalar format.
+                - Otherwise, returns 'name[min=..., max=...]' with specified precision.
+        """
+        if isinstance(arr, DummyVector):
+            return Hamiltonian._fmt_scalar(name, arr[0])
+        
+        arr = np.asarray(arr, dtype=float)
+        if arr.size == 0:
+            return f"{name}=[]"
+        if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
+            return Hamiltonian._fmt_scalar(name, float(arr.flat[0]))
+        return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
+
+    @staticmethod
+    def fmt(name, value):
+        """Choose scalar vs array formatter."""
+        return Hamiltonian._fmt_scalar(name, value) if np.isscalar(value) else Hamiltonian._fmt_array(name, value)
 # --------------------------------------------------------------------------------------------------
 
 def test_generic_hamiltonian(ham: Hamiltonian, ns: int):

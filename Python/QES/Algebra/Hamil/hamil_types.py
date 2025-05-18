@@ -5,7 +5,7 @@ A Hamiltonian model is defined as a class of Hamiltonians that share a common st
 
 Date: 2025-02-01
 '''
-
+from general_python.algebra.utils import distinguish_type
 from enum import Enum, unique
 import numba
 
@@ -83,98 +83,127 @@ def check_dense(model: Hamiltonians) -> bool:
 # @numba.experimental.jitclass
 class DummyVector:
     """
-    A dummy vector-like object that mimics a constant vector of length `ns` with all elements equal to `val`.
-    Used for broadcasting scalar couplings in Hamiltonian construction.
+    Constant vector of length `ns` with all entries == `val`.
+    A thin dummy so scalar couplings can be broadcast like arrays.
     """
-    def __init__(self, val, ns=None, backend=None):
-        self.val = val
-        self.ns = ns if ns is not None else 1
-        self._backend = backend if backend is not None else None
 
-    def __getitem__(self, item):
-        # Support integer or slice indexing
-        if isinstance(item, int):
-            return self.val
-        elif isinstance(item, slice):
-            length = len(range(*item.indices(self.ns)))
-            return [self.val] * length
-        else:
-            raise TypeError("Invalid index type.")
+    #! construction
+    def __init__(self, val, ns: int | None = None, *, backend=None):
+        """
+        Initialize the object with the given value, number of sites, and backend.
+        Args:
+            val:
+                The value to be assigned to the object.
+            ns (int, optional):
+                The number of sites. If not provided, defaults to 1.
+            backend (optional):
+                The backend module to use. If not provided, defaults to 'numpy'.
+        """
+        
+        self.val      = val
+        self.ns       = int(ns) if ns is not None else 1
+        self._backend = backend or __import__("numpy")
 
+    # ---------------------------------------------------------------------------
+    
+    @property
+    def dtype(self):
+        return getattr(self.val, "dtype", type(self.val))
+
+    def astype(self, dtype, copy: bool = False, *, backend=None):
+        """
+        Return a `DummyVector` with the same length but `val` cast to `dtype`.
+
+        Parameters
+        ----------
+        dtype : str | numpy.dtype | jax.numpy.dtype | type
+            Desired element dtype.
+        copy  : bool, default False
+            If False and the dtype is unchanged -> return self.
+            If True  -> always return a *new* `DummyVector`.
+        backend : optional
+            Backend module (`numpy`, `jax.numpy`, …) controlling the cast.
+            If None, use the instance's backend.
+
+        Notes
+        -----
+        *The method never materialises a full array*, so it's O(1) in memory.
+        """
+        backend = backend or self._backend
+        tgt_dt  = distinguish_type(dtype)
+
+        # fast path: nothing to change
+        if not copy and tgt_dt == self.dtype:
+            return self
+
+        new_val = backend.asarray(self.val, dtype=tgt_dt).item()
+        return DummyVector(new_val, ns=self.ns, backend=backend)
+
+    # ---------------------------------------------------------------------------
+    
+    def __array__(self, dtype=None):
+        return self._backend.full(self.ns, self.val, dtype=dtype)
+
+    def __array_priority__(self):
+        return 100.0
+
+    # ---------------------------------------------------------------------------
+    
+    def __repr__(self):
+        return f"DummyVector(val={self.val!r}, ns={self.ns})"
+
+    def __str__(self):
+        return f"[{self.val}] * {self.ns}"
+
+    # ---------------------------------------------------------------------------
+    
     def __len__(self):
         return self.ns
 
-    def __iter__(self):
-        for _ in range(self.ns):
-            yield self.val
-
-    def __repr__(self):
-        return f"DummyVector(val={self.val}, ns={self.ns})"
-
-    def __str__(self):
-        return f"DummyVector({self.val}) * {self.ns}"
-
-    def __array__(self, dtype=None):
-        backend = self._backend if self._backend is not None else __import__('numpy')
-        return backend.full(self.ns, self.val, dtype=dtype)
-
-    def __array_priority__(self):
-        return 100
-
-    # Arithmetic operations
-    def _binary_op(self, other, op):
-        if isinstance(other, (int, float, complex)):
-            return DummyVector(op(self.val, other), ns=self.ns, backend=self._backend)
-        elif isinstance(other, DummyVector):
-            if self.ns != other.ns:
-                raise ValueError("DummyVector: size mismatch in operation.")
-            return DummyVector(op(self.val, other.val), ns=self.ns, backend=self._backend)
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            length = len(range(*idx.indices(self.ns)))
+            return DummyVector(self.val, ns=length, backend=self._backend)
+        elif isinstance(idx, int):
+            return self.val
         else:
-            return NotImplemented
+            raise TypeError("DummyVector supports int or slice indices only.")
 
-    def __mul__(self, other):
-        return self._binary_op(other, lambda a, b: a * b)
+    def __iter__(self):
+        yield from (self.val for _ in range(self.ns))
 
-    def __rmul__(self, other):
-        return self.__mul__(other)
-
-    def __add__(self, other):
-        return self._binary_op(other, lambda a, b: a + b)
-
-    def __radd__(self, other):
-        return self.__add__(other)
-
-    def __sub__(self, other):
-        return self._binary_op(other, lambda a, b: a - b)
-
-    def __rsub__(self, other):
-        return self._binary_op(other, lambda a, b: b - a)
-
-    def __truediv__(self, other):
-        return self._binary_op(other, lambda a, b: a / b)
-
-    def __rtruediv__(self, other):
-        return self._binary_op(other, lambda a, b: b / a)
-
-    def __floordiv__(self, other):
-        return self._binary_op(other, lambda a, b: a // b)
-
-    def __rfloordiv__(self, other):
-        return self._binary_op(other, lambda a, b: b // a)
-
-    def __mod__(self, other):
-        return self._binary_op(other, lambda a, b: a % b)
-
-    def __rmod__(self, other):
-        return self._binary_op(other, lambda a, b: b % a)
-
-    def __pow__(self, other):
-        return self._binary_op(other, lambda a, b: a ** b)
-
-    def __eq__(self, other):
+    # ---------------------------------------------------------------------------
+    
+    def _binary(self, other, op):
         if isinstance(other, DummyVector):
-            return (self.val == other.val) and (self.ns == other.ns)
-        return False
+            if self.ns != other.ns:
+                raise ValueError("DummyVector: size mismatch")
+            other_val = other.val
+        else:  # assume scalar
+            other_val = other
+        return DummyVector(op(self.val, other_val), ns=self.ns, backend=self._backend)
+
+    def __add__(self, other):       return self._binary(other, lambda a, b: a + b)
+    def __radd__(self, other):      return self.__add__(other)
+    def __sub__(self, other):       return self._binary(other, lambda a, b: a - b)
+    def __rsub__(self, other):      return self._binary(other, lambda a, b: b - a)
+    def __mul__(self, other):       return self._binary(other, lambda a, b: a * b)
+    def __rmul__(self, other):      return self.__mul__(other)
+    def __truediv__(self, other):   return self._binary(other, lambda a, b: a / b)
+    def __rtruediv__(self, other):  return self._binary(other, lambda a, b: b / a)
+    # (add more as needed)
+
+    # ---------------------------------------------------------------------------
+    
+    def __eq__(self, other):
+        return (
+            isinstance(other, DummyVector)
+            and self.ns == other.ns
+            and self.val == other.val
+        )
+
+    def __hash__(self):
+        return hash((self.val, self.ns))
     
     def to_array(self, dtype=None, backend=None):
         """
@@ -182,3 +211,6 @@ class DummyVector:
         """
         backend = backend if backend is not None else __import__('numpy')
         return backend.full(self.ns, self.val, dtype=dtype)
+    
+##################################################################################
+#! END OF FILE

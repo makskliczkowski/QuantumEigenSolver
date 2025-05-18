@@ -56,6 +56,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                 dlt                 : Union[List[float], None, float]       = 1.0,
                 dtype               : type                                  = np.float32,
                 backend             : str                                   = "default",
+                use_forward         : bool                                  = True,
                 logger              : Optional['Logger']                    = None,
                 **kwargs):
         '''
@@ -92,7 +93,7 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         # Initialize the Hamiltonian
         self._lattice                   = lattice
         super().__init__(is_manybody=True, hilbert_space=hilbert_space, lattice=lattice, is_sparse=True,
-                         dtype=dtype, backend=backend, logger=logger, **kwargs)
+                         dtype=dtype, backend=backend, logger=logger, use_forward=use_forward, **kwargs)
 
         # Initialize the Hamiltonian
         if hilbert_space is None:
@@ -156,32 +157,17 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
         tol    = 1e-10      # equality tolerance for “uniform” check
         sep    = ","        # parameter separator
 
-        def _fmt_scalar(name, val):
-            return f"{name}={val:.{prec}f}"
-
-        def _fmt_array(name, arr):
-            arr = np.asarray(arr, dtype=float)
-            if arr.size == 0:
-                return f"{name}=[]"
-            if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
-                return _fmt_scalar(name, float(arr.flat[0]))
-            return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
-
-        def fmt(name, value):
-            """Choose scalar vs array formatter."""
-            return _fmt_scalar(name, value) if np.isscalar(value) else _fmt_array(name, value)
-
         # string
         parts = [f"HeiKit(Ns={self.ns}"]
 
         parts += [
-            fmt("J",   self._j),
-            fmt("Kx",  self._kx),
-            fmt("Ky",  self._ky),
-            fmt("Kz",  self._kz),
-            fmt("\ndlt", self._dlt),
-            fmt("hz",  self._hz),
-            fmt("hx",  self._hx),
+            hamil_module.Hamiltonian.fmt("J",   self._j),
+            hamil_module.Hamiltonian.fmt("Kx",  self._kx),
+            hamil_module.Hamiltonian.fmt("Ky",  self._ky),
+            hamil_module.Hamiltonian.fmt("Kz",  self._kz),
+            hamil_module.Hamiltonian.fmt("\ndlt", self._dlt),
+            hamil_module.Hamiltonian.fmt("hz",  self._hz),
+            hamil_module.Hamiltonian.fmt("hx",  self._hx),
         ]
 
         # symmetry / boundary info from HilbertSpace object
@@ -271,24 +257,28 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                                 type_act = operators_spin_module.OperatorTypeActing.Correlation)
         op_sz_sz_c      =   operators_spin_module.sig_z(lattice = self._lattice,
                                 type_act = operators_spin_module.OperatorTypeActing.Correlation)
-        
+        nn_nums         =   [lattice.get_nn_num(i) for i in range(self.ns)] if self._use_forward else \
+                            [lattice.get_nn_forward_num(i) for i in range(self.ns)]
         for i in range(self.ns):
             self._log(f"Starting i: {i}", lvl = 1, log = 'debug')
             
             # now check the local operators
-            self.add(op_sz_l, multiplier = self._hz[i], modifies = False, sites = [i])
-            self.add(op_sx_l, multiplier = self._hx[i], modifies = True, sites = [i])
+            if not np.isclose(self._hz[i], 0.0, rtol=1e-10):
+                self.add(op_sz_l, multiplier = self._hz[i], modifies = False, sites = [i])
+                self._log(f"Adding local Sz at {i} with value {self._hz[i]:.2f}", lvl = 2, log = 'debug')
             
-            self._log(f"Adding local Sz at {i} with value {self._hz[i]:.2f}", lvl = 2, log = 'debug')
-            self._log(f"Adding local Sx at {i} with value {self._hx[i]:.2f}", lvl = 2, log = 'debug')
+            if not np.isclose(self._hx[i], 0.0, rtol=1e-10):
+                self.add(op_sx_l, multiplier = self._hx[i], modifies = True, sites = [i])
+                self._log(f"Adding local Sx at {i} with value {self._hx[i]:.2f}", lvl = 2, log = 'debug')
             
             # now check the correlation operators
-            nn_forward_num = lattice.get_nn_forward_num(i)
-            for nn in range(nn_forward_num):
-                nei = lattice.get_nn_forward(i, num=nn)
-
+            nn_num = nn_nums[i]
+            for nn in range(nn_num):
+                # get the neighbor index
+                nei = lattice.get_nn_forward(i, num=nn) if self._use_forward else lattice.get_nn(i, num=nn)
+                    
                 # check the direction of the bond
-                if nei < 0 or np.isnan(nei):
+                if lattice.wrong_nei(nei):
                     continue
                 
                 # Heisenberg - value of SzSz (multiplier)
@@ -298,20 +288,26 @@ class HeisenbergKitaev(hamil_module.Hamiltonian):
                 # Heisenberg - value of SySy (multiplier)
                 sy_sy = self._j[i] * self._dlt[i]
                 
+                #! check the directional bond
                 if nn == HEI_KIT_Z_BOND_NEI:
                     sz_sz += self._kz[i]
                 elif nn == HEI_KIT_Y_BOND_NEI:
                     sy_sy += self._ky[i]
                 else:
                     sx_sx += self._kx[i]
-
+                    
+                # print(f"Bond {i} - {nei}: SzSz = {sz_sz:.2f}, SxSx = {sx_sx:.2f}, SySy = {sy_sy:.2f}")
                 # append the operators
-                self.add(op_sz_sz_c, sites = [i, nei], multiplier = sz_sz, modifies = False)
-                self._log(f"Adding SzSz at {i},{nei} with value {sz_sz:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sx_sx_c, sites = [i, nei], multiplier = sx_sx, modifies = True)
-                self._log(f"Adding SySy at {i},{nei} with value {sy_sy:.2f}", lvl = 2, log = 'debug')
-                self.add(op_sy_sy_c, sites = [i, nei], multiplier = sy_sy, modifies = True)
-                self._log(f"Adding SxSx at {i},{nei} with value {sx_sx:.2f}", lvl = 2, log = 'debug')
+                if not np.isclose(sz_sz, 0.0, rtol=1e-10):
+                    self.add(op_sz_sz_c, sites = [i, nei], multiplier = sz_sz, modifies = False)
+                    self._log(f"Adding SzSz at {i},{nei} with value {sz_sz:.2f}", lvl = 2, log = 'debug')
+                if not np.isclose(sx_sx, 0.0, rtol=1e-10):
+                    self.add(op_sx_sx_c, sites = [i, nei], multiplier = sx_sx, modifies = True)
+                    self._log(f"Adding SySy at {i},{nei} with value {sy_sy:.2f}", lvl = 2, log = 'debug')
+                if not np.isclose(sy_sy, 0.0, rtol=1e-10):
+                    self.add(op_sy_sy_c, sites = [i, nei], multiplier = sy_sy, modifies = True)
+                    self._log(f"Adding SxSx at {i},{nei} with value {sx_sx:.2f}", lvl = 2, log = 'debug')
+                    
         self._log("Successfully set local energy operators...", lvl=1, log='info')
 
     # ----------------------------------------------------------------------------------------------

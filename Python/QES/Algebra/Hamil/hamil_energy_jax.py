@@ -193,6 +193,9 @@ def local_energy_jax_wrap(ns                        : int,
     _op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites        = flatten_operator_terms(_op_f_nmod_sites, _op_i_nmod_sites, _op_m_nmod_sites)
     _op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites  = flatten_operator_terms(_op_f_nmod_nosites, _op_i_nmod_nosites, _op_m_nmod_nosites)
     
+    # check the dtype of the operator terms and cast to highest type
+    
+    
     # change all multipliers to jax arrays
     _op_m_mod_sites                                             = jnp.array(_op_m_mod_sites, dtype=dtype)
     _op_m_mod_nosites                                           = jnp.array(_op_m_mod_nosites, dtype=dtype)
@@ -258,6 +261,9 @@ def local_energy_jax_wrap(ns                        : int,
                     # use jax.lax.switch
                     site_states, site_energies  = jax.lax.switch(i, _op_f, state)
                     site_energies               = jnp.reshape(site_energies, (-1,)) * _op_m[i]
+                    site_energies               = site_energies.astype(all_energies_acc.dtype)
+                    # site_energies               = (site_energies * _op_m[i]).astype(all_energies_acc.dtype)
+                    
                     # update the state and energy arrays
                     end_idx                     = start + site_energies.shape[0]
                     all_states_acc              = jax.lax.dynamic_update_slice(all_states_acc, site_states.reshape(1, state_dim), (start, 0))

@@ -1651,7 +1651,8 @@ class NQS(MonteCarloSolver):
         logger,
         get_energy     : bool = False,
         plot           : bool = False,
-        **plot_kwargs):
+        plot_kwargs,
+        **kwargs):
         """
         Sample once from `nqs` and evaluate a set of observables.
 
@@ -1663,6 +1664,16 @@ class NQS(MonteCarloSolver):
             mean/std/raw for local energy if `energy_fun` is provided
         timings : dict
             elapsed times for 'sample', 'observables', and 'energy' phases
+        plot_kwargs : dict
+            kwargs for plotting (e.g., bins, ylim, xlim, yscale)
+            Possible keys:
+                - 'bins': number of bins for histogram
+                - 'ylim': y-axis limits for histogram
+                - 'xlim': x-axis limits for histogram
+                - 'yscale': y-axis scale ('linear' or 'log')
+                - 'framealpha': alpha value for legend frame
+                - 'names': list of names for observables
+                - 'inset_axes': list of axes for insets
         """
         from general_python.common.plot import Plotter
         
@@ -1719,7 +1730,7 @@ class NQS(MonteCarloSolver):
 
         #! 4) optional quick-look plot
         if plot:
-            bins    = plot_kwargs.get('bins', 50)
+            bins    = kwargs.get('bins', 50)
             n_ops   = len(operators)
             fig, ax = Plotter.get_subplots(
                 nrows       = n_ops + (energy is not None),
@@ -1727,7 +1738,12 @@ class NQS(MonteCarloSolver):
                 figsize     = (4, 1.5*(n_ops+1)),
                 dpi         = 120,
             )
-
+            names = plot_kwargs.get('names', [op.name for op in operators])
+            if len(names) != n_ops:
+                for i in range(n_ops - len(names), n_ops):
+                    names.append(operators[i].name)
+            
+            #! plot the observables
             for i, op in enumerate(operators):
                 vals            = np.real(np.asarray(results[op]['raw']))
                 mean            = np.nanmean(vals)
@@ -1736,19 +1752,26 @@ class NQS(MonteCarloSolver):
                 hist, binsin    = np.histogram(vals, bins=binsin, density=True)
                 ax[i].hist(vals, bins=binsin, density=True, color='gray', alpha=0.7)
                 ax[i].stairs(hist, binsin, color='gray', alpha=0.7)
-                Plotter.vline(ax[i], mean, color='k', lw=1, label=f'{op}$ = {mean:.3f}$')
+                
+                Plotter.vline(ax[i], mean, color='k', lw=1, label=f'{names[i]}$ = {mean:.3f}$')
                 if true_values is not None and true_values[i] is not None:
                     Plotter.vline(ax[i], true_values[i], color='r', lw=1, alpha=0.5, label=f'$O_{{\\rm true}}={true_values[i]:.3f}$')
-                # minmaxop    = (mean - std, mean + std)
-                minmaxop    = None
-                Plotter.set_ax_params(ax[i], ylabel=r'$P(\langle O \rangle)$', xlim=minmaxop, yscale='log')
-                Plotter.set_legend(ax[i], fontsize=8)
+                
+                # get the next power of 10
+                ylim        = Plotter.set_smart_lim(ax[i], which='y', data=hist, ylim = plot_kwargs.get(f'ylim_{i}', None))
+                xlim        = Plotter.set_smart_lim(ax[i], which='x', xlim = plot_kwargs.get(f'xlim_{i}', None))
+                print(xlim)
+                Plotter.set_ax_params(ax[i],
+                        ylabel      =   r'$P(\langle O \rangle)$',
+                        xlim        =   xlim,
+                        ylim        =   ylim,
+                        yscale      =   plot_kwargs.get(f'yscale_{i}', 'log'))
+                Plotter.set_legend(ax[i], fontsize=8, frameon=True, framealpha=plot_kwargs.get('framealpha', 0.5))
 
             if energy is not None:
                 idx             = -1
                 vals            = np.real(np.asarray(energy['raw']))
                 mean            = np.mean(vals)
-                std             = np.std(vals)
                 minimum         = np.min(vals)
                 maximum         = np.max(vals)
                 binsin          = min(len(vals)//10, bins)
@@ -1757,13 +1780,22 @@ class NQS(MonteCarloSolver):
                 Plotter.vline(ax[idx], mean, color='k', lw=1, label=f'$\\bar E ={mean:.3e}$')
                 if true_en is not None:
                     Plotter.vline(ax[idx], true_en, color='r', lw=1, alpha=0.5, label=f'$E_{{\\rm true}}={true_en:.3e}$')
-                Plotter.set_ax_params(ax[idx], xlabel=r'$\langle O \rangle$', ylabel=r'$P(\langle E_{\rm loc} \rangle)$', xlim=None, yscale='log')
+                ylim            = Plotter.set_smart_lim(ax[idx], which='y', data=hist, ylim = plot_kwargs.get('ylim_e', None))
+                xlim            = Plotter.set_smart_lim(ax[idx], which='x', xlim = plot_kwargs.get('xlim_e', None))
+                Plotter.set_ax_params(ax[idx],
+                    xlabel  =   r'$\langle O \rangle$',
+                    ylabel  =   r'$P(\langle E_{\rm loc} \rangle)$',
+                    xlim    =   xlim,
+                    ylim    =   ylim,
+                    yscale  =   plot_kwargs.get('yscale_e', 'log'))
+
+                #! Inset axes
                 if mean > (minimum + maximum) / 2:
-                    axin = ax[idx].inset_axes([0.2, 0.2, 0.3, 0.4])
-                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper left')
+                    axin = ax[idx].inset_axes(plot_kwargs.get('inset_axes', [0.2, 0.2, 0.3, 0.4]))
+                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper left', frameon=True, framealpha=plot_kwargs.get('framealpha', 0.5))
                 else:
-                    axin = ax[idx].inset_axes([0.6, 0.2, 0.3, 0.4])
-                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper right')
+                    axin = ax[idx].inset_axes(plot_kwargs.get('inset_axes', [0.6, 0.2, 0.3, 0.4]))
+                    Plotter.set_legend(ax[idx], fontsize=8, loc='upper right', frameon=True, framealpha=plot_kwargs.get('framealpha', 0.5))
                 axin.scatter(np.arange(len(vals)), vals, s=0.5, color='gray', alpha=0.7)
                 if true_en is not None:
                     Plotter.hline(axin, true_en, color='r', lw=1, alpha=0.5, label=f'$ref={true_en:.3e}$')

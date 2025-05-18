@@ -121,31 +121,18 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
         prec   = 3
         sep    = ", "
         tol    = 1e-10                      # tolerance for “all equal”
-
-        # helpers
-        def _fmt_scalar(name, val):
-            return f"{name}={val:.{prec}f}"
-
-        def _fmt_array(name, arr):
-            arr = np.asarray(arr, dtype=float)
-            if arr.size == 0:
-                return f"{name}=[]"
-            if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
-                return _fmt_scalar(name, float(arr.flat[0]))
-            else:
-                return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
-
+        
         # fields
         parts = [f"TFIM(Ns={self.ns}"]
 
         # Exchange J
         parts.append(
-            _fmt_scalar("J", self._j) if np.isscalar(self._j) else _fmt_array("J", self._j)
+            hamil_module.Hamiltonian._fmt_scalar("J", self._j) if np.isscalar(self._j) else hamil_module.Hamiltonian._fmt_array("J", self._j)
         )
 
         # Transverse field h_x
         parts.append(
-            _fmt_scalar("hx", self._hx) if np.isscalar(self._hx) else _fmt_array("hx", self._hx)
+            hamil_module.Hamiltonian._fmt_scalar("hx", self._hx) if np.isscalar(self._hx) else hamil_module.Hamiltonian._fmt_array("hx", self._hx)
         )
 
         return sep.join(parts) + ")"
