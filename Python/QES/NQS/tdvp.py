@@ -89,7 +89,7 @@ class TDVP:
             self,
             use_sr          : bool                              = True,
             use_minsr       : bool                              = False,
-            rhs_prefact     : Union[float, complex]             = 1.0,
+            rhs_prefactor   : Union[float, complex]             = 1.0,
             # Stochastic reconfiguration parameters
             sr_lin_solver   : Optional[solvers.Solver]          = None,
             sr_precond      : Optional[precond.Preconditioner]  = None,
@@ -111,7 +111,7 @@ class TDVP:
             
         self.use_sr          = use_sr
         self.use_minsr       = use_minsr
-        self.rhs_prefact     = rhs_prefact
+        self.rhs_prefactor     = rhs_prefactor
         self.form_matrix     = False    # flag to indicate if the full matrix is formed
         
         #! handle the stochastic reconfiguration parameters
@@ -344,16 +344,16 @@ class TDVP:
 
     ###################
     
-    def set_rhs_prefact(self, rhs_prefact: Union[float, complex]):
+    def set_rhs_prefact(self, rhs_prefactor: Union[float, complex]):
         '''
         Set the right-hand side prefactor for the TDVP equation.
         This is used to scale the right-hand side of the TDVP equation.
         Parameters
         ----------
-        rhs_prefact : Union[float, complex]
+        rhs_prefactor : Union[float, complex]
             The right-hand side prefactor to be used for the TDVP equation.
         '''
-        self.rhs_prefact = rhs_prefact
+        self.rhs_prefactor = rhs_prefactor
     
     def set_snr_tol(self, snr_tol: float):
         '''
@@ -663,8 +663,9 @@ class TDVP:
             self._x0 = x0
 
         #! prepare the rhs
-        vec_b                       = vec_b * self.rhs_prefact
-        
+        if self.rhs_prefactor != 1.0:
+            vec_b = vec_b * self.rhs_prefactor
+
         #! precondition the S matrices?
         if True:
             #!TODO:
@@ -756,10 +757,10 @@ class TDVP:
     #########################
     
     def __repr__(self):
-        return f'TDVP(backend={self.backend_str},use_sr={self.use_sr},use_minsr={self.use_minsr},rhs_prefact={self.rhs_prefact},sr_snr_tol={self.sr_snr_tol},sr_pinv_tol={self.sr_pinv_tol},sr_diag_shift={self.sr_diag_shift},sr_maxiter={self.sr_maxiter})'
+        return f'TDVP(backend={self.backend_str},use_sr={self.use_sr},use_minsr={self.use_minsr},rhs_prefactor={self.rhs_prefactor},sr_snr_tol={self.sr_snr_tol},sr_pinv_tol={self.sr_pinv_tol},sr_diag_shift={self.sr_diag_shift},sr_maxiter={self.sr_maxiter})'
     
     def __str__(self):
-        return f'TDVP(backend={self.backend_str},use_sr={self.use_sr},use_minsr={self.use_minsr},rhs_prefact={self.rhs_prefact},sr_snr_tol={self.sr_snr_tol},sr_pinv_tol={self.sr_pinv_tol},sr_diag_shift={self.sr_diag_shift},sr_maxiter={self.sr_maxiter})'
+        return f'TDVP(backend={self.backend_str},use_sr={self.use_sr},use_minsr={self.use_minsr},rhs_prefactor={self.rhs_prefactor},sr_snr_tol={self.sr_snr_tol},sr_pinv_tol={self.sr_pinv_tol},sr_diag_shift={self.sr_diag_shift},sr_maxiter={self.sr_maxiter})'
 
     def __len__(self):
         return len(self._solution) if self._solution is not None else 0
