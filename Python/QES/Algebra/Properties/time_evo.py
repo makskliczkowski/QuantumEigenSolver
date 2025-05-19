@@ -84,13 +84,36 @@ def time_evo_block_jax(eigenstates  : Array,
     Returns:
         Array: The time-evolved state at each time in `times`, shape (M, T).
     """
-    
-    # shape (N, T)
-    phase_mat = jnp.exp(-1j * eigvals[:, None] * times[None, :])
-    coeffs    = overlaps[:, None] * phase_mat
-    return eigenstates @ coeffs
+    t_arr               = jnp.asarray(times)
+    # Compute all evolved states at once
+    evolved_states      = jnp.exp(-1j * jnp.outer(eigvals, t_arr)) * overlaps[:, jnp.newaxis]
+    # Project back to basis
+    quenched_states_t   = eigenstates @ evolved_states # shape: (dim, len(t_arr))
+    # Compute expectation values for all times
+    return quenched_states_t
 
-# @numba.njit
+@jax.jit
+def time_evo_evaluate_jax(quenched_states_t : Array,
+                        quench_operator_m   : Array) -> Array:
+    """
+    Evaluates the expectation value of a quench operator for a set of time-evolved quantum states.
+    Parameters
+    ----------
+    quenched_states_t : Array
+        A 2D array where each column (or row, depending on convention) represents a quantum state at a specific time.
+    quench_operator_m : Array
+        The operator (as a matrix) whose expectation value is to be computed for each time-evolved state.
+    Returns
+    -------
+    Array
+        A 1D array of expectation values of the quench operator for each time-evolved state.
+    Notes
+    -----
+    The function computes ⟨ψ(t)|O|ψ(t)⟩ for each time-evolved state |ψ(t)⟩, where O is the quench operator.
+    """
+    quenched_values_t = jnp.einsum('ij,ji->i', jnp.conj(quenched_states_t.T), quench_operator_m @ quenched_states_t)
+    return quenched_values_t    
+
 def time_evo(eigenstates    : Array,
             eigvals         : Array,
             overlaps        : Array,
@@ -98,17 +121,67 @@ def time_evo(eigenstates    : Array,
     phases = np.exp(-1j * eigvals * time)
     return eigenstates @ (overlaps * phases)
 
-# @numba.njit
-def time_evo_block(eigenstates  : Array,
-                    eigvals     : Array,
-                    overlaps    : Array,
-                    times       : Array) -> Array:
+def time_evo_block(eigenstates          : Array,
+                    eigvals             : Array,
+                    quench_overlaps     : Array,
+                    times               : Array) -> Array:
+    """
+    Evolves a quantum state in time using a given set of eigenstates, eigenvalues, and initial overlaps.
+    Parameters
+    ----------
+    eigenstates : Array
+        Array of eigenstates of the Hamiltonian, shape (dim, N), where dim is the Hilbert space dimension and N is the number of eigenstates.
+    eigvals : Array
+        Array of eigenvalues corresponding to the eigenstates, shape (N,).
+    quench_overlaps : Array
+        Overlaps of the initial state with each eigenstate, shape (N,).
+    times : Array
+        Array of time points at which to compute the evolved state, shape (T,).
+    Returns
+    -------
+    Array
+        Array of evolved states at each time, shape (dim, T), where each column corresponds to the state at a given time.
+    """
+    
     # build (N,T) phase matrix and multiply by overlaps
-    phase_mat = np.exp(-1j * eigvals[:, None] * times[None, :])
-    coeffs    = overlaps[:, None] * phase_mat
-    return eigenstates @ coeffs
+    # Vectorized time evolution for all times (excluding t=0)
+    t_arr               = times
+    # Compute all evolved states at once
+    evolved_states      = np.exp(-1j * np.outer(eigvals, t_arr)) * quench_overlaps[:, np.newaxis]
+    # Project back to basis
+    quenched_states_t   = eigenstates @ evolved_states # shape: (dim, len(t_arr))
+    # Compute expectation values for all times
+    return quenched_states_t
 
-def diagonal_ensemble_jax(  overlaps    : Array,
+def time_evo_evaluate(quenched_states_t : Array,
+                    quench_operator_m   : Array) -> Array:
+    """
+    Evaluates the expectation value of a quench operator for a set of time-evolved quantum states.
+
+    Parameters
+    ----------
+    quenched_states_t : Array
+        A 2D array where each column (or row, depending on convention) represents a quantum state at a specific time.
+    quench_operator_m : Array
+        The operator (as a matrix) whose expectation value is to be computed for each time-evolved state.
+
+    Returns
+    -------
+    Array
+        A 1D array of expectation values of the quench operator for each time-evolved state.
+
+    Notes
+    -----
+    The function computes ⟨ψ(t)|O|ψ(t)⟩ for each time-evolved state |ψ(t)⟩, where O is the quench operator.
+    """
+    quenched_values_t = np.einsum('ij,ji->i', np.conj(quenched_states_t.T), quench_operator_m @ quenched_states_t)
+    return quenched_values_t
+
+# -----------------------------------------------------------------------------
+#! Diagonal Ensemble
+# -----------------------------------------------------------------------------
+
+def diagonal_ensemble_jax(  soverlaps    : Array,
                             diag_mat      : Array) -> Array:
     """
     Computes the diagonal ensemble of a given matrix using the overlaps.
@@ -119,12 +192,13 @@ def diagonal_ensemble_jax(  overlaps    : Array,
         Array: The diagonal ensemble, computed as the sum of the product of overlaps and the diagonal elements of the matrix.
     """
     # \sum _n a_nn |<ψ|n>|²
+    return jnp.dot(soverlaps, diag_mat)
     return jnp.sum(overlaps * diag_mat)    
 
-
-def diagonal_enemble(overlaps : Array,
+def diagonal_ensemble(soverlaps  : Array,
                     diag_mat    : Array):
     # \sum _n a_nn |<ψ|n>|²
+    return np.dot(soverlaps, diag_mat)
     return np.sum(overlaps * diag_mat)
 
 # -----------------------------------------------------------------------------

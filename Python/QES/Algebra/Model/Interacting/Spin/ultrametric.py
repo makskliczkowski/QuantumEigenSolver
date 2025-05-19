@@ -50,7 +50,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
         L               = ns - n
         # initialize Hilbert space
         hilbert_space   = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
-        super().__init__(hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
+        super().__init__(is_manybody=True, hilbert_space=hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
 
         self._ns        = ns
         self._n         = n
