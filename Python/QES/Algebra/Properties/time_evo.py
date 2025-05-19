@@ -9,28 +9,23 @@ computed using the matrix exponential method.
 '''
 
 import numpy as np
+import numba
 from enum import Enum
 
-import sys, os 
+from general_python.common import binary as BinaryMod
+from general_python.algebra.utils import JAX_AVAILABLE, get_backend, Array
 
-# Add the parent directory to the sys.path list.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '...')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from .. import BinaryMod
-
-# Try to import JAX. If unavailable, fall back to NumPy.
-try:
+if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    JAX_AVAILABLE = True
-except ImportError:
-    JAX_AVAILABLE = False
-
-# Use JAX’s numpy if available, otherwise NumPy.
-Backend = jnp if JAX_AVAILABLE else np
+    from jax import lax
+else:
+    jax = None
+    jnp = np
+    lax = None
 
 # -----------------------------------------------------------------
-# Constants
+#! Constants
 # -----------------------------------------------------------------
 
 SYSTEM_PROPERTIES_MIN_SPACING    = 1e-15
@@ -39,36 +34,101 @@ SYSTEM_PROPERTIES_COEFF_THRESHOLD  = 1e-11
 SYSTEM_PROPERTIES_USE_OPENMP       = 0
 
 # -----------------------------------------------------------------------------
-# Time Evolution Function
+#! Time Evolution Functions
 # -----------------------------------------------------------------------------
 
-def time_evo(eigenstates, eigvals, overlaps, time, backend=Backend):
+@jax.jit
+def time_evo_jax(eigenstates    : Array,
+                eigvals         : Array,
+                overlaps        : Array,
+                time            : float) -> Array:
     """
-    Computes the time evolution of a quantum state.
-    
+    Evolves a quantum state in time using the eigenstates and eigenvalues of the system Hamiltonian.
+
+    Parameters
+    ----------
+    eigenstates : Array
+        A matrix whose columns are the eigenstates of the Hamiltonian.
+    eigvals : Array
+        A 1D array of eigenvalues corresponding to the eigenstates.
+    overlaps : Array
+        A 1D array of overlaps (projections) of the initial state onto each eigenstate.
+    time : float
+        The time at which to evaluate the evolved state.
+
+    Returns
+    -------
+    Array
+        The quantum state at the specified time, as a linear combination of eigenstates with time-dependent phases.
+    """
+
+    phases = jnp.exp(-1j * eigvals * time)
+    return eigenstates @ (overlaps * phases)
+
+@jax.jit
+def time_evo_block_jax(eigenstates  : Array,
+                    eigvals         : Array,
+                    overlaps        : Array,
+                    times           : Array) -> Array:
+    """
+    Evolves a quantum state in time using a block of eigenstates, eigenvalues, and overlaps.
     Args:
-        eigenstates : 2D array whose columns are eigenstates.
-        eigvals     : 1D array of eigenvalues.
-        overlaps    : 1D array of coefficients (overlaps of the initial state with the eigenstates).
-        time        : The time at which to evaluate the evolved state.
-        backend     : jnp (if JAX is available) or np.
-        
+        eigenstates (Array):
+            Array of eigenstates, shape (M, N), where M is the Hilbert space dimension and N is the number of eigenstates.
+        eigvals (Array):
+            Array of eigenvalues, shape (N,).
+        overlaps (Array):
+            Array of overlaps between the initial state and eigenstates, shape (N,).
+        times (Array):
+            Array of time points at which to evaluate the evolved state, shape (T,).
     Returns:
-        1D complex array representing the evolved state.
+        Array: The time-evolved state at each time in `times`, shape (M, T).
     """
-    # Compute the exponential factor exp(-i * time * eigenvals)
-    exp_factors     = backend.exp(-1j * time * eigvals)
-    coeffs          = exp_factors * overlaps
-    # The C++ loop (in the original code: cpp/library/include/quantities/statistics.h):
-    #   for (i = 0; i < n_cols; ++i)
-    #       ret += (exp(i)*overlap(i)) * eigenstates.col(i);
-    # is equivalent to a matrix–vector product.
-    return backend.dot(eigenstates, coeffs)
+    
+    # shape (N, T)
+    phase_mat = jnp.exp(-1j * eigvals[:, None] * times[None, :])
+    coeffs    = overlaps[:, None] * phase_mat
+    return eigenstates @ coeffs
+
+# @numba.njit
+def time_evo(eigenstates    : Array,
+            eigvals         : Array,
+            overlaps        : Array,
+            time            : float) -> Array:
+    phases = np.exp(-1j * eigvals * time)
+    return eigenstates @ (overlaps * phases)
+
+# @numba.njit
+def time_evo_block(eigenstates  : Array,
+                    eigvals     : Array,
+                    overlaps    : Array,
+                    times       : Array) -> Array:
+    # build (N,T) phase matrix and multiply by overlaps
+    phase_mat = np.exp(-1j * eigvals[:, None] * times[None, :])
+    coeffs    = overlaps[:, None] * phase_mat
+    return eigenstates @ coeffs
+
+def diagonal_ensemble_jax(  overlaps    : Array,
+                            diag_mat      : Array) -> Array:
+    """
+    Computes the diagonal ensemble of a given matrix using the overlaps.
+    Args:
+        overlaps (Array): A 1D array of overlaps (projections) of the initial state onto each eigenstate.
+        matrix (Array): A 2D array representing the matrix for which to compute the diagonal ensemble.
+    Returns:
+        Array: The diagonal ensemble, computed as the sum of the product of overlaps and the diagonal elements of the matrix.
+    """
+    # \sum _n a_nn |<ψ|n>|²
+    return jnp.sum(overlaps * diag_mat)    
+
+
+def diagonal_enemble(overlaps : Array,
+                    diag_mat    : Array):
+    # \sum _n a_nn |<ψ|n>|²
+    return np.sum(overlaps * diag_mat)
 
 # -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-# Quench Types Enum
+#! Quench Types Enum
 # -----------------------------------------------------------------------------
 
 class QuenchTypes(Enum):
@@ -97,7 +157,7 @@ def create_initial_quench_state(quench_type : QuenchTypes,
                                 Ns          : int,
                                 Eseek       : float = 0.0, 
                                 energies            = None,
-                                backend             = Backend, 
+                                backend             = 'default', 
                                 key                 = None):
     """
     Creates the initial state vector after a quench.
@@ -254,7 +314,7 @@ def create_initial_quench_state(quench_type : QuenchTypes,
 # -----------------------------------------------------------------------------
 # Mean Energy Calculation After Quench
 # -----------------------------------------------------------------------------
-def calc_mean_energy_quench(H, state, backend=Backend):
+def calc_mean_energy_quench(H, state, backend='default'):
     """
     Calculates the mean energy after the quench, defined as <state| H |state>.
     

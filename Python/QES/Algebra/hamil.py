@@ -1316,6 +1316,27 @@ class Hamiltonian(ABC):
     #! Diagonalization methods
     # ----------------------------------------------------------------------------------------------
 
+    def _diagonalize_quadratic_prepare(self, backend, **kwargs):
+        '''
+        Diagonalizes the Hamiltonian matrix whenever the Hamiltonian is single-particle. 
+        This method needs to be implemented by the subclasses.
+        '''
+        if self._is_quadratic:
+            if True:
+                if self.particle_conserving:
+                    self._log("Diagonalizing the quadratic Hamiltonian matrix without BdG...", lvl = 2, log = 'debug')
+                    self._hamil = self._hamil_sp
+                else:
+                    self._log("Diagonalizing the quadratic Hamiltonian matrix with BdG...", lvl = 2, log = 'debug')
+                    if self._isfermions:
+                        self._hamil = backend.block([   [ self._hamil_sp, self._delta_sp ],
+                                                        [-self._delta_sp.conj(), -self._hamil_sp.conj().T ]])
+            else:  # bosons – use ΣH to make it Hermitian
+                sigma = backend.block([ [backend.eye(self.ns), backend.zeros_like(self._hamil)  ],
+                                        [backend.zeros_like(self._hamil), -backend.eye(self.ns) ]])
+                self._hamil = sigma @ backend.block([[ self._hamil_sp,  self._delta_sp          ],
+                                        [self._delta_sp.conj().T, self._hamil_sp.conj().T       ]])
+    
     def diagonalize(self, verbose: bool = False, **kwargs):
         """
         Diagonalizes the Hamiltonian matrix using one of several methods.
@@ -1342,22 +1363,9 @@ class Hamiltonian(ABC):
             self._log(f"Diagonalization started using ({method})...", lvl = 1)
             
         if self._is_quadratic:
-            if True:
-                if self.particle_conserving:
-                    self._log("Diagonalizing the quadratic Hamiltonian matrix without BdG...", lvl = 2, log = 'debug')
-                    self._hamil = self._hamil_sp
-                else:
-                    self._log("Diagonalizing the quadratic Hamiltonian matrix with BdG...", lvl = 2, log = 'debug')
-                    if self._isfermions:
-                        self._hamil = backend.block([   [ self._hamil_sp, self._delta_sp ],
-                                                        [-self._delta_sp.conj(), -self._hamil_sp.conj().T ]])
-            else:  # bosons – use ΣH to make it Hermitian
-                sigma = backend.block([ [backend.eye(self.ns), backend.zeros_like(self._hamil)  ],
-                                        [backend.zeros_like(self._hamil), -backend.eye(self.ns) ]])
-                self._hamil = sigma @ backend.block([[ self._hamil_sp,  self._delta_sp          ],
-                                        [self._delta_sp.conj().T, self._hamil_sp.conj().T       ]])
+            self._diagonalize_quadratic_prepare(backend, **kwargs)
         
-        # try to diagonalize the Hamiltonian matrix
+        #! try to diagonalize the Hamiltonian matrix
         try:
             if self._is_sparse or method.lower() in ["lanczos", "shift-invert"]:
                 self._eig_val, self._eig_vec = linalg.eigsh(self._hamil, backend, **kwargs)
@@ -1666,7 +1674,7 @@ class Hamiltonian(ABC):
             return f"{name}=[]"
         if np.allclose(arr, arr.flat[0], atol=tol, rtol=0):
             return Hamiltonian._fmt_scalar(name, float(arr.flat[0]))
-        return f"{name}[min={arr.min():.{prec}f}, max={arr.max():.{prec}f}]"
+        return f"{name}[min={arr.min():.{prec}f},max={arr.max():.{prec}f}]"
 
     @staticmethod
     def fmt(name, value):

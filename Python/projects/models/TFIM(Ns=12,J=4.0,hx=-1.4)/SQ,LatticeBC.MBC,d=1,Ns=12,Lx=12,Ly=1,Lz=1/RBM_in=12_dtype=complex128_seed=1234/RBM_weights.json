@@ -1,0 +1,8 @@
+{
+  "nqs_repr": "NQS(ansatz=FlaxNetInterface(input_dim=12, dtype=complex128, flax_module=_FlaxRBM),sampler=MCSampler:\n  - State shape: (12,) (Size: 12)\n  - Backend: jax\n  - Chains: 10, Samples/Chain: 200\n  - Params: mu=2.000, beta=1.000, logprob_fact=0.500\n  - Thermalization: 25 sweeps x 12 steps/sweep (43200 total site updates/chain)\n  - Sampling: 12 steps/sample (28800 total site updates/chain)\n,backend=jax)",
+  "checkpoint": {
+    "path": "/home/klimak/Codes/QuantumEigenSolver/Python/projects/models/TFIM(Ns=12,J=4.0,hx=-1.4)/SQ,LatticeBC.MBC,d=1,Ns=12,Lx=12,Ly=1,Lz=1/RBM_in=12_dtype=complex128_seed=1234/RBM_weights.h5",
+    "step": null,
+    "max_kept": 1
+  }
+}

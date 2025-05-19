@@ -183,6 +183,7 @@ class MonteCarloSolver(Solver):
         
         if sampler is None:
             raise ValueError(self._ERROR_MSG_SAMPLER)
+        
         # for the replica and Monte Carlo process
         self._replica_idx       = replica       # replica index
         self._beta              = beta          # inverse temperature beta = 1/T
@@ -192,7 +193,6 @@ class MonteCarloSolver(Solver):
         self._accepted          = 0             # number of accepted steps
         self._total             = 0             # total number of steps
         self._acceptance_rate   = None          # acceptance rate
-        
         
         # information
         self._info              = "a general Monte Carlo Solver"
@@ -514,5 +514,6 @@ class MonteCarloSolver(Solver):
         Load the weights of the model.
         '''
         pass
-    
+
+
 ########################################

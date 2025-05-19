@@ -9,13 +9,13 @@
 import os
 import numpy as np
 import inspect
-import numba
 import h5py
 import json
 
 # typing and other imports
-from typing import Union, Tuple, Union, Callable, Optional, Any, Sequence, List
+from typing import Union, Tuple, Union, Callable, Optional, Any, Sequence, List, Dict
 from functools import partial
+from pathlib import Path
 
 # from general_python imports
 from general_python.algebra.utils import JAX_AVAILABLE, Array
@@ -37,13 +37,15 @@ if JAX_AVAILABLE:
     # jax tree
     try:
         import jax.tree as jax_tree
-        from jax.tree import tree_flatten, tree_unflatten, tree_map
+        from jax.tree import tree_flatten
+        from orbax.checkpoint import CheckpointManager, PyTreeCheckpointHandler
     except ImportError:
         import jax.tree_util as jax_tree
         from jax.tree_util import tree_map
-    from jax.tree_util import tree_flatten, tree_unflatten
-    from jax.flatten_util import ravel_pytree
-
+        from jax.tree_util import tree_flatten
+        CheckpointManager = None
+        PyTreeCheckpointHandler = None
+        
     # use flax
     import flax
     import flax.linen as nn
@@ -63,6 +65,8 @@ else:
     jax_tree        = None
     tree_flatten    = None
     tree_unflatten  = None
+    ravel_pytree    = None
+    orbax_utils     = None
 
 #########################################
 
@@ -122,7 +126,6 @@ class NQS(MonteCarloSolver):
                 # information on the Monte Carlo solver
                 directory   : Optional[str]                     = MonteCarloSolver.defdir,
                 backend     : str                               = 'default',
-                nthreads    : Optional[int]                     = 1,
                 **kwargs):
         '''
         Initialize the NQS solver.
@@ -174,8 +177,7 @@ class NQS(MonteCarloSolver):
                         hilbert     =   hilbert,
                         modes       =   modes,
                         directory   =   directory,
-                        backend     =   backend,
-                        nthreads    =   nthreads)
+                        backend     =   backend)
         
         # pre-set the Hamiltonian
         if hamiltonian is None:
@@ -206,11 +208,12 @@ class NQS(MonteCarloSolver):
         self._batch_size        = batch_size
         self._initialized       = False
         self._dtype             = None
-        self._analytic          = False                                 # analytic gradients
-        self._holomorphic       = True                                  # holomorphic network
+        self._analytic          = False         # analytic gradients
+        self._holomorphic       = True          # holomorphic network
         self._net : Networks.GeneralNet = self._choose_network(net, input_shape=self._shape, backend=self._backend_str, **kwargs)
         if not self._net.initialized:
             self.init_network()
+        
         self._isjax             = getattr(self._net, 'is_jax', True)    # Assumes net object knows its backend type
         self._iscpx             = self._net.is_complex
         self._holomorphic       = self._net.is_holomorphic
@@ -227,7 +230,7 @@ class NQS(MonteCarloSolver):
         self._params_tree_def           = None  # tree definition for the parameters, meaning the structure of the parameters
         self._params_total_size         = None  # total size of the parameters
         #! ------------------------------------
-        self._flat_grad_func             = None  # function to calculate the gradients (returns a flat vector)
+        self._flat_grad_func            = None  # function to calculate the gradients (returns a flat vector)
         self._dict_grad_type            = None  # dictionary with the type of gradients (real/imaginary)
         self._init_gradients()
         self._init_param_metadata()
@@ -260,6 +263,34 @@ class NQS(MonteCarloSolver):
             self._lower_states_manager = NQSLower(lower_states, lower_betas, self)
         else:
             self._lower_states_manager = NQSLower([], [], self)
+            
+        #######################################
+        #! directory to save the results
+        #######################################
+        self._init_directory()
+        
+        
+        self._dir.mkdir()
+        self._dir_detailed.mkdir()
+        
+        #! Orbax checkpoint manager
+        self._use_orbax = kwargs.get('use_orbax', True)
+        self._orbax_max_to_keep = kwargs.get('orbax_max_to_keep', 3)
+
+        if  (self._isjax and self._use_orbax and \
+                hasattr(self._net, 'net_module') and isinstance(self._net.net_module, nn.Module)):
+
+            #! set the checkpoint manager
+            ckpt_base = Path(self._dir_detailed / 'checkpoints')
+            ckpt_base.mkdir(parents=True, exist_ok=True)
+            
+            handler   = PyTreeCheckpointHandler()
+            self._ckpt_manager = CheckpointManager(
+                directory       = str(ckpt_base),
+                checkpoint_type = handler,
+                max_to_keep     = self._orbax_max_to_keep)
+        else:
+            self._ckpt_manager = None
         
     #####################################
     #! NETWORK
@@ -332,6 +363,52 @@ class NQS(MonteCarloSolver):
         
         self._initialized = False
         self._net.force_init()
+    
+    # ---
+    
+    def _init_directory(self):
+        """
+        Initializes the directory for saving results.
+        This method creates a directory structure based on the Hamiltonian and lattice information.
+        It ensures that the directory exists and is ready for use.
+        """
+        
+        base                = Directories(self._dir)
+        detailed            = base.join(str(self._hamiltonian), create=False)
+
+        #! add the lattice information if needed
+        if self._hamiltonian.lattice is not None:
+            detailed        = detailed.join(str(self._hamiltonian.lattice), create=False)
+        else:
+            detailed        = detailed.join(str(self._nvisible), create=False)
+
+        #! network summary: skip sampler & params
+        #   e.g. "FlaxNetInterface_in12_dtypecomplex128"
+        
+        net_cls             = type(self._net).__name__
+        try:
+            dim             = self._net.input_dim
+            dtype           = getattr(self._net, "dtype", self._dtype)
+            seed            = getattr(self._net, "seed", None)
+        except AttributeError:
+            dim, dtype = None, None
+
+        parts               = [net_cls]
+        if dim   is not None: parts.append(f"in={dim}")
+        if dtype is not None: parts.append(f"dtype={dtype}")
+        if seed  is not None: parts.append(f"seed={seed}")
+
+        net_folder          = "_".join(parts)
+        final_dir           = detailed.join(net_folder, create=False)
+
+        #! actually mkdir them all
+        #    create intermediate parents automatically
+        base.mkdir()
+        final_dir.mkdir()
+
+        #! store for later use
+        self._dir           = base
+        self._dir_detailed  = final_dir
     
     # ---
     
@@ -572,7 +649,6 @@ class NQS(MonteCarloSolver):
             The output of the neural network for the given states, representing the log of the 
             wavefunction amplitudes.
         """
-
         # evaluate the network (log ansatz) using JAX
         return net_utils.jaxpy.eval_batched_jax(batch_size, self._ansatz_func, params, states)
     
@@ -638,9 +714,8 @@ class NQS(MonteCarloSolver):
         Returns:
             The evaluated network output.
         '''
-        if self._isjax:
-            return self.eval_jax(states, batch_size=self._batch_size, params=self.get_params())
-        return self.eval_np(states, batch_size=self._batch_size, params=self.get_params())
+        return self._eval_func(func=self._ansatz_func,
+                        data=states, batch_size=self._batch_size, params=self.get_params())
     
     #####################################
     #! EVALUATE FUNCTION VALUES - LOCAL ENERGY AND OTHER FUNCTIONS (OPERATORS)
@@ -648,13 +723,13 @@ class NQS(MonteCarloSolver):
     
     @staticmethod
     @partial(jax_jit, static_argnames=['func', 'logproba_fun', 'batch_size'])
-    def evaluate_fun_jax(func         : Callable,
-                        states        : jnp.ndarray,
-                        probabilities : jnp.ndarray,
-                        logproba_in   : jnp.ndarray,
-                        logproba_fun  : Callable,
-                        parameters    : Union[dict, list, jnp.ndarray],
-                        batch_size    : Optional[int] = None):
+    def apply_fun_jax(func        : Callable,
+                    states        : jnp.ndarray,
+                    probabilities : jnp.ndarray,
+                    logproba_in   : jnp.ndarray,
+                    logproba_fun  : Callable,
+                    parameters    : Union[dict, list, jnp.ndarray],
+                    batch_size    : Optional[int] = None):
         """
         Evaluates a given function on a set of states and probabilities, with optional batching.
         Args:
@@ -690,7 +765,7 @@ class NQS(MonteCarloSolver):
                             batch_size      = batch_size)
     
     @staticmethod
-    def evaluate_fun_np(func          : Callable,
+    def apply_fun_np(func          : Callable,
                         states        : np.ndarray,
                         probabilities : np.ndarray,
                         logproba_in   : np.ndarray,
@@ -734,7 +809,7 @@ class NQS(MonteCarloSolver):
                         batch_size      = batch_size)
 
     @staticmethod
-    def _evaluate_fun(func          : Callable,
+    def _apply_fun(func          : Callable,
                     states          : np.ndarray,
                     probabilities   : np.ndarray,
                     logproba_in     : np.ndarray,
@@ -781,7 +856,7 @@ class NQS(MonteCarloSolver):
                         batch_size      = batch_size)
     
     @staticmethod
-    def _evaluate_fun_s(func        : list[Callable],
+    def _apply_fun_s(func        : list[Callable],
                         sampler     : Sampler,
                         num_samples : int,
                         num_chains  : int,
@@ -819,13 +894,14 @@ class NQS(MonteCarloSolver):
         """
 
         _, (states, ansatze), probabilities = sampler.sample(parameters=parameters, num_samples=num_samples, num_chains=num_chains)
-        evaluated_results = [NQS._evaluate_fun(f, states, probabilities, ansatze, logproba_fun, parameters, batch_size, is_jax) for f in func]
+        evaluated_results = [NQS._apply_fun(f, states, probabilities, ansatze, logproba_fun, parameters, batch_size, is_jax) for f in func]
         return (states, ansatze), probabilities, evaluated_results
     
-    def evaluate_fun(self,
-                functions       : Optional[list] = None,
-                states_and_psi  : Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]] = None,
-                probabilities   : Optional[Union[np.ndarray, jnp.ndarray]] = None,
+    def apply(self,
+                functions       : Optional[Union[List, Callable]]                                                   = None,
+                states_and_psi  : Optional[Tuple[Union[np.ndarray, jnp.ndarray], Union[np.ndarray, jnp.ndarray]]]   = None,
+                probabilities   : Optional[Union[np.ndarray, jnp.ndarray]]                                          = None,
+                batch_size      : Optional[int]                                                                     = None,
                 **kwargs):
         """
         Evaluate a set of functions based on the provided states, wavefunction, and probabilities.
@@ -855,82 +931,69 @@ class NQS(MonteCarloSolver):
                 a list of results is returned.
         """
         
-        output          = [None]
-        batch_size      = kwargs.get('batch_size', self._batch_size)
         params          = kwargs.get('params', self._net.get_params())
+        batch_size      = batch_size if batch_size is not None else self._batch_size
         
-        # check if the functions are provided
-        if functions is None or len(functions) == 0:
+        #! check if the functions are provided
+        if functions is None or (isinstance(functions, list) and len(functions) == 0):
             functions = [self._local_en_func]
+        elif not isinstance(functions, list):
+            functions = [functions]
         
         # check if the states and psi are provided
         states, ansatze = None, None
         if states_and_psi is not None:
-            if isinstance(states_and_psi, tuple):
+            if isinstance(states_and_psi, tuple) and len(states_and_psi) == 2:
                 states, ansatze = states_and_psi
+            elif isinstance(states_and_psi, np.ndarray) or isinstance(states_and_psi, jnp.ndarray):
+                states          = states_and_psi    # assume it's the states
+                ansatze         = self(states)      # call log ansatz function
             else:
-                states          = states_and_psi
-                ansatze         = self(states)
-            
-            # check if the probabilities are provided
-            if probabilities is None:
-                probabilities = self._backend.ones_like(ansatze).astype(ansatze.dtype)
-            
-            if self._isjax:
-                output = [NQS.evaluate_fun_jax(func     = f,
-                                        states          = states,
-                                        probabilities   = probabilities,
-                                        logproba_in     = ansatze,
-                                        logproba_fun    = self._ansatz_func,
-                                        parameters      = params,
-                                        batch_size      = batch_size) for f in functions]
-            else:
-                # otherwise, we shall use the numpy version
-                output = [NQS.evaluate_fun_np(func      = f,
-                                        states          = states,
-                                        probabilities   = probabilities,
-                                        logproba_in     = ansatze,
-                                        logproba_fun    = self._ansatz_func,
-                                        parameters      = params,
-                                        batch_size      = batch_size) for f in functions]
+                raise ValueError(self._ERROR_STATES_PSI)
         else:
             # get other parameters from kwargs
-            num_samples = kwargs.get('num_samples', self._sampler.num_samples)
+            num_samples = kwargs.get('num_samples', self._sampler.numsamples)
             num_chains  = kwargs.get('num_chains', self._sampler.numchains)
+            _, (states, ansatze), probabilities = self._sampler.sample(parameters=params,
+                                                        num_samples=num_samples, num_chains=num_chains)
             
-            # otherwise, we shall use the sampler
-            (states, ansatze), probabilities, output    = \
-                    self._evaluate_fun_s(func           = functions,
-                                        sampler         = self._sampler,
-                                        num_samples     = num_samples,
-                                        num_chains      = num_chains,
-                                        logproba_fun    = self._ansatz_func,
-                                        parameters      = params,
-                                        batch_size      = batch_size,
-                                        is_jax          = self._isjax)
+        # check if the probabilities are provided
+        if probabilities is None:
+            probabilities = self._backend.ones_like(ansatze).astype(ansatze.dtype)
+            
+        output = [
+            self._apply_func(
+                func            = f,
+                states          = states,
+                sample_probas   = probabilities,
+                logprobas_in    = ansatze,
+                logproba_fun    = self._ansatz_func,
+                parameters      = params,
+                batch_size      = batch_size
+            ) for f in functions
+        ]
         
         # check if the output is a list
         if isinstance(output, list) and len(output) == 1:
             output = output[0]
         return (states, ansatze), probabilities, output
 
-    def __getitem__(self, funct: Callable):
-        '''
-        Use this to apply a function to the state with the ansatz.
-        Parameters:
-            funct: The function to apply to the state.
+    def __getitem__(self, funct: Union[Callable, List[Callable]]):
+        """
+        Allows the object to be indexed using square brackets with a callable or a list of callables.
+        When accessed, applies the given function(s) to the object using the `apply` method.
+
+        Args:
+            funct (Union[Callable, List[Callable]]): A single callable or a list of callables to be applied.
+
         Returns:
-            The result of the function applied to the state.
-        Note:
-            This method is used to apply a function to the state with the ansatz.
-            It uses the sampler to sample the states and ansatz, and then applies
-            the function to the sampled states and ansatz.
-        '''
-        # sample the states and ansatz
-        (_, _), (configs, configs_ansatze), probabilities = self._sampler.sample()
-        return self._evaluate_fun(funct,
-                                configs, probabilities, configs_ansatze,
-                                self._ansatz_func, self._net.get_params(), self._batch_size, self._isjax)
+            The result of applying the given function(s) to the object.
+
+        Raises:
+            Any exception raised by the `apply` method.
+        """
+
+        return self.apply(funct)
     
     #####################################
     #! SAMPLE
@@ -954,7 +1017,8 @@ class NQS(MonteCarloSolver):
         '''
         if reset:
             self._sampler.reset()
-        return self._sampler.sample(num_samples=num_samples, num_chains=num_chains)
+        return self._sampler.sample(parameters=self._net.get_params(),
+                            num_samples=num_samples, num_chains=num_chains)
     
     #####################################
     #! GRADIENTS
@@ -1046,7 +1110,7 @@ class NQS(MonteCarloSolver):
     #####################################
     #! UPDATE PARAMETERS
     #####################################
-        
+    
     def transform_flat_params(self,
                             flat_params : jnp.ndarray,
                             shapes      : list,
@@ -1145,7 +1209,7 @@ class NQS(MonteCarloSolver):
         self._sampler.set_numchains(numchains)
         self._sampler.set_numsamples(numsamples)
         return shapes, sizes, iscpx
-        
+    
     @staticmethod
     def _single_step_jax(
             # Dynamic Inputs (Data & State)
@@ -1472,36 +1536,17 @@ class NQS(MonteCarloSolver):
     #! WEIGHTS
     #####################################
     
-    def set_weights(self, weights: dict = None, file_path: str = None, fmt: str = "h5"):
-        """
-        Set the weights of the NQS solver.
-
-        Args:
-            weights:
-                dict of parameter arrays to set.
-            file_path:
-                path to load weights from ('.h5' or '.json').
-            fmt:
-                format of file ('h5' or 'json').
-        """
-        if file_path:
-            self._params = self.load_weights(file_path, fmt)
-        elif weights is not None:
-            self._params = weights
-        else:
-            raise ValueError("Provide either weights dict or file_path.")
-        self.set_params(self._params)
-    
     def update_weights(self, f: any = None, weights: dict = None):
         """
         Update the weights of the NQS solver.
 
         Args:
-            f: scalar multiplier, callable, or None. If scalar, multiplies all params by f.
-               If callable, applies f(param) to each param.
+            f:  scalar multiplier, callable, or None. If scalar, multiplies all params by f.
+                If callable, applies f(param) to each param.
             weights: dict of same structure; added elementwise to current params.
         """
-        # apply function f
+        
+        #! apply function f
         if f is not None:
             if isinstance(f, (int, float)):
                 self._params = jax.tree_map(lambda x: x * f, self._params)
@@ -1509,56 +1554,154 @@ class NQS(MonteCarloSolver):
                 self._params = jax.tree_map(lambda x: f(x), self._params)
             else:
                 raise ValueError("f must be a number or a callable.")
-        # add weights
+        #! add weights
         if weights is not None:
             self._params = jax.tree_multimap(lambda x, y: x + y, self._params, weights)
         self._net.set_params(self._params)
     
-    def save_weights(self, file_path: str, fmt: str = "h5") -> str:
+    # ---
+    
+    def save_weights(
+        self,
+        filename      : Optional[Directories]   = None,
+        fmt           : str                     = "h5",
+        absolute      : bool                    = False,
+        step          : Optional[int]           = 0,
+        max_to_keep   : Optional[int]           = 1,
+        overwrite     : bool                    = True,
+        save_metadata : bool                    = False) -> Dict[str, Any]:
         """
-        Save current weights to disk.
+        Save network weights to disk.
 
         Args:
-            file_path: destination path (without extension).
-            fmt: 'h5' or 'json'.
-        Returns:
-            Full path of saved file.
-        """
-        path = file_path + (".h5" if fmt == "h5" else ".json")
-        if fmt == "h5":
-            with h5py.File(path, "w") as f:
-                for k, v in self._params.items():
-                    f.create_dataset(k, data=jax.device_get(v))
-        elif fmt == "json":
-            serial = {k: jax.device_get(v).tolist() for k, v in self._params.items()}
-            with open(path, "w") as f:
-                json.dump(serial, f)
-        else:
-            raise ValueError("Unsupported format: {}".format(fmt))
-        return path
-    
-    def load_weights(self, file_path: str, fmt: str = "h5") -> dict:
-        """
-        Load weights from disk.
+            filename:
+                Name of the file (with extension). If None, defaults to '<net>_weights.<fmt>'.
+            fmt:
+                Format ('h5' or 'npz').
+            absolute:
+                If True, treat filename as full path; if False, place under self._dir_detailed.
+            use_orbax:
+                If True and net is FlaxNetInterface, use Orbax CheckpointManager.
+            overwrite:
+                If True, overwrite existing file.
+            save_metadata:
+                If True, also write '<filename>.json' with repr(self) metadata.
 
-        Args:
-            file_path: path to file (with extension).
-            fmt: 'h5' or 'json'.
         Returns:
-            Dict of parameter arrays.
+            Full path to the saved weights file.
         """
-        path = file_path
-        if fmt == "h5":
-            with h5py.File(path, "r") as f:
-                loaded = {k: jnp.array(f[k][()]) for k in f.keys()}
-        elif fmt == "json":
-            with open(path, "r") as f:
-                data = json.load(f)
-            loaded = {k: jnp.array(v) for k, v in data.items()}
+        # determine filename
+        if filename is None:
+            base_name = f"{type(self._net).__name__}_weights"
+            filename  = f"{base_name}.{fmt}"
+
+        params = self._net.get_params()
+
+        if self._use_orbax and self._ckpt_manager:
+            if step is None:
+                step = 0
+                
+            #! Optionally override keep parameter
+            if max_to_keep is not None:
+                self._ckpt_manager.max_to_keep = max_to_keep
+
+            self._ckpt_manager.save(
+                step      = step,
+                items     = { 'params': params },
+                overwrite = overwrite
+            )
+            out_path = self._ckpt_manager.directory
+            info     = {
+                'path'      : out_path,
+                'step'      : step,
+                'max_kept'  : self._ckpt_manager.max_to_keep
+            }
         else:
-            raise ValueError("Unsupported format: {}".format(fmt))
-        return loaded
-    
+            # construct path
+            if absolute:
+                path = Directories(filename)
+                path.parent().mkdir(parents=True, exist_ok=True)
+            else:
+                base = Directories(self._dir_detailed)
+                path = Path(str(base.join(filename)))
+
+            # avoid overwrite if disabled
+            if path.exists() and not overwrite:
+                raise FileExistsError(f"File already exists: {path}")
+
+            if fmt == 'h5':
+                with h5py.File(path, 'w') as f:
+                    def write_tree(node, tree):
+                        for k, v in tree.items():
+                            if isinstance(v, dict):
+                                grp = node.create_group(k)
+                                write_tree(grp, v)
+                            else:
+                                node.create_dataset(k, data=np.array(v))
+                    write_tree(f, params)
+            elif fmt == 'npz':
+                flat = {k: np.array(v) for k, v in params.items()}
+                np.savez(path, **flat)
+            else:
+                raise ValueError(f"Unsupported format: {fmt}")
+
+            out_path = str(path)
+            info     = {'path': out_path, 'step': None, 'max_kept': 1}
+
+        if save_metadata:
+            meta = Path(info['path']).with_suffix('.json')
+            with open(meta, 'w') as mf:
+                json.dump({'nqs_repr': repr(self), 'checkpoint': info}, mf, indent=2)
+
+    def load_weights(
+        self,
+        filename : Optional[str] = None,
+        fmt      : str           = "h5",
+        absolute : bool          = False,
+        step     : Optional[int] = None,
+        use_orbax: bool          = False) -> Dict[str, Any]:
+        """
+        Load weights at given step (or latest) and set on self._net.
+
+        Returns the loaded parameters dict.
+        """
+        if use_orbax and self._ckpt_manager:
+            if step is None:
+                #! load latest
+                ckpts   = self._ckpt_manager.list_checkpoints()
+                if not ckpts:
+                    raise FileNotFoundError("No checkpoints found.")
+                step    = max(ckpts)
+
+            state       = self._ckpt_manager.restore(step=step)
+            params      = state['params']
+        else:
+            base_name   = filename or f"{type(self._net).__name__}_weights"
+            fname       = f"{base_name}.{fmt}" if not base_name.endswith(f".{fmt}") else base_name
+            if absolute:
+                path    = Path(fname)
+            else:
+                path    = Path(str(Directories(self._dir_detailed).join(fname)))
+            if not path.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+
+            if fmt == 'h5':
+                with h5py.File(path, 'r') as f:
+                    def read_tree(node):
+                        out = {}
+                        for k, v in node.items():
+                            out[k] = read_tree(v) if isinstance(v, h5py.Group) else v[()]
+                        return out
+                    params = read_tree(f)
+            elif fmt == 'npz':
+                data   = np.load(path)
+                params = {k: data[k] for k in data.files}
+            else:
+                raise ValueError(f"Unsupported format: {fmt}")
+
+        self.set_params(params)
+        return params
+
     #####################################
     
     def get_params(self, unravel: bool = False) -> Any:
@@ -1569,8 +1712,20 @@ class NQS(MonteCarloSolver):
         return params
     
     def set_params(self, new_params: Any, shapes: list = None, sizes: list = None, iscpx: bool = False):
-        """Sets new parameters in the network object."""
+        """
+        Sets new parameters in the network object.
+        Parameters
+        ----------
+        new_params : Any
+            The new parameters to set. Can be:
+                1.  A PyTree (dict, list, custom) matching the exact structure of
+                    the model's parameters.
+                2.  A 1D JAX array (`jnp.ndarray`) containing the update in the
+                    flattened **real representation** format (matching the structure
+                    defined by the model's parameters, including [Re, Im] for complex leaves).
+        """
         params = new_params
+        
         # check if the parameters are provided
         if params is None:
             params = self._net.get_params()
@@ -1593,6 +1748,19 @@ class NQS(MonteCarloSolver):
         Return the neural network.
         '''
         return self._net
+    
+    @property
+    def net_flax(self):
+        '''
+        Return the neural network in Flax format.
+        '''
+        try:
+            return self._net.net_module
+        except AttributeError:
+            raise AttributeError("The neural network is not in Flax format.")
+        except Exception as e:
+            raise e
+        return None
     
     @property
     def sr(self):
@@ -1651,6 +1819,34 @@ class NQS(MonteCarloSolver):
         Return the neural network apply function.
         '''
         return self._ansatz_func
+    
+    @property
+    def apply_f(self):
+        '''
+        Return the neural network apply function.
+        '''
+        return self._apply_func
+    
+    @property
+    def flat_apply(self):
+        '''
+        Return the flat apply function.
+        '''
+        return self._flat_apply_func
+    
+    @property
+    def evaluate_f(self):
+        '''
+        Return the evaluate function.
+        '''
+        return self._eval_func
+    
+    @property
+    def grad(self):
+        '''
+        Return the gradient function.
+        '''
+        return self._grad_func   
     
     @property
     def flat_grad(self):
@@ -1738,7 +1934,7 @@ class NQS(MonteCarloSolver):
         results = {}
         for i, op in enumerate(operators):
             (vals, mu, sig), timings_op = timeit(
-                self.evaluate_fun_jax,
+                self.apply_fun_jax,
                 func           = op.jax,
                 states         = configs,
                 probabilities  = probs,
@@ -1762,7 +1958,7 @@ class NQS(MonteCarloSolver):
         energy = None
         if get_energy:
             (e_vals, e_mu, e_sig), timings['energy'] = timeit(
-                self.evaluate_fun_jax,
+                self.apply_fun_jax,
                 func           = self.local_energy,
                 states         = configs,
                 probabilities  = probs,
@@ -1865,7 +2061,7 @@ class NQS(MonteCarloSolver):
         return results, energy, timings
 
     #####################################
-    
+
 #########################################
 #! NQS Lower States
 #########################################
@@ -1889,7 +2085,7 @@ class NQSLower:
         self._parent_nqs                    = parent_nqs
         self._parent_apply_fn               = parent_nqs.ansatz
         self._parent_params                 = parent_nqs.get_params()                               # will likely be updated during training
-        self._parent_evaluate               = parent_nqs.evaluate_fun_jax if self._isjax else parent_nqs.evaluate_fun_np
+        self._parent_evaluate               = parent_nqs.apply_f
         self._log_p_ratio_fn                = parent_nqs.log_prob_ratio        
         
         #! handle the lower states
@@ -1905,9 +2101,9 @@ class NQSLower:
         self._lower_apply_fns       = [nqs.ansatz for nqs in self._lower_nqs]               # this is static as it is not updated during training
         self._lower_params          = [nqs.get_params() for nqs in self._lower_nqs]         # this is static as it is not updated during training
         if self._isjax:
-            self._lower_evaluate    = [nqs.evaluate_fun_jax for nqs in self._lower_nqs]     # this is static as it is not updated during training
+            self._lower_evaluate    = [nqs.apply_f for nqs in self._lower_nqs]     # this is static as it is not updated during training
         else:
-            self._lower_evaluate    = [nqs.evaluate_fun_np for nqs in self._lower_nqs]
+            self._lower_evaluate    = [nqs.apply_f for nqs in self._lower_nqs]
 
         #! Placeholder for ratios - these would be computed during the excited state's MC sampling
         # Shape: (num_lower_states, num_samples_excited_state)

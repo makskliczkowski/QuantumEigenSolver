@@ -98,7 +98,7 @@ class Solver(ABC):
         self._dir           = directory                                                     # directory for saving the data (potentially)
         if not isinstance(directory, Directories):
             self._dir       = Directories(directory)
-        self._dir.create_folder(False)
+            self._dir.mkdir(parents=True, exist_ok=True)
         
         # check the backend
         self._backend, self._backend_sp, (self._rng, self._rngJAX_RND_DEFAULT_KEY), self._backend_str = self.obtain_backend(backend, seed)

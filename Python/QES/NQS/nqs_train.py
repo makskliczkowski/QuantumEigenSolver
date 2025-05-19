@@ -205,6 +205,12 @@ class NQSTrainer:
             #! update the last parameters
             last_params = self.nqs.get_params()
             
+            #! save the checkpoint
+            self.nqs.save_weights(
+                step = epoch,
+                save_metadata = True,
+            )
+            
             if self.early_stopper(mean_E_real):
                 self.logger.info(f"Early stopping at epoch {epoch}.")
                 break
@@ -300,67 +306,61 @@ class NQSTrainer:
         if plot_kwargs is not None:
             fig, ax     = Plotter.get_subplots(nrows    = 2,
                                             ncols       = 1,
-                                            figsize     = (4, 5),
+                                            figsize     = plot_kwargs.get("figsize", (5, 4)),
                                             dpi         = 150,
                                             sharex      = True)
-            max_all     = np.nanmax(np.real(self.history))
-            min_all     = np.nanmin(np.real(self.history))
-            inset_up    = last_mean > (max_all - min_all) / 3
-            
-            if inset_up:
-                axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.6, 0.3, 0.38, 0.3]), zorder=10)
-            else:
-                axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.2, 0.02, 0.38, 0.3]), zorder=10)
-            ax          = [ax[0], axin, ax[1]]
+            if True:
+                max_all     = np.nanmax(np.real(self.history))
+                min_all     = np.nanmin(np.real(self.history))
+                inset_up    = last_mean > (max_all - min_all) / 3
+                if inset_up:
+                    axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.6, 0.3, 0.38, 0.3]), zorder=10)
+                else:
+                    axin    = ax[0].inset_axes(plot_kwargs.get("inset_axes", [0.2, 0.02, 0.38, 0.3]), zorder=10)
+                ax          = [ax[0], axin, ax[1]]
             
             #! energies
             x           = np.arange(len(energies))
             Plotter.plot(ax[0], x=x, y=energies, marker="o", markersize=0.5, lw=1)
             Plotter.hline(ax[0], val=last_mean, lw=0.5, ls=':', label=f"Mean {last_mean:.3e}")
-            # Plot upper and lower std limits at each epoch
-            
             if eigv is not None:
                 Plotter.hline(ax[0], val=eigv / self.nqs.size, color='r', linestyle="--", lw=0.5, label=f"GS {eigv/self.nqs.size:.3e}")
 
             #! fill between
-            ax[0].fill_between(
-                x,
-                energies - energies_std,
-                energies + energies_std,
-                color   = "gray",
-                alpha   = 0.2,
-                label   = r"$\pm \sigma_E$",
-            )
-            ymin        = np.min(energies - energies_std)
-            ymax        = np.max(energies + energies_std)
-            ymargin     = 0.05 * (ymax - ymin)
             xlim        = (1, x[-1])
-            ylim        = (ymin - ymargin, ymax + ymargin)
-            ylim        = plot_kwargs.get("ylim_0", ylim)
+            Plotter.fill_between(ax[0],
+                                x,
+                                energies - energies_std,
+                                energies + energies_std,
+                                color   = "gray",
+                                alpha   = 0.2,
+                                label   = r"$\pm \sigma_E$")
             Plotter.set_legend(ax[0], loc=plot_kwargs.get("legend_loc_0", "upper right"),
                             fontsize=plot_kwargs.get("fontsize", 8), frameon=True, framealpha=0.8)
             Plotter.set_ax_params(ax[0], 
                             ylabel      =   r"$E/N_s$",
                             yscale      =   plot_kwargs.get("yscale_0", 'symlog'),
                             xscale      =   plot_kwargs.get("xscale_0", 'log'),
-                            ylim        =   ylim,
                             xlim        =   xlim,
                             fontsize    =   plot_kwargs.get("fontsize", 8))
+            Plotter.set_smart_lim(ax[0], which='y', data=energies, ylim=plot_kwargs.get("ylim_0", None))
             Plotter.set_tickparams(ax[0], maj_tick_l=2, min_tick_l=1)
             Plotter.set_annotate_letter(ax[0], iter=0,
-                                        fontsize=plot_kwargs.get("fontsize", 8),
-                                        x = plot_kwargs.get("annotate_x", 0.1),
-                                        y = plot_kwargs.get("annotate_y", 0.1))
-            ax[0].set_title(f"GS train {self.nqs._hamiltonian}", fontsize=8)
-            
+                                        fontsize    = plot_kwargs.get("fontsize", 8),
+                                        x           = plot_kwargs.get("annotate_x", 0.1),
+                                        y           = plot_kwargs.get("annotate_y", 0.1))
+            ax[0].set_title(f"NQS train {self.nqs._hamiltonian}\n{str(self.nqs._net)}", fontsize=plot_kwargs.get("fontsize", 8))
+    
             #! std
             xlim        = (1, x[-1])
             ylim        = plot_kwargs.get("ylim_1", None)
             Plotter.plot(ax[1], x=x, y=energies_std, marker="o", markersize=0.5, lw=1)
             Plotter.set_ax_params(ax[1], ylabel=r"$\sigma_E/N_s$",
-                            xlabel="$i$", yscale='log',
-                            xlim=xlim, ylim=ylim,
-                            xscale='log')
+                            xlabel  =   "$i$",
+                            yscale  =   'log',
+                            xlim    =   xlim,
+                            xscale  =   'log')
+            Plotter.set_smart_lim(ax[1], which='y', data=energies_std, ylim=ylim)
             Plotter.set_tickparams(ax[1], maj_tick_l=2, min_tick_l=1)
             if not inset_up:
                 Plotter.set_label_cords(ax[1], which='x', inX=0.5, inY=1.1)
@@ -371,23 +371,26 @@ class NQSTrainer:
             xlim        = (1, x[-1] + 1)
             ylim        = plot_kwargs.get("ylim_2", None)
             Plotter.plot(ax[2], x=np.arange(len(epoch_times)), y=epoch_times,
-                        markersize=0.5, lw=1, color=next(colorsCycle), label="epoch")
+                        markersize=0.5, lw=1, color=next(colorsCycle), label="epoch/total")
             Plotter.plot(ax[2], x=np.arange(len(sample_times)), y=sample_times, ls=next(linestylesCycle),
                         markersize=0.5, lw=1, alpha=0.5, label="sample", color=next(colorsCycle))
-            Plotter.plot(ax[2], x=np.arange(len(step_times)), y=step_times, ls=next(linestylesCycle),
-                        markersize=0.5, lw=1, alpha=0.5, label="step", color=next(colorsCycle))
             Plotter.plot(ax[2], x=np.arange(len(update_times)), y=update_times, ls=next(linestylesCycle),
                         markersize=0.5, lw=1, alpha=0.5, label="update", color=next(colorsCycle))
             Plotter.plot(ax[2], x=np.arange(len(grad_times)), y=grad_times, ls=next(linestylesCycle),
-                        markersize=0.5, lw=1, alpha=0.5, label="gradient", color=next(colorsCycle))
+                        markersize=0.5, lw=1, alpha=0.5, label="step/gradient", color=next(colorsCycle))
             Plotter.plot(ax[2], x=np.arange(len(prepare_times)), y=prepare_times, ls=next(linestylesCycle),
-                        markersize=0.5, lw=1, alpha=0.5, label="prepare", color=next(colorsCycle))
+                        markersize=0.5, lw=1, alpha=0.5, label="step/prepare", color=next(colorsCycle))
             Plotter.plot(ax[2], x=np.arange(len(solve_times)), y=solve_times, ls=next(linestylesCycle),
-                        markersize=0.5, lw=1, alpha=0.5, label="solve", color=next(colorsCycle))
-            Plotter.set_ax_params(ax[2], xlabel="Epoch", ylabel=r"$t_{\rm epoch}[s/N_s]$",
-                            xscale=plot_kwargs.get("xscale_2", 'log'),
-                            yscale=plot_kwargs.get("yscale_2", 'log'),
-                            xlim=xlim, ylim=ylim)
+                        markersize=0.5, lw=1, alpha=0.5, label="step/solve", color=next(colorsCycle))
+            Plotter.plot(ax[2], x=np.arange(len(step_times)), y=step_times, ls=next(linestylesCycle),
+                        markersize=0.5, lw=1, alpha=0.5, label="step/total", color=next(colorsCycle))
+            Plotter.set_ax_params(ax[2], 
+                            xlabel  =   "Epoch",
+                            ylabel  =   r"$t_{\rm epoch}[s/N_s]$",
+                            xscale  =   plot_kwargs.get("xscale_2", 'log'),
+                            yscale  =   plot_kwargs.get("yscale_2", 'log'),
+                            ylim    =   ylim,
+                            xlim    =   xlim)
             Plotter.set_tickparams(ax[2], maj_tick_l=2, min_tick_l=1)
             Plotter.set_legend(ax[2], loc=plot_kwargs.get("legend_loc_2", "upper right"),
                             fontsize=plot_kwargs.get("fontsize", 8), frameon=True, framealpha=0.8)
@@ -414,19 +417,11 @@ class NQSTrainer:
                                     "epoch_time":  last_time,
                                     "n_points":    len(energies),
                                     "history":     list(self.history),
+                                    "history_std": list(self.history_std),
+                                    "timings":     {k: list(v) for k, v in self.timings.items()},
                                     "lr_history":  list(self.lr_history),
                                     "reg_history": list(self.reg_history),
                                 }, info_path)
-                try:
-                    params_path = os.path.join(savedir, "gs_train_params.json")
-                    params_nqs  = self.nqs.get_params(unravel=True)
-                    # transform jax to numpy
-                    params_nqs  = list(np.array(params_nqs))
-                    self._save_json({'params': params_nqs}, params_path)
-                except Exception as e:
-                    self.logger.warning(f"Failed to save parameters: {e}")
-                    self.logger.warning("Parameters are not saved.")
-                    self.logger.warning("You can save them manually using `nqs.get_params()`.", color="red", lvl=1)
             return fig, ax
         return None, None
     

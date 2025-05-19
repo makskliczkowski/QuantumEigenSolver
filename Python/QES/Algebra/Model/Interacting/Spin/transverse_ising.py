@@ -119,7 +119,7 @@ class TransverseFieldIsing(hamil_module.Hamiltonian):
         TFIM(Ns=32, J=1.000, hx=[min=-0.200, max=0.300])
         """
         prec   = 3
-        sep    = ", "
+        sep    = ","
         tol    = 1e-10                      # tolerance for “all equal”
         
         # fields
