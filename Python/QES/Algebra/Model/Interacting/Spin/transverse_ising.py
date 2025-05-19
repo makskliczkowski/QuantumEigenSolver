@@ -27,7 +27,7 @@ from general_python.lattices.lattice import Lattice, LatticeType
 ##########################################################################################
 
 class TransverseFieldIsing(hamil_module.Hamiltonian):
-    '''
+    r'''
     Hamiltonian for the Transverse Field Ising Model (TFIM).
 
     The Hamiltonian is defined as:

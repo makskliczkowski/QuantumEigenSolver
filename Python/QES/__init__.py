@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 ####################################################################################################
 
-import general_python as general_python
-import Solver as Solver
+import general_python
+import Solver
 
 # -------------------------------------------------------------------------------------------------
