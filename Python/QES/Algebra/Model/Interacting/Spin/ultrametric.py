@@ -36,12 +36,12 @@ class UltrametricModel(hamil_module.Hamiltonian):
     def __init__(self,
                 ns              : int,
                 hilbert_space   : Optional[hilbert_module.HilbertSpace]     = None,
-                n               : int                               = 1,
-                J               : float                             = 1.0,
-                alphas          : Union[List[float], float, None]   = None,
-                gamma           : float                             = 1.0,
-                dtype           : type                              = np.float64,
-                backend         : str                               = "default",
+                n               : int                                       = 1,
+                J               : float                                     = 1.0,
+                alphas          : Union[List[float], float, None]           = None,
+                gamma           : float                                     = 1.0,
+                dtype           : type                                      = np.float64,
+                backend         : str                                       = "default",
                 **kwargs):
         # ns: total spins; n: spins in dot; L = ns - n hierarchical levels
         if n >= ns:
@@ -49,8 +49,8 @@ class UltrametricModel(hamil_module.Hamiltonian):
 
         L               = ns - n
         # initialize Hilbert space
-        hilbert_space   = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
-        super().__init__(is_manybody=True, hilbert_space=hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
+        _hilbert_space  = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
+        super().__init__(is_manybody=True, hilbert_space=_hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
 
         self._ns        = ns
         self._n         = n
@@ -64,7 +64,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
         # parse alphas
         self._set_alphas(alphas)
 
-        self._log(f"UltrametricModel initialized.", lvl=2, log='debug')
+        self._log("UltrametricModel initialized.", lvl=2, log='debug')
         self._log(f"ns (total spins): {self._ns}", lvl=3, log='debug')
         self._log(f"n (dot spins): {self._n}", lvl=3, log='debug')
         self._log(f"L (out spins): {self._L}", lvl=3, log='debug')
@@ -161,8 +161,8 @@ class UltrametricModel(hamil_module.Hamiltonian):
         #! and dim = 2^{n+k}
         
         # initialize the matrix
-        _hedit = backend.zeros((self._nh, self._nh), dtype=self._dtype)
-        
+        _hedit      = backend.zeros((self._nh, self._nh), dtype=self._dtype)
+
         dim0        = 2**self._n
         num_blocks  = 2**self._L
         # multiplier for H0
@@ -194,8 +194,32 @@ class UltrametricModel(hamil_module.Hamiltonian):
     # ---------------------------------------------------------------
     
     def __repr__(self):
-        return (f"UltrametricModel, ns={self.ns}, n={self.n}, J={self.J:.3f}, "
-                f"gamma={self.gamma:.3f}, alphas={self.alphas}")
+        prec    = 3          # decimal places for floats
+        tol     = 1e-10      # tolerance for uniformity check
+        sep     = ","        # parameter separator
+        
+        parts   = [
+            f"Ultrametric(ns={self.ns}",
+            f"N={self.n}",
+            self.fmt("J", self.J),
+            self.fmt("g", self.gamma),
+        ]
+
+        # handle alphas array or scalar
+        a = self.alphas
+        try:
+            amin, amax = min(a), max(a)
+            if abs(amax - amin) < tol:
+                parts.append(f"a={amin:.{prec}f}")
+            else:
+                parts.append(f"a[min={amin:.{prec}f}, max={amax:.{prec}f}]")
+        except TypeError:
+            parts.append(self.fmt("a", a))
+
+        return sep.join(parts) + ")"
+        
+    def __str__(self):
+        return self.__repr__()
 
     # ---------------------------------------------------------------
 

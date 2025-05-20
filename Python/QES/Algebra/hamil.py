@@ -92,7 +92,7 @@ class Hamiltonian(ABC):
     # ----------------------------------------------------------------------------------------------
     
     @staticmethod
-    def _set_backend(backend: str):
+    def _set_backend(backend: str, seed = None):
         '''
         Get the backend, scipy, and random number generator for the backend.
         
@@ -103,7 +103,7 @@ class Hamiltonian(ABC):
             tuple : The backend, scipy, and random number generator for the backend.
         '''
         if isinstance(backend, str):
-            bck = get_backend(backend, scipy=True, random=True)
+            bck = get_backend(backend, scipy=True, random=True, seed=seed)
             if isinstance(bck, tuple):
                 _backend, _backend_sp = bck[0], bck[1]
                 if isinstance(bck[2], tuple):
@@ -135,6 +135,7 @@ class Hamiltonian(ABC):
                 # logger and other kwargs
                 use_forward     : bool                      = False,
                 logger          : Optional[Logger]          = None,
+                seed            : Optional[int]             = None,
                 **kwargs):
         """
         Initialize the Hamiltonian class.
@@ -164,8 +165,8 @@ class Hamiltonian(ABC):
         ValueError
             If required information (such as Hilbert space or lattice) is missing or inconsistent.
         """
-        
-        self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian._set_backend(backend)
+        self._seed                  = seed
+        self._backendstr, self._backend, self._backend_sp, (self._rng, self._rng_k) = Hamiltonian._set_backend(backend, self._seed)
         self._is_jax                = JAX_AVAILABLE and self._backend != np
         self._is_numpy              = not self._is_jax
         self._is_sparse             = is_sparse
