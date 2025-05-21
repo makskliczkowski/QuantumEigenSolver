@@ -190,6 +190,8 @@ def time_evo_evaluate(quenched_states_t : Array,
     """
     quenched_values_t = np.einsum('ij,ji->i', np.conj(quenched_states_t.T), quench_operator_m @ quenched_states_t)
     return quenched_values_t
+    # quenched_values_t = np.conj(quenched_states_t.T) @ quench_operator_m @ quenched_states_t
+    # return quenched_values_t.diagonal()
 
 # -----------------------------------------------------------------------------
 #! Diagonal Ensemble

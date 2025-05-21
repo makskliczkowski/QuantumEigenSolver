@@ -116,6 +116,75 @@ def dos(energies: Array, nbins: int = 100, **kwargs) -> Array:
     return counts
 
 # -----------------------------------------------------------------------------
+#! Matrix elements
+# -----------------------------------------------------------------------------
+
+@numba.njit(fastmath=True)
+def f_function( start               : int,
+                stop                : int,
+                overlaps            : np.ndarray,
+                eigvals             : np.ndarray,
+                omegas_allocated    : np.ndarray,
+                vals_allocated      : np.ndarray,
+                energy_target       : float = 0.0,
+                bw                  : float = 1.0,
+                energy_diff_cut     : float = 0.015):
+    """
+    Computes and allocates omega values and corresponding squared overlaps for pairs of eigenvalues within a specified energy window.
+
+    Parameters:
+        start (int):
+            Starting index for the outer loop over eigenvalues.
+        stop (int):
+            Stopping index (exclusive) for the outer loop over eigenvalues.
+        overlaps (np.ndarray):
+            2D array of overlap values between eigenstates, shape (N, N).
+        eigvals (np.ndarray):
+            1D array of eigenvalues, shape (N,).
+        omegas_allocated (np.ndarray):
+            1D array to store computed omega values.
+        vals_allocated (np.ndarray):
+            1D array to store squared overlap values.
+        energy_target (float, optional):
+            Target energy value for filtering pairs. Default is 0.0.
+        bw (float, optional):
+            Bandwidth parameter for energy window. Default is 1.0.
+        energy_diff_cut (float, optional):
+            Energy difference cutoff factor. Default is 0.015.
+
+    Returns:
+        int: The number of (omega, squared overlap) pairs allocated in the output arrays.
+    """
+    tol    = bw * energy_diff_cut
+    cnt    = 0
+    nh     = eigvals.shape[0]
+
+    for i in range(start, stop):
+        e_i    = eigvals[i]
+        # derive allowed e_j range:
+        low    = 2.0*(energy_target - tol) - e_i
+        high   = 2.0*(energy_target + tol) - e_i
+
+        # find j‐window via binary search
+        j0     = np.searchsorted(eigvals, low)
+        if j0 <= i:
+            j0 = i + 1
+        j1     = np.searchsorted(eigvals, high)
+        if j1 > nh:
+            j1 = nh
+
+        # only loop inside the small window
+        for j in range(j0, j1):
+            diff                    = e_i - eigvals[j]
+            omega                   = diff if diff >= 0.0 else -diff
+            m2                      = overlaps[i, j] * overlaps[i, j]
+            omegas_allocated[cnt]   = omega
+            vals_allocated[cnt]     =  m2
+            cnt                    += 1
+    return cnt
+
+
+# -----------------------------------------------------------------------------
 #! Fidelity susceptibility
 # -----------------------------------------------------------------------------
 
