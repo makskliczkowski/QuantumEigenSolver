@@ -177,7 +177,7 @@ def f_function( start               : int,
         for j in range(j0, j1):
             diff                    = e_i - eigvals[j]
             omega                   = diff if diff >= 0.0 else -diff
-            m2                      = overlaps[i, j] * overlaps[i, j]
+            m2                      = abs(overlaps[i, j] * overlaps[j, i])
             omegas_allocated[cnt]   = omega
             vals_allocated[cnt]     =  m2
             cnt                    += 1
