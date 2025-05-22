@@ -412,7 +412,7 @@ def calculate_bogoliubov_amp_exc(F      : Array,     # (ns, ns)
             m = qp_inds[j]
             M[p, n+j]   =  U[ip, m]
             M[n+j, p]   = -U[ip, m]
-    # lower-right k×k = 0
+    # lower-right k \times k = 0
     return pfaff(M, dim)
 
 # ---------------------------------------------------------------------------

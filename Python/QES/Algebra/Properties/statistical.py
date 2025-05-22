@@ -54,8 +54,6 @@ if JAX_AVAILABLE:
 else:
     ldos_jax = None
     dos_jax = None
-    
-# numpy version
 
 def ldos(energies: Array, overlaps: Array, degenerate: bool = False, tol: float = 1e-8) -> Array:
     r"""
@@ -183,7 +181,6 @@ def f_function( start               : int,
             cnt                    += 1
     return cnt
 
-
 # -----------------------------------------------------------------------------
 #! Fidelity susceptibility
 # -----------------------------------------------------------------------------
@@ -264,6 +261,105 @@ def fidelity_susceptibility(energies: Array, V: Array, mu: float, idx: Optional[
         return np.sum(V2 * omm / denom2, axis=1)
 
 # -----------------------------------------------------------------------------
+#! State information
+# -----------------------------------------------------------------------------
+
+if JAX_AVAILABLE:
+    @partial(jax.jit, static_argnames=["q", "new_basis"])
+    def inverse_participation_ratio_jax(state: Array, q: float = 1.0, new_basis: Optional[Array] = None) -> float:
+        r"""
+        Compute the inverse participation ratio (IPR) of a quantum state.
+
+        The IPR is defined as:
+
+        .. math::
+            \mathrm{IPR} = \sum_{i=1}^{N} |\psi_i|^{2q}\,.
+
+        Parameters
+        ----------
+        state
+            Quantum state, either a 1D array or a NumPy array.
+        q
+            Exponent for the IPR calculation.
+
+        Returns
+        -------
+        float
+            Inverse participation ratio.
+        """
+        if new_basis is not None:
+            return jnp.sum(jnp.abs(new_basis.T @ state)**(2*q))
+        return jnp.sum(jnp.abs(state)**(2*q))
+else:
+    inverse_participation_ratio_jax = None
+
+@numba.njit(parallel=True, fastmath=True)
+def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: Optional[np.ndarray] = None) -> np.ndarray:
+    """
+    Compute IPR_j = ∑_i |ψ_{i j}|^{2q} for each column j of `states`.
+    If `new_basis` is provided (shape n \times n), then ψ → B^T·ψ is used
+    before raising to the 2q power.  Works on 1D or 2D `states`.
+
+    Parameters
+    ----------
+    states : np.ndarray
+        Complex array, shape (n,) or (n, m).
+    q : float
+        Exponent in the IPR definition (default 1.0).
+    new_basis : np.ndarray, optional
+        Change-of-basis matrix (n \times n).  If not None, each state ψ_j is
+        transformed via B^T·ψ_j before computing |·|^(2q).
+
+    Returns
+    -------
+    np.ndarray
+        If input was 1D, returns a scalar in a 0-d array; if 2D, returns
+        a length-m array of IPR values.
+    """
+    
+    # reshape 1D->2D so we can always write m-parallel loops
+    single = False
+    if states.ndim == 1:
+        states = states.reshape(states.shape[0], 1)
+        single = True
+
+    n, m    = states.shape
+    out     = np.zeros(m, dtype=np.float64)
+    two_q   = 2.0 * q
+
+    if new_basis is None:
+        # no transform 
+        for j in numba.prange(m):
+            acc = 0.0
+            for i in range(n):
+                c       = states[i, j]
+                p       = c.real*c.real + c.imag*c.imag
+                acc    += p**q
+            out[j] = acc
+    else:
+        # on-the-fly transform: φ_i = ∑_k B[k,i]*ψ_k
+        # then acc += |φ_i|^(2q)
+        B = new_basis
+        for j in numba.prange(m):
+            acc = 0.0
+            for i in range(n):
+                re = 0.0
+                im = 0.0
+                # compute (B^T·ψ)_i = ∑_k B[k,i] * ψ[k,j]
+                for k in range(n):
+                    b   = B[k, i]
+                    s   = states[k, j]
+                    # complex multiply: (b_r + i b_i)*(s_r + i s_i)
+                    re += b.real*s.real - b.imag*s.imag
+                    im += b.real*s.imag + b.imag*s.real
+                p       = re*re + im*im
+                acc    += p**q
+            out[j] = acc
+
+    return out
+
+# -----------------------------------------------------------------------------
+
 #! EOF 
 
 

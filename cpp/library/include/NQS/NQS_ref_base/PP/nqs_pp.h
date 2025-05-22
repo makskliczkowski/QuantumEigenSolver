@@ -71,7 +71,7 @@ namespace NQS_NS
 	* introduces additional correlations between pairs of particles through antisymmetric 
 	* variational parameters, making it particularly suitable for fermionic systems.
 	* The total wavefunction is represented as a product of the RBM and PP parts:
-	* Ψ(σ) = Ψ_RBM(σ) × Pf(F_PP(σ))
+	* Ψ(σ) = Ψ_RBM(σ)  \times  Pf(F_PP(σ))
 	* where Pf denotes the Pfaffian and F_PP is an antisymmetric matrix of variational parameters.
 	*
 	* @tparam _spinModes Number of possible spin states per site

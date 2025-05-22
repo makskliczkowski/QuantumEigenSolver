@@ -442,10 +442,10 @@ class QuadraticHamiltonian(Hamiltonian):
     - self._is_numpy              : bool        # True for NumPy backend, False for JAX
     - self._ns                    : int         # Number of sites/modes
     - self._dtype                 : np.dtype    # Matrix/vector precision
-    - self._U                     : ndarray     # (ns × n_orb) eigenvectors (fermions, N-conserving)
-    - self._F                     : ndarray     # (ns × ns) pairing matrix (fermions, BdG)
-    - self._Ub                    : ndarray     # (ns × N_qp) columns of u (for excitations)
-    - self._G                     : ndarray     # (ns × ns) pairing matrix (bosons, BdG)
+    - self._U                     : ndarray     # (ns  \times  n_orb) eigenvectors (fermions, N-conserving)
+    - self._F                     : ndarray     # (ns  \times  ns) pairing matrix (fermions, BdG)
+    - self._Ub                    : ndarray     # (ns  \times  N_qp) columns of u (for excitations)
+    - self._G                     : ndarray     # (ns  \times  ns) pairing matrix (bosons, BdG)
     """
     
     def __init__(self,

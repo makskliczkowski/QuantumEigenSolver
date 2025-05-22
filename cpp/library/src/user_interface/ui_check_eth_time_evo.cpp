@@ -20,13 +20,13 @@ namespace TimeEvo
 	void microcanonical_saver(
 		size_t r,                                            // realization index
 		size_t opi,                                          // operator index
-		const std::vector<arma::Mat<T>>& diagonals,          // diagonals[opi] is [nh × n_real]
+		const std::vector<arma::Mat<T>>& diagonals,          // diagonals[opi] is [nh  \times  n_real]
 		const arma::Col<double>& soverlaps,                  // |<ψ|n>|² vector of length nh
 		const std::vector<uint64_t>& mins,                   // window start indices per ε - given energy density
 		const std::vector<uint64_t>& maxs,                   // window end indices per ε - given energy density
-		arma::Mat<double>& diagvals,                         // [n_ops × n_real], to write long‑time avg here (the diagonal ensemble)
-		std::vector<arma::Mat<T>>& microvals,                // [n_ops][n_eps × n_real] to save the microcanonical averages here
-		std::vector<arma::Mat<double>>& microvals2           // [n_ops][n_eps × n_real] squares of the microcanonical averages
+		arma::Mat<double>& diagvals,                         // [n_ops  \times  n_real], to write long‑time avg here (the diagonal ensemble)
+		std::vector<arma::Mat<T>>& microvals,                // [n_ops][n_eps  \times  n_real] to save the microcanonical averages here
+		std::vector<arma::Mat<double>>& microvals2           // [n_ops][n_eps  \times  n_real] squares of the microcanonical averages
 		) 
 	{
 		// grab the diagonal of operator opi for realization r
