@@ -1292,7 +1292,7 @@ def test_spin_operator_matrices(nh = 4, site = 0):
     Test the equality between built-in operator matrices and explicitly constructed matrices
     using Kronecker products for spin operators.
     This function constructs representations for Pauli spin operators (sig_x, sig_y, and sig_z)
-    using both the operator’s built-in methods and explicit Kronecker product expansion.
+    using both the operator's built-in methods and explicit Kronecker product expansion.
     It then compares these two implementations for consistency.
     Parameters:
         nh (int, optional): The Hilbert space dimension for the subsystem.
@@ -1322,7 +1322,7 @@ def test_spin_operator_matrices(nh = 4, site = 0):
     # Set the Hilbert space dimension (for example, 4) and construct an identity.
     # Create a dense identity for the first subsystem.
     ns                  = np.log2(nh)
-    # Build the operator matrices via the operator’s built-in method.
+    # Build the operator matrices via the operator's built-in method.
     sig_x_op            = sig_x(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])
     sig_y_op            = sig_y(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])
     sig_z_op            = sig_z(ns = ns, type_act = OperatorTypeActing.Global, sites = [0])

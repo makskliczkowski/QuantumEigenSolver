@@ -28,11 +28,11 @@ import numbers
 #####################################################################################################
 from abc import ABC
 from enum import Enum, auto, unique
-from typing import Optional, Callable, Union, Iterable, Sequence, Any
+from typing import Optional, Callable, Union, Sequence, Any
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 ####################################################################################################
-from general_python.algebra.utils import get_backend as get_backend, JAX_AVAILABLE
+from general_python.algebra.utils import get_backend as get_backend, JAX_AVAILABLE, Array
 from general_python.lattices import Lattice
 # from Algebra.hilbert import HilbertSpace
 ####################################################################################################
@@ -1437,7 +1437,7 @@ class Operator(ABC):
     
     # -------------------------------
     
-    def _apply_global(self, states : Union[int, list, np.ndarray | jnp.ndarray]):
+    def _apply_global(self, states : Union[int, list, Array]):
         """
         Applies a function to a given state or a collection of states.
 
@@ -1471,7 +1471,7 @@ class Operator(ABC):
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val * self._eigval)
     
-    def _apply_local(self, states : Union[int, list, np.ndarray | jnp.ndarray], i):
+    def _apply_local(self, states : Union[int, list, Array], i):
         """
         Applies a local operation to a given state or a collection of states.
         Parameters:
@@ -1492,7 +1492,7 @@ class Operator(ABC):
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val * self._eigval)
     
-    def _apply_correlation(self, states : Union[int, list, np.ndarray | jnp.ndarray], i, j):
+    def _apply_correlation(self, states : Union[int, list, Array], i, j):
         """
         Applies a correlation function to a given state or a collection of states.
         Parameters:
@@ -1517,7 +1517,7 @@ class Operator(ABC):
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val * self._eigval)
         
-    def apply(self, states : list | np.ndarray | jnp.ndarray, *args):
+    def apply(self, states : list | Array, *args):
         """
         Apply the operator to the state. 
         
@@ -1539,7 +1539,7 @@ class Operator(ABC):
         
     # -------------------------------
     
-    def __call__(self, states: list | np.ndarray | jnp.ndarray, *args):
+    def __call__(self, states: list | Array, *args):
         """
         Apply the operator to the state. 
         
@@ -1551,7 +1551,7 @@ class Operator(ABC):
         """
         return self.apply(states, *args)
     
-    def __getitem__(self, states: list | np.ndarray | jnp.ndarray,):
+    def __getitem__(self, states: list | Array,):
         """
         Apply the operator to the state - returns modified state only.
         
@@ -1585,7 +1585,7 @@ class Operator(ABC):
                             dtype, 
                             max_loc_upd     : int = 1,
                             verbose         : bool = False,
-                            **kwargs) -> np.ndarray | sparse.COO | sparse.CSR:
+                            **kwargs) -> np.ndarray:
         """
         Generate the matrix form of the operator without Hilbert space.
         """
@@ -1624,7 +1624,7 @@ class Operator(ABC):
         return None
         
     def matrix(self, *args, dim = None, matrix_type = 'sparse',
-            hilbert_1 = None, hilbert_2 = None, use_numpy: bool = True, **kwargs) -> np.ndarray | jnp.ndarray | sparse.COO | sparse.CSR | None:
+            hilbert_1 = None, hilbert_2 = None, use_numpy: bool = True, **kwargs) -> Array | None:
         """
         Generates the matrix representation of the operator.
 
@@ -2194,7 +2194,7 @@ def _dispatch(op    : Operator,
 
 def test_operator_on_state(op           : Union[Operator, Sequence[Operator]],
                         lat             : Lattice,
-                        state           : Union[int, np.ndarray, jnp.ndarray],
+                        state           : Union[int, Array],
                         *,
                         ns              : Optional[int] = None,
                         op_acting       : "OperatorTypeActing" = OperatorTypeActing.Local,

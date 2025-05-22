@@ -48,7 +48,7 @@ Creation and annihilation operators obey
 Jordan-Wigner Phase (Fermionic Sign)
 ------------------------------------
 
-Because fermions anticommute, the operator must “pass through’’
+Because fermions anticommute, the operator must “pass through''
 all modes to its left before acting. Define the parity operator up to (but not including) site :math:`i`:
 
 .. math::

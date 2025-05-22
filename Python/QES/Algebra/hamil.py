@@ -1590,7 +1590,7 @@ class Hamiltonian(ABC):
             except Exception as e:
                 self._log(f"Failed to set JAX local energy functions: {e}", lvl=3, color="red", log='error')
         else:
-            self._log("JAX is not available, skipping JAX local energy function setup.", lvl=3, color="yellow", log='warning')
+            self._log("JAX is not available, skipping JAX local energy function setup.", lvl=3, color="yellow", log='debug')
             self._loc_energy_jax_fun   = None
 
         # log success

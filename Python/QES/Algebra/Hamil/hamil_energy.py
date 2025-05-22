@@ -17,7 +17,11 @@ from Algebra.Hamil.hamil_energy_helper import unpack_operator_terms, flatten_ope
 if JAX_AVAILABLE:
     from Algebra.Hamil.hamil_energy_jax import local_energy_jax_wrap
     import jax.numpy as jnp
-
+else:
+    local_energy_jax_wrap = None
+    jax = None
+    jnp = np
+    
 #################################################################################
 #! INTEGER REPRESENTATION
 #################################################################################
@@ -249,13 +253,16 @@ def local_energy_int_wrap(ns            : int,
     fnm_nos,    _,          mnm_nos    = unpack_operator_terms(ns, _op_nmod_nosites)
     
     # 1.5) Create a dummy operator function
-    dtype_code_val       = {np.float32:0, np.float64:1, np.complex64:2, np.complex128:3,
-                            jnp.float32:0, jnp.float64:1, jnp.complex64:2, jnp.complex128:3}[dtype]
+    dtype_code_val       = {np.float32:0, np.float64:1, np.complex64:2, np.complex128:3}
+    if JAX_AVAILABLE:
+        dtype_code_val.update({jnp.float32:0, jnp.float64:1, jnp.complex64:2, jnp.complex128:3})
+        
+    dtype_code_val       = dtype_code_val[dtype]
     _dummy_op_with_sites = _dummy_op(True, dtype_code_val)
     _dummy_op_no_sites   = _dummy_op(False, dtype_code_val)
     
     # 2) Pad any empty per‐site list with a dummy no-op
-    #    (you’ll need to define _dummy_op_with_sites / _dummy_op_no_sites elsewhere)
+    #    (you'll need to define _dummy_op_with_sites / _dummy_op_no_sites elsewhere)
     fm_sites,   im_sites,   mm_sites   = _pad_site_lists(fm_sites,   im_sites,   mm_sites,   _dummy_op_with_sites)
     fm_nos,     _,          mm_nos     = _pad_site_lists(fm_nos,     None,       mm_nos,     _dummy_op_no_sites)
     fnm_sites,  inm_sites,  mnm_sites  = _pad_site_lists(fnm_sites,  inm_sites,  mnm_sites,  _dummy_op_with_sites)

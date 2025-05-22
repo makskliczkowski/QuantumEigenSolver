@@ -262,7 +262,7 @@ class QuadraticSelection:
 
         rng = np.random.default_rng() if rng is None else rng
 
-        #! fast path: SciPy’s true Haar unitary, if available
+        #! fast path: SciPy's true Haar unitary, if available
         try:
             from scipy.stats import unitary_group
             return unitary_group.rvs(gamma, random_state=rng).astype(dtype)[:, 0]
