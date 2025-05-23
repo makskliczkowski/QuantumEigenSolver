@@ -199,6 +199,7 @@ def _single_realisation(
         # time_vals[name][r, :] = np.real(quenched_values_t)
         logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} time evolution done in {time.perf_counter() - time_start_evo:.2f} s", lvl=3, color='blue')
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} done in {time.perf_counter() - time_start_r:.2f} s", lvl=4, color='red')
+    return True
 
 def _single_alpha(alpha             : float, 
                 ns                  : int, 
