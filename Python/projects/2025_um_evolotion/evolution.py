@@ -547,6 +547,7 @@ if __name__ == "__main__":
     
     start_time          = time.perf_counter()
     remaining_time      = SlurmMonitor.get_remaining_time()
+    logger.info(f"Remaining time: {remaining_time:.2f} s, which is {remaining_time / 60:.2f} min, {remaining_time / 3600:.2f} h")
     
     if max_workers > 1:
         logger.info(f"Using {max_workers} workers")
