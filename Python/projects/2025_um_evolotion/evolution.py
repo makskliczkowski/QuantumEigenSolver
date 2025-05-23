@@ -32,6 +32,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 # project imports
+from QES.general_python.run_scripts.slurm import SlurmMonitor
 from QES.general_python.common.binary import get_global_logger
 from QES.general_python.common import Directories
 from QES.general_python.common import HDF5Handler
@@ -67,7 +68,13 @@ def _single_realisation(
         h_typ                   : dict,
         diagonals_operators     : dict,
         diagonal_ensembles      : dict,
+        start_time              : float = None,
+        job_time                : float = None,
         ):
+
+    if SlurmMonitor.is_overtime(limit=1200, start_time=start_time, job_time=job_time):  # 20 minutes buffer
+        logger.warning(f"SLURM job approaching timeout, skipping realization {r}")
+        return False
     
     #! constants
     alpha           = model.alphas[0]
@@ -126,11 +133,6 @@ def _single_realisation(
     overlaps                = model.eig_vec.T @ quench_state
     soverlaps               = np.square(np.abs(overlaps))
     
-    if not batch_limit(ns):
-        quench_states_t     = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=time_steps)
-    else:
-        quench_states_t     = None
-        
     #! compute the ldos
     ldos[r, :]              = statistical.ldos(energies = model.eig_val, overlaps = overlaps)
     energies[r, :]          = model.eig_val
@@ -165,14 +167,35 @@ def _single_realisation(
         
         #! time evolution
         time_start_evo = time.perf_counter()
-        for i in range(batch_num(ns)):
-            start                           = i * time_num // batch_num(ns)
-            stop                            = (i + 1) * time_num // batch_num(ns)
-            if quench_states_t is None:
-                quench_states_t = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=time_steps[start:stop])
-            quenched_values_t               = time_evo.time_evo_evaluate(quench_states_t, operators_mat[name])
-            time_vals[name][r, start:stop]  = np.real(quenched_values_t)
-            
+        if not batch_limit(ns):
+            # Small systems: compute all at once
+            quench_states_t         = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=time_steps)
+            quenched_values_t       = time_evo.time_evo_evaluate(quench_states_t, operators_mat[name])
+            time_vals[name][r, :]   = np.real(quenched_values_t)
+        else:
+            # Large systems: batch processing
+            batch_size = time_num // batch_num(ns)
+            for i in range(batch_num(ns)):
+                start_idx   = i * batch_size
+                end_idx     = min((i + 1) * batch_size, time_num)
+                
+                if start_idx >= time_num:
+                    break
+                    
+                # Check timeout during batching
+                if SlurmMonitor.is_overtime(limit=600):  # 10 minutes buffer
+                    logger.warning(f"SLURM timeout during batch {i}, stopping early")
+                    break
+                
+                # Compute time evolution for this batch
+                batch_times             = time_steps[start_idx:end_idx]
+                quench_states_batch     = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=batch_times)
+                quenched_values_batch   = time_evo.time_evo_evaluate(quench_states_batch, operators_mat[name])
+                time_vals[name][r, start_idx:end_idx] = np.real(quenched_values_batch)
+                
+                # Clean up memory
+                del quench_states_batch, quenched_values_batch
+        
         # time_vals[name][r, :] = np.real(quenched_values_t)
         logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} time evolution done in {time.perf_counter() - time_start_evo:.2f} s", lvl=3, color='blue')
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} done in {time.perf_counter() - time_start_r:.2f} s", lvl=4, color='red')
@@ -202,7 +225,9 @@ def _single_alpha(alpha             : float,
                 histograms_av       : dict,
                 histograms_typ      : dict,
                 time_vals           : dict,
-                operators_mat       : dict,        
+                operators_mat       : dict,
+                start_time          : float = None,
+                job_time            : float = None,
                 ) -> None:
 
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}", lvl=2, color='green')
@@ -252,9 +277,10 @@ def _single_alpha(alpha             : float,
     data_dir_in = data_dir.join('uniform' if uniform else 'log', f'{str(model)}')
     data_dir_in.mkdir()
     
+    completed_realizations = 0
     #! go through the realisations
     for r in range(n_realisations):
-        _single_realisation(
+        success = _single_realisation(
             model                   = model,
             r                       = r,
             sigma_es                = sigma_es,
@@ -273,7 +299,16 @@ def _single_alpha(alpha             : float,
             h_av                    = h_av,
             h_typ                   = h_typ,
             diagonals_operators     = diagonals_operators,
-            diagonal_ensembles      = diagonal_ensembles)
+            diagonal_ensembles      = diagonal_ensembles,
+            start_time              = start_time,
+            job_time                = job_time)
+        
+        if success:
+            completed_realizations += 1
+        else:
+            logger.warning(f"Realization {r} failed or was skipped due to timeout")
+            break
+    logger.info(f"Completed {completed_realizations}/{n_realisations} realizations for ns={ns}, alpha={alpha:.2f}")
     
     #! store the combined histogram for this (ns,alpha)
     for name in operators:
@@ -281,7 +316,7 @@ def _single_alpha(alpha             : float,
         histograms_typ[name][alpha][ns] = h_typ[name]
     
     #! save the data
-    if True:
+    if completed_realizations > 0:
         data_stat = {
             'bandwidth'                 : bandwidths,
             'sigma_e'                   : sigma_es,
@@ -318,7 +353,8 @@ def _single_alpha(alpha             : float,
         #! time evolution
         data_time = {
             'time'                          : time_steps,
-            'time_evolution/quench/energy'  : quench_energies
+            'time_evolution/quench/energy'  : quench_energies,
+            'completed_realizations'        : completed_realizations,
         }
         data_time.update({
             f'time_evolution/{name}/expectation' : time_vals[name] for name in operators.keys()
@@ -345,6 +381,8 @@ def prepare_evolution(
                 n_random        : int   = 0,
                 bw_df           : pd.DataFrame = None,
                 mls_df          : pd.DataFrame = None,
+                start_time      : float = None,
+                job_time        : float = None,
                 ) -> tuple:
     
     #! allocate the data
@@ -356,7 +394,6 @@ def prepare_evolution(
     
     qs_ipr              = { 2.0, 0.5 }
     qs_entro            = { 1.0 }
-    batch_limit         = lambda ns: ns > 13
 
     histograms_av       = { op: {alpha: {} for alpha in alphas} for op in operators_map }
     histograms_typ      = { op: {alpha: {} for alpha in alphas} for op in operators_map }
@@ -429,6 +466,8 @@ def prepare_evolution(
                 histograms_av           = histograms_av,
                 histograms_typ          = histograms_typ,
                 operators_mat           = operators_mat,
+                start_time              = start_time,
+                job_time                = job_time,
             )
             
     return histograms_av, histograms_typ, bandwidths
@@ -492,8 +531,8 @@ if __name__ == "__main__":
     #! -------------------------------------------------------
     memory_per_worker   = args.memory_per_worker
     avail_gb            = psutil.virtual_memory().available / (1024**3)
-    max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
-    # max_workers         = 1
+    # max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
+    max_workers         = 1
     logger.info(f"Available memory: {avail_gb:.2f} GB")
     logger.info(f"Memory per worker: {memory_per_worker:.2f} GB")
     logger.info(f"Max workers: {max_workers}")
@@ -505,6 +544,9 @@ if __name__ == "__main__":
     alphas_chunks       = [chunk for chunk in alphas_chunks if len(chunk) > 0]
     logger.info(f"Alphas chunks: {alphas_chunks}")
     #! -------------------------------------------------------
+    
+    start_time          = time.perf_counter()
+    remaining_time      = SlurmMonitor.get_remaining_time()
     
     if max_workers > 1:
         logger.info(f"Using {max_workers} workers")
@@ -522,7 +564,9 @@ if __name__ == "__main__":
                     uniform         = True,
                     n_random        = rand_num,
                     bw_df           = bw_df,
-                    mls_df          = mls_df
+                    mls_df          = mls_df,
+                    start_time      = start_time,
+                    job_time        = remaining_time,
                 ): chunk for chunk in alphas_chunks
             }
             
@@ -546,7 +590,9 @@ if __name__ == "__main__":
             uniform         = True,
             n_random        = rand_num,
             bw_df           = bw_df,
-            mls_df          = mls_df
+            mls_df          = mls_df,
+            start_time      = start_time,
+            job_time        = remaining_time,
         )
     logger.info(f"All done")
         
