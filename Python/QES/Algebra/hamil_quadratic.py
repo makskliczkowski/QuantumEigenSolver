@@ -61,7 +61,7 @@ if JAX_AVAILABLE:
     )
 else:
     jax                         = None
-    jnp                         = None
+    jnp                         = np
     BCOO                        = None
     calculate_slater_det_jax    = None
     calculate_bcs_amp_jax       = None

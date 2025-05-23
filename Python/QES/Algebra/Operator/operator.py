@@ -86,7 +86,7 @@ if JAX_AVAILABLE:
     
 else:
     jax                         = None
-    jnp                         = None
+    jnp                         = np
     sparse                      = None
     make_jax_operator_closure   = lambda op_func, sites, *args, **kwargs: op_func
 

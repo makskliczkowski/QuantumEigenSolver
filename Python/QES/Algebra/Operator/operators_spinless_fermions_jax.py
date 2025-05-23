@@ -378,9 +378,9 @@ if JAX_AVAILABLE:
     
 else:
     jax = jnp = lax = jit = None
-    c_jnp = c_dag_jnp = c_k_jnp = c_k_dag_jnp = None
+    c_jnp = c_dag_jnp = c_k_jnp = c_k_dag_jnp = np
     f_parity_int_jnp = f_parity_np_jnp = f_parity_int_vec = f_parity_np_vec = None
-    c_int_jnp = c_dag_int_jnp = None
+    c_int_jnp = c_dag_int_jnp = np
     n_jax = n_int_jax = None
 
 #============================================================================

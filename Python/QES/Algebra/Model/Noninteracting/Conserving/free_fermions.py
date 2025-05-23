@@ -74,7 +74,7 @@ if JAX_AVAILABLE:
         return eig_val, phase.astype(jnp.complex128)
 else:
     jax = None
-    jnp = None
+    jnp = np
     def _free_fermions_spectrum_jax(ns: int, t: float) -> tuple[np.ndarray, np.ndarray]:
         raise ImportError("JAX is not available. Please install JAX to use this function.")
 

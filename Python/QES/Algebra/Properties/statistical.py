@@ -359,7 +359,64 @@ def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: O
     return out
 
 # -----------------------------------------------------------------------------
+#! K - function
+# -----------------------------------------------------------------------------
 
+@numba.njit(fastmath=True)
+def k_function(ldos     :   np.ndarray,
+            energies    :   np.ndarray,
+            bins        :   np.ndarray,
+            target      :   float = 0.0,
+            tol         :   float = 0.015
+            ):
+    """
+    Compute 
+        k(omega) = \sum _{ij} ldos[i] * ldos[j] * delta (omega - |E[j]-E[i]|)
+    using a histogram binning method.
+    
+    Parameters
+    ----------
+    ldos : float64
+        Local density of states (LDOS) at each energy level.
+    energies : float64
+        Energies of the system.
+    bins : float64
+        Bins for histogramming the energy differences.
+    """
+    nE   = energies.shape[0]
+    nbin = bins.shape[0] - 1
+    kf   = np.zeros(nbin, ldos.dtype)
+    cnt  = np.zeros(nbin, np.int64)
+
+    for i in range(nE):
+        ei = energies[i]
+        li = ldos[i]
+        for j in range(i, nE):
+        # for j in range(0, nE):
+            # absolute energy difference
+            ej      = energies[j]
+            
+            # if abs((ei + ej) / 2.0 - target) < tol:
+            #     continue
+            
+            dE      = ei - ej
+            omega   = dE if dE >= 0.0 else -dE
+            
+            # find bin index: largest b such that bins[b] <= omega
+            idx     = np.searchsorted(bins, omega, side='right') - 1
+
+            # clamp to valid range [0, nbin−1]
+            if idx < 0:
+                idx = 0
+            elif idx >= nbin:
+                idx = nbin - 1
+
+            kf[idx]  += li * ldos[j]
+            cnt[idx] += 1
+
+    return kf, cnt
+
+# -----------------------------------------------------------------------------
 #! EOF 
 
 

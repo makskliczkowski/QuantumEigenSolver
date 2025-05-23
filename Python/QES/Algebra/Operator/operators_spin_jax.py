@@ -57,12 +57,12 @@ if JAX_AVAILABLE:
             operand = None
         )
 else:
-    _SIG_0_jnp = None
-    _SIG_X_jnp = None
-    _SIG_Y_jnp = None
-    _SIG_Z_jnp = None
-    _SIG_P_jnp = None
-    _SIG_M_jnp = None
+    _SIG_0_jnp = np
+    _SIG_X_jnp = np
+    _SIG_Y_jnp = np
+    _SIG_Z_jnp = np
+    _SIG_P_jnp = np
+    _SIG_M_jnp = np
     _flip_func = None
 
 # -----------------------------------------------------------------------------
@@ -858,22 +858,22 @@ if JAX_AVAILABLE:
 # -----------------------------------------------------------------------------
 
 if not JAX_AVAILABLE:
-    sigma_x_int_jnp = None
-    sigma_x_jnp = None
-    sigma_y_int_jnp = None
-    sigma_y_jnp = None
-    sigma_z_int_jnp = None
-    sigma_z_jnp = None
-    sigma_plus_int_jnp = None
-    sigma_plus_jnp = None
-    sigma_minus_int_jnp = None
-    sigma_minus_jnp = None
-    sigma_pm_jnp = None
-    sigma_mp_jnp = None
-    sigma_k_int_jnp = None
-    sigma_k_jnp = None
-    sigma_pm_int_jnp = None
-    sigma_mp_int_jnp = None
-    sigma_k_int_jnp = None
-    sigma_k_jnp = None
+    sigma_x_int_jnp = np
+    sigma_x_jnp = np
+    sigma_y_int_jnp = np
+    sigma_y_jnp = np
+    sigma_z_int_jnp = np
+    sigma_z_jnp = np
+    sigma_plus_int_jnp = np
+    sigma_plus_jnp = np
+    sigma_minus_int_jnp = np
+    sigma_minus_jnp = np
+    sigma_pm_jnp = np
+    sigma_mp_jnp = np
+    sigma_k_int_jnp = np
+    sigma_k_jnp = np
+    sigma_pm_int_jnp = np
+    sigma_mp_int_jnp = np
+    sigma_k_int_jnp = np
+    sigma_k_jnp = np
     

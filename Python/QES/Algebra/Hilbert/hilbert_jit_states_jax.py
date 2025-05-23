@@ -9,7 +9,7 @@ if JAX_AVAILABLE:
     import jax
 else:
     jax = None
-    jnp = None
+    jnp = np
 
 #######################################################################
 

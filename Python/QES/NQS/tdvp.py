@@ -21,7 +21,7 @@ if JAX_AVAILABLE:
     import jax.numpy as jnp
 else:
     jax = None
-    jnp = None
+    jnp = np
 
 #################################################################
 
