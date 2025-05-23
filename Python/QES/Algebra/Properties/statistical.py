@@ -417,6 +417,79 @@ def k_function(ldos     :   np.ndarray,
     return kf, cnt
 
 # -----------------------------------------------------------------------------
+#! Spectral CDF
+# -----------------------------------------------------------------------------
+
+@staticmethod
+def spectral_cdf(x, y, gammaval = 0.5, BINVAL = 21):
+    """
+    Calculate the cumulative distribution function (CDF) and find the gamma value.
+
+    Parameters:
+    x (array-like): The independent variable values.
+    y (array-like): The dependent variable values, which may contain NaNs.
+    gammaval (float, optional): The target CDF value to find the corresponding gamma value. Default is 0.5.
+
+    Returns:
+    tuple: A tuple containing:
+        - x (array-like): The input independent variable values.
+        - y (array-like): The input dependent variable values with NaNs removed.
+        - cdf (array-like): The cumulative distribution function values.
+        - gammaf (float): The value of the independent variable corresponding to the target CDF value.
+    """
+    # Apply the moving average to smooth y
+    y_smoothed  = np.convolve(y, np.ones(BINVAL)/BINVAL, mode='same')
+    cdf         = np.cumsum(y_smoothed * np.diff(np.insert(x, 0, 0)))
+    cdf         /= cdf[-1]
+    y_smoothed  /= cdf[-1]
+    gammaf      = x[np.argmin(np.abs(cdf - gammaval))]
+    return x, y_smoothed, cdf, gammaf
+
+
+# -----------------------------------------------------------------------------
+#! Structures
+# -----------------------------------------------------------------------------
+
+def spectral_structure(data: np.ndarray, window: int) -> np.ndarray:
+    """
+    Compute the residuals of a moving average (spectral structure) for each row in the input data.
+
+    For each row, the function subtracts a moving average from the data:
+    - For the first `window` points, the moving average is computed with a growing denominator (1, 2, ..., window).
+    - For the remaining points, a fixed-size window is used.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Input 2D array of shape (N, T), where N is the number of rows (e.g., signals or samples)
+        and T is the number of time points.
+    window : int
+        Size of the moving average window.
+
+    Returns
+    -------
+    np.ndarray
+        Array of the same shape as `data`, containing the residuals after subtracting the moving average.
+    """
+
+    N, T      = data.shape
+    cumsum    = np.cumsum(data, axis=1)      # shape (N, T)
+    residual  = np.empty_like(data, dtype=float)
+
+    # first `window` points use growing denominator (1,2,…,window)
+    t0        = min(window, T)
+    counts    = np.arange(1, t0+1)           # [1, 2, …, t0]
+    residual[:, :t0] = data[:, :t0] - cumsum[:, :t0] / counts
+
+    # remaining points use fixed window
+    if T > window:
+        numer = cumsum[:, window:] - cumsum[:, :-window]
+        ma    = numer / window
+        residual[:, window:] = data[:, window:] - ma
+
+    return residual
+
+# -----------------------------------------------------------------------------
 #! EOF 
 
 

@@ -6,13 +6,13 @@ chmod +x evolution.py
 
 # run with:
 python evolution.py         \
-    ./data_test             \
-    0.7                     \
-    0.04                    \
-    1                       \
+    ./data_big_times        \
+    0.68                    \
+    0.06                    \
+    4                       \
     10                      \
-    6                       \
-    7                       \
+    14                      \
+    15                      \
     1                       \
-    50000                   \
-    1.5
+    100000                  \
+    10

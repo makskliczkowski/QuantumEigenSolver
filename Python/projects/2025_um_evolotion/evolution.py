@@ -494,7 +494,7 @@ if __name__ == "__main__":
     memory_per_worker   = args.memory_per_worker
     avail_gb            = psutil.virtual_memory().available / (1024**3)
     max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
-    max_workers         = 1
+    # max_workers         = 1
     logger.info(f"Available memory: {avail_gb:.2f} GB")
     logger.info(f"Memory per worker: {memory_per_worker:.2f} GB")
     logger.info(f"Max workers: {max_workers}")
