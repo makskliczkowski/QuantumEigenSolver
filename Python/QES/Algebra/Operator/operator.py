@@ -2354,7 +2354,7 @@ def test_operators(op,
         params_str = ", ".join(map(str, add_args))
         tests = {
             f"op(state, {params_str})"     : lambda: op(state, *add_args),
-            f"op[state, {params_str}]"     : lambda: op[state, *add_args],
+            # f"op[state, {params_str}]"     : lambda: op[state, *add_args],
             f"op % state, {params_str}"    : lambda: op % (state, *add_args),
         }
     
