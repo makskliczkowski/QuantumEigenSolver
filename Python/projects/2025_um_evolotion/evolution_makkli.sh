@@ -181,7 +181,7 @@ main() {
     TIM=$(validate_time "$TIM") || exit 1
     
     # Validate memory distribution with minimum 2GB per worker
-    # mem_per_worker=$(validate_memory_distribution "$MEM" "$CPU" 2) || exit 1
+    mem_per_worker=$(validate_memory_distribution "$MEM" "$CPU" 2) || exit 1
     
     # Validate QES package directory exists
     validate_file_exists "${defaults[QES_PACKAGE_DIR]}/setup.py" "QES setup.py file" || exit 1
