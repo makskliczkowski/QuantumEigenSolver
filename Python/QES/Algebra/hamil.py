@@ -43,7 +43,6 @@ if JAX_AVAILABLE:
     from Algebra.Hamil.hamil_energy import local_energy_jax_wrap
     from Algebra.hilbert import process_matrix_elem_jax, process_matrix_batch_jax
 else:
-    import jax
     jax                     = None
     jnp                     = None
     lax                     = None
