@@ -260,7 +260,7 @@ python3 ${RUN_DIR}/evolution.py     \\
     ${LUSTRE_DIR}                   \\
     ${a_start} ${a_step} ${a_num}   \\
     ${n_rel} ${Ns_start} ${Ns_end}  \\
-    1 100000 ${mem_per_worker}      \\
+    ${n} ${t_num} ${mem_per_worker} \\
     > ${LOG_DIR}/log_${job_params}.log 2>&1
 
 # Copy results back (if uncommented)

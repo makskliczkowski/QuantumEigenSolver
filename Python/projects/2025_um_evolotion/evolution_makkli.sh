@@ -58,9 +58,8 @@ a_start=""
 a_step=""
 a_num=""
 n_rel=""
-TIM=""
-MEM=""
-CPU=""
+n=""
+t_num=""
 override_time=""
 override_mem=""
 override_cpu=""
@@ -84,7 +83,7 @@ if [[ "$1" == *" "* ]]; then
     shift
     
     # Parse the parameter string
-    read -r Ns_start Ns_end a_start a_step a_num n_rel TIM MEM CPU param_time param_mem param_cpu <<< "$param_string"
+    read -r a_start a_step a_num n_rel Ns_start Ns_end n t_num param_time param_mem param_cpu <<< "$param_string"
     
     # Use parameters from string as defaults
     if [ -n "$param_time" ]; then
@@ -261,7 +260,7 @@ python3 ${RUN_DIR}/evolution.py     \\
     ${LUSTRE_DIR}                   \\
     ${a_start} ${a_step} ${a_num}   \\
     ${n_rel} ${Ns_start} ${Ns_end}  \\
-    1 100000 ${mem_per_worker}      \\
+    ${n} ${t_num} ${mem_per_worker} \\
     > ${LOG_DIR}/log_${job_params}.log 2>&1
 
 # Copy results back (if uncommented)
