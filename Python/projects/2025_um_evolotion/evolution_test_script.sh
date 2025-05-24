@@ -58,9 +58,8 @@ a_start=""
 a_step=""
 a_num=""
 n_rel=""
-TIM=""
-MEM=""
-CPU=""
+n=""
+t_num=""
 override_time=""
 override_mem=""
 override_cpu=""
@@ -84,7 +83,7 @@ if [[ "$1" == *" "* ]]; then
     shift
     
     # Parse the parameter string
-    read -r Ns_start Ns_end a_start a_step a_num n_rel TIM MEM CPU param_time param_mem param_cpu <<< "$param_string"
+    read -r a_start a_step a_num n_rel Ns_start Ns_end n t_num param_time param_mem param_cpu <<< "$param_string"
     
     # Use parameters from string as defaults
     if [ -n "$param_time" ]; then
@@ -191,8 +190,8 @@ TIM=$(validate_time "$TIM") || exit 1
 mem_per_worker=$(( MEM / CPU ))
 
 # Set directory paths
-RUN_DIR="/home/makkli4548/CODES/QuantumEigenSolver/Python/projects/2025_um_evolotion"
-LUSTRE_DIR="/home/makkli4548/mylustre/DATA_EVO_2025_UM"
+RUN_DIR="$(dirname "$(realpath "$0")")"
+LUSTRE_DIR="${RUN_DIR}/DATA/RANDOM_MODELS_EVO_2025_UM"
 LOG_DIR="${RUN_DIR}/LOG/RANDOM_MODELS_EVO_2025_UM"
 SLURM_DIR="${RUN_DIR}/SLURM"
 
