@@ -12,3 +12,4 @@ numba>=0.55.0
 seaborn>=0.11.2
 IPython>=7.22.0
 psutil>=5.8.0
+matplotlib-label-lines>=0.8.0

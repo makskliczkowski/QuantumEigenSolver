@@ -49,6 +49,7 @@ dependencies = [
     "physics-tenpy>=0.9.0",
     "pyutils>=0.0.8",
     "scienceplots>=0.1.0",
+    "matplotlib-label-lines>=0.7.0"
 ]
 
 [project.optional-dependencies]
