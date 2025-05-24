@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "QES"
 dynamic = ["version"]
 description = "Quantum Eigen Solver: Comprehensive framework for quantum eigenvalue problem solving"
-readme = "../../README.md"
+readme = "README.md"
 license = {text = "CC-BY-4.0"}
 authors = [
     {name = "Maksymilian Kliczkowski", email = "maksymilian.kliczkowski@pwr.edu.pl"}
