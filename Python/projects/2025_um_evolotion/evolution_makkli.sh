@@ -64,13 +64,12 @@ parse_vqmc_params() {
     local -n params_ref=$1    # use nameref so we actually write into the caller’s array
     shift
 
+    # First argument contains spaces, treat as parameter string
     if [[ "$1" == *" "* ]]; then
-        # First argument contains spaces, treat as parameter string
         read -r params_ref[a_start] params_ref[a_step] params_ref[a_num] params_ref[n_rel] \
                 params_ref[Ns_start] params_ref[Ns_end] params_ref[n] params_ref[t_num] <<< "$1"
-        return 1  # Signal that we used parameter string format
-    else
-        # Individual parameters
+        return 1   
+    else                        # Signal that we used parameter string format
         if [ $# -lt 8 ]; then
             echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num"
             return 2
@@ -227,7 +226,7 @@ main() {
         
         add_module_section "Python/3.10.4-GCCcore-11.3.0" "HDF5"
 
-        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "qes_vqmc_env" "${CODES_DIR}/qes_vqmc_env"
+        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "qes_venv" "${CODES_DIR}/qes_venv"
 
         echo "# Change to working directory"
         echo "cd ${defaults[RUN_DIR]}"

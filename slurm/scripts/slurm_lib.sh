@@ -503,5 +503,17 @@ setup_qes_environment() {
 }
 
 # -----------------------------------------------------------------------
+
+# Function to log job information
+#   It appends job information and timestamp to a log file.
+log_job_info() {
+    local log_file="$1"
+    local job_info="$2"
+    local timestamp=$(date)
+    
+    echo -e "${job_info}\t${timestamp}" >> "$log_file"
+}
+
+# -----------------------------------------------------------------------
 # End of slurm_lib.sh
 # -----------------------------------------------------------------------
