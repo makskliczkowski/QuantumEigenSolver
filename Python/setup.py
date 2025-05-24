@@ -67,6 +67,10 @@ INSTALL_REQUIRES = [
     'tqdm>=4.60.0',         # For progress bars
     'requests>=2.25.0',     # For HTTP requests
     'numba>=0.55.0',        # For just-in-time compilation
+    'physics-tenpy>=0.9.0', # For tensor network physics simulations
+    'pyutils>=0.0.10',      # For utility functions
+    'IPython>=7.16.0',      # For interactive computing
+    'scienceplots>=0.1.0',  # For scientific plotting
 ]
 
 # Optional dependencies for enhanced functionality
@@ -85,13 +89,13 @@ EXTRAS_REQUIRE = {
         'h5py>=3.1.0',          # For HDF5 file format support
     ],
     'dev': [
-        'pytest>=6.0.0',        # For testing
-        'pytest-cov>=2.12.0',   # For coverage testing
-        'black>=21.0.0',        # For code formatting
-        'flake8>=3.9.0',        # For linting
-        'mypy>=0.910',          # For type checking
-        'sphinx>=4.0.0',        # For documentation generation
-        'sphinx-rtd-theme>=0.5.0',  # For documentation theme
+        'pytest>=6.0.0',                # For testing
+        'pytest-cov>=2.12.0',           # For coverage testing
+        'black>=21.0.0',                # For code formatting
+        'flake8>=3.9.0',                # For linting
+        'mypy>=0.910',                  # For type checking
+        'sphinx>=4.0.0',                # For documentation generation
+        'sphinx-rtd-theme>=0.5.0',      # For documentation theme
     ],
     'docs': [
         'sphinx>=4.0.0',
