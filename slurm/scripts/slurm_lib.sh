@@ -474,7 +474,7 @@ setup_qes_environment() {
 
     echo "# Setup QES Python environment"
     echo "export QES_BASE_DIR=\"${base_dir}\""
-    echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}/Python\""
+    echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}\""
     echo ""
     
     echo "# Create virtual environment if it doesn't exist"

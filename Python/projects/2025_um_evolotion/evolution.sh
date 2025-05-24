@@ -8,11 +8,11 @@ chmod +x evolution.py
 python evolution.py         \
     ./data_big_times        \
     0.68                    \
-    0.06                    \
-    5                       \
+    0.03                    \
+    9                       \
     10                      \
-    8                       \
-    8                       \
+    11                      \
+    12                      \
     1                       \
     100000                  \
     10
