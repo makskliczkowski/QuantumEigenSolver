@@ -2194,7 +2194,7 @@ def _dispatch(op    : Operator,
 
 def test_operator_on_state(op           : Union[Operator, Sequence[Operator]],
                         lat             : Lattice,
-                        state           : Union[int, Array],
+                        state           : Union[int, np.ndarray],
                         *,
                         ns              : Optional[int] = None,
                         op_acting       : "OperatorTypeActing" = OperatorTypeActing.Local,

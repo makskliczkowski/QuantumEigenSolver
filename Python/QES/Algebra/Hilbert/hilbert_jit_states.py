@@ -22,7 +22,7 @@ PfFunc              = Callable[[Array, int], Union[float, complex]]
 # Signature: hafnian(A)     (symmetric,   even n)
 HfFunc              = Callable[[Array], Union[float, complex]]
 # Signature: callable for $\Psi$
-CallableCoefficient = Callable[[Array, Array, Union[int, Array], int], Union[float, complex]]
+CallableCoefficient = Callable[[Array, Array, Union[int, np.ndarray], int], Union[float, complex]]
 
 _TOLERANCE          = 1e-10
 _USE_EIGEN          = True
@@ -53,7 +53,7 @@ def _popcount(x: int) -> int:
 
 @njit(cache=True)
 def _extract_occupied(ns    : int,
-                    basis   : Union[int, Array]) -> Array:
+                    basis   : Union[int, np.ndarray]) -> Array:
     """
     Extracts the indices of occupied sites from a basis state representation.
 
@@ -304,7 +304,7 @@ def pairing_matrix(u_mat: Array, v_mat: Array) -> Array:
 
 @njit(cache=True)
 def calculate_bogoliubov_amp(F          : Array, # pairing  (ns, ns)
-                            basis       : Union[int, Array],
+                            basis       : Union[int, np.ndarray],
                             ns          : int,
                             pfaff       : PfFunc,
                             enforce     = True):
@@ -320,7 +320,7 @@ def calculate_bogoliubov_amp(F          : Array, # pairing  (ns, ns)
     ----------
     F : Array
         Pairing matrix of shape (ns, ns) representing the Bogoliubov transformation.
-    basis : Union[int, Array]
+    basis : Union[int, np.ndarray]
         Basis configuration specifying the occupied sites. Can be an integer or an array.
     ns : int
         Number of single-particle states.
@@ -374,7 +374,7 @@ def calculate_bogoliubov_amp_exc(F      : Array,     # (ns, ns)
             The Bogoliubov transformation matrix of shape (ns, Nqp).
         qp_inds (Array):
             Array of indices [m1, ..., mk] specifying the excited quasiparticle states.
-        basis (Union[int, Array]):
+        basis (Union[int, np.ndarray]):
             Basis state, either as an integer or an array of occupation numbers.
         ns (int):
             Number of single-particle states.
@@ -434,7 +434,7 @@ def calculate_bosonic_gaussian_amp(G        : Array,    # (ns, ns)
     Args:
         G (Array):
             The (ns, ns) complex symmetric matrix representing the Gaussian state.
-        basis (Union[int, Array]):
+        basis (Union[int, np.ndarray]):
             The Fock basis state, either as an integer or an array of occupations.
         ns (int):
             The number of modes.
