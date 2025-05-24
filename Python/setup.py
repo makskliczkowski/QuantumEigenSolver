@@ -68,7 +68,7 @@ INSTALL_REQUIRES = [
     'requests>=2.25.0',     # For HTTP requests
     'numba>=0.55.0',        # For just-in-time compilation
     'physics-tenpy>=0.9.0', # For tensor network physics simulations
-    'pyutils>=0.0.10',      # For utility functions
+    'pyutils>=0.0.8',       # For utility functions
     'IPython>=7.16.0',      # For interactive computing
     'scienceplots>=0.1.0',  # For scientific plotting
 ]
