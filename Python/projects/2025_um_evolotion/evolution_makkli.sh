@@ -101,7 +101,7 @@ main() {
     defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/DATA_EVO_2025_UM"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
     defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM"
-    defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python/QES"
+    defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python"
     
     # Parse command line arguments
     if [ $# -eq 0 ]; then
