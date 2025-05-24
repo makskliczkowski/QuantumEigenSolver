@@ -45,6 +45,10 @@ dependencies = [
     "setuptools>=45",
     "seaborn>=0.11.0",
     "psutil>=5.8.0",
+    "IPython>=7.16.0",
+    "physics-tenpy>=0.9.0",
+    "pyutils>=0.1.0",
+    "scienceplots>=0.1.0",
 ]
 
 [project.optional-dependencies]
