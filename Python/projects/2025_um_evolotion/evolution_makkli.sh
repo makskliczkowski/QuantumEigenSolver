@@ -238,14 +238,18 @@ cat > "${script_file}" << EOF
 export SLURM_JOB_ID=\${SLURM_JOB_ID}
 
 # Set up scratch directory
-SAVDIR="/lustre/tmp/slurm/\${SLURM_JOB_ID}"
-mkdir -p "\${SAVDIR}"
+# SAVDIR="/lustre/tmp/slurm/\${SLURM_JOB_ID}"
+# mkdir -p "\${SAVDIR}"
 
 # Log the job directory
 echo -e "\${SAVDIR}\t\$(date)" >> ${RUN_DIR}/slurm_ids_run.log
 
 # Load required modules
 source /usr/local/sbin/modules.sh
+
+# Load necessary modules and install for 
+
+
 module load python
 module load HDF5
 
@@ -265,7 +269,7 @@ python3 ${RUN_DIR}/evolution.py     \\
 # rm -rf "\${SAVDIR}/"*
 
 # Clean up scratch directory (if using TMPDIR)
-rmdir "\${SAVDIR}" 2>/dev/null || true
+# rmdir "\${SAVDIR}" 2>/dev/null || true
 EOF
 
 #! for the tests, echo the script content

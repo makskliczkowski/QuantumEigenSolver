@@ -33,17 +33,26 @@ if parent_dir not in sys.path:
 
 # project imports
 from QES.general_python.run_scripts.slurm import SlurmMonitor
+
 from QES.general_python.common.binary import get_global_logger
+
+from QES.general_python.algebra.linalg import overlap
 from QES.general_python.common import Directories
 from QES.general_python.common import HDF5Handler
+from QES.general_python.run_scripts.prepareini import ManyBodyEstimator
+
 from QES.general_python.maths.statistics import HistogramAverage
-from QES.general_python.physics import entropy
+
+#! VON NEUMANN, TSALLIS, PARTICIPATION ENTROPY
+from QES.general_python.physics import entropy as entropy, density_matrix as density_matrix
+
+#! MODEL
 from QES.Algebra.Model.Interacting.Spin.ultrametric import UltrametricModel
-from QES.general_python.algebra.linalg import overlap
+
 from QES.Algebra.Properties import time_evo, statistical
 import QES.Algebra.Operator.operators_spin as op_spin
 
-logger      = get_global_logger()
+logger = get_global_logger()
 
 # ------------------------------------------------------------------
 #! Read the parameters
@@ -51,25 +60,31 @@ logger      = get_global_logger()
 def _single_realisation(
         model                   : UltrametricModel,
         r                       : int,
-        sigma_es                : np.ndarray,
-        bandwidths              : np.ndarray,
-        energies                : np.ndarray,
-        ldos                    : np.ndarray,
-        iprs                    : dict,
-        entros                  : dict,
-        quench_energies         : np.ndarray,
-        time_vals               : dict,
-        time_steps              : np.ndarray,
-        operators               : dict,
-        operators_mat           : dict,
-        omegas_allocated        : np.ndarray,
-        vals_allocated          : np.ndarray,
-        h_av                    : dict,
-        h_typ                   : dict,
-        diagonals_operators     : dict,
-        diagonal_ensembles      : dict,
-        start_time              : float = None,
-        job_time                : float = None,
+        sigma_es                : np.ndarray,   # save the energy width
+        bandwidths              : np.ndarray,   # save the bandwidth
+        energies                : np.ndarray,   # save the energies
+        ldos                    : np.ndarray,   # save the local density of states
+        iprs                    : dict,         # save the inverse participation ratio
+        entros                  : dict,         # save the participation entropy
+        quench_energies         : np.ndarray,   # save the quench energies
+        time_vals               : dict,         # save the time evolution values
+        time_steps              : np.ndarray,   # save the time steps
+        operators               : dict,         # operators to compute - has the names etc
+        operators_mat           : dict,         # operators matrices
+        omegas_allocated        : np.ndarray,   # allocated omegas for histogram
+        vals_allocated          : np.ndarray,   # allocated values for histogram
+        h_av                    : dict,         # histogram averages
+        h_typ                   : dict,         # histogram typical values
+        diagonals_operators     : dict,         # save the diagonal elements of the operators
+        diagonal_ensembles      : dict,         # save the diagonal ensembles
+        vn_entropies            : np.ndarray,   # save the von Neumann entropies for the quench state
+        tsalis                  : np.ndarray,   # save the Tsallis entropies for the quench state
+        schmidt_gaps            : np.ndarray,   # save the Schmidt gaps for the quench state
+        iprs_quench             : dict,         # save the IPR for the quench state
+        par_ent_quench          : dict,         # save the participation entropy for the quench state
+        # optional parameters - info about the job
+        start_time              : float = None, # start time for the job - when it started
+        job_time                : float = None, # job time for the job - how long it can run
         ):
 
     if SlurmMonitor.is_overtime(limit=1200, start_time=start_time, job_time=job_time):  # 20 minutes buffer
@@ -80,11 +95,8 @@ def _single_realisation(
     alpha           = model.alphas[0]
     ns              = model.ns
     hilbert_size    = 2**ns
-    vn_num          = min(500, hilbert_size)
-    qs_ipr          = { 2.0, 0.5 }
-    qs_entro        = { 1.0 }
-    batch_limit     = lambda ns: ns > 13
-    batch_num       = lambda ns: 100 if batch_limit(ns) else 1
+    batch_limit     = lambda ns: ns > 14
+    batch_num       = lambda ns: 10 if batch_limit(ns) else 1
     
     time_start_r    = time.perf_counter()
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r}", lvl=3, color='red')
@@ -97,33 +109,25 @@ def _single_realisation(
     
     #! compute the bandwidth
     time_start_stat = time.perf_counter()
-    mean_energy     = model.av_en
-    idx_mean        = int(np.argmin(np.abs(model.eig_val - mean_energy)))
-    idx_mn, idx_mx  = int(idx_mean - vn_num // 2), int(idx_mean + vn_num // 2)
-    idx_mn, idx_mx  = np.clip(idx_mn, 0, hilbert_size), np.clip(idx_mx, 0, hilbert_size)
-    bandwidth       = model.get_bandwidth()
-    sigma_e         = model.get_energywidth()
-    bandwidths[r]   = bandwidth
-    sigma_es[r]     = sigma_e
+    mean_energy                 = model.av_en
+    bandwidth                   = model.get_bandwidth()
+    sigma_e                     = model.get_energywidth()
+    bandwidths[r]               = bandwidth
+    sigma_es[r]                 = sigma_e
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} bandwidth = {bandwidth:.2f} done in {time.perf_counter() - time_start_stat:.2f} s", lvl=3, color='red')
     
     #! IPR
     time_start_ipr = time.perf_counter()
-    for q in qs_ipr:
+    for q in iprs.keys():
         iprs[q][r, :] = statistical.inverse_participation_ratio(model.eig_vec, q=q)
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} IPR done in {time.perf_counter() - time_start_ipr:.2f} s", lvl=3, color='red')
 
     #! participation entropy
     time_start_entro = time.perf_counter()
-    for q in qs_entro:
+    for q in entros.keys():
         entros[q][r, :] = entropy.entropy(model.eig_vec, q=q, typek=entropy.Entanglement.PARTIC)
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} entropy done in {time.perf_counter() - time_start_entro:.2f} s", lvl=3, color='red')
 
-    #! von Neumann entropy
-    # von_neumann[r, :]   = entropy.entropy(model.eig_vec[:, idx_mn:idx_mx], q=1.0, typek=entropy.Entanglement.VN)
-    #! Tsallis entropy
-    # tsalis[r, :]        = entropy.entropy(model.eig_vec[:, idx_mn:idx_mx], q=2.0, typek=entropy.Entanglement.TSALLIS)
-    
     #! select the quench state
     quench_state            = np.zeros(hilbert_size, dtype=np.float64)
     diff                    = np.abs(model.hamil.diagonal() - mean_energy)
@@ -133,28 +137,47 @@ def _single_realisation(
     overlaps                = model.eig_vec.T @ quench_state
     soverlaps               = np.square(np.abs(overlaps))
     
+    if True:
+        time_start_entro_quench = time.perf_counter()
+        #! calculate the entropies for the initial state in the eigenbasis
+        schmidt_val, _      = density_matrix.schmidt_numba(overlaps, 2, 2**(ns - 1), eig = False)
+        #! von Neumann entropy
+        vn_entropies[r]     = entropy.entropy(schmidt_val, q=1.0, typek=entropy.Entanglement.VN)
+        #! Tsallis entropy
+        tsalis[r]           = entropy.entropy(schmidt_val, q=2.0, typek=entropy.Entanglement.TSALLIS)
+        #! Schmidt gaps
+        schmidt_gaps[r]     = schmidt_val[1] - schmidt_val[0] if len(schmidt_val) > 1 else 0.0 
+        #! Iprs for the quench state
+        for q in iprs_quench.keys():
+            iprs_quench[q][r] = statistical.inverse_participation_ratio(overlaps, q=q)
+        for q in par_ent_quench.keys():
+            par_ent_quench[q][r] = entropy.entropy(overlaps, q=q, typek=entropy.Entanglement.PARTIC)
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} entropies for quench state done in {time.perf_counter() - time_start_entro_quench:.2f} s", lvl=3, color='white')
+        
     #! compute the ldos
     ldos[r, :]              = statistical.ldos(energies = model.eig_val, overlaps = overlaps)
     energies[r, :]          = model.eig_val
         
     #! accumulate into the single histogram
     for name in operators.keys():
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} computing histogram for operator {name}", lvl=3, color='blue')
+        
         matrix_elements                 = overlap(model.eig_vec, operators_mat[name])
         diagonals_operators[name][r, :] = matrix_elements.diagonal()
         diagonal_ensembles[name][r]     = time_evo.diagonal_ensemble(soverlaps=soverlaps, diag_mat=matrix_elements.diagonal())
 
         time_start_hist = time.perf_counter()
         cnt = statistical.f_function(
-            start               = 0,
-            stop                = len(model.eig_vec),
-            overlaps            = matrix_elements,
-            eigvals             = model.eig_val,
-            omegas_allocated    = omegas_allocated,
-            vals_allocated      = vals_allocated,
-            energy_target       = mean_energy,
-            bw                  = bandwidth,
-            energy_diff_cut     = 0.015)
-        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} histogram done in {time.perf_counter() - time_start_hist:.2f} s", lvl=3, color='blue')
+                start               = 0,
+                stop                = len(model.eig_vec),
+                overlaps            = matrix_elements,
+                eigvals             = model.eig_val,
+                omegas_allocated    = omegas_allocated,
+                vals_allocated      = vals_allocated,
+                energy_target       = mean_energy,
+                bw                  = bandwidth,
+                energy_diff_cut     = 0.015)
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} histogram done in {time.perf_counter() - time_start_hist:.2f} s", lvl=4, color='blue')
         
         #! remove zeros and nan
         omegas                  = omegas_allocated[:cnt]
@@ -165,7 +188,7 @@ def _single_realisation(
         h_av[name].append(omegas, vals)
         h_typ[name].append(omegas, np.log(vals))
         
-        #! time evolution
+        #! time evolution - compute the expectation values
         time_start_evo = time.perf_counter()
         if not batch_limit(ns):
             # Small systems: compute all at once
@@ -174,12 +197,13 @@ def _single_realisation(
             time_vals[name][r, :]   = np.real(quenched_values_t)
         else:
             # Large systems: batch processing
-            batch_size = time_num // batch_num(ns)
-            for i in range(batch_num(ns)):
+            batch_count             = batch_num(ns)
+            batch_size              = (time_num + batch_count - 1) // batch_count
+            for i in range(batch_count):
                 start_idx   = i * batch_size
-                end_idx     = min((i + 1) * batch_size, time_num)
+                end_idx     = min(start_idx + batch_size, time_num)
                 
-                if start_idx >= time_num:
+                if start_idx >= end_idx:
                     break
                     
                 # Check timeout during batching
@@ -195,9 +219,9 @@ def _single_realisation(
                 
                 # Clean up memory
                 del quench_states_batch, quenched_values_batch
-        
-        # time_vals[name][r, :] = np.real(quenched_values_t)
-        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} time evolution done in {time.perf_counter() - time_start_evo:.2f} s", lvl=3, color='blue')
+
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} time evolution done in {time.perf_counter() - time_start_evo:.2f} s", lvl=4, color='blue')
+
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} done in {time.perf_counter() - time_start_r:.2f} s", lvl=4, color='red')
     return True
 
@@ -229,19 +253,14 @@ def _single_alpha(alpha             : float,
                 operators_mat       : dict,
                 start_time          : float = None,
                 job_time            : float = None,
+                seed                : int   = None
                 ) -> None:
 
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}", lvl=2, color='green')
     time_start_a        = time.perf_counter()
     hilbert_size        = 2**ns
-    vn_num              = min(500, hilbert_size)
-    qs_ipr              = { 2.0, 0.5 }
-    qs_entro            = { 1.0 }
     
     #! constants
-    # heisenberg_time     = 1.0 / mls_df.loc[f'{alpha:.2f}', ns] * 2.0 * np.pi
-    # bandwidth_data      = bw_df.loc[f'{alpha:.2f}', ns]
-    
     heisenberg_time     = 1.0 / mean_lvl_spacing * 2.0 * np.pi
     time_delta          = 2.0 * np.pi / bandwidth_data
     time_start          = heisenberg_time - time_num * time_delta / 2
@@ -258,21 +277,22 @@ def _single_alpha(alpha             : float,
         time_steps      = np.logspace(-2, np.log10(hilbert_size * 100), num=time_num)
             
     #! histogram
-    o_max               = 3 * bandwidth_data
-    o_min               = 0.01 / hilbert_size
+    o_min, o_max        = 0.01 / hilbert_size, 3 * bandwidth_data
     n_bins              = int(20 * ns)
     edges               = HistogramAverage.uniform_log(n_bins, v_max=o_max, v_min=o_min)
     for name in operators.keys():
         h_av    = { k : HistogramAverage(n_bins, edges=edges) for k in operators.keys() }
         h_typ   = { k : HistogramAverage(n_bins, edges=edges) for k in operators.keys() }
 
+    #! entropies 
+    vn_entropies        = np.zeros((n_realisations,), dtype=np.float64)  # von Neumann entropies
+    tsalis              = np.zeros((n_realisations,), dtype=np.float64)  # Tsallis entropies
+    schmidt_gaps        = np.zeros((n_realisations,), dtype=np.float64)  # Schmidt gaps
+    par_ent_quench      = { q : np.zeros((n_realisations), dtype=np.float64) for q in [0.5, 1.0, 2.0] }  # participation entropy for the quench state
+    iprs_quench         = { q : np.zeros((n_realisations), dtype=np.float64) for q in [0.5, 1.0, 2.0] }  # IPR for the quench state
+
     #! model
-    model               = UltrametricModel(
-                                ns      = ns,
-                                n       = n,
-                                alphas  = alpha,
-                                backend = np,
-                                seed    = None)
+    model               = UltrametricModel(ns = ns, n = n, alphas = alpha, backend = np, seed = seed)
     
     #! directories
     data_dir_in = data_dir.join('uniform' if uniform else 'log', f'{str(model)}')
@@ -302,7 +322,13 @@ def _single_alpha(alpha             : float,
             diagonals_operators     = diagonals_operators,
             diagonal_ensembles      = diagonal_ensembles,
             start_time              = start_time,
-            job_time                = job_time)
+            job_time                = job_time,
+            vn_entropies            = vn_entropies,
+            tsalis                  = tsalis,
+            schmidt_gaps            = schmidt_gaps,
+            iprs_quench             = iprs_quench,
+            par_ent_quench          = par_ent_quench,
+        )
         
         if success:
             completed_realizations += 1
@@ -319,15 +345,18 @@ def _single_alpha(alpha             : float,
     #! save the data
     if completed_realizations > 0:
         data_stat = {
-            'bandwidth'                 : bandwidths,
-            'sigma_e'                   : sigma_es,
-            'energies'                  : energies,
-            'ldos'                      : ldos,
-            # 'entropy/von_neumann/1.0'   : von_neumann,
-            # 'entropy/tsallis/1.0'       : tsalis,
+            'bandwidth'                         : bandwidths,
+            'sigma_e'                           : sigma_es,
+            'energies'                          : energies,
+            'ldos'                              : ldos,
+            'entropy/quench/von_neumann/1.0'    : vn_entropies,
+            'entropy/quench/tsallis/2.0'        : tsalis,
+            'entropy/quench/schmidt_gap'        : schmidt_gaps,
         }
-        data_stat.update({f'iprs/{q}' : iprs[q] for q in qs_ipr})
-        data_stat.update({f'entropy/participation/{q}' : entros[q] for q in qs_entro})
+        data_stat.update({f'iprs/quench/{q}'                        : iprs_quench[q] for q in iprs_quench.keys()})
+        data_stat.update({f'participation/quench/{q}'               : par_ent_quench[q] for q in par_ent_quench.keys()})
+        data_stat.update({f'iprs/{q}'                               : iprs[q] for q in iprs.keys()})
+        data_stat.update({f'entropy/eigenbasis/participation/{q}'   : entros[q] for q in entros.keys()})
         
         #! statistical
         HDF5Handler.save_hdf5(directory =   data_dir_in, 
@@ -377,14 +406,66 @@ def prepare_evolution(
                 n_realisations  : dict, 
                 time_num        : int, 
                 operators_map   : dict,
-                n               : int   = 1,
-                uniform         : bool  = True,
-                n_random        : int   = 0,
-                bw_df           : pd.DataFrame = None,
-                mls_df          : pd.DataFrame = None,
-                start_time      : float = None,
-                job_time        : float = None,
-                ) -> tuple:
+                n               : int           = 1,
+                uniform         : bool          = True,
+                n_random        : int           = 0,
+                bw_df           : pd.DataFrame  = None,
+                mls_df          : pd.DataFrame  = None,
+                start_time      : float         = None,
+                job_time        : float         = None,
+                seed            : int           = None) -> tuple:
+    """
+    Prepares and allocates data structures for quantum evolution simulations over multiple system sizes and disorder strengths.
+    This function initializes and allocates arrays and dictionaries required for simulating quantum evolution, 
+    including observables, energies, bandwidths, and histograms. It loops over the specified system sizes (`sites`) 
+    and disorder strengths (`alphas`), and for each combination, prepares the necessary data for further computation 
+    by calling the `_single_alpha` function.
+    Parameters
+    ----------
+    data_dir : Directories
+        Object or structure containing paths to data directories.
+    sites : iterable
+        List or array of system sizes (number of sites) to simulate.
+    alphas : iterable
+        List or array of disorder strengths (alpha values) to consider.
+    n_realisations : dict
+        Dictionary mapping system size to the number of disorder realisations to simulate.
+    time_num : int
+        Number of time points for time evolution.
+    operators_map : dict
+        Dictionary mapping operator names to operator constructor functions.
+    n : int, optional
+        Parameter for the simulation, default is 1.
+    uniform : bool, optional
+        Whether to use uniform distribution for disorder, default is True.
+    n_random : int, optional
+        Number of random samples to use, default is 0.
+    bw_df : pd.DataFrame, optional
+        DataFrame containing precomputed bandwidth data, indexed by alpha and system size.
+    mls_df : pd.DataFrame, optional
+        DataFrame containing precomputed mean level spacing data, indexed by alpha and system size.
+    start_time : float, optional
+        Start time of the job, for logging or timing purposes.
+    job_time : float, optional
+        Maximum allowed job time, for resource management.
+    seed : int, optional
+        Random seed for reproducibility.
+    Returns
+    -------
+    tuple
+        A tuple containing:
+            - histograms_av: dict
+                Nested dictionary of averaged histograms for each operator and alpha.
+            - histograms_typ: dict
+                Nested dictionary of typical histograms for each operator and alpha.
+            - bandwidths: np.ndarray
+                Array of bandwidths for each realisation.
+    Notes
+    -----
+    This function is intended to be used as a preparatory step before running quantum evolution simulations.
+    It does not perform the actual evolution but sets up all necessary data structures and calls `_single_alpha`
+    for each (system size, alpha) pair.
+    """
     
     #! allocate the data
     max_ns              = sites[-1]
@@ -392,9 +473,6 @@ def prepare_evolution(
     max_allocated       = max_nh * (max_nh - 1) // 2
     vals_allocated      = np.zeros(max_allocated, dtype=np.float64)
     omegas_allocated    = np.zeros(max_allocated, dtype=np.float64)
-    
-    qs_ipr              = { 2.0, 0.5 }
-    qs_entro            = { 1.0 }
 
     histograms_av       = { op: {alpha: {} for alpha in alphas} for op in operators_map }
     histograms_typ      = { op: {alpha: {} for alpha in alphas} for op in operators_map }
@@ -412,11 +490,9 @@ def prepare_evolution(
         
         #! energy and bandwidth
         ldos                = np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64)
-        iprs                = {q : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for q in qs_ipr              }
-        entros              = {q : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for q in qs_entro            }
-        # von_neumann         = np.zeros(shape=(n_realisations_in, vn_num), dtype=np.float64)
-        # tsalis              = np.zeros(shape=(n_realisations_in, tsalis_num), dtype=np.float64)
-        
+        iprs                = {q : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for q in [2.0, 0.5]          }
+        entros              = {q : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for q in [1.0]               }
+
         energies            = np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64)
         diagonals_operators = { k : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for k in operators.keys()   }
         bandwidths          = np.zeros(shape=(n_realisations_in,), dtype=np.float64)
@@ -424,7 +500,6 @@ def prepare_evolution(
         
         time_vals           = { k : np.zeros(shape=(n_realisations_in, time_num), dtype=np.float64) for k in operators.keys()       }
         diagonal_ensembles  = { k : np.zeros(shape=(n_realisations_in,), dtype=np.float64) for k in operators.keys()                }
-        idx                 = 0
         logger.info(f"ns = {ns} allocation done in {time.perf_counter() - time_start_ns:.2f} s", lvl=1, color='blue')
         
         #! go through the alphas
@@ -469,6 +544,7 @@ def prepare_evolution(
                 operators_mat           = operators_mat,
                 start_time              = start_time,
                 job_time                = job_time,
+                seed                    = seed
             )
             
     return histograms_av, histograms_typ, bandwidths
@@ -483,21 +559,22 @@ def make_sig_z_global(ns):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Parallel time-evolution statistics')
-    parser.add_argument('save_dir',                                                             help    =   'Directory to save data')
-    parser.add_argument('alpha_start',              type    =   float,                          help    =   'Initial alpha value')
-    parser.add_argument('alpha_step',               type    =   float,                          help    =   'Step for alpha')
-    parser.add_argument('alphas_number',            type    =   int,                            help    =   'Number of alpha steps')
-    parser.add_argument('number_of_realizations',   type    =   int,    default =   10,         help    =   'Realizations per ns')
-    parser.add_argument('sites_start',              type    =   int,                            help    =   'Minimum number of spins')
-    parser.add_argument('sites_end',                type    =   int,                            help    =   'Maximum number of spins (inclusive)')
-    parser.add_argument('n',                        type    =   int,    default =   1,          help    =   'Model parameter n')
-    parser.add_argument('time_num',               type    =   int,    default =   int(1e5),     help    =   'Number of time points')
-    parser.add_argument('memory_per_worker',      type    =   float,  default =   2.0,          help    =   'Memory reserved per worker in GB')
+    parser.add_argument('save_dir',                         type    =   str,                            help    =   'Directory to save data')
+    parser.add_argument('alpha_start',                      type    =   float,                          help    =   'Initial alpha value')
+    parser.add_argument('alpha_step',                       type    =   float,                          help    =   'Step for alpha')
+    parser.add_argument('alphas_number',                    type    =   int,                            help    =   'Number of alpha steps')
+    parser.add_argument('number_of_realizations',           type    =   int,    default =   10,         help    =   'Realizations per ns')
+    parser.add_argument('sites_start',                      type    =   int,                            help    =   'Minimum number of spins')
+    parser.add_argument('sites_end',                        type    =   int,                            help    =   'Maximum number of spins (inclusive)')
+    parser.add_argument('-n',        '--n',                 type    =   int,    default =   1,          help    =   'Model parameter n')
+    parser.add_argument('-T',        '--time_num',          type    =   int,    default =   int(1e5),   help    =   'Number of time points')
+    parser.add_argument('-M',        '--memory_per_worker', type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
+    parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     args = parser.parse_args()
     
     
     #! -------------------------------------------------------
-    rng                 = np.random.default_rng()
+    rng                 = np.random.default_rng(seed=args.seed)
     rand_num            = rng.integers(0, int(1e5))
     bw_df               = pd.read_csv("./bw.csv", index_col=0, header=None, dtype=float)
     mls_df              = pd.read_csv("./mls.csv", index_col=0, header=None, dtype=float)
@@ -528,9 +605,13 @@ if __name__ == "__main__":
     logger.info(f"Number of sites: {len(sites)}")
     logger.info(f"Alphas: {alphas}")
     logger.info(f"Sites: {sites}")
+    logger.info(f"Operators: {operators_map.keys()}")
+    logger.info(f"Time steps: {time_num}")
 
     #! -------------------------------------------------------
     memory_per_worker   = args.memory_per_worker
+    memory_per_worker   = max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(ns = sites[-1]), memory_per_worker)) # minimum 1 GB
+        
     avail_gb            = psutil.virtual_memory().available / (1024**3)
     # max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
     max_workers         = 1
@@ -541,14 +622,13 @@ if __name__ == "__main__":
     
     # split alphas into chunks
     n_alphas_per_worker = len(alphas) // max_workers
-    alphas_chunks       = [alphas[i:i + n_alphas_per_worker] for i in range(0, len(alphas), n_alphas_per_worker)]
-    alphas_chunks       = [chunk for chunk in alphas_chunks if len(chunk) > 0]
+    alphas_chunks       = np.array_split(alphas, max_workers)
     logger.info(f"Alphas chunks: {alphas_chunks}")
     #! -------------------------------------------------------
     
     start_time          = time.perf_counter()
     remaining_time      = SlurmMonitor.get_remaining_time()
-    logger.info(f"Remaining time: {remaining_time:.2f} s, which is {remaining_time / 60:.2f} min, {remaining_time / 3600:.2f} h")
+    logger.info(f"Remaining time: {remaining_time:.2f} s, which is {remaining_time / 60:.2f} min, {remaining_time / 3600:.2f} h", color='green')
     
     if max_workers > 1:
         logger.info(f"Using {max_workers} workers")
@@ -596,7 +676,7 @@ if __name__ == "__main__":
             start_time      = start_time,
             job_time        = remaining_time,
         )
-    logger.info(f"All done")
+    logger.info(f"All done in {time.perf_counter() - start_time:.2f} s", color='green')
         
     #! -------------------------------------------------------
 

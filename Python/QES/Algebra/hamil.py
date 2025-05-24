@@ -608,6 +608,51 @@ class Hamiltonian(ABC):
         return self._av_en
     
     @property
+    def av_en_idx(self):
+        '''
+        Returns the index of the average energy of the Hamiltonian.
+        This is used to track the average energy during calculations.
+        '''
+        if self._av_en_idx is not None or self._av_en_idx == 0:
+            self._av_en_idx = int(np.argmin(np.abs(self.eig_val - self.av_en)))
+        return self._av_en_idx
+    
+    @property
+    def av_en_idx_and_value(self):
+        '''
+        Returns the index and value of the average energy of the Hamiltonian.
+        This is used to track the average energy during calculations.
+        
+        Returns:
+            tuple : (index, value) of the average energy.
+        '''
+        return self.av_en_idx, self.av_en
+    
+    def indices_around_energy(self, energy: float, fraction: Union[int, float] = 500):
+        '''
+        Returns the indices around the average energy of the Hamiltonian.
+        This is used to track the average energy during calculations.
+        
+        Returns:
+            tuple : (index, value) of the average energy.
+        '''
+        hilbert_size    = len(self.eig_val)
+        if fraction <= 1.0:
+            fraction_in = int(fraction * hilbert_size)
+        else:
+            fraction_in = int(fraction)
+        
+        #! get the energy index
+        energy_in       = self.av_en if energy is None else energy
+        energy_index    = int(np.argmin(np.abs(self.eig_val - energy_in))) if energy is None else self.av_en_idx
+        
+        #! left
+        left_index      = min(max(0, energy_index - fraction_in // 2), energy_index - 5)
+        right_index     = max(min(hilbert_size, energy_index + fraction_in // 2), energy_index + 5)
+
+        return left_index, right_index, energy_index
+
+    @property
     def std_en(self):
         '''
         Returns the standard deviation of the energy of the Hamiltonian.
