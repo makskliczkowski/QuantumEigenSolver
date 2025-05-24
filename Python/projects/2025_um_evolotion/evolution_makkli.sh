@@ -212,7 +212,7 @@ main() {
     # Generate job identifiers
     job_params="fun=2025_um_evo,Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
-    
+    venv_name="qes_venv"
     # Create SLURM job script
     {
         create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
@@ -222,8 +222,8 @@ main() {
         echo ""
         
         add_module_section "Python/3.10.4-GCCcore-11.3.0"
-
-        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "qes_venv" "${CODES_DIR}/qes_venv"
+        echo "venv_name=\"${venv_name}\""
+        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "$venv_name" "${CODES_DIR}" || exit 1
 
         echo "# Change to working directory"
         echo "cd ${defaults[RUN_DIR]}"

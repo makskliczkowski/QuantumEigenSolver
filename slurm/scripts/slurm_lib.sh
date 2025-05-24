@@ -468,22 +468,24 @@ validate_file_exists() {
 
 setup_qes_environment() {
     local base_dir="$1"
-    local venv_name="$2"
-    
+    local req_file="$2"
+    local venv_name="$3"
+    local venv_path="$4"
+
     echo "# Setup QES Python environment"
     echo "export QES_BASE_DIR=\"${base_dir}\""
     echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}/Python\""
     echo ""
     
     echo "# Create virtual environment if it doesn't exist"
-    echo "if [ ! -d \"\${QES_BASE_DIR}/\${venv_name}\" ]; then"
+    echo "if [ ! -d \"\${venv_path}/\${venv_name}\" ]; then"
     echo "    echo \"Creating virtual environment: \${venv_name}\""
-    echo "    python3 -m venv \"\${QES_BASE_DIR}/\${venv_name}\""
+    echo "    python3 -m venv \"\${venv_path}/\${venv_name}\""
     echo "fi"
     echo ""
     
     echo "# Activate virtual environment"
-    echo "source \"\${QES_BASE_DIR}/\${venv_name}/bin/activate\""
+    echo "source \"\${venv_path}/\${venv_name}/bin/activate\""
     echo "echo \"Activated virtual environment: \${venv_name}\""
     echo ""
     
