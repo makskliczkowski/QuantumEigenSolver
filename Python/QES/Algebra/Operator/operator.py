@@ -2351,10 +2351,11 @@ def test_operators(op,
         # Note: We assume that add_args is a tuple of additional arguments.
         #       The first argument is the state, and the rest are additional arguments.
         #       The operator should be able to handle these additional arguments.
+        params_str = ", ".join(map(str, add_args))
         tests = {
-            f"op(state, {str(*add_args)})"     : lambda: op(state, *add_args),
-            f"op[state, {str(*add_args)}]"     : lambda: op[state, *add_args],
-            f"op % state, {str(*add_args)}"    : lambda: op % (state, *add_args),
+            f"op(state, {params_str})"     : lambda: op(state, *add_args),
+            f"op[state, {params_str}]"     : lambda: op[state, *add_args],
+            f"op % state, {params_str}"    : lambda: op % (state, *add_args),
         }
     
     # List to collect the data for each test.
