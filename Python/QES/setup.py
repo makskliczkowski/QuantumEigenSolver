@@ -131,7 +131,7 @@ setup(
         'Topic :: Scientific/Engineering :: Physics',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Topic :: Software Development :: Libraries :: Python Modules',
-        'License :: OSI Approved :: MIT License',  # Note: Update if license changes
+        'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',

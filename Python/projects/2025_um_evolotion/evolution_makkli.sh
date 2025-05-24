@@ -9,7 +9,8 @@
 
 # Source the reusable library
 HOME_DIR=${HOME:-$HOME}
-PACKAGE_DIR="${HOME_DIR}/Codes/QuantumEigenSolver/"
+CODES_DIR="${HOME_DIR}/Codes/"
+PACKAGE_DIR="${CODES_DIR}/QuantumEigenSolver/"
 source "${PACKAGE_DIR}/slurm/scripts/slurm_lib.sh"
 
 # Function to display usage
@@ -225,9 +226,9 @@ main() {
         echo ""
         
         add_module_section "Python/3.10.4-GCCcore-11.3.0" "HDF5"
-        
-        setup_qes_environment "${defaults[BASE_DIR]}" "qes_vqmc_env"
-        
+
+        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "qes_vqmc_env" "${CODES_DIR}/qes_vqmc_env"
+
         echo "# Change to working directory"
         echo "cd ${defaults[RUN_DIR]}"
         echo ""
