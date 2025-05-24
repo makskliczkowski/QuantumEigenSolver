@@ -221,7 +221,7 @@ main() {
         echo "echo -e \"\$(pwd)\t\$(date)\" >> ${defaults[RUN_DIR]}/slurm_ids_run.log"
         echo ""
         
-        add_module_section "Python/3.10.4-GCCcore-11.3.0" "HDF5"
+        add_module_section "Python/3.10.4-GCCcore-11.3.0"
 
         setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "qes_venv" "${CODES_DIR}/qes_venv"
 
