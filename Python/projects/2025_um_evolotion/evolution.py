@@ -26,10 +26,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 os.environ['BACKEND'] = 'numpy'
 #! -------------------------------------------------------
 
-script_dir = os.path.dirname(os.curdir)
-parent_dir = os.path.abspath(os.path.join(script_dir, '..', '..'))
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+this_file       = os.path.abspath(__file__)
+project_root    = os.path.abspath(os.path.join(this_file, '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # project imports
 from QES.general_python.run_scripts.slurm import SlurmMonitor
