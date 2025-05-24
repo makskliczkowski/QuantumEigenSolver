@@ -1,5 +1,5 @@
-#!/opt/homebrew/bin/bash
-#bin/bash
+#!bin/bash
+#/opt/homebrew/bin/bash
 
 #SBATCH -N1
 #SBATCH -c1
