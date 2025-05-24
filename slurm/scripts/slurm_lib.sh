@@ -80,39 +80,49 @@ validate_numeric() {
 #   It extracts time, memory, and CPU options from the command line arguments.
 #   It updates the provided references with the parsed values.
 #   Returns 0 on success, 1 on error, and 2 if help is requested.
+# Function to parse common SLURM options
+#   $1 = name of variable to receive time override
+#   $2 = name of variable to receive mem override
+#   $3 = name of variable to receive cpu override
+#   returns: 0=ok, 1=error, 2=help
 parse_slurm_options() {
-    local -n override_time_ref=$1
-    local -n override_mem_ref=$2
-    local -n override_cpu_ref=$3
-    
-    while [[ $# -gt 3 ]]; do
-        shift 3  # Skip the reference parameters
+    local time_var=$1 mem_var=$2 cpu_var=$3
+    shift 3
+
+    # Temporaries for the values we’ll collect
+    local _ot _om _oc
+
+    while [[ $# -gt 0 ]]; do
         case $1 in
+            -h|--help)
+                return 2
+                ;;
+            -t)
+                _ot=$2; shift 2
+                ;;
+            -t*)
+                _ot=${1#-t}; shift
+                ;;
             --time=*)
-                override_time_ref="${1#*=}"
-                shift
+                _ot=${1#*=}; shift
+                ;;
+            -m)
+                _om=$2; shift 2
+                ;;
+            -m*)
+                _om=${1#-m}; shift
                 ;;
             --mem=*)
-                override_mem_ref="${1#*=}"
-                shift
+                _om=${1#*=}; shift
+                ;;
+            -c)
+                _oc=$2; shift 2
                 ;;
             -c*)
-                if [ "${1#-c}" != "$1" ]; then
-                    # Format: -c16
-                    override_cpu_ref="${1#-c}"
-                else
-                    # Format: -c 16
-                    shift
-                    override_cpu_ref="$1"
-                fi
-                shift
+                _oc=${1#-c}; shift
                 ;;
             --cpu=*)
-                override_cpu_ref="${1#*=}"
-                shift
-                ;;
-            -h|--help)
-                return 2  # Signal help requested
+                _oc=${1#*=}; shift
                 ;;
             *)
                 echo "Error: Unknown option: $1" >&2
@@ -120,7 +130,16 @@ parse_slurm_options() {
                 ;;
         esac
     done
-    
+
+    # Write them back into the caller's variables
+    eval "$time_var=\"\$_ot\""
+    eval "$mem_var=\"\$_om\""
+    eval "$cpu_var=\"\$_oc\""
+
+    echo "Parsed SLURM options:"
+    echo "  Time: ${!time_var:-not set}"
+    echo "  Memory: ${!mem_var:-not set}"
+    echo "  CPU: ${!cpu_var:-not set}"
     return 0
 }
 
@@ -130,27 +149,38 @@ parse_slurm_options() {
 #   It updates the provided references with validated overrides for time, memory, and CPU.
 #   Returns 0 on success, 1 on error.
 apply_resource_overrides() {
-    local -n tim_ref=$1
-    local -n mem_ref=$2
-    local -n cpu_ref=$3
-    local override_time="$4"
-    local override_mem="$5"
-    local override_cpu="$6"
-    
-    # Apply overrides with validation
+    local time_var=$1 mem_var=$2 cpu_var=$3
+    local override_time=$4 override_mem=$5 override_cpu=$6
+    local newval
+
+    # 1) Time override
     if [ -n "$override_time" ]; then
-        tim_ref=$(validate_time "$override_time") || return 1
+        newval=$(validate_time "$override_time") || return 1
+        # newval=$override_time
+        eval "$time_var=\"\$newval\""
     fi
+
+    # 2) Memory override
     if [ -n "$override_mem" ]; then
-        mem_ref=$(parse_memory "$override_mem") || return 1
+        newval=$(parse_memory "$override_mem") || return 1
+        # newval=$override_mem
+        eval "$mem_var=\"\$newval\""
     fi
+
+    # 3) CPU override
     if [ -n "$override_cpu" ]; then
         validate_numeric "$override_cpu" "CPU" false || return 1
-        cpu_ref="$override_cpu"
+        # override_cpu=$(echo "$override_cpu" | sed 's/[^0-9]//g')
+        eval "$cpu_var=\"\$override_cpu\""
     fi
-    
+    # Print the final values
+    echo "Final resource parameters:"
+    echo "  Time: ${!time_var:-not set}"
+    echo "  Memory: ${!mem_var:-not set}"
+    echo "  CPU: ${!cpu_var:-not set}"
     return 0
 }
+
 
 # ----------------------------------------------------------------------
 

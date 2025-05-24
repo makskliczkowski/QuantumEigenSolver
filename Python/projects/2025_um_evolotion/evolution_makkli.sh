@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/opt/homebrew/bin/bash
+#bin/bash
+
 #SBATCH -N1
 #SBATCH -c1
 #SBATCH --mem=1gb
@@ -6,8 +8,8 @@
 #SBATCH --job-name=vqmc-loop
 
 # Source the reusable library
-# PACKAGE_DIR="/home/klimak/Codes/QuantumEigenSolver"
-PACKAGE_DIR="/home/makkli4548/CODES/QuantumEigenSolver/"
+HOME_DIR=${HOME:-$HOME}
+PACKAGE_DIR="${HOME_DIR}/Codes/QuantumEigenSolver/"
 source "${PACKAGE_DIR}/slurm/scripts/slurm_lib.sh"
 
 # Function to display usage
@@ -58,9 +60,9 @@ validate_vqmc_params() {
 
 # Function to parse VQMC parameters from string or arguments
 parse_vqmc_params() {
-    local -n params_ref=$1
+    local -n params_ref=$1    # use nameref so we actually write into the caller’s array
     shift
-    
+
     if [[ "$1" == *" "* ]]; then
         # First argument contains spaces, treat as parameter string
         read -r params_ref[a_start] params_ref[a_step] params_ref[a_num] params_ref[n_rel] \
@@ -97,9 +99,9 @@ main() {
     declare -A defaults
     
     # Set default paths - CUSTOMIZE THESE FOR YOUR ENVIRONMENT
-    defaults[BASE_DIR]="/home/makkli4548/CODES/QuantumEigenSolver/"
-    defaults[RUN_DIR]="/home/makkli4548/CODES/QuantumEigenSolver/Python/projects/2025_um_evolotion"
-    defaults[LUSTRE_DIR]="/home/makkli4548/mylustre/DATA_EVO_2025_UM"
+    defaults[BASE_DIR]="${PACKAGE_DIR}"
+    defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025_um_evolotion"
+    defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/DATA_EVO_2025_UM"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
     defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM"
     defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python/QES"
@@ -157,17 +159,20 @@ main() {
     override_time=""
     override_mem=""
     override_cpu=""
-    
+
     if ! parse_slurm_options override_time override_mem override_cpu "$@"; then
         case $? in
             1) show_usage; exit 1 ;;
             2) show_usage; exit 0 ;;
         esac
     fi
-    
+    echo "Parsed SLURM options: TIM=$override_time, MEM=$override_mem, CPU=$override_cpu"
+
     # Apply resource overrides
     apply_resource_overrides TIM MEM CPU "$override_time" "$override_mem" "$override_cpu" || exit 1
-    
+    # Set resource parameters, using overrides if provided, otherwise defaults
+
+
     # Validate VQMC parameters
     validate_vqmc_params "${params[a_start]}" "${params[a_step]}" "${params[a_num]}" "${params[n_rel]}" \
                          "${params[Ns_start]}" "${params[Ns_end]}" "${params[n]}" "${params[t_num]}" || exit 1
@@ -178,7 +183,7 @@ main() {
     TIM=$(validate_time "$TIM") || exit 1
     
     # Validate memory distribution with minimum 2GB per worker
-    mem_per_worker=$(validate_memory_distribution "$MEM" "$CPU" 2) || exit 1
+    # mem_per_worker=$(validate_memory_distribution "$MEM" "$CPU" 2) || exit 1
     
     # Validate QES package directory exists
     validate_file_exists "${defaults[QES_PACKAGE_DIR]}/setup.py" "QES setup.py file" || exit 1
