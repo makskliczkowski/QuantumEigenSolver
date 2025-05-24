@@ -5,303 +5,253 @@
 #SBATCH --time=1:00:00
 #SBATCH --job-name=vqmc-loop
 
+# Source the reusable library
+# PACKAGE_DIR="/home/klimak/Codes/QuantumEigenSolver"
+PACKAGE_DIR="/home/makkli4548/CODES/QuantumEigenSolver/"
+source "${PACKAGE_DIR}/slurm/scripts/slurm_lib.sh"
+
 # Function to display usage
 show_usage() {
+    show_usage_template "$0" "a_start a_step a_num n_rel Ns_start Ns_end n t_num"
+    
     cat << EOF
-Usage   : $0 "param_string" [OPTIONS]
-    or  : $0 Ns_start Ns_end a_start a_step a_num n_rel TIM MEM CPU [OPTIONS]
-
-Parameter string format: "Ns_start Ns_end a_start a_step a_num n_rel TIM MEM CPU time mem cpu"
-
-Options:
-    --time=TIME             Override time allocation (format: HH:MM:SS)
-    --mem=MEM               Override memory allocation (in GB, format: Xgb or X)
-    -c CPU, --cpu=CPU       Override CPU count
-    -h, --help              Show this help message
 
 Examples:
-    $0 "0.68 0.06 1 5 16 16 1 100000 32 133:19:59 8gb 4" --time=133:19:59 --mem=16 -c16
-    $0 0.68 0.06 1 5 16 16 1 100000 32 --time=133:19:59 --mem=16gb -c16
+    $0 "0.68 0.06 1 5 16 16 1 100000" --time=24:00:00 --mem=16 -c16
+    $0 0.68 0.06 1 5 16 16 1 100000 --time=133:19:59 --mem=16gb -c16
+Using:
+    ./evolution_makkli.sh "0.68 0.06 1 5 16 16 1 100000" --time=24:00:00 --mem=16gb -c16
 EOF
 }
 
-# Function to parse memory value and convert to GB integer
-parse_memory() {
-    local mem_input="$1"
-    local mem_value
+# ---------------------------------------------------------------------------------------------------------
+
+# Function to validate VQMC-specific parameters
+validate_vqmc_params() {
+    local a_start="$1" a_step="$2" a_num="$3" n_rel="$4"
+    local Ns_start="$5" Ns_end="$6" n="$7" t_num="$8"
     
-    # Remove 'gb' suffix if present and extract number
-    mem_value=$(echo "$mem_input" | sed -E 's/[gG][bB]?$//' | sed 's/[^0-9]//g')
+    # Validate all parameters are provided
+    local params=("$a_start" "$a_step" "$a_num" "$n_rel" "$Ns_start" "$Ns_end" "$n" "$t_num")
+    local param_names=("a_start" "a_step" "a_num" "n_rel" "Ns_start" "Ns_end" "n" "t_num")
     
-    if [[ ! "$mem_value" =~ ^[0-9]+$ ]] || [ "$mem_value" -le 0 ]; then
-        echo "Error: Invalid memory format: $mem_input" >&2
+    for i in "${!params[@]}"; do
+        if [[ -z "${params[$i]}" ]]; then
+            echo "Error: Missing required parameter: ${param_names[$i]}" >&2
+            return 1
+        fi
+        
+        # Validate numeric parameters
+        validate_numeric "${params[$i]}" "${param_names[$i]}" false || return 1
+    done
+    
+    # Additional domain-specific validations
+    if (( $(echo "$Ns_start > $Ns_end" | bc -l) )); then
+        echo "Error: Ns_start ($Ns_start) must be <= Ns_end ($Ns_end)" >&2
         return 1
     fi
     
-    echo "$mem_value"
+    return 0
 }
 
-# Function to validate time format
-validate_time() {
-    local time_input="$1"
-    if [[ ! "$time_input" =~ ^[0-9]{1,3}:[0-5]?[0-9]:[0-5]?[0-9]$ ]]; then
-        echo "Error: Invalid time format: $time_input (expected HH:MM:SS)" >&2
-        return 1
-    fi
-    echo "$time_input"
-}
+# ----------------------------------------------------------------------------------------------------------
 
-# Initialize variables
-Ns_start=""
-Ns_end=""
-a_start=""
-a_step=""
-a_num=""
-n_rel=""
-n=""
-t_num=""
-override_time=""
-override_mem=""
-override_cpu=""
-
-# Parse arguments
-if [ $# -eq 0 ]; then
-    show_usage
-    exit 1
-fi
-
-# Check if first argument is help
-if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
-    show_usage
-    exit 0
-fi
-
-# Determine if first argument is a parameter string or individual parameters
-if [[ "$1" == *" "* ]]; then
-    # First argument contains spaces, treat as parameter string
-    param_string="$1"
+# Function to parse VQMC parameters from string or arguments
+parse_vqmc_params() {
+    local -n params_ref=$1
     shift
     
-    # Parse the parameter string
-    read -r a_start a_step a_num n_rel Ns_start Ns_end n t_num param_time param_mem param_cpu <<< "$param_string"
+    if [[ "$1" == *" "* ]]; then
+        # First argument contains spaces, treat as parameter string
+        read -r params_ref[a_start] params_ref[a_step] params_ref[a_num] params_ref[n_rel] \
+                params_ref[Ns_start] params_ref[Ns_end] params_ref[n] params_ref[t_num] <<< "$1"
+        return 1  # Signal that we used parameter string format
+    else
+        # Individual parameters
+        if [ $# -lt 8 ]; then
+            echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num"
+            return 2
+        fi
+        
+        params_ref[a_start]="$1"
+        params_ref[a_step]="$2"
+        params_ref[a_num]="$3"
+        params_ref[n_rel]="$4"
+        params_ref[Ns_start]="$5"
+        params_ref[Ns_end]="$6"
+        params_ref[n]="$7"
+        params_ref[t_num]="$8"
+        
+        return 0  # Signal that we used individual parameter format
+    fi
+}
+
+# ----------------------------------------------------------------------------------------------------------
+
+################
+
+# Main execution
+main() {
+    # Initialize parameter array
+    declare -A params
+    declare -A defaults
     
-    # Use parameters from string as defaults
-    if [ -n "$param_time" ]; then
-        TIM="$param_time"
-    fi
-    if [ -n "$param_mem" ]; then
-        MEM=$(parse_memory "$param_mem") || exit 1
-    fi
-    if [ -n "$param_cpu" ]; then
-        CPU="$param_cpu"
-    fi
-else
-    # Individual parameters
-    if [ $# -lt 9 ]; then
-        echo "Error: Insufficient parameters when using individual argument format"
+    # Set default paths - CUSTOMIZE THESE FOR YOUR ENVIRONMENT
+    defaults[BASE_DIR]="/home/makkli4548/CODES/QuantumEigenSolver/"
+    defaults[RUN_DIR]="/home/makkli4548/CODES/QuantumEigenSolver/Python/projects/2025_um_evolotion"
+    defaults[LUSTRE_DIR]="/home/makkli4548/mylustre/DATA_EVO_2025_UM"
+    defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
+    defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM"
+    defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python/QES"
+    
+    # Parse command line arguments
+    if [ $# -eq 0 ]; then
         show_usage
         exit 1
     fi
     
-    Ns_start="$1"
-    Ns_end="$2"
-    a_start="$3"
-    a_step="$4"
-    a_num="$5"
-    n_rel="$6"
-    TIM="$7"
-    MEM="$8"
-    CPU="$9"
-    shift 9
-fi
-
-# Parse remaining options
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --time=*)
-            override_time="${1#*=}"
-            shift
-            ;;
-        --mem=*)
-            override_mem="${1#*=}"
-            shift
-            ;;
-        -c*)
-            if [ "${1#-c}" != "$1" ]; then
-                # Format: -c16
-                override_cpu="${1#-c}"
-            else
-                # Format: -c 16
-                shift
-                override_cpu="$1"
-            fi
-            shift
-            ;;
-        --cpu=*)
-            override_cpu="${1#*=}"
-            shift
-            ;;
-        -h|--help)
-            show_usage
-            exit 0
-            ;;
-        *)
-            echo "Error: Unknown option: $1"
+    # Check for help
+    if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        show_usage
+        exit 0
+    fi
+    
+    # Parse VQMC parameters
+    parse_return=0
+    if parse_vqmc_params params "$@"; then
+        # Used individual parameters
+        if [ $# -lt 11 ]; then
+            echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num TIM MEM CPU"
             show_usage
             exit 1
-            ;;
-    esac
-done
-
-# Apply overrides
-if [ -n "$override_time" ]; then
-    TIM=$(validate_time "$override_time") || exit 1
-fi
-if [ -n "$override_mem" ]; then
-    MEM=$(parse_memory "$override_mem") || exit 1
-fi
-if [ -n "$override_cpu" ]; then
-    CPU="$override_cpu"
-fi
-
-# Validate all required parameters are set
-if [ -z "$Ns_start" ] || [ -z "$Ns_end" ] || [ -z "$a_start" ] || [ -z "$a_step" ] || \
-   [ -z "$a_num" ] || [ -z "$n_rel" ] || [ -z "$TIM" ] || [ -z "$MEM" ] || [ -z "$CPU" ]; then
-    echo "Error: Missing required parameters"
-    show_usage
-    exit 1
-fi
-
-# Validate numeric inputs
-if ! [[ "$CPU" =~ ^[0-9]+$ ]] || [ "$CPU" -le 0 ]; then
-    echo "Error: CPU must be a positive integer"
-    exit 1
-fi
-
-if ! [[ "$MEM" =~ ^[0-9]+$ ]] || [ "$MEM" -le 0 ]; then
-    echo "Error: MEM must be a positive integer"
-    exit 1
-fi
-
-# Validate time format if not already validated
-TIM=$(validate_time "$TIM") || exit 1
-
-# Calculate memory per worker with proper integer division
-mem_per_worker=$(( MEM / CPU ))
-
-# Set directory paths
-RUN_DIR="/home/makkli4548/CODES/QuantumEigenSolver/Python/projects/2025_um_evolotion"
-LUSTRE_DIR="/home/makkli4548/mylustre/DATA_EVO_2025_UM"
-LOG_DIR="${RUN_DIR}/LOG/RANDOM_MODELS_EVO_2025_UM"
-SLURM_DIR="${RUN_DIR}/SLURM"
-
-# Change to run directory
-cd "${RUN_DIR}" || { 
-    echo "Error: Cannot access RUN_DIR: ${RUN_DIR}" 
-    exit 1 
+        fi
+        shift 8
+    else
+        parse_result=$?
+        if [[ $parse_result -eq 2 ]]; then
+            show_usage
+            exit 1
+        fi
+        # Used parameter string format, shift by 1
+        shift 1
+    fi
+    
+    # Set defaults from parameter string if provided
+    TIM="${params[param_time]:-01:00:00}"
+    MEM="${params[param_mem]:-1}"
+    CPU="${params[param_cpu]:-1}"
+    
+    # Ensure all critical parameters are defined
+    if [[ -z "${params[n]:-}" ]] || [[ -z "${params[t_num]:-}" ]]; then
+        echo "Error: Critical parameters 'n' and 't_num' must be provided" >&2
+        show_usage
+        exit 1
+    fi
+    
+    # Parse memory if it came from parameters
+    if [[ -n "${params[param_mem]:-}" ]]; then
+        MEM=$(parse_memory "${params[param_mem]}") || exit 1
+    fi
+    
+    # Parse remaining SLURM options
+    override_time=""
+    override_mem=""
+    override_cpu=""
+    
+    if ! parse_slurm_options override_time override_mem override_cpu "$@"; then
+        case $? in
+            1) show_usage; exit 1 ;;
+            2) show_usage; exit 0 ;;
+        esac
+    fi
+    
+    # Apply resource overrides
+    apply_resource_overrides TIM MEM CPU "$override_time" "$override_mem" "$override_cpu" || exit 1
+    
+    # Validate VQMC parameters
+    validate_vqmc_params "${params[a_start]}" "${params[a_step]}" "${params[a_num]}" "${params[n_rel]}" \
+                         "${params[Ns_start]}" "${params[Ns_end]}" "${params[n]}" "${params[t_num]}" || exit 1
+    
+    # Validate final resource parameters
+    validate_numeric "$CPU" "CPU" false || exit 1
+    validate_numeric "$MEM" "MEM" false || exit 1
+    TIM=$(validate_time "$TIM") || exit 1
+    
+    # Validate memory distribution with minimum 2GB per worker
+    mem_per_worker=$(validate_memory_distribution "$MEM" "$CPU" 2) || exit 1
+    
+    # Validate QES package directory exists
+    validate_file_exists "${defaults[QES_PACKAGE_DIR]}/setup.py" "QES setup.py file" || exit 1
+    
+    # Create and validate directories
+    dirs_to_create=("${defaults[LUSTRE_DIR]}" "${defaults[LOG_DIR]}" "${defaults[SLURM_DIR]}")
+    create_directories "${dirs_to_create[@]}" || exit 1
+    
+    # Validate access to run directory
+    validate_directories "${defaults[RUN_DIR]}" || exit 1
+    
+    # Change to run directory
+    cd "${defaults[RUN_DIR]}" || exit 1
+    
+    # Display configuration
+    echo "=== VQMC Job Configuration ==="
+    echo "  BASE_DIR=${defaults[BASE_DIR]}"
+    echo "  RUN_DIR=${defaults[RUN_DIR]}"
+    echo "  LUSTRE_DIR=${defaults[LUSTRE_DIR]}"
+    echo "  QES_PACKAGE_DIR=${defaults[QES_PACKAGE_DIR]}"
+    echo "  Parameters:"
+    echo "    Ns_start=${params[Ns_start]}, Ns_end=${params[Ns_end]}"
+    echo "    a_start=${params[a_start]}, a_step=${params[a_step]}, a_num=${params[a_num]}"
+    echo "    n_rel=${params[n_rel]}, n=${params[n]}, t_num=${params[t_num]}"
+    echo "  Resources: ${TIM}, ${MEM}gb, ${CPU} CPUs"
+    echo "  mem_per_worker=${mem_per_worker}gb"
+    echo "=============================="
+    
+    # Generate job identifiers
+    job_params="fun=2025_um_evo,Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]}"
+    script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
+    
+    # Create SLURM job script
+    {
+        create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
+        
+        echo "# Log the job directory"
+        echo "echo -e \"\$(pwd)\t\$(date)\" >> ${defaults[RUN_DIR]}/slurm_ids_run.log"
+        echo ""
+        
+        add_module_section "Python/3.10.4-GCCcore-11.3.0" "HDF5"
+        
+        setup_qes_environment "${defaults[BASE_DIR]}" "qes_vqmc_env"
+        
+        echo "# Change to working directory"
+        echo "cd ${defaults[RUN_DIR]}"
+        echo ""
+        
+        echo "# Verify QES is available"
+        echo "python3 -c \"import QES; print('QES version:', getattr(QES, '__version__', 'unknown'))\""
+        echo ""
+        
+        echo "# Run the main computation"
+        echo "python3 ${defaults[RUN_DIR]}/evolution.py \\"
+        echo "    ${defaults[LUSTRE_DIR]} \\"
+        echo "    ${params[a_start]} ${params[a_step]} ${params[a_num]} \\"
+        echo "    ${params[n_rel]} ${params[Ns_start]} ${params[Ns_end]} \\"
+        echo "    ${params[n]} ${params[t_num]} ${mem_per_worker} \\"
+        echo "    > ${defaults[LOG_DIR]}/log_${job_params}.log 2>&1"
+        echo ""
+        
+        echo "echo \"Job completed successfully\""
+    } > "$script_file"
+    
+    # Submit the job
+    submit_slurm_job "$script_file" true || exit 1
+    
+    # Log job information
+    log_job_info "${defaults[RUN_DIR]}/submitted_jobs.log" "$job_params"
 }
 
-echo "Configuration:"
-echo "  RUN_DIR=${RUN_DIR}"
-echo "  Ns_start=${Ns_start}, Ns_end=${Ns_end}"
-echo "  a_start=${a_start}, a_step=${a_step}, a_num=${a_num}"
-echo "  n_rel=${n_rel}"
-echo "  Resources: ${TIM}, ${MEM}gb, ${CPU} CPUs"
-echo "  mem_per_worker=${mem_per_worker}gb"
+# Run main function with all arguments
+main "$@"
 
-# Create necessary directories
-mkdir -p "${LUSTRE_DIR}" "${LOG_DIR}" "${SLURM_DIR}"
-
-# Create temporary directory if using TMPDIR
-if [ -n "${TMPDIR}" ]; then
-    SAVDIR="${TMPDIR}/DATA/${SLURM_JOBID}"
-    mkdir -p "${SAVDIR}"
-fi
-
-# Generate job identifiers
-job_params="fun=2025_um_evo,Ns=${Ns_start}-${Ns_end},a=${a_start}-${a_step}-${a_num}"
-script_file="${SLURM_DIR}/${job_params}.sh"
-
-# Create SLURM job script
-cat > "${script_file}" << EOF
-#!/bin/bash
-#SBATCH -N1
-#SBATCH -c${CPU}
-#SBATCH --mem=${MEM}gb
-#SBATCH --time=${TIM}
-#SBATCH -o ${SLURM_DIR}/out-%j-${job_params}.out
-#SBATCH -e ${SLURM_DIR}/err-%j-${job_params}.err
-#SBATCH --job-name=${job_params}
-
-# Export job ID for use in script
-export SLURM_JOB_ID=\${SLURM_JOB_ID}
-
-# Set up scratch directory
-# SAVDIR="/lustre/tmp/slurm/\${SLURM_JOB_ID}"
-# mkdir -p "\${SAVDIR}"
-
-# Log the job directory
-echo -e "\${SAVDIR}\t\$(date)" >> ${RUN_DIR}/slurm_ids_run.log
-
-# Load required modules
-source /usr/local/sbin/modules.sh
-
-# Load necessary modules and install for 
-
-module load Python/3.10.4-GCCcore-11.3.0
-module load HDF5
-
-virtualenv ${RUN_DIR}/wtf
-source ${RUN_DIR}/wtf/bin/activate
-pip install -r ${RUN_DIR}/requirements.txt
-
-# Change to working directory
-cd ${RUN_DIR}
-
-# Run the main computation
-python3 ${RUN_DIR}/evolution.py     \\
-    ${LUSTRE_DIR}                   \\
-    ${a_start} ${a_step} ${a_num}   \\
-    ${n_rel} ${Ns_start} ${Ns_end}  \\
-    ${n} ${t_num} ${mem_per_worker} \\
-    > ${LOG_DIR}/log_${job_params}.log 2>&1
-
-# Copy results back (if uncommented)
-# rsync -a --ignore-existing --remove-source-files "\${SAVDIR}/"* ${LUSTRE_DIR}/
-# rm -rf "\${SAVDIR}/"*
-
-# Clean up scratch directory (if using TMPDIR)
-# rmdir "\${SAVDIR}" 2>/dev/null || true
-EOF
-
-#! for the tests, echo the script content
-# echo "Generated SLURM script:"
-# cat "${script_file}"
-
-# Make the script executable
-chmod +x "${script_file}"
-
-# Log temporary directory if using TMPDIR
-if [ -n "${TMPDIR}" ] && [ -n "${SLURM_JOBID}" ]; then
-    echo "${TMPDIR}/DATA/${SLURM_JOBID}" >> last_tmp_jobs.log
-fi
-
-# Submit the job
-echo "Submitting job: ${job_params}"
-if sbatch_output=$(sbatch "${script_file}" 2>&1); then
-    echo "Job submitted successfully:"
-    echo "${sbatch_output}"
-    job_id=$(echo "${sbatch_output}" | grep -o '[0-9]\+$')
-    echo "Job ID: ${job_id}"
-    exit_code=0
-else
-    echo "Job submission failed:"
-    echo "${sbatch_output}"
-    exit_code=1
-fi
-
-# Clean up the temporary script file
-rm -f "${script_file}"
-
-# Return appropriate exit code
-exit ${exit_code}
+# -----------------------------------------------------------------------------------------------------------
+# End of script

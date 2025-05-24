@@ -576,8 +576,8 @@ if __name__ == "__main__":
     #! -------------------------------------------------------
     rng                 = np.random.default_rng(seed=args.seed)
     rand_num            = rng.integers(0, int(1e5))
-    bw_df               = pd.read_csv("./bw.csv", index_col=0, header=None, dtype=float)
-    mls_df              = pd.read_csv("./mls.csv", index_col=0, header=None, dtype=float)
+    bw_df               = pd.read_csv("./model/bw.csv", index_col=0, header=None, dtype=float)
+    mls_df              = pd.read_csv("./model/mls.csv", index_col=0, header=None, dtype=float)
     bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
     mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
     bw_df.columns       = list(range(7, 17))

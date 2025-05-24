@@ -1,0 +1,66 @@
+include CHANGELOG.md
+include INSTALL.md
+include LICENSE.md
+include README.md
+include pyproject.toml
+
+# Include all Python source files
+recursive-include QES *.py
+recursive-include QES *.pyx
+recursive-include QES *.pxd
+
+# Include data files
+recursive-include QES *.txt
+recursive-include QES *.rst
+recursive-include QES *.md
+recursive-include QES *.yaml
+recursive-include QES *.yml
+recursive-include QES *.json
+
+# Include test data
+recursive-include QES/general_python/tests/data *
+
+# Include documentation
+recursive-include docs *.rst
+recursive-include docs *.py
+recursive-include docs *.txt
+recursive-include docs *.md
+recursive-include docs *.png
+recursive-include docs *.jpg
+recursive-include docs *.jpeg
+recursive-include docs *.gif
+recursive-include docs *.svg
+
+# Include examples if any
+recursive-include examples *.py
+recursive-include examples *.ipynb
+recursive-include examples *.md
+
+# Exclude compiled files and caches
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude *.so
+global-exclude *.dll
+global-exclude *.dylib
+
+# Exclude version control
+global-exclude .git*
+global-exclude .svn*
+
+# Exclude build artifacts
+global-exclude build/*
+global-exclude dist/*
+global-exclude *.egg-info/*
+
+# Exclude IDE files
+global-exclude .vscode/*
+global-exclude .idea/*
+global-exclude *.swp
+global-exclude *.swo
+global-exclude *~
+
+# Exclude OS files
+global-exclude .DS_Store
+global-exclude Thumbs.db
