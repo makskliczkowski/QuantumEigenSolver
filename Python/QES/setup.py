@@ -39,7 +39,7 @@ from setuptools import setup, find_packages
 # Read the README file for long description
 def read_readme():
     """Read README.md file and return its content."""
-    readme_path = os.path.join(os.path.dirname(__file__), '..', '..', 'README.md')
+    readme_path = os.path.join(os.path.dirname(__file__), 'README.md')
     if os.path.exists(readme_path):
         with open(readme_path, 'r', encoding='utf-8') as f:
             return f.read()
