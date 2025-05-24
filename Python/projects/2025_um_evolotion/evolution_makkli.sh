@@ -272,33 +272,33 @@ python3 ${RUN_DIR}/evolution.py     \\
 EOF
 
 #! for the tests, echo the script content
-echo "Generated SLURM script:"
-cat "${script_file}"
+# echo "Generated SLURM script:"
+# cat "${script_file}"
 
 # Make the script executable
-# chmod +x "${script_file}"
+chmod +x "${script_file}"
 
-# # Log temporary directory if using TMPDIR
-# if [ -n "${TMPDIR}" ] && [ -n "${SLURM_JOBID}" ]; then
-#     echo "${TMPDIR}/DATA/${SLURM_JOBID}" >> last_tmp_jobs.log
-# fi
+# Log temporary directory if using TMPDIR
+if [ -n "${TMPDIR}" ] && [ -n "${SLURM_JOBID}" ]; then
+    echo "${TMPDIR}/DATA/${SLURM_JOBID}" >> last_tmp_jobs.log
+fi
 
-# # Submit the job
-# echo "Submitting job: ${job_params}"
-# if sbatch_output=$(sbatch "${script_file}" 2>&1); then
-#     echo "Job submitted successfully:"
-#     echo "${sbatch_output}"
-#     job_id=$(echo "${sbatch_output}" | grep -o '[0-9]\+$')
-#     echo "Job ID: ${job_id}"
-#     exit_code=0
-# else
-#     echo "Job submission failed:"
-#     echo "${sbatch_output}"
-#     exit_code=1
-# fi
+# Submit the job
+echo "Submitting job: ${job_params}"
+if sbatch_output=$(sbatch "${script_file}" 2>&1); then
+    echo "Job submitted successfully:"
+    echo "${sbatch_output}"
+    job_id=$(echo "${sbatch_output}" | grep -o '[0-9]\+$')
+    echo "Job ID: ${job_id}"
+    exit_code=0
+else
+    echo "Job submission failed:"
+    echo "${sbatch_output}"
+    exit_code=1
+fi
 
-# # Clean up the temporary script file
-# rm -f "${script_file}"
+# Clean up the temporary script file
+rm -f "${script_file}"
 
-# # Return appropriate exit code
-# exit ${exit_code}
+# Return appropriate exit code
+exit ${exit_code}
