@@ -26,10 +26,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 os.environ['BACKEND'] = 'numpy'
 #! -------------------------------------------------------
 
-this_file       = os.path.abspath(__file__)
-project_root    = os.path.abspath(os.path.join(this_file, '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+script_dir              = os.path.dirname(os.curdir)
+parent_dir              = os.path.abspath(os.path.join(script_dir, '..'))
+parent_dir_up           = os.path.abspath(os.path.join(parent_dir, '..'))
+if parent_dir_up not in sys.path:
+    sys.path.append(parent_dir_up)
 
 # project imports
 from QES.general_python.run_scripts.slurm import SlurmMonitor
@@ -139,8 +140,9 @@ def _single_realisation(
     
     if True:
         time_start_entro_quench = time.perf_counter()
+        rho                 = density_matrix.rho_numba(overlaps, dimA=2, dimB=2**(ns - 1))
         #! calculate the entropies for the initial state in the eigenbasis
-        schmidt_val, _      = density_matrix.schmidt_numba(overlaps, 2, 2**(ns - 1), eig = False)
+        schmidt_val, _      = density_matrix.schmidt_numba(rho, 2, 2**(ns - 1), eig = False)
         #! von Neumann entropy
         vn_entropies[r]     = entropy.entropy(schmidt_val, q=1.0, typek=entropy.Entanglement.VN)
         #! Tsallis entropy
@@ -149,9 +151,9 @@ def _single_realisation(
         schmidt_gaps[r]     = schmidt_val[1] - schmidt_val[0] if len(schmidt_val) > 1 else 0.0 
         #! Iprs for the quench state
         for q in iprs_quench.keys():
-            iprs_quench[q][r] = statistical.inverse_participation_ratio(overlaps, q=q)
+            iprs_quench[q][r]       = statistical.inverse_participation_ratio(overlaps[np.newaxis, :], q=q)[0]
         for q in par_ent_quench.keys():
-            par_ent_quench[q][r] = entropy.entropy(overlaps, q=q, typek=entropy.Entanglement.PARTIC)
+            par_ent_quench[q][r]    = entropy.entropy(overlaps[np.newaxis, :], q=q, typek=entropy.Entanglement.PARTIC)[0]
         logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} entropies for quench state done in {time.perf_counter() - time_start_entro_quench:.2f} s", lvl=3, color='white')
         
     #! compute the ldos
@@ -344,6 +346,7 @@ def _single_alpha(alpha             : float,
     
     #! save the data
     if completed_realizations > 0:
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f} saving data to {data_dir_in} - random number: {rand_num}", lvl=2, color='green')
         data_stat = {
             'bandwidth'                         : bandwidths,
             'sigma_e'                           : sigma_es,
@@ -566,9 +569,9 @@ if __name__ == "__main__":
     parser.add_argument('number_of_realizations',           type    =   int,    default =   10,         help    =   'Realizations per ns')
     parser.add_argument('sites_start',                      type    =   int,                            help    =   'Minimum number of spins')
     parser.add_argument('sites_end',                        type    =   int,                            help    =   'Maximum number of spins (inclusive)')
-    parser.add_argument('-n',        '--n',                 type    =   int,    default =   1,          help    =   'Model parameter n')
-    parser.add_argument('-T',        '--time_num',          type    =   int,    default =   int(1e5),   help    =   'Number of time points')
-    parser.add_argument('-M',        '--memory_per_worker', type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
+    parser.add_argument('n',                                type    =   int,    default =   1,          help    =   'Model parameter n')
+    parser.add_argument('time_num',                         type    =   int,    default =   int(1e5),   help    =   'Number of time points')
+    parser.add_argument('memory_per_worker',              type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     args = parser.parse_args()
     
@@ -610,7 +613,7 @@ if __name__ == "__main__":
 
     #! -------------------------------------------------------
     memory_per_worker   = args.memory_per_worker
-    memory_per_worker   = max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(ns = sites[-1]), memory_per_worker)) # minimum 1 GB
+    memory_per_worker   = max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(Ns = sites[-1]), memory_per_worker)) # minimum 1 GB
         
     avail_gb            = psutil.virtual_memory().available / (1024**3)
     # max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
