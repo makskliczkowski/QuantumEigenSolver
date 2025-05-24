@@ -248,9 +248,12 @@ source /usr/local/sbin/modules.sh
 
 # Load necessary modules and install for 
 
-
-module load python
+module load Python/3.10.4-GCCcore-11.3.0
 module load HDF5
+
+virtualenv ${RUN_DIR}/wtf
+source ${RUN_DIR}/wtf/bin/activate
+pip install -r ${RUN_DIR}/requirements.txt
 
 # Change to working directory
 cd ${RUN_DIR}
