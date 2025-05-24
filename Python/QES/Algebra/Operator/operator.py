@@ -1437,7 +1437,7 @@ class Operator(ABC):
     
     # -------------------------------
     
-    def _apply_global(self, states : Union[int, float]):
+    def _apply_global(self, states):
         """
         Applies a function to a given state or a collection of states.
 
@@ -1471,7 +1471,7 @@ class Operator(ABC):
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val * self._eigval)
     
-    def _apply_local(self, states : Union[int, float], i):
+    def _apply_local(self, states, i):
         """
         Applies a local operation to a given state or a collection of states.
         Parameters:
@@ -1492,7 +1492,7 @@ class Operator(ABC):
         out, val    = zip(*results) if results else ([], [])
         return list(out), list(val * self._eigval)
     
-    def _apply_correlation(self, states : Union[int, float], i, j):
+    def _apply_correlation(self, states, i, j):
         """
         Applies a correlation function to a given state or a collection of states.
         Parameters:
