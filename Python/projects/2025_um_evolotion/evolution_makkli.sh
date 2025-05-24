@@ -98,6 +98,7 @@ main() {
     # Set default paths - CUSTOMIZE THESE FOR YOUR ENVIRONMENT
     defaults[BASE_DIR]="${PACKAGE_DIR}"
     defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025_um_evolotion"
+    defaults[CODES_DIR]="${CODES_DIR}"
     defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/DATA_EVO_2025_UM"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
     defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM"
@@ -213,7 +214,7 @@ main() {
     job_params="fun=2025_um_evo,Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
     venv_name="qes_venv"
-    venv_path="${CODES_DIR}"
+    venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
     # Create SLURM job script
     {
         create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
@@ -224,7 +225,8 @@ main() {
         
         add_module_section "Python/3.10.4-GCCcore-11.3.0"
         echo "venv_name=\"${venv_name}\""
-        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" $venv_name $venv_path || exit 1
+        echo "venv_path=\"${venv_path}\""
+        setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "$venv_name" "$venv_path" || exit 1
 
         echo "# Change to working directory"
         echo "cd ${defaults[RUN_DIR]}"
