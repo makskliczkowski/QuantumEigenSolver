@@ -634,6 +634,8 @@ if __name__ == "__main__":
     
     start_time          = time.perf_counter()
     remaining_time      = SlurmMonitor.get_remaining_time()
+    if remaining_time == -1:
+        remaining_time = 60 * 60 * 24 * 2  # default to 2 days if not set
     logger.info(f"Remaining time: {remaining_time:.2f} s, which is {remaining_time / 60:.2f} min, {remaining_time / 3600:.2f} h", color='green')
     
     if max_workers > 1:
