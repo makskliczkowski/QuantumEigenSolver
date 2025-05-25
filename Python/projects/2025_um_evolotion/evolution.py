@@ -348,26 +348,28 @@ def _single_alpha(alpha             : float,
     if completed_realizations > 0:
         logger.info(f"ns = {ns}, alpha = {alpha:.2f} saving data to {data_dir_in} - random number: {rand_num}", lvl=2, color='green')
         data_stat = {
-            'bandwidth'                         : bandwidths,
-            'sigma_e'                           : sigma_es,
-            'energies'                          : energies,
-            'ldos'                              : ldos,
-            'entropy/quench/von_neumann/1.0'    : vn_entropies,
-            'entropy/quench/tsallis/2.0'        : tsalis,
-            'entropy/quench/schmidt_gap'        : schmidt_gaps,
+            'bandwidth'                         : bandwidths[:completed_realizations],
+            'sigma_e'                           : sigma_es[:completed_realizations],
+            'energies'                          : energies[:completed_realizations],
+            'ldos'                              : ldos[:completed_realizations],
+            'entropy/quench/von_neumann/1.0'    : vn_entropies[:completed_realizations],
+            'entropy/quench/tsallis/2.0'        : tsalis[:completed_realizations],
+            'entropy/quench/schmidt_gap'        : schmidt_gaps[:completed_realizations],
+            'completed_realizations'            : completed_realizations,
         }
-        data_stat.update({f'iprs/quench/{q}'                        : iprs_quench[q] for q in iprs_quench.keys()})
-        data_stat.update({f'participation/quench/{q}'               : par_ent_quench[q] for q in par_ent_quench.keys()})
-        data_stat.update({f'iprs/{q}'                               : iprs[q] for q in iprs.keys()})
-        data_stat.update({f'entropy/eigenbasis/participation/{q}'   : entros[q] for q in entros.keys()})
-        
+        data_stat.update({f'iprs/quench/{q}'                        : iprs_quench[q][:completed_realizations] for q in iprs_quench.keys()})
+        data_stat.update({f'participation/quench/{q}'               : par_ent_quench[q][:completed_realizations] for q in par_ent_quench.keys()})
+        data_stat.update({f'iprs/{q}'                               : iprs[q][:completed_realizations] for q in iprs.keys()})
+        data_stat.update({f'entropy/eigenbasis/participation/{q}'   : entros[q][:completed_realizations] for q in entros.keys()})
+
         #! statistical
         HDF5Handler.save_hdf5(directory =   data_dir_in, 
                             filename    =   f'stat_{rand_num}.h5',
                             data        =   data_stat)
         data_hist = {
-            'historgram/edges'  : histograms_av[name][alpha][ns].bin_edges,
-            'historgram/counts' : histograms_av[name][alpha][ns].counts(),
+            'historgram/edges'          : histograms_av[name][alpha][ns].bin_edges,
+            'historgram/counts'         : histograms_av[name][alpha][ns].counts(),
+            'completed_realizations'    : completed_realizations,
         }
         for name in operators.keys():
             data_hist.update({
@@ -378,7 +380,8 @@ def _single_alpha(alpha             : float,
                             filename    =   f'hist_{rand_num}.h5', 
                             data        =   data_hist)
         #! operator
-        data_op = { op : diag for op, diag in diagonals_operators.items() }
+        data_op = { op : diag[:completed_realizations] for op, diag in diagonals_operators.items() }
+        data_op.update({ 'completed_realizations' : completed_realizations })
         HDF5Handler.save_hdf5(directory =   data_dir_in,
                             filename    =   f'diag_{rand_num}.h5', 
                             data        =   data_op)
@@ -386,7 +389,7 @@ def _single_alpha(alpha             : float,
         #! time evolution
         data_time = {
             'time'                          : time_steps,
-            'time_evolution/quench/energy'  : quench_energies,
+            'time_evolution/quench/energy'  : quench_energies[:completed_realizations],
             'completed_realizations'        : completed_realizations,
         }
         data_time.update({
