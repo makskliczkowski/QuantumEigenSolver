@@ -294,7 +294,7 @@ else:
     inverse_participation_ratio_jax = None
 
 @numba.njit(parallel=True, fastmath=True)
-def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: Optional[np.ndarray] = None) -> np.ndarray:
+def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: Optional[np.ndarray] = None, square: bool = True) -> np.ndarray:
     """
     Compute IPR_j = ∑_i |ψ_{i j}|^{2q} for each column j of `states`.
     If `new_basis` is provided (shape n \times n), then ψ → B^T·ψ is used
@@ -325,7 +325,7 @@ def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: O
 
     n, m    = states.shape
     out     = np.zeros(m, dtype=np.float64)
-    two_q   = 2.0 * q
+    two_q   = 2.0 * q if square else q
 
     if new_basis is None:
         # no transform 
@@ -333,8 +333,8 @@ def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: O
             acc = 0.0
             for i in range(n):
                 c       = states[i, j]
-                p       = c.real*c.real + c.imag*c.imag
-                acc    += p**q
+                p       = np.abs(c)**two_q
+                acc    += p
             out[j] = acc
     else:
         # on-the-fly transform: φ_i = ∑_k B[k,i]*ψ_k
