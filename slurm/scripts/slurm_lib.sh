@@ -323,7 +323,7 @@ setup_python_environment() {
     echo "# Upgrade pip and install/update requirements"
     echo "echo \"Upgrading pip and installing requirements...\""
     echo "pip install --upgrade pip"
-    echo "pip install -r \"\$REQUIREMENTS_FILE\" || {"
+    echo "pip install -r --resume-retries \"\$REQUIREMENTS_FILE\" || {"
     echo "    echo \"Error: Failed to install requirements\" >&2"
     echo "    exit 1"
     echo "}"
