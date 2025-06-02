@@ -5,14 +5,14 @@ cd "$(dirname "$0")"
 chmod +x evolution.py
 
 # run with:
-python evolution.py         \
+python evolution.py      \
     ./data_big_times        \
     0.68                    \
     0.03                    \
     9                       \
     40                      \
-    14                      \
-    15                      \
+    12                      \
+    13                      \
     1                       \
     100000                  \
     5
