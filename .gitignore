@@ -162,6 +162,8 @@ dmypy.json
 *DATA
 *log*
 *ns=*
+*.csv
+*.txt
 
 #PYTHON
 #$ scp -rP 22 klimak97@ui.wcss.pl:/home/klimak97/CODES/QuantumEigenSolver/cpp/library/DATA/ "./"
