@@ -50,7 +50,7 @@ def _operator_create_np_inner_loop_no_hilbert():
         return data_idx
     return _inner_loop
 
-def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace):
+def _operator_create_np_sparse_inner_loop(hilbert ):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert is not None and hilbert.modifies:
@@ -102,7 +102,7 @@ def _operator_create_np_sparse_inner_loop(hilbert : Hilbert.HilbertSpace):
     return _operator_create_np_inner_loop_no_hilbert()
 
 def operator_create_np_sparse(  ns                  : int,
-                                hilbert             : Hilbert.HilbertSpace,
+                                hilbert             ,
                                 local_fun           : Union[Callable],
                                 max_local_changes   : int,
                                 start               = 0,
@@ -179,7 +179,7 @@ def _operator_create_np_dense_inner_loop_no_hilbert():
         return matrix
     return _inner_loop
 
-def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace):
+def _operator_create_np_dense_inner_loop(hilbert ):
     ''' Inner loop to update the matrix elements - go through all basis states '''
     
     if hilbert.modifies:
@@ -227,7 +227,7 @@ def _operator_create_np_dense_inner_loop(hilbert : Hilbert.HilbertSpace):
     return _operator_create_np_dense_inner_loop_no_hilbert()
         
 def operator_create_np_dense(ns                     : int,
-                    hilbert_space                   : Hilbert.HilbertSpace,
+                    hilbert_space                   ,
                     local_fun                       : Callable,
                     start                           = 0,
                     dtype                           = None):
@@ -260,7 +260,7 @@ def operator_create_np_dense(ns                     : int,
 #####################################################################################################
 
 def operator_create_np( ns                  : Union[int, None],
-                        hilbert_space       : Hilbert.HilbertSpace,
+                        hilbert_space       ,
                         local_fun           : Union[Callable],
                         max_local_changes   : int,
                         is_sparse           : bool,
@@ -288,7 +288,7 @@ def operator_create_np( ns                  : Union[int, None],
 ####################################################################################################
 
 def operator_create(ns                  : int,
-                    hilbert_space       : Hilbert.HilbertSpace,
+                    hilbert_space       ,
                     local_fun           : Union[Callable],
                     max_local_changes   : int,
                     is_sparse           : bool,

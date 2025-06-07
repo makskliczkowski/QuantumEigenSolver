@@ -19,7 +19,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 ####################################################################################################
 
 import general_python
-import Solver
+
+# Conditionally import Solver - skip during documentation build
+import os
+if os.environ.get('SPHINX_BUILD') != '1':
+    try:
+        import Solver
+    except ImportError:
+        pass  # Skip during documentation build
 
 # -------------------------------------------------------------------------------------------------
 #! End of QES package initialization

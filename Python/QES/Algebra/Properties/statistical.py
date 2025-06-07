@@ -369,7 +369,7 @@ def k_function(ldos     :   np.ndarray,
             target      :   float = 0.0,
             tol         :   float = 0.015
             ):
-    """
+    r"""
     Compute 
         k(omega) = \sum _{ij} ldos[i] * ldos[j] * delta (omega - |E[j]-E[i]|)
     using a histogram binning method.

@@ -23,21 +23,11 @@ master_doc  = 'index'
 # Add any Sphinx extension module names here.
 extensions = [
     'sphinx.ext.autodoc',           # Core library for html generation from docstrings
-    'sphinx.ext.autosummary',       # Create neat summary tables
     'sphinx.ext.viewcode',          # Add links to highlighted source code
     'sphinx.ext.napoleon',          # Support for NumPy and Google style docstrings
     'sphinx.ext.intersphinx',       # Link to other project's documentation
     'sphinx.ext.mathjax',           # Math support
-    'sphinx.ext.doctest',           # Test snippets in the documentation
-    'sphinx.ext.todo',              # Support for todo items
-    'sphinx.ext.coverage',          # Coverage of documentation
-    'nbsphinx',                     # Jupyter Notebook support
-    'sphinx.ext.imgconverter',      # Convert images to web-friendly formats
-    'sphinx.ext.graphviz',          # Graphviz support for diagrams
-    'sphinx.ext.ifconfig',          # Conditional inclusion of content based on configuration
-    'sphinx.ext.githubpages',       # Support for GitHub Pages
     'sphinx_rtd_theme',             # Read the Docs theme
-    'sphinx.ext.extlinks',          # External links support
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -56,7 +46,7 @@ html_theme_options  = {
     'canonical_url'                 : '',
     'analytics_id'                  : '',
     'logo_only'                     : False,
-    'display_version'               : True,
+    'display_version'               : False,
     'prev_next_buttons_location'    : 'bottom',
     'style_external_links'          : False,
     'vcs_pageview_mode'             : '',
@@ -86,7 +76,7 @@ autodoc_default_options = {
 }
 
 # Generate autosummary automatically
-autosummary_generate                = True
+# autosummary_generate                = True
 
 # -- Options for Napoleon (Google/NumPy style docstrings) -------------------
 
@@ -125,11 +115,13 @@ autodoc_mock_imports = [
     'flax',
     'optax',
     'physics-tenpy',
+    'tenpy',
     'pyutils',
     'scienceplots',
     'IPython',
     'h5py',
     'scikit-learn',
+    'sklearn',
     'scikit-image',
     'numba',
     'requests',
@@ -137,7 +129,18 @@ autodoc_mock_imports = [
     'sympy',
     'matplotlib',
     'numpy',
+    'scipy',
+    'pandas',
+    'tensorflow',
+    'torch',
+    'QES.general_python.common.flog',
+    'QES.general_python.algebra.utils',
+    'QES.general_python.ml.schedulers',
 ]
+
+# Disable autodoc strict mode to avoid import failures
+autodoc_inherit_docstrings = False
+autodoc_preserve_defaults = True
 
 # -- Options for todo extension ----------------------------------------------
 

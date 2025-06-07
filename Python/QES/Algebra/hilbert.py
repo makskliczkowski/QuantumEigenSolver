@@ -7,6 +7,7 @@ Date    : 2025-02-01
 Version : 1.0.0
 Changes : 
     - 2025.02.01 : 1.0.0 - Initial version of the Hilbert space class. - MK
+    
 """
 
 import math
@@ -1212,7 +1213,7 @@ class HilbertSpace(ABC):
     # --------------------------------------------------------------------------------------------------
     
     def get_matrix_element(self, k, new_k, kmap = None, h_conj = False):
-        """
+        r"""
         Compute the matrix element between two states in the Hilbert space.
         This method determines the matrix element corresponding to the transition between a given state |k⟩ and a new state defined by new_k.
         It accounts for the possibility that the new state may not be in its representative form, in which case it finds the representative state

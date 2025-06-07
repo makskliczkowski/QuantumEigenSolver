@@ -16,6 +16,9 @@ build:
     post_install:
       # Install your package and dependencies
       - cd Python && pip install -e .[docs,all]
+    pre_build:
+      # Set environment variable for Sphinx build
+      - export SPHINX_BUILD=1
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
