@@ -164,6 +164,18 @@ dmypy.json
 *ns=*
 *.csv
 *.txt
+*.DS_*
+*.DS_Store
+# CMake
+# CMake files
+*.cmake
+# CMake cache
+CMakeCache.txt
+# CMake build directories
+CMakeFiles/
+# CMake generated files
+# CMake install files
+# CMake install manifest
 
 #PYTHON
 #$ scp -rP 22 klimak97@ui.wcss.pl:/home/klimak97/CODES/QuantumEigenSolver/cpp/library/DATA/ "./"
