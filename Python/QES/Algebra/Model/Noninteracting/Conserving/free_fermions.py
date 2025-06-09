@@ -129,7 +129,7 @@ class FreeFermions(QuadraticHamiltonian):
                         lattice                 = None,
                         hilbert_space           = None,
                         logger                  = logger)
-        self._t = self._set_some_coupling(t)        
+        self._t = self._set_some_coupling(t).astype(self._dtype)     
         # # Allocate dummy single-particle matrix so that parent methods that
         # # expect one (e.g. set_single_particle_matrix) still work.
         # xp = self._backend

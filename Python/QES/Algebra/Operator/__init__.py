@@ -26,6 +26,7 @@ try:
     from .operator import Operator, SymmetryGenerators
     from .operator_matrix import *
     from .operators_spin import *
+    from .operators_spin import *
     
     __all__ = ['Operator', 'SymmetryGenerators']
 except ImportError:

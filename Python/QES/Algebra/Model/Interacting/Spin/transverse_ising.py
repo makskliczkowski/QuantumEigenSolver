@@ -16,7 +16,7 @@ from typing import List, Tuple, Union, Optional
 # Assume these are available from the QES package:
 import Algebra.hilbert as hilbert_module
 import Algebra.hamil as hamil_module
-import Algebra.Operator.operators_spin as operators_spin_module
+from Algebra.Operator import operators_spin as operators_spin_module
 
 # Utilities (assuming availability)
 import general_python.algebra.linalg as linalg
