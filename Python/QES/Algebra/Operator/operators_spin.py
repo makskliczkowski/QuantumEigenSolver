@@ -42,7 +42,7 @@ from general_python.common.binary import (
 
 if JAX_AVAILABLE:
     import jax
-    import Algebra.Operator.operators_spin_jax as jaxpy
+    # import Algebra.Operator.operators_spin_jax as jaxpy
     import jax.numpy as jnp
     # sigma x
     from Algebra.Operator.operators_spin_jax import sigma_x_int_jnp, sigma_x_jnp, sigma_x_inv_jnp

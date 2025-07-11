@@ -41,6 +41,7 @@ from QES.general_python.algebra.linalg import overlap
 from QES.general_python.common import Directories
 from QES.general_python.common import HDF5Handler
 from QES.general_python.run_scripts.prepareini import ManyBodyEstimator
+from QES.general_python.run_scripts import calculate_optimal_workers
 
 from QES.general_python.maths.statistics import HistogramAverage
 
@@ -563,6 +564,82 @@ def make_sig_z_global(ns):
         type_act    = op_spin.OperatorTypeActing.Global,
         sites       = [0])
 
+#! -------------------------------------------------------
+
+def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num, operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers):
+    """Run evolution in parallel with proper error handling"""
+    
+    if max_workers == 1:
+        logger.info("Running in single-threaded mode")
+        return prepare_evolution(
+            data_dir        = base_dir,
+            sites           = sites,
+            alphas          = alphas_chunks[0],  # All alphas in single chunk
+            n_realisations  = n_reals,
+            time_num        = time_num,
+            operators_map   = operators_map,
+            n               = n,
+            uniform         = True,
+            n_random        = rand_num,
+            bw_df           = bw_df,
+            mls_df          = mls_df,
+            start_time      = start_time,
+            job_time        = remaining_time,
+        )
+    
+    logger.info(f"Using {max_workers} workers for parallel processing")
+    results = []
+    
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all jobs
+            futures = {
+                executor.submit(
+                    prepare_evolution,
+                    data_dir        = base_dir,
+                    sites           = sites,
+                    alphas          = chunk,
+                    n_realisations  = n_reals,
+                    time_num        = time_num,
+                    operators_map   = operators_map,
+                    n               = n,
+                    uniform         = True,
+                    n_random        = rand_num,
+                    bw_df           = bw_df,
+                    mls_df          = mls_df,
+                    start_time      = start_time,
+                    job_time        = remaining_time,
+                ): chunk for chunk in alphas_chunks
+            }
+            
+            # Collect results
+            for future in as_completed(futures):
+                chunk = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    logger.info(f"Chunk {chunk} completed successfully")
+                except Exception as e:
+                    logger.error(f"Error processing chunk {chunk}: {e}")
+                    # Continue with other chunks instead of failing completely
+                    continue
+    
+    except Exception as e:
+        logger.error(f"Error in parallel processing: {e}")
+        # Fallback to single-threaded processing
+        logger.info("Falling back to single-threaded processing")
+        return run_parallel_evolution(
+            [np.concatenate(alphas_chunks)], base_dir, sites, n_reals, time_num,
+            operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, 1
+        )
+    
+    if not results:
+        raise RuntimeError("No results obtained from parallel processing")
+    
+    # If multiple results, you might need to combine them
+    # This depends on what prepare_evolution returns
+    return results[0] if len(results) == 1 else results
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Parallel time-evolution statistics')
     parser.add_argument('save_dir',                         type    =   str,                            help    =   'Directory to save data')
@@ -574,7 +651,7 @@ if __name__ == "__main__":
     parser.add_argument('sites_end',                        type    =   int,                            help    =   'Maximum number of spins (inclusive)')
     parser.add_argument('n',                                type    =   int,    default =   1,          help    =   'Model parameter n')
     parser.add_argument('time_num',                         type    =   int,    default =   int(1e5),   help    =   'Number of time points')
-    parser.add_argument('memory_per_worker',              type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
+    parser.add_argument('memory_per_worker',                type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     args = parser.parse_args()
     
@@ -615,12 +692,22 @@ if __name__ == "__main__":
     logger.info(f"Time steps: {time_num}")
 
     #! -------------------------------------------------------
-    memory_per_worker   = args.memory_per_worker
-    memory_per_worker   = max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(Ns = sites[-1]), memory_per_worker)) # minimum 1 GB
-        
     avail_gb            = psutil.virtual_memory().available / (1024**3)
-    # max_workers         = max_workers= max(1, min(len(alphas), int(avail_gb / memory_per_worker)))
-    max_workers         = 1
+    memory_per_worker   = max(args.memory_per_worker, 1.0)
+    memory_per_worker   = min(avail_gb, max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(Ns = sites[-1]), memory_per_worker))) # minimum 1 GB
+
+    try:
+        estimated_memory    = ManyBodyEstimator.estimate_matrix_memory(Ns=sites[-1])
+        memory_per_worker   = min(avail_gb, max(1.0, max(estimated_memory, memory_per_worker)))
+    except Exception as e:
+        logger.warning(f"Could not estimate memory requirements: {e}")
+        logger.info("Using default memory per worker")
+
+    if args.force_single_thread:
+        max_workers = 1
+    else:
+        max_workers         = calculate_optimal_workers(alphas, avail_gb, memory_per_worker, args.max_cores)
+    
     logger.info(f"Available memory: {avail_gb:.2f} GB")
     logger.info(f"Memory per worker: {memory_per_worker:.2f} GB")
     logger.info(f"Max workers: {max_workers}")
@@ -632,59 +719,28 @@ if __name__ == "__main__":
     logger.info(f"Alphas chunks: {alphas_chunks}")
     #! -------------------------------------------------------
     
-    start_time          = time.perf_counter()
-    remaining_time      = SlurmMonitor.get_remaining_time()
-    if remaining_time == -1:
-        remaining_time = 60 * 60 * 24 * 2  # default to 2 days if not set
-    logger.info(f"Remaining time: {remaining_time:.2f} s, which is {remaining_time / 60:.2f} min, {remaining_time / 3600:.2f} h", color='green')
-    
-    if max_workers > 1:
-        logger.info(f"Using {max_workers} workers")
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(
-                    prepare_evolution,
-                    data_dir        = base_dir,
-                    sites           = sites,
-                    alphas          = chunk,
-                    n_realisations  = n_reals,
-                    time_num        = time_num,
-                    operators_map   = operators_map,
-                    n               = n,
-                    uniform         = True,
-                    n_random        = rand_num,
-                    bw_df           = bw_df,
-                    mls_df          = mls_df,
-                    start_time      = start_time,
-                    job_time        = remaining_time,
-                ): chunk for chunk in alphas_chunks
-            }
-            
-            for future in as_completed(futures):
-                chunk = futures[future]
-                try:
-                    histograms_av, histograms_typ, bandwidths = future.result()
-                except Exception as e:
-                    logger.error(f"Error chunk {chunk}: {e}")
-                else:
-                    logger.info(f"Chunk {chunk} done")
-    else:
-        histograms_av, histograms_typ, bandwidths = prepare_evolution(
-            data_dir        = base_dir,
-            sites           = sites,
-            alphas          = alphas,
-            n_realisations  = n_reals,
-            time_num        = time_num,
-            operators_map   = operators_map,
-            n               = n,
-            uniform         = True,
-            n_random        = rand_num,
-            bw_df           = bw_df,
-            mls_df          = mls_df,
-            start_time      = start_time,
-            job_time        = remaining_time,
-        )
-    logger.info(f"All done in {time.perf_counter() - start_time:.2f} s", color='green')
-        
-    #! -------------------------------------------------------
+    # Split alphas into chunks
+    try:
+        alphas_chunks   = np.array_split(alphas, max_workers)
+        logger.info(f"Alpha chunks: {[len(chunk) for chunk in alphas_chunks]}")
+
+        # Get remaining time
+        start_time      = time.perf_counter()
+        remaining_time  = SlurmMonitor.get_remaining_time()
+        if remaining_time == -1:
+            remaining_time = 60 * 60 * 24 * 2  # default to 2 days
+        logger.info(f"Remaining time: {remaining_time:.2f} s ({remaining_time/3600:.2f} hours)", color='green')
+
+        # Run evolution
+        results = run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num,
+            operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers)
+
+        logger.info(f"All computations completed in {time.perf_counter() - start_time:.2f} s", color='green')
+
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        sys.exit(1)
 
