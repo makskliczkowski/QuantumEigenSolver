@@ -97,7 +97,7 @@ main() {
     
     # Set default paths - CUSTOMIZE THESE FOR YOUR ENVIRONMENT
     defaults[BASE_DIR]="${PACKAGE_DIR}"
-    defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025_um_evolotion"
+    defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025/um_evolotion"
     defaults[CODES_DIR]="${CODES_DIR}"
     defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/DATA_EVO_2025_UM"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
