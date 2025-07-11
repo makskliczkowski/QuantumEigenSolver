@@ -241,7 +241,7 @@ main() {
         echo "    ${defaults[LUSTRE_DIR]} \\"
         echo "    ${params[a_start]} ${params[a_step]} ${params[a_num]} \\"
         echo "    ${params[n_rel]} ${params[Ns_start]} ${params[Ns_end]} \\"
-        echo "    ${params[n]} ${params[t_num]} ${mem_per_worker} \\"
+        echo "    ${params[n]} ${params[t_num]} ${mem_per_worker} 86 \\"
         echo "    > ${defaults[LOG_DIR]}/log_${job_params}.log 2>&1"
         echo ""
         
