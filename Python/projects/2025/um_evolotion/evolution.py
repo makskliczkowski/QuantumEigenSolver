@@ -26,11 +26,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 os.environ['BACKEND'] = 'numpy'
 #! -------------------------------------------------------
 
-script_dir              = os.path.dirname(os.curdir)
-parent_dir              = os.path.abspath(os.path.join(script_dir, '..'))
-parent_dir_up           = os.path.abspath(os.path.join(parent_dir, '..'))
-if parent_dir_up not in sys.path:
-    sys.path.append(parent_dir_up)
+# Add parent directories to sys.path for imports
+for _ in range(4):
+    parent = os.path.abspath(os.path.join(os.path.dirname(__file__), *(['..'] * (_ + 1))))
+    if parent not in sys.path:
+        sys.path.append(parent)
 
 # project imports
 from QES.general_python.run_scripts.slurm import SlurmMonitor
@@ -51,7 +51,7 @@ from QES.general_python.physics import entropy as entropy, density_matrix as den
 #! MODEL
 from QES.Algebra.Model.Interacting.Spin.ultrametric import UltrametricModel
 
-from QES.Algebra.Properties import time_evo, statistical
+from QES.Algebra.Properties import time_evolution, statistical, time_evo
 import QES.Algebra.Operator.operators_spin as op_spin
 
 logger = get_global_logger()
@@ -652,9 +652,11 @@ if __name__ == "__main__":
     parser.add_argument('n',                                type    =   int,    default =   1,          help    =   'Model parameter n')
     parser.add_argument('time_num',                         type    =   int,    default =   int(1e5),   help    =   'Number of time points')
     parser.add_argument('memory_per_worker',                type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
+    parser.add_argument("max_memory",                       type    =   float,  default =   80.0,       help    =   'Maximum memory in GB')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
+    parser.add_argument('-c',        '--max_cores',         type    =   int,    default =   psutil.cpu_count(), help='Maximum number of cores to use')
+    parser.add_argument('-f',        '--force_single_thread',                   action  =   'store_true',       help='Force single-threaded execution')
     args = parser.parse_args()
-    
     
     #! -------------------------------------------------------
     rng                 = np.random.default_rng(seed=args.seed)
@@ -692,7 +694,7 @@ if __name__ == "__main__":
     logger.info(f"Time steps: {time_num}")
 
     #! -------------------------------------------------------
-    avail_gb            = psutil.virtual_memory().available / (1024**3)
+    avail_gb            = min(psutil.virtual_memory().available / (1024**3), args.max_memory)
     memory_per_worker   = max(args.memory_per_worker, 1.0)
     memory_per_worker   = min(avail_gb, max(1.0, max(ManyBodyEstimator.estimate_matrix_memory(Ns = sites[-1]), memory_per_worker))) # minimum 1 GB
 

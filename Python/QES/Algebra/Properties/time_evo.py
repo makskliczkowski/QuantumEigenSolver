@@ -128,7 +128,7 @@ else:
 
 # numpy version
 
-def time_evo(eigenstates    : Array,
+def time_evolution(eigenstates    : Array,
             eigvals         : Array,
             overlaps        : Array,
             time            : float) -> Array:
