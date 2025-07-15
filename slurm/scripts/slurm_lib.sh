@@ -476,32 +476,40 @@ setup_qes_environment() {
     echo "export QES_BASE_DIR=\"${base_dir}\""
     echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}\""
     echo ""
-    
-    echo "# Create virtual environment if it doesn't exist"
-    echo "if [ ! -d \"\${venv_path}/\${venv_name}\" ]; then"
-    echo "    echo \"Creating virtual environment: \${venv_name}\""
-    echo "    python3 -m venv \"\${venv_path}/\${venv_name}\""
+
+    echo "# Activate or create virtual environment"
+    echo "if [ ! -d \"${venv_path}/${venv_name}\" ]; then"
+    echo "    echo \"Creating virtual environment: ${venv_name}\""
+    echo "    python3 -m venv \"${venv_path}/${venv_name}\""
     echo "fi"
+    echo "source \"${venv_path}/${venv_name}/bin/activate\""
+    echo "echo \"Activated virtual environment: ${venv_name}\""
     echo ""
-    
-    echo "# Activate virtual environment"
-    echo "source \"\${venv_path}/\${venv_name}/bin/activate\""
-    echo "echo \"Activated virtual environment: \${venv_name}\""
+
+    echo "# Skip install if QES is already importable"
+    cat << 'EOF'
+if python3 - <<'PYCODE' &>/dev/null; then
+    import QES
+PYCODE
+then
+    echo "QES already installed; nothing to do."
+    return
+fi
+EOF
+
     echo ""
-    
-    echo "# Upgrade pip"
-    echo "pip install --upgrade pip"
-    echo ""
-    
-    echo "# Install QES package in development mode"
-    echo "echo \"Installing QES package from: \${QES_PACKAGE_DIR}\""
+    echo "# Otherwise, do your one-time install steps"
+    echo "echo \"Upgrading pip, setuptools, wheel…\""
+    echo "pip install --upgrade pip setuptools wheel"
+    if [ -n "${req_file}" ] && [ -f "${req_file}" ]; then
+        echo "echo \"Installing requirements from ${req_file}\""
+        echo "pip install -r \"${req_file}\""
+    fi
+    echo "echo \"Installing QES in editable mode…\""
     echo "cd \"\${QES_PACKAGE_DIR}\""
-    echo "pip install -e .[all]  # Install with all optional dependencies"
+    echo "pip install -e .[all]"
     echo ""
-    
-    echo "# Verify QES installation"
-    echo "python3 -c \"import QES; print(f'QES package successfully imported from: {QES.__file__}')\""
-    echo ""
+    echo "echo \"QES environment setup complete.\""
 }
 
 # -----------------------------------------------------------------------

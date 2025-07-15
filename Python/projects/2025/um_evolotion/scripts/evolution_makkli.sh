@@ -215,6 +215,8 @@ main() {
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
     venv_name="qes_venv"
     venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
+    timestamp=$(date +'%Y%m%d_%H%M%S')
+    logfile="${defaults[LOG_DIR]}/log_${job_params}_${timestamp}.log"
     # Create SLURM job script
     {
         create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
@@ -242,7 +244,7 @@ main() {
         echo "    ${params[a_start]} ${params[a_step]} ${params[a_num]} \\"
         echo "    ${params[n_rel]} ${params[Ns_start]} ${params[Ns_end]} \\"
         echo "    ${params[n]} ${params[t_num]} ${mem_per_worker} 86 \\"
-        echo "    > ${defaults[LOG_DIR]}/log_${job_params}.log 2>&1"
+        echo "    > ${logfile} 2>&1"
         echo ""
         
         echo "echo \"Job completed successfully\""
