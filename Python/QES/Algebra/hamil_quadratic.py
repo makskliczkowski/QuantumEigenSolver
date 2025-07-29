@@ -330,6 +330,97 @@ class QuadraticSelection:
             q     *= ph[np.newaxis, :]
             return q
 
+    def haar_random_coeff_real(gamma    : int,
+                                *,
+                                rng     : np.random.Generator | None = None,
+                                dtype   = np.float64) -> np.ndarray:
+        r"""
+        Return a length-gamma real vector distributed with the Haar measure
+        on the unit sphere (i.e. what you get from the first column of a Haar
+        random orthogonal matrix).
+
+        Parameters
+        ----------
+        gamma : int
+            Dimension of states to mix.
+        rng : numpy.random.Generator, optional
+            Random-number generator to use. `np.random.default_rng()` is the
+            default; pass your own for reproducibility.
+        dtype : np.dtype, default=np.float64
+            Precision of the returned coefficients.
+
+        Returns
+        -------
+        np.ndarray
+            A real vector of length `gamma` sampled from the Haar measure.
+
+        Notes
+        -----
+        Uses Gaussian normalisation trick to sample from the Haar measure.
+        
+        Examples
+        --------
+        >>> haar_random_coeff_real(4) # doctest: +ELLIPSIS
+        array([ 0.44..., -0.40...,  0.63...,  0.16...])
+        """
+        
+        if gamma < 1:
+            raise ValueError("`gamma` must be at least 1.")
+        if gamma == 1:
+            return np.ones(1, dtype=dtype)
+
+        rng = np.random.default_rng() if rng is None else rng
+        # Generate normally distributed real numbers - normalize to unit sphere
+        z   = rng.normal(size=gamma)
+        z   = z.astype(dtype, copy=False)
+        z  /= np.linalg.norm(z)
+        return z
+
+    def haar_random_unitary_real(gamma   : int,
+                                *,
+                                rng     : np.random.Generator | None = None,
+                                dtype   = np.float64) -> np.ndarray:
+        r"""
+        Generate a Haar-random real orthogonal matrix of shape (gamma, gamma).
+        Parameters
+        ----------
+        gamma : int
+            Dimension of the orthogonal matrix.
+        rng : numpy.random.Generator, optional
+            Random number generator (default: np.random.default_rng()).
+        dtype : np.dtype, default=np.float64
+            Desired real dtype.
+
+        Returns
+        -------
+        np.ndarray
+            Haar-distributed orthogonal matrix of shape (gamma, gamma).
+
+        Notes
+        -----
+        Uses QR decomposition of a Gaussian matrix to sample from the Haar measure.
+
+        Examples
+        --------
+        >>> U = haar_random_unitary_real(4)
+        >>> np.allclose(U.T @ U, np.eye(4))
+        True
+        """
+        
+        if gamma < 1:
+            raise ValueError("`gamma` must be at least 1.")
+
+        rng     = np.random.default_rng() if rng is None else rng
+
+        # Generate a random real orthogonal matrix using QR decomposition
+        A       = rng.normal(size=(gamma, gamma))
+        Q, R    = np.linalg.qr(A)
+        d       = np.diag(R)
+        Q      *= np.sign(d)
+        
+        # Return the first column as the Haar-random real vector
+        return Q.astype(dtype, copy=False)
+
     # ------------------------------------------------------------------------
     #! Energy concerned
     # ------------------------------------------------------------------------
