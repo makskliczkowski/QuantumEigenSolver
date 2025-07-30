@@ -195,8 +195,9 @@ def _single_realisation(
         time_start_evo = time.perf_counter()
         if not batch_limit(ns):
             # Small systems: compute all at once
-            quench_states_t         = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=time_steps)
-            quenched_values_t       = time_evo.time_evo_evaluate(quench_states_t, operators_mat[name])
+            evolved_overlaps        = np.exp(-1j * np.outer(model.eig_val, time_steps)) * overlaps[:, np.newaxis]
+            quench_states_t         = model.eig_vec @ evolved_overlaps
+            quenched_values_t       = np.einsum('ij,ji->i', np.conj(quench_states_t.T), operators_mat[name] @ quench_states_t)
             time_vals[name][r, :]   = np.real(quenched_values_t)
         else:
             # Large systems: batch processing
@@ -216,12 +217,14 @@ def _single_realisation(
                 
                 # Compute time evolution for this batch
                 batch_times             = time_steps[start_idx:end_idx]
-                quench_states_batch     = time_evo.time_evo_block(model.eig_vec, model.eig_val, quench_overlaps=overlaps, times=batch_times)
-                quenched_values_batch   = time_evo.time_evo_evaluate(quench_states_batch, operators_mat[name])
-                time_vals[name][r, start_idx:end_idx] = np.real(quenched_values_batch)
+                evolved_overlaps_batch  = np.exp(-1j * np.outer(model.eig_val, batch_times)) * overlaps[:, np.newaxis]
+                quench_states_batch     = model.eig_vec @ evolved_overlaps_batch
+                values_batch            = np.einsum('ji,jk,ki->i', quench_states_batch.conj(), operators_mat[name], quench_states_batch)
+                # Store the results
+                time_vals[name][r, start_idx:end_idx] = np.real(values_batch)
                 
                 # Clean up memory
-                del quench_states_batch, quenched_values_batch
+                del quench_states_batch, values_batch, evolved_overlaps_batch
 
         logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} time evolution done in {time.perf_counter() - time_start_evo:.2f} s", lvl=4, color='blue')
 
@@ -235,6 +238,7 @@ def _single_alpha(alpha             : float,
                 uniform             : bool, 
                 data_dir            : Directories,
                 rand_num            : int,
+                worker_id           : int,
                 n_realisations      : int,
                 mean_lvl_spacing    : float,
                 bandwidth_data      : float,
@@ -259,7 +263,7 @@ def _single_alpha(alpha             : float,
                 seed                : int   = None
                 ) -> None:
 
-    logger.info(f"ns = {ns}, alpha = {alpha:.2f}", lvl=2, color='green')
+    logger.info(f"ns = {ns}, alpha = {alpha:.2f}, worker = {worker_id}", lvl=2, color='green')
     time_start_a        = time.perf_counter()
     hilbert_size        = 2**ns
     
@@ -475,21 +479,19 @@ def prepare_evolution(
     """
     
     #! allocate the data
-    max_ns              = sites[-1]
-    max_nh              = 2**(max_ns)
-    max_allocated       = max_nh * (max_nh - 1) // 2
-    vals_allocated      = np.zeros(max_allocated, dtype=np.float64)
-    omegas_allocated    = np.zeros(max_allocated, dtype=np.float64)
-
     histograms_av       = { op: {alpha: {} for alpha in alphas} for op in operators_map }
     histograms_typ      = { op: {alpha: {} for alpha in alphas} for op in operators_map }
     
     #! loop over the sites
     for ins, ns in enumerate(sites):
         logger.info(f"ns = {ns}", lvl=1, color='blue')
-        time_start_ns       = time.perf_counter()
-        hilbert_size        = 2**ns
-        n_realisations_in   = n_realisations[ns]
+        time_start_ns           = time.perf_counter()
+        hilbert_size            = 2**ns
+        n_realisations_in       = n_realisations[ns]
+        
+        max_allocated_for_ns    = hilbert_size * (hilbert_size - 1) // 2
+        vals_allocated          = np.zeros(max_allocated_for_ns, dtype=np.float64)
+        omegas_allocated        = np.zeros(max_allocated_for_ns, dtype=np.float64)
         
         # operators_map[sig_z_l(ns).name] = sig_z_l
         operators           = {k : v(ns) for k, v in operators_map.items()}
@@ -530,6 +532,7 @@ def prepare_evolution(
                 uniform                 = uniform,
                 data_dir                = data_dir,
                 rand_num                = n_random,
+                worker_id               = ins * len(alphas) + ia,  # Unique worker ID for each (ns, alpha)
                 n_realisations          = n_realisations_in,
                 mean_lvl_spacing        = mean_lvl_spacing,
                 bandwidth_data          = bandwidth_data,
@@ -553,7 +556,7 @@ def prepare_evolution(
                 job_time                = job_time,
                 seed                    = seed
             )
-            
+    
     return histograms_av, histograms_typ, bandwidths
 
 #! -------------------------------------------------------
