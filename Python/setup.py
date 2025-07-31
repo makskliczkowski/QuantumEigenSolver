@@ -75,11 +75,11 @@ INSTALL_REQUIRES = [
 
 # Optional dependencies for enhanced functionality
 EXTRAS_REQUIRE = {
+    # JAX + ML ecosystem (excluding jax/jaxlib — install those manually for GPU)
     'jax': [
-        'jax>=0.4.0',           # For JAX support on CPU and GPU
-        'jaxlib>=0.4.0',        # For JAX support on CPU and GPU
         'flax>=0.6.0',          # For neural network support in JAX
         'optax>=0.1.0',         # For optimization in JAX
+        # https://github.com/google/jax#installation
     ],
     'ml': [
         'scikit-learn>=1.0.0',  # For machine learning utilities
@@ -106,7 +106,12 @@ EXTRAS_REQUIRE = {
 }
 
 # All optional dependencies combined
-EXTRAS_REQUIRE['all'] = [dep for deps in EXTRAS_REQUIRE.values() for dep in deps]
+# Flatten 'all' dependencies (excluding jax/jaxlib)
+excluded_pkgs           = {'jax', 'jaxlib'}
+EXTRAS_REQUIRE['all']   = [
+    dep for deps in EXTRAS_REQUIRE.values() for dep in deps
+    if all(not dep.strip().startswith(excl) for excl in excluded_pkgs)
+]
 
 setup(
     # Basic package information

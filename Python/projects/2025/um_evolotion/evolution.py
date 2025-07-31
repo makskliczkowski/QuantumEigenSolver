@@ -190,6 +190,7 @@ def _single_realisation(
         vals                    = vals[mask]
         h_av[name].append(omegas, vals)
         h_typ[name].append(omegas, np.log(vals))
+        logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} histogram for operator {name} removed bad values {time.perf_counter() - time_start_hist:.2f} s", lvl=5, color='blue')
         
         #! time evolution - compute the expectation values
         time_start_evo = time.perf_counter()

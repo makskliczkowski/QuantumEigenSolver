@@ -136,6 +136,7 @@
     "python.testing.pytestArgs": [
         "."
     ],
+    "python.envFile": "${workspaceFolder}/.env",
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:conda",
