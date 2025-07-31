@@ -97,7 +97,7 @@ def _single_realisation(
     alpha           = model.alphas[0]
     ns              = model.ns
     hilbert_size    = 2**ns
-    batch_limit     = lambda ns: ns > 14
+    batch_limit     = lambda ns: ns >= 14
     batch_num       = lambda ns: 10 if batch_limit(ns) else 1
     
     time_start_r    = time.perf_counter()
