@@ -127,7 +127,7 @@ class QuantumStateEnvironment:
 
         # callable cost function
         self.metrics                = None
-        self.max_entropy            = np.log(dim_a)
+        self.max_entropy            = np.log(self.dim_a)
     
         # reset environment
         self.reset()
@@ -157,7 +157,7 @@ class QuantumStateEnvironment:
             self.state              = np.eye(self.gamma, dtype=self.dtype) 
         else:
             # is vector of coefficients for a single mixed state
-            self.state              = np.eye(self.gamma, dtype=self.dtype) / np.sqrt(self.gamma)
+            self.state              = np.ones(self.gamma, dtype=self.dtype) / np.sqrt(self.gamma)
             
         self.step_count             = 0
         self.metrics                = self._calculate_all_metrics(self.state)
@@ -175,10 +175,10 @@ class QuantumStateEnvironment:
 
         if not self.unitary_agent:
             # Single state representation
-            real_part                   = np.real(self.state).flatten()
-            imag_part                   = np.imag(self.state).flatten()
-            magnitude                   = np.abs(self.state).flatten()
-            phase                       = np.angle(self.state).flatten()
+            real_part                   = np.real(self.state)
+            imag_part                   = np.imag(self.state)
+            magnitude                   = np.abs(self.state)
+            phase                       = np.angle(self.state)
             current_metrics             = self._calculate_all_metrics(self.state)
             # Add step information and entropy history
             step_info                   = np.array([
@@ -230,21 +230,23 @@ class QuantumStateEnvironment:
         
         # Decode action - currently real rotations
         # Decode action
-        pair_idx, angle_idx, phi_idx    = self._decode_action(action)
-        angle                           = self.rotation_angles[angle_idx]
-        phi                             = self.rotation_angles_phi[phi_idx]
-        coeff1_idx, coeff2_idx          = self._get_coefficient_pair(pair_idx)
+        pair_idx, angle_idx, phi_idx = self._decode_action(action)
+        angle                   = self.rotation_angles[angle_idx]
+        phi                     = self.rotation_angles_phi[phi_idx]
+        coeff1_idx, coeff2_idx  = self._get_coefficient_pair(pair_idx)
         
         # Apply rotation
-        old_metrics                     = self._calculate_all_metrics(self.state)
+        old_metrics             = self._calculate_all_metrics(self.state)
         self._apply_rotation(coeff1_idx, coeff2_idx, angle, phi)
-        new_metrics                     = self._calculate_all_metrics(self.state)
-
-        # Calculate reward
-        reward                          = self._calculate_reward(old_metrics, new_metrics)
+        new_metrics             = self._calculate_all_metrics(self.state)
         
+        # Calculate reward
+        entr_reduction          = old_metrics['entropy'] - new_metrics['entropy']
+        done                    = (self.step_count >= self.max_steps or new_metrics['entropy'] < self.ent_threshold)
+        reward                  = self._calculate_reward(old_metrics, new_metrics, done)
+
         # Update tracking
-        self.step_count                += 1
+        self.step_count        += 1
         if new_metrics['entropy'] < self.best_entropy:
             self.best_entropy = new_metrics['entropy']
         
@@ -253,7 +255,7 @@ class QuantumStateEnvironment:
 
         info = {
             'entropy'           : new_metrics['entropy'],
-            'entropy_reduction' : old_metrics['entropy'] - new_metrics['entropy'],
+            'entropy_reduction' : entr_reduction,
             'purity'            : new_metrics['purity'],
             'nongaussianity'    : new_metrics['nongaussianity'],
             'best_entropy'      : self.best_entropy
@@ -292,66 +294,60 @@ class QuantumStateEnvironment:
     def _apply_rotation(self, idx1: int, idx2: int, angle: float, phi: float = 0.0):
         """Apply rotation to two coefficients"""
         
-        rotation_matrix = np.eye(self.gamma, dtype=self.dtype)
         c, s            = np.cos(angle), np.sin(angle)
-        
-        if self.iscomplex:
-            rotation_matrix[idx1, idx1] = c
-            rotation_matrix[idx1, idx2] = -s * np.exp(1j * phi)
-            rotation_matrix[idx2, idx1] = s * np.exp(-1j * phi)
-            rotation_matrix[idx2, idx2] = c
-        else:
-            rotation_matrix[idx1, idx1] = c
-            rotation_matrix[idx1, idx2] = -s
-            rotation_matrix[idx2, idx1] = s
-            rotation_matrix[idx2, idx2] = c
-        
         if self.unitary_agent:
+            rotation_matrix = np.eye(self.gamma, dtype=self.dtype)
+            if self.iscomplex:
+                rotation_matrix[idx1, idx1] = c
+                rotation_matrix[idx1, idx2] = -s * np.exp(1j * phi)
+                rotation_matrix[idx2, idx1] = s * np.exp(-1j * phi)
+                rotation_matrix[idx2, idx2] = c
+            else:
+                rotation_matrix[idx1, idx1] = c
+                rotation_matrix[idx1, idx2] = -s
+                rotation_matrix[idx2, idx1] = s
+                rotation_matrix[idx2, idx2] = c
             self.state  = rotation_matrix @ self.state
         else:
-            self.state  = rotation_matrix @ self.state
+            if self.iscomplex:
+                rotation         = np.exp(1j * phi)
+                self.state[idx1] = c * self.state[idx1] - s * rotation * self.state[idx2]
+                self.state[idx2] = s * np.conj(rotation) * self.state[idx1] + c * self.state[idx2]
+            else:
+                self.state[idx1] = c * self.state[idx1] - s * self.state[idx2]
+                self.state[idx2] = s * self.state[idx1] + c * self.state[idx2]
             self.state /= np.linalg.norm(self.state)
 
     # -----------------------------------------------------------------------
     #! Reward calculation and metrics
     # -----------------------------------------------------------------------
     
-    def _calculate_reward(self, old_metrics: dict, new_metrics: dict) -> float:
+    def _calculate_reward(self, old_metrics: dict, new_metrics: dict, done: bool = False) -> float:
         """Calculate reward based on entropy change"""
-        reward = 0.0
         
-        # Reward for reducing entropy
+        # 1. Small penalty for each step to encourage efficiency
+        step_penalty = -0.1 * (1 - self.step_count / self.max_steps)
+
+        # 2. Reward for incremental improvement (optional but can help)
+        incremental_reward = 0
         if self.obj_config.entropy_weight > 0:
-            entropy_reduction = old_metrics['entropy'] - new_metrics['entropy']
-            
-            # Bonus for significant improvements
-            if entropy_reduction > 0.01:
-                reward += 10.0
-            # Primary reward: entropy reduction
-            if entropy_reduction < 0:
-                reward -= 5.0
-            reward += self.obj_config.entropy_weight * entropy_reduction * 100.0
-        
-        # Reward for increasing purity (purity is 1 for pure state, so we reward increase)
+            entropy_reduction   = old_metrics['entropy'] - new_metrics['entropy']
+            incremental_reward += self.obj_config.entropy_weight * (entropy_reduction / self.max_entropy)
+
         if self.obj_config.purity_weight > 0:
-            purity_increase = new_metrics['purity'] - old_metrics['purity']
-            reward += self.obj_config.purity_weight * purity_increase * 50.0
+            purity_increase     = new_metrics['purity'] - old_metrics['purity']
+            incremental_reward += self.obj_config.purity_weight * purity_increase * 5.0
+            
+        # 3. Large terminal reward based on the final entropy
+        terminal_reward = 0
+        if done:
+            # Reward is inversely proportional to the final entropy.
+            # A final entropy of 0 gets the max reward of 1000.
+            # A final entropy equal to the max possible entropy gets 0 reward.
+            frac = max(0, (self.ent_threshold - new_metrics['entropy']) / self.ent_threshold)
+            terminal_reward = 1000.0 * (1 - new_metrics['entropy'] / self.max_entropy) + 500.0 * frac**2
 
-        # Reward for reducing non-Gaussianity
-        if self.obj_config.non_gaussianity_weight > 0:
-            non_gaussianity_reduction = old_metrics['non_gaussianity'] - new_metrics['non_gaussianity']
-            reward += self.obj_config.non_gaussianity_weight * non_gaussianity_reduction * 20.0
-
-        # Bonus for reaching target entropy
-        if new_metrics['entropy'] < self.ent_threshold:
-            reward += 1000.0
-        
-        if self.obj_config.rotations_weight > 0:
-            # Reward for minimizing number of rotations
-            # This is a negative reward, so we want to minimize it
-            reward -= self.obj_config.rotations_weight * (self.step_count / self.max_steps) * 10.0
-        
-        return reward
+        return step_penalty + incremental_reward + terminal_reward
     
     # -----------------------------------------------------------------------
     
@@ -361,16 +357,11 @@ class QuantumStateEnvironment:
         purities            = []
         nongaussianities    = []
 
+        # Go through each state and calculate metrics
         for state in self.states:
-            transformed_states  = state @ state_transform
+            transformed_states  = state @ state_transform # Apply transformation to the state
+            entanglements.append(loss_entanglement_states(transformed_states, self.dim_a, self.dim_b))
 
-            entropies           = loss_entanglement_states(transformed_states, self.dim_a, self.dim_b)
-            if self.obj_config.entropy_weight > 0:
-                # Entropy loss is inverted because we want to minimize entropy
-                entanglements.append(-entropies)
-            else:
-                entanglements.append(0.0)
-            
             if self.obj_config.purity_weight > 0:
                 # Purity loss is inverted because we want to maximize purity
                 purities.append(1.0 + loss_purity_states(transformed_states, self.dim_a, self.dim_b))
@@ -384,9 +375,9 @@ class QuantumStateEnvironment:
                 nongaussianities.append(0.0)
 
         return {
-            'entropy'           : (entanglements if isinstance(entanglements, float) else np.mean(entanglements)) * self.obj_config.entropy_weight,
-            'purity'            : (purities if isinstance(purities, float) else np.mean(purities)) * self.obj_config.purity_weight,
-            'nongaussianity'    : (nongaussianities if isinstance(nongaussianities, float) else np.mean(nongaussianities)) * self.obj_config.non_gaussianity_weight
+            'entropy'           : np.mean(entanglements),
+            'purity'            : np.mean(purities),
+            'nongaussianity'    : np.mean(nongaussianities)
         }
     
     # -----------------------------------------------------------------------
@@ -451,7 +442,7 @@ class DisentanglementNetwork(nn.Module):
     capture quantum correlations through attention.
     """
     
-    def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 512):
+    def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 512, n_res: int = 2, n_block: int = 2):
         super().__init__()
         
         # Feature extraction with residual connections
@@ -475,11 +466,11 @@ class DisentanglementNetwork(nn.Module):
         # - n_heads: number of attention heads (default is 8)
         # - d_model: dimension of the model (hidden_dim)
         # - dropout: dropout rate (default is 0.1)
-        self.attention = AttentionBlock(hidden_dim, n_heads=8)
+        self.attention = AttentionBlock(hidden_dim, n_heads=4)
         
         # Shared backbone with residual connections
         self.backbone = nn.ModuleList([
-            self._make_residual_block(hidden_dim) for _ in range(4)
+            self._make_residual_block(hidden_dim) for _ in range(n_res)
         ])
         
         # Actor head (policy network)
@@ -576,7 +567,7 @@ class PPOAgent:
         self.max_grad_norm  = max_grad_norm
 
         # Networks
-        self.network        = DisentanglementNetwork(state_dim, action_dim).to(device)
+        self.network        = DisentanglementNetwork(state_dim, action_dim, hidden_dim=256).to(device)
         self.optimizer      = torch.optim.AdamW(self.network.parameters(), lr=lr, weight_decay=1e-4, eps=1e-5)
 
         # Learning rate scheduler
@@ -812,13 +803,20 @@ def train_disentanglement_agent(
             
             # Take step
             next_state, reward, done, info = env.step(action)
-            
+
             # Store experience
             agent.store_experience(state, action, reward, next_state, done, log_prob, value)
             
             # Update state and reward
             state           = next_state
             total_reward   += reward
+            
+        # Log episode info
+        if logger:
+            logger.info(f"Episode {episode}: Total Reward: {total_reward:.4f}, "
+                        f"Entropy: {info['entropy']:.6f}, Purity: {info['purity']:.4f}, "
+                        f"Non-Gaussianity: {info['nongaussianity']:.4f}",
+                        color="blue", lvl=2)
         
         # Update agent
         if episode % update_frequency == 0 and episode > 0:
@@ -838,7 +836,8 @@ def train_disentanglement_agent(
             avg_entropy     = np.mean(episode_entropies[-100:])
             
             logger.info(f"Episode {episode}: Avg Reward: {avg_reward:.4f}, "
-                        f"Avg Entropy: {avg_entropy:.6f}, Purity: {info['purity']:.4f}, Non-Gaussianity: {info['nongaussianity']:.4f},"
+                        f"Avg Entropy: {avg_entropy:.6f}, Purity: {info['purity']:.4f}, Non-Gaussianity: {info['nongaussianity']:.4f}, "
+                        f"Std Entropy: {np.std(episode_entropies[-100:]):.6f}, "
                         f"Best Entropy: {best_entropy:.6f}",
                         color="green", lvl=2)
         
@@ -912,6 +911,8 @@ if __name__ == "__main__":
     ax[0].set_ylabel("Reward")
     ax[1].set_ylabel(r"$\bar{S}$")
     ax[1].set_xlabel("Episodes")
+    ax[1].set_yscale("log")
+    ax[1].set_xscale("log")
 
     logger.info("Training completed successfully!", color="green", lvl=1)
     logger.info(f"Final rewards: {rewards[-1]}, Final entropies: {entropies[-1]}", color="blue", lvl=2)

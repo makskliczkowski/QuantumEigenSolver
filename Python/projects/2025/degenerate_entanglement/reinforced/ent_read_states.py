@@ -17,8 +17,8 @@ def parse_arguments():
     parser.add_argument("--data_dir",   type=str,       default=d_dir,  help=f"Base data directory (default: '{d_dir}')")
     parser.add_argument("--is_complex", type=int,       default=0,      help="Use complex coefficients (default: False)")
     parser.add_argument("--n_states",   type=int,       default=1,      help="Number of states to load (default: 1)")
-    parser.add_argument("--lr",         type=float,     default=0.01,   help="Learning rate for optimization (default: 0.01)")
-    parser.add_argument("--n_steps",    type=int,       default=1500,   help="Number of optimization steps (default: 1500)")
+    parser.add_argument("--lr",         type=float,     default=3e-4,   help="Learning rate for optimization (default: 0.01)")
+    parser.add_argument("--n_steps",    type=int,       default=20000,   help="Number of optimization steps (default: 1500)")
     
     # Optional for unitary agent
     parser.add_argument("--k",          type=int,       default=8,      help="Number of rotations (default: 8)")
@@ -26,7 +26,7 @@ def parse_arguments():
     parser.add_argument("--max_steps",  type=int,       default=100,    help="Maximum steps per episode (default: 100)")
     parser.add_argument("--upd_freq",   type=int,       default=10,     help="Update frequency (default: 10)")
     parser.add_argument("--sav_freq",   type=int,       default=100,    help="Save frequency (default: 100)")
-    parser.add_argument("--batch_size", type=int,       default=32,     help="Batch size for training (default: 32)")
+    parser.add_argument("--batch_size", type=int,       default=256,    help="Batch size for training (default: 32)")
     parser.add_argument("--sav_dir",    type=str,       default=s_dir,  help=f"Directory to save agent data (default: '{s_dir}')")
     parser.add_argument("--ent_thr",    type=float,     default=0.1,    help="Entanglement threshold for training (default: 0.1)")
     
