@@ -1,12 +1,7 @@
 import os, sys
 import math
 import numpy as np
-import itertools as it
-import matplotlib.pyplot as plt
-from collections import defaultdict
-from tqdm import tqdm
-from typing import Optional, List, Tuple, Dict, Union
-from dataclasses import dataclass, field
+from typing import Optional, List, Tuple
 
 script_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in locals() else os.getcwd()
 for i in range(1, 5): # Check up to 4 levels up
@@ -23,14 +18,8 @@ from ent_loss_jax import *
 try:
     import jax
     import jax.numpy as jnp
-    import gymnasium as gym
-    # for Flax
-    import optax
-    import flax.linen as nn
-    from flax.linen.initializers import orthogonal
-    from flax.training.train_state import TrainState
 except ImportError as e:
-    print("Please install the required packages: jax, jaxlib, gymnasium, optax, flax")
+    print("Please install the required packages: jax, jaxlib, optax, flax")
     sys.exit(1)
     
 # ------------------------------------------------------------------------------------
@@ -244,8 +233,6 @@ class MultiStateOptimizerSimple:
 
 if __name__ == "__main__":    
     # load the states from the HDF5 file
-    from QES.general_python.common import HDF5Handler
-    from QES.general_python.common import Directories
     from QES.general_python.common import flog
     from ent_read_states import load_quantum_states, parse_arguments
     

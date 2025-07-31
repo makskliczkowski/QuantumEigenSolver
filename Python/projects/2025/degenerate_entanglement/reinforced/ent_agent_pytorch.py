@@ -1,53 +1,124 @@
 import numpy as np
-import random
 import math
-from collections import deque, namedtuple
-from typing import List, Tuple, Optional, Dict, Any, Union
+import matplotlib.pyplot as plt
+from collections import namedtuple
+from dataclasses import dataclass
+from typing import Any, List, Tuple, Union
+from enum import Enum
+from tqdm import trange
+
+# ------------------------------------------------------------------------------------
+
+from ent_loss_np import *
+
+# ------------------------------------------------------------------------------------
 
 # pytorch imports
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
-from tqdm import trange
 
 # Experience tuple for replay buffer
 Experience = namedtuple('Experience', ['state', 'action', 'reward', 'next_state', 'done', 'log_prob', 'value'])
+
+# ---------------------------------------------------------------------------
+"""
+Ideas:
+-   Brief: Try to maximize the purity of each subsystem - purity(rho_a) + purity(rho_b) = Tr(rho_a^2) + Tr(rho_b^2) to the reward
+    This is a measure of how close the state is to being a pure state.
+    Comment: ...
+-   Brief: Energy-variance penalty: penalize states with high energy variance in the full Hamiltonian - if we are able
+    to disentangle the state, the energy variance should be lower - no superpositions of degenerate states.
+    Comment: ...
+-   Brief: Orthogonality penalty: penalize states that are not orthogonal to other states in the training set.
+    This encourages the agent to find states that are distinct from the training set.
+    Comment: ...
+-   Brief: Try to minimize the number of rotations needed to disentangle the state - quantum computing purpose is to
+    minimize the number of gates needed to perform a task due to noise and decoherence.
+    Comment: ...
+-   Schmidt rank penalty: penalize states with high Schmidt rank - this is a measure of how entangled the state is.
+    Comment: ...
+"""
+
+class ObjectiveType(Enum):
+    """Enum for different objective types"""
+    ENTANGLEMENT    = "entanglement"            # minimize entanglement entropy
+    PURITY          = "purity"                  # maximize purity of subsystems
+    NONGAUSSIANITY  = "non_gaussianity"         # maximize non-Gaussianity of the state
+    ROTATIONS       = "rotations"               # minimize number of rotations, Pareto with entanglement
+    SCHMIDT_RANK    = "schmidt_rank"            # minimize Schmidt rank - NOT IMPLEMENTED
+    ENERGY_VAR      = "energy_variance"         # minimize energy variance - NOT IMPLEMENTED
+    ORTHOGONALITY   = "orthogonality"           # maximize orthogonality - NOT IMPLEMENTED
+
+@dataclass
+class ObjectiveConfig:
+    """Configuration for objective function"""
+    entropy_weight          : float = 1.0
+    purity_weight           : float = 0.0
+    non_gaussianity_weight  : float = 0.0
+    rotations_weight        : float = 0.0
+    schmidt_weight          : float = 0.0       # NOT IMPLEMENTED
+    energy_weight           : float = 0.0       # NOT IMPLEMENTED
+    orthogonality_weight    : float = 0.0       # NOT IMPLEMENTED
+
+# ---------------------------------------------------------------------------
 
 class QuantumStateEnvironment:
     """Environment for quantum state disentanglement task"""
     
     def __init__(self, 
-                gamma                       : int,
-                train_states                : List[np.ndarray],
-                org_states                  : List[np.ndarray] = None,
-                rotation_angles             : Union[List[float], int] = None,
-                rotation_angles_phi         : List[float] = None,
-                max_steps                   : int = 100,
-                target_entropy_threshold    : float = 1e-6,
-                cost_function               : callable = None,
+                    # state parameters
+                    gamma                       : int,
+                    dim_a                       : int,
+                    dim_b                       : int,
+                    train_states                : List[np.ndarray],
+                    objective_config            : ObjectiveConfig           = ObjectiveConfig(),
+                    org_states                  : List[np.ndarray]          = None,
+                    # simulation parameters
+                    rotation_angles             : Union[List[float], int]   = None,
+                    rotation_angles_phi         : List[float]               = None,
+                    unitary_agent               : bool                      = False,
+                    # machine learning parameters
+                    max_steps                   : int                       = 100,
+                    target_entropy_threshold    : float                     = 1e-6,
+                    # other
+                    logger                      : Any                       = None,
+                    iscomplex                   : bool                      = False
                 ):
         
+        self.logger         = logger
+        self.iscomplex      = iscomplex
+        self.dtype          = np.complex64 if iscomplex else np.float32
+        self.device         = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if logger is not None:
+            logger.info("I am a quantum state environment!", color="blue", lvl=1)
+
         # state related parameters
         self.org_states     = org_states
+        self.state          = None
         self.states         = train_states if isinstance(train_states, list) else [train_states]
         self.dimension      = train_states[0].shape[0]
-        
-        # simulation parameters
+        self.dim_a          = dim_a
+        self.dim_b          = dim_b
         self.gamma          = gamma
+        
+        # objective configuration
+        self.obj_config     = objective_config
+        if logger:
+            for attr in ObjectiveConfig.__dataclass_fields__:
+                if getattr(self.obj_config, attr) > 0:
+                    logger.info(f"Objective config '{attr}': {getattr(self.obj_config, attr)}", color="red", lvl=2)
+
+        # simulation parameters
         self.max_steps      = max_steps
         self.ent_threshold  = target_entropy_threshold
+        self.unitary_agent  = unitary_agent
         
         # default rotation angles (in radians)
-        if rotation_angles is None:
-            self.rotation_angles = [np.pi/8, np.pi/4, np.pi/2, np.pi, 3*np.pi/2]
-        elif isinstance(rotation_angles, int) or isinstance(rotation_angles, float):
-            d_theta                 = np.pi / rotation_angles
-            self.rotation_angles    = [d_theta * i for i in range(-rotation_angles, rotation_angles + 1)]
-        elif isinstance(rotation_angles, list) or isinstance(rotation_angles, np.ndarray):
-            self.rotation_angles    = rotation_angles
-        self.rotation_angles_phi    = rotation_angles_phi if rotation_angles_phi is not None else [0.0]
-            
+        self.rotation_angles, self.rotation_angles_phi = None, None
+        self._initialize_angles(rotation_angles, rotation_angles_phi)
+        
         # action space: (coeff1_idx, coeff2_idx, angle_idx, phi)
         self.n_coefficient_pairs    = (gamma * (gamma - 1)) // 2
         self.n_angles               = len(self.rotation_angles)
@@ -55,18 +126,42 @@ class QuantumStateEnvironment:
         self.action_space_size      = self.n_coefficient_pairs * self.n_angles * self.n_angles_phi
 
         # callable cost function
-        self.cost_function          = cost_function if cost_function is not None else self.calculate_entanglement_entropy
-        
+        self.metrics                = None
+        self.max_entropy            = np.log(dim_a)
+    
         # reset environment
         self.reset()
+        
+    # -----------------------------------------------------------------------
+    #! Private initialization methods
+    # -----------------------------------------------------------------------
+
+    def _initialize_angles(self, rotation_angles: Union[List[float], int], rotation_angles_phi: Union[List[float], int]) -> List[float]:
+        # default rotation angles (in radians)
+        if rotation_angles is None:
+            self.rotation_angles    = [np.pi/8, np.pi/4, np.pi/2, np.pi, 3*np.pi/2]
+        elif isinstance(rotation_angles, int) or isinstance(rotation_angles, float):
+            d_theta                 = np.pi / rotation_angles
+            self.rotation_angles    = [d_theta * i for i in range(-rotation_angles, rotation_angles + 1)]
+        elif isinstance(rotation_angles, list) or isinstance(rotation_angles, np.ndarray):
+            self.rotation_angles    = rotation_angles
+        self.rotation_angles_phi    = rotation_angles_phi if rotation_angles_phi is not None else [0.0]
+
     # -----------------------------------------------------------------------
     
     def reset(self):
         """Reset to uniform state"""
-        # Start with uniform normalized vector
-        self.state                  = np.ones(self.gamma, dtype=complex) / np.sqrt(self.gamma)
+        
+        if self.unitary_agent:
+            # is unitary matrix consisting of gamma x gamma rotations
+            self.state              = np.eye(self.gamma, dtype=self.dtype) 
+        else:
+            # is vector of coefficients for a single mixed state
+            self.state              = np.eye(self.gamma, dtype=self.dtype) / np.sqrt(self.gamma)
+            
         self.step_count             = 0
-        self.initial_entropy        = self.calculate_entanglement_entropy(self.state)
+        self.metrics                = self._calculate_all_metrics(self.state)
+        self.initial_entropy        = self.metrics['entropy']
         self.best_entropy           = self.initial_entropy
         return self._get_state_representation()
     
@@ -77,15 +172,54 @@ class QuantumStateEnvironment:
     def _get_state_representation(self):
         """Convert complex state to real representation for neural network"""
         # Concatenate real and imaginary parts, plus magnitude and phase
-        real_part                   = np.real(self.state)
-        imag_part                   = np.imag(self.state)
-        magnitude                   = np.abs(self.state)
-        phase                       = np.angle(self.state)
 
-        # Add step information and entropy history
-        step_info                   = np.array([self.step_count / self.max_steps, self.best_entropy / (self.initial_entropy + 1e-8)])
-        return np.concatenate([real_part, imag_part, magnitude, phase, step_info])
-    
+        if not self.unitary_agent:
+            # Single state representation
+            real_part                   = np.real(self.state).flatten()
+            imag_part                   = np.imag(self.state).flatten()
+            magnitude                   = np.abs(self.state).flatten()
+            phase                       = np.angle(self.state).flatten()
+            current_metrics             = self._calculate_all_metrics(self.state)
+            # Add step information and entropy history
+            step_info                   = np.array([
+                                                self.step_count / self.max_steps, 
+                                                current_metrics['entropy'] / (self.max_entropy + 1e-8),
+                                                current_metrics['purity'],
+                                                current_metrics['nongaussianity']
+                                            ])
+            features                    = np.concatenate([
+                                                real_part, 
+                                                imag_part, 
+                                                magnitude, 
+                                                phase, 
+                                                step_info
+                                            ])
+            return np.nan_to_num(features).astype(np.float32)
+        else:
+            # Unitary matrix representation - more efficient and stable
+            real_part                   = np.real(self.state).flatten()
+            imag_part                   = np.imag(self.state).flatten()
+            
+            # Unitarity measure
+            unitarity_error             = np.linalg.norm(self.state.conj().T @ self.state - np.eye(self.gamma), 'fro')
+            
+            # Current metrics
+            current_metrics             = self._calculate_all_metrics(self.state)
+
+            # Combine features
+            features                    = np.concatenate([
+                                                real_part, 
+                                                imag_part,
+                                                np.array([
+                                                    self.step_count / self.max_steps, 
+                                                    current_metrics['entropy'] / (self.max_entropy + 1e-8),
+                                                    current_metrics['purity'],
+                                                    current_metrics['nongaussianity'],
+                                                    unitarity_error
+                                                ])
+                                            ])
+            return np.nan_to_num(features).astype(np.float32)
+        
     # -----------------------------------------------------------------------
     
     def step(self, action: int):
@@ -95,29 +229,33 @@ class QuantumStateEnvironment:
             return self._get_state_representation(), 0.0, True, {}
         
         # Decode action - currently real rotations
-        pair_idx, angle_idx     = self._decode_action(action)
-        coeff1_idx, coeff2_idx  = self._get_coefficient_pair(pair_idx)
-        angle                   = self.rotation_angles[angle_idx]
+        # Decode action
+        pair_idx, angle_idx, phi_idx    = self._decode_action(action)
+        angle                           = self.rotation_angles[angle_idx]
+        phi                             = self.rotation_angles_phi[phi_idx]
+        coeff1_idx, coeff2_idx          = self._get_coefficient_pair(pair_idx)
         
         # Apply rotation
-        old_entropy             = self.calculate_entanglement_entropy(self.state)
-        self._apply_rotation(coeff1_idx, coeff2_idx, angle)
-        new_entropy             = self.calculate_entanglement_entropy(self.state)
-        
+        old_metrics                     = self._calculate_all_metrics(self.state)
+        self._apply_rotation(coeff1_idx, coeff2_idx, angle, phi)
+        new_metrics                     = self._calculate_all_metrics(self.state)
+
         # Calculate reward
-        reward                  = self._calculate_reward(old_entropy, new_entropy)
+        reward                          = self._calculate_reward(old_metrics, new_metrics)
         
         # Update tracking
-        self.step_count        += 1
-        if new_entropy < self.best_entropy:
-            self.best_entropy = new_entropy
+        self.step_count                += 1
+        if new_metrics['entropy'] < self.best_entropy:
+            self.best_entropy = new_metrics['entropy']
         
         # Check termination
-        done                    = (self.step_count >= self.max_steps or new_entropy < self.ent_threshold)
+        done                    = (self.step_count >= self.max_steps or new_metrics['entropy'] < self.ent_threshold)
 
         info = {
-            'entropy'           : new_entropy,
-            'entropy_reduction' : old_entropy - new_entropy,
+            'entropy'           : new_metrics['entropy'],
+            'entropy_reduction' : old_metrics['entropy'] - new_metrics['entropy'],
+            'purity'            : new_metrics['purity'],
+            'nongaussianity'    : new_metrics['nongaussianity'],
             'best_entropy'      : self.best_entropy
         }
         
@@ -126,67 +264,132 @@ class QuantumStateEnvironment:
     # -----------------------------------------------------------------------
     #! Private methods for action decoding and application
     # -----------------------------------------------------------------------
-    
-    def _decode_action(self, action: int) -> Tuple[int, int]:
-        """Decode action index to components"""
+
+    def _decode_action(self, action: int) -> Tuple[int, int, int]:
+        """Decode action index to components for unitary agent"""
+        phi_idx         = action % self.n_angles_phi
+        action        //= self.n_angles_phi
         angle_idx       = action % self.n_angles
         action        //= self.n_angles
         pair_idx        = action % self.n_coefficient_pairs
-        return pair_idx, angle_idx
+        return pair_idx, angle_idx, phi_idx
+
+    # -----------------------------------------------------------------------
 
     def _get_coefficient_pair(self, pair_idx: int) -> Tuple[int, int]:
         """Get coefficient indices from pair index"""
         # Convert linear index to upper triangular matrix indices
         k = 0
-        for i in range(self.gamma_length):
-            for j in range(i + 1, self.gamma_length):
+        for i in range(self.gamma):
+            for j in range(i + 1, self.gamma):
                 if k == pair_idx:
                     return i, j
                 k += 1
         raise ValueError(f"Invalid pair index: {pair_idx}")
 
-    def _apply_rotation(self, idx1: int, idx2: int, angle: float):
+    # -----------------------------------------------------------------------
+
+    def _apply_rotation(self, idx1: int, idx2: int, angle: float, phi: float = 0.0):
         """Apply rotation to two coefficients"""
-        c1, c2 = self.state[idx1], self.state[idx2]
         
-        # if is_complex:
-        #     # Complex rotation (multiply by e^(i*angle))
-        #     rotation = np.exp(1j * angle)
-        #     self.state[idx1] = c1 * np.cos(angle) - c2 * np.sin(angle) * rotation
-        #     self.state[idx2] = c1 * np.sin(angle) * np.conj(rotation) + c2 * np.cos(angle)
+        rotation_matrix = np.eye(self.gamma, dtype=self.dtype)
+        c, s            = np.cos(angle), np.sin(angle)
         
-        # Real rotation (Givens rotation)
-        cos_angle, sin_angle    = np.cos(angle), np.sin(angle)
-        self.state[idx1]        = c1 * cos_angle - c2 * sin_angle
-        self.state[idx2]        = c1 * sin_angle + c2 * cos_angle
+        if self.iscomplex:
+            rotation_matrix[idx1, idx1] = c
+            rotation_matrix[idx1, idx2] = -s * np.exp(1j * phi)
+            rotation_matrix[idx2, idx1] = s * np.exp(-1j * phi)
+            rotation_matrix[idx2, idx2] = c
+        else:
+            rotation_matrix[idx1, idx1] = c
+            rotation_matrix[idx1, idx2] = -s
+            rotation_matrix[idx2, idx1] = s
+            rotation_matrix[idx2, idx2] = c
         
-        # Renormalize to maintain unit norm - for numerical stability
-        self.state             /= np.linalg.norm(self.state)
+        if self.unitary_agent:
+            self.state  = rotation_matrix @ self.state
+        else:
+            self.state  = rotation_matrix @ self.state
+            self.state /= np.linalg.norm(self.state)
+
+    # -----------------------------------------------------------------------
+    #! Reward calculation and metrics
+    # -----------------------------------------------------------------------
     
-    def _calculate_reward(self, old_entropy: float, new_entropy: float) -> float:
+    def _calculate_reward(self, old_metrics: dict, new_metrics: dict) -> float:
         """Calculate reward based on entropy change"""
-        entropy_reduction   = old_entropy - new_entropy
+        reward = 0.0
         
-        # Primary reward: entropy reduction
-        reward              = entropy_reduction * 100.0
+        # Reward for reducing entropy
+        if self.obj_config.entropy_weight > 0:
+            entropy_reduction = old_metrics['entropy'] - new_metrics['entropy']
+            
+            # Bonus for significant improvements
+            if entropy_reduction > 0.01:
+                reward += 10.0
+            # Primary reward: entropy reduction
+            if entropy_reduction < 0:
+                reward -= 5.0
+            reward += self.obj_config.entropy_weight * entropy_reduction * 100.0
         
-        # Bonus for significant improvements
-        if entropy_reduction > 0.01:
-            reward         += 10.0
+        # Reward for increasing purity (purity is 1 for pure state, so we reward increase)
+        if self.obj_config.purity_weight > 0:
+            purity_increase = new_metrics['purity'] - old_metrics['purity']
+            reward += self.obj_config.purity_weight * purity_increase * 50.0
+
+        # Reward for reducing non-Gaussianity
+        if self.obj_config.non_gaussianity_weight > 0:
+            non_gaussianity_reduction = old_metrics['non_gaussianity'] - new_metrics['non_gaussianity']
+            reward += self.obj_config.non_gaussianity_weight * non_gaussianity_reduction * 20.0
+
+        # Bonus for reaching target entropy
+        if new_metrics['entropy'] < self.ent_threshold:
+            reward += 1000.0
         
-        # Penalty for increasing entropy
-        if entropy_reduction < 0:
-            reward         -= 5.0
-        
-        # Large bonus for reaching target
-        if new_entropy < self.ent_threshold:
-            reward         += 1000.0
+        if self.obj_config.rotations_weight > 0:
+            # Reward for minimizing number of rotations
+            # This is a negative reward, so we want to minimize it
+            reward -= self.obj_config.rotations_weight * (self.step_count / self.max_steps) * 10.0
         
         return reward
     
-    def calculate_entanglement_entropy(self, state: np.ndarray) -> float:
-        """Calculate the entanglement entropy of a quantum state"""
-        return self.cost_function(state, self.states)
+    # -----------------------------------------------------------------------
+    
+    def _calculate_all_metrics(self, state_transform):
+        
+        entanglements       = []
+        purities            = []
+        nongaussianities    = []
+
+        for state in self.states:
+            transformed_states  = state @ state_transform
+
+            entropies           = loss_entanglement_states(transformed_states, self.dim_a, self.dim_b)
+            if self.obj_config.entropy_weight > 0:
+                # Entropy loss is inverted because we want to minimize entropy
+                entanglements.append(-entropies)
+            else:
+                entanglements.append(0.0)
+            
+            if self.obj_config.purity_weight > 0:
+                # Purity loss is inverted because we want to maximize purity
+                purities.append(1.0 + loss_purity_states(transformed_states, self.dim_a, self.dim_b))
+            else:
+                purities.append(0.0)
+                
+            if self.obj_config.non_gaussianity_weight > 0:
+                # We want to minimize non-Gaussianity (which is 0 for Gaussian states) so we give it a negative sign
+                nongaussianities.append(-loss_nongaussianity_states(transformed_states, self.dim_a, self.dim_b))
+            else:
+                nongaussianities.append(0.0)
+
+        return {
+            'entropy'           : (entanglements if isinstance(entanglements, float) else np.mean(entanglements)) * self.obj_config.entropy_weight,
+            'purity'            : (purities if isinstance(purities, float) else np.mean(purities)) * self.obj_config.purity_weight,
+            'nongaussianity'    : (nongaussianities if isinstance(nongaussianities, float) else np.mean(nongaussianities)) * self.obj_config.non_gaussianity_weight
+        }
+    
+    # -----------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 #! Advanced neural network architecture for disentanglement
@@ -345,6 +548,9 @@ class DisentanglementNetwork(nn.Module):
         
         return action_logits, value
 
+# ---------------------------------------------------------------------------
+#! Proximal Policy Optimization (PPO) Agent for Quantum Disentanglement
+# ---------------------------------------------------------------------------
 
 class PPOAgent:
     """Proximal Policy Optimization agent for quantum disentanglement"""
@@ -359,7 +565,7 @@ class PPOAgent:
             value_coeff     : float = 0.5,
             entropy_coeff   : float = 0.01,
             max_grad_norm   : float = 0.5,
-            device          : str = 'cuda' if torch.cuda.is_available() else 'cpu'):
+            device          : str   = 'cuda' if torch.cuda.is_available() else 'cpu'):
         
         self.device         = device
         self.gamma          = gamma
@@ -445,23 +651,23 @@ class PPOAgent:
         
         if len(self.buffer) < batch_size:
             return
-        
+                
         # Prepare batch data
-        states          = torch.FloatTensor([exp.state for exp in self.buffer]).to(self.device)
-        actions         = torch.LongTensor([exp.action for exp in self.buffer]).to(self.device)
-        old_log_probs   = torch.FloatTensor([exp.log_prob for exp in self.buffer]).to(self.device)
-        rewards         = [exp.reward for exp in self.buffer]
-        values          = [exp.value for exp in self.buffer]
-        dones           = [exp.done for exp in self.buffer]
+        states              = torch.FloatTensor(np.array([exp.state for exp in self.buffer])).to(self.device)
+        actions             = torch.LongTensor(np.array([exp.action for exp in self.buffer])).to(self.device)
+        old_log_probs       = torch.FloatTensor(np.array([exp.log_prob for exp in self.buffer])).to(self.device)
+        rewards             = [exp.reward for exp in self.buffer]
+        values              = [exp.value for exp in self.buffer]
+        dones               = [exp.done for exp in self.buffer]
         
         # Compute next values for GAE
-        next_values     = values[1:] + [0.0] # Assume terminal value is 0
+        next_values         = values[1:] + [0.0] # Assume terminal value is 0
         
         # Compute advantages and returns
         advantages, returns = self.compute_gae(rewards, values, next_values, dones)
-        advantages          = torch.FloatTensor(advantages).to(self.device)
-        returns             = torch.FloatTensor(returns).to(self.device)
-        
+        advantages          = torch.tensor(advantages, dtype=torch.float32, device=self.device)
+        returns             = torch.tensor(returns, dtype=torch.float32, device=self.device)
+
         # Normalize advantages
         advantages          = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
@@ -552,39 +758,48 @@ class PPOAgent:
 def train_disentanglement_agent(
     states_list             : List[np.ndarray],
     gamma                   : int,
-    rotation_angles         : Union[List[float], int] = None,
-    episodes                : int = 5000,
-    max_steps_per_episode   : int = 100,
-    update_frequency        : int = 100,
-    save_frequency          : int = 500,
-    model_path              : str = 'pytorch/disentanglement_agent.pth',
-    org_states              : np.ndarray = None,
-    ent_threshold           : float = 1e-6,
-    cost_function           : callable = None
+    la                      : int,
+    lb                      : int,
+    config                  : ObjectiveConfig = ObjectiveConfig(),
+    unitary_agent           : bool = False,                             # whether to use unitary agent or not - unitary agent uses matrix rotations
+    iscomplex               : bool = False,                             # whether the states are complex or real
+    rotation_angles         : Union[List[float], int] = None,           # for real Givens rotations
+    episodes                : int = 5000,                               # number of training episodes for the agent
+    max_steps_per_episode   : int = 100,                                # maximum steps per episode - the maximum number of rotations per episode
+    update_frequency        : int = 100,                                # frequency of agent updates - how often to update the agent's policy
+    save_frequency          : int = 500,                                # frequency of model saving - how often to save the model
+    batch_size              : int = 64,                                 # batch size for training
+    model_path              : str = 'pytorch/disentanglement_agent.pth',# path to save the model
+    org_states              : np.ndarray = None,                        # original states for reference
+    ent_threshold           : float = 1e-6,                             # target entropy threshold for termination
+    logger                  : Any = None,                            # logger for logging information
 ):
     """Train the disentanglement agent"""
     
     # Create environment
-    env = QuantumStateEnvironment(gamma         = gamma, 
-                                train_states    = states_list,
-                                org_states      = org_states,
-                                rotation_angles = rotation_angles,
-                                max_steps       = max_steps_per_episode,
-                                target_entropy_threshold = ent_threshold,
-                                cost_function   = cost_function)
-    
+    env = QuantumStateEnvironment(gamma                     = gamma, 
+                                dim_a                       = 2**la,
+                                dim_b                       = 2**lb,
+                                train_states                = states_list,
+                                objective_config            = config,
+                                org_states                  = org_states,
+                                rotation_angles             = rotation_angles,
+                                unitary_agent               = unitary_agent,
+                                iscomplex                   = iscomplex,
+                                logger                      = logger,
+                                max_steps                   = max_steps_per_episode,
+                                target_entropy_threshold    = ent_threshold)
+
     # Create agent
-    state_dim       = len(env._get_state_representation())
-    action_dim      = env.action_space_size
-    agent           = PPOAgent(state_dim, action_dim)
+    state_dim           = len(env._get_state_representation())
+    action_dim          = env.action_space_size
+    agent               = PPOAgent(state_dim, action_dim)
     
     # Training loop
     episode_rewards     = []
     episode_entropies   = []
     best_entropy        = float('inf')
-    
-    print(f"Starting training for {episodes} episodes...")
-    print(f"State dimension: {state_dim}, Action dimension: {action_dim}")
+    logger.info(f"State dimension (representation): {state_dim}, Action dimension: {action_dim}", color="blue", lvl=1)
     
     for episode in trange(episodes, desc="Training Episodes"):
         state           = env.reset()
@@ -607,7 +822,7 @@ def train_disentanglement_agent(
         
         # Update agent
         if episode % update_frequency == 0 and episode > 0:
-            agent.update()
+            agent.update(epochs=4, batch_size=batch_size)
         
         # Track metrics
         final_entropy = info['entropy']
@@ -621,8 +836,11 @@ def train_disentanglement_agent(
         if episode % 100 == 0:
             avg_reward      = np.mean(episode_rewards[-100:])
             avg_entropy     = np.mean(episode_entropies[-100:])
-            print(f"Episode {episode}: Avg Reward: {avg_reward:.4f}, "
-                f"Avg Entropy: {avg_entropy:.6f}, Best Entropy: {best_entropy:.6f}")
+            
+            logger.info(f"Episode {episode}: Avg Reward: {avg_reward:.4f}, "
+                        f"Avg Entropy: {avg_entropy:.6f}, Purity: {info['purity']:.4f}, Non-Gaussianity: {info['nongaussianity']:.4f},"
+                        f"Best Entropy: {best_entropy:.6f}",
+                        color="green", lvl=2)
         
         # Save model
         if episode % save_frequency == 0 and episode > 0:
@@ -630,21 +848,71 @@ def train_disentanglement_agent(
     
     # Final save
     agent.save(model_path)
-    print(f"Training completed! Best entropy achieved: {best_entropy:.6f}")
+    logger.info(f"Training completed! Best entropy achieved: {best_entropy:.6f}", color="green", lvl=1)
     
     return agent, episode_rewards, episode_entropies
 
 
 # # Example usage
-# if __name__ == "__main__":
-#     # Train agent for 4D quantum state with 8-dimensional gamma vector
-#     agent, rewards, entropies = train_disentanglement_agent(
-#         dimension=4,
-#         gamma_length=8,
-#         episodes=2000,
-#         max_steps_per_episode=50
-#     )
+if __name__ == "__main__":
+    from QES.general_python.common import flog, plot
+    from ent_read_states import load_quantum_states, parse_arguments
     
-#     print("Training completed!")
-#     print(f"Final average reward: {np.mean(rewards[-100:]):.4f}")
-#     print(f"Final average entropy: {np.mean(entropies[-100:]):.6f}")?
+    args        = parse_arguments()
+    logger      = flog.get_global_logger()
+    
+    (org_states, org_entropies), (mix_states_real, mix_entropies_real), system_params = load_quantum_states(
+        L               = args.L,
+        gamma           = args.gamma,
+        r               = args.r,
+        n_states        = args.n_states,
+        data_dir        = args.data_dir,
+        mixture_index   = args.mixture_index,
+        logger          = logger
+    )
+    
+    la          = args.L // 2
+    lb          = args.L // 2
+    savedir     = f"{args.sav_dir}/pytorch"
+    logger.info(f"Saving models to {savedir}", color="blue", lvl=1)
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
+
+    config     = ObjectiveConfig(
+        entropy_weight          = args.ent_weight,
+        purity_weight           = args.pur_weight,
+        non_gaussianity_weight  = args.non_weight,
+        rotations_weight        = args.rot_weight
+    )
+
+    # Train the disentanglement agent
+    logger.info("Starting training of disentanglement agent...", color="green", lvl=1)                
+    agent, rewards, entropies = train_disentanglement_agent(
+        states_list             = mix_states_real,
+        gamma                   = int(args.gamma),
+        la                      = la,
+        lb                      = lb,
+        rotation_angles         = args.k,
+        episodes                = int(args.n_steps),
+        max_steps_per_episode   = int(args.max_steps),
+        update_frequency        = int(args.upd_freq),
+        save_frequency          = int(args.sav_freq),
+        batch_size              = int(args.batch_size),
+        model_path              = f'{args.sav_dir}/pytorch/disentanglement_agent.pth',
+        org_states              = org_states,
+        ent_threshold           = args.ent_thr,
+        logger                  = logger,
+        unitary_agent           = args.unitary,
+        iscomplex               = args.is_complex
+    )
+    
+    fig, ax = plot.Plotter.get_subplots(nrows=2, ncols=1, figsize=(10, 8), sharex=True)
+    x       = plot.Plotter.plot(ax[0], x=np.arange(len(rewards)), y=rewards, color="blue")
+    y       = plot.Plotter.plot(ax[1], x=np.arange(len(entropies)), y=entropies, color="orange")
+    ax[0].set_ylabel("Reward")
+    ax[1].set_ylabel(r"$\bar{S}$")
+    ax[1].set_xlabel("Episodes")
+
+    logger.info("Training completed successfully!", color="green", lvl=1)
+    logger.info(f"Final rewards: {rewards[-1]}, Final entropies: {entropies[-1]}", color="blue", lvl=2)
+    plt.show()
