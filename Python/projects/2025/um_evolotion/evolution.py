@@ -220,7 +220,7 @@ def _single_realisation(
                 batch_times             = time_steps[start_idx:end_idx]
                 evolved_overlaps_batch  = np.exp(-1j * np.outer(model.eig_val, batch_times)) * overlaps[:, np.newaxis]
                 quench_states_batch     = model.eig_vec @ evolved_overlaps_batch
-                values_batch            = np.einsum('ji,jk,ki->i', quench_states_batch.conj(), operators_mat[name], quench_states_batch)
+                values_batch            = np.einsum('ij,ji->i', np.conj(quench_states_batch.T), operators_mat[name] @ quench_states_batch)
                 # Store the results
                 time_vals[name][r, start_idx:end_idx] = np.real(values_batch)
                 

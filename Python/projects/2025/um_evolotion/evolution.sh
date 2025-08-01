@@ -22,12 +22,12 @@ chmod +x ./evolution.py
 # 11. maximal memory
 python ./evolution.py      \
     data_big_times          \
-    0.7                     \
+    0.8                     \
     0.02                    \
-    15                      \
-    20                     \
+    10                      \
+    1                     \
     14                      \
-    15                      \
+    14                      \
     1                       \
     100000                  \
     64                       \
