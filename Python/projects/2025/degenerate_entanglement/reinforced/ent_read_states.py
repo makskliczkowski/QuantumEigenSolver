@@ -1,24 +1,40 @@
 import argparse
-import jax.numpy as jnp
 import numpy as np
 from typing import List, Tuple, Dict, Any
-from pathlib import Path
 
 def parse_arguments():
     """Parse command line arguments for quantum state loading."""
-    parser = argparse.ArgumentParser(description="Load quantum states from HDF5 files")
+    parser          = argparse.ArgumentParser(description="Load quantum states from HDF5 files")
+    d_dir           = "./data/hamiltonian/random/states/"
+    s_dir           = "./data/hamiltonian/random/agent/"
     
     # Required parameters
-    parser.add_argument("--L",      type=int,   required=True, help="System size L")
-    parser.add_argument("--gamma",  type=float, required=True, help="Gamma parameter")
-    parser.add_argument("--r",      type=int,   required=True, help="Random seed parameter r")
+    parser.add_argument("--L",          type=int,       default=6,      help="System size L")
+    parser.add_argument("--gamma",      type=float,     default=6,      help="Gamma parameter")
+    parser.add_argument("--r",          type=int,       default=42,     help="Random seed parameter r")
     
     # Optional parameters with defaults
-    parser.add_argument("--data_dir",   type=str,               default="data", help="Base data directory (default: 'data')")
-    parser.add_argument("--is_complex", action="store_true",    default=False,  help="Use complex coefficients (default: False)")
-    parser.add_argument("--n_states",   type=int,               default=1,      help="Number of states to load (default: 1)")
-    parser.add_argument("--lr",         type=float,             default=0.01,   help="Learning rate for optimization (default: 0.01)")
-    parser.add_argument("--n_steps",    type=int,               default=1500,   help="Number of optimization steps (default: 1500)")
+    parser.add_argument("--data_dir",   type=str,       default=d_dir,  help=f"Base data directory (default: '{d_dir}')")
+    parser.add_argument("--is_complex", type=int,       default=0,      help="Use complex coefficients (default: False)")
+    parser.add_argument("--n_states",   type=int,       default=1,      help="Number of states to load (default: 1)")
+    parser.add_argument("--lr",         type=float,     default=3e-4,   help="Learning rate for optimization (default: 0.01)")
+    parser.add_argument("--n_steps",    type=int,       default=20000,   help="Number of optimization steps (default: 1500)")
+    
+    # Optional for unitary agent
+    parser.add_argument("--k",          type=int,       default=8,      help="Number of rotations (default: 8)")
+    parser.add_argument("--unitary",    type=int,       default=0,      help="Use unitary agent (default: False)")
+    parser.add_argument("--max_steps",  type=int,       default=100,    help="Maximum steps per episode (default: 100)")
+    parser.add_argument("--upd_freq",   type=int,       default=10,     help="Update frequency (default: 10)")
+    parser.add_argument("--sav_freq",   type=int,       default=100,    help="Save frequency (default: 100)")
+    parser.add_argument("--batch_size", type=int,       default=256,    help="Batch size for training (default: 32)")
+    parser.add_argument("--sav_dir",    type=str,       default=s_dir,  help=f"Directory to save agent data (default: '{s_dir}')")
+    parser.add_argument("--ent_thr",    type=float,     default=0.1,    help="Entanglement threshold for training (default: 0.1)")
+    
+    parser.add_argument("--ent_weight", type=float,     default=1.0,    help="Weight for entropy in loss function (default: 1.0)")
+    parser.add_argument("--pur_weight", type=float,     default=0.0,    help="Weight for purity in loss function (default: 0.0)")
+    parser.add_argument("--rnk_weight", type=float,     default=0.0,    help="Weight for rank in loss function (default: 0.0)")
+    parser.add_argument("--rot_weight", type=float,     default=0.0,    help="Weight for rotations in loss function (default: 0.0)")
+    parser.add_argument("--non_weight", type=float,     default=0.0,    help="Weight for non-gaussianity in loss function (default: 0.0)")
     
     # Very optional parameters
     parser.add_argument("--verbose_every", type=int, default=50, help="Print verbose output every N steps (default: 50)")
@@ -33,7 +49,7 @@ def load_quantum_states(L           : int,
                     n_states        : int = 1, 
                     data_dir        : str = "data", 
                     mixture_index   : int = 0,
-                    logger          : Any = None) -> Tuple[List[jnp.ndarray], List[float], List[jnp.ndarray], List[float], Dict[str, Any]]:
+                    logger          : Any = None) -> Tuple[List[np.ndarray], List[float], List[np.ndarray], List[float], Dict[str, Any]]:
     """
     Load quantum states from HDF5 file.
     
@@ -118,7 +134,7 @@ def load_quantum_states(L           : int,
             
             # Extract real parts and convert to JAX arrays
             mix_states = mix_state_data[f"/eigvec/{i}/mixture/c/{mixture_index}/states"]
-            mix_states_real.append(jnp.asarray(np.real(mix_states), dtype=jnp.float32))
+            mix_states_real.append(np.asarray(np.real(mix_states), dtype=np.float32))
             mix_entropies_real.append(mix_entropy_data[f"/eigvec/{i}/mixture/c/{mixture_index}/entropy"])
             
             # Log the loaded mixture states
