@@ -44,12 +44,14 @@ from QES.general_python.run_scripts.prepareini import ManyBodyEstimator
 from QES.general_python.run_scripts import calculate_optimal_workers
 
 from QES.general_python.maths.statistics import HistogramAverage
+from QES.general_python.algebra.ran_wrapper import set_global_seed
 
 #! VON NEUMANN, TSALLIS, PARTICIPATION ENTROPY
 from QES.general_python.physics import entropy as entropy, density_matrix as density_matrix
 
 #! MODEL
 from QES.Algebra.Model.Interacting.Spin.ultrametric import UltrametricModel
+from QES.Algebra.Model.Noninteracting.plrb import PowerLawRandomBanded
 
 from QES.Algebra.Properties import time_evolution, statistical, time_evo
 import QES.Algebra.Operator.operators_spin as op_spin
@@ -79,6 +81,10 @@ def _single_realisation(
         h_typ                   : dict,         # histogram typical values
         diagonals_operators     : dict,         # save the diagonal elements of the operators
         diagonal_ensembles      : dict,         # save the diagonal ensembles
+        # fidelity susceptibility
+        fidelity_susc_av        : dict,         # save the fidelity susceptibility average
+        fidelity_susc_typ       : dict,         # save the fidelity susceptibility typical
+        # extra data
         vn_entropies            : np.ndarray,   # save the von Neumann entropies for the quench state
         tsalis                  : np.ndarray,   # save the Tsallis entropies for the quench state
         schmidt_gaps            : np.ndarray,   # save the Schmidt gaps for the quench state
@@ -94,7 +100,7 @@ def _single_realisation(
         return False
     
     #! constants
-    alpha           = model.alphas[0]
+    alpha           = model.alphas[0] if isinstance(model, UltrametricModel) else model.a
     ns              = model.ns
     hilbert_size    = 2**ns
     batch_limit     = lambda ns: ns >= 14
@@ -192,10 +198,24 @@ def _single_realisation(
         h_typ[name].append(omegas, np.log(vals))
         logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} histogram for operator {name} removed bad values {time.perf_counter() - time_start_hist:.2f} s", lvl=5, color='blue')
         
+        #! fidelity susceptibility
+        if name in fidelity_susc_av:
+            fidelity_susc_av[name][r, :] = statistical.fidelity_susceptibility(
+                energies  = model.eig_val,
+                V         = matrix_elements,
+                mu        = bandwidth / hilbert_size
+            )
+            fidelity_susc_typ[name][r, :] = statistical.fidelity_susceptibility(
+                energies  = model.eig_val,
+                V         = matrix_elements,
+                mu        = 1e-10
+            )
+        
         #! time evolution - compute the expectation values
         time_start_evo = time.perf_counter()
         if not batch_limit(ns):
             # Small systems: compute all at once
+            logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} computing time evolution for operator {name} in one go", lvl=4, color='blue')
             evolved_overlaps        = np.exp(-1j * np.outer(model.eig_val, time_steps)) * overlaps[:, np.newaxis]
             quench_states_t         = model.eig_vec @ evolved_overlaps
             quenched_values_t       = np.einsum('ij,ji->i', np.conj(quench_states_t.T), operators_mat[name] @ quench_states_t)
@@ -204,6 +224,7 @@ def _single_realisation(
             # Large systems: batch processing
             batch_count             = batch_num(ns)
             batch_size              = (time_num + batch_count - 1) // batch_count
+            logger.info(f"ns = {ns}, alpha = {alpha:.2f}, r = {r} computing time evolution for operator {name} in batches of size {batch_size}", lvl=4, color='blue')
             for i in range(batch_count):
                 start_idx   = i * batch_size
                 end_idx     = min(start_idx + batch_size, time_num)
@@ -255,13 +276,18 @@ def _single_alpha(alpha             : float,
                 entros              : dict,
                 diagonals_operators : dict,
                 diagonal_ensembles  : dict,
+                # fidelity susceptibility
+                fidelity_susc_av    : dict,
+                fidelity_susc_typ   : dict,
+                # histograms
                 histograms_av       : dict,
                 histograms_typ      : dict,
                 time_vals           : dict,
                 operators_mat       : dict,
                 start_time          : float = None,
                 job_time            : float = None,
-                seed                : int   = None
+                seed                : int   = None,
+                modelstr            : 'str' = 'um'
                 ) -> None:
 
     logger.info(f"ns = {ns}, alpha = {alpha:.2f}, worker = {worker_id}", lvl=2, color='green')
@@ -300,7 +326,12 @@ def _single_alpha(alpha             : float,
     iprs_quench         = { q : np.zeros((n_realisations), dtype=np.float64) for q in [0.5, 1.0, 2.0] }  # IPR for the quench state
 
     #! model
-    model               = UltrametricModel(ns = ns, n = n, alphas = alpha, backend = np, seed = seed)
+    if modelstr == 'um':
+        model = UltrametricModel(ns = ns, n = n, alphas = alpha, backend = np, seed = seed)
+    elif modelstr == 'plrb':
+        model = PowerLawRandomBanded(ns = ns, many_body = True, a = alpha, b = 1.0, backend = np, seed = seed)
+
+    logger.info(f"ns = {ns}, {str(model)}, worker = {worker_id} model created", lvl=2, color='green')
     
     #! directories
     data_dir_in = data_dir.join('uniform' if uniform else 'log', f'{str(model)}')
@@ -329,13 +360,17 @@ def _single_alpha(alpha             : float,
             h_typ                   = h_typ,
             diagonals_operators     = diagonals_operators,
             diagonal_ensembles      = diagonal_ensembles,
+            # fidelity susceptibility
+            fidelity_susc_av        = fidelity_susc_av,
+            fidelity_susc_typ       = fidelity_susc_typ,
+            # optional parameters
             start_time              = start_time,
             job_time                = job_time,
             vn_entropies            = vn_entropies,
             tsalis                  = tsalis,
             schmidt_gaps            = schmidt_gaps,
             iprs_quench             = iprs_quench,
-            par_ent_quench          = par_ent_quench,
+            par_ent_quench          = par_ent_quench
         )
         
         if success:
@@ -343,7 +378,7 @@ def _single_alpha(alpha             : float,
         else:
             logger.warning(f"Realization {r} failed or was skipped due to timeout")
             break
-    logger.info(f"Completed {completed_realizations}/{n_realisations} realizations for ns={ns}, alpha={alpha:.2f}")
+    logger.info(f"Completed {completed_realizations}/{n_realisations} realizations for ns={ns}, alpha={alpha:.2f}.")
     
     #! store the combined histogram for this (ns,alpha)
     for name in operators:
@@ -407,6 +442,18 @@ def _single_alpha(alpha             : float,
         HDF5Handler.save_hdf5(directory =   data_dir_in,
                             filename    =   f'evo_{rand_num}.h5', 
                             data        =   data_time)
+    
+        #! fidelity susceptibility
+        data_fid = {}
+        for name in fidelity_susc_av.keys():
+            data_fid.update({
+                f'agp/fidelity/{name}/0.0'      : fidelity_susc_typ[name][:completed_realizations],
+                f'agp/fidelity/{name}/bw_nh'    : fidelity_susc_av[name][:completed_realizations],
+            })
+        HDF5Handler.save_hdf5(directory =   data_dir_in,
+                            filename    =   f'fid_{rand_num}.h5', 
+                            data        =   data_fid)
+    
     logger.info(f"ns = {ns}, alpha = {alpha:.2f} done in {time.perf_counter() - time_start_a:.2f} s", lvl=2, color='green')
 
 #! -------------------------------------------------------
@@ -425,7 +472,8 @@ def prepare_evolution(
                 mls_df          : pd.DataFrame  = None,
                 start_time      : float         = None,
                 job_time        : float         = None,
-                seed            : int           = None) -> tuple:
+                seed            : int           = None,
+                modelstr        : str           = 'um') -> tuple:
     """
     Prepares and allocates data structures for quantum evolution simulations over multiple system sizes and disorder strengths.
     This function initializes and allocates arrays and dictionaries required for simulating quantum evolution, 
@@ -505,6 +553,8 @@ def prepare_evolution(
 
         energies            = np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64)
         diagonals_operators = { k : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for k in operators.keys()   }
+        fidelity_susc_av    = { k : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for k in operators.keys()   }
+        fidelity_susc_typ   = { k : np.zeros(shape=(n_realisations_in, hilbert_size), dtype=np.float64) for k in operators.keys()   }
         bandwidths          = np.zeros(shape=(n_realisations_in,), dtype=np.float64)
         sigma_es            = np.zeros(shape=(n_realisations_in,), dtype=np.float64)
         
@@ -550,13 +600,25 @@ def prepare_evolution(
                 time_vals               = time_vals,
                 diagonals_operators     = diagonals_operators,
                 diagonal_ensembles      = diagonal_ensembles,
+                # fidelity susceptibility
+                fidelity_susc_av        = fidelity_susc_av,
+                fidelity_susc_typ       = fidelity_susc_typ,
+                # histograms
                 histograms_av           = histograms_av,
                 histograms_typ          = histograms_typ,
                 operators_mat           = operators_mat,
                 start_time              = start_time,
                 job_time                = job_time,
-                seed                    = seed
+                seed                    = seed,
+                modelstr                = modelstr
             )
+            # time left for the job
+            if start_time is not None and job_time is not None:
+                remaining_time = job_time - (time.perf_counter() - start_time)
+                if remaining_time <= 0:
+                    logger.warning(f"Job time exceeded for ns = {ns}, alpha = {alpha:.2f}. Stopping early.")
+                    break
+                logger.info(f"Remaining time for ns = {ns}, alpha = {alpha:.2f}: {remaining_time:.2f} seconds")
     
     return histograms_av, histograms_typ, bandwidths
 
@@ -570,7 +632,8 @@ def make_sig_z_global(ns):
 
 #! -------------------------------------------------------
 
-def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num, operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers):
+def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, 
+                time_num, operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers, seed, modelstr):
     """Run evolution in parallel with proper error handling"""
     
     if max_workers == 1:
@@ -589,6 +652,8 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num, op
             mls_df          = mls_df,
             start_time      = start_time,
             job_time        = remaining_time,
+            modelstr        = modelstr,
+            seed            = time.time_ns() % (2**32 - 1) if seed is None else seed # Unique seed for single-threaded run
         )
     
     logger.info(f"Using {max_workers} workers for parallel processing")
@@ -613,6 +678,8 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num, op
                     mls_df          = mls_df,
                     start_time      = start_time,
                     job_time        = remaining_time,
+                    modelstr        = modelstr,
+                    seed            = time.time_ns() % (2**32 - 1) if seed is None else seed # Unique seed for each chunk
                 ): chunk for chunk in alphas_chunks
             }
             
@@ -657,13 +724,26 @@ if __name__ == "__main__":
     parser.add_argument('time_num',                         type    =   int,    default =   int(1e5),   help    =   'Number of time points')
     parser.add_argument('memory_per_worker',                type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
     parser.add_argument("max_memory",                       type    =   float,  default =   80.0,       help    =   'Maximum memory in GB')
+    parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     parser.add_argument('-c',        '--max_cores',         type    =   int,    default =   psutil.cpu_count(), help='Maximum number of cores to use')
     parser.add_argument('-f',        '--force_single_thread',                   action  =   'store_true',       help='Force single-threaded execution')
     args = parser.parse_args()
     
     #! -------------------------------------------------------
-    rng                 = np.random.default_rng(seed=args.seed)
+    if args.seed is not None:
+        logger.info(f"Using provided seed: {args.seed}", lvl=1, color='green')
+        seed    = args.seed
+        rng     = np.random.default_rng(seed=args.seed)
+        set_global_seed(seed, backend=np)
+        logger.info(f"Random seed set to {seed}", lvl=2, color='green')
+    else:
+        logger.info("No seed provided, using current time for random seed", lvl=1, color='yellow')
+        seed    = time.time_ns() % (2**32 - 1)
+        rng     = np.random.default_rng(seed=seed)
+        set_global_seed(seed, backend=np)
+        logger.info(f"Random seed set to {seed}", lvl=2, color='yellow')
+
     rand_num            = rng.integers(0, int(1e5))
     bw_df               = pd.read_csv("./model/bw.csv", index_col=0, header=None, dtype=float)
     mls_df              = pd.read_csv("./model/mls.csv", index_col=0, header=None, dtype=float)
@@ -671,8 +751,8 @@ if __name__ == "__main__":
     mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
     bw_df.columns       = list(range(7, 17))
     mls_df.columns      = list(range(7, 16))
-    logger.info(f"Bandwidths:\n{bw_df}", lvl=2, color='blue')
-    logger.info(f"Mean level spacing:\n{mls_df}", lvl=2, color='blue')
+    logger.debug(f"Bandwidths:\n{bw_df}", lvl=2, color='blue')
+    logger.debug(f"Mean level spacing:\n{mls_df}", lvl=2, color='blue')
     logger.breakline(1)
     #! -------------------------------------------------------    
     base_dir            = Directories(args.save_dir)
@@ -687,6 +767,7 @@ if __name__ == "__main__":
     operators_map   = { op_spin.sig_z(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0]).name: make_sig_z_global }
     n_reals         = {ns: args.number_of_realizations for ns in sites}
     time_num        = args.time_num
+    modelstr        = args.model
 
     #! -------------------------------------------------------
 
@@ -696,6 +777,11 @@ if __name__ == "__main__":
     logger.info(f"Sites: {sites}")
     logger.info(f"Operators: {operators_map.keys()}")
     logger.info(f"Time steps: {time_num}")
+    logger.info(f"Memory per worker: {args.memory_per_worker} GB")
+    logger.info(f"Max memory: {args.max_memory} GB")
+    logger.info(f"Random number: {rand_num}")
+    logger.info(f"Max cores: {args.max_cores}")
+    logger.info(f"Model: {modelstr}")
 
     #! -------------------------------------------------------
     avail_gb            = min(psutil.virtual_memory().available / (1024**3), args.max_memory)
@@ -739,7 +825,7 @@ if __name__ == "__main__":
 
         # Run evolution
         results = run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num,
-            operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers)
+            operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers, seed, modelstr)
 
         logger.info(f"All computations completed in {time.perf_counter() - start_time:.2f} s", color='green')
 

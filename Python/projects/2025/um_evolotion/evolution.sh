@@ -21,14 +21,15 @@ chmod +x ./evolution.py
 # 10. memory per job
 # 11. maximal memory
 python ./evolution.py      \
-    data_big_times          \
-    0.8                     \
-    0.02                    \
-    10                      \
+    data_big_times         \
+    0.7                    \
+    0.05                   \
+    10                     \
     1                     \
-    14                      \
-    14                      \
-    1                       \
-    100000                  \
-    64                       \
-    64
+    7                      \
+    8                      \
+    1                      \
+    100000                 \
+    64                     \
+    64                     \
+    -m plrb

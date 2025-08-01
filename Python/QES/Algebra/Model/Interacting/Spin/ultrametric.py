@@ -15,7 +15,7 @@ import Algebra.hilbert as hilbert_module
 import Algebra.hamil as hamil_module
 
 #! Random matrix wrapper and linear algebra utilities
-from general_python.algebra.ran_wrapper import RMT, random_matrix
+from general_python.algebra.ran_wrapper import RMT, random_matrix, set_global_seed
 from general_python.algebra.utils import Array
 import general_python.algebra.linalg as linalg
 
@@ -75,7 +75,9 @@ class UltrametricModel(hamil_module.Hamiltonian):
         # storage for random blocks
         self._hamil         = None
         self._std_en        = None
-        
+        self._seed          = kwargs.get('seed', None)
+        set_global_seed(self._seed, backend=self._backend)
+
         # set the Hamiltonian operators
         self._max_local_ch_o = 0
         self._set_local_energy_operators()

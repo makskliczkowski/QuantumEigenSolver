@@ -240,24 +240,26 @@ def fidelity_susceptibility(energies: Array, V: Array, mu: float, idx: Optional[
     float
         Fidelity susceptibility \(\chi_i\).
     """
-    if idx is not None and 0 <= idx < len(energies):
+    mu2 = mu * mu
+
+    if idx is not None:
         E       = energies[idx]
         dE      = energies - E
         omm     = dE**2
-        mu2     = mu*mu
-        # overlap squared - take a given row
-        V2_row  = np.abs(V[idx, :])**2
-        # denominator squared
-        denom2  = (omm + mu2)**2
-        # vectorized sum; diag term is zero since omm[idx]=0
-        return np.sum(V2_row * omm / denom2)
+        V_row   = np.abs(V[idx])**2
+
+        mask    = np.ones(len(energies), dtype=bool)
+        mask[idx] = False
+
+        denom   = omm[mask] + mu2
+        return np.sum(V_row[mask] * omm[mask] / denom**2)
     else:
         dE      = energies[:, None] - energies[None, :]
         omm     = dE**2
-        mu2     = mu*mu
         denom2  = (omm + mu2)**2
+        np.fill_diagonal(denom2, 1.0)  # avoid div-by-zero (will get zero in numerator anyway)
         V2      = np.abs(V)**2
-        # sum over columns j for each row i
+        np.fill_diagonal(V2, 0.0)      # eliminate diagonal contribution explicitly
         return np.sum(V2 * omm / denom2, axis=1)
 
 # -----------------------------------------------------------------------------
