@@ -223,7 +223,7 @@ main() {
     job_params="fun=2025_um_evo,Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
     venv_name="qes_venv"
-    venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
+    venv_path=${defaults[CODES_DIR]}/venvs/qes_venv/${venv_name}
     timestamp=$(date +'%Y%m%d_%H%M%S')
     logfile="${defaults[LOG_DIR]}/log_${job_params}_${timestamp}.log"
     # Create SLURM job script
