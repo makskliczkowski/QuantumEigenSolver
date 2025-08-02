@@ -275,7 +275,7 @@ main() {
         echo "    --n ${params[n]} \\"
         echo "    --time_num ${params[t_num]} \\"
         echo "    --memory_per_worker ${mem_per_worker} \\"
-        echo "    --max_memory 64 \\"
+        echo "    --max_memory ${MEM} \\"
         echo "    > \"${logfile}\" 2>&1"
         echo ""
         
