@@ -713,17 +713,20 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Parallel time-evolution statistics')
-    parser.add_argument('save_dir',                         type    =   str,                            help    =   'Directory to save data')
-    parser.add_argument('alpha_start',                      type    =   float,                          help    =   'Initial alpha value')
-    parser.add_argument('alpha_step',                       type    =   float,                          help    =   'Step for alpha')
-    parser.add_argument('alphas_number',                    type    =   int,                            help    =   'Number of alpha steps')
-    parser.add_argument('number_of_realizations',           type    =   int,    default =   10,         help    =   'Realizations per ns')
-    parser.add_argument('sites_start',                      type    =   int,                            help    =   'Minimum number of spins')
-    parser.add_argument('sites_end',                        type    =   int,                            help    =   'Maximum number of spins (inclusive)')
-    parser.add_argument('n',                                type    =   int,    default =   1,          help    =   'Model parameter n')
-    parser.add_argument('time_num',                         type    =   int,    default =   int(1e5),   help    =   'Number of time points')
-    parser.add_argument('memory_per_worker',                type    =   float,  default =   2.0,        help    =   'Memory reserved per worker in GB')
-    parser.add_argument("max_memory",                       type    =   float,  default =   80.0,       help    =   'Maximum memory in GB')
+    parser.add_argument('save_dir',                 type=str,                           help='Directory to save data')
+    parser.add_argument('alpha_start',              type=float,                         help='Initial alpha value')
+    parser.add_argument('alpha_step',               type=float,                         help='Step for alpha')
+    parser.add_argument('alphas_number',            type=int,                           help='Number of alpha steps')
+    parser.add_argument('sites_start',              type=int,                           help='Minimum number of spins')
+    parser.add_argument('sites_end',                type=int,                           help='Maximum number of spins (inclusive)')
+    
+    # OPTIONAL arguments with defaults
+    parser.add_argument('--number_of_realizations', type=int,    default=10,            help='Realizations per ns (default: 10)')
+    parser.add_argument('--n',                      type=int,    default=1,             help='Model parameter n (default: 1)')
+    parser.add_argument('--time_num',               type=int,    default=int(1e5),      help='Number of time points (default: 100000)')
+    parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
+    parser.add_argument('--max_memory',             type=float,  default=80.0,          help='Maximum memory in GB (default: 80.0)')
+    
     parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     parser.add_argument('-c',        '--max_cores',         type    =   int,    default =   psutil.cpu_count(), help='Maximum number of cores to use')
