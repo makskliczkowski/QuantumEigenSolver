@@ -798,7 +798,7 @@ if __name__ == "__main__":
         logger.warning(f"Could not estimate memory requirements: {e}")
         logger.info("Using default memory per worker")
 
-    if args.force_single_thread:
+    if args.force_single_thread or True:
         max_workers = 1
     else:
         max_workers         = calculate_optimal_workers(alphas, avail_gb, memory_per_worker, args.max_cores)
