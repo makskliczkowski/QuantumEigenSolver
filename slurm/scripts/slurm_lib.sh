@@ -477,37 +477,38 @@ setup_qes_environment() {
     echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}\""
     echo ""
 
-    echo "# Activate or create virtual environment"
-    echo "if [ ! -d \"${venv_path}/${venv_name}\" ]; then"
+    echo "# Create and activate virtual environment"
+    echo "if [ ! -d \"${venv_path}\" ]; then"
     echo "    echo \"Creating virtual environment: ${venv_name}\""
-    echo "    python3 -m venv \"${venv_path}/${venv_name}\""
+    echo "    python3 -m venv \"${venv_path}\""
     echo "fi"
-    echo "source \"${venv_path}/${venv_name}/bin/activate\""
+    echo ""
+    
+    echo "# Activate virtual environment"
+    echo "source \"${venv_path}/bin/activate\""
     echo "echo \"Activated virtual environment: ${venv_name}\""
     echo ""
 
-    echo "# Skip install if QES is already importable"
-    cat << 'EOF'
-if python3 - <<'PYCODE' &>/dev/null; then
-    import QES
-PYCODE
-then
-    echo "QES already installed; nothing to do."
-    return
-fi
-EOF
-
+    echo "# Check if QES is already installed"
+    echo "if python3 -c 'import QES' 2>/dev/null; then"
+    echo "    echo \"QES already installed and importable\""
+    echo "else"
+    echo "    echo \"Installing QES and dependencies...\""
+    echo "    echo \"Upgrading pip, setuptools, wheel...\""
+    echo "    pip install --upgrade pip setuptools wheel"
     echo ""
-    echo "# Otherwise, do your one-time install steps"
-    echo "echo \"Upgrading pip, setuptools, wheel…\""
-    echo "pip install --upgrade pip setuptools wheel"
+    
+    # Only install requirements if file exists
     if [ -n "${req_file}" ] && [ -f "${req_file}" ]; then
-        echo "echo \"Installing requirements from ${req_file}\""
-        echo "pip install -r \"${req_file}\""
+        echo "    echo \"Installing requirements from ${req_file}\""
+        echo "    pip install -r \"${req_file}\""
     fi
-    echo "echo \"Installing QES in editable mode…\""
-    echo "cd \"\${QES_PACKAGE_DIR}\""
-    echo "pip install -e .[all]"
+    
+    echo "    echo \"Installing QES in editable mode...\""
+    echo "    cd \"\${QES_PACKAGE_DIR}\""
+    echo "    pip install -e ."
+    echo "    echo \"QES installation complete\""
+    echo "fi"
     echo ""
     echo "echo \"QES environment setup complete.\""
 }
