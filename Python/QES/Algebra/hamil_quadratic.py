@@ -551,6 +551,7 @@ class QuadraticHamiltonian(Hamiltonian):
                 hilbert_space           : Optional[HilbertSpace]= None,
                 lattice                 : Optional[Lattice]     = None,
                 logger                  : Optional['Logger']    = None,
+                seed                    : Optional[int]         = None,
                 **kwargs):
         """
         Initialize a Quadratic Hamiltonian.
@@ -586,6 +587,7 @@ class QuadraticHamiltonian(Hamiltonian):
                         is_sparse       =   is_sparse,
                         dtype           =   dtype,
                         backend         =   backend,
+                        seed            =   seed,
                         **kwargs)
 
         # setup the arguments first

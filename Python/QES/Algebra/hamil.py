@@ -269,6 +269,11 @@ class Hamiltonian(ABC):
         self._loc_energy_np_fun     : Optional[Callable]    = None
         self._loc_energy_jax_fun    : Optional[Callable]    = None
         
+        if self._is_jax:
+            self._iscpx = jnp.iscomplexobj(self._dtype)
+        else:
+            self._iscpx = np.iscomplexobj(self._dtype)        
+        
     # ----------------------------------------------------------------------------------------------
     
     def _log(self, msg : str, log : str = 'info', lvl : int = 0, color : str = "white"):

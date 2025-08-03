@@ -12,9 +12,8 @@ import Algebra.hilbert as hilbert_module
 import Algebra.hamil as hamil_module
 
 #! Random matrix wrapper and linear algebra utilities
-from general_python.algebra.ran_wrapper import RMT, random_matrix, set_global_seed
+from general_python.algebra.ran_wrapper import set_global_seed
 from general_python.algebra.utils import Array
-import general_python.algebra.linalg as linalg
 
 class PowerLawRandomBanded(hamil_module.Hamiltonian):
     r"""
@@ -34,6 +33,7 @@ class PowerLawRandomBanded(hamil_module.Hamiltonian):
                 dtype           : type                                      = np.float64,
                 backend         : str                                       = "default",
                 many_body       : bool                                      = True,
+                seed            : Optional[int]                             = None,
                 **kwargs):
 
         # initialize Hilbert space
@@ -42,7 +42,9 @@ class PowerLawRandomBanded(hamil_module.Hamiltonian):
         self._nh            = 2**self._ns if many_body else ns
 
         _hilbert_space      = hilbert_module.HilbertSpace(ns=ns, backend=backend, dtype=dtype, nhl=2)
-        super().__init__(is_manybody=True, hilbert_space=_hilbert_space, is_sparse=True, dtype=dtype, backend=backend, **kwargs)
+        super().__init__(is_manybody = True, 
+            hilbert_space=_hilbert_space, is_sparse=True, seed=seed,
+            dtype=dtype, backend=backend, **kwargs)
 
         self._is_sparse     = False
         self._a             = a
