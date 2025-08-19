@@ -10,26 +10,28 @@ import time
 import math
 import numpy as np
 import argparse
+import itertools
 
 # Import the external module for non-Gaussianity calculations
 from nongaussianity_ext import *
 from QES.general_python.common.timer import Timer
 from QES.general_python.common.directories import Directories
+from QES.general_python.common.hdf5_lib import HDF5Handler
 
 def main():
     ap = argparse.ArgumentParser(description='Calculate non-Gaussianity in quantum states.')
-    ap.add_argument('--lx',     type=int,   default=10,     help='Size of the system [X] (number of modes)')
-    ap.add_argument('--ly',     type=int,   default=1,      help='Size of the system [Y] (number of modes)')
-    ap.add_argument('--lz',     type=int,   default=1,      help='Size of the system [Z] (number of modes)')
-    ap.add_argument('--la',     type=float, default=0.5,    help='Size of the system [A] (number of modes)')
-    ap.add_argument('--seed',   type=int,   default=42,     help='Random seed for reproducibility')
-    ap.add_argument('--occ',    type=float, default=0.5,    help='Occupation number. If > 1, treated as integer.')
-    ap.add_argument('--ordered', action='store_true',       help='Whether to use ordered modes')
+    ap.add_argument('--lx',     type=int,       default=10,     help='Size of the system [X] (number of modes)')
+    ap.add_argument('--ly',     type=int,       default=1,      help='Size of the system [Y] (number of modes)')
+    ap.add_argument('--lz',     type=int,       default=1,      help='Size of the system [Z] (number of modes)')
+    ap.add_argument('--la',     type=float,     default=0.5,    help='Size of the system [A] (number of modes)')
+    ap.add_argument('--seed',   type=int,       default=None,   help='Random seed for reproducibility')
+    ap.add_argument('--occ',    type=float,     default=0.5,    help='Occupation number. If > 1, treated as integer.')
+    ap.add_argument('--ordered',type=bool,      default=True,   help='Whether to use ordered modes')
     # couplings
-    ap.add_argument('--J',      type=float, default=1.0,    help='Coupling strength')
-    ap.add_argument('--lmbd',   type=float, default=1.0,    help='Aubry-André model parameter')
-    ap.add_argument('--beta',   type=float, default=1.0/np.sqrt(2), help='Beta parameter for AA model')
-    ap.add_argument('--dtype',  type=str,   default='float64', help='Data type for calculations')
+    ap.add_argument('--J',      type=float,     default=1.0,    help='Coupling strength')
+    ap.add_argument('--lmbd',   type=float,     default=1.0,    help='Aubry-André model parameter')
+    ap.add_argument('--beta',   type=float,     default=1.0/np.sqrt(2), help='Beta parameter for AA model')
+    ap.add_argument('--dtype',  type=str,       default='float64', help='Data type for calculations')
     # orbital selection and then random mixtures
     ap.add_argument('--norbitals',  type=int,   default=0,      help='Number of orbitals to select from the full spectrum.')
     ap.add_argument('--nreal',      type=int,   default=5,      help='Number of realizations to generate.')
@@ -44,10 +46,10 @@ def main():
                                 choices = ModelHamiltonians,
                                 help    = 'Type of Hamiltonian to use')
 
-    args = ap.parse_args()
+    args        = ap.parse_args()
 
     # get the command line arguments
-    seed        = args.seed
+    seed        = args.seed if args.seed is not None else int(time.time() * 1000) % 10000
     lx, ly, lz  = args.lx, args.ly, args.lz
     ns          = args.lx * args.ly * args.lz
     nh          = 2**ns
@@ -62,11 +64,13 @@ def main():
     dimB        = 2**lb
     
     # other
-    ordered     = args.ordered
     rng         = np.random.default_rng(seed)
-    e_window    = (-e_window, e_window) if args.e_window is not None else None
+    e_window    = (-args.e_window, args.e_window) if args.e_window is not None else None
+    ran_file    = f"{rng.integers(0, 10000)}"
     savedir     = Directories(args.savepath, "data")
     savedir.mkdir()
+    logger.info(f"Saving results to {savedir} using r={ran_file}", lvl=1, color='blue')
+    logger.info(f"Saving results to {savedir} using r={ran_file}", lvl=1, color='blue')
 
     # mixture parameters
     if isinstance(args.gammas, str):
@@ -90,7 +94,9 @@ def main():
     logger.title(f'Calculating non-Gaussianity for {ns} modes with {nocc} occupied modes - particle conserving', 100, '#', lvl = 0, color = 'red')
     logger.info(f"Using gamma values: {gammas}", lvl=1, color='blue')
     logger.info(f"Using random seed: {seed}", lvl=1, color='blue')
-    
+    logger.info(f"Using dtype: {args.dtype}", lvl=1, color='blue')
+    logger.info(f"Using ordered: {args.ordered}", lvl=1, color='blue')
+
     #########################################
     #! 1) Create hamiltonian
     #########################################
@@ -104,6 +110,9 @@ def main():
         J           = args.J,
         lmbd        = args.lmbd,
         beta        = args.beta,
+        lx          = lx,
+        ly          = ly,
+        lz          = lz,
         dtype       = np.dtype(args.dtype),
     )
     
@@ -111,7 +120,7 @@ def main():
         hamil.build(verbose=True, use_numpy=True)
         hamil.diagonalize(verbose=True)
     
-    t_ham       = timer.now()
+    t_ham = timer.now()
     logger.info(f"Hamiltonian {hamil}, dtype: {hamil.dtype}", lvl=2)
     logger.info(f"Finished building Hamiltonian after t={timer.format_time(t_ham, t_start)}", lvl=1, color='green')
 
@@ -125,18 +134,18 @@ def main():
         filling     = nocc,
         hamil       = hamil,
         number      = args.norbitals if args.norbitals > 0 else None,
-        e_window    = args.e_window if hasattr(args, 'e_window') else None,
+        e_window    = e_window,
         rng         = rng,
         constraints = [q_constraint(ns, 0.0, 1e-5)] if model_type == ModelHamiltonians.FreeFermions else [],    
     )
-    t_orb       = timer.now()
+    t_orb = timer.now()
     logger.info(f"Selected orbitals: {len(orbitals_en)} in t={timer.format_time(t_orb, t_ham)}", lvl=1, color='blue')
 
     ##########################################
     #! 3) Prepare transformation matrices
     ##########################################
     
-    transform_pc    = prepare_trans_mat_orbitals(hamil, occ=la, ordered=ordered)
+    transform_pc    = prepare_trans_mat_orbitals(hamil, occ=la, ordered=args.ordered)
     W, W_A, W_A_CT  = transform_pc.W, transform_pc.W_A(), transform_pc.W_A_CT()
     t_transform     = timer.now()
     logger.info(f"Shape of W: {W.shape}, dtype: {W.dtype}", lvl=2)
@@ -153,6 +162,14 @@ def main():
     
     # prepare the many-body state - memory efficient
     mb_state        = np.zeros(nh, dtype=hamil.dtype) if calculate_mb else None
+    # store the results in the HDF5
+    HDF5Handler.save_hdf5(
+            directory   = savedir,
+            filename    = f'nongaussianity_{ran_file}.h5',
+            data        = {
+                "gamma" : np.array(gammas, dtype=np.int64),
+            }
+        )
 
     for gamma in gammas:
         
@@ -217,9 +234,24 @@ def main():
             "CORRELATION"   : entropies_sp_corr,
             "MANY_BODY"     : entropies_mb_stat
         }
+        
+        HDF5Handler.append_hdf5(
+            directory   = savedir,
+            filename    = f'nongaussianity_{ran_file}.h5',
+            new_data    = {
+                f'correlation/gamma={gamma}/ng'             : [x[0] for x in entropies_sp_corr],
+                f'correlation/gamma={gamma}/gaussianity'    : [x[1] for x in entropies_sp_corr],
+                f'correlation/gamma={gamma}/purity'         : [x[2] for x in entropies_sp_corr],
+                f'correlation/gamma={gamma}/m4'             : [x[3] for x in entropies_sp_corr],
+                f'correlation/gamma={gamma}/m6'             : [x[4] for x in entropies_sp_corr],
+                f'many_body/gamma={gamma}/ent'              : entropies_mb_stat,
+            }
+        )
+        
         t_gamma = timer.now()
         logger.info(f"Finished gamma={gamma} calculations in t={timer.format_time(t_gamma, t_transform)}", lvl=1, color='green')
-    print("Results:")
+    
+    # print("Results:")
     for gamma, res in results.items():
         print(f"  Gamma={gamma}:")
         print(f"    CORRELATION:  {res['CORRELATION']}")
