@@ -1,23 +1,31 @@
 import os, sys
-import numpy as np
 import itertools
-from enum import Enum
-from typing import Optional, List, Any, Union, Tuple, Sequence, Iterable, Callable, Literal
+import numpy as np
 from math import comb as nCk
+from enum import Enum
+from typing import Optional, List, Union, Tuple, Sequence, Iterable, Callable, Literal
+
+########################################################################
+#! RESOLVE PATH
+########################################################################
+
+from pathlib import Path
+cwd         = Path.cwd()
+mod_path    = Path(__file__).resolve()
+qes_path    = Path(__file__).parent.parent.parent.parent
+lib_path    = qes_path / 'QES'
+print("Current working directory:", cwd)
+print("Module path:", mod_path)
+print("QES path:", qes_path)
+print("Library path:", lib_path, "\n\tWith folders:", os.listdir(lib_path))
+sys.path.insert(0, str(lib_path))
 
 #! -----
 os.environ['BACKEND'] = 'numpy'
 #! -----
 
-# Add parent directories to sys.path for imports
-for _ in range(5):
-    parent = os.path.abspath(os.path.join(os.path.dirname(__file__), *(['..'] * (_ + 1))))
-    if parent not in sys.path:
-        sys.path.append(parent)
-
 # ---------------------------------------------------------------------
 import numpy as np
-import time
 
 #! General Python imports
 try:
