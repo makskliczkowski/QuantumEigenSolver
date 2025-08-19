@@ -8,7 +8,7 @@ email   : maksymilian.kliczkowski@pwr.edu.pl
 import numpy as np
 import scipy as sp
 
-from typing import List, Tuple, Union, Optional, Callable
+from typing import List, Tuple, Union, Optional, Sequence
 from enum import Enum, unique
 from abc import ABC
 from functools import partial
@@ -16,6 +16,7 @@ from scipy.special import comb
 from itertools import combinations
 from collections import defaultdict
 from scipy.stats import unitary_group
+from dataclasses import dataclass, field
 
 ##############################################################################
 
@@ -68,6 +69,7 @@ else:
     calculate_permament_jax     = None
 
 from general_python.common.binary import int2base, base2int, extract as Extractor
+from general_python.common import indices_from_mask, complement_indices
 
 ##############################################################################
 
@@ -213,7 +215,7 @@ class QuadraticSelection:
             out_dict['mask_b_int']  = base2int(out_dict['mask_b_1h'], spin=False, spin_value=1)
             out_dict['order']       = tuple(mask_a) + tuple(mask_b)
         return out_dict
-        
+    
     # ------------------------------------------------------------------------
     #! Haar random coefficients
     # ------------------------------------------------------------------------
@@ -588,6 +590,7 @@ class QuadraticHamiltonian(Hamiltonian):
                         dtype           =   dtype,
                         backend         =   backend,
                         seed            =   seed,
+                        logger          =   logger,
                         **kwargs)
 
         # setup the arguments first
@@ -777,45 +780,122 @@ class QuadraticHamiltonian(Hamiltonian):
             # Recalculate energy stats if offset was applied
             self._calculate_av_en()
 
-    def prepare_transformation(self, mask_a_idx: np.ndarray):
-        """
-        Prepares the transformation matrix for a given mask of occupied orbitals.
+    ###########################################################################
+    #! Transformation Preparation
+    ###########################################################################
 
-        Args:
-            mask_a_idx (np.ndarray):
-                The mask of occupied orbitals (1 for occupied, 0 for unoccupied).
 
-        Returns:
-            np.ndarray: The transformation matrix.
+    @dataclass(frozen=True)
+    class PCTransform:
+        """Particle-conserving transformation handle."""
+        W           : np.ndarray          # (Ns, Ns) single-particle eigenvectors (unitary)
+        occ_idx     : np.ndarray          # (Na,)
+        unocc_idx   : np.ndarray          # (Ns-Na,)
+
+        # on-demand helpers (allocate only when used)
+
+        def W_A(self) -> np.ndarray:
+            """Form columns W[:, occ_idx]. NOTE: column gather copies."""
+            return np.take(self.W, self.occ_idx, axis=1)
+
+        def W_A_CT(self) -> np.ndarray:
+            """Conjugate transpose of W_A (allocates as above)."""
+            WA = np.take(self.W, self.occ_idx, axis=1)
+            return WA.conj().T
+
+        def order_occ_then_unocc(self) -> np.ndarray:
+            """Permutation indices [occ, unocc]."""
+            return np.concatenate((self.occ_idx, self.unocc_idx), dtype=np.int64)
+
+    @dataclass(frozen=True)
+    class BdGTransform:
+        """BdG/Nambu transform handle, avoids big temporaries."""
+        W           : np.ndarray            # (2N, 2N) quasiparticle eigenvectors in Nambu basis
+        N           : int                   # single-particle dimension
+        occ_idx     : np.ndarray            # subset in physical modes (0..N-1)
+        unocc_idx   : np.ndarray            # complement in physical modes
+
+        # Block views (no copies): U= W[:N,:N], V= W[:N,N:]
+        @property
+        def U(self) -> np.ndarray:
+            return self.W[:self.N, :self.N]
+
+        @property
+        def V(self) -> np.ndarray:
+            return self.W[:self.N, self.N:]
+
+        # ---- Prefer row slicing (views) when projecting to a *mode subset* ----
+
+        def U_rows_A(self) -> np.ndarray:
+            """Rows of U restricted to A (view). Shape (|A|, N)."""
+            return self.U[self.occ_idx, :]
+
+        def V_rows_A(self) -> np.ndarray:
+            """Rows of V restricted to A (view). Shape (|A|, N)."""
+            return self.V[self.occ_idx, :]
+
+        # Columns-for-A (copies; only form when needed)
+        def U_cols_A(self) -> np.ndarray:
+            """Columns of U for A (copy; unavoidable in NumPy). Shape (N, |A|)."""
+            return np.take(self.U, self.occ_idx, axis=1)
+
+        def V_cols_A(self) -> np.ndarray:
+            """Columns of V for A (copy; unavoidable). Shape (N, |A|)."""
+            return np.take(self.V, self.occ_idx, axis=1)
+
+    def prepare_transformation(self, occ, *, bdg: bool | None = None):
         """
-        # mask_b_idx = np.logical_not(mask_a_idx)
-        # mask_a_sum = np.sum(mask_a_idx)
-        # mask_b_sum = np.sum(mask_b_idx)
-        # mask_2_use = mask_a_idx if mask_a_sum < mask_b_sum else mask_b_idx
-        
-        if self._particle_conserving:
-            # mask_b_idx  =   np.logical_not(mask_a_idx)
-            # mask_a_nonz =   np.nonzero(mask_a_idx)[0]
-            # mask_b_nonz =   np.nonzero(mask_b_idx)[0]
-            # order       =   tuple(mask_a_nonz) + tuple(mask_b_nonz)
-            # print(mask_a_nonz, mask_b_nonz, order)
-            # Wprime      =   self._eig_vec[:, order]
-            # W_A         =   Wprime[:, :mask_a_nonz.shape[0]]
-            # W_A_CT      =   W_A.conj().T
-            # return Wprime, W_A, W_A_CT
-            W       =   self._eig_vec
-            W_A     = W[:, mask_a_idx]
-            W_A_CT  = W_A.conj().T
-            return W, W_A, W_A_CT
-        else:
-            raise NotImplementedError("BdG transformation not implemented yet.")
-            W       = self._eig_vec
-            W_A     = W[:, mask_a_idx]
-            W_B     = W[:, ~mask_a_idx]
-            W_A_CT  = W_A.conj().T
-            W_B_CT  = W_B.conj().T
-            return W, W_A, W_B, W_A_CT, W_B_CT
-        
+        Memory-conscious preparation of subspace transforms.
+
+        Parameters
+        ----------
+        occ : IndexLike
+            - int k             : take first k orbitals/modes
+            - 1D bool mask      : occupied mask over Ns (PC) or N (BdG physical sector)
+            - 1D int indices    : occupied indices in 0..Ns-1 (PC) or 0..N-1 (BdG)
+        bdg : bool | None
+            - If None: infer from self._particle_conserving (bdg = not particle_conserving).
+            - If True : treat eigenvector matrix as (2N x 2N) BdG/Nambu.
+            - If False: treat as particle-conserving (Ns x Ns).
+
+        Returns
+        -------
+        QuadraticHamiltonian.PCTransform   if bdg == False
+        QuadraticHamiltonian.BdGTransform  if bdg == True
+
+        Notes
+        -----
+        - Does not eagerly form large submatrices.
+        - Column gathers (W_A, U_cols_A, V_cols_A) allocate only when invoked.
+        - Row slices (U_rows_A, V_rows_A) are views.
+        """
+        if bdg is None:
+            bdg = not self._particle_conserving
+
+        W = self._eig_vec
+        if W is None:
+            raise RuntimeError("Eigenvectors not available. Call diagonalize() first.")
+
+        if bdg:
+            # BdG / Nambu path
+            if W.ndim != 2 or W.shape[0] != W.shape[1] or (W.shape[0] % 2 != 0):
+                raise ValueError(f"Expect square (2N,2N) BdG eigenvector matrix; got {W.shape}")
+            
+            twoN        = W.shape[0]
+            N           = twoN // 2
+
+            occ_idx     = indices_from_mask(occ, N)
+            unocc_idx   = complement_indices(N, occ_idx)
+            return self.BdGTransform(W=W, N=N, occ_idx=occ_idx, unocc_idx=unocc_idx)
+
+        # Particle-conserving path
+        if W.ndim != 2 or W.shape[0] != W.shape[1]:
+            raise ValueError(f"Expect square (Ns,Ns) eigenvector matrix; got {W.shape}")
+        Ns          = W.shape[1]
+        occ_idx     = indices_from_mask(occ, Ns)
+        unocc_idx   = complement_indices(Ns, occ_idx)
+        return self.PCTransform(W=W, occ_idx=occ_idx, unocc_idx=unocc_idx)
+    
     ###########################################################################
     #! UNUSED METHODS
     ###########################################################################
@@ -888,7 +968,7 @@ class QuadraticHamiltonian(Hamiltonian):
                 if occ.max() >= self._ns:
                     raise IndexError("BdG index must be in 0…Ns-1 (positive branch)")
                 e = nrg_bdg(self._eig_val, self._ns, occ)
-        return float(e) + self._constant_offset
+        return self._backend.real(e) + self._constant_offset
 
     def many_body_energies(self, n_occupation: Union[float, int] = 0.5, 
                     nh: Optional[int] = None, use_combinations: bool = False) -> dict[int, float]:
@@ -1052,11 +1132,10 @@ class QuadraticHamiltonian(Hamiltonian):
         Returns
         -------
         np.ndarray
-            Coefficient vector `ψ(x)`.
+            Coefficient vector `psi(x)`.
         """
         if target_basis != "sites":
-            raise NotImplementedError("Only the site/bitstring basis "
-                                    "is implemented for now.")
+            raise NotImplementedError("Only the site/bitstring basis is implemented for now.")
 
         # If new occupied_orbitals are provided, or the cached state is missing (e.g., after cache invalidation)
         if occupied_orbitals is not None or self._occupied_orbitals_cached is None:
@@ -1071,8 +1150,10 @@ class QuadraticHamiltonian(Hamiltonian):
 
         #! choose mapping / dimensions
         ns           = self._ns
-        dtype        = getattr(self, "_dtype", np.complex128)
-
+        dtype        = getattr(self, "_dtype", np.result_type(matrix_arg))
+        if resulting_state is not None:
+            dtype = np.result_type(resulting_state, dtype)
+        
         if many_body_hs is None or not many_body_hs.modifies:
             return many_body_state_full(matrix_arg, calculator, ns, resulting_state, dtype=dtype)
         else:            

@@ -236,29 +236,29 @@ class Hamiltonian(ABC):
         self._logger        = self._hilbert_space.logger if logger is None else logger
         
         # for the Hamiltonian matrix properties, and energy properties    
-        self._av_en_idx     = 0
-        self._av_en         = 0.0
-        self._std_en        = 0.0
-        self._min_en        = 0.0
-        self._max_en        = 0.0
+        self._av_en_idx         = 0
+        self._av_en             = 0.0
+        self._std_en            = 0.0
+        self._min_en            = 0.0
+        self._max_en            = 0.0
         
         # for the matrix representation of the Hamiltonian
-        self._hamil         = None  # will store the Hamiltonian matrix with Nh x Nh full Hilbert space
+        self._hamil             : np.ndarray = None  # will store the Hamiltonian matrix with Nh x Nh full Hilbert space
         
         #! single particle Hamiltonian info
-        self._hamil_sp          = None  # will store Ns x Ns (2Ns x 2Ns for BdG) matrix for quadratic Hamiltonian
-        self._delta_sp          = None
+        self._hamil_sp          : np.ndarray = None  # will store Ns x Ns (2Ns x 2Ns for BdG) matrix for quadratic Hamiltonian
+        self._delta_sp          : np.ndarray = None
         self._constant_offset   = 0.0
         self._isfermions        = True
         self._isbosons          = False
         
         #! general Hamiltonian info
-        self._eig_vec       = None
-        self._eig_val       = None
-        self._krylov        = None
-        self._name          = "Hamiltonian"
-        self._max_local_ch  = 1 # maximum number of local changes - through the loc_energy function
-        self._max_local_ch_o= self._max_local_ch # maximum number of local changes - through the operator
+        self._eig_vec           : np.ndarray = None
+        self._eig_val           : np.ndarray = None
+        self._krylov            : np.ndarray = None
+        self._name              = "Hamiltonian"
+        self._max_local_ch      = 1 # maximum number of local changes - through the loc_energy function
+        self._max_local_ch_o    = self._max_local_ch # maximum number of local changes - through the operator
         
         #! set the local energy functions and the corresponding methods
         self._ops_nmod_nosites      = [[] for _ in range(self.ns)]      # operators that do not modify the state and do not act on any site (through the function call)
@@ -1170,7 +1170,9 @@ class Hamiltonian(ABC):
         except Exception as e:
             raise ValueError(f"{Hamiltonian._ERR_HAMILTONIAN_BUILD} : {str(e)}") from e
         ham_duration = time.perf_counter() - ham_start
-        if self._hamil is not None and self._hamil.size > 0:
+        
+        
+        if (self._hamil is not None and self._hamil.size > 0) or (self._hamil_sp is not None and self._hamil_sp.size > 0):
             if verbose:
                 self._log(f"Hamiltonian matrix built in {ham_duration:.6f} seconds.", lvl = 1)
         else:

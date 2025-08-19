@@ -118,7 +118,9 @@ class FreeFermions(QuadraticHamiltonian):
                 constant_offset     : float                 = 0.0,
                 dtype               : Optional[np.dtype]    = None,
                 backend             : str                   = "default",
-                logger              = None):
+                logger              = None,
+                **kwargs
+                ):
         super().__init__(ns                     = ns,
                         particle_conserving     = True,
                         dtype                   = dtype,
@@ -128,8 +130,10 @@ class FreeFermions(QuadraticHamiltonian):
                         is_sparse               = False,
                         lattice                 = None,
                         hilbert_space           = None,
-                        logger                  = logger)
-        self._t = self._set_some_coupling(t).astype(self._dtype)     
+                        logger                  = logger,
+                        **kwargs
+        )
+        self._t = self._set_some_coupling(t).astype(self._dtype)
         # # Allocate dummy single-particle matrix so that parent methods that
         # # expect one (e.g. set_single_particle_matrix) still work.
         # xp = self._backend
@@ -142,11 +146,18 @@ class FreeFermions(QuadraticHamiltonian):
     # -----------------------------------------------------------------
     
     def _set_free_spectrum(self):
-        t = self._t.to_array(float, self._backend)
+        t = self._backend.asarray(self._t, dtype=self._dtype)
         if self._is_jax:
             self._eig_val, self._eig_vec = _free_fermions_spectrum_jax(self._ns, jnp.asarray(t))
         else:
             self._eig_val, self._eig_vec = _free_fermions_spectrum(self._ns, t)
+
+        # If target dtype is non-complex -> keep only the real part (cast in-place, no extra copy)
+        if np.issubdtype(np.dtype(self._dtype), np.complexfloating) or self._is_jax and jnp.issubdtype(self._dtype, jnp.complexfloating):
+            self._eig_vec  = self._eig_vec.astype(self._dtype, copy=False)
+        else:
+            # use backend.real for NumPy/JAX symmetry; cast to requested float dtype
+            self._eig_vec  = self._backend.real(self._eig_vec).astype(self._dtype, copy=False)
 
     # -----------------------------------------------------------------
     #! override parent diagonalisation (nothing to diagonalise)
@@ -197,7 +208,7 @@ class FreeFermions(QuadraticHamiltonian):
     # -----------------------------------------------------------------
     
     def add_term(self, *_, **__):
-        raise NotImplementedError("FreeFermions is fully analytic – "
+        raise NotImplementedError("FreeFermions is fully analytic - "
                                 "use QuadraticHamiltonian directly for "
                                 "arbitrary hopping matrices.")
 

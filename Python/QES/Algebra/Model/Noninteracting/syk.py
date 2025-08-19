@@ -49,11 +49,13 @@ class SYK2(QuadraticHamiltonian):
             dtype=dtype,
             seed=seed,
             backend=backend, **kwargs)
+        self._name = "SYK2"
         
     def _hamiltonian_quadratic(self, use_numpy = False):
         '''
         Create the Hamiltonian matrix for the SYK model.
         '''
+        self._log("Building SYK2 Hamiltonian...", lvl = 2, color = 'green')
         if self._iscpx:
             self._hamil_sp = random_matrix(
                 shape           = (self._ns, self._ns),
@@ -66,8 +68,8 @@ class SYK2(QuadraticHamiltonian):
                 typek           = RMT.GOE,
                 backend         = 'np' if use_numpy else self._backend,
                 dtype           = self._dtype)
-
-    def add_term(self, *_, **_):
+        
+    def add_term(self, *args, **kwargs):
         raise NotImplementedError("Add term not implemented for SYK2 model.")
     
     def __repr__(self):
