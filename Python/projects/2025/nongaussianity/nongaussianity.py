@@ -199,8 +199,8 @@ def main():
         number              = min(args.norbitals, args.maxorbs) if args.norbitals > 0 else args.maxorbs,
         e_window            = e_window,
         rng                 = rng,
-        constraints         = [q_constraint(ns, 0.0, 1e-5)] if model_type == ModelHamiltonians.FreeFermions else [],
-        choose_momentum     = model_type == ModelHamiltonians.FreeFermions
+        constraints         = [], #[q_constraint(ns, 0.0, 1e-5)] if model_type == ModelHamiltonians.FreeFermions else [],
+        choose_momentum     = False #model_type == ModelHamiltonians.FreeFermions
     )
     t_orb               = timer.now()
     logger.info(f"Selected orbitals: {len(orbitals_en)} in t={timer.format_time(t_orb, t_ham)}", lvl=1, color='blue')
