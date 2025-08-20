@@ -245,7 +245,7 @@ def bogolubov_decompose(eig_val, eig_vec, tol = _TOLERANCE) -> Tuple[Array, Arra
     this function selects the positive eigenvalues (above a given tolerance), extracts
     the corresponding eigenvectors, and splits them into their (u, v) components.
     Each column of the resulting U and V matrices is normalized such that
-    U†U + V†V = I.
+    U\dagU + V\dagV = I.
     
     Args:
         eig_val (Array):
@@ -851,7 +851,7 @@ def test_many_body_states(seed: int = 12345) -> None:
                         arg[0], arg[1], np.array([0]), st, ns_, pf),
                         ns)
     
-    # norm ratio equals ⟨γ₀γ₀†⟩ = 1
+    # norm ratio equals ⟨γ₀γ₀\dag⟩ = 1
     assert np.isclose(np.sum(np.abs(psi_exc)**2) /
                     np.sum(np.abs(psi_bdg)**2), 1.0)
 

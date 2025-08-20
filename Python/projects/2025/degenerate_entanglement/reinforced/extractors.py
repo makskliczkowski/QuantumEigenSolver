@@ -45,7 +45,7 @@ def corr_single(
     Parameters
     ----------
     W_A  : ndarray (Ls, La)
-        Rows = orbitals q, columns = real-space sites i∈A.
+        Rows = orbitals q, columns = real-space sites i\inA.
         Matrix of coefficients from the single particle Hamiltonian diagonalization.
     W_A_CT : ndarray (La, Ls), optional
         Conjugate transpose of W_A, if not provided it will be computed.
@@ -74,7 +74,7 @@ def corr_single(
         C           =       2 * (W_prime @ Wp)  # (La, La)
     else:
         prefactors  =       2 * occ - 1 # maps 0→-1, 1→+1
-        # Efficiently compute C = W_A† · diag(prefactors) · W_A without explicit diag
+        # Efficiently compute C = W_A\dag · diag(prefactors) · W_A without explicit diag
         # (La, Ls) * (Ls,) → (La, Ls), then @ (Ls, La) → (La, La)
         C           =       (W_A_CT * prefactors) @ W_A
 

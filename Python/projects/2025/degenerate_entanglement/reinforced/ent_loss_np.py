@@ -239,7 +239,7 @@ def apply_annihilation(psi: np.ndarray, l: int, Ns: int) -> np.ndarray:
 
 def apply_creation(psi: np.ndarray, l: int, Ns: int) -> np.ndarray:
     """
-    Apply fermionic creation operator c_l^† to state vector psi (in Fock basis) - binary representation.
+    Apply fermionic creation operator c_l^\dag to state vector psi (in Fock basis) - binary representation.
 
     Parameters:
         psi : np.ndarray

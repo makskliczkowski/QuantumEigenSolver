@@ -130,7 +130,7 @@ if JAX_AVAILABLE:
         Apply the inverse of the Pauli-X (σₓ) operator on a JAX array state.
         This is equivalent to applying the σₓ operator again.
         Corresponds to the adjoint operation.
-        <s|O|s'> = <s'|O†|s>
+        <s|O|s'> = <s'|O\dag|s>
         meaning that we want to find all the states s' that lead to the state s.
         Parameters:
             state (jax.numpy.ndarray):
@@ -273,7 +273,7 @@ if JAX_AVAILABLE:
         """
         Apply the inverse of the Pauli-Y (σᵧ) operator on a JAX array state.
         Corresponds to the adjoint operation.
-        <s|O|s'> = <s'|O†|s>
+        <s|O|s'> = <s'|O\dag|s>
         meaning that we want to find all the states s' that lead to the state s.
         Parameters:
             state (np.ndarray) :
@@ -396,7 +396,7 @@ if JAX_AVAILABLE:
         """
         Apply the inverse of the Pauli-Z (σ_z) operator on a JAX array state.
         Corresponds to the adjoint operation.
-        <s|O|s'> = <s'|O†|s>
+        <s|O|s'> = <s'|O\dag|s>
         meaning that we want to find all the states s' that lead to the state s.
         Parameters:
             state (np.ndarray) :
@@ -798,7 +798,7 @@ if JAX_AVAILABLE:
         Apply the inverse
         of the Fourier-transformed spin operator (σₖ) on a JAX array state.
         Corresponds to the adjoint operation.
-        <s|O|s'> = <s'|O†|s>
+        <s|O|s'> = <s'|O\dag|s>
         
         meaning that we want to find all the states s' that lead to the state s.
         Parameters:

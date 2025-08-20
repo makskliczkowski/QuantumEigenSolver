@@ -1239,7 +1239,7 @@ def sig_k(  k           : float,
     r"""
     Factory for the momentum‑space operator  
 
-        σₖ = (1/√N)\,\sum_{i∈\text{sites}} σ_z(i)\,e^{\,ik i}.
+        σₖ = (1/√N)\,\sum_{i\in\text{sites}} σ_z(i)\,e^{\,ik i}.
     """
 
     return create_operator(

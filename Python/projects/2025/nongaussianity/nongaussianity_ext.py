@@ -1,5 +1,6 @@
 import os, sys
 import itertools
+from turtle import filling
 import numpy as np
 from math import comb as nCk
 from enum import Enum
@@ -39,7 +40,7 @@ except ImportError:
 try:
     from QES.Algebra.Model.Noninteracting import syk
     from QES.Algebra.Model.Noninteracting.Conserving import free_fermions, aubry_andre
-    from QES.Algebra.hamil_quadratic import QuadraticHamiltonian
+    from QES.Algebra.hamil_quadratic import QuadraticHamiltonian, QuadraticSelection
 except ImportError:
     raise ImportError("QES modules are not available. Please ensure QES is installed correctly.")
 
@@ -115,8 +116,36 @@ def create_hamiltonian(ns           : int,
 #! Orbital selection
 # --------------------------------------------------------------------
 
-def _energy_single(hamil: QuadraticHamiltonian, config: np.ndarray) -> float:
-    return float(hamil.many_body_energy(config))
+def momentum_pairs(L: int, filling: int, rng=None):
+    """
+    Choose orbitals q from -L/2..L/2-1 such that total momentum = 0 mod L,
+    by selecting ±q pairs (and optionally 0 or L/2).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    qs          = np.arange(-L//2, L//2)     # full Brillouin zone
+    pairs       = [(q, -q) for q in range(1, L//2)]  # exclude 0
+    specials    = [0]
+    if L % 2 == 0:
+        specials.append(-L//2) # this is the "pi" momentum, self-paired
+
+    chosen      = []
+
+    # handle specials if filling odd
+    if filling % 2 == 1:
+        # must include one self-paired momentum
+        q           = rng.choice(specials)
+        chosen.append(q)
+        filling    -= 1
+
+    # now fill with pairs
+    rng.shuffle(pairs)
+    needed_pairs = filling // 2
+    for p in pairs[:needed_pairs]:
+        chosen.extend(p)
+
+    return np.sort(np.array(chosen)) + L//2
 
 def choose_orbitals(arrangement     : Sequence[int],
                     filling         : int,
@@ -125,7 +154,8 @@ def choose_orbitals(arrangement     : Sequence[int],
                     number          : Optional[int]                 = None,
                     e_window        : Optional[float]               = None,
                     rng             : Optional[np.random.Generator] = None,
-                    constraints     : List[Callable]                = []
+                    constraints     : List[Callable]                = [],
+                    choose_momentum : bool                          = False
                     ):
     '''
     Choose orbitals based on the given criteria.
@@ -168,8 +198,8 @@ def choose_orbitals(arrangement     : Sequence[int],
         raise ValueError("Invalid arrangement or filling.")
 
     # generator of all combinations - fast path
-    combos  = itertools.combinations(domain, filling)
     if number is None and e_window is None:
+        combos  = itertools.combinations(domain, filling)
         results = []
         for c in combos:
             cfg     = np.fromiter(c, dtype=int)
@@ -192,48 +222,78 @@ def choose_orbitals(arrangement     : Sequence[int],
         else:
             emin, emax = -np.inf, float(e_window)
 
-    if rng is not None and number is not None and isinstance(arrangement, int) and number <= max(1, int(0.01 * ns)):
-        
+    total_combs     = nCk(ns, filling)
+    use_sampling    = (rng is not None) and (number is not None) and (ns > 100 or (number < int(0.001 * total_combs)))
+
+    if use_sampling:
+        logger.info(f"Using sampling for {number} configurations out of {total_combs if total_combs < 1e9 else 'shittons'} total combinations.", lvl=2, color='yellow')
         target      = int(number)
-        total_combs = nCk(ns, filling)
-        target      = min(target, total_combs)       # cap to available unique combos
-
-        results     : List[Tuple[np.ndarray, float]] = []
-        seen        = set()                              # dedupe sampled configs
-        
-        # pick a batch size that amortizes overhead but stays modest
-        batch_size  = min(max(64, 4 * target), 4096)
-
-        # safety guard: avoid infinite search if acceptance is tiny
+        results     = []
+        seen        = set()
+        batch_size  = min(max(2048, 8 * target), 100000)  # bigger batches amortize overhead
         max_batches = 10000
         batches     = 0
+        logger.info(f"Batch size: {batch_size}, Max batches: {max_batches}", lvl=2, color='yellow')
+        
+        # Take the single particle energies
+        eps         = np.real(hamil.eig_val)
 
+        # Early rejection: if window impossible, bail out
+        if e_window is not None:
+            # best/worst case sums given filling
+            sorted_eps      = np.sort(eps)
+            e_min_possible  = np.sum(sorted_eps[:filling])
+            e_max_possible  = np.sum(sorted_eps[-filling:])
+            if emax < e_min_possible or emin > e_max_possible:
+                return []
+        
         while len(results) < target and batches < max_batches:
-            # draw B samples of size `filling` from 0..ns-1, without replacement within each row
-            batches    += 1
-            samples     = rng.choice(ns, size=(batch_size, filling), replace=False)
-            samples.sort(axis=1)                     # canonicalize rows
+            batches        += 1
+            if not choose_momentum:
+                samples         = np.array([rng.choice(ns, size=filling, replace=False) for _ in range(batch_size)], dtype=int)
+            else:
+                samples         = np.array([momentum_pairs(ns, filling, rng) for _ in range(batch_size)], dtype=int)
+            logger.info(f"Batch {batches}: {len(samples)} samples", lvl=2, color='yellow')
+            
+            # dedupe within batch
+            uniq            = np.unique(samples, axis=0)
+            logger.info(f"Unique configurations in batch: {len(uniq)}", lvl=3, color='yellow')
 
-            # dedupe within batch and against global set
-            uniq = np.unique(samples, axis=0)
-            for cfg in uniq:
-                ok = True
-                for constraint in constraints:
-                    ok = ok and constraint(cfg)
-                    
-                if not ok:
-                    continue
-                
+            # vectorized energies
+            E               = eps[uniq].sum(axis=1)
+
+            # energy window first
+            if e_window is None:
+                win_mask = np.ones(len(uniq), dtype=bool)
+            else:
+                win_mask = (E >= emin) & (E <= emax)
+
+            # now apply constraints only to survivors
+            for cfg, e in zip(uniq[win_mask], E[win_mask]):
                 key = cfg.tobytes()
                 if key in seen:
                     continue
-                seen.add(key)
-                e   = _energy_single(hamil, cfg)
-                if emin <= e <= emax:
-                    results.append((cfg.copy(), e))
-                    if len(results) >= target:
+                
+                ok = True
+                for constraint in constraints:
+                    if not constraint(cfg):
+                        ok = False
                         break
-
+                
+                if not ok:
+                    continue
+                
+                seen.add(key)
+                results.append((cfg.copy(), float(e)))
+                
+                if len(results) >= target:
+                    logger.info(f"Collected {len(results)} configurations in {batches} batches. Finish...", lvl=2, color='yellow')
+                    break
+            logger.info(f"Batch {batches} processed: {len(results)} results so far", lvl=2, color='yellow')
+            
+            if len(results) >= target:
+                break
+            
         return results
 
     # general streaming path (combinations)    
@@ -262,12 +322,8 @@ def choose_orbitals(arrangement     : Sequence[int],
     return results
 
 def q_constraint(ns: int, equals: float, prec: float) -> bool:
-    coef = 2 * np.pi / ns
     def check(cfg: Sequence[int]) -> bool:
-        sum_value = np.sum(np.array(cfg) * coef)
-        while sum_value >= 2 * np.pi:
-            sum_value -= 2 * np.pi
-        isclose = np.isclose(sum_value, equals, atol=prec)
+        isclose = np.isclose(np.sum(cfg) % ns, equals, atol=prec)
         return isclose
     return check
 

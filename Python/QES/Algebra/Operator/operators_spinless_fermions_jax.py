@@ -7,11 +7,11 @@ This module implements creation and annihilation operators for spinless fermions
 Main Features:
 --------------
 
-- JAX-accelerated implementations of fermionic creation (`c†`) and annihilation (`c`) operators.
+- JAX-accelerated implementations of fermionic creation (`c\dag`) and annihilation (`c`) operators.
 - Support for both integer (bitstring) and array-based state representations.
 - Jordan-Wigner parity calculation for correct fermionic sign structure.
 - Vectorized (batched) versions of operators for efficient application to multiple sites or states.
-- Momentum-space operators (`c_k`, `c_k†`) for Fourier-transformed basis.
+- Momentum-space operators (`c_k`, `c_k\dag`) for Fourier-transformed basis.
 - All functions are JIT-compiled with JAX for high performance.
 
 Functions:
@@ -248,7 +248,7 @@ if JAX_AVAILABLE:
                         k     : float,
                         pref  : float = 1.0):
         """
-        Momentum-space creation  c_k†  on integer basis label.
+        Momentum-space creation  c_k\dag  on integer basis label.
         """
         pos            = ns - 1 - sites
         bits           = _bit_jnp(state, pos)
@@ -293,7 +293,7 @@ if JAX_AVAILABLE:
                     k      : float,
                     pref   : float = 1.0):
         """
-        Momentum-space creation  c_k†  on occupation array.
+        Momentum-space creation  c_k\dag  on occupation array.
         """
         bits           = jnp.take(state, sites)
         signs          = f_parity_np_vec(state, sites)

@@ -922,7 +922,7 @@ class QuadraticHamiltonian(Hamiltonian):
                 eigenstates (orbitals α or quasiparticles γ).
 
         Returns:
-            The total energy E = Σ_{α∈occupied} ε_α (or E = Σ_{γ∈occupied} E_γ for BdG).
+            The total energy E = Σ_{α\inoccupied} ε_α (or E = Σ_{γ\inoccupied} E_γ for BdG).
             Result includes the constant_offset.
         """
         

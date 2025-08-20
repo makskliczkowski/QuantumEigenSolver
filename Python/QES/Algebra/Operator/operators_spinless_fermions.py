@@ -188,7 +188,7 @@ def c_dag_int_np(state      : int,
                 sites       : List[int],
                 prefactor   : float = 1.0):
     """
-    Applies the creation operator (c†) for spinless fermions on a given site of an integer-represented Fock state.
+    Applies the creation operator (c\dag) for spinless fermions on a given site of an integer-represented Fock state.
     Parameters
     ----------
     state : int
@@ -306,7 +306,7 @@ def c_dag_np(state      : np.ndarray,
              sites      : np.ndarray,
              prefactor  : float = 1.0):
     """
-    Applies the fermionic creation operator (c†) at a given site to a spinless fermion state.
+    Applies the fermionic creation operator (c\dag) at a given site to a spinless fermion state.
 
     Parameters
     ----------
@@ -387,7 +387,7 @@ def c_np(state       : np.ndarray,
     # return state, sign * prefactor**n_sites
 
 ###############################################################################
-#!  Momentum-space fermionic operator  c_k and c_k†
+#!  Momentum-space fermionic operator  c_k and c_k\dag
 #      c_k = (1/√N) Σ_i  e^{-ik i} c_i
 ###############################################################################
 
@@ -484,7 +484,7 @@ def c_k_dag_int_np(state      : int,
                    k          : float,
                    prefactor  : float = 1.0):
     """
-    Applies the momentum-space fermionic creation operator c†_k to a given basis state.
+    Applies the momentum-space fermionic creation operator c\dag_k to a given basis state.
 
     This function constructs the action of the creation operator in momentum space
     on a spinless fermion basis state represented as an integer bitstring. It sums
@@ -541,7 +541,7 @@ def c_k_dag_np(state       : np.ndarray,
                k           : float,
                prefactor   : float = 1.0):
     """
-    Apply momentum‑space creation operator c_k† to a NumPy occupation array.
+    Apply momentum‑space creation operator c_k\dag to a NumPy occupation array.
     """
     ns               = state.shape[0]
     # empty sites count ⇒ upper bound
@@ -562,7 +562,7 @@ def c_k_dag_np(state       : np.ndarray,
             continue
 
         tmp_state     = state.copy()
-        tmp_state, c  = c_dag_np(tmp_state, i, prefactor)  # local c_i†
+        tmp_state, c  = c_dag_np(tmp_state, i, prefactor)  # local c_i\dag
         if c == 0.0:
             continue
 
@@ -711,7 +711,7 @@ def cdag( lattice   : Optional[Lattice]     = None,
         sites       : Optional[List[int]]   = None,
         prefactor   : float                 = 1.0) -> Operator:
     """
-    Factory for the fermionic creation operator c_i†.
+    Factory for the fermionic creation operator c_i\dag.
     """
     return create_operator(
         type_act    = type_act,
