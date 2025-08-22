@@ -182,7 +182,7 @@ def main():
     logger.info(f"Finished building Hamiltonian after t={timer.format_time(t_ham, t_start)}", lvl=1, color='green')
 
     # save directory
-    savedir     = Directories(args.savepath, "data", f"{hamil}")
+    savedir     = Directories(args.savepath, "data_ent", f"{hamil}")
     savedir.mkdir()
     logger.title(f'Calculating non-Gaussianity for {ns} modes with {nocc} occupied modes - particle conserving', 100, '#', lvl = 0, color = 'red')
     logger.info(f"Saving results to {savedir} using r={ran_file}", lvl=1, color='blue')

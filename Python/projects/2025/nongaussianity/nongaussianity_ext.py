@@ -1,6 +1,5 @@
 import os, sys
 import itertools
-from turtle import filling
 import numpy as np
 from math import comb as nCk
 from enum import Enum

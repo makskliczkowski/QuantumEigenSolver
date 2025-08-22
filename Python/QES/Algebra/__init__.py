@@ -26,9 +26,9 @@ Email: maksymilian.kliczkowski@pwr.edu.pl
 
 # Import main classes
 try:
-    from .hilbert import HilbertSpace
-    from .hamil import Hamiltonian
-    from .symmetries import *
+    from hilbert import HilbertSpace
+    from hamil import Hamiltonian
+    from symmetries import *
     
     __all__ = ['HilbertSpace', 'Hamiltonian']
 except ImportError:

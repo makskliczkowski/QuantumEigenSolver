@@ -9,37 +9,54 @@ Changes :
     - 2025.02.01 : 1.0.0 - Initial version of the Hilbert space class. - MK
     
 """
-
+import os
+import sys
 import math
 import time
 import numpy as np
-from numba import njit, jit
 from abc import ABC
+from dataclasses import dataclass, field
+from typing import Union, Optional, Callable, List, Tuple, Dict
+from enum import Enum
+
+# other
+from numba import njit, jit
 from itertools import combinations
-from typing import Union, Optional, Callable, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# already imported from general_python
-from Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, maybe_jit
-####################################################################################################
-from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
-from general_python.common.flog import get_global_logger, Logger
-if JAX_AVAILABLE:
-    from general_python.algebra.utils import pad_array_jax
-from general_python.common.binary import bin_search
-####################################################################################################
-from Algebra.Operator.operator import Operator, SymmetryGenerators, GlobalSymmetries, operator_identity, OperatorFunction
-from Algebra.globals import GlobalSymmetry
-from Algebra.symmetries import choose, translation
+try:
+    # general thingies
+    from general_python.common.flog import get_global_logger, Logger
+    from general_python.lattices.lattice import Lattice, LatticeBC, LatticeDirection
+    from general_python.common.binary import bin_search
+    
+    # already imported from general_python
+    from Algebra.Hilbert.hilbert_jit_states import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, maybe_jit
 
-####################################################################################################
-#! WRAPPER FOR JIT AND NUMBA
-####################################################################################################
+    #################################################################################################
+    if JAX_AVAILABLE:
+        from general_python.algebra.utils import pad_array_jax
+    
+    #################################################################################################
+    from Algebra.Operator.operator import ( Operator, LocalSpace, LocalSpaceTypes, StateTypes,      
+                                            SymmetryGenerators, GlobalSymmetries, 
+                                            operator_identity)
+    from Algebra.globals import GlobalSymmetry
+    from Algebra.symmetries import choose, translation
+    
+    #################################################################################################
+    #! WRAPPER FOR JIT AND NUMBA
+    #################################################################################################
 
-from Algebra.Hilbert.hilbert_jit_methods import (
-    get_mapping, find_repr_int, find_representative_int, get_matrix_element,
-    jitted_find_repr_int, jitted_get_mapping, jitted_get_matrix_element
-)   
+    from Algebra.Hilbert.hilbert_jit_methods import (
+        get_mapping, find_repr_int, find_representative_int, get_matrix_element,
+        jitted_find_repr_int, jitted_get_mapping, jitted_get_matrix_element
+    )   
+except ImportError as e:
+    print("Could not import some modules:", e)
+    sys.exit(1)
+
+#####################################################################################################
 
 if JAX_AVAILABLE:
     import jax
@@ -77,12 +94,75 @@ class HilbertSpace(ABC):
         "ns"            : "Either 'ns' or 'lattice' must be provided.",
         "lattice"       : "Either 'ns' or 'lattice' must be provided.",
         "nhl"           : "The local Hilbert space dimension must be an integer.",
+        "nhl_small"     : "The local Hilbert space dimension must be >= 2.",
         "nhint"         : "The number of modes must be an integer.",
+        "nh_incons"     : "The provided Nh is inconsistent with Ns and Nhl.",
         "single_part"   : "The flag for the single particle system must be a boolean.",
         "state_type"    : "The state type must be a string.",
         "backend"       : "The backend must be a string or a module.",
     }
     
+    @staticmethod
+    def _raise(s: str):
+        raise ValueError(s)
+
+    def _check_init_sym_errors(self, sym_gen, global_syms, gen_mapping):
+        ''' Check for initialization symmetry errors '''
+        if not isinstance(sym_gen, (dict,)) and sym_gen is not None:
+            HilbertSpace._raise(HilbertSpace._ERRORS["sym_gen"])
+        if not isinstance(global_syms, list) and global_syms is not None:
+            HilbertSpace._raise(HilbertSpace._ERRORS["global_syms"])
+        if not isinstance(gen_mapping, bool):
+            HilbertSpace._raise(HilbertSpace._ERRORS["gen_mapping"])
+
+    def _check_ns_infer(self, lattice, ns, nh):
+
+        # infer local dimension
+        _local_dim = self._local_space.local_dim if self._local_space else 2
+
+        # handle the system physical size dimension
+        if ns is not None:
+            self._ns      = int(ns)
+            self._lattice = lattice
+            if self._lattice is not None and self._lattice.ns != self._ns:
+                self._log(f"Warning: The number of sites in lattice ({self._lattice.ns}) is different than provided ({ns}).", lvl = 1, color = 'yellow', log = 'info')
+        elif lattice is not None:
+            self._lattice = lattice
+            self._ns      = int(lattice.ns)
+        elif nh is not None and self._is_many_body:
+            # nh = (local_dim)^Ns  -> infer Ns from nh and local_space.local_dim
+            try:
+                if _local_dim <= 1:
+                    HilbertSpace._raise(HilbertSpace._ERRORS["nhl_small"])
+
+                # compute Ns via logarithm and validate exact power
+                Ns_est          = int(round(math.log(float(nh), float(_local_dim))))
+                if _local_dim ** Ns_est != int(nh):
+                    raise ValueError(HilbertSpace._ERRORS['nh_incons'])
+                
+                self._ns      = Ns_est
+                self._lattice = None
+                self._log(f"Inferred Ns={self._ns} from Nh={nh} and local_dim={_local_dim}", log='info', lvl=2)
+            except Exception as e:
+                HilbertSpace._raise(HilbertSpace._ERRORS['nh_incons'])
+        elif nh is not None and self._is_quadratic:
+            # Quadratic mode: treat Nh as an effective basis size; commonly Nh==Ns
+            self._ns      = int(nh)
+            self._lattice = None
+            self._log(f"Assuming Ns={self._ns} from provided Nh={nh} in quadratic mode.", log='info', lvl=2)
+        else:
+            HilbertSpace._raise(HilbertSpace._ERRORS['ns'])
+
+        try:
+            self._nhfull    = _local_dim ** (self._ns) if self._ns > 0 else 0
+        except OverflowError:
+            self._nhfull    = float('inf')
+            self._log(f"Warning: Full Hilbert space size exceeds standard limits (Ns={self._ns}).", log='warning', lvl=0)
+    
+    # --------------------------------------------------------------------------------------------------
+    #! Initialization
+    # --------------------------------------------------------------------------------------------------
+
     def __init__(self,
                 # core definition - elements to define the modes
                 ns          : Union[int, None]                  = None,
@@ -92,13 +172,12 @@ class HilbertSpace(ABC):
                 is_manybody : bool                              = True,
                 part_conserv: Optional[bool]                    = True,
                 # local space properties - for many body
-                nhl         : Optional[int]                     = 2,
-                nhint       : Optional[int]                     = 1,
                 sym_gen     : Union[dict, None]                 = None,
                 global_syms : Union[List[GlobalSymmetry], None] = None,
                 gen_mapping : bool                              = False,
+                local_space : Optional[LocalSpace]              = None,
                 # general parameters
-                state_type  : str                               = "integer",
+                state_type  : StateTypes                        = StateTypes.INTEGER,
                 backend     : str                               = 'default',
                 dtype                                           = np.float64,
                 logger      : Optional[Logger]                  = None,
@@ -144,55 +223,24 @@ class HilbertSpace(ABC):
         """
         
         self._logger        = logger if logger is not None else get_global_logger()
+        
         # initialize the backend for the vectors and matrices
         self._backend, self._backend_str, self._state_type = self.reset_backend(backend, state_type)
         self._dtype         = dtype if dtype is not None else self._backend.float64
         self._is_many_body  = is_manybody
         self._is_quadratic  = not is_manybody
         
-        # check if the arguments match the requirements
-        if not isinstance(sym_gen, dict) and sym_gen is not None:
-            raise ValueError(HilbertSpace._ERRORS["sym_gen"])
-        if not isinstance(global_syms, list) and global_syms is not None:
-            raise ValueError(HilbertSpace._ERRORS["global_syms"])
-        if not isinstance(gen_mapping, bool):
-            raise ValueError(HilbertSpace._ERRORS["gen_mapping"])
-        
-        # handle the system physical size dimension - distinguish between the number of sites and the lattice object
-        # if the lattice object is provided, the number of sites is calculated from the lattice object
-        if ns is not None:
-            self._ns        = ns
-            self._lattice   = lattice
-            if self._lattice is not None and self._lattice.ns != ns:
-                self._log(f"Warning: The number of sites in the lattice ({self._lattice.ns}) is different than the number of sites provided ({ns}).",
-                            lvl = 1, color = 'yellow', log = 'info')
-        elif lattice is not None:
-            self._ns        = lattice.ns
-            self._lattice   = lattice
-        elif nh is not None and self._is_many_body:
-            try:
-                self._ns        = int(math.log(nh, nhl))
-                if nhl**(self._ns * nhl) < nh:
-                    raise ValueError(HilbertSpace._ERRORS["ns"])
-                self._log(f"Inferred Ns={self._ns} from Nh={nh} and Nhl={nhl}", log='info', lvl=2)
-            except ValueError as e:
-                raise ValueError(f"Cannot infer Ns from Nh={nh}, Nhl={nhl}. Provide Ns or Lattice. Error: {e}")
-        elif nh is not None and self._is_quadratic:
-            self._ns        = nh                        # Assume Nh directly represents Ns for simple quadratic
-            self._lattice   = None
-            self._log(f"Assuming Ns={self._ns} from provided Nh={nh} in quadratic mode.", log='info', lvl=2)
-        else:
-            raise ValueError(HilbertSpace._ERRORS["ns"])
-        
+        # quick check
+        self._check_init_sym_errors(sym_gen, global_syms, gen_mapping)
+
         # set locals
-        self._nhl           = nhl
-        self._nhint         = nhint
-        # Nhfull: Potential full many-body space size
-        try:
-            self._nhfull    = self._nhl**(self._nhint * self._ns) if self._ns > 0 else 0
-        except OverflowError:
-            self._nhfull    = float('inf')
-            self._log(f"Warning: Full Hilbert space size NhFull exceeds standard limits (Ns={self._ns}, Nhl={self._nhl}).", log='warning', lvl=0)
+        # If you have a LocalSpace.default(), use it; otherwise use your default spin-1/2 factory.
+        self._local_space   = local_space if local_space is not None else LocalSpace.default()  # or default_spin_half_local_space()
+        if self._local_space is None:
+            raise ValueError("local_space must be provided or LocalSpace.default() must return a valid LocalSpace.")
+
+        # infer the system sizes
+        self._check_ns_infer(lattice=lattice, ns=ns, nh=nh)
 
         # Nh: Effective dimension of the *current* representation
         # Initial estimate:
@@ -200,15 +248,13 @@ class HilbertSpace(ABC):
             # For quadratic, the "dimension" is often Ns (or 2Ns if pairing)
             # We'll set it initially to Ns, can be adjusted later if needed (e.g., for Bogoliubov)
             self._nh = self._ns
-            self._log(f"Initialized HilbertSpace in quadratic mode: Ns={self._ns}, effective Nh={self._nh}.",
-                        log='debug', lvl=1, color='green')
+            self._log(f"Initialized HilbertSpace in quadratic mode: Ns={self._ns}, effective Nh={self._nh}.", log='debug', lvl=1, color='green')
         else: # Many-body
             # If symmetries will be applied, Nh will be reduced later.
             # Start with the full size, potentially reduced by global syms only initially.
             self._nh = self._nhfull
-            self._log(f"Initialized HilbertSpace in many-body mode: Ns={self._ns}, Nhl={self._nhl}, initial Nh={self._nh} (potentially reducible).",
-                        color = 'green', log='debug', lvl=1)
-    
+            self._log(f"Initialized HilbertSpace in many-body mode: Ns={self._ns}, initial Nh={self._nh} (potentially reducible).", color='green', log='debug', lvl=1)
+
         #! Initialize the symmetries
         self._normalization         = []                            # normalization of the states - how to return to the representative
         self._sym_group             = []
@@ -217,13 +263,13 @@ class HilbertSpace(ABC):
         self._particle_conserving   = part_conserv
     
         # initialize the properties of the Hilbert space
-        self._mapping       = None
-        self._reprmap       = None                                  # mapping of the representatives (vector of tuples (state, representative value))
-        self._fullmap       = None                                  # mapping of the full Hilbert space
+        self._mapping               = None
+        self._reprmap               = None                          # mapping of the representatives (vector of tuples (state, representative value))
+        self._fullmap               = None                          # mapping of the full Hilbert space
         
-        self._getmapping_fun= None                                  # function to get the mapping of the states
+        self._getmapping_fun        = None                          # function to get the mapping of the states
         # setup the logger instance for the Hilbert space
-        self._threadnum     = kwargs.get('threadnum', 1)            # number of threads to use
+        self._threadnum             = kwargs.get('threadnum', 1)    # number of threads to use
         
         if self._is_many_body:
             if gen_mapping:
@@ -263,19 +309,19 @@ class HilbertSpace(ABC):
         
         statetype = HilbertSpace.reset_statetype(state_type, _backend)
         return _backend, _backend_str, statetype
-        
+    
     @staticmethod
-    def reset_statetype(state_type : str, backend):
+    def reset_statetype(state_type: str, backend):
         """
         Reset the state type for the Hilbert space.
         
         Args:
             state_type (str): The state type to use for the Hilbert space.
         """
-        if state_type.lower() == "integer" or state_type.lower() == "int":
+        if str(state_type).lower() == "integer" or str(state_type).lower() == "int":
             return int
         return backend.array
-        
+    
     def reset_local_symmetries(self):
         """
         Reset the local symmetries of the Hilbert space.
@@ -320,7 +366,7 @@ class HilbertSpace(ABC):
     ####################################################################################################
     
     #! Translation related
-        
+    
     def _gen_sym_group_check_t(self, sym_gen : list) -> (list, Tuple[bool, bool], Tuple[Operator, LatticeDirection]):
         '''
         Helper function to check the translation symmetry. This function is used to check the translation symmetry.
@@ -333,11 +379,11 @@ class HilbertSpace(ABC):
             list, tuple : A list of symmetry generators and a tuple of flags (has_translation, has_cpx_translation).
         '''
         if self._lattice is None:
-            has_translation = any(g[0].has_translation() for g in sym_gen if hasattr(g,'__len__') and len(g)>0)
+            has_translation = any(g[0].has_translation() for g in sym_gen if hasattr(g,'__len__') and len(g) > 0)
             if has_translation:
-                self._log("Warning: Translation symmetry requested but no Lattice provided. Ignoring translation.", log='warning', lvl=1)
+                    self._log("Translation requested but no Lattice; ignoring.", log='warning', lvl=1)
             # Remove translation generators if found
-            sym_gen_out = [g for g in sym_gen if not (hasattr(g,'__len__') and len(g)>0 and g[0].has_translation())]
+            sym_gen_out = [(g, s) for (g, s) in (sym_gen or []) if not g.has_translation()]
             return sym_gen_out, (False, False), (None, LatticeDirection.X)
         
         has_cpx_translation = False
@@ -746,7 +792,9 @@ class HilbertSpace(ABC):
             list: The normalization of the states.
         """
         return self._normalization
-    
+
+    # --------------------------------------------------------------------------------------------------
+
     @property
     def local(self):
         """
@@ -755,57 +803,17 @@ class HilbertSpace(ABC):
         Returns:
             int: The local Hilbert space dimension.
         """
-        return self._nhl
+        return self._local_space.local_dim if self._local_space else 2
     
     @property
-    def Nhl(self):
+    def local_space(self):
         """
-        Return the local Hilbert space dimension.
+        Return the local Hilbert space.
         
         Returns:
-            int: The local Hilbert space dimension.
+            LocalSpace: The local Hilbert space.
         """
-        return self._nhl
-    
-    def get_Nhl(self):
-        """
-        Return the local Hilbert space dimension.
-        
-        Returns:
-            int: The local Hilbert space dimension.
-        """
-        return self._nhl
-    
-    # --------------------------------------------------------------------------------------------------
-    
-    @property
-    def modes(self):
-        """
-        Return the number of modes (fermions, bosons, etc. on each site).
-        
-        Returns:
-            int: The number of modes.
-        """
-        return self._nhint
-    
-    @property
-    def Nhint(self):
-        """
-        Return the number of modes (fermions, bosons, etc. on each site).
-        
-        Returns:
-            int: The number of modes.
-        """
-        return self._nhint
-    
-    def get_Nhint(self):
-        """
-        Return the number of modes (fermions, bosons, etc. on each site).
-        
-        Returns:
-            int: The number of modes.
-        """
-        return self._nhint
+        return self._local_space
     
     # --------------------------------------------------------------------------------------------------
     
@@ -842,6 +850,16 @@ class HilbertSpace(ABC):
     
     @property
     def dimension(self):
+        """
+        Return the dimension of the Hilbert space.
+        
+        Returns:
+            int: The dimension of the Hilbert space.
+        """
+        return self._nh
+    
+    @property
+    def dim(self):
         """
         Return the dimension of the Hilbert space.
         
@@ -925,12 +943,10 @@ class HilbertSpace(ABC):
     
     def __str__(self):
         """ Return a string representation of the Hilbert space. """
-        mode = "Many-Body" if self._is_many_body else "Quadratic"
-        info = f"Mode: {mode}\n"
-        info += f"Ns (sites/modes): {self._ns}\n"
+        mode    =  "Many-Body" if self._is_many_body else "Quadratic"
+        info    = f"Mode: {mode}, Ns: {self._ns}, Nh: {self._nh}\n"
         if self._is_many_body:
-            info    += f"Nhl (local dim): {self._nhl}\n"
-            info    += f"NhFull (potential MB size): {self._nhfull}\n"
+            info += f"Local: {self._local_space}"
 
         if self._mapping is not None:
             info    += f"Reduced Hilbert space size (Nh): {self._nh}\n"
@@ -950,9 +966,9 @@ class HilbertSpace(ABC):
 
     def __repr__(self):
         sym_info = self.get_sym_info()
-        base = "Single particle" if self._single_part else "Many body"
-        return f"{base} Hilbert space with {self._nh} states and {self._ns} sites; {self._nhl} modes per site. Symmetries: {sym_info}" if sym_info else ""
-    
+        base = "Single particle" if self._is_quadratic else "Many body"
+        return f"{base} Hilbert space with {self._nh} states and {self._ns} sites; {self._local_space}. Symmetries: {sym_info}" if sym_info else ""
+
     ####################################################################################################
     #! Find the representative of a state
     ####################################################################################################
@@ -1369,7 +1385,7 @@ class HilbertSpace(ABC):
         return NotImplementedError("Only integer indexing is supported.")
     
     ################################################################################################
-    
+
 ####################################################################################################
 
 def set_operator_elem(operator, hilbert : HilbertSpace, k : int, val, new_k : int, conj = False):

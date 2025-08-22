@@ -28,10 +28,11 @@ import numbers
 #####################################################################################################
 from abc import ABC
 from enum import Enum, auto, unique
-from typing import Optional, Callable, Union, Sequence, Any
+from typing import Optional, Callable, Union, Sequence, Any, Set
 from typing import Union, Tuple, List               # type hints for the functions and methods
 from functools import partial                       # partial function application for operator composition
 ####################################################################################################
+from Algebra.Hilbert.hilbert_local import LocalSpace, LocalSpaceTypes, StateTypes, LocalOpKernels
 from general_python.algebra.utils import get_backend as get_backend, JAX_AVAILABLE, Array
 from general_python.lattices import Lattice
 # from Algebra.hilbert import HilbertSpace
@@ -94,45 +95,44 @@ else:
 
 class SymmetryGenerators(Enum):
     """
-    Available symmetry generators for symmetry analysis. 
-    - E                 : Identity symmetry. 
-    - Translation-x (Tx): Translation symmetry in the x-direction.
-    - Translation-y (Ty): Translation symmetry in the y-direction.
-    - Translation-z (Tz): Translation symmetry in the z-direction.
-    - Reflecition (R)   : Reflection symmetry.
-    - Parity (Px)       : Parity symmetry in the x-direction.
-    - Parity (Py)       : Parity symmetry in the y-direction.
-    - Parity (Pz)       : Parity symmetry in the z-direction. 
+    Available symmetry generators for symmetry analysis.
     """
-    
-    # standard symmetries
+
+    # lattice / local operators
     E               = auto()
     Translation_x   = auto()
     Translation_y   = auto()
     Translation_z   = auto()
     Reflection      = auto()
-    ParityX         = auto()
-    ParityY         = auto()
-    ParityZ         = auto()
-    
+    ParityX         = auto()    # spin-only (sigma-x parity)
+    ParityY         = auto()    # spin-only (sigma-y parity)
+    ParityZ         = auto()    # spin-only (sigma-z parity)
+
+    # fermion-specific
+    FermionParity   = auto()    # (−1)^{N}
+    ParticleHole    = auto()    # PH transform
+    TimeReversal    = auto()    # optional placeholder, depends on model
+
     # other symmetries - fallback
     Other           = auto()
 
-    # -----------
+    # ---------------
+    #! HASERS
+    # ---------------
     
     def has_translation(self):
-        """
-        Check if the symmetry is a translation symmetry.
-        """
         return self in [SymmetryGenerators.Translation_x, SymmetryGenerators.Translation_y, SymmetryGenerators.Translation_z]
     
-    # -----------
-
     def has_reflection(self):
-        """
-        Check if the symmetry is a reflection symmetry.
-        """
         return self in [SymmetryGenerators.Reflection]
+    
+    def supported_kind(self) -> Set[LocalSpaceTypes]:
+        if self in [SymmetryGenerators.ParityX, SymmetryGenerators.ParityY, SymmetryGenerators.ParityZ]:
+            return {LocalSpaceTypes.SPIN_1_2, LocalSpaceTypes.SPIN_1}
+        elif self in [SymmetryGenerators.FermionParity, SymmetryGenerators.ParticleHole]:
+            return {LocalSpaceTypes.SPINLESS_FERMIONS}
+        else:
+            return set()
     
     # -----------
 
@@ -140,7 +140,6 @@ class GlobalSymmetries(Enum):
     """
     Global symmetries for representing different symmetry groups.
     """
-    
     U1      = auto()
     Other   = auto()
 

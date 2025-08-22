@@ -7,8 +7,7 @@ Description: This module contains functions to compute the symmetries of a given
 import math
 import numpy as np
 import time
-from functools import partial
-from typing import Callable, Union, Tuple, List, Optional
+from typing import Tuple, Optional
 
 # operator module for operator overloading
 from Algebra.Operator.operator import Operator, SymmetryGenerators
@@ -19,15 +18,33 @@ from general_python.common.binary import rotate_left, rotate_right, flip_all, re
 
 ####################################################################################################
 
-__LATTICE_NONE_ERROR    = "Lattice object is None."
-__LATTICE_DIM2_ERROR    = "Lattice dimension must be at least 2..."
-__LATTICE_DIM3_ERROR    = "Lattice dimension must be at least 3..."
+_LATTICE_NONE_ERROR = "Lattice object is None."
+_LATTICE_DIM2_ERROR = "Lattice dimension must be at least 2..."
+_LATTICE_DIM3_ERROR = "Lattice dimension must be at least 3..."
 
 ####################################################################################################
-# Tanslational Symmetries
+#! Fermionic helpers
 ####################################################################################################
 
-def translation_x(lat, backend='default'):
+def _fermionic_boundary_sign_int_1d(state: int, ns: int, site_moving_mask: int) -> int:
+    """
+    Returns (-1)^{n_cross}, where n_cross is the number of particles that cross the boundary
+    during a cyclic shift. For a left shift by 1 in 1D, particles at site 0 move to site Ns-1 (or vice versa depending on encoding).
+    site_moving_mask marks those crossing sites (usually a single bit).
+    """
+    # Count how many occupied bits cross the boundary:
+    return -1 if ((state & site_moving_mask) != 0) else +1
+
+def _fermionic_boundary_sign_array_1d(state_vec: np.ndarray, crossing_indices: np.ndarray) -> int:
+    # crossing_indices are the indices that wrap around; count occupations mod 2
+    n_cross = int(state_vec[crossing_indices].sum()) & 1
+    return -1 if n_cross == 1 else +1
+
+####################################################################################################
+#! Tanslational Symmetries - spin-1/2
+####################################################################################################
+
+def translation_x(lat: Lattice, backend='default', local_space: Optional['LocalSpace'] = None):
     """
     Translation in the X direction.
     - For 1D: 
@@ -42,7 +59,7 @@ def translation_x(lat, backend='default'):
     """
     
     if lat is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     
     lx          = lat.lx
     ly          = lat.ly if lat.dim > 1 and hasattr(lat, 'ly') else 1
@@ -94,9 +111,9 @@ def translation_y(lat, backend='default'):
     For integer states (binary encoded), it cyclically reassigns entire rows.
     """
     if lat is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     if lat.dim == 1:
-        raise ValueError(__LATTICE_DIM2_ERROR)
+        raise ValueError(_LATTICE_DIM2_ERROR)
 
     lx = lat.lx
     ly = lat.ly if lat.dim > 1 and hasattr(lat, 'ly') else 1
@@ -133,9 +150,9 @@ def translation_z(lat, backend='default'):
     - For integer states: performs a cyclic shift of the z-slices.
     """
     if lat is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     if lat.dim != 3:
-        raise ValueError(__LATTICE_DIM3_ERROR)
+        raise ValueError(_LATTICE_DIM3_ERROR)
     
     lx = lat.lx
     ly = lat.ly
@@ -180,7 +197,7 @@ def translation(lat : Lattice,
         Operator: The translation operator with the defined momentum phase factor.    
     """
     if lat is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     
     if dim is None:
         dim = lat.dim()
@@ -218,7 +235,7 @@ def translation(lat : Lattice,
             type = typek, backend = backend, name = name)
 
 ####################################################################################################
-# Reflection Symmetries
+#! Reflection Symmetries - spin-1/2
 ####################################################################################################
 
 def _reflection(ns : int, backend : str = 'default'):
@@ -242,11 +259,11 @@ def reflection(sec : int, lat : Optional[Lattice] = None, ns : Optional[int] = N
     if lat is not None:
         ns = lat.sites
     elif ns is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     return Operator(lattice = lat, eigval = sec, fun=_reflection(ns, backend), typek=SymmetryGenerators.Reflection)
 
 ####################################################################################################
-# Parity Symmetries
+#! Parity Symmetries - spin-1/2
 ####################################################################################################
 
 # --- Parity Z ---
@@ -265,7 +282,6 @@ def _flip_z(ns: int, backend: str = 'default', spin: bool = BACKEND_DEF_SPIN, sp
         return (state, phase)
     return op
 
-
 def parity_z(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = None,
             backend : str = 'default', spin: bool = BACKEND_DEF_SPIN, spin_value : float = BACKEND_REPR):
     """
@@ -278,7 +294,7 @@ def parity_z(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
     if lat is not None:
         ns = lat.sites
     elif ns is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     return Operator(lattice = lat, eigval = sec, fun=_flip_z(ns, backend, spin, spin_value), typek=SymmetryGenerators.ParityZ)
 
 # --- Parity Y ---
@@ -316,7 +332,7 @@ def parity_y(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
     if lat is not None:
         ns = lat.sites
     elif ns is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     return Operator(lattice = lat, eigval = sec, fun=_flip_y(ns, backend, spin, spin_value), typek=SymmetryGenerators.ParityY)
 
 # --- Parity X ---
@@ -347,7 +363,7 @@ def parity_x(sec : int, ns : Optional[int] = None, lat : Optional[Lattice] = Non
     if lat is not None:
         ns = lat.sites
     elif ns is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     return Operator(lattice = lat, eigval = sec, fun=_flip_x(ns, backend, spin, spin_value), typek=SymmetryGenerators.ParityX)
 
 ####################################################################################################
@@ -383,7 +399,7 @@ def choose(sym_specifier : Tuple[SymmetryGenerators, int],
     if lat is not None:
         ns = lat.sites
     elif ns is None:
-        raise ValueError(__LATTICE_NONE_ERROR)
+        raise ValueError(_LATTICE_NONE_ERROR)
     
     if gen == SymmetryGenerators.Translation_x:
         return translation(lat, kx=eig, dim = lat.dim, direction = LatticeDirection.X)
@@ -669,5 +685,5 @@ class SymmetryTests(GeneralAlgebraicTest):
         self._log(f"Total testing time: {total_time:.6f} sec", 0, "green")
         self._log(separator, 0)
         self._log("Testing completed.", 0, "green")
-        
+
 # -------------------------------------------------------------------------------------------------
