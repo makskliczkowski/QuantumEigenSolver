@@ -3,6 +3,7 @@
 
 import numpy as np
 import numba
+import math
 from enum import Enum
 from typing import Tuple, Union, Optional
 from functools import partial
@@ -13,11 +14,9 @@ from general_python.algebra.utils import JAX_AVAILABLE, get_backend, Array
 if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
-    from jax import lax
 else:
     jax = None
     jnp = np
-    lax = None
     
 # -----------------------------------------------------------------------------
 #! LDOS
@@ -117,69 +116,175 @@ def dos(energies: Array, nbins: int = 100, **kwargs) -> Array:
 #! Matrix elements
 # -----------------------------------------------------------------------------
 
-@numba.njit(fastmath=True)
-def f_function( start               : int,
-                stop                : int,
-                overlaps            : np.ndarray,
-                eigvals             : np.ndarray,
-                omegas_allocated    : np.ndarray,
-                vals_allocated      : np.ndarray,
-                energy_target       : float = 0.0,
-                bw                  : float = 1.0,
-                energy_diff_cut     : float = 0.015):
+@numba.njit(fastmath=True, cache=True)
+def extract_indices_window(
+        start               : int,
+        stop                : int,
+        eigvals             : np.ndarray,
+        indices_alloc       : Optional[np.ndarray] = None,
+        energy_target       : float = 0.0,
+        bw                  : float = 1.0,
+        energy_diff_cut     : float = 0.015,
+        whole_spectrum      : bool  = False):
+    '''
+    Extract indices of eigenvalues within a specified energy window.
+    '''
+
+    if whole_spectrum:
+        return np.empty((0, 2), dtype=np.int64)
+    
+    if indices_alloc is None:
+        indices_alloc = np.empty((0, 2), dtype=np.int64)
+        return indices_alloc
+    
+    cnt     = 0
+    nh      = eigvals.shape[0]
+    tol     = bw * energy_diff_cut
+    j_lo    = 0
+    j_hi    = 0
+
+    # iterate i descending so j_lo/j_hi move forward only
+    for i in range(stop - 1, start - 1, -1):
+        e_i         = eigvals[i]
+        low         = 2.0 * (energy_target - tol) - e_i
+        high        = 2.0 * (energy_target + tol) - e_i
+        print(low, high)
+        # advance j_lo to first eigvals[j] >= low
+        while j_lo < nh and eigvals[j_lo] < low:
+            j_lo += 1
+
+        # strictly upper triangle: j > i
+        if j_lo <= i:
+            j_lo = i + 1
+
+        if j_hi < j_lo:
+            j_hi = j_lo
+
+        print(j_lo, j_hi)
+        
+        # advance j_hi to first eigvals[j] > high  (window is [j_lo, j_hi))
+        while j_hi < nh and eigvals[j_hi] <= high:
+            j_hi += 1
+
+        span = j_hi - j_lo
+        if span <= 0:
+            continue
+
+        end = cnt + span
+        if end > indices_alloc.shape[0]:
+            return indices_alloc[:cnt]
+
+        # fill without allocating arange
+        k = cnt
+        for j in range(j_lo, j_hi):
+            indices_alloc[k, 0] = i
+            indices_alloc[k, 1] = j
+            k += 1
+        cnt = end
+
+    return indices_alloc[:cnt]
+
+@numba.njit(fastmath=True, cache=True)
+def _m2_hermitian(v):
+    # Works for real or complex
+    a = abs(v)
+    return a * a
+
+@numba.njit(fastmath=True, cache=True)
+def _m2_generic(x, y):
+    # |x*y| = |x|*|y|
+    return np.sqrt(abs(x) * abs(y))
+
+# -----------------------------------------------------------------------------
+
+@numba.njit(fastmath=True, cache=True)
+def f_function( overlaps        : np.ndarray,
+                eigvals         : np.ndarray,
+                *,
+                indices_alloc   : Optional[np.ndarray] = None,
+                bins            : Optional[np.ndarray] = None,
+                typical         : bool = False):
     """
-    Computes and allocates omega values and corresponding squared overlaps for pairs of eigenvalues within a specified energy window.
-
-    Parameters:
-        start (int):
-            Starting index for the outer loop over eigenvalues.
-        stop (int):
-            Stopping index (exclusive) for the outer loop over eigenvalues.
-        overlaps (np.ndarray):
-            2D array of overlap values between eigenstates, shape (N, N).
-        eigvals (np.ndarray):
-            1D array of eigenvalues, shape (N,).
-        omegas_allocated (np.ndarray):
-            1D array to store computed omega values.
-        vals_allocated (np.ndarray):
-            1D array to store squared overlap values.
-        energy_target (float, optional):
-            Target energy value for filtering pairs. Default is 0.0.
-        bw (float, optional):
-            Bandwidth parameter for energy window. Default is 1.0.
-        energy_diff_cut (float, optional):
-            Energy difference cutoff factor. Default is 0.015.
-
-    Returns:
-        int: The number of (omega, squared overlap) pairs allocated in the output arrays.
+    Compute the f-function for a given set of overlaps and eigenvalues.
     """
-    tol    = bw * energy_diff_cut
-    cnt    = 0
-    nh     = eigvals.shape[0]
+    
+    nh          = eigvals.shape[0]
+    use_hist    = (bins is not None) and (bins.shape[0] >= 2)
 
-    for i in range(start, stop):
-        e_i    = eigvals[i]
-        # derive allowed e_j range:
-        low    = 2.0*(energy_target - tol) - e_i
-        high   = 2.0*(energy_target + tol) - e_i
+    if use_hist:
+        #! Small allocation - can handle that
+        nbins           = bins.shape[0] - 1
+        counts          = np.zeros(nbins, dtype=np.int64)
+        sums            = np.zeros(nbins, dtype=np.float64)
+        empty_values    = np.empty((0, 2), dtype=np.float64)
+    else:
+        #! Worst-case allocation
+        if indices_alloc is not None and indices_alloc.shape[0] > 0:
+            cap = indices_alloc.shape[0]
+        else:
+            cap = nh * (nh - 1) // 2
+        
+        values = np.empty((cap, 2), dtype=np.float64)
+        counts = np.empty(0, dtype=np.int64)
+        sums   = np.empty(0, dtype=np.float64)
+        cnt    = 0
 
-        # find j‐window via binary search
-        j0     = np.searchsorted(eigvals, low)
-        if j0 <= i:
-            j0 = i + 1
-        j1     = np.searchsorted(eigvals, high)
-        if j1 > nh:
-            j1 = nh
+    if indices_alloc is not None and indices_alloc.shape[0] > 0:
+        #! Fast path over precomputed pairs
+        if use_hist:
+            for k in range(indices_alloc.shape[0]):
+                i       = indices_alloc[k, 0]
+                j       = indices_alloc[k, 1]
+                
+                omega   = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
 
-        # only loop inside the small window
-        for j in range(j0, j1):
-            diff                    = e_i - eigvals[j]
-            omega                   = diff if diff >= 0.0 else -diff
-            m2                      = abs(overlaps[i, j] * overlaps[j, i])
-            omegas_allocated[cnt]   = omega
-            vals_allocated[cnt]     =  m2
-            cnt                    += 1
-    return cnt
+                m2      = _m2_generic(overlaps[i, j], overlaps[j, i])
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+            return empty_values, counts, sums
+        else:
+            cnt = 0
+            for k in range(indices_alloc.shape[0]):
+                i               = indices_alloc[k, 0]
+                j               = indices_alloc[k, 1]
+                
+                omega           = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
+                    
+                m2              = _m2_generic(overlaps[i, j], overlaps[j, i])
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+            return values[:cnt], counts, sums
+
+    # No indices provided: generate the pair set on the fly
+    if use_hist:
+        for i in range(nh):
+            e_i     = eigvals[i]
+            for j in range(i + 1, nh):
+                omega   = abs(e_i - eigvals[j])
+                m2      = _m2_generic(overlaps[i, j], overlaps[j, i])
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+        return np.empty((0, 2), dtype=np.float64), counts, sums
+    else:
+        cnt = 0
+        for i in range(nh):
+            e_i = eigvals[i]
+            for j in range(i + 1, nh):
+                omega           = abs(e_i - eigvals[j])
+                m2              = _m2_generic(overlaps[i, j], overlaps[j, i])
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+        return values[:cnt], counts, sums
 
 # -----------------------------------------------------------------------------
 #! Fidelity susceptibility
@@ -364,59 +469,186 @@ def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: O
 #! K - function
 # -----------------------------------------------------------------------------
 
-@numba.njit(fastmath=True)
-def k_function(ldos     :   np.ndarray,
-            energies    :   np.ndarray,
-            bins        :   np.ndarray,
-            target      :   float = 0.0,
-            tol         :   float = 0.015
-            ):
-    r"""
-    Compute 
-        k(omega) = \sum _{ij} ldos[i] * ldos[j] * delta (omega - |E[j]-E[i]|)
-    using a histogram binning method.
-    
-    Parameters
-    ----------
-    ldos : float64
-        Local density of states (LDOS) at each energy level.
-    energies : float64
-        Energies of the system.
-    bins : float64
-        Bins for histogramming the energy differences.
+@numba.njit(fastmath=True, cache=True)
+def k_function( ldos            : np.ndarray,
+                eigvals         : np.ndarray,
+                indices_alloc   : Optional[np.ndarray] = None,
+                bins            : Optional[np.ndarray] = None,
+                typical         : bool = False):
     """
-    nE   = energies.shape[0]
-    nbin = bins.shape[0] - 1
-    kf   = np.zeros(nbin, ldos.dtype)
-    cnt  = np.zeros(nbin, np.int64)
+    Compute the f-function for a given set of overlaps and eigenvalues.
+    """
+    
+    nh          = eigvals.shape[0]
+    use_hist    = (bins is not None) and (bins.shape[0] >= 2)
 
-    for i in range(nE):
-        ei = energies[i]
-        li = ldos[i]
-        for j in range(i, nE):
-        # for j in range(0, nE):
-            # absolute energy difference
-            ej      = energies[j]
-            
-            # if abs((ei + ej) / 2.0 - target) < tol:
-            #     continue
-            
-            dE      = ei - ej
-            omega   = dE if dE >= 0.0 else -dE
-            
-            # find bin index: largest b such that bins[b] <= omega
-            idx     = np.searchsorted(bins, omega, side='right') - 1
+    if use_hist:
+        #! Small allocation - can handle that
+        nbins           = bins.shape[0] - 1
+        counts          = np.zeros(nbins, dtype=np.int64)
+        sums            = np.zeros(nbins, dtype=np.float64)
+        empty_values    = np.empty((0, 2), dtype=np.float64)
+    else:
+        #! Worst-case allocation
+        if indices_alloc is not None and indices_alloc.shape[0] > 0:
+            cap = indices_alloc.shape[0]
+        else:
+            cap = nh * (nh - 1) // 2
+        
+        values = np.empty((cap, 2), dtype=np.float64)
+        counts = np.empty(0, dtype=np.int64)
+        sums   = np.empty(0, dtype=np.float64)
+        cnt    = 0
 
-            # clamp to valid range [0, nbin−1]
-            if idx < 0:
-                idx = 0
-            elif idx >= nbin:
-                idx = nbin - 1
+    if indices_alloc is not None and indices_alloc.shape[0] > 0:
+        #! Fast path over precomputed pairs
+        if use_hist:
+            for k in range(indices_alloc.shape[0]):
+                i       = indices_alloc[k, 0]
+                j       = indices_alloc[k, 1]
+                
+                omega   = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
 
-            kf[idx]  += li * ldos[j]
-            cnt[idx] += 1
+                m2      = ldos[i] * ldos[j]
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+            return empty_values, counts, sums
+        else:
+            cnt = 0
+            for k in range(indices_alloc.shape[0]):
+                i               = indices_alloc[k, 0]
+                j               = indices_alloc[k, 1]
+                
+                omega           = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
 
-    return kf, cnt
+                m2              = ldos[i] * ldos[j]
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+            return values[:cnt], counts, sums
+
+    # No indices provided: generate the pair set on the fly
+    if use_hist:
+        for i in range(nh):
+            e_i     = eigvals[i]
+            for j in range(i + 1, nh):
+                omega   = abs(e_i - eigvals[j])
+                m2      = ldos[i] * ldos[j]
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+        return np.empty((0, 2), dtype=np.float64), counts, sums
+    else:
+        cnt = 0
+        for i in range(nh):
+            e_i = eigvals[i]
+            for j in range(i + 1, nh):
+                omega           = abs(e_i - eigvals[j])
+                m2              = ldos[i] * ldos[j]
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+        return values[:cnt], counts, sums
+
+# -----------------------------------------------------------------------------
+#! Fourier spectrum function - S(omega) = \sum _{n \neq m} |c_n|^2 |c_m|^2 |O_mn|^2 \delta (omega - |E_m - E_n|)
+# -----------------------------------------------------------------------------
+
+@numba.njit(fastmath=True, cache=True)
+def s_function( ldos            : np.ndarray,
+                overlaps        : np.ndarray,
+                eigvals         : np.ndarray,
+                indices_alloc   : Optional[np.ndarray] = None,
+                bins            : Optional[np.ndarray] = None,
+                typical         : bool = False):
+    """
+    Compute the f-function for a given set of overlaps and eigenvalues.
+    """
+    
+    nh          = eigvals.shape[0]
+    use_hist    = (bins is not None) and (bins.shape[0] >= 2)
+
+    if use_hist:
+        #! Small allocation - can handle that
+        nbins           = bins.shape[0] - 1
+        counts          = np.zeros(nbins, dtype=np.int64)
+        sums            = np.zeros(nbins, dtype=np.float64)
+        empty_values    = np.empty((0, 2), dtype=np.float64)
+    else:
+        #! Worst-case allocation
+        if indices_alloc is not None and indices_alloc.shape[0] > 0:
+            cap = indices_alloc.shape[0]
+        else:
+            cap = nh * (nh - 1) // 2
+        
+        values = np.empty((cap, 2), dtype=np.float64)
+        counts = np.empty(0, dtype=np.int64)
+        sums   = np.empty(0, dtype=np.float64)
+        cnt    = 0
+
+    if indices_alloc is not None and indices_alloc.shape[0] > 0:
+        #! Fast path over precomputed pairs
+        if use_hist:
+            for k in range(indices_alloc.shape[0]):
+                i       = indices_alloc[k, 0]
+                j       = indices_alloc[k, 1]
+                
+                omega   = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
+
+                m2      = ldos[i] * ldos[j] * abs(overlaps[i, j])**2
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+            return empty_values, counts, sums
+        else:
+            cnt = 0
+            for k in range(indices_alloc.shape[0]):
+                i               = indices_alloc[k, 0]
+                j               = indices_alloc[k, 1]
+                
+                omega           = eigvals[i] - eigvals[j]
+                if omega < 0:
+                    omega = -omega
+
+                m2              = ldos[i] * ldos[j] * abs(overlaps[i, j])**2
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+            return values[:cnt], counts, sums
+
+    # No indices provided: generate the pair set on the fly
+    if use_hist:
+        for i in range(nh):
+            e_i     = eigvals[i]
+            for j in range(i + 1, nh):
+                omega   = abs(e_i - eigvals[j])
+                m2      = ldos[i] * ldos[j] * abs(overlaps[i, j])**2
+                b       = np.searchsorted(bins, omega, side='right') - 1
+                if 0 <= b < nbins:
+                    counts[b] += 1
+                    sums[b]   += m2 if not typical else math.log(m2 + 1e-30)
+        return np.empty((0, 2), dtype=np.float64), counts, sums
+    else:
+        cnt = 0
+        for i in range(nh):
+            e_i = eigvals[i]
+            for j in range(i + 1, nh):
+                omega           = abs(e_i - eigvals[j])
+                m2              = ldos[i] * ldos[j] * abs(overlaps[i, j])**2
+                values[cnt, 0]  = omega
+                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
+                cnt            += 1
+        return values[:cnt], counts, sums
 
 # -----------------------------------------------------------------------------
 #! Spectral CDF
@@ -447,6 +679,44 @@ def spectral_cdf(x, y, gammaval = 0.5, BINVAL = 21):
     gammaf      = x[np.argmin(np.abs(cdf - gammaval))]
     return x, y_smoothed, cdf, gammaf
 
+# -----------------------------------------------------------------------------
+#! Survival probability
+# -----------------------------------------------------------------------------
+
+def survival_prob(psi0  : np.ndarray,
+                psi_t   : np.ndarray,
+                *,
+                axis    : int = 0,
+                out     : np.ndarray | None = None) -> np.ndarray:
+    """
+    P_k = |<psi(0) | psi(t_k)>|^2
+
+    psi0 : (H,) complex
+    psi_t : (H, N) complex
+        - axis=0 -> (H, N)  columns are states at times t_k
+        - axis=1 -> (N, H)  rows    are states at times t_k
+    """
+    psi0  = np.asarray(psi0)
+    psi_t = np.asarray(psi_t)
+
+    # Compute amplitudes without creating large temporaries.
+    if axis == 0:   # (H, N)
+        # amp = psi_t^† @ psi0  -> (N,)
+        amp = psi_t.conj().T @ psi0
+    elif axis == 1: # (N, H)
+        # amp = psi_t @ psi0^*  -> (N,)
+        amp = psi_t @ psi0.conj()
+    else:
+        raise ValueError("axis must be 0 (psi_t shape (H,N)) or 1 (psi_t shape (N,H)).")
+
+    # P = |amp|^2 without allocating abs(amp)
+    if out is not None:
+        if out.shape != amp.shape:
+            raise ValueError("Output array has incorrect shape.")
+        out[:] = np.abs(amp)**2
+        return out
+    P = np.abs(amp)**2
+    return P
 
 # -----------------------------------------------------------------------------
 #! Structures

@@ -17,7 +17,7 @@ if JAX_AVAILABLE:
     
     @partial(jax.jit)
     def calculate_slater_det_jax(sp_eigvecs         : jnp.ndarray,      # U matrix (Ns x Norb)
-                                occupied_orbitals   : jnp.ndarray,      # Indices {α_k}
+                                occupied_orbitals   : jnp.ndarray,      # Indices {\alpha_k}
                                 org_basis_state     : Union[int, jnp.ndarray],
                                 ns                  : int
                                 ) -> jnp.ndarray: # Returns JAX array (scalar)
@@ -30,9 +30,9 @@ if JAX_AVAILABLE:
         Args:
             sp_eigvecs (jnp.ndarray):
                 Eigenvector matrix U (shape: Ns x Norb). Assumes columns are eigenvectors,
-                so sp_eigvecs[i, α] = <i|ψ_α>.
+                so sp_eigvecs[i, \alpha] = <i|ψ_\alpha>.
             occupied_orbitals (jnp.ndarray):
-                1D array (length N) of integer indices of the occupied orbitals {α_k}.
+                1D array (length N) of integer indices of the occupied orbitals {\alpha_k}.
             org_basis_state (Union[int, jnp.ndarray]):
                 Represents the Fock state R.
                 If int: 
@@ -71,7 +71,7 @@ if JAX_AVAILABLE:
             valid_indices   = jnp.all(occupied_sites != -1)
 
             #! Construct Slater Matrix M using vectorized indexing
-            # M_{jk} = U_{i_j, α_k} = sp_eigvecs[occupied_sites[j], occupied_orbitals[k]]
+            # M_{jk} = U_{i_j, \alpha_k} = sp_eigvecs[occupied_sites[j], occupied_orbitals[k]]
             row_idx         = occupied_sites[:, None]       # Shape (N, 1)
             col_idx         = occupied_orbitals[None, :]    # Shape (1, N)
             slater_matrix   = sp_eigvecs[row_idx, col_idx]  # Shape (N, N)
@@ -111,7 +111,7 @@ if JAX_AVAILABLE:
     
     @jax.jit
     def calculate_permament_jax(sp_eigvecs          : jnp.ndarray,   # (Ns x Norb) matrix of eigenvectors
-                            occupied_orbitals       : jnp.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {α_k}.
+                            occupied_orbitals       : jnp.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {\alpha_k}.
                             org_basis_state         : Union[int, jnp.ndarray]):
         return 1.0
 else:
@@ -132,7 +132,7 @@ else:
         pass
     
     def calculate_permament_jax(sp_eigvecs          : np.ndarray,   # (Ns x Norb) matrix of eigenvectors
-                            occupied_orbitals       : np.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {α_k}.
+                            occupied_orbitals       : np.ndarray,   # 1D array of integer indices of the occupied single-particle orbitals {\alpha_k}.
                             org_basis_state         : Union[int, np.ndarray]):
         return 1.0
         

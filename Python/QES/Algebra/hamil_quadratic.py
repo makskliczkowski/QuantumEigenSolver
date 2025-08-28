@@ -919,10 +919,10 @@ class QuadraticHamiltonian(Hamiltonian):
         Args:
             occupied_orbitals (list/array):
                 Indices of the occupied single-particle
-                eigenstates (orbitals α or quasiparticles γ).
+                eigenstates (orbitals \alpha or quasiparticles γ).
 
         Returns:
-            The total energy E = Σ_{α\inoccupied} ε_α (or E = Σ_{γ\inoccupied} E_γ for BdG).
+            The total energy E = Σ_{\alpha\inoccupied} ε_\alpha (or E = Σ_{γ\inoccupied} E_γ for BdG).
             Result includes the constant_offset.
         """
         
@@ -1058,7 +1058,7 @@ class QuadraticHamiltonian(Hamiltonian):
         #! Fermions
         if self._isfermions:
             if self._particle_conserving:
-                #! Slater determinant needs (U, α_k) - U is the matrix of eigenvectors
+                #! Slater determinant needs (U, \alpha_k) - U is the matrix of eigenvectors
                 if not hasattr(self, "_occupied_orbitals_cached"):
                     raise RuntimeError( "call many_body_state(...) with "
                                         "`occupied_orbitals` first.")
@@ -1117,7 +1117,7 @@ class QuadraticHamiltonian(Hamiltonian):
         Parameters
         ----------
         occupied_orbitals
-            For **particle-conserving fermions/bosons**: list/array of α_k.
+            For **particle-conserving fermions/bosons**: list/array of \alpha_k.
             Ignored otherwise.
         target_basis
             Currently only `"sites"` is supported.

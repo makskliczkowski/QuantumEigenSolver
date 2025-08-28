@@ -12,7 +12,8 @@ import numpy as np
 import numba
 
 #! private
-_INT_BINARY_REPR       = 2**6
+_INT_BINARY_REPR       = 64
+_INT_HUGE_REPR         = np.iinfo(np.int64).max
 _SYM_NORM_THRESHOLD    = 1e-12
 from general_python.common.binary import bin_search
 from general_python.algebra.utils import get_backend, JAX_AVAILABLE, ACTIVE_INT_TYPE, Array, maybe_jit
@@ -77,8 +78,8 @@ if True:
         # If no mapping exists, find the representative.
         if _sym_group is None or len(_sym_group) == 0:
             return state, 1.0
-        
-        _sec = (1 << _INT_BINARY_REPR) - 1 # by default, using 64-bit integers
+
+        _sec = _INT_HUGE_REPR
         _val = 1.0
         
         # loop over all states in symmetry sectors

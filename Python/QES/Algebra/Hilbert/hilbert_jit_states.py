@@ -238,7 +238,7 @@ def calculate_slater_det(sp_eigvecs         : np.ndarray,
 
 @njit(cache=True)
 def bogolubov_decompose(eig_val, eig_vec, tol = _TOLERANCE) -> Tuple[Array, Array, Array]:
-    """
+    r"""
     Decomposes eigenvalues and eigenvectors into Bogoliubov (u, v) components.
     
     Given the eigenvalues and eigenvectors of a Bogoliubov-de Gennes (BdG) Hamiltonian,
@@ -506,7 +506,7 @@ def _calculate_permanent_core_np(M: np.ndarray):
 
 @njit(cache=True)
 def calculate_permanent(sp_eigvecs          : np.ndarray,   # U matrix (Ns x Norb)
-                        occupied_orbitals   : np.ndarray,   # Indices {α_k}, shape (N,)
+                        occupied_orbitals   : np.ndarray,   # Indices {\alpha_k}, shape (N,)
                         org_basis_state     : Union[int, np.ndarray],
                         ns                  : int
                         ) -> np.complex128:
@@ -519,7 +519,7 @@ def calculate_permanent(sp_eigvecs          : np.ndarray,   # U matrix (Ns x Nor
         sp_eigvecs (np.ndarray):
             Eigenvector matrix U (shape: Ns x Norb).
         occupied_orbitals (np.ndarray):
-            1D array (length N) of occupied orbital indices {α_k}.
+            1D array (length N) of occupied orbital indices {\alpha_k}.
         org_basis_state (Union[int, np.ndarray]):
             Represents the Fock state R (int bitmask or 0/1 array).
         ns (int):
@@ -589,7 +589,7 @@ def _fill_batched_space(   matrix_arg               : np.ndarray,
         matrix_arg (np.ndarray):
             Matrix needed by calculator (e.g., sp_eigvecs U, f_mat).
         occupied_orbitals (np.ndarray):
-            Indices needed by calculator (e.g., orbitals α_k, sites i_p).
+            Indices needed by calculator (e.g., orbitals \alpha_k, sites i_p).
             For the particle occupation representation
         calculator_func (Callable):
             Numba-jitted function (e.g., calculate_slater_det_np).

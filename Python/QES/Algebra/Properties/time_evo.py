@@ -15,6 +15,7 @@ Author  : Maksymilian Kliczkowski
 Date    : 2025-02-01
 """
 
+from turtle import back
 import numpy as np
 import numba
 from enum import Enum
@@ -239,7 +240,7 @@ class QuenchTypes(Enum):
     DW_THIRD_DN= 10 # Domain wall - third down
     MEAN       = 11 # Mean state 
     SEEK       = 12 # Seek state with a given energy
-    
+
 # -----------------------------------------------------------------------------
 
 def create_initial_quench_state(quench_type : QuenchTypes, 
@@ -248,7 +249,8 @@ def create_initial_quench_state(quench_type : QuenchTypes,
                                 Eseek       : float = 0.0, 
                                 energies            = None,
                                 backend             = 'default', 
-                                key                 = None):
+                                key                 = None,
+                                state               = None):
     """
     Creates the initial state vector after a quench.
     
@@ -265,11 +267,13 @@ def create_initial_quench_state(quench_type : QuenchTypes,
         A 1D array of length Nh representing the initial state (one-hot vector).
     """
     # Initialize state to zeros.
-    state = backend.zeros(Nh, dtype=backend.float64)
-    
+    if state is None:
+        state = backend.zeros(Nh, dtype=backend.float64)
+    is_jax = backend == jax
+
     if quench_type == QuenchTypes.RANDP:
         # For RANDP, generate a random bit pattern over Ns bits.
-        if JAX_AVAILABLE and key is not None:
+        if is_jax and key is not None:
             bits = jax.random.bernoulli(key, p=0.5, shape=(Ns,))
             # Convert boolean bits to integer index.
             idx = 0
@@ -376,9 +380,9 @@ def create_initial_quench_state(quench_type : QuenchTypes,
         if quench_type == QuenchTypes.SEEK:
             if Eseek is None:
                 raise ValueError("Eseek must be provided for SEEK quench type.")
-            diff = backend.abs(energies - Eseek)
-            idx = int(backend.argmin(diff))
-            if JAX_AVAILABLE:
+            diff    = backend.abs(energies - Eseek)
+            idx     = int(backend.argmin(diff))
+            if is_jax:
                 state = state.at[idx].set(1.0)
             else:
                 state[idx] = 1.0
@@ -387,14 +391,14 @@ def create_initial_quench_state(quench_type : QuenchTypes,
             diff = backend.abs(energies - mean_val)
             idx = int(backend.argmin(diff))
             print(f"MEAN energy: {mean_val}, chosen index: {idx}")
-            if JAX_AVAILABLE:
+            if is_jax:
                 state = state.at[idx].set(1.0)
             else:
                 state[idx] = 1.0
 
     else:
         # Default: set the first element.
-        if JAX_AVAILABLE:
+        if is_jax:
             state = state.at[0].set(1.0)
         else:
             state[0] = 1.0

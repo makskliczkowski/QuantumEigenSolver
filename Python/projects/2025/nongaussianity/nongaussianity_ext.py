@@ -21,7 +21,7 @@ print("Library path:", lib_path, "\n\tWith folders:", os.listdir(lib_path))
 sys.path.insert(0, str(lib_path))
 
 #! -----
-os.environ['BACKEND'] = 'numpy'
+os.environ['QES_BACKEND'] = 'numpy'
 #! -----
 
 # ---------------------------------------------------------------------

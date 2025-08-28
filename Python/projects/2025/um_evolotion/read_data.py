@@ -1,6 +1,6 @@
 import sys
 import os
-os.environ['BACKEND'] = 'numpy'
+os.environ['QES_BACKEND'] = 'numpy'
 
 # Add the parent directory (project root) to sys.path
 script_dir                  = os.path.dirname(os.curdir)
