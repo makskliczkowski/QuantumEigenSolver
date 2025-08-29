@@ -13,10 +13,12 @@ os.environ['QES_LOGFILE']   = '0'       # Disable logging to file
 
 cwd         = Path.cwd()
 mod_path    = Path(__file__).resolve()
+file_path   = Path(__file__).parent
 qes_path    = Path(__file__).parent.parent.parent.parent
 lib_path    = qes_path / 'QES'
 gen_python  = lib_path / 'general_python'
 print("-> Current working directory:", cwd)
+print("-> File path:", file_path)
 print("-> Module path:", mod_path)
 print("-> QES path:", qes_path)
 print("-> General Python path:", gen_python)
@@ -111,11 +113,11 @@ class EvolutionData:
     h_av_full           : Dict[str, HistogramAverage] = field(default_factory=dict) #! NEW
     time_steps          : Dict[str, HistogramAverage] = field(default_factory=dict)
     
-    k_functions         : np.ndarray = field(default_factory=dict) #! NEW
-    k_functions_full    : np.ndarray = field(default_factory=dict) #! NEW
+    k_functions         : HistogramAverage = field(default_factory=dict) #! NEW
+    k_functions_full    : HistogramAverage = field(default_factory=dict) #! NEW
 
-    s_functions         : Dict[str, np.ndarray] = field(default_factory=dict) #! NEW
-    s_functions_full    : Dict[str, np.ndarray] = field(default_factory=dict) #! NEW
+    s_functions         : Dict[str, HistogramAverage] = field(default_factory=dict) #! NEW
+    s_functions_full    : Dict[str, HistogramAverage] = field(default_factory=dict) #! NEW
 
 #! ------------------
 
@@ -234,12 +236,12 @@ class EvolutionData:
 
         #! NEW, s_functions
         for name in self.operators:
-            d[f'historgram/{name}/s_functions/values'] = self.s_functions[name].averages_av()
+            d[f's_function/{name}/values'] = self.s_functions[name].averages_av()
 
         #! NEW, update with full s-functions
         for name in self.operators:
-            d[f'historgram/{name}/s_functions/full/values'] = self.s_functions_full[name].averages_av()
-        
+            d[f's_function/{name}/full/values'] = self.s_functions_full[name].averages_av()
+
         return d
 
     def _build_diag_dict(self, completed: int) -> dict:

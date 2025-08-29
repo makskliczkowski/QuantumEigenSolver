@@ -18,7 +18,8 @@ try:
             Timer,
             Directories, 
             UltrametricModel, PowerLawRandomBanded, Hamiltonian,
-            create_model
+            create_model,
+            file_path
         )
     
     # log
@@ -116,21 +117,20 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
 
     #! compute the indices for the histograms
     if edata.indices_omegas is None or edata.indices_omegas.shape[0] <= 0:
-        capacity                = int(2**(np.log(edata.hilbert_size) - 2))
-        edata.indices_omegas    = np.empty((capacity, 2), dtype=np.int64)
+        capacity                = edata.hilbert_size # idx_i, idx_j_start, idx_j_end
+        edata.indices_omegas    = np.empty((capacity, 3), dtype=np.int64)
         
     with Timer(f"Histogram indices: r = {r}, alpha = {edata.alpha:.2f}, ns = {edata.ns}, nh = {edata.hilbert_size}", logger=logger, logger_args = {'lvl':3, 'color':'red'}):
-        edata.indices_omegas = statistical.extract_indices_window(
+        edata.indices_omegas, cnt = statistical.extract_indices_window(
             start           = 0,
             stop            = edata.hilbert_size,
             eigvals         = model.eig_val,
-            indices_alloc   = edata.indices_omegas,
             bw              = bandwidth,
             energy_diff_cut = 0.015,
             energy_target   = edata.mean_energy,
             whole_spectrum  = False
         )
-    print(f"indices_omegas: {edata.indices_omegas}")
+        indices_local = edata.indices_omegas[:cnt]
 
     #! accumulate into the single histogram
     for name in edata.operators.keys():
@@ -142,26 +142,30 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
 
         #! F-Function
         with Timer(f"{name} F-Function", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
-            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=edata.indices_omegas, bins=edata.edges)
+            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices_alloc=indices_local, bins=edata.edges, uniform_log_bins=True)
             edata.h_av[name].add(sums, counts)
-            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=edata.indices_omegas, bins=edata.edges, typical=True)
+            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices_alloc=indices_local, bins=edata.edges, typical=True, uniform_log_bins=True)
             edata.h_typ[name].add(sums, counts)
             # full
-            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=None, bins=edata.edges)
+            _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices_alloc=None, bins=edata.edges, uniform_log_bins=True)
             edata.h_av_full[name].add(sums, counts)
             
         #! K-Function
         with Timer(f"{name} K-Function", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
-            _, counts, sums = statistical.k_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=edata.indices_omegas, bins=edata.edges)
+            _, counts, sums = statistical.k_function(ldos=edata.ldos[r], eigvals=model.eig_val, 
+                                                    indices_alloc=indices_local, bins=edata.edges, uniform_log_bins=True)
             edata.k_functions.add(sums, counts)
-            _, counts, sums = statistical.k_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=None, bins=edata.edges)
+            _, counts, sums = statistical.k_function(ldos=edata.ldos[r], eigvals=model.eig_val, 
+                                                    indices_alloc=None, bins=edata.edges, uniform_log_bins=True)
             edata.k_functions_full.add(sums, counts)
 
         #! S-Function
         with Timer(f"{name} S-Function", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
-            _, counts, sums = statistical.s_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=edata.indices_omegas, bins=edata.edges)
+            _, counts, sums = statistical.s_function(ldos=edata.ldos[r], overlaps=matrix_elements,
+                                        eigvals=model.eig_val, indices_alloc=indices_local, bins=edata.edges, uniform_log_bins=True)
             edata.s_functions[name].add(sums, counts)
-            _, counts, sums = statistical.s_function(overlaps=matrix_elements, eigvals=model.eig_val, indices=None, bins=edata.edges)
+            _, counts, sums = statistical.s_function(ldos=edata.ldos[r], overlaps=matrix_elements,
+                                        eigvals=model.eig_val, indices_alloc=None, bins=edata.edges, uniform_log_bins=True)
             edata.s_functions_full[name].add(sums, counts)
 
         #! fidelity susceptibility
@@ -179,15 +183,18 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
     
     #! time evolution - compute the expectation values
     if not batch_limit(edata.ns):
+        logger.info(f"ns = {edata.ns}, alpha = {edata.alpha:.2f}, r = {r} computing time evolution for operator {name} in one go", lvl=4, color='blue')
         # Small systems: compute all at once
-        with Timer(f"Time Evolution: overlaps", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
-            evolved_overlaps            = np.exp(-1j * np.outer(model.eig_val, edata.time_steps)) * overlaps[:, np.newaxis]
-            quench_states_t             = model.eig_vec @ evolved_overlaps
+        with Timer(f"Time Evolution: overlaps", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
+            # evolved_overlaps   = np.exp(-1j * np.outer(model.eig_val, edata.time_steps)) * overlaps[:, np.newaxis]
+            # quench_states_t    = model.eig_vec @ evolved_overlaps
+            quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
+
+        with Timer(f"Survival Probability", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
             edata.survival_proba[r, :]  = statistical.survival_prob(psi0 = quench_state, psi_t = quench_states_t)
 
         for name in edata.operators.keys():
-            with Timer(f"{name} Time Evolution", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
-                logger.info(f"ns = {edata.ns}, alpha = {edata.alpha:.2f}, r = {r} computing time evolution for operator {name} in one go", lvl=4, color='blue')
+            with Timer(f"{name} Time Evolution", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
                 quenched_values_t               = np.einsum('ij,ji->i', np.conj(quench_states_t.T), edata.operators_mat[name] @ quench_states_t)
                 edata.time_vals[name][r, :]     = np.real(quenched_values_t)
     else:
@@ -213,7 +220,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
                 evolved_overlaps_batch  = np.exp(-1j * np.outer(model.eig_val, batch_times)) * overlaps[:, np.newaxis]
                 quench_states_batch     = model.eig_vec @ evolved_overlaps_batch
                 for name in edata.operators.keys():
-                    with Timer(f"{name} Time Evolution: batch {i+1}/{batch_count}", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
+                    with Timer(f"{name} Time Evolution: batch {i+1}/{batch_count}", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
                         values_batch                                = np.einsum('ij,ji->i', np.conj(quench_states_batch.T), edata.operators_mat[name] @ quench_states_batch)
                         edata.time_vals[name][r, start_idx:end_idx] = np.real(values_batch)
                 del quench_states_batch, evolved_overlaps_batch
@@ -242,11 +249,17 @@ def _single_alpha(modelstr : 'str' = 'um', evolution_data : EvolutionData = None
         else:
             logger.warning(f"Realization {r} failed or was skipped due to timeout")
             break
-    logger.info(f"Completed {completed_realizations}/{evolution_data.realizations} realizations for ns={evolution_data.ns}, alpha={evolution_data.alpha:.2f}.")
+        
+    # log me
+    logger.info(f"Completed {completed_realizations}/{evolution_data.realizations} realizations for ns={evolution_data.ns}, alpha={evolution_data.alpha:.2f}.",
+                lvl=2, color='green' if completed_realizations == evolution_data.realizations else 'yellow')
     
     #! save the data
-    if completed_realizations > 0:
-        logger.info(f"ns = {evolution_data.ns}, alpha = {evolution_data.alpha:.2f} saving data to {data_dir_in} - random number: {rand_num}", lvl=2, color='green')
+    with Timer(f"Saving data: ns = {evolution_data.ns}, alpha = {evolution_data.alpha:.2f}", logger=logger, logger_args = {'lvl':3, 'color':'green'}):
+        if completed_realizations > 0:
+            evolution_data.save_all(directory=data_dir_in, rand_num=sim_params.rand_num, completed=completed_realizations)
+        else:
+            logger.warning(f"No completed realizations to save for ns={evolution_data.ns}, alpha={evolution_data.alpha:.2f}.")
 
     logger.info(f"ns = {evolution_data.ns}, alpha = {evolution_data.alpha:.2f} done in {time.perf_counter() - time_start_a:.2f} s", lvl=2, color='green')
 
@@ -468,8 +481,8 @@ if __name__ == "__main__":
         logger.info(f"Random seed set to {seed}", lvl=2, color='yellow')
 
     rand_num            = rng.integers(0, int(1e5))
-    bw_df               = pd.read_csv("./model/bw.csv", index_col=0, header=None, dtype=float)
-    mls_df              = pd.read_csv("./model/mls.csv", index_col=0, header=None, dtype=float)
+    bw_df               = pd.read_csv(f"{file_path}/model/bw.csv", index_col=0, header=None, dtype=float)
+    mls_df              = pd.read_csv(f"{file_path}/model/mls.csv", index_col=0, header=None, dtype=float)
     bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
     mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
     bw_df.columns       = list(range(7, 17))
@@ -488,7 +501,7 @@ if __name__ == "__main__":
                                 args.alpha_step)
     sites           = list(range(args.sites_start, args.sites_end + 1))
     operators_map   = { op_spin.sig_z(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0]).name: make_sig_z_global }
-    n_reals         = {ns: args.number_of_realizations for ns in sites}
+    n_reals         = {ns: args.number_of_realizations for ns in sites} if isinstance(args.number_of_realizations, int) else args.number_of_realizations
     time_num        = args.time_num
     modelstr        = args.model
 

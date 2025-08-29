@@ -168,6 +168,98 @@ def time_evo_block(eigenstates          : Array,
     # Compute expectation values for all times
     return quenched_states_t
 
+def time_evo_block_optimized(
+    eig_vec     : np.ndarray,           # shape (M, N), eigenvectors as columns
+    eig_val     : np.ndarray,           # shape (N,)
+    overlaps    : np.ndarray,           # shape (N,)
+    time_steps  : np.ndarray,           # shape (T,)
+    *,
+    out         : np.ndarray | None = None,    # optional preallocated (M, T) complex
+    dtype       = np.complex128,               # output/compute dtype
+    block_cols  : int | None = None,           # if None, auto; else number of time columns per block
+    max_temp_gb : float | None = 1.0           # soft cap for temporary phases (in GiB) when block_cols is None
+    ) -> np.ndarray:
+    """
+    Compute quench states for arbitrary times:
+        Q(:, t_k) = eig_vec @ (exp(-i * eig_val * t_k) * overlaps)
+
+    Memory/perf notes:
+    - Uses a single NtimesT temporary "phases" when it fits under `max_temp_gb`,
+        then one GEMM. Otherwise processes in blocks of `block_cols`.
+    - Ensures Fortran order for the right operand of GEMM and for the output.
+
+    Shapes:
+        eig_vec     : (M, N)
+        eig_val     : (N,)
+        overlaps    : (N,)
+        time_steps  : (T,)
+        returns out : (M, T) with dtype `dtype`
+    """
+    
+    # ---- sanitize & dtypes ----
+    E   = np.ascontiguousarray(eig_val, dtype=np.float64)           # real energies
+    ovl = np.ascontiguousarray(overlaps, dtype=dtype)               # complex overlaps
+    t   = np.ascontiguousarray(time_steps, dtype=np.float64)        # real times
+
+    # BLAS likes column-major on the right operand; left matrix can be either, but
+    # giving it Fortran also helps. Cast once to target dtype.
+    V   = np.asfortranarray(eig_vec, dtype=dtype)
+
+    M, N    = V.shape
+    T       = t.size
+    if E.size != N or ovl.size != N:
+        raise ValueError("Shape mismatch: eig_vec (M,N), eig_val (N,), overlaps (N,) must agree.")
+
+    # prepare output
+    if out is None:
+        out = np.empty((M, T), dtype=dtype, order='F')
+    else:
+        if out.shape != (M, T):
+            raise ValueError(f"'out' must be shape {(M, T)}, got {out.shape}.")
+        if out.dtype != dtype:
+            raise ValueError(f"'out' dtype must be {dtype}, got {out.dtype}.")
+        # ensure Fortran for better slice assignment into columns
+        if not out.flags.f_contiguous:
+            out = np.asfortranarray(out)
+
+    #! choose blocking - this is important for large T
+    if block_cols is None:
+        if max_temp_gb is None:
+            max_temp_gb = 1.0 # sensible default
+        bytes_per_c128  = np.dtype(dtype).itemsize
+        # NtimesB complex buffer; try to keep under cap (leave ~20% headroom for intermediates)
+        max_bytes       = int(max_temp_gb * (1024**3) * 0.8)
+        # ensure at least 1 column
+        block_cols      = max(1, min(T, max_bytes // max(1, (N * bytes_per_c128))))
+        # if it all fits comfortably, do everything at once
+        if block_cols >= T:
+            block_cols = T
+
+    #! full GEMM path (fits in memory)
+    if block_cols == T:
+        # Build phases once: phases = exp(-i * E[:,None] * t[None,:]) * overlaps[:,None]
+        # Make it Fortran for BLAS (right operand).
+        phases = np.asfortranarray(np.exp(-1j * (E[:, None] * t[None, :])), dtype=dtype)
+        # Row-scale in-place by overlaps (avoid extra temp)
+        np.multiply(phases, ovl[:, None], out=phases)
+        # One GEMM
+        out[:, :] = V @ phases
+        return out
+
+    #! blocked path (arbitrary times, large T)
+    # Precompute E[:,None] once to save tiny broadcast overhead inside the loop
+    Ecol = E.reshape(N, 1)
+    for p in range(0, T, block_cols):
+        q           = min(p + block_cols, T)
+        t_blk       = t[p:q].reshape(1, q - p)  # (1, B)
+        # phases_blk = exp(-i * (E[:,None] * t_blk))  -> (N, B), Fortran order
+        phases_blk  = np.asfortranarray(np.exp(-1j * (Ecol * t_blk)), dtype=dtype)
+        # scale rows by overlaps in-place
+        np.multiply(phases_blk, ovl[:, None], out=phases_blk)
+        # GEMM for the block
+        out[:, p:q] = V @ phases_blk
+    return out
+
 def time_evo_evaluate(quenched_states_t : Array,
                     quench_operator_m   : Array) -> Array:
     """
