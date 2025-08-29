@@ -103,6 +103,11 @@ class EvolutionData:
     par_ent_quench      : Dict[float, np.ndarray] = field(default_factory=dict)
     quench_energies     : np.ndarray = field(init=False)
 
+    # FFT data
+    fft_omegas          : np.ndarray = field(init=False) #! NEW
+    fft_results         : Dict[str, np.ndarray] = field(init=False) #! NEW
+    fft_n               : Dict[str, np.ndarray] = field(init=False) #! NEW
+
     survival_proba      : np.ndarray = field(init=False) #! NEW
 
     # histograms
@@ -183,6 +188,26 @@ class EvolutionData:
             self.time_steps = np.linspace(t0, t0 + dt_step*self.time_num, num=self.time_num, dtype=dt)
         else:
             self.time_steps = np.logspace(-2, np.log10(hs*100), num=self.time_num, dtype=dt)
+        
+        #! FFT data
+        try:
+            # 1) calculate the time delta and number of time steps
+            # 2) calculate the FFT frequencies and take only the positive frequencies
+            # 3) calculate the FFT of the time evolution data, normalize it, and take the positive frequencies
+            # 4) normalize the FFT by the number of samples
+            if self.uniform:
+                data_evo_time           = self.time_steps
+                time_delta              = data_evo_time[1] - data_evo_time[0]
+                time_num                = data_evo_time.shape[-1]
+                self.fft_omegas         = np.fft.rfftfreq(time_num, d=time_delta) * 2 * np.pi
+                self.fft_results        = {name: np.zeros((self.realizations, time_num//2 - 1), dtype=dt) for name in self.operators}
+                self.fft_n              = {name: np.zeros(self.realizations, dtype=dt) for name in self.operators}
+            else:
+                self.fft_omegas         = np.empty((0,), dtype=dt)
+                self.fft_results        = {name: np.zeros((self.realizations, self.fft_omegas.shape[0]), dtype=dt) for name in self.operators}
+                self.fft_n              = {name: np.zeros(self.realizations, dtype=dt) for name in self.operators}
+        except Exception as e:
+            print(f"Error in FFT calculation: {e}")
 
     ##########################################################
     #! saving helpers
@@ -229,10 +254,10 @@ class EvolutionData:
             d[f'historgram/{name}/full/average/values'] = self.h_av_full[name].averages_av()
 
         #! NEW, k_functions
-        d[f'historgram/k_function/values'] = self.k_functions.averages_av()
+        d[f'k_function/values'] = self.k_functions.averages_av()
 
         #! NEW, update with full k-functions
-        d[f'historgram/k_function/full/values'] = self.k_functions_full.averages_av()
+        d[f'k_function/full/values'] = self.k_functions_full.averages_av()
 
         #! NEW, s_functions
         for name in self.operators:
@@ -241,6 +266,21 @@ class EvolutionData:
         #! NEW, update with full s-functions
         for name in self.operators:
             d[f's_function/{name}/full/values'] = self.s_functions_full[name].averages_av()
+
+        #! NEW, calculate s_times_f
+        for name in self.operators:
+            k_times_hist                            = d[f'k_function/values'] * d[f'historgram/{name}/average/values']
+            k_times_hist[np.isnan(k_times_hist)]   /= np.trapz(k_times_hist, self.edges)
+            d[f'k_times_f/{name}/values']           = k_times_hist
+            # full
+            k_times_hist_full                               = d[f'k_function/full/values'] * d[f'historgram/{name}/full/average/values']
+            k_times_hist_full[np.isnan(k_times_hist_full)] /= np.trapz(k_times_hist_full, self.edges)
+            d[f'k_times_f/{name}/full/values']              = k_times_hist_full
+        
+            # mix, use full k and normal f
+            k_times_hist_mix                                = d[f'k_function/full/values'] * d[f'historgram/{name}/average/values']
+            k_times_hist_mix[np.isnan(k_times_hist_mix)]   /= np.trapz(k_times_hist_mix, self.edges)
+            d[f'k_times_f/{name}/mix/values']               = k_times_hist_mix
 
         return d
 
@@ -256,9 +296,18 @@ class EvolutionData:
             'time_evolution/quench/survival'    : self.survival_proba[:completed],
             'completed_realizations'            : completed,
         }
+        if self.uniform:
+            d[f'fft/fft_omega']   = self.fft_omegas
+            
         for name in self.operators:
             d[f'time_evolution/{name}/expectation'] = self.time_vals[name][:completed]
             d[f'time_evolution/{name}/diag_ens']    = self.diagonal_ensembles[name][:completed]
+            # fft
+            if self.uniform:
+                for name in self.operators:
+                    d[f'fft/{name}/fft']     = self.fft_results[name][:completed]
+                    d[f'fft/{name}/fft_n']   = self.fft_n[name][:completed]
+
         return d
     
     def _build_fid_dict(self, completed: int) -> dict:

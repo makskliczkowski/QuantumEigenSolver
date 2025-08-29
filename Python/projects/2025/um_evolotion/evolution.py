@@ -190,13 +190,28 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
             # quench_states_t    = model.eig_vec @ evolved_overlaps
             quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
 
+
         with Timer(f"Survival Probability", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
             edata.survival_proba[r, :]  = statistical.survival_prob(psi0 = quench_state, psi_t = quench_states_t)
+
 
         for name in edata.operators.keys():
             with Timer(f"{name} Time Evolution", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
                 quenched_values_t               = np.einsum('ij,ji->i', np.conj(quench_states_t.T), edata.operators_mat[name] @ quench_states_t)
                 edata.time_vals[name][r, :]     = np.real(quenched_values_t)
+
+            if edata.uniform:
+                with Timer(f"FFT", logger=logger, logger_args = {'lvl':6, 'color':'yellow'}):
+                    # remove the diagonal ens
+                    time_norm                       = 2 / np.sqrt(edata.time_num)
+                    data_evo_av                     = edata.time_vals[name][r, :] - edata.diagonal_ensembles[name][r]
+                    #! calculate FFT
+                    data_evo_fft_base               = np.fft.rfft(data_evo_av) * time_norm
+                    data_evo_fft                    = np.abs(data_evo_fft_base)**2 / edata.time_num**2
+                    data_evo_fft_n                  = np.trapz(data_evo_fft, x=edata.fft_omegas, axis=0)
+                    data_evo_fft                    = data_evo_fft / data_evo_fft_n
+                    edata.fft_results[name][r, :]   = data_evo_fft[1:-1] # Exclude the zero frequency and Nyquist
+                    edata.fft_n[name][r]            = data_evo_fft_n
     else:
         # Large systems: batch processing
         batch_count             = batch_num(edata.ns)
@@ -360,6 +375,12 @@ def make_sig_z_global(ns):
         type_act    = op_spin.OperatorTypeActing.Global,
         sites       = [0])
 
+def make_sig_x_global(ns):
+    return op_spin.sig_x(
+        ns          = ns,
+        type_act    = op_spin.OperatorTypeActing.Global,
+        sites       = [0, 5])
+
 #! -------------------------------------------------------
 
 def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, 
@@ -500,7 +521,12 @@ if __name__ == "__main__":
                                 args.alpha_start + args.alpha_step * args.alphas_number,
                                 args.alpha_step)
     sites           = list(range(args.sites_start, args.sites_end + 1))
-    operators_map   = { op_spin.sig_z(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0]).name: make_sig_z_global }
+    
+    #! operators
+    operators_map   = {}
+    operators_map.update({ op_spin.sig_z(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0]).name: make_sig_z_global })
+    operators_map.update({ op_spin.sig_x(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0,5]).name: make_sig_x_global })
+    
     n_reals         = {ns: args.number_of_realizations for ns in sites} if isinstance(args.number_of_realizations, int) else args.number_of_realizations
     time_num        = args.time_num
     modelstr        = args.model
