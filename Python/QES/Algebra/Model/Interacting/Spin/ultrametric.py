@@ -194,21 +194,26 @@ class UltrametricModel(hamil_module.Hamiltonian):
         return _hedit
     
     # ---------------------------------------------------------------
-    
-    def __repr__(self):
+
+    @staticmethod
+    def repr(**kwargs):
         prec    = 3          # decimal places for floats
         tol     = 1e-10      # tolerance for uniformity check
         sep     = ","        # parameter separator
+        ns      = kwargs.get('ns', None)
+        n       = kwargs.get('n', None)
+        J       = kwargs.get('J', 1.0)
+        g       = kwargs.get('g', 1.0)
+        a       = kwargs.get('alphas', None)
         
         parts   = [
-            f"Ultrametric(ns={self.ns}",
-            f"N={self.n}",
-            self.fmt("J", self.J),
-            self.fmt("g", self.gamma),
+            f"Ultrametric(ns={ns}",
+            f"N={n}",
+            hamil_module.Hamiltonian.fmt("J", J),
+            hamil_module.Hamiltonian.fmt("g", g),
         ]
 
         # handle alphas array or scalar
-        a = self.alphas
         try:
             amin, amax = min(a), max(a)
             if abs(amax - amin) < tol:
@@ -216,9 +221,11 @@ class UltrametricModel(hamil_module.Hamiltonian):
             else:
                 parts.append(f"a[min={amin:.{prec}f}, max={amax:.{prec}f}]")
         except TypeError:
-            parts.append(self.fmt("a", a))
-
+            parts.append(hamil_module.Hamiltonian.fmt("a", a, prec))
         return sep.join(parts) + ")"
+            
+    def __repr__(self):
+        return self.repr(ns=self.ns, n=self.n, J=self.J, g=self.gamma, alphas=self.alphas)
         
     def __str__(self):
         return self.__repr__()

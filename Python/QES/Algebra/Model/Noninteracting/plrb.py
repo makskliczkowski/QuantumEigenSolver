@@ -118,6 +118,13 @@ class PowerLawRandomBanded(hamil_module.Hamiltonian):
     
     # ---------------------------------------------------------------
     
+    @staticmethod
+    def repr(**kwargs) -> str:
+        ns  = kwargs.get('ns', '?')
+        a   = kwargs.get('a', 1.0)
+        b   = kwargs.get('b', 1.0)
+        return f"PLRB(ns={ns},a={a:.3f},b={b:.3f})"
+
     def __repr__(self):
         return f"PLRB(ns={self.ns},a={self.a:.3f},b={self.b:.3f})"
 

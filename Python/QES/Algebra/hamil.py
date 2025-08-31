@@ -273,7 +273,11 @@ class Hamiltonian(ABC):
             self._iscpx = jnp.iscomplexobj(self._dtype)
         else:
             self._iscpx = np.iscomplexobj(self._dtype)        
-        
+
+    @staticmethod
+    def repr(**kwargs):
+        return "Hamiltonian"
+
     # ----------------------------------------------------------------------------------------------
     
     def _log(self, msg : str, log : str = 'info', lvl : int = 0, color : str = "white"):
@@ -1729,9 +1733,9 @@ class Hamiltonian(ABC):
         return f"{name}[min={arr.min():.{prec}f},max={arr.max():.{prec}f}]"
 
     @staticmethod
-    def fmt(name, value):
+    def fmt(name, value, prec=1):
         """Choose scalar vs array formatter."""
-        return Hamiltonian._fmt_scalar(name, value) if np.isscalar(value) else Hamiltonian._fmt_array(name, value)
+        return Hamiltonian._fmt_scalar(name, value, prec=prec) if np.isscalar(value) else Hamiltonian._fmt_array(name, value, prec=prec)
 # --------------------------------------------------------------------------------------------------
 
 def test_generic_hamiltonian(ham: Hamiltonian, ns: int):
