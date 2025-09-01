@@ -22,9 +22,9 @@ python ./evolution.py \
     --alpha_start 0.7 \
     --alpha_step 0.1 \
     --alphas_number 3 \
-    --sites_start 11 \
-    --sites_end 12 \
-    --number_of_realizations 2 \
+    --sites_start 8 \
+    --sites_end 9 \
+    --number_of_realizations 30 \
     --n 1 \
     --time_num 100000 \
     --memory_per_worker 64 \
