@@ -274,7 +274,7 @@ def read_energy(
             bandwidth_data          = np.mean(np.max(data_energy, axis=1) - np.min(data_energy, axis=1))    # mean bandwidth of the energy levels
             mean_lvl_spacing        = np.mean(np.mean(differences, axis = 1), axis=0)                       # mean level spacing over all samples
             mean_lvl_spacing_c_100  = np.mean(np.mean(differences[:, hilber_dim//2 - 50: hilber_dim//2 + 50], axis = 1), axis=0) if hilber_dim > 100 else mean_lvl_spacing
-                    
+            
             # gap ratio
             gap_ratios              = np.minimum(differences[:, :-1], differences[:, 1:]) / np.maximum(differences[:, :-1], differences[:, 1:])
             mean_gap_ratio          = np.nanmean(np.mean(gap_ratios, axis=1) if gap_ratios.size > 0 else np.nan)

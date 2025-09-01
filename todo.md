@@ -4,10 +4,10 @@ Here, we place current todos.
 
 ## Project: Fading ergodicity and the random matrix ensembles
 
-- [ ] Check whether $\sigma_t ^2 $ is always $\leq P_s$ for the initial states in the eigenbasis. For that take the participation that we have and do the size scaling.
+- [x] Check whether $\sigma_t ^2 $ is always $\leq P_s$ for the initial states in the eigenbasis. For that take the participation that we have and do the size scaling.
 - [ ] Check how the LDOS looks like for the UM model. Plot it as a function of $\gamma$
 - [ ] Check whether weighted time average in Eq.(18) is necessary
-- [ ] Check whether temporal fluctuations depend on the choice of initial time $t_0$.
+- [x] Check whether temporal fluctuations depend on the choice of initial time $t_0$.
 - [ ] Check slopes of the power spectrum.
 - [ ] Check the exact Eq.(28) computation in the same bins as the f-function
 - [ ] Check whether the spectral function changes when evaluated over whole spectrum - choose single parameter $\gamma$.
