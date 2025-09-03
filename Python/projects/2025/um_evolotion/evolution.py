@@ -208,7 +208,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
                     #! calculate FFT
                     data_evo_fft_base               = np.fft.rfft(data_evo_av) * time_norm
                     data_evo_fft                    = np.abs(data_evo_fft_base)**2 / edata.time_num**2
-                    data_evo_fft_n                  = np.trapezoid(data_evo_fft, x=edata.fft_omegas, axis=0)
+                    data_evo_fft_n                  = np.trapz(data_evo_fft, x=edata.fft_omegas, axis=0)
                     data_evo_fft                    = data_evo_fft / data_evo_fft_n
                     edata.fft_results[name][r, :]   = data_evo_fft[1:-1] # Exclude the zero frequency and Nyquist
                     edata.fft_n[name][r]            = data_evo_fft_n

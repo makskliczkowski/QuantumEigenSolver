@@ -186,7 +186,7 @@ def _m2_hermitian(v):
 @numba.njit(fastmath=True, cache=True)
 def _m2_generic(x, y):
     # |x*y| = |x|*|y|
-    return np.sqrt(abs(x) * abs(y))
+    return abs(x) * abs(y)
 
 @numba.njit(fastmath=True, cache=True)
 def _omega_abs(ei, ej):
