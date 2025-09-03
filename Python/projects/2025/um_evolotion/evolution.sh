@@ -18,12 +18,12 @@ chmod +x ./evolution.py
 # 10. memory per job
 # 11. maximal memory
 python ./evolution.py \
-    --save_dir data_big_times_test \
+    --save_dir data_big_times_fixed_f \
     --alpha_start 0.7 \
     --alpha_step 0.1 \
     --alphas_number 3 \
     --sites_start 8 \
-    --sites_end 9 \
+    --sites_end 10 \
     --number_of_realizations 30 \
     --n 1 \
     --time_num 100000 \
