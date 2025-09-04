@@ -17,13 +17,14 @@ chmod +x ./evolution.py
 # 9. number of timesteps
 # 10. memory per job
 # 11. maximal memory
+    # --save_dir data_big_times_fixed_f \
 python ./evolution.py \
-    --save_dir data_big_times_fixed_f \
+    --save_dir data_log \
     --alpha_start 0.66 \
     --alpha_step 0.02 \
     --alphas_number 7 \
-    --sites_start 8 \
-    --sites_end 12 \
+    --sites_start 7 \
+    --sites_end 10 \
     --number_of_realizations 50 \
     --n 1 \
     --time_num 100000 \
