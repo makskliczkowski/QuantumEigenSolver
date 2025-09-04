@@ -384,7 +384,9 @@ def make_sig_x_global(ns):
 #! -------------------------------------------------------
 
 def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, 
-                time_num, operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers, seed, modelstr):
+                time_num, operators_map, n, rand_num, bw_df, mls_df, 
+                start_time, remaining_time, 
+                max_workers, seed, modelstr, uniform=False):
     """Run evolution in parallel with proper error handling"""
         
     sim_params = SimulationParams(
@@ -405,8 +407,7 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
             bw_df           = bw_df,
             mls_df          = mls_df,
             n               = n,
-            # uniform         = True,
-            uniform         = False,
+            uniform         = uniform,
             n_realisations  = n_reals,
             # simulation
             sim_params      = sim_params,
@@ -478,7 +479,7 @@ if __name__ == "__main__":
     parser.add_argument('--time_num',               type=int,    default=int(1e5),      help='Number of time points (default: 100000)')
     parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
     parser.add_argument('--max_memory',             type=float,  default=80.0,          help='Maximum memory in GB (default: 80.0)')
-    
+    parser.add_argument('--uniform',                type=int,    default=1,             help='Use uniform times for the evolution')
     parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     parser.add_argument('-c',        '--max_cores',         type    =   int,    default =   psutil.cpu_count(), help='Maximum number of cores to use')
@@ -588,7 +589,8 @@ if __name__ == "__main__":
 
         # Run evolution
         results = run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num,
-            operators_map, n, rand_num, bw_df, mls_df, start_time, remaining_time, max_workers, seed, modelstr)
+            operators_map, n, rand_num, bw_df, mls_df, start_time, 
+            remaining_time, max_workers, seed, modelstr, uniform=args.uniform)
 
         logger.info(f"All computations completed in {time.perf_counter() - start_time:.2f} s", color='green')
 

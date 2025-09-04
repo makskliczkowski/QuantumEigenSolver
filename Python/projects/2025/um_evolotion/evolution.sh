@@ -30,4 +30,5 @@ python ./evolution.py \
     --time_num 100000 \
     --memory_per_worker 64 \
     --max_memory 64 \
-    --model um
+    --model um \
+    --uniform 1
