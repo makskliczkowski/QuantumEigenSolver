@@ -42,7 +42,7 @@ validate_vqmc_params() {
         fi
         
         # Validate numeric parameters
-        validate_numeric "${params[$i]}" "${param_names[$i]}" false || return 1
+        # validate_numeric "${params[$i]}" "${param_names[$i]}" false || return 1
     done
     
     # Additional domain-specific validations
