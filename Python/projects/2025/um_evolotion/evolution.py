@@ -40,10 +40,13 @@ try:
     from QES.general_python.physics import entropy as entropy, density_matrix as density_matrix
 
     from QES.Algebra.Properties import time_evolution, statistical, time_evo
+except ImportError as e:
+    print("Error importing operators_spin:", e)
+    
+try:
     import QES.Algebra.Operator.operators_spin as op_spin
 except ImportError as e:
     print("Error importing operators_spin:", e)
-    sys.exit(1)
 
 logger = get_global_logger()
 
