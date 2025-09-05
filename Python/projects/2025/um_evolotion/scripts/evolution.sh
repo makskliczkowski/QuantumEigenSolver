@@ -236,9 +236,9 @@ main() {
         echo "cd ${defaults[RUN_DIR]}"
         echo ""
         
-        echo "# Verify QES is available"
-        echo "python3 -c \"import QES; print('QES version:', getattr(QES, '__version__', 'unknown'))\""
-        echo ""
+        # echo "# Verify QES is available"
+        # echo "python3 -c \"import QES; print('QES version:', getattr(QES, '__version__', 'unknown'))\""
+        # echo ""
         
         echo "# Run the main computation"
         echo "python3 ${defaults[RUN_DIR]}/evolution.py \\"
