@@ -39,9 +39,9 @@ try:
     from QES.general_python.common.hdf5_lib import HDF5Handler
     from QES.general_python.common.timer import Timer
     
-except ImportError:
+except ImportError as e:
     print("Error importing QES modules. Please ensure QES is correctly installed and the PYTHONPATH is set.")
-    sys.exit(1)
+    print(e)
 
 # --------------------------------
 
