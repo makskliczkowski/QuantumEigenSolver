@@ -227,7 +227,7 @@ main() {
         echo "echo -e \"\$(pwd)\t\$(date)\" >> ${defaults[RUN_DIR]}/slurm_ids_run.log"
         echo ""
 
-        add_module_section "Python/3.10.8-GCCcore-12.2.0"
+        add_module_section "Python/3.11.3-GCCcore-12.3.0"
         echo "venv_name=\"${venv_name}\""
         echo "venv_path=\"${venv_path}\""
         setup_qes_environment "${defaults[QES_PACKAGE_DIR]}" "requirements/requirements.txt" "$venv_name" "$venv_path" || exit 1
