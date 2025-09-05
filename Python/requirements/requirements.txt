@@ -1,5 +1,5 @@
 # Core dependencies for QES package
-numpy>=1.20.0
+numpy>=1.15.0
 scipy>=1.7.0
 matplotlib>=3.3.0
 scienceplots>=2.1.0
