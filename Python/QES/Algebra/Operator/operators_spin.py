@@ -21,7 +21,6 @@ import math
 import numpy as np
 import numba
 from typing import List, Union, Optional, Callable
-from functools import partial
 
 ################################################################################
 from Algebra.Operator.operator import (
