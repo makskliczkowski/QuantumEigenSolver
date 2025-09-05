@@ -1,5 +1,6 @@
 import os, sys
 import numpy as np
+import matplotlib
 from dataclasses import dataclass, field
 from typing import Dict, Any
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 #! -------------------------------------------------------
 os.environ['QES_BACKEND']   = 'numpy'   # Backend for numerical operations
 os.environ['QES_LOGFILE']   = '0'       # Disable logging to file
+matplotlib.use("Agg")
 #! -------------------------------------------------------
 
 # --------------------------------

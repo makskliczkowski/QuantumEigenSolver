@@ -912,7 +912,7 @@ class QuadraticHamiltonian(Hamiltonian):
     ###########################################################################
     
     def many_body_energy(self, occupied_orbitals: Union[int, List[int], np.ndarray]) -> float:
-        """
+        r"""
         Calculates the total energy of a many-body state defined by occupying
         single-particle orbitals (or quasiparticle orbitals for BdG).
 
