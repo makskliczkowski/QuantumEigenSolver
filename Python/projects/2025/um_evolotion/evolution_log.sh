@@ -21,11 +21,11 @@ chmod +x ./evolution.py
 python ./evolution.py \
     --save_dir data_log \
     --alpha_start 0.52 \
-    --alpha_step 0.04 \
+    --alpha_step 0.08 \
     --alphas_number 5 \
     --sites_start 10 \
-    --sites_end 13 \
-    --number_of_realizations 5 \
+    --sites_end 15 \
+    --number_of_realizations 10 \
     --n 1 \
     --time_num 10000 \
     --memory_per_worker 64 \

@@ -12,15 +12,15 @@ source "${PACKAGE_DIR}/slurm/scripts/slurm_lib.sh"
 
 # Function to display usage
 show_usage() {
-    show_usage_template "$0" "a_start a_step a_num n_rel Ns_start Ns_end n t_num"
+    show_usage_template "$0" "a_start a_step a_num n_rel Ns_start Ns_end n t_num uniform"
     
     cat << EOF
 
 Examples:
-    $0 "0.68 0.06 1 5 16 16 1 100000" --time=24:00:00 --mem=16 -c16
-    $0 0.68 0.06 1 5 16 16 1 100000 --time=133:19:59 --mem=16gb -c16
+    $0 "0.68 0.06 1 5 16 16 1 100000 1" --time=24:00:00 --mem=16 -c16
+    $0 "0.68 0.06 1 5 16 16 1 100000 1" --time=133:19:59 --mem=16gb -c16
 Using:
-    ./evolution_makkli.sh "0.68 0.06 1 5 16 16 1 100000" --time=24:00:00 --mem=16gb -c16
+    ./evolution.sh "0.68 0.06 1 5 16 16 1 100000 1" --time=24:00:00 --mem=16gb -c16
 EOF
 }
 
@@ -29,12 +29,12 @@ EOF
 # Function to validate VQMC-specific parameters
 validate_vqmc_params() {
     local a_start="$1" a_step="$2" a_num="$3" n_rel="$4"
-    local Ns_start="$5" Ns_end="$6" n="$7" t_num="$8"
-    
+    local Ns_start="$5" Ns_end="$6" n="$7" t_num="$8" uniform="$9" model="${10}"
+
     # Validate all parameters are provided
-    local params=("$a_start" "$a_step" "$a_num" "$n_rel" "$Ns_start" "$Ns_end" "$n" "$t_num")
-    local param_names=("a_start" "a_step" "a_num" "n_rel" "Ns_start" "Ns_end" "n" "t_num")
-    
+    local params=("$a_start" "$a_step" "$a_num" "$n_rel" "$Ns_start" "$Ns_end" "$n" "$t_num" "$uniform" "$model")
+    local param_names=("a_start" "a_step" "a_num" "n_rel" "Ns_start" "Ns_end" "n" "t_num" "uniform" "model")
+
     for i in "${!params[@]}"; do
         if [[ -z "${params[$i]}" ]]; then
             echo "Error: Missing required parameter: ${param_names[$i]}" >&2
@@ -64,9 +64,9 @@ parse_vqmc_params() {
     # First argument contains spaces, treat as parameter string
     if [[ "$1" == *" "* ]]; then
         read -r params_ref[a_start] params_ref[a_step] params_ref[a_num] params_ref[n_rel] \
-                params_ref[Ns_start] params_ref[Ns_end] params_ref[n] params_ref[t_num] <<< "$1"
-        return 1   
-    else                        # Signal that we used parameter string format
+                params_ref[Ns_start] params_ref[Ns_end] params_ref[n] params_ref[t_num] params_ref[uniform] params_ref[model] <<< "$1"
+        return 1 # Signal that we used parameter string format
+    else # Signal that we used parameter string format
         if [ $# -lt 8 ]; then
             echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num"
             return 2
@@ -80,7 +80,9 @@ parse_vqmc_params() {
         params_ref[Ns_end]="$6"
         params_ref[n]="$7"
         params_ref[t_num]="$8"
-        
+        params_ref[uniform]="$9"
+        params_ref[model]="${10:-um}"  # Default model to 'um' if not provided
+
         return 0  # Signal that we used individual parameter format
     fi
 }
@@ -99,9 +101,9 @@ main() {
     defaults[BASE_DIR]="${PACKAGE_DIR}"
     defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025/um_evolotion"
     defaults[CODES_DIR]="${CODES_DIR}"
-    defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/DATA_EVO_2025_UM"
-    defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/RANDOM_MODELS_EVO_2025_UM"
-    defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM"
+    defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/data_septermber_2025/um_evolution"
+    defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/2025_09_01/um_evolution"
+    defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM/2025_09_01/um_evolution"
     defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python"
     
     # Parse command line arguments
@@ -121,7 +123,7 @@ main() {
     if parse_vqmc_params params "$@"; then
         # Used individual parameters
         if [ $# -lt 11 ]; then
-            echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num TIM MEM CPU"
+            echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num uniform TIM MEM CPU"
             show_usage
             exit 1
         fi
@@ -173,8 +175,8 @@ main() {
 
     # Validate VQMC parameters
     validate_vqmc_params "${params[a_start]}" "${params[a_step]}" "${params[a_num]}" "${params[n_rel]}" \
-                         "${params[Ns_start]}" "${params[Ns_end]}" "${params[n]}" "${params[t_num]}" || exit 1
-    
+                        "${params[Ns_start]}" "${params[Ns_end]}" "${params[n]}" "${params[t_num]}" "${params[uniform]}" "${params[model]}" || exit 1
+
     # Validate final resource parameters
     validate_numeric "$CPU" "CPU" false || exit 1
     validate_numeric "$MEM" "MEM" false || exit 1
@@ -205,27 +207,18 @@ main() {
     echo "  Parameters:"
     echo "    Ns_start=${params[Ns_start]}, Ns_end=${params[Ns_end]}"
     echo "    a_start=${params[a_start]}, a_step=${params[a_step]}, a_num=${params[a_num]}"
-    echo "    n_rel=${params[n_rel]}, n=${params[n]}, t_num=${params[t_num]}"
+    echo "    n_rel=${params[n_rel]}, n=${params[n]}, t_num=${params[t_num]}, uniform=${params[uniform]}"
     echo "  Resources: ${TIM}, ${MEM}gb, ${CPU} CPUs"
     echo "  mem_per_worker=${mem_per_worker}gb"
+    echo "  model=${params[model]}"
     echo "=============================="
-
-    echo "# Debug: Test Python import"
-    echo "python3 -c \"import sys; print('Python path:'); [print(p) for p in sys.path]\" || echo 'Python import test failed'"
-    echo "python3 -c \"import QES; print('QES imported successfully')\" || echo 'QES import failed'"
-    echo ""
-
-    echo "# Debug: Run with explicit error handling"
-    echo "set -e  # Exit on any error"
-    echo "set -x  # Print each command"
     
     # Generate job identifiers
-    job_params="fun=2025_um_evo,Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]}"
+    job_params="09_25_${params[model]},Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]},uniform=${params[uniform]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
     venv_name="qes_venv"
-    venv_path=${defaults[CODES_DIR]}/venvs/qes_venv/${venv_name}
-    timestamp=$(date +'%Y%m%d_%H%M%S')
-    logfile="${defaults[LOG_DIR]}/log_${job_params}_${timestamp}.log"
+    venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
+
     # Create SLURM job script
     {
         create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
@@ -247,48 +240,23 @@ main() {
         echo "python3 -c \"import QES; print('QES version:', getattr(QES, '__version__', 'unknown'))\""
         echo ""
         
-        # DEBUG: Add argument verification
-        echo "# Debug: Print arguments"
-        echo "echo 'Running evolution.py with arguments:'"
-        echo "echo 'save_dir: ${defaults[LUSTRE_DIR]}'"
-        echo "echo 'alpha_start: ${params[a_start]}'"
-        echo "echo 'alpha_step: ${params[a_step]}'"
-        echo "echo 'alphas_number: ${params[a_num]}'"
-        echo "echo 'number_of_realizations: ${params[n_rel]}'"
-        echo "echo 'sites_start: ${params[Ns_start]}'"
-        echo "echo 'sites_end: ${params[Ns_end]}'"
-        echo "echo 'n: ${params[n]}'"
-        echo "echo 'time_num: ${params[t_num]}'"
-        echo "echo 'memory_per_worker: ${mem_per_worker}'"
-        echo "echo 'max_memory: ${MEM}'"
-        echo ""
-        
         echo "# Run the main computation"
         echo "python3 ${defaults[RUN_DIR]}/evolution.py \\"
-        echo "    \"${defaults[LUSTRE_DIR]}\" \\"
-        echo "    --alpha_start ${params[a_start]} \\"
-        echo "    --alpha_step ${params[a_step]} \\"
-        echo "    --alphas_number ${params[a_num]} \\"
-        echo "    --sites_start ${params[Ns_start]} \\"
-        echo "    --sites_end ${params[Ns_end]} \\"
-        echo "    --number_of_realizations ${params[n_rel]} \\"
-        echo "    --n ${params[n]} \\"
-        echo "    --time_num ${params[t_num]} \\"
-        echo "    --memory_per_worker ${mem_per_worker} \\"
-        echo "    --max_memory ${MEM} \\"
-        echo "    --model um"
-        echo "    > \"${logfile}\" 2>&1"
+        echo "    --save_dir ${defaults[LUSTRE_DIR]} \\"
+        echo "    --alpha_start ${params[a_start]} --alpha_step ${params[a_step]} --alphas_number ${params[a_num]} \\"
+        echo "    --number_of_realizations ${params[n_rel]} --sites_start ${params[Ns_start]} --sites_end ${params[Ns_end]} \\"
+        echo "    --n ${params[n]} --time_num ${params[t_num]} --memory_per_worker ${mem_per_worker} --model ${params[model]} \\"
+        echo "    > ${defaults[LOG_DIR]}/log_${job_params}.log 2>&1"
         echo ""
         
-        echo "# Final message"
-        echo "echo \"Job completed successfully at \$(date)\""
+        echo "echo \"Job completed successfully\""
     } > "$script_file"
     
     # Submit the job
     submit_slurm_job "$script_file" true || exit 1
     
     # Log job information
-    log_job_info "${defaults[RUN_DIR]}/submitted_jobs.log" "$job_params"
+    log_job_info "${defaults[RUN_DIR]}/submitted_jobs_$(date +%Y%m%d).log" "$job_params"
 }
 
 # Run main function with all arguments
