@@ -216,7 +216,7 @@ main() {
     # Generate job identifiers
     job_params="09_25_${params[model]},Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]},uniform=${params[uniform]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
-    venv_name="qes_venv"
+    venv_name="qes_venv/qes_venv"
     venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
 
     # Create SLURM job script
