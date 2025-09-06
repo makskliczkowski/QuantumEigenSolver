@@ -15,14 +15,15 @@ Author  : Maksymilian Kliczkowski
 Date    : 2025-02-01
 """
 
-from turtle import back
 import numpy as np
-import numba
 from enum import Enum
 
-from general_python.common import binary as BinaryMod
-from general_python.algebra.utils import JAX_AVAILABLE, get_backend, Array
-
+try:
+    from general_python.common import binary as BinaryMod
+    from general_python.algebra.utils import JAX_AVAILABLE, Array
+except ImportError as e:
+    print("Error importing modules in time_evo.py:", e)
+    
 if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
@@ -36,10 +37,10 @@ else:
 #! Constants
 # -----------------------------------------------------------------------------
 
-SYSTEM_PROPERTIES_MIN_SPACING    = 1e-15
-SYSTEM_PROPERTIES_THROW_DEGENERATE = 1
-SYSTEM_PROPERTIES_COEFF_THRESHOLD  = 1e-11
-SYSTEM_PROPERTIES_USE_OPENMP       = 0
+SYSTEM_PROPERTIES_MIN_SPACING       = 1e-15
+SYSTEM_PROPERTIES_THROW_DEGENERATE  = 1
+SYSTEM_PROPERTIES_COEFF_THRESHOLD   = 1e-11
+SYSTEM_PROPERTIES_USE_OPENMP        = 0
 
 # -----------------------------------------------------------------------------
 #! Time Evolution Functions
