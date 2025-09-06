@@ -41,7 +41,7 @@ try:
 
     from QES.Algebra.Properties import time_evolution, statistical, time_evo
 except ImportError as e:
-    print("Error importing operators_spin:", e)
+    print("Error importing:", e)
     
 try:
     import QES.Algebra.Operator.operators_spin as op_spin
