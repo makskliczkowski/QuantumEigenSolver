@@ -16,7 +16,6 @@ try:
     from typing import Tuple, Union, Optional
     from functools import partial
     
-    from general_python.common import binary as BinaryMod
     from general_python.algebra.utils import JAX_AVAILABLE, Array
 except ImportError:
     print("Error importing modules in statistical.py")

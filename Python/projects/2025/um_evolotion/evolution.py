@@ -38,8 +38,13 @@ try:
 
     # VON NEUMANN, TSALLIS, PARTICIPATION ENTROPY
     from QES.general_python.physics import entropy as entropy, density_matrix as density_matrix
+except ImportError as e:
+    print("Error importing evolution_data or related modules:", e)
 
-    from QES.Algebra.Properties import time_evolution, statistical, time_evo
+# ------------------------------------------------------------------
+
+try:
+    from QES.Algebra.Properties import statistical, time_evo
 except ImportError as e:
     print("Error importing:", e)
     
