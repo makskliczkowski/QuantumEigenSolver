@@ -18,12 +18,14 @@ Date    : 2025-02-01
 import numpy as np
 from enum import Enum
 
+from torch import R
+
 try:
     from general_python.common import binary as BinaryMod
     from general_python.algebra.utils import JAX_AVAILABLE, Array
 except ImportError as e:
-    print("Error importing modules in time_evo.py:", e)
-    
+    raise ImportError("Error importing modules in time_evo.py: " + str(e))
+
 if JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
