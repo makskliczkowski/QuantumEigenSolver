@@ -30,7 +30,7 @@ try:
     
     # runner
     from QES.general_python.run_scripts.slurm import SlurmMonitor, SimulationParams
-    from QES.general_python.run_scripts import calculate_optimal_workers
+    from QES.general_python.run_scripts import calculate_optimal_workers, calculate_realisations_per_parameter
     from QES.general_python.run_scripts.prepareini import ManyBodyEstimator
 
     # histograms etc.
@@ -66,7 +66,7 @@ batch_num   = lambda ns: 10 if batch_limit(ns) else 1
 
 def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r : int, sim_params : SimulationParams = None, edata: EvolutionData = None) -> bool:
 
-    if SlurmMonitor.is_overtime(limit=1200, start_time=sim_params.start_time, job_time=sim_params.job_time): # 20 minutes buffer
+    if SlurmMonitor.is_overtime(limit=3600, start_time=sim_params.start_time, job_time=sim_params.job_time): # 20 minutes buffer
         return False
     
     #! constants
@@ -289,21 +289,36 @@ def _single_alpha(modelstr : 'str' = 'um', evolution_data : EvolutionData = None
 #! -------------------------------------------------------
 
 def _mean_lvl_and_bw(alpha: float, ns: int, hilbert_size: int):
-    min_ns  = 7
-    max_ns  = 16
-    ns_idx  = (ns - min_ns) if 7 <= ns <= 16 else max(0, min(ns - min_ns, max_ns - min_ns))
+    
+    if ns not in mls_df.columns:
+        if ns < mls_df.columns.min():
+            mult = 2 ** (int(mls_df.columns.min())-ns)
+            ns = mls_df.columns.min()
+        else:
+            mult = 2 ** (int(mls_df.columns.max())-ns)
+            ns = mls_df.columns.max()
+    else:
+        mult = 1.0
+        
     try:
         mean_lvl_keys       = np.array(mls_df.index, dtype=float)
         closest_idx         = np.abs(mean_lvl_keys - alpha).argmin()
-        logger.info(f"Using params: alpha = {alpha:.2f}, alpha_idx = {mean_lvl_keys[closest_idx]:.2f}, ns = {ns}, ns_idx = {ns_idx}", lvl=2, color='blue')
-        mean_lvl_spacing    = mls_df.iloc[closest_idx, ns_idx]
+        logger.info(f"Using params: alpha = {alpha:.2f}, alpha_idx = {mean_lvl_keys[closest_idx]:.2f}, ns = {ns}", lvl=2, color='blue')
+        mean_lvl_spacing    = mls_df.iloc[closest_idx][ns] * mult
     except KeyError:
         logger.error(f"Mean level spacing not found for ns = {ns}, alpha = {alpha:.2f}")
         mean_lvl_spacing    = 1 / hilbert_size * 2.0 * np.pi
+        
+    #! bandwidth
+    if ns not in bw_df.columns:
+        if ns < bw_df.columns.min():
+            ns = bw_df.columns.min()
+        else:
+            ns = bw_df.columns.max()
     try:
         bandwidth_keys      = np.array(bw_df.index, dtype=float)
         closest_idx         = np.abs(bandwidth_keys - alpha).argmin()
-        bandwidth_data      = bw_df.iloc[closest_idx, ns_idx]
+        bandwidth_data      = bw_df.iloc[closest_idx][ns]
     except KeyError:
         logger.error(f"Bandwidth not found for ns = {ns}, alpha = {alpha:.2f}")
         bandwidth_data      = (1 + (alpha**2 * (1 - alpha**(2 * ns))) / (1 - alpha**2))
@@ -312,9 +327,6 @@ def _mean_lvl_and_bw(alpha: float, ns: int, hilbert_size: int):
 def prepare_evolution(
                 sites, 
                 alphas,
-                # dataframes and other parameters
-                bw_df           : pd.DataFrame      = None,
-                mls_df          : pd.DataFrame      = None,
                 n               : int               = 1,
                 uniform         : bool              = True,
                 n_realisations  : dict              = None,
@@ -392,8 +404,7 @@ def make_sig_x_global(ns):
 #! -------------------------------------------------------
 
 def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, 
-                time_num, operators_map, n, rand_num, bw_df, mls_df, 
-                start_time, remaining_time, 
+                time_num, operators_map, n, rand_num, start_time, remaining_time, 
                 max_workers, seed, modelstr, uniform=False):
     """Run evolution in parallel with proper error handling"""
         
@@ -412,8 +423,6 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
             sites           = sites,
             alphas          = alphas_chunks[0],  # All alphas in single chunk
             # other parameters
-            bw_df           = bw_df,
-            mls_df          = mls_df,
             n               = n,
             uniform         = uniform,
             n_realisations  = n_reals,
@@ -434,8 +443,6 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
                     sites           = sites,
                     alphas          = chunk,
                     # other parameters
-                    bw_df           = bw_df,
-                    mls_df          = mls_df,
                     n               = n,
                     uniform         = True,
                     n_realisations  = n_reals,
@@ -482,7 +489,7 @@ if __name__ == "__main__":
     parser.add_argument('--sites_end',       type=int,   required=True, help='Maximum number of spins (inclusive)')
     
     # OPTIONAL arguments with defaults
-    parser.add_argument('--number_of_realizations', type=int,    default=10,            help='Realizations per ns (default: 10)')
+    parser.add_argument('--number_of_realizations', type=str,    default='10',            help='Realizations per ns (default: 10)')
     parser.add_argument('--n',                      type=int,    default=1,             help='Model parameter n (default: 1)')
     parser.add_argument('--time_num',               type=int,    default=int(1e5),      help='Number of time points (default: 100000)')
     parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
@@ -518,8 +525,8 @@ if __name__ == "__main__":
     mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
     bw_df.columns       = list(range(7, 17))
     mls_df.columns      = list(range(7, 16))
-    logger.debug(f"Bandwidths:\n{bw_df}", lvl=2, color='blue')
-    logger.debug(f"Mean level spacing:\n{mls_df}", lvl=2, color='blue')
+    logger.info(f"Bandwidths:\n{bw_df}", lvl=2, color='blue')
+    logger.info(f"Mean level spacing:\n{mls_df}", lvl=2, color='blue')
     logger.breakline(1)
     #! -------------------------------------------------------    
     base_dir            = Directories(args.save_dir if args.save_dir else './data')
@@ -537,7 +544,7 @@ if __name__ == "__main__":
     operators_map.update({ op_spin.sig_z(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0]).name: make_sig_z_global })
     operators_map.update({ op_spin.sig_x(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0,5]).name: make_sig_x_global })
     
-    n_reals         = {ns: args.number_of_realizations for ns in sites} if isinstance(args.number_of_realizations, int) else args.number_of_realizations
+    n_reals         = calculate_realisations_per_parameter(sites, args.number_of_realizations)
     time_num        = args.time_num
     modelstr        = args.model
 
@@ -567,14 +574,14 @@ if __name__ == "__main__":
         logger.warning(f"Could not estimate memory requirements: {e}")
         logger.info("Using default memory per worker")
 
-    if args.force_single_thread or True:
+    if args.force_single_thread:
         max_workers = 1
     else:
-        max_workers         = calculate_optimal_workers(alphas, avail_gb, memory_per_worker, args.max_cores)
-    
-    logger.info(f"Available memory: {avail_gb:.2f} GB")
-    logger.info(f"Memory per worker: {memory_per_worker:.2f} GB")
-    logger.info(f"Max workers: {max_workers}")
+        max_workers = calculate_optimal_workers(alphas, avail_gb, memory_per_worker, args.max_cores)
+
+    logger.info(f"Available memory: {avail_gb:.2f} GB", color='orange', lvl=1)
+    logger.info(f"Memory per worker: {memory_per_worker:.2f} GB", color='orange', lvl=1)
+    logger.info(f"Max workers: {max_workers}", color='orange', lvl=1)
     #! -------------------------------------------------------
     
     # split alphas into chunks
@@ -597,7 +604,7 @@ if __name__ == "__main__":
 
         # Run evolution
         results = run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, time_num,
-            operators_map, n, rand_num, bw_df, mls_df, start_time, 
+            operators_map, n, rand_num, start_time, 
             remaining_time, max_workers, seed, modelstr, uniform=args.uniform)
 
         logger.info(f"All computations completed in {time.perf_counter() - start_time:.2f} s", color='green')

@@ -15,18 +15,18 @@ Author  : Maksymilian Kliczkowski
 Date    : 2025-02-01
 """
 
+import os
 import numpy as np
 from enum import Enum
 
-from torch import R
-
 try:
     from general_python.common import binary as BinaryMod
-    from general_python.algebra.utils import JAX_AVAILABLE, Array
+    from general_python.algebra.utils import Array
 except ImportError as e:
     raise ImportError("Error importing modules in time_evo.py: " + str(e))
 
-if JAX_AVAILABLE:
+_JAX_AVAILABLE = os.environ.get("PY_JAX_AVAILABLE", 0) == "1"
+if _JAX_AVAILABLE:
     import jax
     import jax.numpy as jnp
     from jax import lax
@@ -48,7 +48,7 @@ SYSTEM_PROPERTIES_USE_OPENMP        = 0
 #! Time Evolution Functions
 # -----------------------------------------------------------------------------
 
-if JAX_AVAILABLE:
+if _JAX_AVAILABLE:
     @jax.jit
     def time_evo_jax(eigenstates    : Array,
                     eigvals         : Array,
@@ -383,14 +383,14 @@ def create_initial_quench_state(quench_type : QuenchTypes,
                 if b:
                     idx |= 1 << i
         # Update state: for JAX, use functional update; for NumPy, in-place.
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
 
     elif quench_type == QuenchTypes.RANDN:
         # Create a normally distributed state, then normalize.
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             if key is None:
                 raise ValueError("A PRNG key must be provided for JAX random generation.")
             state = jax.random.normal(key, (Nh,))
@@ -401,7 +401,7 @@ def create_initial_quench_state(quench_type : QuenchTypes,
 
     elif quench_type == QuenchTypes.RANDU:
         # Create a uniformly distributed state, then normalize.
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             if key is None:
                 raise ValueError("A PRNG key must be provided for JAX random generation.")
             state = jax.random.uniform(key, (Nh,), minval=0.0, maxval=1.0)
@@ -412,7 +412,7 @@ def create_initial_quench_state(quench_type : QuenchTypes,
 
     elif quench_type == QuenchTypes.AF_UP:
         idx = int(Nh / 3) if (Ns % 2 == 0) else int((Nh + 1) / 3)
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
@@ -420,28 +420,28 @@ def create_initial_quench_state(quench_type : QuenchTypes,
     elif quench_type == QuenchTypes.AF_DN:
         idx = int(Nh / 3) if (Ns % 2 == 0) else int((Nh + 1) / 3)
         idx = flip_all(idx, Ns)
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
 
     elif quench_type == QuenchTypes.F_UP:
         idx = Nh - 1
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
 
     elif quench_type == QuenchTypes.F_DN:
         idx = 0
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[0] = 1.0
 
     elif quench_type == QuenchTypes.DW_HALF_UP:
         idx = ULLPOW(max(int(Ns / 2) - 1, 0))
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
@@ -449,14 +449,14 @@ def create_initial_quench_state(quench_type : QuenchTypes,
     elif quench_type == QuenchTypes.DW_HALF_DN:
         idx = ULLPOW(max(int(Ns / 2) - 1, 0))
         idx = flip_all(idx, Ns)
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
 
     elif quench_type == QuenchTypes.DW_THIRD_UP:
         idx = BinaryMod.ULLPOW(max(int(Ns / 3) - 1, 0))
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
@@ -464,7 +464,7 @@ def create_initial_quench_state(quench_type : QuenchTypes,
     elif quench_type == QuenchTypes.DW_THIRD_DN:
         idx = BinaryMod.ULLPOW(max(int(Ns / 3) - 1, 0))
         idx = BinaryMod.flip_all(idx, Ns)
-        if JAX_AVAILABLE:
+        if _JAX_AVAILABLE:
             state = state.at[idx].set(1.0)
         else:
             state[idx] = 1.0
