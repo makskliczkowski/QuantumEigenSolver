@@ -187,8 +187,7 @@ class UltrametricModel(hamil_module.Hamiltonian):
             for j in range(rest):
                 start   = j*dimk
                 end     = (j+1)*dimk
-                Rk      = random_matrix((dimk, dimk), typek=RMT.GOE,
-                                    backend=backend, dtype=self._dtype)
+                Rk      = random_matrix((dimk, dimk), typek=RMT.GOE, backend=backend, dtype=self._dtype)
                 _hedit[start:end, start:end] += multk * Rk
 
         return _hedit

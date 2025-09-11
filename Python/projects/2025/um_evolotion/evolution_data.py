@@ -37,6 +37,7 @@ try:
     from QES.Algebra.hamil import Hamiltonian
     from QES.Algebra.Model.Interacting.Spin.ultrametric import UltrametricModel
     from QES.Algebra.Model.Noninteracting.plrb import PowerLawRandomBanded
+    from QES.Algebra.Model.Noninteracting.rpm import RosenzweigPorter
     
     # general
     from QES.general_python.common.directories import Directories
@@ -339,5 +340,7 @@ def create_model(model: str, ns: int, param: float, seed: int, **kwargs):
         return UltrametricModel(ns=ns, n=kwargs.get('n', 2), alphas=param, backend=np, seed=seed)
     elif model == 'plrb' or model == 'powerlaw':
         return PowerLawRandomBanded(ns=ns, many_body=True, a=param, b=1.0, backend=np, seed=seed)
+    elif model == 'rpm' or model == 'rosenzweig':
+        return RosenzweigPorter(ns=ns, many_body=True, gamma=param, backend=np, seed=seed)
     else:
         raise ValueError(f"Unknown model: {model}")

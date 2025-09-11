@@ -194,9 +194,9 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
         logger.info(f"ns = {edata.ns}, alpha = {edata.alpha:.2f}, r = {r} computing time evolution for operator {name} in one go", lvl=4, color='blue')
         # Small systems: compute all at once
         with Timer(f"Time Evolution: overlaps", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
-            # evolved_overlaps   = np.exp(-1j * np.outer(model.eig_val, edata.time_steps)) * overlaps[:, np.newaxis]
-            # quench_states_t    = model.eig_vec @ evolved_overlaps
-            quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
+            evolved_overlaps   = np.exp(-1j * np.outer(model.eig_val, edata.time_steps)) * overlaps[:, np.newaxis]
+            quench_states_t    = model.eig_vec @ evolved_overlaps
+            # quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
 
 
         with Timer(f"Survival Probability", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
@@ -495,7 +495,7 @@ if __name__ == "__main__":
     parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
     parser.add_argument('--max_memory',             type=float,  default=196.0,          help='Maximum memory in GB (default: 80.0)')
     parser.add_argument('--uniform',                type=int,    default=1,             help='Use uniform times for the evolution')
-    parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
+    parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb', 'rpm'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
     parser.add_argument('-c',        '--max_cores',         type    =   int,    default =   psutil.cpu_count(), help='Maximum number of cores to use')
     parser.add_argument('-f',        '--force_single_thread',                   action  =   'store_true',       help='Force single-threaded execution')
@@ -534,9 +534,7 @@ if __name__ == "__main__":
     
     #! process the arguments
     n               = args.n
-    alphas          = np.arange(args.alpha_start,
-                                args.alpha_start + args.alpha_step * args.alphas_number,
-                                args.alpha_step)
+    alphas          = np.array([args.alpha_start + i * args.alpha_step for i in range(args.alphas_number)])
     sites           = list(range(args.sites_start, args.sites_end + 1))
     
     #! operators
