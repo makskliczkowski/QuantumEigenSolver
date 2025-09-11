@@ -221,7 +221,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
                     edata.fft_results[name][r, :]   = data_evo_fft[1:-1] # Exclude the zero frequency and Nyquist
                     edata.fft_n[name][r]            = data_evo_fft_n
     else:
-        # Large systems: batch processing
+        #! Large systems: batch processing
         batch_count             = batch_num(edata.ns)
         batch_size              = (edata.time_num + batch_count - 1) // batch_count
         logger.info(f"ns = {edata.ns}, alpha = {edata.alpha:.2f}, r = {r} computing time evolution for operator {name} in batches of size {batch_size}", lvl=4, color='blue')
@@ -493,7 +493,7 @@ if __name__ == "__main__":
     parser.add_argument('--n',                      type=int,    default=1,             help='Model parameter n (default: 1)')
     parser.add_argument('--time_num',               type=int,    default=int(1e5),      help='Number of time points (default: 100000)')
     parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
-    parser.add_argument('--max_memory',             type=float,  default=80.0,          help='Maximum memory in GB (default: 80.0)')
+    parser.add_argument('--max_memory',             type=float,  default=196.0,          help='Maximum memory in GB (default: 80.0)')
     parser.add_argument('--uniform',                type=int,    default=1,             help='Use uniform times for the evolution')
     parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')

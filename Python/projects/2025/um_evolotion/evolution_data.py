@@ -185,10 +185,12 @@ class EvolutionData:
         #! time grid
         heisenberg_time = 2.0*np.pi / self.mean_lvl_space
         if self.uniform:
-            dt_step = 2.0*np.pi / self.bandwidth_data
-            t0      = heisenberg_time - self.time_num*dt_step/2.0
-            if t0 < 0.0:
-                t0  = heisenberg_time/100.0
+            #! uniform time steps around the Heisenberg time - change 10.09.25
+            t0      = 0.0
+            dt_step = 2.0*np.pi / self.bandwidth_data * 10.0
+            # t0      = heisenberg_time - self.time_num*dt_step/2.0
+            # if t0 < 0.0:
+                # t0  = heisenberg_time/100.0
             self.time_steps = np.linspace(t0, t0 + dt_step*self.time_num, num=self.time_num, dtype=dt)
         else:
             self.time_steps = np.logspace(-2, np.log10(hs*100), num=self.time_num, dtype=dt)

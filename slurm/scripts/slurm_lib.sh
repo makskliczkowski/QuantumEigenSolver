@@ -489,27 +489,27 @@ setup_qes_environment() {
     echo "echo \"Activated virtual environment: ${venv_name}\""
     echo ""
 
-    echo "# Check if QES is already installed"
-    echo "if python3 -c 'import QES' 2>/dev/null; then"
-    echo "    echo \"QES already installed and importable\""
-    echo "else"
-    echo "    echo \"Installing QES and dependencies...\""
-    echo "    echo \"Upgrading pip, setuptools, wheel...\""
-    echo "    pip install --upgrade pip setuptools wheel"
-    echo ""
+    # echo "# Check if QES is already installed"
+    # echo "if python3 -c 'import QES' 2>/dev/null; then"
+    # echo "    echo \"QES already installed and importable\""
+    # echo "else"
+    # echo "    echo \"Installing QES and dependencies...\""
+    # echo "    echo \"Upgrading pip, setuptools, wheel...\""
+    # echo "    pip install --upgrade pip setuptools wheel"
+    # echo ""
     
-    # Only install requirements if file exists
-    if [ -n "${req_file}" ] && [ -f "${req_file}" ]; then
-        echo "    echo \"Installing requirements from ${req_file}\""
-        echo "    pip install -r \"${req_file}\""
-    fi
+    # # Only install requirements if file exists
+    # if [ -n "${req_file}" ] && [ -f "${req_file}" ]; then
+    #     echo "    echo \"Installing requirements from ${req_file}\""
+    #     echo "    pip install -r \"${req_file}\""
+    # fi
     
-    echo "    echo \"Installing QES in editable mode...\""
-    echo "    cd \"\${QES_PACKAGE_DIR}\""
-    echo "    pip install -e ."
-    echo "    echo \"QES installation complete\""
-    echo "fi"
-    echo ""
+    # echo "    echo \"Installing QES in editable mode...\""
+    # echo "    cd \"\${QES_PACKAGE_DIR}\""
+    # echo "    pip install -e ."
+    # echo "    echo \"QES installation complete\""
+    # echo "fi"
+    # echo ""
     echo "echo \"QES environment setup complete.\""
 }
 
