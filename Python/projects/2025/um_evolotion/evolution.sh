@@ -25,7 +25,7 @@ python ./evolution.py \
     --alphas_number 7 \
     --sites_start 13 \
     --sites_end 16 \
-    --number_of_realizations 50,30,20,5 \
+    --number_of_realizations 50 \
     --n 1 \
     --time_num 100000 \
     --max_memory 64 \
