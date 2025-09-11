@@ -299,10 +299,13 @@ def _mean_lvl_and_bw(alpha: float, ns: int, hilbert_size: int):
         mult = 1.0
         
     try:
-        mean_lvl_keys       = np.array(mls_df.index, dtype=float)
-        closest_idx         = np.abs(mean_lvl_keys - alpha).argmin()
-        logger.info(f"Using params: alpha = {alpha:.2f}, alpha_idx = {mean_lvl_keys[closest_idx]:.2f}, ns = {ns}", lvl=2, color='blue')
-        mean_lvl_spacing    = mls_df.iloc[closest_idx][ns] * mult
+        if not mls_df.empty:
+            mean_lvl_keys       = np.array(mls_df.index, dtype=float)
+            closest_idx         = np.abs(mean_lvl_keys - alpha).argmin()
+            logger.info(f"Using params: alpha = {alpha:.2f}, alpha_idx = {mean_lvl_keys[closest_idx]:.2f}, ns = {ns}", lvl=2, color='blue')
+            mean_lvl_spacing    = mls_df.iloc[closest_idx][ns] * mult
+        else:
+            mean_lvl_spacing    = 1 / hilbert_size * 2.0 * np.pi
     except KeyError:
         logger.error(f"Mean level spacing not found for ns = {ns}, alpha = {alpha:.2f}")
         mean_lvl_spacing    = 1 / hilbert_size * 2.0 * np.pi
@@ -517,12 +520,24 @@ if __name__ == "__main__":
         logger.info(f"Random seed set to {seed}", lvl=2, color='yellow')
 
     rand_num            = rng.integers(0, int(1e5))
-    bw_df               = pd.read_csv(f"{file_path}/model/bw.csv", index_col=0, header=None, dtype=float)
-    mls_df              = pd.read_csv(f"{file_path}/model/mls.csv", index_col=0, header=None, dtype=float)
-    bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
-    mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
-    bw_df.columns       = list(range(7, 17))
-    mls_df.columns      = list(range(7, 16))
+    if args.model == 'um':
+        bw_df               = pd.read_csv(f"{file_path}/model/bw.csv", index_col=0, header=None, dtype=float)
+        mls_df              = pd.read_csv(f"{file_path}/model/mls.csv", index_col=0, header=None, dtype=float)
+        bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
+        mls_df.index        = [f'{x:.2f}' for x in mls_df.index]
+        bw_df.columns       = list(range(7, 17))
+        mls_df.columns      = list(range(7, 16))
+    elif args.model == 'plrb':
+        bw_df               = pd.read_csv(f"{file_path}/model/plrb/bw.csv", index_col=0, header=None, dtype=float)
+        bw_df.columns       = list(range(6, 17))
+        bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
+        mls_df              = pd.DataFrame([], columns=list(range(7, 15)))
+    elif args.model == 'rpm':
+        bw_df               = pd.read_csv(f"{file_path}/model/rpm/bw.csv", index_col=0, header=None, dtype=float)
+        bw_df.index         = [f'{x:.2f}' for x in bw_df.index]
+        bw_df.columns       = list(range(6, 17))
+        mls_df              = pd.DataFrame([], columns=list(range(6, 16)))
+        
     logger.info(f"Bandwidths:\n{bw_df}", lvl=2, color='blue')
     logger.info(f"Mean level spacing:\n{mls_df}", lvl=2, color='blue')
     logger.breakline(1)
