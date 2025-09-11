@@ -23,9 +23,9 @@ python ./evolution.py \
     --alpha_start 1.5 \
     --alpha_step 0.05 \
     --alphas_number 4 \
-    --sites_start 10 \
-    --sites_end 10 \
-    --number_of_realizations 5 \
+    --sites_start 9 \
+    --sites_end 9 \
+    --number_of_realizations 10 \
     --n 1 \
     --time_num 300000 \
     --max_memory 64 \

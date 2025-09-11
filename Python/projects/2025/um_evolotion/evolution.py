@@ -198,10 +198,8 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
             quench_states_t    = model.eig_vec @ evolved_overlaps
             # quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
 
-
         with Timer(f"Survival Probability", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
             edata.survival_proba[r, :]  = statistical.survival_prob(psi0 = quench_state, psi_t = quench_states_t)
-
 
         for name in edata.operators.keys():
             with Timer(f"{name} Time Evolution", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):

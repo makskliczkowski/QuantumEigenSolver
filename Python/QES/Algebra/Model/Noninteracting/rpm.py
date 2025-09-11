@@ -111,8 +111,8 @@ class RosenzweigPorter(hamil_module.Hamiltonian):
         """
         
         if self._nh == 0:
-            raise ValueError("UltrametricModel: Hamiltonian not initialized.")
-        
+            raise ValueError("RPM: Hamiltonian not initialized.")
+
         # initialize zero Hamiltonian container
         try:
             backend_changed = self._backend if not use_numpy else np
