@@ -7,6 +7,7 @@ This module contains functions for calculating statistical properties of quantum
 '''
 
 
+from typing import Callable
 import numpy as np
 import numba
 import math
@@ -195,13 +196,6 @@ def _m2_generic(x, y):
     # |x*y| = |x|*|y|
     return abs(x) * abs(y)
 
-@numba.njit(fastmath=True, cache=True)
-def _omega_abs(ei, ej):
-    d = ei - ej
-    if d < 0:
-        return -d
-    return d
-
 @numba.njit(cache=True, fastmath=True, inline='always')
 def _bin_index( omega, 
                 bins,
@@ -209,24 +203,36 @@ def _bin_index( omega,
                 inv_binw,
                 uniform_bins        = False,
                 uniform_log_bins    = False):
-    # returns (-1) if out-of-range for uniform path; for non-uniform caller must still range-check
-    if uniform_bins:
-        idx = int((omega - bin0) * inv_binw)
-        return idx
-    elif uniform_log_bins:
-        # Handle uniform log bins
-        if omega <= 0.0:
-            return -1
+    nBins = bins.shape[0] - 1
 
-        # bin0 should be the log of the first bin edge
-        # inv_binw should be the inverse width of the log bins
-        
+    if uniform_bins:
+        idx = int((omega - bin0) * inv_binw) + 1  # shift by +1
+        if omega < bins[0]:
+            return 0
+        elif omega >= bins[-1]:
+            return nBins
+        return idx
+
+    elif uniform_log_bins:
+        if omega <= 0.0:
+            return 0  # underflow
         t = math.log(omega) - bin0
-        b = int(t * inv_binw)  # floor
-        # caller should still range-check (0 <= b < nbins)
+        b = int(t * inv_binw) + 1
+        if omega < bins[0]:
+            return 0
+        elif omega >= bins[-1]:
+            return nBins
         return b
-    #! non-uniform log bins
-    return np.searchsorted(bins, omega, side='right') - 1
+
+    # Non-uniform: use binary search
+    if omega < bins[0]:
+        return 0
+    elif omega >= bins[-1]:
+        return nBins
+    idx = np.searchsorted(bins, omega, side='right')
+    return idx  # already in [1..nBins-1]
+
+# -----------------------------------------------------------------------------
 
 @numba.njit(fastmath=True, cache=True)
 def _alloc_values_or_bins(nh: int, bins: Optional[np.ndarray] = None, indices_alloc: Optional[np.ndarray] = None) -> Tuple[np.ndarray, int]:
@@ -280,86 +286,152 @@ def _alloc_bin_info(uniform_bins: bool, uniform_log_bins: bool, bins: Optional[n
 # -----------------------------------------------------------------------------
 
 @numba.njit(fastmath=True, cache=True)
-def f_function( overlaps        : np.ndarray,
-                eigvals         : np.ndarray,
-                indices_alloc   : Optional[np.ndarray] = None,
-                bins            : Optional[np.ndarray] = None,
-                # other info about the bins
-                typical         : bool = False,
-                uniform_bins    : bool = False,
-                uniform_log_bins: bool = False,
-                log_eps         : float = 1e-24,
-                ):
+def _normalize_by_bin_width(sums: np.ndarray, bins: np.ndarray) -> None:
     """
-    Compute the f-function for a given set of overlaps and eigenvalues.
+    In-place divide by Δω; counts- or typical-normalization can be done elsewhere.
     """
-    
-    nh                              = eigvals.shape[0]
-    use_hist                        = (bins is not None) and (bins.shape[0] >= 2)
-    #! allocation
-    (counts, sums, nbins), values   = _alloc_values_or_bins(nh, bins)
-    bin0, inv_binw, (uniform_bins, uniform_log_bins) = _alloc_bin_info(uniform_bins, uniform_log_bins, bins)
+    nbins = bins.shape[0] - 1
+    for i in range(nbins):
+        w = bins[i + 1] - bins[i]
+        if w > 0.0:
+            sums[i] = sums[i] / w
+        else:
+            sums[i] = 0.0
 
+# -----------------------------------------------------------------------------
+
+@numba.njit(fastmath=True, cache=True)
+def f_value(overlaps, ldos, i, j, log_eps, typical):
+    m2 = _m2_hermitian(overlaps[i, j])
+    return math.log(m2 + log_eps) if typical else m2
+
+@numba.njit(fastmath=True, cache=True)
+def k_value(overlaps, ldos, i, j, log_eps, typical):
+    val = ldos[i] * ldos[j]
+    return math.log(val + log_eps) if typical else val
+
+@numba.njit(fastmath=True, cache=True)
+def s_value(overlaps, ldos, i, j, log_eps, typical):
+    val     = ldos[i] * ldos[j]
+    val    *= _m2_hermitian(overlaps[i, j])
+    return math.log(val + log_eps) if typical else val
+
+@numba.njit(fastmath=True, cache=True)
+def pair_histogram(eigvals, 
+                overlaps, 
+                ldos,
+                value_fn            : Callable,
+                indices_alloc       = None, 
+                bins                = None,
+                typical             = False, 
+                uniform_bins        = False, 
+                uniform_log_bins    = False,
+                log_eps             = 1e-24):
+    """
+    Generic pairwise histogram/scatter accumulator.
+    Parameters
+    ----------
+    eigvals : (N,) float
+        Eigenvalues.
+    arr : array
+        Data array used inside `value_fn`.
+    value_fn : njit function
+        Must have signature (arr, i, j, log_eps, typical) -> float
+    indices_alloc : (M,3) int or None
+        Precomputed (i, j_start, j_end) triplets.
+    bins : (B,) float or None
+        Bin edges (len B >= 2).
+    typical : bool
+        If true, value_fn should handle log-scaling.
+    uniform_bins, uniform_log_bins : bool
+        Flags for binning mode.
+    log_eps : float
+        Small epsilon for logs.
+    Returns
+    -------
+    values : (K,2) float
+        (ω, value) pairs if not histogram mode, else empty.
+    counts : (nbins,) uint64
+        Bin counts if histogram mode.
+    sums : (nbins,) float
+        Bin sums (width-normalized, counts-normalization left for later).
+    """
+    nh          = eigvals.shape[0]
+    use_hist    = (bins is not None) and (bins.shape[0] >= 2)
+
+    (counts, sums, nbins), values           = _alloc_values_or_bins(nh, bins, indices_alloc)
+    bin0, inv_binw, (is_uniform, is_log)    = _alloc_bin_info(uniform_bins, uniform_log_bins, bins)
+
+    #!path 1: indices_alloc provided
     if indices_alloc is not None and indices_alloc.shape[0] > 0 and indices_alloc.shape[1] == 3:
-        #! Fast path over precomputed pairs
         if use_hist:
             for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-                ei      = eigvals[i]
-                for j in range(j_start, j_end):
-                    omega   = _omega_abs(ei, eigvals[j])
-                    b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
+                i   = indices_alloc[k, 0]
+                j0  = indices_alloc[k, 1]
+                j1  = indices_alloc[k, 2]
+                ei  = eigvals[i]
+                for j in range(j0, j1):
+                    omega   = ei - eigvals[j]
+                    if omega < 0.0:
+                        omega = -omega
+                    b       = _bin_index(omega, bins, bin0, inv_binw, is_uniform, is_log)
                     if 0 <= b < nbins:
-                        m2         = _m2_generic(overlaps[i, j], overlaps[j, i])
-                        sums[b]   += (np.log(m2 + log_eps) if typical else m2)
-                        counts[b] += 1
-            return values, counts, sums
+                        val         = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                        sums[b]    += val
+                        counts[b]  += 1
+            # _normalize_by_bin_width(sums, bins)
+            return np.empty((0, 2), dtype=np.float64), counts, sums
         else:
             cnt = 0
+            cap = values.shape[0]
             for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-
-                for j in range(j_start, j_end):
-                    omega           = eigvals[i] - eigvals[j]
-                    if omega < 0:
-                        omega = -omega
-
-                    m2              = _m2_generic(overlaps[i, j], overlaps[j, i])
-                    values[cnt, 0]  = omega
-                    values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                    cnt            += 1
-            
+                i   = indices_alloc[k, 0]
+                j0  = indices_alloc[k, 1]
+                j1  = indices_alloc[k, 2]
+                for j in range(j0, j1):
+                    if cnt >= cap: break
+                    omega = eigvals[i] - eigvals[j]
+                    if omega < 0.0: omega = -omega
+                    val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                    values[cnt, 0] = omega
+                    values[cnt, 1] = val
+                    cnt += 1
             return values[:cnt], counts, sums
 
-    # ----------
-    
-    #! No indices provided: generate the pair set on the fly
+    #!path 2: generate pairs on the fly
     if use_hist:
         for i in range(nh):
-            e_i     = eigvals[i]
+            ei = eigvals[i]
             for j in range(i + 1, nh):
-                omega   = abs(e_i - eigvals[j])
-                b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
+                omega = ei - eigvals[j]
+                if omega < 0.0: omega = -omega
+                b = _bin_index(omega, bins, bin0, inv_binw, is_uniform, is_log)
                 if 0 <= b < nbins:
-                    m2          = _m2_generic(overlaps[i, j], overlaps[j, i])
-                    counts[b]  += 1
-                    sums[b]    += m2 if not typical else math.log(m2 + log_eps)
-        return values, counts, sums
+                    val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                    sums[b]   += val
+                    counts[b] += 1
+        # _normalize_by_bin_width(sums, bins)
+        return np.empty((0, 2), dtype=np.float64), counts, sums
     else:
         cnt = 0
+        cap = values.shape[0]
         for i in range(nh):
-            e_i = eigvals[i]
+            ei = eigvals[i]
             for j in range(i + 1, nh):
-                omega           = abs(e_i - eigvals[j])
-                m2              = _m2_generic(overlaps[i, j], overlaps[j, i])
-                values[cnt, 0]  = omega
-                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                cnt            += 1
+                if cnt >= cap: break
+                omega = ei - eigvals[j]
+                if omega < 0.0: omega = -omega
+                val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                values[cnt, 0] = omega
+                values[cnt, 1] = val
+                cnt += 1
         return values[:cnt], counts, sums
+
+# -----------------------------------------------------------------------------
+
+@numba.njit(fastmath=True)
+def f_function(overlaps, eigvals, indices_alloc=None, bins=None, typical=False, uniform_bins=False, uniform_log_bins=False, log_eps=1e-24):
+    return pair_histogram(eigvals, overlaps, None, f_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Fidelity susceptibility
@@ -544,7 +616,7 @@ def inverse_participation_ratio(states: np.ndarray, q: float = 1.0, new_basis: O
 #! K - function
 # -----------------------------------------------------------------------------
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True)
 def k_function( ldos            : np.ndarray,
                 eigvals         : np.ndarray,
                 indices_alloc   : Optional[np.ndarray] = None,
@@ -554,193 +626,24 @@ def k_function( ldos            : np.ndarray,
                 uniform_bins    : bool = False,
                 uniform_log_bins: bool = False,
                 log_eps         : float = 1e-24) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Compute the f-function for a given set of overlaps and eigenvalues.
-    """
-    nh                              = eigvals.shape[0]
-    use_hist                        = (bins is not None) and (bins.shape[0] >= 2)
-    #! allocation
-    (counts, sums, nbins), values   = _alloc_values_or_bins(nh, bins)
-    bin0, inv_binw, (uniform_bins, uniform_log_bins) = _alloc_bin_info(uniform_bins, uniform_log_bins, bins)
-    
-    if indices_alloc is not None and indices_alloc.shape[0] > 0 and indices_alloc.shape[1] == 3:
-        #! Fast path over precomputed pairs
-        if use_hist:
-            for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-                ei      = eigvals[i]
-                for j in range(j_start, j_end):
-                    omega   = _omega_abs(ei, eigvals[j])
-                    b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
-                    if 0 <= b < nbins:
-                        val        = ldos[i] * ldos[j]
-                        sums[b]   += (np.log(val + log_eps) if typical else val)
-                        counts[b] += 1
-            return values, counts, sums
-        else:
-            cnt = 0
-            for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-
-                for j in range(j_start, j_end):
-                    omega           = eigvals[i] - eigvals[j]
-                    if omega < 0:
-                        omega = -omega
-
-                    m2              = ldos[i] * ldos[j]
-                    values[cnt, 0]  = omega
-                    values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                    cnt            += 1
-            
-            return values[:cnt], counts, sums
-
-    # ----------
-    
-    #! No indices provided: generate the pair set on the fly
-    if use_hist:
-        for i in range(nh):
-            e_i     = eigvals[i]
-            for j in range(i + 1, nh):
-                omega   = abs(e_i - eigvals[j])
-                b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
-                if 0 <= b < nbins:
-                    m2          = ldos[i] * ldos[j]
-                    counts[b]  += 1
-                    sums[b]    += m2 if not typical else math.log(m2 + log_eps)
-        return values, counts, sums
-    else:
-        cnt = 0
-        for i in range(nh):
-            e_i = eigvals[i]
-            for j in range(i + 1, nh):
-                omega           = abs(e_i - eigvals[j])
-                m2              = ldos[i] * ldos[j]
-                values[cnt, 0]  = omega
-                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                cnt            += 1
-        return values[:cnt], counts, sums
+    return pair_histogram(eigvals, None, ldos, k_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Fourier spectrum function - S(omega) = \sum _{n \neq m} |c_n|^2 |c_m|^2 |O_mn|^2 \delta (omega - |E_m - E_n|)
 # -----------------------------------------------------------------------------
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True)
 def s_function( ldos            : np.ndarray,
-                overlaps        : np.ndarray,
                 eigvals         : np.ndarray,
+                overlaps        : np.ndarray,
                 indices_alloc   : Optional[np.ndarray] = None,
                 bins            : Optional[np.ndarray] = None,
                 # additional parameters
                 typical         : bool = False,
                 uniform_bins    : bool = False,
                 uniform_log_bins: bool = False,
-                log_eps         : float = 1e-24
-                ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    r"""
-    Compute the power spectrum S(omega) for a given set of overlaps and eigenvalues.
-    Coarse-grained representation in energy space.
-
-    Power spectrum S(omega) is defined as:
-    S(omega) = \sum _{n \neq m} |c_n|^2 |c_m|^2 |O_mn|^2 \delta (omega - |E_m - E_n|)
-
-    Parameters
-    ----------
-    ldos : np.ndarray
-        Local density of states.
-    overlaps : np.ndarray
-        Overlap matrix.
-    eigvals : np.ndarray
-        Eigenvalues.
-    indices_alloc : Optional[np.ndarray], optional
-        Precomputed indices for allocation.
-    bins : Optional[np.ndarray], optional
-        Bins for histogram.
-    typical : bool, optional
-        If True, use typical values.
-    uniform_bins : bool, optional
-        If True, use uniform bins.
-    uniform_log_bins : bool, optional
-        If True, use uniform log bins.
-
-    Returns
-    -------
-    np.ndarray
-        Power spectrum S(omega).
-    """
-    
-    nh                              = eigvals.shape[0]
-    use_hist                        = (bins is not None) and (bins.shape[0] >= 2)
-    #! allocation
-    (counts, sums, nbins), values   = _alloc_values_or_bins(nh, bins)
-    bin0, inv_binw, (uniform_bins, uniform_log_bins) = _alloc_bin_info(uniform_bins, uniform_log_bins, bins)
-    
-    if indices_alloc is not None and indices_alloc.shape[0] > 0 and indices_alloc.shape[1] == 3:
-        #! Fast path over precomputed pairs
-        if use_hist:
-            for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-                ei      = eigvals[i]
-                for j in range(j_start, j_end):
-                    omega   = _omega_abs(ei, eigvals[j])
-                    b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
-                    if 0 <= b < nbins:
-                        val        = ldos[i] * ldos[j]
-                        val       *= _m2_generic(overlaps[i, j], overlaps[j, i])
-                        sums[b]   += (np.log(val + log_eps) if typical else val)
-                        counts[b] += 1
-            return values, counts, sums
-        else:
-            cnt = 0
-            for k in range(indices_alloc.shape[0]):
-                i       = indices_alloc[k, 0]
-                j_start = indices_alloc[k, 1]
-                j_end   = indices_alloc[k, 2]
-
-                for j in range(j_start, j_end):
-                    omega           = eigvals[i] - eigvals[j]
-                    if omega < 0:
-                        omega = -omega
-
-                    m2              = ldos[i] * ldos[j]
-                    m2             *= _m2_generic(overlaps[i, j], overlaps[j, i])
-                    values[cnt, 0]  = omega
-                    values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                    cnt            += 1
-            return values[:cnt], counts, sums
-
-    # ----------
-    
-    #! No indices provided: generate the pair set on the fly
-    if use_hist:
-        for i in range(nh):
-            e_i     = eigvals[i]
-            for j in range(i + 1, nh):
-                omega   = abs(e_i - eigvals[j])
-                b       = _bin_index(omega, bins, bin0, inv_binw, uniform_bins, uniform_log_bins)
-                if 0 <= b < nbins:
-                    m2          = ldos[i] * ldos[j]
-                    m2         *= _m2_generic(overlaps[i, j], overlaps[j, i])
-                    counts[b]  += 1
-                    sums[b]   += m2 if not typical else math.log(m2 + log_eps)
-        return values, counts, sums
-    else:
-        cnt = 0
-        for i in range(nh):
-            e_i = eigvals[i]
-            for j in range(i + 1, nh):
-                omega           = abs(e_i - eigvals[j])
-                m2              = ldos[i] * ldos[j]
-                m2             *= _m2_generic(overlaps[i, j], overlaps[j, i])
-                values[cnt, 0]  = omega
-                values[cnt, 1]  = m2 if not typical else math.log(m2 + 1e-30)
-                cnt            += 1
-        return values[:cnt], counts, sums
+                log_eps         : float = 1e-24) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    return pair_histogram(eigvals, overlaps, ldos, s_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Spectral CDF

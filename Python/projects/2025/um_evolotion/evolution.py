@@ -6,18 +6,20 @@ import argparse
 import numpy as np
 import pandas as pd
 import numpy as np
+import scipy
 from typing import Union
 from dataclasses import dataclass
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+import scipy.integrate
 
 # project imports
 try:
     from evolution_data import (
             EvolutionData, 
-            HistogramAverage,
             Timer,
             Directories, 
-            UltrametricModel, PowerLawRandomBanded, Hamiltonian,
+            UltrametricModel, PowerLawRandomBanded, RosenzweigPorter,
             create_model,
             file_path
         )
@@ -64,7 +66,7 @@ batch_num   = lambda ns: 10 if batch_limit(ns) else 1
 
 # ------------------------------------------------------------------
 
-def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r : int, sim_params : SimulationParams = None, edata: EvolutionData = None) -> bool:
+def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded, RosenzweigPorter], r : int, sim_params : SimulationParams = None, edata: EvolutionData = None) -> bool:
 
     if SlurmMonitor.is_overtime(limit=3600, start_time=sim_params.start_time, job_time=sim_params.job_time): # 20 minutes buffer
         return False
@@ -83,6 +85,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
         edata.mean_energy       = model.av_en
         bandwidth               = model.get_bandwidth()
         sigma_e                 = model.get_energywidth()
+        logger.info(f"ns = {edata.ns}, alpha = {edata.alpha:.2f}, r = {r} mean energy = {edata.mean_energy:.4f}, bandwidth = {bandwidth:.4f}, sigma_e = {sigma_e:.4f}", lvl=4, color='red')
         edata.bandwidths[r]     = bandwidth
         edata.sigma_es[r]       = sigma_e
 
@@ -127,7 +130,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
     if edata.indices_omegas is None or edata.indices_omegas.shape[0] <= 0:
         capacity                = edata.hilbert_size # idx_i, idx_j_start, idx_j_end
         edata.indices_omegas    = np.empty((capacity, 3), dtype=np.int64)
-        
+    
     with Timer(f"Histogram indices: r = {r}, alpha = {edata.alpha:.2f}, ns = {edata.ns}, nh = {edata.hilbert_size}", logger=logger, logger_args = {'lvl':3, 'color':'red'}):
         edata.indices_omegas, cnt = statistical.extract_indices_window(
             start           = 0,
@@ -150,8 +153,10 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
 
         #! F-Function
         with Timer(f"{name} F-Function", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
+            # Standard
             _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices_alloc=indices_local, bins=edata.edges, uniform_log_bins=True)
             edata.h_av[name].add(sums, counts)
+            # Typical
             _, counts, sums = statistical.f_function(overlaps=matrix_elements, eigvals=model.eig_val, indices_alloc=indices_local, bins=edata.edges, typical=True, uniform_log_bins=True)
             edata.h_typ[name].add(sums, counts)
             # full
@@ -160,6 +165,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
             
         #! K-Function
         with Timer(f"{name} K-Function", logger=logger, logger_args = {'lvl':4, 'color':'blue'}):
+            # Standard
             _, counts, sums = statistical.k_function(ldos=edata.ldos[r], eigvals=model.eig_val, 
                                                     indices_alloc=indices_local, bins=edata.edges, uniform_log_bins=True)
             edata.k_functions.add(sums, counts)
@@ -196,6 +202,10 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
         with Timer(f"Time Evolution: overlaps", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
             evolved_overlaps   = np.exp(-1j * np.outer(model.eig_val, edata.time_steps)) * overlaps[:, np.newaxis]
             quench_states_t    = model.eig_vec @ evolved_overlaps
+
+            # coeffs              = overlaps[:,None] * np.exp(-1j * model.eig_val[:,None] * edata.time_steps[None,:])
+            # quench_states_t     = model.eig_vec @ coeffs
+            del evolved_overlaps
             # quench_states_t     = time_evo.time_evo_block_optimized(eig_vec=model.eig_vec, eig_val=model.eig_val, overlaps=overlaps, time_steps=edata.time_steps)
 
         with Timer(f"Survival Probability", logger=logger, logger_args = {'lvl':5, 'color':'blue'}):
@@ -214,7 +224,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded], r
                     #! calculate FFT
                     data_evo_fft_base               = np.fft.rfft(data_evo_av) * time_norm
                     data_evo_fft                    = np.abs(data_evo_fft_base)**2 / edata.time_num**2
-                    data_evo_fft_n                  = np.trapz(data_evo_fft, x=edata.fft_omegas, axis=0)
+                    data_evo_fft_n                  = scipy.integrate.trapezoid(y=data_evo_fft, x=edata.fft_omegas, axis=0)
                     data_evo_fft                    = data_evo_fft / data_evo_fft_n
                     edata.fft_results[name][r, :]   = data_evo_fft[1:-1] # Exclude the zero frequency and Nyquist
                     edata.fft_n[name][r]            = data_evo_fft_n
@@ -287,43 +297,54 @@ def _single_alpha(modelstr : 'str' = 'um', evolution_data : EvolutionData = None
 #! -------------------------------------------------------
 
 def _mean_lvl_and_bw(alpha: float, ns: int, hilbert_size: int):
-    
+    '''
+    Obtain mean level spacing and bandwidth for given parameters.
+    '''
+    def _lookup(df: pd.DataFrame, ns: int, alpha: float, mult=1.0, fallback=None, name=""):
+        # Clamp ns to nearest available column
+        if ns not in df.columns:
+            if ns < df.columns.min():
+                ns = df.columns.min()
+            else:
+                ns = df.columns.max()
+
+        if df.empty:
+            logger.info("The dataframe is empty, using fallback value", lvl=2, color="yellow")
+            return fallback
+
+        # Closest alpha index
+        keys    = np.asarray(df.index, dtype=float)
+        idx     = int(np.abs(keys - alpha).argmin())
+        try:
+            val = df.iloc[idx][ns] * mult
+            logger.info(f"Using {name}: alpha={alpha:.2f}, alpha_idx={keys[idx]:.2f}, ns={ns}, mult={mult}", lvl=2, color="blue")
+            return val
+        except Exception as e:
+            logger.error(f"{name} not found for ns={ns}, alpha={alpha:.2f}: {e}")
+            return fallback
+
+    # mean level spacing
+    mult = 1.0
     if ns not in mls_df.columns:
         if ns < mls_df.columns.min():
-            mult = 2 ** (int(mls_df.columns.min())-ns)
-            ns = mls_df.columns.min()
+            mult    = 2 ** (mls_df.columns.min() - ns)
+            ns      = mls_df.columns.min()
         else:
-            mult = 2 ** (int(mls_df.columns.max())-ns)
-            ns = mls_df.columns.max()
-    else:
-        mult = 1.0
-        
-    try:
-        if not mls_df.empty:
-            mean_lvl_keys       = np.array(mls_df.index, dtype=float)
-            closest_idx         = np.abs(mean_lvl_keys - alpha).argmin()
-            logger.info(f"Using params: alpha = {alpha:.2f}, alpha_idx = {mean_lvl_keys[closest_idx]:.2f}, ns = {ns}", lvl=2, color='blue')
-            mean_lvl_spacing    = mls_df.iloc[closest_idx][ns] * mult
-        else:
-            mean_lvl_spacing    = 1 / hilbert_size * 2.0 * np.pi
-    except KeyError:
-        logger.error(f"Mean level spacing not found for ns = {ns}, alpha = {alpha:.2f}")
-        mean_lvl_spacing    = 1 / hilbert_size * 2.0 * np.pi
-        
-    #! bandwidth
-    if ns not in bw_df.columns:
-        if ns < bw_df.columns.min():
-            ns = bw_df.columns.min()
-        else:
-            ns = bw_df.columns.max()
-    try:
-        bandwidth_keys      = np.array(bw_df.index, dtype=float)
-        closest_idx         = np.abs(bandwidth_keys - alpha).argmin()
-        bandwidth_data      = bw_df.iloc[closest_idx][ns]
-    except KeyError:
-        logger.error(f"Bandwidth not found for ns = {ns}, alpha = {alpha:.2f}")
-        bandwidth_data      = (1 + (alpha**2 * (1 - alpha**(2 * ns))) / (1 - alpha**2))
+            mult    = 2 ** (mls_df.columns.max() - ns)
+            ns      = mls_df.columns.max()
+
+    mean_lvl_spacing = _lookup(
+        mls_df, ns, alpha, mult, fallback=(2.0 * np.pi) / hilbert_size, name="mean level spacing"
+    )
+    logger.info(f"Mean level spacing (before adjustment): {mean_lvl_spacing}", lvl=2, color="blue")
+    # bandwidth
+    bandwidth_data = _lookup(
+        bw_df, ns, alpha, 1.0, fallback=(1 + (alpha**2 * (1 - alpha**(2 * ns))) / (1 - alpha**2)), name="bandwidth"
+    )
+    logger.info(f"Bandwidth data (before adjustment): {bandwidth_data}", lvl=2, color="blue")
     return mean_lvl_spacing, bandwidth_data
+
+#! -------------------------------------------------------
 
 def prepare_evolution(
                 sites, 
@@ -331,6 +352,7 @@ def prepare_evolution(
                 n               : int               = 1,
                 uniform         : bool              = True,
                 n_realisations  : dict              = None,
+                time_num        : dict              = None,
                 # job parameters
                 sim_params      : SimulationParams  = None,
                 modelstr        : str               = 'um') -> tuple:
@@ -341,6 +363,7 @@ def prepare_evolution(
     for ins, ns in enumerate(sites):
         logger.info(f"ns = {ns}", lvl=1, color='blue')
         n_realisations_in       = n_realisations[ns]
+        time_num_in             = time_num[ns]
         hilbert_size            = 2**ns
         
         # operators_map[sig_z_l(ns).name] = sig_z_l
@@ -351,7 +374,7 @@ def prepare_evolution(
                                         alpha               = None,  # placeholder, will be set in the loop
                                         realizations        = n_realisations_in,
                                         hilbert_size        = hilbert_size,
-                                        time_num            = time_num,
+                                        time_num            = time_num_in,
                                         # other
                                         mean_lvl_space      = None,  # placeholder, will be set in the loop
                                         bandwidth_data      = None,  # placeholder, will be set in the loop
@@ -404,8 +427,8 @@ def make_sig_x_global(ns):
 
 #! -------------------------------------------------------
 
-def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals, 
-                time_num, operators_map, n, rand_num, start_time, remaining_time, 
+def run_parallel_evolution(alphas_chunks, base_dir: str, sites: list, n_reals: dict, 
+                time_num: dict, operators_map, n, rand_num, start_time, remaining_time, 
                 max_workers, seed, modelstr, uniform=False):
     """Run evolution in parallel with proper error handling"""
         
@@ -427,6 +450,7 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
             n               = n,
             uniform         = uniform,
             n_realisations  = n_reals,
+            time_num        = time_num,
             # simulation
             sim_params      = sim_params,
             modelstr        = modelstr,
@@ -445,8 +469,9 @@ def run_parallel_evolution(alphas_chunks, base_dir, sites, n_reals,
                     alphas          = chunk,
                     # other parameters
                     n               = n,
-                    uniform         = True,
+                    uniform         = uniform,
                     n_realisations  = n_reals,
+                    time_num        = time_num,
                     # simulation
                     sim_params      = sim_params,
                     modelstr        = modelstr,
@@ -490,11 +515,11 @@ if __name__ == "__main__":
     parser.add_argument('--sites_end',       type=int,   required=True, help='Maximum number of spins (inclusive)')
     
     # OPTIONAL arguments with defaults
-    parser.add_argument('--number_of_realizations', type=str,    default='10',            help='Realizations per ns (default: 10)')
+    parser.add_argument('--number_of_realizations', type=str,    default='10',          help='Realizations per ns (default: 10)')
     parser.add_argument('--n',                      type=int,    default=1,             help='Model parameter n (default: 1)')
-    parser.add_argument('--time_num',               type=int,    default=int(1e5),      help='Number of time points (default: 100000)')
+    parser.add_argument('--time_num',               type=str,    default='100000',      help='Number of time points (default: 100000)')
     parser.add_argument('--memory_per_worker',      type=float,  default=2.0,           help='Memory reserved per worker in GB (default: 2.0)')
-    parser.add_argument('--max_memory',             type=float,  default=196.0,          help='Maximum memory in GB (default: 80.0)')
+    parser.add_argument('--max_memory',             type=float,  default=196.0,         help='Maximum memory in GB (default: 80.0)')
     parser.add_argument('--uniform',                type=int,    default=1,             help='Use uniform times for the evolution')
     parser.add_argument('-m',        '--model',             type    =   str,    default =   'um',       choices=['um', 'plrb', 'rpm'], help='Model type: um (ultrametric) or plrb (power-law random banded)')
     parser.add_argument('-S',        '--seed',              type    =   int,    default =   None,       help    =   'Random seed for reproducibility')
@@ -556,7 +581,8 @@ if __name__ == "__main__":
     operators_map.update({ op_spin.sig_x(ns=0, type_act=op_spin.OperatorTypeActing.Global, sites=[0,5]).name: make_sig_x_global })
     
     n_reals         = calculate_realisations_per_parameter(sites, args.number_of_realizations)
-    time_num        = args.time_num
+    # time_num        = args.time_num
+    time_num        = calculate_realisations_per_parameter(sites, args.time_num)
     modelstr        = args.model
 
     #! -------------------------------------------------------

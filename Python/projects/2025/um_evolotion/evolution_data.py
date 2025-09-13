@@ -188,7 +188,7 @@ class EvolutionData:
         if self.uniform:
             #! uniform time steps around the Heisenberg time - change 10.09.25
             t0      = 0.0
-            dt_step = 2.0*np.pi / self.bandwidth_data * 10.0
+            dt_step = 2.0*np.pi / self.bandwidth_data
             # t0      = heisenberg_time - self.time_num*dt_step/2.0
             # if t0 < 0.0:
                 # t0  = heisenberg_time/100.0

@@ -78,10 +78,7 @@ class RosenzweigPorter(hamil_module.Hamiltonian):
         '''
         if kwargs.get('seed', None) is not None:
             set_global_seed(kwargs['seed'], backend=self._backend)
-        
-        # initialize the blocks
-        # self._diagonal  = self._rng.normal(loc=0.0, scale=1.0, size=self._nh).astype(self._dtype)
-        self._diagonal = self._backend.asarray(np.random.normal(loc=0.0, scale=1.0, size=self._nh), dtype=self._dtype)
+        self._hamiltonian(use_numpy=kwargs.get("use_numpy", True))
     
     # ---------------------------------------------------------------
     
@@ -101,36 +98,50 @@ class RosenzweigPorter(hamil_module.Hamiltonian):
 
     def _hamiltonian(self, use_numpy: bool = False):
         """
-        Build the full ultrametric Hamiltonian by combining the central dot Hamiltonian H0
-        with the hierarchical blocks Hk.
-        
-        First, the Hamiltonian is initialized. There shall be no operators
-        acting on states apart from the random blocks.
-        The Hamiltonian is constructed as a Kronecker product of the central dot Hamiltonian H0
-        and the identity matrix of size 2^L.
-        """
-        
-        if self._nh == 0:
-            raise ValueError("RPM: Hamiltonian not initialized.")
+        Build the Rosenzweig-Porter Hamiltonian.
 
-        # initialize zero Hamiltonian container
-        try:
-            backend_changed = self._backend if not use_numpy else np
-            
-            #! off-diagonal part
-            self._hamil     = backend_changed.zeros((self._nh, self._nh), dtype=self._dtype)
-            if self._iscpx:
-                self._hamil += backend_changed.asarray(GUE(self._nh), dtype=self._dtype) * self._gamma_power_i
-            else:
-                self._hamil += backend_changed.asarray(GOE(self._nh), dtype=self._dtype) * self._gamma_power_i
-            
-            #! add diagonal disorder
-            self.randomize()
-            self._hamil += backend_changed.diag(self._diagonal)
-            
-            self._hamiltonian_validate()
-        except Exception as e:
-            raise e
+        H = D + λ * V
+
+        where
+            - D is a random diagonal with entries ~ N(0,1)
+            - V is a GOE (or GUE if complex) random matrix
+            - λ = N^{-gamma/2}, with N = hilbert space dimension (_nh)
+
+        Parameters
+        ----------
+        use_numpy : bool, optional
+            If True, force NumPy backend regardless of self._backend.
+        """
+        if self._nh == 0:
+            raise ValueError("RPM: Hamiltonian not initialized (nh=0).")
+
+        # select backend
+        xp          = np if use_numpy else self._backend
+        N           = self._nh
+
+        # scaling
+        lam         = N ** (-0.5 * self._gamma)
+
+        # initialize Hamiltonian
+        H           = xp.zeros((N, N), dtype=self._dtype)
+
+        # diagonal part ~ N(0,1)
+        diag_vals   = np.random.normal(loc=0.0, scale=1.0, size=N).astype(self._dtype)
+        
+        if xp is np:
+            np.fill_diagonal(H, diag_vals)
+        else:
+            H = H.at[xp.arange(N), xp.arange(N)].set(diag_vals)
+
+        # off-diagonal part (GOE/GUE)
+        # if self._iscpx:
+            # V = GUE(N)
+        # else:
+        V = GOE((N, N))
+
+        H           = H + xp.asarray(V, dtype=self._dtype) * lam
+        self._hamil = H
+        self._hamiltonian_validate()
 
     # ---------------------------------------------------------------
     
