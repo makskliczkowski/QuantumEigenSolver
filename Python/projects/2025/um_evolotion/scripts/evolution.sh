@@ -101,9 +101,10 @@ main() {
     defaults[BASE_DIR]="${PACKAGE_DIR}"
     defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025/um_evolotion"
     defaults[CODES_DIR]="${CODES_DIR}"
-    defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/data_septermber_2025/um_evolution"
-    defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/2025_09_01/um_evolution"
-    defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM/2025_09_01/um_evolution"
+    current_date=$(date +%Y_%m_%d)
+    defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/data_09_12_25/um_evolution"
+    defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/${current_date}/um_evolution"
+    defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM/${current_date}/um_evolution"
     defaults[QES_PACKAGE_DIR]="${defaults[BASE_DIR]}/Python"
     
     # Parse command line arguments
@@ -214,7 +215,7 @@ main() {
     echo "=============================="
     
     # Generate job identifiers
-    job_params="09_25_${params[model]},Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]},uniform=${params[uniform]}"
+    job_params="${current_date}_${params[model]},Ns=${params[Ns_start]}-${params[Ns_end]},a=${params[a_start]}-${params[a_step]}-${params[a_num]},uniform=${params[uniform]}"
     script_file="${defaults[SLURM_DIR]}/${job_params}.sh"
     venv_name="qes_venv/qes_venv"
     venv_path=${defaults[CODES_DIR]}/venvs/${venv_name}
