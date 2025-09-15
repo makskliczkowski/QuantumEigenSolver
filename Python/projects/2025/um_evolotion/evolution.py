@@ -141,7 +141,7 @@ def _single_realisation(model : Union[UltrametricModel, PowerLawRandomBanded, Ro
             energy_target   = edata.mean_energy,
             whole_spectrum  = False
         )
-        indices_local = edata.indices_omegas[:cnt]
+        indices_local = edata.indices_omegas[:cnt].copy()
 
     #! accumulate into the single histogram
     for name in edata.operators.keys():

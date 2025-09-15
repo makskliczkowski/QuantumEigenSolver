@@ -19,16 +19,16 @@ chmod +x ./evolution.py
 # 11. maximal memory
     # --save_dir data_big_times_fixed_f \
 python ./evolution.py \
-    --save_dir data \
-    --alpha_start 1.2 \
+    --save_dir data_13_09_25_rpfixed \
+    --alpha_start 0.72 \
     --alpha_step 0.2 \
-    --alphas_number 4 \
+    --alphas_number 2 \
     --sites_start 13 \
     --sites_end 13 \
-    --number_of_realizations 5 \
+    --number_of_realizations 1 \
     --n 1 \
     --time_num 100000 \
     --max_memory 16 \
     --memory_per_worker 4 \
-    --model rpm \
-    --uniform 1
+    --model um \
+    --uniform 1 \ 

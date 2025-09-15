@@ -101,7 +101,7 @@ main() {
     defaults[BASE_DIR]="${PACKAGE_DIR}"
     defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025/um_evolotion"
     defaults[CODES_DIR]="${CODES_DIR}"
-    current_date=$(date +%Y_%m_%d_%H%M)
+    current_date=$(date +%Y_%m_%d_%H)
     defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/data_09_12_25/um_evolution"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/${current_date}/um_evolution"
     defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM/${current_date}/um_evolution"
