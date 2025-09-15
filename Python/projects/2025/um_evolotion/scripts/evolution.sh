@@ -101,7 +101,7 @@ main() {
     defaults[BASE_DIR]="${PACKAGE_DIR}"
     defaults[RUN_DIR]="${PACKAGE_DIR}/Python/projects/2025/um_evolotion"
     defaults[CODES_DIR]="${CODES_DIR}"
-    current_date=$(date +%Y_%m_%d)
+    current_date=$(date +%Y_%m_%d_%H%M)
     defaults[LUSTRE_DIR]="${HOME_DIR}/mylustre/data_09_12_25/um_evolution"
     defaults[LOG_DIR]="${defaults[RUN_DIR]}/LOG/${current_date}/um_evolution"
     defaults[SLURM_DIR]="${defaults[RUN_DIR]}/SLURM/${current_date}/um_evolution"
@@ -124,7 +124,7 @@ main() {
     if parse_vqmc_params params "$@"; then
         # Used individual parameters
         if [ $# -lt 11 ]; then
-            echo "Error: Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num uniform TIM MEM CPU"
+            log_error "${defaults[LOG_DIR]}/error.log" "Insufficient parameters. Need: a_start a_step a_num n_rel Ns_start Ns_end n t_num uniform TIM MEM CPU"
             show_usage
             exit 1
         fi
@@ -146,7 +146,7 @@ main() {
     
     # Ensure all critical parameters are defined
     if [[ -z "${params[n]:-}" ]] || [[ -z "${params[t_num]:-}" ]]; then
-        echo "Error: Critical parameters 'n' and 't_num' must be provided" >&2
+        log_error "${defaults[LOG_DIR]}/error.log" "Critical parameters 'n' and 't_num' must be provided"
         show_usage
         exit 1
     fi
@@ -223,10 +223,6 @@ main() {
     # Create SLURM job script
     {
         create_slurm_header "$CPU" "$MEM" "$TIM" "${defaults[SLURM_DIR]}" "$job_params"
-        
-        echo "# Log the job directory"
-        echo "echo -e \"\$(pwd)\t\$(date)\" >> ${defaults[RUN_DIR]}/slurm_ids_run.log"
-        echo ""
 
         add_module_section "Python/3.12.3-GCCcore-13.3.0"
         echo "venv_name=\"${venv_name}\""
@@ -257,7 +253,7 @@ main() {
     submit_slurm_job "$script_file" true || exit 1
     
     # Log job information
-    log_job_info "${defaults[RUN_DIR]}/submitted_jobs_$(date +%Y%m%d).log" "$job_params"
+    log_job_info "${defaults[RUN_DIR]}/submitted_jobs_${current_date}.log" "$job_params"
 }
 
 # Run main function with all arguments

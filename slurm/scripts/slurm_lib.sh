@@ -199,6 +199,23 @@ create_directories() {
 
 # ----------------------------------------------------------------------
 
+# Function to log error messages
+#   It appends error messages with timestamps to a specified log file.
+#   Parameters:
+#     - Log file path
+#     - Error message
+#     - Optional job parameters for context
+log_error() {
+    local logfile="$1"
+    local message="$2"
+    local ts
+    ts=$(date +"%Y-%m-%d %H:%M:%S")
+    echo -e "[ERROR] $ts | ${job_params:-"N/A"} | $message" >> "$logfile"
+    echo "Error: $message (logged to $logfile)" >&2
+}
+
+# ----------------------------------------------------------------------
+
 # Function to validate directory access
 #   It checks if the directories exist and if they are writable.
 #   Returns 0 if all directories are valid, 1 if any directory is invalid.
