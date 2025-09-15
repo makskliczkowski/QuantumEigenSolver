@@ -185,13 +185,13 @@ def extract_indices_window(
         cnt                  += 1
     return indices_alloc, cnt
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True, inline='always')
 def _m2_hermitian(v):
     # Works for real or complex
     a = abs(v)
     return a * a
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(fastmath=True, cache=True, inline='always')
 def _m2_generic(x, y):
     # |x*y| = |x|*|y|
     return abs(x) * abs(y)
@@ -316,13 +316,37 @@ def s_value(overlaps, ldos, i, j, log_eps, typical):
     val    *= _m2_hermitian(overlaps[i, j])
     return math.log(val + log_eps) if typical else val
 
-@numba.njit(fastmath=True, cache=True)
+@numba.njit(inline='always', fastmath=True)
+def _value(mode, overlaps, ldos, i, j, log_eps, typical):
+    ''' 
+    Combined f, k, s value function.
+    '''
+    # mode: 0=f, 1=k, 2=s
+    if mode == 0:                  # f
+        v = _m2_hermitian(overlaps[i, j])
+    elif mode == 1:                # k
+        v = ldos[i] * ldos[j]
+    else:                          # s
+        v  = ldos[i] * ldos[j]
+        v *= _m2_hermitian(overlaps[i, j])
+    return math.log(v + log_eps) if typical else v
+
+@numba.njit(inline='always', fastmath=True)
+def _own_contig_1d(a):
+    # cheap guard; Numba can't introspect .base, so assume caller did the copy.
+    return a
+
+@numba.njit(inline='always', fastmath=True)
+def _own_contig_2d(a):
+    return a
+
+@numba.njit(fastmath=True)
 def pair_histogram(eigvals, 
-                overlaps, 
+                overlaps,
                 ldos,
-                value_fn            : Callable,
                 indices_alloc       = None, 
                 bins                = None,
+                mode                : int = 0, # 0=f, 1=k, 2=s
                 typical             = False, 
                 uniform_bins        = False, 
                 uniform_log_bins    = False,
@@ -376,7 +400,7 @@ def pair_histogram(eigvals,
                         omega = -omega
                     b       = _bin_index(omega, bins, bin0, inv_binw, is_uniform, is_log)
                     if 0 <= b < nbins:
-                        val         = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                        val         = _value(mode, overlaps, ldos, i, j, log_eps, typical)
                         sums[b]    += val
                         counts[b]  += 1
             # _normalize_by_bin_width(sums, bins)
@@ -392,7 +416,7 @@ def pair_histogram(eigvals,
                     if cnt >= cap: break
                     omega = eigvals[i] - eigvals[j]
                     if omega < 0.0: omega = -omega
-                    val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                    val = _value(mode, overlaps, ldos, i, j, log_eps, typical)
                     values[cnt, 0] = omega
                     values[cnt, 1] = val
                     cnt += 1
@@ -407,7 +431,7 @@ def pair_histogram(eigvals,
                 if omega < 0.0: omega = -omega
                 b = _bin_index(omega, bins, bin0, inv_binw, is_uniform, is_log)
                 if 0 <= b < nbins:
-                    val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                    val = _value(mode, overlaps, ldos, i, j, log_eps, typical)
                     sums[b]   += val
                     counts[b] += 1
         # _normalize_by_bin_width(sums, bins)
@@ -421,7 +445,7 @@ def pair_histogram(eigvals,
                 if cnt >= cap: break
                 omega = ei - eigvals[j]
                 if omega < 0.0: omega = -omega
-                val = value_fn(overlaps, ldos, i, j, log_eps, typical)
+                val = _value(mode, overlaps, ldos, i, j, log_eps, typical)
                 values[cnt, 0] = omega
                 values[cnt, 1] = val
                 cnt += 1
@@ -431,7 +455,8 @@ def pair_histogram(eigvals,
 
 @numba.njit(fastmath=True)
 def f_function(overlaps, eigvals, indices_alloc=None, bins=None, typical=False, uniform_bins=False, uniform_log_bins=False, log_eps=1e-24):
-    return pair_histogram(eigvals, overlaps, None, f_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
+    ldos = np.empty((0,), dtype=np.float64) # dummy
+    return pair_histogram(eigvals, overlaps, ldos, indices_alloc, bins, 0, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Fidelity susceptibility
@@ -626,7 +651,8 @@ def k_function( ldos            : np.ndarray,
                 uniform_bins    : bool = False,
                 uniform_log_bins: bool = False,
                 log_eps         : float = 1e-24) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    return pair_histogram(eigvals, None, ldos, k_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
+    overlaps = np.empty((1, 1), dtype=np.complex128) # dummy
+    return pair_histogram(eigvals, overlaps, ldos, indices_alloc, bins, 1, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Fourier spectrum function - S(omega) = \sum _{n \neq m} |c_n|^2 |c_m|^2 |O_mn|^2 \delta (omega - |E_m - E_n|)
@@ -643,7 +669,7 @@ def s_function( ldos            : np.ndarray,
                 uniform_bins    : bool = False,
                 uniform_log_bins: bool = False,
                 log_eps         : float = 1e-24) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    return pair_histogram(eigvals, overlaps, ldos, s_value, indices_alloc, bins, typical, uniform_bins, uniform_log_bins, log_eps)
+    return pair_histogram(eigvals, overlaps, ldos, indices_alloc, bins, 2, typical, uniform_bins, uniform_log_bins, log_eps)
 
 # -----------------------------------------------------------------------------
 #! Spectral CDF

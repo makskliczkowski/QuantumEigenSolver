@@ -23,12 +23,12 @@ python ./evolution.py \
     --alpha_start 0.72 \
     --alpha_step 0.2 \
     --alphas_number 2 \
-    --sites_start 13 \
-    --sites_end 13 \
+    --sites_start 12 \
+    --sites_end 12 \
     --number_of_realizations 1 \
     --n 1 \
     --time_num 100000 \
     --max_memory 16 \
     --memory_per_worker 4 \
     --model um \
-    --uniform 1 \ 
+    --uniform 1
