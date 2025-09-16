@@ -20,12 +20,12 @@ chmod +x ./evolution.py
     # --save_dir data_big_times_fixed_f \
 python ./evolution.py \
     --save_dir data_log \
-    --alpha_start 0.52 \
-    --alpha_step 0.08 \
-    --alphas_number 5 \
-    --sites_start 10 \
+    --alpha_start 0.6 \
+    --alpha_step 0.04 \
+    --alphas_number 10 \
+    --sites_start 15 \
     --sites_end 15 \
-    --number_of_realizations 10 \
+    --number_of_realizations 5 \
     --n 1 \
     --time_num 10000 \
     --memory_per_worker 64 \
