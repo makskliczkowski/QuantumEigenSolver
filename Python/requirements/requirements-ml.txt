@@ -1,3 +1,0 @@
-# Machine learning utilities
-scikit-learn>=1.0.0
-scikit-image>=0.18.0

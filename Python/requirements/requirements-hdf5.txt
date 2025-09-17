@@ -1,2 +1,0 @@
-# HDF5 file format support
-h5py>=3.1.0
