@@ -13,6 +13,12 @@ For detailed documentation and usage instructions, please refer to the [project 
 
 ---
 
+## Paths
+
+Add the following paths to use the solver easier:
+
+QES_PATH
+
 ## Features
 
 - Cross-platform support (Linux and Windows).
