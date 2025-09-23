@@ -289,13 +289,25 @@ add_module_section() {
     local modules=("$@")
     
     echo "# Load required modules"
-    echo "source /usr/local/sbin/modules.sh"    # Ensure module command is available
+    echo 'if [ -f /usr/local/sbin/modules.sh ]; then'
+    echo '    source /usr/local/sbin/modules.sh'
+    echo 'else'
+    echo '    echo "Warning: /usr/local/sbin/modules.sh not found, skipping module setup." >&2'
+    echo 'fi'
     echo ""
     
     for module in "${modules[@]}"; do
-        echo "module load $module"
+        cat <<EOF
+if module avail "$module" 2>&1 | grep -q "$module"; then
+    module load "$module"
+else
+    base="\$(echo "$module" | cut -d'/' -f1)"   # take family before '/'
+    echo "Module '$module' not found, falling back to '\$base'" >&2
+    module load "\$base" || echo "Fallback '\$base' not available either." >&2
+fi
+
+EOF
     done
-    echo ""
 }
 
 # ----------------------------------------------------------------------
