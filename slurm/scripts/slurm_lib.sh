@@ -243,13 +243,20 @@ validate_directories() {
 #     - Time allocation in HH:MM:SS format
 #     - Output directory for logs
 #     - Job name
+#     - Optional partition name
 create_slurm_header() {
     local cpu="$1"
     local mem="$2"
     local time="$3"
     local output_dir="$4"
     local job_name="$5"
-    
+    local partition="${6:-}"    # optional
+
+    mkdir -p "${output_dir}" || {
+        echo "Error: Failed to create output directory '${output_dir}'" >&2
+        exit 1
+    }
+
     cat << EOF
 #!/bin/bash
 #SBATCH -N1
@@ -259,24 +266,50 @@ create_slurm_header() {
 #SBATCH -o ${output_dir}/out-%j-${job_name}.out
 #SBATCH -e ${output_dir}/err-%j-${job_name}.err
 #SBATCH --job-name=${job_name}
+${partition:+#SBATCH -p ${partition}}
 
-# Export job ID for use in script
-export SLURM_JOB_ID=\${SLURM_JOB_ID}
+# -----------------------------------------------------------------------------
+# Environment setup and error handling
+# -----------------------------------------------------------------------------
 
-# Set up error handling
-set -e
-set -u
-set -o pipefail
+# Fail on errors, unset vars, and failed pipes
+set -euo pipefail
 
-# Function to clean up on exit
+# set -x
+
+# Export job ID and metadata
+export SLURM_JOB_ID=\${SLURM_JOB_ID:-unknown}
+export JOB_NAME="${job_name}"
+export JOB_START_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+
+echo "============================================================"
+echo " Job started: \${JOB_NAME}"
+echo " Job ID: \${SLURM_JOB_ID}"
+echo " Start time: \${JOB_START_TIME}"
+echo " Node list : \${SLURM_NODELIST:-N/A}"
+echo "============================================================"
+
+# -----------------------------------------------------------------------------
+# Cleanup on exit
+# -----------------------------------------------------------------------------
 cleanup() {
     local exit_code=\$?
-    echo "Job finished with exit code: \$exit_code"
-    # Add any cleanup logic here
+    local end_time=\$(date '+%Y-%m-%d %H:%M:%S')
+
+    echo "------------------------------------------------------------"
+    echo " Job finished."
+    echo " Job name   : \${JOB_NAME}"
+    echo " Job ID     : \${SLURM_JOB_ID}"
+    echo " Exit code  : \$exit_code"
+    echo " End time   : \${end_time}"
+    echo "------------------------------------------------------------"
+
+    if [[ \$exit_code -ne 0 ]]; then
+        echo "Error: Job \${JOB_NAME} exited with code \$exit_code" >&2
+    fi
     exit \$exit_code
 }
 trap cleanup EXIT
-
 EOF
 }
 
