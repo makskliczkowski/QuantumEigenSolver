@@ -461,47 +461,117 @@ submit_slurm_job() {
 }
 
 # ----------------------------------------------------------------------
+# JOB ARRAY HANDLING
+# ----------------------------------------------------------------------
 
-# Function to create job array script header
-create_slurm_array_header() {
-    local cpu="$1"
-    local mem="$2"
-    local time="$3"
-    local output_dir="$4"
-    local job_name="$5"
-    local array_spec="$6"  # e.g., "1-10" or "1-10:2"
-    
-    cat << EOF
+# ----------------------------------------------------------------------
+# Generic Job Array Submitter
+# ----------------------------------------------------------------------
+# Usage:
+#   submit_job_array \
+#       --job-name "my_sweep" \
+#       --script "path/to/script.py" \
+#       --param-file "path/to/arguments.txt" \
+#       --venv "path/to/venv" \
+#       --time "04:00:00" --mem "8" --cpu "1" --partition "lem-cpu"
+# ----------------------------------------------------------------------
+submit_job_array() {
+    # Defaults
+    local job_name="array_job"
+    local python_script=""
+    local param_file=""
+    local venv_path=""
+    local time="01:00:00"
+    local mem="4"
+    local cpu="1"
+    local partition=""
+    local max_concurrent="100"
+    local log_dir="./logs"
+    local env_vars=""
+
+    # Parse named arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --job-name)     job_name="$2"; shift 2 ;;
+            --script)       python_script="$2"; shift 2 ;;
+            --param-file)   param_file="$2"; shift 2 ;;
+            --venv)         venv_path="$2"; shift 2 ;;
+            --time)         time="$2"; shift 2 ;;
+            --mem)          mem="$2"; shift 2 ;;
+            --cpu)          cpu="$2"; shift 2 ;;
+            --partition)    partition="$2"; shift 2 ;;
+            --concurrent)   max_concurrent="$2"; shift 2 ;;
+            --log-dir)      log_dir="$2"; shift 2 ;;
+            --env)          env_vars="$2"; shift 2 ;; # Pass "VAR1=val VAR2=val"
+            *) echo "Unknown option: $1"; return 1 ;;
+        esac
+    done
+
+    # Validation
+    if [[ -z "$python_script" || -z "$param_file" ]]; then
+        echo "Error: --script and --param-file are required."
+        return 1
+    fi
+
+    # Count lines in param file to set array range
+    local total_jobs=$(wc -l < "$param_file" | xargs) # xargs trims whitespace
+    if [[ "$total_jobs" -eq 0 ]]; then
+        echo "Error: Parameter file is empty."
+        return 1
+    fi
+
+    # Ensure log dir exists
+    mkdir -p "$log_dir"
+
+    # Define wrapper script path
+    local submit_script="${log_dir}/submit_${job_name}.sh"
+
+    # Generate the SBATCH script
+    cat << EOF > "$submit_script"
 #!/bin/bash
-#SBATCH -N1
-#SBATCH -c${cpu}
+#SBATCH -J ${job_name}
+#SBATCH -N 1
+#SBATCH -c ${cpu}
 #SBATCH --mem=${mem}gb
 #SBATCH --time=${time}
-#SBATCH --array=${array_spec}
-#SBATCH -o ${output_dir}/out-%A_%a-${job_name}.out
-#SBATCH -e ${output_dir}/err-%A_%a-${job_name}.err
-#SBATCH --job-name=${job_name}
+#SBATCH --array=1-${total_jobs}%${max_concurrent}
+#SBATCH -o ${log_dir}/%x-%A_%a.out
+#SBATCH -e ${log_dir}/%x-%A_%a.err
+${partition:+#SBATCH -p ${partition}}
 
-# Export job ID and array task ID for use in script
-export SLURM_JOB_ID=\${SLURM_JOB_ID}
-export SLURM_ARRAY_JOB_ID=\${SLURM_ARRAY_JOB_ID}
-export SLURM_ARRAY_TASK_ID=\${SLURM_ARRAY_TASK_ID}
-
-# Set up error handling
+# 1. Load Environment
 set -e
-set -u
-set -o pipefail
+${env_vars}
 
-# Function to clean up on exit
-cleanup() {
-    local exit_code=\$?
-    echo "Array task \${SLURM_ARRAY_TASK_ID} finished with exit code: \$exit_code"
-    # Add any cleanup logic here
-    exit \$exit_code
-}
-trap cleanup EXIT
+# 2. Activate Virtual Environment
+if [[ -n "${venv_path}" ]]; then
+    source "${venv_path}/bin/activate"
+fi
+
+# 3. Extract Parameters for this Task ID
+# sed 'Xq;d' is an efficient way to extract line X
+ARGS=\$(sed "\${SLURM_ARRAY_TASK_ID}q;d" "${param_file}")
+
+echo "========================================================"
+echo "Job: \${SLURM_JOB_NAME} | ID: \${SLURM_ARRAY_JOB_ID}_\${SLURM_ARRAY_TASK_ID}"
+echo "Node: \${SLURMD_NODENAME}"
+echo "Args: \$ARGS"
+echo "========================================================"
+
+# 4. Run Python Script
+# We use 'eval' or simple expansion to pass the args string as flags
+python3 "${python_script}" \$ARGS
 
 EOF
+
+    # Submit
+    echo "------------------------------------------------"
+    echo "Submitting Array Job: $job_name"
+    echo "Tasks: $total_jobs (Limit: $max_concurrent running at once)"
+    echo "Script: $submit_script"
+    echo "------------------------------------------------"
+    
+    sbatch "$submit_script"
 }
 
 # ----------------------------------------------------------------------
