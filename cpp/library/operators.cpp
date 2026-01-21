@@ -1510,7 +1510,7 @@ namespace Operators
 		*         - first: The resulting basis state (unchanged in this case)
 		*         - second: The coefficient after applying the operator
 		* 
-		* @note The function includes phase factors exp(ikr) where k = 2π*q/N
+		* @note The function includes phase factors exp(ikr) where k = 2Pi*q/N
 		* @note The result is normalized by 1/sqrt(N) where N is the number of sites
 		*/
 		template <typename _T>
