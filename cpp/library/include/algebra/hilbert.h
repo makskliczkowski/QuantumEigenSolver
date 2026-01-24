@@ -242,7 +242,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Create the Hilbert space class allowing for creation of specific symmetry 
 	* sectors or a general Hilbert space for the system.
 	* @param _lat general lattice to be used for creation of the system
@@ -278,7 +278,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Assign constructor with different type
 	*/
 	template<typename _T, uint _spinModes>
@@ -302,7 +302,7 @@ namespace Hilbert
 		this->hi();
 	};
 
-	/*
+	/**
 	* @brief Assign constructor
 	*/
 	template<typename _T, uint _spinModes>
@@ -317,7 +317,7 @@ namespace Hilbert
 		std::lock(lhs_lk, rhs_lk);
 	};
 
-	/*
+	/**
 	* @brief Move constructor
 	*/
 	template<typename _T, uint _spinModes>
@@ -345,7 +345,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Introduction to the Hilbert space class allowing for creation of specific symmetry
 	* sectors or a general Hilbert space for the system.
 	*/
@@ -388,7 +388,7 @@ namespace Hilbert
 		}
 	}
 
-	/*
+	/**
 	* @brief Initialize the variables for the Hilbert space.
 	*/
 	template<typename _T, uint _spinModes>
@@ -403,7 +403,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 	
-	/*
+	/**
 	* @brief Initializes the mapping for the Hilbert space
 	*/
 	template<typename _T, uint _spinModes>
@@ -426,7 +426,7 @@ namespace Hilbert
 	
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Based on the input symmetry generators, allows to create a local point symmetry group mix.
 	* @param g enum types generators with corresponding sector value
 	*/
@@ -587,7 +587,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates the information string about the Hilbert space and symmetries
 	* @returns string containing the information about all the symmetries
 	*/
@@ -629,7 +629,7 @@ namespace Hilbert
 	// ##########################################################################################################################################
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Find representatives of other state by using various combinations of the symmetries. We aim to look for the smallest 
 	* representative possible generated from the usage of symmetry generators combinations. We find also the value of returning to that state.
 	* @param @base_idx current base vector index to act on it with symmetry generators
@@ -663,7 +663,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Finds the representative for a given baseIdx in sector_alfa. The usage of this procedure is handy when acting with matrix
 	* on a representative |\\bar n>. Then, the matrix in general transforms |\\bar n>->|m> and we look for its representative |\\bar m>, to which the
 	* distance needs to be calculated.
@@ -709,7 +709,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief From applying symmetry operators the function finds the normalisation for a given state. The
 	* normalization constitutes of finding the sum of generator eigenvalues for a given symmetry that return to the same state.
 	* (Connected to the period of a given state)
@@ -732,7 +732,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates a symmetry rotation matrix that reproduces the full Hiblert state (without the local symmetries included)
 	* @param fMap full mapping between current Hilber space and the full Hilbert space (usefull when having global symmetries), otherwise empty
 	* @returns the rotation matrix that transforms to the full Hilbert space (without the local symmetries included)
@@ -771,7 +771,7 @@ namespace Hilbert
 		return U;
 	}
 
-	/*
+	/**
 	* @brief Creates a symmetry rotation matrix that reproduces the full Hiblert state. Generates the full map if necessary (global symmetries check).
 	*/
 	template<typename _T, uint _spinModes>
@@ -821,7 +821,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief For a given range of states in a full Hilbert space, get a transformation to equivalence class representatives (ECR).
 	* This means that we make it by acting on each basis state with all symmetry generators.
 	*/
@@ -858,7 +858,7 @@ namespace Hilbert
 		}
 	}
 
-	/*
+	/**
 	* @brief For all states in full Hilbert space, get a transformation to equivalence class representatives (ECR) and save it for later.
 	*/
 	template<typename _T, uint _spinModes>
@@ -903,7 +903,7 @@ namespace Hilbert
 		LOGINFO("Finished the map of representatives", LOG_TYPES::INFO, 2);
 	}
 
-	/*
+	/**
 	* @brief Splits the mapping genertation onto threads, where each finds basis states in the reduced Hilbert space within a given range.
 	* The mapping is retrieved by concatenating the resulting maps from each thread.
 	*/
@@ -968,7 +968,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief If the global symmetry exists, creates a transformation map to the base without it. Otherwise returns nothing. This means that 
 	* for each representative, we have a full Hilbert space state in the map.
 	* Hiblert space.
@@ -998,7 +998,7 @@ namespace Hilbert
 		return fullMap;
 	}
 
-	/*
+	/**
 	* @brief Generates full mapping to the full Hilbert space using global symmetries.
 	*/
 	template<typename _T, uint _spinModes>
@@ -1024,7 +1024,7 @@ namespace Hilbert
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Calculates the cast to the full Hilbert space when global symmetry is present. The state will have mostly zeros outside the globals.
 	* @param _s state to be transformed
 	* @returns if global symmetry is present, we transform the state; otherwise we return the same state. 
@@ -1060,14 +1060,14 @@ namespace Hilbert
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Usefull functions for single particle Hamiltonians. 
 */
 namespace SingleParticle
 {
 	namespace CorrelationMatrix
 	{
-		/*
+		/**
 		* @brief Create single particle correlation matrix for a given Fock state in orbital basis
 		* @param _Ns number of lattice sites
 		* @param _W_A transformation matrix to quasiparticle operators reduced to subsystem fraction A
@@ -1140,7 +1140,7 @@ namespace SingleParticle
 		// #######################################################
 		// #######################################################
 
-		/*
+		/**
 		* @brief Create correlation matrix for multiple states
 		*/
 		template<typename _S, typename _SA = std::allocator<_S>, typename _T1 = double, typename _T2 = _T1>

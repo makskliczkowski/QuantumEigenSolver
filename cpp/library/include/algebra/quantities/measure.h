@@ -6,7 +6,7 @@
 
 #include "../../quantities/statistics.h"
 
-/*
+/**
 * @brief Class that stores the measurements is able to save them.
 * !TODO: Transform this to std::variant!
 */
@@ -271,7 +271,7 @@ inline auto Measurement<_T>::clear() -> void
 
 // ############################################################################################################################################################
 
-/*
+/**
 * @brief Initialize the matrices for the measurement. The matrices are stored in the measurement object.
 * @param _dim The dimension of the system.
 */
@@ -482,7 +482,7 @@ inline void Measurement<_T>::measure(const _C & _stateL, const _C & _stateR)
 
 // #############
 
-/*
+/**
 * @brief Check the norm of the operators.
 * @param _ev The eigenvector of the system.
 */

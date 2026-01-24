@@ -9,7 +9,7 @@
 
 #include "../defines/prlb_def.hpp"
 
-/*
+/**
 * @brief: This class is an instance of the Power Law Random Banded model.
 */
 template<typename _T>
@@ -138,7 +138,7 @@ inline void PowerLawRandomBanded<_T>::checkQuadratic()
 
 // ### H A M I L T O N I A N ###
 
-/*
+/**
 * @brief: This function builds the Hamiltonian for the Power Law Random Banded model.
 * @note: The Hamiltonian is built in the following way:
 *		- The Hamiltonian is a banded matrix with the bandwidth of 1.

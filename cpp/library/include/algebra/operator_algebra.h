@@ -11,7 +11,7 @@ using u64 = unsigned long long;
 using cpx = std::complex<double>;
 
 
-/*
+/**
 * @brief Contains the definisions for the operator functions
 * Normally, they return a pair of unsigned long long and a complex number - new state and the value of the operator
 * We also define extensive operators for the case of multiple return values - new states vector and the values vector
@@ -28,7 +28,7 @@ namespace Operators {
 	typedef _OPxEXT<cpx> _OPCxEXT;
 	typedef _OPxEXT<double> _OPReEXT;
 
-	/*
+	/**
 	* @brief All possible correlators
 	*/
 	template <typename _RET>
@@ -41,7 +41,7 @@ namespace Operators {
 		using LOC		=		std::function<R(u64, int)>;
 		using COR		=		std::function<R(u64, int, int)>;
 
-		/*
+		/**
 		* @brief contains all possible functions in a template
 		*/
 		template <typename... _T>
@@ -57,7 +57,7 @@ namespace Operators {
 		using LOCEXT	=		std::function<REXT(u64, int)>;
 		using COREXT	=		std::function<REXT(u64, int, int)>;
 
-		/*
+		/**
 		* @brief contains all possible functions in a template as extensive operator
 		*/
 		template <typename... _T>
@@ -131,7 +131,7 @@ namespace Operators {
 	// 		};
 	// };
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
 	* Fixes both the inputs to be complex  - thus returning complex
@@ -149,7 +149,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
 	* Fixes both inputs to be real - thus returning real
@@ -167,7 +167,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...)
 	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
 	* Fixes first input to be real and the second input to be complex  - thus returning complex
@@ -185,7 +185,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of argumentrs)
 	* Fixes first input to be complex and the second input to be real - thus returning complex
@@ -287,7 +287,7 @@ namespace Operators {
 	typedef _OPx_V<cpx> _OPCx_V;
 	typedef _OPx_V<double> _OPRe_V;
 
-	/*
+	/**
 	* @brief All possible correlators
 	*/
 	template <typename _RET>
@@ -300,7 +300,7 @@ namespace Operators {
 		using LOC		=		std::function<R(_OP_V_T_CR, int)>;
 		using COR		=		std::function<R(_OP_V_T_CR, int, int)>;
 
-		/*
+		/**
 		* @brief contains all possible functions in a template
 		*/
 		template <typename... _T>
@@ -331,7 +331,7 @@ namespace Operators {
 	using _INP_V		=		typename _OP_V<_T>::template INP<_Ts...>;
 
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of arguments)
 	* Fixes both the inputs to be complex - thus returning complex
@@ -349,7 +349,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of arguments)
 	* Fixes both inputs to be real - thus returning real
@@ -367,7 +367,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...)
 	* Leaves more types to handle thereafter (the function takes combined number of arguments)
 	* Fixes first input to be real and the second input to be complex - thus returning complex
@@ -385,7 +385,7 @@ namespace Operators {
 		};
 	};
 
-	/*
+	/**
 	* @brief Imitates the behavior f \\dot g \\equiv f(g(n,...),...) 
 	* Leaves more types to handle thereafter (the function takes combined number of arguments)
 	* Fixes first input to be complex and the second input to be real - thus returning complex
@@ -478,7 +478,7 @@ namespace OperatorsCombination {
 	using _OPCx 		= _OPx<cpx>;
 	using _OPRe 		= _OPx<double>;
 
-	/*
+	/**
 	* @brief All possible correlators that this operator can return
 	* The operator acts on the product state and returns a vector of new states and values
 	* The operator can be global, local or correlation operator
@@ -494,7 +494,7 @@ namespace OperatorsCombination {
 		using LOC      = std::function<R(_OP_T, int)>;
 		using COR      = std::function<R(_OP_T, int, int)>;
 
-		/*
+		/**
 		* @brief Contains all possible functions in a template
 		*/
 		template <typename... _T>
@@ -539,7 +539,7 @@ namespace OperatorsCombination {
 	using _OPCx_V 		= _OPx_V<cpx>;
 	using _OPRe_V 		= _OPx_V<double>;
 
-	/*
+	/**
 	* @brief All possible correlators that this operator can return
 	* The operator acts on the product state and returns a vector of new states and values
 	* The operator can be global, local or correlation operator
@@ -555,7 +555,7 @@ namespace OperatorsCombination {
 		using LOC      = std::function<R(_OP_V_T_CR, int)>;
 		using COR      = std::function<R(_OP_V_T_CR, int, int)>;
 
-		/*
+		/**
 		* @brief Contains all possible functions in a template
 		*/
 		template <typename... _T>

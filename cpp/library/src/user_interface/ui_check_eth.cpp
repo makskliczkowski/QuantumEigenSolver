@@ -367,7 +367,7 @@ std::array<double, 6> UI::checkETH_statistics_mat_elems(
 
 // -----------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Check the properties of the models complying to ETH based on the Hamiltonian provided.
 * It saves the gap ratios, level statistcs, energies, and the operators.
 * @param _H: Hamiltonian to check

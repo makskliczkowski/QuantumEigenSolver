@@ -9,13 +9,15 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.9"
+  apt_packages:
+    - doxygen
   jobs:
     post_create_environment:
       # Install any system dependencies
       - pip install --upgrade pip setuptools wheel
     post_install:
       # Install your package and dependencies
-      - cd Python && pip install -e .[docs,all]
+      - cd pyqusolver/Python && pip install -e .[docs,all]
     pre_build:
       # Set environment variable for Sphinx build
       - export SPHINX_BUILD=1
@@ -34,7 +36,7 @@ formats:
 python:
   install:
     - method: pip
-      path: Python
+      path: pyqusolver/Python
       extra_requirements:
         - docs
         - all

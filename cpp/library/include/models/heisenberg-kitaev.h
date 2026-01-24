@@ -11,7 +11,7 @@
 #ifndef HEISENBERG_KITAEV_H
 #define HEISENBERG_KITAEV_H
 
-/*
+/**
 * @brief HeisenbergKitaev Hamiltonian.
 */
 template <typename _T>
@@ -81,7 +81,7 @@ public:
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Set the info about the Heisenberg-Kitaev model.
 * @param skip which parameters to skip
 * @param sep separator
@@ -313,7 +313,7 @@ inline cpx HeisenbergKitaev<_T>::locEnergy(const arma::Col<double>& _cur, uint _
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief body of setting up of the Hamiltonian
 */
 template<typename _T>

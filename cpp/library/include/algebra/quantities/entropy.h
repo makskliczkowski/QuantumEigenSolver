@@ -44,7 +44,7 @@ namespace Entropy
 			
 			// ##########################################################################################################################################
 
-			/*
+			/**
 			* @brief Calculates the von Neuman entropy from the density matrix of the system
 			* @param rho density matrix
 			* @param _ch method choice
@@ -61,7 +61,7 @@ namespace Entropy
 			
 			// ##########################################################################################################################################
 
-			/*
+			/**
 			* @brief Calculates the von Neuman entropy
 			* @param _s state to construct the density matrix from
 			* @param _sizeA subsystem size
@@ -100,7 +100,7 @@ namespace Entropy
 
 			// ##########################################################################################################################################
 
-			/*
+			/**
 			* @brief Calculates the von Neuman entropy
 			* @param _s			state to construct the density matrix from
 			* @param _sizeA		subsystem size
@@ -143,7 +143,7 @@ namespace Entropy
 			namespace Renyi
 			{
 
-				/*
+				/**
 				* @brief Calculates the Renyi entropy defined by the values of the density matrix
 				* @param vals values of the density matrix (eigenvalues) obtained from the reduced density matrix
 				* either by the Schmidt decomposition or the standard method
@@ -168,7 +168,7 @@ namespace Entropy
 
 				// ##########################################################################################################################################
 
-				/*
+				/**
 				* @brief Calculates the Renyi entropy defined by the values of the density matrix
 				* @param rho density matrix
 				* @param q exponent of the Renyi entropy S_q = 1/(1-q) * log(Tr(rho^q)) / log(D_A),
@@ -196,7 +196,7 @@ namespace Entropy
 			
 			namespace SingleParticle
 			{
-				/*
+				/**
 				* @brief For the single particle states, the von Neuman entropy is defined withing the 
 				* single particle correlation matrix
 				* @param _J single particle correlation matrix

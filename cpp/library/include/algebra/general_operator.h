@@ -88,7 +88,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Prints the operator information. This is only available in debug mode.
 	* @param _mat the matrix to print the information about
 	*/
@@ -137,7 +137,7 @@ namespace Operators {
 	// ################################################################# G E N E R A L ##########################################################################
 
 
-	/*
+	/**
 	* @brief Implemented symmetry types
 	*/
 	enum SymGenerators { E, T, Tr, R, PX, PY, PZ, OTHER, SX, SY, SZ };
@@ -159,7 +159,7 @@ namespace Operators {
 	}
 	END_ENUM(SymGenerators);
 
-	/*
+	/**
 	* @brief Implemented fermionic operators
 	*/
 	enum FermionicOperators { C_UP_DAG, C_UP, C_DOWN_DAG, C_DOWN };
@@ -724,7 +724,7 @@ namespace Operators
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		/*
+		/**
 		* @brief representative eigenvalue calculator for the operator 
 		* @param _op operator to calculate the eigenvalue for
 		* @returns the eigenvalue of the operator
@@ -763,7 +763,7 @@ namespace Operators
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Returns the matrix representation of the operator. This is a default implementation for the operators that are acting on the states.
 	* The matrix here is created ad-hoc by an overriden matrix function. If the function is not overriden, the function throws an error.
 	* @param _dim dimension of the matrix
@@ -1079,12 +1079,12 @@ namespace Operators {
 
 		// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% F R I E N D S %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-		/*
+		/**
 		* @brief calculate operator acting on state num eigenvalue
 		*/
 		friend _T chi(const Operator<_T, _Ts...>& _op, u64 _s, _Ts... _a)				{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
 
-		/*
+		/**
 		* @brief calculate operator acting on state num eigenvalue (vector version)
 		*/
 		friend _T chi(const Operator<_T, _Ts...>& _op, const _VT& _s, _Ts... _a)		{ auto [state, val] = _op(_s, std::forward<_Ts>(_a)...); return val * _op.eigVal_; };
@@ -1183,7 +1183,7 @@ namespace Operators {
 
 	// #################################################### M A T R I X   G E N E R A T I O N ####################################################
 
-	/*
+	/**
 	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
 	* The operator is acting on the same Hilbert space as the one it is acting on.
 	* For the total Hilbert space known to be without symmetries - not looking for representatives
@@ -1218,7 +1218,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
 	* The operator is acting on the same Hilbert space as the one it is acting on.
 	* For the total Hilbert space known to be without symmetries - not looking for representatives
@@ -1254,7 +1254,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates an operator matrix whenever the operator is not transforming the state from a different symmetry sector.
 	* Uses the Hilbert space that stores the state transformations from the representative base.
 	* @param _Hil the Hilbert space in which we operate
@@ -1293,7 +1293,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
 	* @param _Hil the Hilbert space in which we operate
 	* @warning (takes into account that we are going to a different symmetry sector so matrix is not square)
@@ -1522,7 +1522,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Calculating the application of the operator on the state and the values it returns
 	* @param s the state on which the operator is acting
 	* @param a the values of the operator
@@ -1554,7 +1554,7 @@ namespace Operators {
 	
 	// ------------------------------------------------------------------------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculating the application of the operator on the state and the values it returns (vector version)
 	* @param s the state on which the operator is acting
 	* @param a the values of the operator
@@ -1823,7 +1823,7 @@ namespace Operators {
 			this->currentIdx_ = 0;
 		}
 
-		/*
+		/**
 		* @brief Updates the current value of the operator with the given value and indices
 		* @param _val value to add
 		* @param i index to add to the current value of the index
@@ -1843,7 +1843,7 @@ namespace Operators {
 
 		// ##########################################################################################################################################
 
-		/*
+		/**
 		* @brief Resize the current value so one can store only the necessary values in the matrix (sizeX, sizeY)
 		* Global		has sizeX = sizeY = 1 		-	stores only one value (scalar)
 		* Local			has sizeX = Ns, sizeY = 1,	- 	stores Ns values (vector)
@@ -1889,7 +1889,7 @@ namespace Operators {
 
 		// ##########################################################################################################################################
 		
-		/*
+		/**
 		* @brief Sets the many body matrix (Operator Matrix) to apply it later for the states in a many body representation. It can be used as a combination 
 		* of the operators acting on the Hilbert space. This means that one uses the Hilbert space to generate the matrix for the operator.
 		* @param _H Hilbert space - the Hilbert space in which the operator is acting
@@ -1985,7 +1985,7 @@ namespace Operators {
 
 		// ------------------------------------------------------------------------------------------------------------------------------------------
 
-		/*
+		/**
 		* @brief Sets the many body matrix (Operator Matrix) to apply it later for the states in a many body representation. It can be used as a combination
 		* of the operators acting on the Hilbert space. This means that one uses the Hilbert space to generate the matrix for the operator.
 		* @param _H Hilbert space - the Hilbert space in which the operator is acting
@@ -2114,7 +2114,7 @@ namespace Operators {
 
 		// ##########################################################################################################################################
 
-		/*
+		/**
 		* @brief Samples the operator for the given state and stores the value in the samples
 		* @param _state state on which the operator is acting
 		* @param i index of the sample
@@ -2334,7 +2334,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
  
-	/*
+	/**
 	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
 	* The operator is acting on the same Hilbert space as the one it is acting on.
 	* For the total Hilbert space known to be without symmetries - not looking for representatives
@@ -2362,7 +2362,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates a most basic operator matrix knowing only the dimension of the Hilbert space. 
 	* The operator is acting on the same Hilbert space as the one it is acting on.
 	* For the total Hilbert space known to be without symmetries - not looking for representatives
@@ -2391,7 +2391,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates an operator matrix whenever the operator is not transforming the state from a different symmetry sector.
 	* Uses the Hilbert space that stores the state transformations from the representative base.
 	* @param _Hil the Hilbert space in which we operate
@@ -2420,7 +2420,7 @@ namespace Operators {
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Creates an operator matrix whenever the operator is transforming the state to a different symmetry sector 
 	* @param _Hil the Hilbert space in which we operate
 	* @warning (takes into account that we are going to a different symmetry sector so matrix is not square)

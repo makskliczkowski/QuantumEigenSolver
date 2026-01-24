@@ -104,7 +104,7 @@ namespace SystemProperties
 			SEEK
 		};
 
-		/*
+		/**
 		* @brief Create the initial state after the quench. The quench is defined by the initial state
 		* and the type of the quench. The quench can be random, antiferromagnetic, ferromagnetic, or domain walls.
 		* @param _type - the type of the quench
@@ -232,7 +232,7 @@ namespace SystemProperties
 
 		// ---------------------------------------------------------------------------
 
-		/*
+		/**
 		* @brief Calculate the mean energy after quench
 		* @param _H - the Hamiltonian matrix
 		* @param _state - the state
@@ -257,7 +257,7 @@ namespace SystemProperties
 
 	namespace AGP
 	{
-		/*
+		/**
 		* @brief Calculate the fidelity susceptability of the perturbation. The fidelity susceptability
 		* is calculated based on the energies and overlaps of the system. The perturbation is given by the
 		* matrix V (the perturbation matrix) and the cutoff mu.
@@ -365,7 +365,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Caculate the Local density of states (LDOS) of the system. Otherwise known as the
 	* strength function. The LDOS is calculated based on the energies and overlaps of the system.
 	* @param _energies - the energies of the system
@@ -410,7 +410,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Get the Hilbert space fraction based on the parameter given by the user. It 
 	* depends on the size of the Hilbert space - checks not to make the fraction too big
 	* @param _fraction fraction of the Hilbert space to take
@@ -430,7 +430,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Get the specific indices in a range around a given index in the Hilber space. 
 	* Checks for the boundaries as well.
 	* @param _l number of elements to the left from the average energy
@@ -447,7 +447,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Targets the mean energy to be close to a target energy with some tolerance precision.
 	* @param _l left energy
 	* @param _r right energy
@@ -462,7 +462,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Targets the energy difference to be close to a target energy with some tolerance precision.
 	* @param _l left energy
 	* @param _r right energy
@@ -477,7 +477,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Targets the energy difference to be close to a target energy with some tolerance precision.
 	* @param _l left energy
 	* @param _r right energy
@@ -525,7 +525,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Transforms the operator to the new basis
 	* @param _op the operator
 	* @param _basis the new basis
@@ -545,7 +545,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the Hilbert Schmidt norm of the matrix.
 	* The Hilbert Schmidt norm is defined as the trace of the square of the matrix
 	* divided by the number of elements in the matrix.
@@ -565,7 +565,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the eigenlevel statistics of the system
 	* aka the gap ratio. The gap ratio is a measure of the level spacing
 	* repulsion. 
@@ -689,7 +689,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the inverse participation ratio of the state
 	* @param _state - the state
 	* @param q - the exponent
@@ -713,7 +713,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the inverse participation ratio of the state
 	* @param _state the state
 	* @param q the exponent
@@ -745,7 +745,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the information entropy of the state
 	* @param _state - the state
 	* @returns the information entropy
@@ -769,7 +769,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculates the information entropy of the state.
 	* The information entropy is calculated in the new basis
 	* This corresponds to the situation when the system is slightly 
@@ -841,7 +841,7 @@ namespace SystemProperties
 		return -ent / std::log(0.48 * _state.size());
 	}
 
-	/*
+	/**
 	* @brief Calculates the participation ratio of the state
 	* @param _state - the state
 	* @param q - the exponent
@@ -862,7 +862,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 	
-	/*
+	/**
 	* @brief Calculate the mean level spacing of the Hamiltonian matrix.
 	* @param _E - the eigenvalues of the Hamiltonian matrix
 	*/
@@ -880,7 +880,7 @@ namespace SystemProperties
 		return std::exp(arma::mean(arma::log(arma::diff(_E))));
 	}
 
-	/*
+	/**
 	* @brief Calculates the mean level spacing of the Hamiltonian matrix. See the 
 	* reference Suntajs, Vidmar, Ergodicity Breaking transition in zero dimensions, PRL 2022 for more details.
 	* @param _H - the Hamiltonian matrix
@@ -909,7 +909,7 @@ namespace SystemProperties
 		return arma::sum(_values * _dE);
 	}
 
-	/*
+	/**
 	* @brief Calculates the Heisenberg time from the mean level spacing obtained from the Hamiltonian matrix.
 	* @param gamma2 - the mean level spacing
 	* @param L - the system size
@@ -922,7 +922,7 @@ namespace SystemProperties
 
 	}
 
-	/*
+	/**
 	* @brief Calculates the Heisenberg frequency from the mean level spacing obtained from the Hamiltonian matrix.
 	* @param gamma2 - the mean level spacing
 	* @param L - the system size
@@ -1019,7 +1019,7 @@ namespace SystemProperties
 		return _ret;
 	}
 
-	/*
+	/**
 	* @brief Calculate the Fourier transform of the function stored in the matrix G in the real space.
 	* The first thing to do is to calculate the function as a diffrence of the positions in the matrix.
 	* @param _G - the matrix with the function
@@ -1110,7 +1110,7 @@ namespace SystemProperties
 
 	// ---------------------------------------------------------------------------
 
-	/*
+	/**
 	* @brief Calculate the Fourier transform of the function stored in the matrix G in the real space.
 	* The first thing to do is to calculate the function as a diffrence of the positions in the matrix.
 	* @param _G - the matrix with the function
@@ -1158,7 +1158,7 @@ namespace SystemProperties
 				return arma::hist(arma::vec(_E), bins);
 			}
 
-			/*
+			/**
 			* @brief Calculate the electronic Density of States. Use gaussian broadening to ensure smoothness of the SFs.
 			* @param _E energie to be used for the eDOS
 			* @param _Sig broadening of gaussians
@@ -1192,7 +1192,7 @@ namespace SystemProperties
 			
 			// ---------------------------------------------------------------------------
 
-			/*
+			/**
 			* @brief Calculate the spectral function for noninteracting systems (time resolved Green's function).
 			* The spectral function is calculated based on the Hamiltonian matrix and the energy.
 			* This is calculated as $$ G(\omega) = \frac{1}{\omega - H + i\eta} $$.
@@ -1263,7 +1263,7 @@ namespace SystemProperties
 
 			// ---------------------------------------------------------------------------
 
-			/*
+			/**
 			* @brief Calculate the spectral function for noninteracting systems (time resolved Green's function).
 			* The spectral function is calculated based on the time resolved Green's function in the k-space.
 			* @param _G - the time resolved Green's function

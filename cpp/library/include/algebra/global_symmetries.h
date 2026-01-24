@@ -55,7 +55,7 @@ namespace GlobalSyms
 
 	// ###################################
 
-	/*
+	/**
 	* @brief describes the global check of U(1) symmetry
 	*/
 	inline auto U1Sym(u64 _state, double _val)			-> bool					{ return std::popcount(_state) == _val;				};
