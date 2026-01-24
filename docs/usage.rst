@@ -3,8 +3,11 @@ Usage Guide
 
 This guide provides examples and tutorials for using the Quantum EigenSolver (QES) framework.
 
+Python Interface
+----------------
+
 Quick Start
------------
+~~~~~~~~~~~
 
 Import the main QES package and start working with quantum systems:
 
@@ -16,7 +19,7 @@ Import the main QES package and start working with quantum systems:
     import numpy as np
 
 Basic Hilbert Space Construction
---------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Create a Hilbert space for a spin-1/2 system:
 
@@ -31,7 +34,7 @@ Create a Hilbert space for a spin-1/2 system:
     print(f"Hilbert space dimension: {hilbert.get_dim()}")
 
 Hamiltonian Construction
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Build a Heisenberg model Hamiltonian:
 
@@ -51,7 +54,7 @@ Build a Heisenberg model Hamiltonian:
     hamiltonian = H.build()
 
 Exact Diagonalization
-----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 Solve small systems exactly:
 
@@ -71,7 +74,7 @@ Solve small systems exactly:
     print(f"Ground state energy: {ground_energy}")
 
 Neural Quantum States
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 Use neural networks for larger systems:
 
@@ -101,7 +104,7 @@ Use neural networks for larger systems:
     print(f"Final energy: {energies[-1]}")
 
 Entanglement Analysis
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 Calculate entanglement entropy:
 
@@ -119,7 +122,7 @@ Calculate entanglement entropy:
     print(f"Entanglement entropy: {entropy}")
 
 Time Evolution
---------------
+~~~~~~~~~~~~~~
 
 Evolve quantum states in time:
 
@@ -146,7 +149,7 @@ Evolve quantum states in time:
         magnetization.append(mag)
 
 Monte Carlo Sampling
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 Perform statistical sampling:
 
@@ -173,7 +176,7 @@ Perform statistical sampling:
     print(f"Specific heat: {specific_heat}")
 
 Visualization
--------------
+~~~~~~~~~~~~~
 
 Plot results using built-in utilities:
 
@@ -197,10 +200,10 @@ Plot results using built-in utilities:
     plt.show()
 
 Advanced Features
------------------
+~~~~~~~~~~~~~~~~~
 
 GPU Acceleration with JAX
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Enable GPU support for large-scale calculations:
 
@@ -214,7 +217,7 @@ Enable GPU support for large-scale calculations:
     # Now all computations will use JAX/GPU when available
 
 Symmetry-Adapted Calculations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Use quantum symmetries to reduce computational cost:
 
@@ -229,7 +232,7 @@ Use quantum symmetries to reduce computational cost:
     print(f"Reduced Hilbert space dimension: {hilbert_sym.get_dim()}")
 
 Custom Models
-~~~~~~~~~~~~~
+^^^^^^^^^^^^^
 
 Define your own quantum models:
 
@@ -247,4 +250,16 @@ Define your own quantum models:
 
 For more detailed examples and advanced usage, see the :doc:`api` reference.
 
-    python main.py --N 3 --L 4 --U 2.0 --layers 5
+C++ Library Usage
+-----------------
+
+The C++ library provides high-performance implementations of key algorithms.
+To use the C++ executable after building:
+
+.. code-block:: bash
+
+    ./build/QES_Main
+
+Input files can be configured in `cpp/library/inputs`.
+
+See the :doc:`cpp_api` for detailed C++ class documentation.

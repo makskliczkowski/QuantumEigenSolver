@@ -65,7 +65,7 @@ public:
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
 
-/*
+/**
 * @brief Quantum Ising Model constructor
 * @param hilbert hilbert space handler
 * @param J interaction between Sz's on the nearest neighbors
@@ -111,7 +111,7 @@ IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double 
 
 // ----------------------------------------------------------------------------- LOCAL ENERGY -------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief body of setting up of the Hamiltonian
 */
 template<typename _T>

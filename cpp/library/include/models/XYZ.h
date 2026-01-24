@@ -11,7 +11,7 @@
 #ifndef XYZ_H
 #define XYZ_H
 
-/*
+/**
 * @brief XYZ Hamiltonian with next nearest neighbors.
 */
 template <typename _T>
@@ -93,7 +93,7 @@ public:
 // ##########################################################################################################################################
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Set the info about the XYZ model.
 * @param skip which parameters to skip
 * @param sep separator
@@ -396,7 +396,7 @@ cpx XYZ<_T>::locEnergy(const DCOL& _cur, uint _site, XYZ<_T>::NQSFun _fun)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief body of setting up of the Hamiltonian
 */
 template<typename _T>

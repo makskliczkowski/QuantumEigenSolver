@@ -1,0 +1,13 @@
+PROJECT_NAME           = "Quantum EigenSolver"
+PROJECT_NUMBER         = 0.1.0
+INPUT                  = ../cpp/library/
+OUTPUT_DIRECTORY       = _build/doxygen
+RECURSIVE              = YES
+GENERATE_XML           = YES
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+WARN_IF_UNDOCUMENTED   = NO
+JAVADOC_AUTOBRIEF      = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES

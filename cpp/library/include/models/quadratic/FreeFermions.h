@@ -14,7 +14,7 @@
 
 // //////////////////////////////////////////////////////////////////////////
 
-/*
+/**
 * @brief The choice of momentum for the translationally invariant FF lays in the regions of -\Pi, -\Pi/2 and \Pi/2, \Pi.
 * We want to move the momentum from the rest of the space to this region.
 * @param k momentum
@@ -141,7 +141,7 @@ public:
 
 // ###################################################################################
 
-/*
+/**
 * @brief Returns the transformation matrix for free fermions, as we know it by hand...
 */
 template<typename _T>
@@ -158,7 +158,7 @@ inline arma::Mat<_T> FreeFermions<_T>::getTransMat()
 
 // ###################################################################################
 
-/*
+/**
 * @brief Returns the transformation matrix for free fermions, as we know it by hand...
 */
 template<typename _T>
@@ -174,7 +174,7 @@ inline arma::Col<double> FreeFermions<_T>::getSPEnMat()
 
 // ###################################################################################
 
-/*
+/**
 * @brief Create combination of quasiparticle orbitals to obtain the many body product states...
 * @warning Using zero energy (based on the knowledge of model). This is defined on the degenerate manifold of zero energies.
 * @param N number of particles

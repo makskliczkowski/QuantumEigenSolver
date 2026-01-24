@@ -31,7 +31,7 @@
 
 namespace Operators
 {
-	/*
+	/**
 	* @brief For Quadratic Operators, we will treat the operators as acting on the integer index as it was not the configuration!
 	*/
 	namespace QuadraticOperators

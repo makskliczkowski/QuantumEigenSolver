@@ -72,7 +72,7 @@ namespace Operators
 		return cyclicShift;
 	}
 
-	/*
+	/**
 	* @brief generates translation symmetry
 	* @param kx K sector in X direction
 	* @param ky K sector in Y direction
@@ -112,7 +112,7 @@ namespace Operators
 		return fun;
 	};
 
-	/*
+	/**
 	* @brief Reflection symmetry
 	*/
 	template <typename _T>
@@ -191,7 +191,7 @@ namespace Operators
 
 	// ###################################################################
 
-	/*
+	/**
 	* @brief Parity with \\sigma^x
 	*/
 	template <typename _T>
@@ -203,7 +203,7 @@ namespace Operators
 
 	// ###################################################################
 
-	/*
+	/**
 	* @brief Parity with \\sigma^y
 	*/
 	template <typename _T>
@@ -215,7 +215,7 @@ namespace Operators
 
 	// ###################################################################
 
-	/*
+	/**
 	* @brief Parity with \\sigma^z
 	*/
 	template <typename _T>

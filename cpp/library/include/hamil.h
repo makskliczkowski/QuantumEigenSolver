@@ -294,7 +294,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(bool _isSparse)
 	CONSTRUCTOR_CALL;
 }
 
-/*
+/**
 * @brief Constructor of the Hamiltonian class for the systems that don't require the lattice
 * @param _Ns number of particles in the system
 */
@@ -309,7 +309,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const size_t _Ns, bool _isSparse
 	this->Nh_	=  this->Nh;
 }
 
-/*
+/**
 * @brief Constructor of the Hamiltonian with the Hilbert space
 */
 template<typename _T, uint _spinModes>
@@ -324,7 +324,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hilbert::HilbertSpace<_T, 
 	this->Nh_	=	this->Nh;
 };
 
-/*
+/**
 * @brief Constructor with move semantics for the Hilbert space
 */
 template<typename _T, uint _spinModes>
@@ -407,7 +407,7 @@ inline Hamiltonian<_T,_spinModes>& Hamiltonian<_T, _spinModes>::operator=(Hamilt
 
 // ------------------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Copy constructor of the Hamiltonian class. It copies all the elements of the Hamiltonian. 
 */
 template<typename _T, uint _spinModes>
@@ -433,7 +433,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(const Hamiltonian<_T,_spinModes>
 	CONSTRUCTOR_CALL;
 }
 
-/*
+/**
 * @brief Move constructor of the Hamiltonian class. It moves all the elements of the Hamiltonian.
 */
 template<typename _T, uint _spinModes>
@@ -465,7 +465,7 @@ inline Hamiltonian<_T, _spinModes>::Hamiltonian(Hamiltonian<_T,_spinModes>&& _ot
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Sets and gets the information about the model
 * @param skip vector of elements to be skipped in the info showcase
 * @returns trimmed information about the model
@@ -523,7 +523,7 @@ void Hamiltonian<_T, _spinModes>::hamiltonian()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Initialize Hamiltonian matrix.
 */
 template<typename _T, uint _spinModes>
@@ -558,7 +558,7 @@ inline void Hamiltonian<_T, _spinModes>::buildHamiltonian(bool _verbose)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the index closest to the average energy in the Hamiltonian. The index is stored in the avEnIdx variable.
 */
 template<typename _T, uint _spinModes>
@@ -581,7 +581,7 @@ inline void Hamiltonian<_T, _spinModes>::calcAvEn()
 	this->avEnIdx				= _it - std::begin(tmp);
 }
 
-/*
+/**
 * @brief Calculates the index of the energy closest to the given energy
 * @param _E energy to be compared with
 * @returns index of the energy closest to the given energy
@@ -601,7 +601,7 @@ inline u64 Hamiltonian<_T, _spinModes>::calcEnIdx(double _E)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the index closest to the average energy in the Hamiltonian. The index is stored in the avEnIdx variable.
 * @param _l number of elements to the left from the average energy
 * @param _r number of elements to the right from the average energy
@@ -615,7 +615,7 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndAvIdx(long long
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the index closest to the given energy in the Hamiltonian.
 * @param _l number of elements to the left from the given energy
 * @param _r number of elements to the right from the given energy
@@ -630,7 +630,7 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEIdx(long long 
 
 // ------------------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Calculates the indices of the energy pairs in the spectrum that are close to each other within the given tolerance
 * This is based on the energy density! E/V
 * @param _Eidx index of the energy spectrum
@@ -664,7 +664,7 @@ inline std::pair<u64, u64> Hamiltonian<_T, _spinModes>::getEnArndEnEps(u64 _Eidx
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the indices of the energy pairs in the spectrum that are close to each other within the given tolerance
 * @param _mn minimum index of the energy spectrum
 * @param _mx maximum index of the energy spectrum
@@ -683,7 +683,7 @@ inline v_1d<std::tuple<double, u64, u64>> Hamiltonian<_T, _spinModes>::getEnPair
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief prints the base state in the BRAKET notation
 * @param _s base state to be printed in the integer form
 * @param _val coefficient before the state
@@ -701,7 +701,7 @@ inline void Hamiltonian<_T, _spinModes>::printBaseState(std::ostream& output, u6
 	}
 }
 
-/*
+/**
 * @brief goes through the whole state and prints it in numerical basis
 * @param state the state to be printed
 * @param Ns number of lattice sites
@@ -723,7 +723,7 @@ inline void Hamiltonian<_T, _spinModes>::prettyPrint(std::ostream& output, const
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Sets the non-diagonal elements of the Hamimltonian matrix with symmetry sectors: therefore the matrix elements are summed over the SEC
 * @param k index of the basis state acted upon with the Hamiltonian
 * @param value value of the given matrix element to be set
@@ -755,7 +755,7 @@ inline void Hamiltonian<_T, _spinModes>::setHElem(u64 k, _T val, u64 newIdx)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * @param withoutEigenVec doesnot compute eigenvectors to save memory potentially
 */
@@ -783,7 +783,7 @@ inline void Hamiltonian<_T, _spinModes>::diagH(bool woEigVec, bool _verbose)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief General procedure to diagonalize the Hamiltonian using eig_sym from the Armadillo library
 * Modes (form):
 *		From ARMA:
@@ -881,7 +881,7 @@ inline void Hamiltonian<_T, _spinModes>::diagHs(bool woEigVec)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Prints the eigenvalues into some file "energies" in some directory
 * @param _dir directory to be saved onto
 * @param _typ type of the file extension (dat, h5 or other).
@@ -921,7 +921,7 @@ inline auto Hamiltonian<_T, _spinModes>::getEigVal(std::string _dir, HAM_SAVE_EX
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Prints the eigenvectors into some file "energies" in some directory
 * @param _dir directory to be saved onto
 * @param _mid how many states to be saved
@@ -960,7 +960,7 @@ inline auto Hamiltonian<_T, _spinModes>::getEigVec(std::string _dir, u64 _mid, H
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the degeneracy histogram of the eigenvalues.
 * @returns The degeneracy histogram of the degeneracies in the eigenspectrum.
 */

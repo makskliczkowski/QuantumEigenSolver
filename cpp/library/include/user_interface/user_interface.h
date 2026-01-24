@@ -11,7 +11,7 @@
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief User interface class for the QES
 */
 class UI : public UserInterface 
@@ -215,7 +215,7 @@ inline UI::UI(int argc, char** argv)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Sets the default map for the UI
 */
 inline void UI::setDefaultMap()
@@ -288,7 +288,7 @@ inline void UI::setDefaultMap()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Based on the input by the user, creates a Hilbert space for future purposes
 */
 template<typename _T>
@@ -310,7 +310,7 @@ inline bool UI::defineHilbert(Hilbert::HilbertSpace<_T>& _Hil)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Defines the interacting model based on the input file...
 */
 template<typename _T>

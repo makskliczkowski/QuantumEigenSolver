@@ -1412,7 +1412,7 @@ namespace Operators
 
 			// #############################################################################################
 
-			/*
+			/**
 			* @brief multiplication of \sum _i c^r_i S_z^i |state> 
 			*/
 			std::pair<u64, double> sig_z(u64 base_vec, size_t _Ns)
@@ -1690,7 +1690,7 @@ namespace Operators
 	{
 		// #############################################################################################
 
-		/*
+		/**
 		* @brief Create the occupation operator for single particle basis. Each state corresponds to single particle vector |... 1 ... 0 ...>, with 1 at the site _site.
 		* @param _Ns the number of sites
 		* @param _site the site to be acted on
@@ -1719,7 +1719,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		/*
+		/**
 		* @brief Create the operator that has random coefficients at all diagonal sites. The coefficients are given by the vector _coeffs.
 		* @param _Ns the number of sites
 		* @param _coeffs the coefficients to be used
@@ -1754,7 +1754,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		/*
+		/**
 		* @brief Create the operator that has a random coefficients at the sites given by the vector _sites. The coefficients are given by the vector _coeffs.
 		* @param _Ns the number of sites
 		* @param _sites the sites to be acted on
@@ -1793,7 +1793,7 @@ namespace Operators
 
 		// #############################################################################################
 		
-		/*
+		/**
 		* @brief Create the operator for the nq modulation of the occupation number
 		* @param _Ns the number of sites
 		* @param _momentum the momentum to be added
@@ -1827,7 +1827,7 @@ namespace Operators
 
 		// #############################################################################################
 
-		/*
+		/**
 		* @brief Standard hopping!
 		* @param _Ns the number of sites
 		* @param _site_plus the site to be acted on
@@ -1892,7 +1892,7 @@ namespace Operators
 			return _op;			
 		}
 
-		/*
+		/**
 		* @brief Create the operator for the quasimomentum occupation number
 		* @param _Ns the number of sites
 		* @returns the operator
@@ -2000,7 +2000,7 @@ namespace Operators
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief multiplication of sigma_xi | state >checkBit(tmp, L - 1 - site) ? I * Operators::_SPIN : -I * Operators::_SPIN;
 * @param L lattice dimensionality (base vector length)
 * @param sites the sites to meassure correlation at
@@ -2021,7 +2021,7 @@ Operators::Operator<double> Operators::makeSigmaX(std::shared_ptr<Lattice> lat, 
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief multiplication of sigma_yi | state >
 * @param L lattice dimensionality (base vector length)
 * @param sites the sites to meassure correlation at
@@ -2052,7 +2052,7 @@ Operators::Operator<cpx> Operators::makeSigmaY(std::shared_ptr<Lattice> lat, uin
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief Describes the act of c_i1^+ c_i2^+ ... c_in^+ on some state, where n is the length of '_sites'
 * |s1, s2, ..., sL> = (1-d_{s1, 1})c_1^+ ... (1-d_{sL, 1})c_L^+ |vac>
 * This includes the arrangement of the operators in order to include fermionic sign.
@@ -2113,7 +2113,7 @@ Operators::Operator<double> Operators::makeCDagUp(std::shared_ptr<Lattice> _lat,
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief Describes the act of c_i1^ c_i2^ ... c_in^ on some state, where n is the length of '_sites'
 * |s1, s2, ..., sL> = (1-d_{s1, 1})c_1^+ ... (1-d_{sL, 1})c_L^+ |vac>
 * This includes the arrangement of the operators in order to include fermionic sign.
@@ -2174,7 +2174,7 @@ Operators::Operator<double> Operators::makeCUp(std::shared_ptr<Lattice> _lat, ui
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief Spin down. Describes the act of c_i1^+ c_i2^+ ... c_in^+ on some state, where n is the length of '_sites'
 * |s1, s2, ..., sL> = (1-d_{s1, 1})c_1^+ ... (1-d_{sL, 1})c_L^+ |vac>
 * This includes the arrangement of the operators in order to include fermionic sign.
@@ -2234,7 +2234,7 @@ Operators::Operator<double> Operators::makeCDagDn(std::shared_ptr<Lattice> _lat,
 
 // ##############################################################################################################################
 
-/*
+/**
 * @brief Spin down. Describes the act of c_i1^ c_i2^ ... c_in^ on some state, where n is the length of '_sites'
 * |s1, s2, ..., sL> = (1-d_{s1, 1})c_1^+ ... (1-d_{sL, 1})c_L^+ |vac>
 * This includes the arrangement of the operators in order to include fermionic sign.
