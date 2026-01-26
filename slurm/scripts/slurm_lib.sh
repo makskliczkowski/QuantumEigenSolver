@@ -646,7 +646,7 @@ setup_qes_environment() {
     # 2. JAX (GPU)
     echo "if ! python3 -c 'import jax' 2>/dev/null; then"
     echo "    echo \"Installing JAX with CUDA support...\""
-    echo "    pip install --upgrade \"jax[cuda12_local]\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+    echo "    pip install --upgrade \"jax[cuda12_local]==0.4.28\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
     echo "fi"
 
     # 3. Standard requirements
