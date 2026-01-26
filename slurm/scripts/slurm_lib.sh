@@ -643,20 +643,6 @@ setup_qes_environment() {
     # 1. Pip upgrade
     echo "pip install --upgrade pip"
 
-    # 2. JAX (GPU) - Pip wheels
-    # Check for JAX *and* compatibility with Orbax (PositionalSharding presence)
-    echo "if ! python3 -c 'import jax.sharding; assert hasattr(jax.sharding, \"PositionalSharding\")' 2>/dev/null; then"
-    echo "    echo \"Detected missing or incompatible JAX/Orbax. Reinstalling...\""
-    echo "    echo \"Cleaning up existing JAX installation...\""
-    echo "    pip uninstall -y jax jaxlib jax-cuda12-plugin"
-    echo "    echo \"Installing JAX with CUDA support (pip wheels)...\""
-    echo "    pip install --upgrade --force-reinstall \"jax[cuda12]\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
-    echo "    echo \"Ensuring compatible Flax and Orbax...\""
-    echo "    pip install --upgrade flax \"orbax-checkpoint>=0.10.0\""
-    echo "else"
-    echo "    echo \"JAX/Orbax environment verified. Skipping installation.\""
-    echo "fi"
-
     # 3. Standard requirements
     echo "if [ -f \"${req_dir}/requirements.txt\" ]; then"
     echo "    echo \"Installing core requirements...\""
