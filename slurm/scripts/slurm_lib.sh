@@ -653,6 +653,8 @@ setup_qes_environment() {
     echo "    pip install --upgrade --force-reinstall \"jax[cuda12]\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
     echo "    echo \"Ensuring compatible Flax and Orbax...\""
     echo "    pip install --upgrade flax \"orbax-checkpoint>=0.10.0\""
+    echo "else"
+    echo "    echo \"JAX/Orbax environment verified. Skipping installation.\""
     echo "fi"
 
     # 3. Standard requirements
