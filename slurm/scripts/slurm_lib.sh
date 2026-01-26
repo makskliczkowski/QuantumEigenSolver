@@ -326,7 +326,6 @@ add_module_section() {
     echo "# Load required modules"
     echo 'if [ -f /usr/local/sbin/modules.sh ]; then'
     echo '    source /usr/local/sbin/modules.sh'
-    echo '    module purge'
     echo 'else'
     echo '    echo "Warning: /usr/local/sbin/modules.sh not found, skipping module setup." >&2'
     echo 'fi'
