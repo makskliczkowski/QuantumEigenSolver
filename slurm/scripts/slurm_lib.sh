@@ -649,6 +649,8 @@ setup_qes_environment() {
     echo "    pip uninstall -y jax jaxlib jax-cuda12-plugin"
     echo "    echo \"Installing JAX with CUDA support (pip wheels)...\""
     echo "    pip install --upgrade --force-reinstall \"jax[cuda12]\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+    echo "    echo \"Ensuring compatible Flax and Orbax...\""
+    echo "    pip install --upgrade flax orbax-checkpoint"
     echo "fi"
 
     # 3. Standard requirements
