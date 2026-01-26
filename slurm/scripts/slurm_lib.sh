@@ -330,12 +330,11 @@ add_module_section() {
     echo '    source /etc/profile.d/modules.sh'
     echo 'elif [ -f /usr/share/modules/init/bash ]; then'
     echo '    source /usr/share/modules/init/bash'
+    echo 'else'
+    echo '    echo "Warning: No module initialization script found." >&2'
     echo 'fi'
     
     echo 'module purge || echo "Module purge failed, proceeding..."'
-    echo ""
-    echo '    echo "Warning: /usr/local/sbin/modules.sh not found, skipping module setup." >&2'
-    echo 'fi'
     echo ""
     
     for module in "${modules[@]}"; do
