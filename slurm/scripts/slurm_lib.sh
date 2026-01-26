@@ -251,6 +251,7 @@ create_slurm_header() {
     local output_dir="$4"
     local job_name="$5"
     local partition="${6:-}"    # optional
+    local gres="${7:-}"         # optional
 
     mkdir -p "${output_dir}" || {
         echo "Error: Failed to create output directory '${output_dir}'" >&2
@@ -267,6 +268,7 @@ create_slurm_header() {
 #SBATCH -e ${output_dir}/err-%j-${job_name}.err
 #SBATCH --job-name=${job_name}
 ${partition:+#SBATCH -p ${partition}}
+${gres:+#SBATCH --gres=${gres}}
 
 # -----------------------------------------------------------------------------
 # Environment setup and error handling
