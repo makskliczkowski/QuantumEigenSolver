@@ -605,6 +605,14 @@ setup_qes_environment() {
     local req_file="$2"
     local venv_name="$3"
     local venv_path="$4"
+    
+    # Determine directory containing requirements
+    local req_dir
+    if [[ -d "$req_file" ]]; then
+        req_dir="$req_file"
+    else
+        req_dir=$(dirname "$req_file")
+    fi
 
     echo "# Setup QES Python environment"
     echo "export QES_BASE_DIR=\"${base_dir}\""
@@ -622,6 +630,27 @@ setup_qes_environment() {
     echo "source \"${venv_path}/bin/activate\""
     echo "echo \"Activated virtual environment: ${venv_name}\""
     echo ""
+    
+    echo "# Environment Installation / Update"
+    echo "echo \"Checking and installing dependencies...\""
+    
+    # 1. Pip upgrade
+    echo "pip install --upgrade pip"
+
+    # 2. Standard requirements
+    echo "if [ -f \"${req_dir}/requirements.txt\" ]; then"
+    echo "    echo \"Installing core requirements...\""
+    echo "    pip install -r \"${req_dir}/requirements.txt\""
+    echo "fi"
+    
+    # 3. Optional requirements
+    for opt in requirements-jax.txt requirements-ml.txt requirements-hdf5.txt; do
+        echo "if [ -f \"${req_dir}/${opt}\" ]; then"
+        echo "    echo \"Installing ${opt}...\""
+        echo "    pip install -r \"${req_dir}/${opt}\""
+        echo "fi"
+    done
+    
     echo "echo \"Environment setup complete.\""
 }
 
