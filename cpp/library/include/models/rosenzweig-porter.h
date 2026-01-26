@@ -75,7 +75,7 @@ public:
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Destructor of the QSM model.
 */
 template<typename _T>
@@ -108,7 +108,7 @@ inline void RosenzweigPorter<_T>::checkQuadratic()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
 * @param _N: the number of particles in the system.
 * @param _gamma: multiplier of the offdiagonal couplings in the Hamiltonian.
@@ -171,7 +171,7 @@ inline RosenzweigPorter<_T>::RosenzweigPorter(Hilbert::HilbertSpace<_T>&& _hil, 
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Randomizes the parameters of the QSM model. The parameters that can be randomized are: 
 * alpha [alpha], magnetic field [h], distance random limits [xi] and the random dot GOE distribution [dot].
 * The latter is done automatically and does not need to be specified.
@@ -196,7 +196,7 @@ inline void RosenzweigPorter<_T>::randomize(double _around, double _str, const s
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Returns the information about the QSM model.
 * @param skip: the parameters to skip.
 * @param sep: the separator between the parameters.
@@ -222,7 +222,7 @@ inline std::string RosenzweigPorter<_T>::info(const strVec & skip, std::string s
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Builds the Hamiltonian of the QSM model.
 * @note The Hamiltonian is built in the following way:
 * 1. The first term is the Hamiltonian of the dot particles. This is a random matrix.
@@ -249,7 +249,7 @@ inline void RosenzweigPorter<_T>::hamiltonian()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Calculates the local energy of the QSM model. The local energy is calculated for a specific particle at a specific site.
 * @param _elemId: the index of the element in the Hilbert space.
 * @param _elem: the element in the Hilbert space (considered when there are symmetries)

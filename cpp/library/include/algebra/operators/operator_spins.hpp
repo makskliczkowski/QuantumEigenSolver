@@ -46,7 +46,7 @@
 
 namespace Operators
 {
-    /*
+    /**
 	* @brief The spin operator namespace. Contains the most common spin operators.
 	*/
 	namespace SpinOperators

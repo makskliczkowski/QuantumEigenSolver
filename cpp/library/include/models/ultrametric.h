@@ -92,7 +92,7 @@ public:
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Destructor of the QSM model.
 */
 template<typename _T>
@@ -103,7 +103,7 @@ inline Ultrametric<_T>::~Ultrametric()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Checks the sizes of the vectors of the Ultrametric model. It checks if the number of particles in the dot is larger than the number of particles in the system.
 * It also checks if the sizes of the coupling vector 'a', the random box distribution vector 'xi' and the magnetic field vector 'h' are equal to the number of particles outside the dot.
 * @throws std::invalid_argument if the number of particles in the dot is larger than the number of particles in the system.
@@ -127,7 +127,7 @@ inline void Ultrametric<_T>::checkSizes()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
 */
 template<typename _T>
@@ -142,7 +142,7 @@ inline Ultrametric<_T>::Ultrametric(const size_t _Nall)
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Constructor of the QSM model. It takes the number of particles in the system and initializes the Hamiltonian.
 */
 template<typename _T>
@@ -164,7 +164,7 @@ inline Ultrametric<_T>::Ultrametric(const size_t _Nall, const size_t _N, const d
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Constructor of the QSM model. It takes the Hilbert space and the parameters of the QSM model.
 * @param _hil: the Hilbert space of the QSM model.
 * @param _N: the number of particles within the dot.
@@ -196,7 +196,7 @@ inline Ultrametric<_T>::Ultrametric(const Hilbert::HilbertSpace<_T>& _hil, const
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Constructor of the QSM model. It takes the Hilbert space and moves it along with
 * the parameters of the QSM model.
 * @param _hil: the Hilbert space of the QSM model.
@@ -233,7 +233,7 @@ inline Ultrametric<_T>::Ultrametric(Hilbert::HilbertSpace<_T>&& _hil, const size
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Randomizes the parameters of the QSM model. The parameters that can be randomized are: 
 * alpha [alpha], magnetic field [h], distance random limits [xi] and the random dot GOE distribution [dot].
 * The latter is done automatically and does not need to be specified.
@@ -250,7 +250,7 @@ inline void Ultrametric<_T>::randomize(double _around, double _str, const strVec
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Initializes the particles outside the dot. It also initializes the random neighbors and distances for the particles outside the dot.
 * @note The random neighbors are used to create the spin-flip interaction between the dot and the outside world.
 */
@@ -285,7 +285,7 @@ inline void Ultrametric<_T>::initializeParticles()
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Returns the information about the Ultrametric model.
 * @param skip: the parameters to skip.
 * @param sep: the separator between the parameters.
@@ -311,7 +311,7 @@ inline std::string Ultrametric<_T>::info(const strVec & skip, std::string sep, i
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Builds the Hamiltonian of the QSM model.
 * @note The Hamiltonian is built in the following way:
 * 1. The first term is the Hamiltonian of the dot particles. This is a random matrix.

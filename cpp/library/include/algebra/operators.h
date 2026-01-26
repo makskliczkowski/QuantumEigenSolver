@@ -178,7 +178,7 @@ namespace Operators
 	{
 		// ##########################################################################################################################################
 
-		/*
+		/**
 		* @brief For the states in state occupation representation, check if they
 		* correspond to the given state, if yes, return 1.0, otherwise 0.0.
 		* @note The function is used not in the full Hilbert space representation, but in the state occupation representation.
@@ -194,7 +194,7 @@ namespace Operators
 			return std::make_pair(base_vec, (base_vec == _proj) ? 1.0 : 0.0);
 		}
 		
-		/*
+		/**
 		* @brief For the states in state occupation representation, check if they
 		* correspond to the given state, if yes, return 1.0, otherwise 0.0. 
 		* @note The function is used not in the full Hilbert space representation, but in the state occupation representation.
@@ -274,7 +274,7 @@ namespace Operators
 			return Operator<_T>(_Ns, 1.0, fun_, funV_, SymGenerators::OTHER);
 		}
 
-		/*
+		/**
 		* @brief Creates the operator that projects the state to the given state and sums the values of the operator.
 		* This is: \sum _{s'} |s><s'| * pRatio[excited state](s' -> s)) 
 		* @param _Ns number of sites
@@ -333,7 +333,7 @@ namespace Operators
 	std::pair<u64, cpx> sigma_y(u64 base_vec, int L, const v_1d<uint>& sites);
 	Operators::Operator<cpx> makeSigmaY(std::shared_ptr<Lattice> lat, uint site);
 
-	/*
+	/**
 	* @brief multiplication of sigma_zi | state >
 	* @param L lattice dimensionality (base vector length)
 	* @param sites the sites to meassure correlation at
@@ -365,7 +365,7 @@ namespace Operators
 		return Operator<_T>(lat, 1.0, fun_, SymGenerators::SZ);
 	}
 	
-	/*
+	/**
 	* @brief Creates local sigma z
 	*/
 	template <typename _T>
@@ -376,7 +376,7 @@ namespace Operators
 		return Operator<_T, uint>(lat, 1.0, fun_, SymGenerators::SZ);
 	}
 
-	/*
+	/**
 	* @brief Creates correlation sigma z
 	*/
 	template <typename _T>

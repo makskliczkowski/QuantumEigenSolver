@@ -1,7 +1,7 @@
 Welcome to Quantum EigenSolver's Documentation
 ==============================================
 
-**Quantum EigenSolver (QES)** is a comprehensive Python framework for solving quantum eigenvalue problems and performing quantum many-body simulations. It provides a unified interface for various computational methods including exact diagonalization, Neural Quantum States (NQS), and Monte Carlo techniques.
+**Quantum EigenSolver (QES)** is a comprehensive framework for solving quantum eigenvalue problems and performing quantum many-body simulations. It provides a unified interface for various computational methods including exact diagonalization, Neural Quantum States (NQS), and Monte Carlo techniques.
 
 Key Features
 ------------
@@ -15,6 +15,7 @@ Key Features
    - JIT compilation with Numba for CPU acceleration
    - Optional JAX backend for GPU/TPU support
    - Parallel Monte Carlo implementations
+   - C++ Core for critical performance paths
 
 🧠 **Neural Quantum States**
    - Variational quantum Monte Carlo with neural networks
@@ -44,6 +45,7 @@ The QES package is organized into several main modules:
    installation
    usage
    api
+   cpp_api
    contributing
    license
 

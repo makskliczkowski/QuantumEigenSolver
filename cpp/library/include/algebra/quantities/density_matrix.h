@@ -12,7 +12,7 @@
 #endif // !HILBERT_H
 
 
-/*
+/**
 * @brief Enables one to construct density matrices of quantum states.
 */
 namespace DensityMatrix
@@ -28,7 +28,7 @@ namespace DensityMatrix
 
 	// ###############################################################
 
-	/*
+	/**
 	* @brief Calculates the bipartite reduced density matrix of the system via the state mixing
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -78,7 +78,7 @@ namespace DensityMatrix
 
 	// ###############################################################
 
-	/*
+	/**
 	* @brief Calculates the bipartite reduced density matrix of the system via the state mixing. Knowing the mapping with global symmetry.
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -124,7 +124,7 @@ namespace DensityMatrix
 
 	// ###############################################################
 
-	/*
+	/**
 	* @brief Using reshape method to calculate the reduced density matrix
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -146,7 +146,7 @@ namespace DensityMatrix
 
 	// ##############################################################################################################################
 
-	/*
+	/**
 	* @brief Using reshape method to calculate the reduced density matrix
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -166,7 +166,7 @@ namespace DensityMatrix
 
 	// ###############################################################
 
-	/*
+	/**
 	* @brief Using reshape method to calculate the reduced density matrix - Schmidt decomposition for the state
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -208,7 +208,7 @@ namespace DensityMatrix
 	
 	// ##############################################################################################################################
 
-	/*
+	/**
 	* @brief Calculates the reduced density matrix with one of the methods
 	* @param _s state to construct the density matrix from
 	* @param _sizeA subsystem size
@@ -330,7 +330,7 @@ namespace DensityMatrix
 
 		// ##############################################################################################################################
 
-		/*
+		/**
 		* @brief Calculates the reduced density matrix with one of the methods and returns the eigenvalues
 		* @param _s state to construct the density matrix from
 		* @param _sizeA subsystem size

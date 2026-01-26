@@ -8,7 +8,7 @@
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Based on symmetry parametes, create local and global symmetries
 */
 std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, int>>> UI::createSymmetries()
@@ -33,7 +33,7 @@ std::pair<v_1d<GlobalSyms::GlobalSym>, v_1d<std::pair<Operators::SymGenerators, 
 
 // ##########################################################################################################################################
 
-/*
+/**
 * @brief Computes the Hamiltonian with symmetries and saves the entanglement entropies.
 * @param start time of the beginning
 * @param _H the shared pointer to the Hamiltonian - for convinience of the usage
@@ -147,7 +147,7 @@ void UI::symmetries(std::shared_ptr<Hamiltonian<_T>> _H, bool _diag, bool _state
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Tests the currently implemented symmetries based on specific model parameters
 * @param start the timer start
 */
@@ -453,7 +453,7 @@ void UI::symmetriesTest()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Allows to calculate how do the degeneracies look in case of symmetric Hamiltonians...
 * At the same time, it calculates mixing of the states in the degenerate manifold
 */
@@ -619,7 +619,7 @@ void UI::symmetriesDeg()
 	LOGINFO(_timer.point(1), "Degenerate - Entropies", 2);
 }
 
-/*
+/**
 * @brief Use this function to create a combination of states in the middle of the spectrum and 
 * calculate their entanglement entropies 
 */

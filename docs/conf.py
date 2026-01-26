@@ -5,8 +5,8 @@ import sys
 
 # Add the project root directory and Python package to sys.path
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('../Python'))
-sys.path.insert(0, os.path.abspath('../Python/QES'))
+sys.path.insert(0, os.path.abspath('../pyqusolver/Python'))
+sys.path.insert(0, os.path.abspath('../pyqusolver/Python/QES'))
 
 # -- Project information -----------------------------------------------------
 
@@ -28,7 +28,14 @@ extensions = [
     'sphinx.ext.intersphinx',       # Link to other project's documentation
     'sphinx.ext.mathjax',           # Math support
     'sphinx_rtd_theme',             # Read the Docs theme
+    'breathe',                      # Bridge between Sphinx and Doxygen
 ]
+
+# Breathe configuration
+breathe_projects = {
+    "QES": "_build/doxygen/xml"
+}
+breathe_default_project = "QES"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path      = ['_templates']

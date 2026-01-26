@@ -39,7 +39,7 @@ namespace Operators
 		}
 		END_ENUM(OperatorsAvailable)
 
-		/*
+		/**
 		* @brief Checks if the operator needs integer indices
 		* @param _op the operator
 		* @returns true if the operator needs integer indices	
@@ -58,7 +58,7 @@ namespace Operators
 		}
 		// --------------------------------------------------------------------------------------------
 
-		/*
+		/**
 		* @brief Check if the operator uses Hilbert space dimension rather than the integer indices
 		* @param _op the operator
 		* @returns true if the operator uses Hilbert space dimension

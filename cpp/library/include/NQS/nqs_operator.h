@@ -261,7 +261,7 @@ namespace NQSAv
 
 	// ##########################################################################################################################################
 
-	/*
+	/**
 	* @brief Apply the operators with a value change (!with pRatio). The function is used to calculate the measuremnet of given a state and the operator and container
 	* @param _state base state to apply the operators to
 	* @param _gO operator to apply

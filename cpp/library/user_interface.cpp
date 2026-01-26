@@ -37,7 +37,7 @@ void UI::exitWithHelp()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief  Setting parameters to default.
 */
 void UI::setDefault()
@@ -674,7 +674,7 @@ bool UI::defineModelsQ(bool _createLat)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief A placeholder for making the simulation with symmetries.
 * @param Should diagonalize and proceed with the simulation?
 */
@@ -694,7 +694,7 @@ void UI::makeSimSymmetries(bool _diag, bool _states)
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Use the simulation and Haar matrices to calculate the degeneracies and entropies
 */
 void UI::makeSimSymmetriesDeg()
@@ -710,7 +710,7 @@ void UI::makeSimSymmetriesDeg()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief Use the simulation and CUE matrices to calculate entanglement entropy of multiple degeneracies
 */
 void UI::makeSimSymmetriesCreateDeg()
@@ -726,7 +726,7 @@ void UI::makeSimSymmetriesCreateDeg()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief A placeholder for making the simulation with symmetries, sweeping them all
 */
 void UI::makeSimSymmetriesSweep()
@@ -789,7 +789,7 @@ void UI::makeSimSymmetriesSweep()
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-/*
+/**
 * @brief A placeholder for making the simulation with symmetries, sweeping them all. Saves the Hilbert space sizes for future reference of what to run.
 */
 void UI::makeSimSymmetriesSweepHilbert()

@@ -63,7 +63,7 @@ inline std::string filenameQuadraticRandom(std::string _f,				// #
 }																		// #
 // #########################################################################
 
-/*
+/**
 * @brief Allows one to construct a non-interacting Hamiltonian - can be transformed to spinless fermions 
 */
 template <typename _T>
@@ -199,7 +199,7 @@ public:
 // ##################################################################################################################################
 // ##################################################################################################################################
 
-/*
+/**
 * @brief Given a set of indices, it creates a many body energy from single particle states. For example, having [0, 1, 1, 0, 1],
 * the procedure will use orbitals N_1, N_2, N_4 to calculate the many body energy as a sum of single particle orbital energies.
 * @param getManyBodyEnergy _state set of indices that indicate single particle states occupied
@@ -231,7 +231,7 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const std::vector<_T2,
 
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Given a set of indices, it creates a many body energy from single particle states. For example, having [1, 3, 5],
 * the procedure will use orbitals N_1, N_3, N_5 to calculate the many body energy as a sum of single particle orbital energies.
 * @param _state set of indices that indicate single particle states
@@ -264,7 +264,7 @@ inline double QuadraticHamiltonian<_T>::getManyBodyEnergy(const v_1d<std::seed_s
 
 // ----------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief Given an integer, it transforms it to a set of indices. For the people that like binary!
 * It creates a many body energy from single particle states. For example, having [0, 1, 1, 0, 1],
 * the procedure will use orbitals N_1, N_2, N_4 to calculate the many body energy as a sum of single particle orbital energies.
@@ -298,7 +298,7 @@ inline std::string QuadraticHamiltonian<_T>::getType() const
 // ##################################################################################################################################
 // ##################################################################################################################################
 
-/*
+/**
 * @brief Create combination of quasiparticle orbitals to obtain the many body product states...
 * @param N number of particles out of the single particle sectors
 * @param _orbitals set of many single particle states selection
@@ -319,7 +319,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyOrbitals(uint N, v_1d<uint> _or
 
 // ##################################################################################################################################
 
-/*
+/**
 * @brief Create combination of quasiparticle orbitals to obtain the many body product states... Does so by random selection.
 * @param N number of particles out of the single particle sectors
 * @param _orbitals set of many single particle states selection
@@ -346,7 +346,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyOrbitals(uint N, v_1d<uint> _or
 
 // ##################################################################################################################################
 
-/*
+/**
 * @brief Create combination of quasiparticle orbitals to obtain the many body product states...
 * @param manyBodySpectrum save the many body energies here!
 * @param manyBodyOrbitals set of many single particle states selection 
@@ -369,7 +369,7 @@ inline void QuadraticHamiltonian<_T>::getManyBodyEnergies(v_1d<double>& manyBody
 
 // ##################################################################################################################################
 
-/*
+/**
 * @brief Sets the slater determinant in order to create a single coefficient of a state.
 * @param _singlePartOrbs single particle orbitals that are occupied
 * @param _realSpaceOccupations state that represents real space occupations
@@ -463,7 +463,7 @@ inline arma::Mat<_T> QuadraticHamiltonian<_T>::getSlater(const _T1& _singlePartO
 
 // ################################################################################################################################################
 
-/*
+/**
 * @brief For a given single particle state (product of single particle orbitals),
 * creates a many body state in a full Hilbert space by calculating the Slater determinants.
 * @param _singlePartOrbs set of indices indicating taken single particle orbitals
@@ -500,7 +500,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const v_1d<_T1>&
 
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief For a given single particle state (product of single particle orbitals),
 * creates a many body state in a full Hilbert space by calculating the Slater determinants.
 * @param _singlePartOrbs set of indices indicating taken single particle orbitals
@@ -535,7 +535,7 @@ inline arma::Col<_T> QuadraticHamiltonian<_T>::getManyBodyState(const arma::Col<
 
 // -----------------------------------------------------------------------------------------------------------------------------------
 
-/*
+/**
 * @brief For a given single particle state (product of single particle orbitals),
 * creates a many body state in a full Hilbert space by calculating the Slater determinants.
 * @param _singlePartOrbs set of indices indicating taken single particle orbitals

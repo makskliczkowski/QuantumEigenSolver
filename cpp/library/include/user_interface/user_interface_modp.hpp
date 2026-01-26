@@ -319,7 +319,7 @@ namespace UI_PARAMS
 
 		// -------------------------------------
 
-		/*
+		/**
 		* @brief Check whether the model itself is complex...
 		*/
 		bool checkComplex() const

@@ -27,7 +27,7 @@ BEGIN_ENUMC(MY_MODELS_F)												// #
 END_ENUMC(MY_MODELS_F)													// #	
 // #########################################################################
 
-/*
+/**
 * @brief Allows one to construct a interacting Hamiltonian
 */
 template <typename _T>

@@ -41,7 +41,7 @@ public:
 
 // ######################################################################################################################
 
-/*
+/**
 * @brief Creates a thermal average in a specific symmetry sector of a given operator. We do not even need the Hilbert
 * space. It is assumed that the matrix is correctly created in a given representative (REP) basis.
 * @param _beta inverse temperature 1/T
