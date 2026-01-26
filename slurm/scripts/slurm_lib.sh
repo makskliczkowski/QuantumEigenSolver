@@ -643,10 +643,16 @@ setup_qes_environment() {
     # 1. Pip upgrade
     echo "pip install --upgrade pip"
 
-    # 2. JAX (GPU)
+    # 2. JAX (GPU) - Smart Install based on Environment
     echo "if ! python3 -c 'import jax' 2>/dev/null; then"
     echo "    echo \"Installing JAX with CUDA support...\""
-    echo "    pip install --upgrade \"jax[cuda12_local]==0.4.28\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
+    echo "    # Detect cuDNN version to choose compatible JAX"
+    echo "    JAX_CONSTRAINT=\"\""
+    echo "    if [[ \"\$EBVERSIONCUDNN\" == 8.* ]]; then"
+    echo "        echo \"Detected cuDNN 8.x (\$EBVERSIONCUDNN). Pinning JAX < 0.4.30\""
+    echo "        JAX_CONSTRAINT=\"<0.4.30\""
+    echo "    fi"
+    echo "    pip install --upgrade \"jax[cuda12_local]\${JAX_CONSTRAINT}\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
     echo "fi"
 
     # 3. Standard requirements
