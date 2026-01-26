@@ -645,6 +645,8 @@ setup_qes_environment() {
 
     # 2. JAX (GPU) - Pip wheels
     echo "if ! python3 -c 'import jax' 2>/dev/null; then"
+    echo "    echo \"Cleaning up existing JAX installation...\""
+    echo "    pip uninstall -y jax jaxlib jax-cuda12-plugin"
     echo "    echo \"Installing JAX with CUDA support (pip wheels)...\""
     echo "    pip install --upgrade --force-reinstall \"jax[cuda12]\" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html"
     echo "fi"
