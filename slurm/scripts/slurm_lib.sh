@@ -326,7 +326,14 @@ add_module_section() {
     echo "# Load required modules"
     echo 'if [ -f /usr/local/sbin/modules.sh ]; then'
     echo '    source /usr/local/sbin/modules.sh'
-    echo 'else'
+    echo 'elif [ -f /etc/profile.d/modules.sh ]; then'
+    echo '    source /etc/profile.d/modules.sh'
+    echo 'elif [ -f /usr/share/modules/init/bash ]; then'
+    echo '    source /usr/share/modules/init/bash'
+    echo 'fi'
+    
+    echo 'module purge || echo "Module purge failed, proceeding..."'
+    echo ""
     echo '    echo "Warning: /usr/local/sbin/modules.sh not found, skipping module setup." >&2'
     echo 'fi'
     echo ""
