@@ -87,6 +87,12 @@ if (WIN32 OR (UNIX AND NOT APPLE) OR DEFINED ENV{USE_MKL})
         PATHS "$ENV{MKL_LIB_DIR}" "/usr/lib" "/usr/local/lib" "/opt/intel/mkl/lib"
         DOC "Path to MKL library directory"
     )
+
+    if (MKL_INCL_DIR AND MKL_LIB_DIR)
+        set(MKL_FOUND TRUE)
+    else()
+        set(MKL_FOUND FALSE)
+    endif()
 endif()
 
 # Find the path of the HDF5 include directory using an environment variable or common paths
@@ -231,9 +237,12 @@ set(SOURCES
 set(INCLUDE_DIRS 
     ${ARMADILLO_INCL_DIR}
     ${CPPSOURCE}
-    ${MKL_INCL_DIR}
     ${HDF5_INCL_DIR}
 )
+
+if (MKL_FOUND)
+    list(APPEND INCLUDE_DIRS ${MKL_INCL_DIR})
+endif()
 
 ######################### Set the libraries #########################
 
@@ -244,8 +253,11 @@ set(LIB_DIRS ${MKL_LIB_DIR} ${HDF5_LIB_DIR})
 set(LIBRARIES hdf5)
 list(APPEND LIBRARIES ${OPENBLAS_LIBRARY} ${LAPACK_LIBRARY})
 
+# Add Armadillo definitions
+add_definitions(-DARMA_USE_LAPACK -DARMA_USE_BLAS)
+
 # Check for Intel MKL libraries
-if (WIN32 OR (UNIX AND NOT APPLE))
+if (MKL_FOUND AND (WIN32 OR (UNIX AND NOT APPLE)))
     message(STATUS "\tMKL library directory: ${MKL_LIB_DIR}")
     if (OS_PLATFORM STREQUAL "windows")
         find_library(MKL_CORE_LIBRARY mkl_core HINTS ${MKL_LIB_DIR})
@@ -371,10 +383,10 @@ message(STATUS "HDF5 libraries: ${LIBHDF5_HL_LIBRARY} ${LIBHDF5_CPP_HL_LIBRARY} 
 message(STATUS "All: ${LIBRARIES}")
 target_link_libraries(qsolver
     -Wl${CMAKE_EXE_LINKER_FLAGS_S}
-    ${MKL_CORE_LIBRARY}
-    ${MKL_SEQUENTIAL_LIBRARY}
-    ${MKL_RT_LIBRARY}
-    ${MKL_INTEL_ILP64_LIBRARY}
+    $<$<BOOL:${MKL_FOUND}>:${MKL_CORE_LIBRARY}>
+    $<$<BOOL:${MKL_FOUND}>:${MKL_SEQUENTIAL_LIBRARY}>
+    $<$<BOOL:${MKL_FOUND}>:${MKL_RT_LIBRARY}>
+    $<$<BOOL:${MKL_FOUND}>:${MKL_INTEL_ILP64_LIBRARY}>
     -Wl${CMAKE_EXE_LINKER_FLAGS_E}
     ${LIBRARIES}
     # OpenMP::OpenMP_CXX  # Uncomment if you are using OpenMP

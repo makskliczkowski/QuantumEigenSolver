@@ -109,7 +109,7 @@ namespace UI_PARAMS
 		
 		// ############## ISING ################
 		
-		UI_PARAM_STEP(double, J1, 1.0);			// spin exchange
+		UI_PARAM_STEP(double, J, 1.0);			// spin exchange
 		UI_PARAM_STEP(double, hz, 1.0);			// perpendicular field
 		UI_PARAM_STEP(double, hx, 1.0);			// transverse field
 
@@ -265,7 +265,7 @@ namespace UI_PARAMS
 			{
 				// ising
 				{
-					UI_PARAM_SET_DEFAULT_STEP(J1);
+					UI_PARAM_SET_DEFAULT_STEP(J);
 					UI_PARAM_SET_DEFAULT_STEP(hz);
 					UI_PARAM_SET_DEFAULT_STEP(hx);
 				}
