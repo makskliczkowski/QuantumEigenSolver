@@ -33,6 +33,20 @@ echo "✓ Python smoke tests passed."
 if [[ "$1" == "--build" ]]; then
     echo "Building C++ code..."
 
+    # Auto-detect MKL include directory if not set
+    if [ -z "$MKL_INCL_DIR" ]; then
+        if [ -d "/usr/include/mkl" ]; then
+            echo "Auto-detected MKL include dir: /usr/include/mkl"
+            export MKL_INCL_DIR="/usr/include/mkl"
+        elif [ -d "/opt/intel/mkl/include" ]; then
+            echo "Auto-detected MKL include dir: /opt/intel/mkl/include"
+            export MKL_INCL_DIR="/opt/intel/mkl/include"
+        elif [ -d "/usr/include" ] && [ -f "/usr/include/mkl.h" ]; then
+             echo "Auto-detected MKL include dir: /usr/include"
+             export MKL_INCL_DIR="/usr/include"
+        fi
+    fi
+
     # Create build directory if not exists
     mkdir -p build
 

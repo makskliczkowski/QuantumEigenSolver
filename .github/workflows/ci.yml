@@ -28,7 +28,7 @@ jobs:
                 pip install -r pyqusolver/Python/requirements/requirements.txt
             fi
             # Ensure basic scientific stack is present if not in requirements
-            pip install numpy scipy
+            pip install numpy scipy numba
 
       - name: Run validation script (Sanity)
         run: ./scripts/validate.sh
