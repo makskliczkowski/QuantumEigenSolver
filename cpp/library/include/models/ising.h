@@ -18,8 +18,8 @@ class IsingModel : public Hamiltonian<_T, 2> {
 protected:
 	// ------------------------------------------- MODEL BASED PARAMETERS -------------------------------------------
 	DISORDER_EQUIV(double, J);
-	DISORDER_EQUIV(double, g);
-	DISORDER_EQUIV(double, h);
+	DISORDER_EQUIV(double, hx);
+	DISORDER_EQUIV(double, hz);
 
 	//arma::vec tmp_vec;
 	//vec tmp_vec2;
@@ -32,10 +32,10 @@ public:
 		LOGINFO(this->info() + " - destructor called.", LOG_TYPES::INFO, 4);
 	};
 	IsingModel()										= default;
-	IsingModel(const Hilbert::HilbertSpace<_T>& hilbert,double J, double g, double h, 
-														double J0 = 0, double g0 = 0, double h0 = 0);
-	IsingModel(Hilbert::HilbertSpace<_T>&& hilbert,		double J, double g, double h,
-														double J0 = 0, double g0 = 0, double h0 = 0);
+	IsingModel(const Hilbert::HilbertSpace<_T>& hilbert,double J, double hx, double hz,
+														double J0 = 0, double hx0 = 0, double hz0 = 0);
+	IsingModel(Hilbert::HilbertSpace<_T>&& hilbert,		double J, double hx, double hz,
+														double J0 = 0, double hx0 = 0, double hz0 = 0);
 
 	// -------------------------------------------				METHODS				-------------------------------------------
 	void hamiltonian()									override final;
@@ -53,14 +53,14 @@ public:
 		auto BC = this->hilbertSpace.getBC();
 		std::string name = sep + "ising,Ns=" + STR(Ns);
 		PARAMS_S_DISORDER(J, name);
-		PARAMS_S_DISORDER(g, name);
-		PARAMS_S_DISORDER(h, name);
+		PARAMS_S_DISORDER(hx, name);
+		PARAMS_S_DISORDER(hz, name);
 		name += this->hilbertSpace.getSymInfo();
 		name += ",BC=" + SSTR(getSTR_BoundaryConditions(BC));
 		return this->Hamiltonian<_T>::info(name, skip, sep);
 	}
 	void updateInfo()									override final { this->info_ = this->info(); 			};
-	void quenchHamiltonian()							override final { this->h *= -1.0; this->updateInfo(); 	};
+	void quenchHamiltonian()							override final { this->hz *= -1.0; this->updateInfo(); 	};
 };
 
 // ----------------------------------------------------------------------------- CONSTRUCTORS -----------------------------------------------------------------------------
@@ -70,20 +70,20 @@ public:
 * @param hilbert hilbert space handler
 * @param J interaction between Sz's on the nearest neighbors
 * @param J0 disorder at J interaction from (-J0,J0) added to J
-* @param g transverse magnetic field
-* @param g0 disorder at g field from (-g0, g0) added to g
-* @param h perpendicular magnetic field
-* @param w disorder at h field from (-w, w) added to h
+* @param hx transverse magnetic field
+* @param hx0 disorder at hx field from (-hx0, hx0) added to hx
+* @param hz perpendicular magnetic field
+* @param hz0 disorder at hz field from (-hz0, hz0) added to hz
 */
 template <typename _T>
-IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, double g, double h, double J0, double g0, double h0)
-	: Hamiltonian<_T>(hilbert), J(J), J0(J0), g(g), g0(g0), h(h), h0(h0)
+IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, double hx, double hz, double J0, double hx0, double hz0)
+	: Hamiltonian<_T>(hilbert), J(J), J0(J0), hx(hx), hx0(hx0), hz(hz), hz0(hz0)
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.template createRanVec<double>(this->Ns, this->h0);		// creates random disorder vector
+	this->dhz			=			this->ran_.template createRanVec<double>(this->Ns, this->hz0);		// creates random disorder vector
 	this->dJ			=			this->ran_.template createRanVec<double>(this->Ns, this->J0);		// creates random exchange vector
-	this->dg			=			this->ran_.template createRanVec<double>(this->Ns, this->g0);		// creates random transverse field vector
+	this->dhx			=			this->ran_.template createRanVec<double>(this->Ns, this->hx0);		// creates random transverse field vector
 	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info
@@ -93,14 +93,14 @@ IsingModel<_T>::IsingModel(const Hilbert::HilbertSpace<_T>& hilbert, double J, d
 }
 
 template <typename _T>
-IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double g, double h, double J0, double g0, double h0)
-	: Hamiltonian<_T>(std::move(hilbert)), J(J), J0(J0), g(g), g0(g0), h(h), h0(h0)
+IsingModel<_T>::IsingModel(Hilbert::HilbertSpace<_T>&&hilbert, double J, double hx, double hz, double J0, double hx0, double hz0)
+	: Hamiltonian<_T>(std::move(hilbert)), J(J), J0(J0), hx(hx), hx0(hx0), hz(hz), hz0(hz0)
 {
 	this->ran_			=			randomGen();
 	this->Ns			=			this->hilbertSpace.getLatticeSize();
-	this->dh			=			this->ran_.template createRanVec<double>(this->Ns, this->h0);		// creates random disorder vector
+	this->dhz			=			this->ran_.template createRanVec<double>(this->Ns, this->hz0);		// creates random disorder vector
 	this->dJ			=			this->ran_.template createRanVec<double>(this->Ns, this->J0);		// creates random exchange vector
-	this->dg			=			this->ran_.template createRanVec<double>(this->Ns, this->g0);		// creates random transverse field vector
+	this->dhx			=			this->ran_.template createRanVec<double>(this->Ns, this->hx0);		// creates random transverse field vector
 	this->type_			=			MY_MODELS::ISING_M;
 
 	//change info
@@ -124,18 +124,14 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 
 	// -------------- perpendicular field --------------
 	std::tie(newIdx, newVal) = Operators::sigma_z<_T>(_elem, this->Ns, { _site });
-	//stout << "Z:" << newIdx << ":" << newVal << EL;
-	//intToBase(newIdx, tmp);
-	//stout << tmp.t() << EL << EL;
-	this->setHElem(_elemId, PARAM_W_DISORDER(h, _site) * newVal, newIdx);
+	// Python: -hz * Sz
+	this->setHElem(_elemId, -PARAM_W_DISORDER(hz, _site) * newVal, newIdx);
 
 	// -------------- transverse field --------------
-	if (!EQP(this->g, 0.0, 1e-9)) {
+	if (!EQP(this->hx, 0.0, 1e-9)) {
 		std::tie(newIdx, newVal) = Operators::sigma_x(_elem, this->Ns, { _site });
-		//stout << "X:" << newIdx << ":" << newVal << EL;
-		//intToBase(newIdx, tmp);
-		//stout << tmp.t() << EL << EL;
-		this->setHElem(_elemId, PARAM_W_DISORDER(g, _site) * newVal, newIdx);
+		// Python: -hx * Sx
+		this->setHElem(_elemId, -PARAM_W_DISORDER(hx, _site) * newVal, newIdx);
 	}
 
 	// -------------- CHECK NN ---------------
@@ -147,10 +143,8 @@ inline void IsingModel<_T>::locEnergy(u64 _elemId, u64 _elem, uint _site)
 			// Ising-like spin correlation
 			auto [idx_z, val_z]			=		Operators::sigma_z<_T>(_elem, this->Ns, { _site });
 			auto [idx_z2, val_z2]		=		Operators::sigma_z<_T>(idx_z, this->Ns, { (uint)nei });
-			//stout << "NEI:" << idx_z2 << ":" << val_z2 * val_z << EL;
-			//intToBase(idx_z2, tmp);
-			//stout << tmp.t() << EL << EL;
-			this->setHElem(_elemId, PARAM_W_DISORDER(J, _site) * (val_z * val_z2), idx_z2);
+			// Python: -J * Sz * Sz
+			this->setHElem(_elemId, -PARAM_W_DISORDER(J, _site) * (val_z * val_z2), idx_z2);
 		}
 	}
 	//stout << "____________________________" << EL << EL;
@@ -173,20 +167,21 @@ inline cpx IsingModel<_T>::locEnergy(u64 _id, uint site, NQSFun f1)
 	// check spin at a given site
 	double _Si			=	checkBit(_id, this->Ns - site - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 
-	// add to a local value
-	_locVal				+=	PARAM_W_DISORDER(h, site) * _Si;
+	// add to a local value (Perpendicular field)
+	_locVal				+=	-PARAM_W_DISORDER(hz, site) * _Si;
 
 	// check the S_i^z * S_{i+1}^z
 	for (uint nn = 0; nn < NUM_OF_NN; nn++) {
 		auto N_NUMBER = this->lat_->get_nn_ForwardNum(site, nn);
 		if (auto nei = this->lat_->get_nn(site, N_NUMBER); nei >= 0) {
 			double _Sj	=	checkBit(_id, this->Ns - nei - 1) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			_locVal		+=	PARAM_W_DISORDER(J, site) * _Si * _Sj;
+			_locVal		+=	-PARAM_W_DISORDER(J, site) * _Si * _Sj;
 		}
 	}
 	// -----------------------------------------------------------
+	// Transverse field
 	_changedVal			+=	f1(std::initializer_list<int>({ (int)site }),
-							   std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, site) * Operators::_SPIN_RBM;
+							   std::initializer_list<double>({ _Si })) * -PARAM_W_DISORDER(hx, site) * Operators::_SPIN_RBM;
 
 	// -----------------------------------------------------------
 	return _changedVal + _locVal;
@@ -202,7 +197,7 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 	double _Si			=	Binary::check(v, _site) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
 
 	// add to a local value
-	_locVal				+=	PARAM_W_DISORDER(h, _site) * _Si;
+	_locVal				+=	-PARAM_W_DISORDER(hz, _site) * _Si;
 
 	// check the S_i^z * S_{i+1}^z
 	for (uint nn = 0; nn < (uint)this->lat_->get_nn_ForwardNum(_site); ++nn) 
@@ -210,12 +205,12 @@ inline cpx IsingModel<_T>::locEnergy(const arma::Col<double>& v, uint _site, NQS
 		if (int nei = this->lat_->get_nnf(_site, nn); nei >= 0) 
 		{
 			double _Sj	=	Binary::check(v, nei) ? Operators::_SPIN_RBM : -Operators::_SPIN_RBM;
-			_locVal		+=	PARAM_W_DISORDER(J, _site) * _Si * _Sj;
+			_locVal		+=	-PARAM_W_DISORDER(J, _site) * _Si * _Sj;
 		}
 	}
 	// -----------------------------------------------------------
-	if (!EQP(this->g, 0.0, 1e-9)) {
-		_changedVal += f1(std::initializer_list<int>({ (int)_site }), std::initializer_list<double>({ _Si })) * PARAM_W_DISORDER(g, _site) * Operators::_SPIN_RBM;
+	if (!EQP(this->hx, 0.0, 1e-9)) {
+		_changedVal += f1(std::initializer_list<int>({ (int)_site }), std::initializer_list<double>({ _Si })) * -PARAM_W_DISORDER(hx, _site) * Operators::_SPIN_RBM;
 	}
 	// -----------------------------------------------------------
 	return _changedVal + _locVal;

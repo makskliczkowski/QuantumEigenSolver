@@ -247,7 +247,8 @@ inline void UI::setDefaultMap()
 		// ----------------- model parameters -----------------			
 		UI_OTHER_MAP(mod		, this->modP._modTyp, FHANDLE_PARAM_BETWEEN(0., 1000.)),
 		// -------- ising
-		UI_PARAM_MAP(J1			, this->modP._J1		, FHANDLE_PARAM_DEFAULT),
+		UI_PARAM_MAP(J			, this->modP._J			, FHANDLE_PARAM_DEFAULT),
+		UI_PARAM_MAP(J1			, this->modP._J			, FHANDLE_PARAM_DEFAULT), // shim
 		UI_PARAM_MAP(hx			, this->modP._hx		, FHANDLE_PARAM_DEFAULT),
 		UI_PARAM_MAP(hz			, this->modP._hz		, FHANDLE_PARAM_DEFAULT),
 		// -------- heisenberg		
@@ -326,13 +327,13 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 	// !!!!!!!!!!!!!!!!!!!!!!! SPIN !!!!!!!!!!!!!!!!!!!!!!!
 	case MY_MODELS::ISING_M:
 		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
+			this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
 		break;
 	case MY_MODELS::XYZ_M:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
 			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
 		break;
@@ -360,7 +361,7 @@ inline bool UI::defineModel(Hilbert::HilbertSpace<_T>& _Hil, std::shared_ptr<Ham
 
 	// !!!!!!!!!!!!!!!!!!!!!!! QUADRATIC FERMIONS !!!!!!!!!!!!!!!!!!!!!!!
 	case MY_MODELS::FREE_FERMIONS_M:
-		_H = std::make_shared<FreeFermions<_T>>(std::move(_Hil), this->modP.J1_, this->modP.J10_, 0.0);
+		_H = std::make_shared<FreeFermions<_T>>(std::move(_Hil), this->modP.J_, this->modP.J0_, 0.0);
 		break;
 	case MY_MODELS::AUBRY_ANDRE_M:
 		_H = std::make_shared<AubryAndre<_T>>(std::move(_Hil), this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
@@ -398,13 +399,13 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 	{
 	case MY_MODELS::ISING_M:
 		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
+			this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
 		break;
 	case MY_MODELS::XYZ_M:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
 			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
 		break;
@@ -432,7 +433,7 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, std::shared_pt
 		break;
 		// --------------------------- QUADRATIC MODELS ---------------------------
 	case MY_MODELS::FREE_FERMIONS_M:
-		_H = std::make_shared<FreeFermions<_T>>(_lat, this->modP.J1_, this->modP.J10_, 0.0);
+		_H = std::make_shared<FreeFermions<_T>>(_lat, this->modP.J_, this->modP.J0_, 0.0);
 		break;
 	case MY_MODELS::AUBRY_ANDRE_M:
 		_H = std::make_shared<AubryAndre<_T>>(_lat, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
@@ -469,13 +470,13 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 	{
 	case MY_MODELS::ISING_M:
 		_H = std::make_shared<IsingModel<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.hx_, this->modP.hz_, this->modP.J10_, this->modP.hx0_, this->modP.hz0_);
+			this->modP.J_, this->modP.hx_, this->modP.hz_, this->modP.J0_, this->modP.hx0_, this->modP.hz0_);
 		break;
 	case MY_MODELS::XYZ_M:
 		_H = std::make_shared<XYZ<_T>>(std::move(_Hil),
-			this->modP.J1_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
+			this->modP.J_, this->modP.J2_, this->modP.hx_, this->modP.hz_,
 			this->modP.dlt1_, this->modP.dlt2_, this->modP.eta1_, this->modP.eta2_,
-			this->modP.J10_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
+			this->modP.J0_, this->modP.J20_, this->modP.hx0_, this->modP.hz0_,
 			this->modP.dlt10_, this->modP.dlt20_, this->modP.eta10_, this->modP.eta20_,
 			false);
 		break;
@@ -501,7 +502,7 @@ inline bool UI::defineModel(std::shared_ptr<Hamiltonian<_T>>& _H, uint _Ns)
 		break;
 		// --------------------------- QUADRATIC MODELS ---------------------------
 	case MY_MODELS::FREE_FERMIONS_M:
-		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J1_, this->modP.J10_, 0.0);
+		_H = std::make_shared<FreeFermions<_T>>(_Ns, this->modP.J_, this->modP.J0_, 0.0);
 		break;
 	case MY_MODELS::AUBRY_ANDRE_M:
 		_H = std::make_shared<AubryAndre<_T>>(_Ns, this->modP.aubry_andre.aa_J_, this->modP.aubry_andre.aa_lambda_,
