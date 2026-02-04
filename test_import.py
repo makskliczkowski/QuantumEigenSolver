@@ -4,7 +4,7 @@ import sys
 import os
 
 # Add the Python directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'Python'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'pyqusolver', 'Python'))
 
 try:
     import QES
@@ -32,3 +32,4 @@ except Exception as e:
     print(f"✗ QES import failed: {e}")
     import traceback
     traceback.print_exc()
+    sys.exit(1)

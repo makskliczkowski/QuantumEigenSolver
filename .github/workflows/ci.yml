@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  sanity-check:
+    name: Sanity Check (Format-Free)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Python dependencies
+        run: |
+            python -m pip install --upgrade pip
+            if [ -f pyqusolver/Python/requirements/requirements.txt ]; then
+                pip install -r pyqusolver/Python/requirements/requirements.txt
+            fi
+            # Ensure basic scientific stack is present if not in requirements
+            pip install numpy scipy numba
+
+      - name: Run validation script (Sanity)
+        run: ./scripts/validate.sh
+
+  build-cpp:
+    name: Build C++
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          # Install HDF5, Armadillo, and CMake
+          sudo apt-get install -y libhdf5-dev libarmadillo-dev cmake g++ hdf5-tools
+          # Install MKL (Heavy dependency)
+          # We install it to ensure the build passes as CMakeLists.txt expects it on Linux.
+          # This gates the heavy dependency requirement cleanly as requested.
+          sudo apt-get install -y libmkl-dev || echo "Warning: MKL installation failed."
+
+      - name: Run validation script (Build)
+        run: ./scripts/validate.sh --build
