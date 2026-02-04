@@ -4,6 +4,7 @@
 //#ifdef _DEBUG
  //#	include "vld.h"
 //#endif
+#include <complex>
 #include "source/src/lin_alg.h"
 constexpr auto ARMA_VEC_SEED = 0;
 

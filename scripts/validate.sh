@@ -33,6 +33,12 @@ echo "✓ Python smoke tests passed."
 if [[ "$1" == "--build" ]]; then
     echo "Building C++ code..."
 
+    # Patch submodules if needed (CI fix)
+    if [ -f "scripts/patch_submodules.py" ]; then
+        echo "Patching submodules..."
+        python3 scripts/patch_submodules.py
+    fi
+
     # Auto-detect MKL include directory if not set
     if [ -z "$MKL_INCL_DIR" ]; then
         if [ -d "/usr/include/mkl" ]; then
