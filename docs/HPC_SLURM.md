@@ -97,7 +97,7 @@ Use `slurm/run_py.sh` to submit Python scripts.
     --time=02:00:00 \
     --script=pyqusolver/examples/example_session.py \
     --venv=./venv \
-    --requirements=./pyqusolver/requirements.txt \
+    --requirements=./pyqusolver/Python/requirements/requirements.txt \
     -- "--option value"
 ```
 
