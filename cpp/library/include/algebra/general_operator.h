@@ -2021,7 +2021,7 @@ namespace Operators {
 				}
 				else {	
 					GeneralizedMatrix<_T> _Min;
-					_Min.setSparse(_op.template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+					_Min.setSparse(_op.template generateMat<false, res_typ, arma::SpMat>(_hilb, a...));
 					this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 				}
 			}
@@ -2056,7 +2056,7 @@ namespace Operators {
 				}
 				else {	
 					GeneralizedMatrix<_T> _Min;
-					_Min.setSparse(_op.template generateMat<false, res_typ, typename arma::SpMat>(_hilb, a...));
+					_Min.setSparse(_op.template generateMat<false, res_typ, arma::SpMat>(_hilb, a...));
 					this->manyBodyMatrix_ += algebra::cast<_T>(_Min);
 				}
 			}
