@@ -1,5 +1,5 @@
 #!/bin/bash
-# slurm_lib.sh - Reusable SLURM job management functions
+# slurm_utils.sh - Reusable SLURM job management functions
 
 # Function to display usage template
 show_usage_template() {
@@ -15,6 +15,7 @@ Options:
     --time=TIME             Override time allocation (format: HH:MM:SS)
     --mem=MEM               Override memory allocation (in GB, format: Xgb or X)
     -c CPU, --cpu=CPU       Override CPU count
+    -p PART, --partition=PART Partition to use
     -h, --help              Show this help message
 EOF
 }
@@ -76,111 +77,14 @@ validate_numeric() {
 
 # ----------------------------------------------------------------------
 
-# Function to parse common SLURM options
-#   It extracts time, memory, and CPU options from the command line arguments.
-#   It updates the provided references with the parsed values.
-#   Returns 0 on success, 1 on error, and 2 if help is requested.
-# Function to parse common SLURM options
-#   $1 = name of variable to receive time override
-#   $2 = name of variable to receive mem override
-#   $3 = name of variable to receive cpu override
-#   returns: 0=ok, 1=error, 2=help
-parse_slurm_options() {
-    local time_var=$1 mem_var=$2 cpu_var=$3
-    shift 3
-
-    # Temporaries for the values we’ll collect
-    local _ot _om _oc
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                return 2
-                ;;
-            -t)
-                _ot=$2; shift 2
-                ;;
-            -t*)
-                _ot=${1#-t}; shift
-                ;;
-            --time=*)
-                _ot=${1#*=}; shift
-                ;;
-            -m)
-                _om=$2; shift 2
-                ;;
-            -m*)
-                _om=${1#-m}; shift
-                ;;
-            --mem=*)
-                _om=${1#*=}; shift
-                ;;
-            -c)
-                _oc=$2; shift 2
-                ;;
-            -c*)
-                _oc=${1#-c}; shift
-                ;;
-            --cpu=*)
-                _oc=${1#*=}; shift
-                ;;
-            *)
-                echo "Error: Unknown option: $1" >&2
-                return 1
-                ;;
-        esac
-    done
-
-    # Write them back into the caller's variables
-    eval "$time_var=\"\$_ot\""
-    eval "$mem_var=\"\$_om\""
-    eval "$cpu_var=\"\$_oc\""
-
-    echo "Parsed SLURM options:"
-    echo "  Time: ${!time_var:-not set}"
-    echo "  Memory: ${!mem_var:-not set}"
-    echo "  CPU: ${!cpu_var:-not set}"
+# Function to check if sbatch is available
+check_sbatch_available() {
+    if ! command -v sbatch &> /dev/null; then
+        echo "Error: sbatch command not found. Are you on a login node?" >&2
+        return 1
+    fi
     return 0
 }
-
-# ----------------------------------------------------------------------
-
-# Function to apply resource overrides
-#   It updates the provided references with validated overrides for time, memory, and CPU.
-#   Returns 0 on success, 1 on error.
-apply_resource_overrides() {
-    local time_var=$1 mem_var=$2 cpu_var=$3
-    local override_time=$4 override_mem=$5 override_cpu=$6
-    local newval
-
-    # 1) Time override
-    if [ -n "$override_time" ]; then
-        newval=$(validate_time "$override_time") || return 1
-        # newval=$override_time
-        eval "$time_var=\"\$newval\""
-    fi
-
-    # 2) Memory override
-    if [ -n "$override_mem" ]; then
-        newval=$(parse_memory "$override_mem") || return 1
-        # newval=$override_mem
-        eval "$mem_var=\"\$newval\""
-    fi
-
-    # 3) CPU override
-    if [ -n "$override_cpu" ]; then
-        validate_numeric "$override_cpu" "CPU" false || return 1
-        # override_cpu=$(echo "$override_cpu" | sed 's/[^0-9]//g')
-        eval "$cpu_var=\"\$override_cpu\""
-    fi
-    # Print the final values
-    echo "Final resource parameters:"
-    echo "  Time: ${!time_var:-not set}"
-    echo "  Memory: ${!mem_var:-not set}"
-    echo "  CPU: ${!cpu_var:-not set}"
-    return 0
-}
-
 
 # ----------------------------------------------------------------------
 
@@ -448,6 +352,13 @@ submit_slurm_job() {
     
     echo "Submitting job script: $script_file"
     
+    # Check if sbatch is available
+    if ! command -v sbatch &> /dev/null; then
+        echo "Error: sbatch not found. Skipping submission." >&2
+        echo "Script generated at: $script_file"
+        return 1
+    fi
+
     # Submit the job
     if sbatch_output=$(sbatch "$script_file" 2>&1); then
         echo "Job submitted successfully:"
@@ -466,120 +377,6 @@ submit_slurm_job() {
         echo "$sbatch_output" >&2
         return 1
     fi
-}
-
-# ----------------------------------------------------------------------
-# JOB ARRAY HANDLING
-# ----------------------------------------------------------------------
-
-# ----------------------------------------------------------------------
-# Generic Job Array Submitter
-# ----------------------------------------------------------------------
-# Usage:
-#   submit_job_array \
-#       --job-name "my_sweep" \
-#       --script "path/to/script.py" \
-#       --param-file "path/to/arguments.txt" \
-#       --venv "path/to/venv" \
-#       --time "04:00:00" --mem "8" --cpu "1" --partition "lem-cpu"
-# ----------------------------------------------------------------------
-submit_job_array() {
-    # Defaults
-    local job_name="array_job"
-    local python_script=""
-    local param_file=""
-    local venv_path=""
-    local time="01:00:00"
-    local mem="4"
-    local cpu="1"
-    local partition=""
-    local max_concurrent="100"
-    local log_dir="./logs"
-    local env_vars=""
-
-    # Parse named arguments
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --job-name)     job_name="$2"; shift 2 ;;
-            --script)       python_script="$2"; shift 2 ;;
-            --param-file)   param_file="$2"; shift 2 ;;
-            --venv)         venv_path="$2"; shift 2 ;;
-            --time)         time="$2"; shift 2 ;;
-            --mem)          mem="$2"; shift 2 ;;
-            --cpu)          cpu="$2"; shift 2 ;;
-            --partition)    partition="$2"; shift 2 ;;
-            --concurrent)   max_concurrent="$2"; shift 2 ;;
-            --log-dir)      log_dir="$2"; shift 2 ;;
-            --env)          env_vars="$2"; shift 2 ;; # Pass "VAR1=val VAR2=val"
-            *) echo "Unknown option: $1"; return 1 ;;
-        esac
-    done
-
-    # Validation
-    if [[ -z "$python_script" || -z "$param_file" ]]; then
-        echo "Error: --script and --param-file are required."
-        return 1
-    fi
-
-    # Count lines in param file to set array range
-    local total_jobs=$(wc -l < "$param_file" | xargs) # xargs trims whitespace
-    if [[ "$total_jobs" -eq 0 ]]; then
-        echo "Error: Parameter file is empty."
-        return 1
-    fi
-
-    # Ensure log dir exists
-    mkdir -p "$log_dir"
-
-    # Define wrapper script path
-    local submit_script="${log_dir}/submit_${job_name}.sh"
-
-    # Generate the SBATCH script
-    cat << EOF > "$submit_script"
-#!/bin/bash
-#SBATCH -J ${job_name}
-#SBATCH -N 1
-#SBATCH -c ${cpu}
-#SBATCH --mem=${mem}gb
-#SBATCH --time=${time}
-#SBATCH --array=1-${total_jobs}%${max_concurrent}
-#SBATCH -o ${log_dir}/%x-%A_%a.out
-#SBATCH -e ${log_dir}/%x-%A_%a.err
-${partition:+#SBATCH -p ${partition}}
-
-# 1. Load Environment
-set -e
-${env_vars}
-
-# 2. Activate Virtual Environment
-if [[ -n "${venv_path}" ]]; then
-    source "${venv_path}/bin/activate"
-fi
-
-# 3. Extract Parameters for this Task ID
-# sed 'Xq;d' is an efficient way to extract line X
-ARGS=\$(sed "\${SLURM_ARRAY_TASK_ID}q;d" "${param_file}")
-
-echo "========================================================"
-echo "Job: \${SLURM_JOB_NAME} | ID: \${SLURM_ARRAY_JOB_ID}_\${SLURM_ARRAY_TASK_ID}"
-echo "Node: \${SLURMD_NODENAME}"
-echo "Args: \$ARGS"
-echo "========================================================"
-
-# 4. Run Python Script
-# We use 'eval' or simple expansion to pass the args string as flags
-python3 "${python_script}" \$ARGS
-
-EOF
-
-    # Submit
-    echo "------------------------------------------------"
-    echo "Submitting Array Job: $job_name"
-    echo "Tasks: $total_jobs (Limit: $max_concurrent running at once)"
-    echo "Script: $submit_script"
-    echo "------------------------------------------------"
-    
-    sbatch "$submit_script"
 }
 
 # ----------------------------------------------------------------------
@@ -603,64 +400,6 @@ validate_file_exists() {
 }
 
 # -----------------------------------------------------------------------
-# Setup the QES environment
-# -----------------------------------------------------------------------
-
-setup_qes_environment() {
-    local base_dir="$1"
-    local req_file="$2"
-    local venv_name="$3"
-    local venv_path="$4"
-    
-    # Determine directory containing requirements
-    local req_dir
-    if [[ -d "$req_file" ]]; then
-        req_dir="$req_file"
-    else
-        req_dir=$(dirname "$req_file")
-    fi
-
-    echo "# Setup QES Python environment"
-    echo "export QES_BASE_DIR=\"${base_dir}\""
-    echo "export QES_PACKAGE_DIR=\"\${QES_BASE_DIR}\""
-    echo ""
-
-    echo "# Create and activate virtual environment"
-    echo "if [ ! -d \"${venv_path}\" ]; then"
-    echo "    echo \"Creating virtual environment: ${venv_name}\""
-    echo "    python3 -m venv \"${venv_path}\""
-    echo "fi"
-    echo ""
-    
-    echo "# Activate virtual environment"
-    echo "source \"${venv_path}/bin/activate\""
-    echo "echo \"Activated virtual environment: ${venv_name}\""
-    echo ""
-    
-    echo "# Environment Installation / Update"
-    echo "echo \"Checking and installing dependencies...\""
-    
-    # 1. Pip upgrade
-    echo "pip install --upgrade pip"
-
-    # 3. Standard requirements
-    echo "if [ -f \"${req_dir}/requirements.txt\" ]; then"
-    echo "    echo \"Installing core requirements...\""
-    echo "    pip install -r \"${req_dir}/requirements.txt\""
-    echo "fi"
-    
-    # 3. Optional requirements
-    for opt in requirements-jax.txt requirements-ml.txt requirements-hdf5.txt; do
-        echo "if [ -f \"${req_dir}/${opt}\" ]; then"
-        echo "    echo \"Installing ${opt}...\""
-        echo "    pip install -r \"${req_dir}/${opt}\""
-        echo "fi"
-    done
-    
-    echo "echo \"Environment setup complete.\""
-}
-
-# -----------------------------------------------------------------------
 
 # Function to log job information
 #   It appends job information and timestamp to a log file.
@@ -673,5 +412,5 @@ log_job_info() {
 }
 
 # -----------------------------------------------------------------------
-# End of slurm_lib.sh
+# End of slurm_utils.sh
 # -----------------------------------------------------------------------
