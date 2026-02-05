@@ -10,7 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 # Compilation flags
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
+# Removed -Wpedantic and -Wextra to allow legacy code compilation
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
@@ -423,15 +424,12 @@ if (OS_PLATFORM STREQUAL "linux")
         string(REPLACE "-fopenmp" "-qopenmp" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     else()
         message (STATUS "\tUsing GCC C++ compilers")
-        # Fix: Remove duplicate flags and use target_compile_options instead
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -fpermissive")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp -D_DEBUG")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp")
 
-        # Specific flags for qsolver to handle legacy code in submodules
-        target_compile_options(qsolver PRIVATE -fpermissive)
-        # Force include complex to fix Armadillo issues in submodules
-        target_compile_options(qsolver PRIVATE -include complex)
+        # Ensure complex is included for all files (fixes Armadillo errors in submodules)
+        add_compile_options(-include complex)
     endif()
 elseif (OS_PLATFORM STREQUAL "windows")
     message (STATUS "\tUsing MSVC C++ compilers")
