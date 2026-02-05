@@ -1,6 +1,8 @@
 #include "include/user_interface/user_interface.h"
 #include "source/src/UserInterface/ui.h"
 #include <cstddef>
+#include <algorithm>
+#include <cctype>
 int LASTLVL = 0;
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -64,6 +66,36 @@ void UI::setDefault()
 
 // ###############################################################################################
 
+template<>
+inline bool UserInterface::setOption<BoundaryConditions>(BoundaryConditions& value, cmdArg& argv, std::string choice)
+{
+	std::string option	=	this->getCmdOption(argv, "-" + choice);
+	bool setVal			=	option.empty();
+	if (setVal)
+		option = this->setDefaultMsg(option, std::string(choice), std::string(choice + ":\n"), defaultParams);
+
+	if (!option.empty())
+	{
+		std::string opt_lower = option;
+		std::transform(opt_lower.begin(), opt_lower.end(), opt_lower.begin(), ::tolower);
+
+		if (opt_lower == "pbc")			value = BoundaryConditions::PBC;
+		else if (opt_lower == "obc")	value = BoundaryConditions::OBC;
+		else if (opt_lower == "mbc")	value = BoundaryConditions::MBC;
+		else if (opt_lower == "sbc")	value = BoundaryConditions::SBC;
+		else
+		{
+			try {
+				value = static_cast<BoundaryConditions>(std::stoi(option));
+			} catch (...) {
+				return false;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
 /**
 * @brief Parses the command line arguments and sets the model parameters accordingly.
 * 
@@ -94,10 +126,15 @@ void UI::parseModel(int argc, cmdArg& argv)
 	// ----------------- LATTICE -----------------
 	{
 		SETOPTIONV(latP,	typ,	"l"	);
+		SETOPTIONV(latP,	typ,	"lattice");
 		SETOPTIONV(latP,	dim,	"d"	);
+		SETOPTIONV(latP,	dim,	"dim");
 		SETOPTION(latP,		Lx			);
+		SETOPTIONV(latP,	Lx,		"lx");
 		SETOPTION(latP,		Ly			);
+		SETOPTIONV(latP,	Ly,		"ly");
 		SETOPTION(latP,		Lz			);
+		SETOPTIONV(latP,	Lz,		"lz");
 		SETOPTION(latP,		bc			);
 		SETOPTION(latP,		Ntot		);
 		SETOPTIONVECTORRESIZE(latP, Ntots, 10);
@@ -182,6 +219,7 @@ void UI::parseModel(int argc, cmdArg& argv)
 	{
 		// model type
 		SETOPTIONV(modP, modTyp, "mod");
+		SETOPTIONV(modP, modTyp, "model");
 		// randomness
 		{
 			this->modP.modRanN_ = { 1 };

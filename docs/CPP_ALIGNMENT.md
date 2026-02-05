@@ -1,50 +1,45 @@
-# C++ Alignment to Python Semantics
+# C++ Alignment to Python Reference Semantics
 
-This document outlines the alignment of the C++ implementation (`cpp/`) with the Python reference implementation (`pyqusolver/`). The Python implementation is considered the source of truth for semantics, naming, and behavior.
+This document outlines the alignment between the C++ implementation (`cpp/`) and the Python reference (`pyqusolver/`), detailing semantic mappings, divergences, and compatibility shims.
 
 ## Python Reference Semantics
 
-### Transverse Field Ising Model (TFIM)
+The Python implementation (`pyqusolver`) is the maintained reference for:
+*   **Hamiltonian Configuration**: Uses `HamiltonianConfig` or `Hamiltonian` subclasses with specific keyword arguments (`is_manybody`, `ns`, `lattice`).
+*   **Lattice Definitions**:
+    *   **SquareLattice**: Defined by `lx`, `ly`, `lz` (dimensions), and `dim` (1D/2D/3D). `ly` and `lz` default to 1.
+    *   **Boundary Conditions (BC)**: Enum `LatticeBC` with values `PBC`, `OBC`, `MBC`, `SBC`. The Enum uses `auto()`, implying 1-based indexing (PBC=1, OBC=2, ...), but typically initialized via string aliases ("pbc", "obc").
+*   **Symmetries**: Defined via dictionaries/lists (e.g., `{'translation': 0}`, `{'parity': 1}`).
 
-**Class:** `TransverseFieldIsing` (in `pyqusolver/Python/QES/Algebra/Model/Interacting/Spin/transverse_ising.py`)
+## Mapping Table: Python Concepts ↔ C++ Components
 
-**Hamiltonian:**
-$$ H = - \sum_{\langle i,j \rangle} J_{ij} \sigma^z_i \sigma^z_j - \sum_i h_{x,i} \sigma^x_i - \sum_i h_{z,i} \sigma^z_i $$
+| Concept | Python (Reference) | C++ (Implementation) | CLI Flag (New) | CLI Flag (Shim) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Lattice Type** | `SquareLattice`, etc. | `SquareLattice` (class), `LatticeTypes` (enum) | `-lattice` | `-l` |
+| **Lattice Dimensions** | `lx`, `ly`, `lz` | `Lx_`, `Ly_`, `Lz_` | `-lx`, `-ly`, `-lz` | (same) |
+| **Dimension** | `dim` (1, 2, 3) | `dim` | `-dim` | `-d` |
+| **Boundary Conditions** | `LatticeBC` ("pbc", "obc") | `BoundaryConditions` (enum) | `-bc` | (same) |
+| **Model Type** | `Hamiltonian` subclass / config | `MY_MODELS` (enum), `modTyp` | `-model` | `-mod` |
+| **Sites** | `ns` | `Ntot_` / derived | `-ns` (or implied) | `-Ntot` |
+| **Coupling** | `J` | `J_` | `-J` | (same) |
+| **Fields** | `hx`, `hz` | `hx_`, `hz_` | `-hx`, `-hz` | (same) |
+| **Symmetry (Momentum)**| `translation` (k) | `k_` | `-k` | (same) |
+| **Symmetry (Parity X)**| `parity_x` | `px_` | `-px` | (same) |
 
-**Parameters:**
-- `j` (Union[List[float], float]): Ising coupling strength. Default: 1.0. (Positive J implies Ferromagnetic interaction due to minus sign in Hamiltonian).
-- `hx` (Union[List[float], float]): Transverse field strength. Default: 1.0.
-- `hz` (Union[List[float], float]): Perpendicular field strength. Default: 1.0.
-- `lattice`: Defines the geometry and neighbors.
+## Divergences and Resolutions
 
-**Behavior:**
-- Accepts lists for site-dependent parameters (disorder).
-- Uses negative signs for all terms in the Hamiltonian construction.
+### 1. Lattice Boundary Condition Values
+*   **Divergence**: Python `LatticeBC` uses 1-based indexing (PBC=1) or string parsing. C++ `BoundaryConditions` uses 0-based indexing (PBC=0).
+*   **Resolution**: Implement string-based parsing in C++ CLI for `-bc`. C++ will accept "pbc", "obc", etc., and map them to internal C++ enum values (0, 1, ...), matching Python's user-facing behavior.
 
-## Mapping Table: Python ↔ C++
+### 2. Lattice Size Logic
+*   **Divergence**: C++ `UI` explicitly calculates `Ns = Lx * Ly * Lz` (and doubles it for non-square 2D lattices like Honeycomb). Python `SquareLattice` sets `ns` internally.
+*   **Resolution**: This behavior is semantically consistent for `SquareLattice`. For Honeycomb, both should agree on `Ns = 2 * Lx * Ly`. No change needed if Python's `HoneycombLattice` follows this (standard practice).
 
-| Concept | Python (`TransverseFieldIsing`) | C++ (`IsingModel`) |
-| :--- | :--- | :--- |
-| **Interaction** | `j` | `J` (was `J1`) |
-| **Transverse Field** | `hx` | `hx` (was `g`) |
-| **Perpendicular Field** | `hz` | `hz` (was `h`) |
-| **Disorder** | List of values | Base value + Random vector (`J0`, `hx0`, `hz0` define width/range) |
-| **Hamiltonian Signs** | Negative terms (`-J`, `-hx`, `-hz`) | **Previously:** Positive terms (`+J`, `+g`, `+h`). **Now:** Aligned to Negative terms. |
+### 3. CLI Naming
+*   **Divergence**: C++ used terse flags (`-l`, `-d`, `-mod`). Python config uses descriptive keys (`lattice`, `dim`).
+*   **Resolution**: Renamed C++ CLI flags to match Python (`-lattice`, `-dim`, `-model`). Retained old flags as shims.
 
-## Divergences and Alignment Strategy
-
-### 1. Naming
-- **Divergence:** C++ used `g` for transverse field and `h` for perpendicular field. CLI used `J1`.
-- **Resolution:**
-  - Renamed `g` → `hx`, `h` → `hz` in `IsingModel` class.
-  - Renamed `J1` → `J` in `ModP` structure.
-  - Updated CLI to accept `J`, `hx`, `hz`.
-  - Added compatibility shim for `J1` in CLI to map to `J`.
-
-### 2. Hamiltonian Definition (Signs)
-- **Divergence:** Python implementation applies a minus sign to all terms: $H = -J ... -hx ...$. C++ implementation added terms with positive signs.
-- **Resolution:** Modified `IsingModel::locEnergy` to apply negative signs to `J`, `hx`, `hz` terms, ensuring that passing positive parameter values results in the same physical model (e.g., Ferromagnetic for positive J).
-
-### 3. Disorder Handling
-- **Divergence:** Python accepts explicit lists for disordered parameters. C++ generates disorder internally based on a base value and a disorder strength/width.
-- **Resolution:** Kept C++ internal generation for now to avoid major rewrite of input parsing, but ensured the naming (`J0`, `hx0`, `hz0`) is consistent. C++ CLI allows seeding and disorder strength configuration.
+### 4. Configuration Structure
+*   **Divergence**: Python uses a structured `HamiltonianConfig`. C++ uses flat `UI_PARAMS` structs (`LatP`, `ModP`).
+*   **Resolution**: Kept C++ structure but aligned naming conventions. The CLI parser acts as the bridge.
