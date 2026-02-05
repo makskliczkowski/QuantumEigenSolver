@@ -10,6 +10,9 @@
 #ifndef USER_INTERFACE_INCLUDE_H
 #define USER_INTERFACE_INCLUDE_H
 
+// Fix for Armadillo/BLAS types in submodules
+#include <complex>
+
 #include "../../source/src/UserInterface/ui.h"
 #include <memory>
 #include <vector>

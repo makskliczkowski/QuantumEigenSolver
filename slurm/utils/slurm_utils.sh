@@ -20,18 +20,33 @@ Options:
 EOF
 }
 
-# Function to parse memory value and convert to GB integer
-#   It removes any 'gb' suffix and ensures the value is a positive integer.
-#   Returns the memory value in GB or an error message if invalid.
+# Function to parse memory value and convert to GB integer.
+#   It strictly requires the input to be a number (assumed GB) or a number with 'gb'/'GB' suffix.
+#   It rejects other suffixes like 'mb' to avoid interpretation errors.
+#   Returns the memory value in GB (integer) or an error message if invalid.
 parse_memory() {
     local mem_input="$1"
     local mem_value
     
-    # Remove 'gb' suffix if present and extract number
-    mem_value=$(echo "$mem_input" | sed -E 's/[gG][bB]?$//' | sed 's/[^0-9]//g')
+    # Check if input has invalid suffix (anything other than nothing, g, gb, G, GB)
+    # We use grep to check if the string ends with something else
+    if echo "$mem_input" | grep -Eq '[^0-9gGbB]'; then
+         echo "Error: Invalid memory format: $mem_input (Only GB supported, use 'gb' suffix or integer)" >&2
+         return 1
+    fi
+
+    # Check specifically for 'm' or 'mb' or 'k' etc to be helpful
+    if echo "$mem_input" | grep -iq '[mk]b\?$'; then
+         echo "Error: Invalid memory format: $mem_input (Only GB supported)" >&2
+         return 1
+    fi
+
+    # Remove 'gb' or 'g' suffix (case insensitive)
+    mem_value=$(echo "$mem_input" | sed -E 's/[gG][bB]?$//')
     
+    # Check if result is a positive integer
     if [[ ! "$mem_value" =~ ^[0-9]+$ ]] || [ "$mem_value" -le 0 ]; then
-        echo "Error: Invalid memory format: $mem_input" >&2
+        echo "Error: Invalid memory value: $mem_input" >&2
         return 1
     fi
     
@@ -221,9 +236,10 @@ EOF
 
 # ----------------------------------------------------------------------
 
-# Function to add module loading section
+# Function to add module loading section.
 #   It generates a section to load required modules in the SLURM script.
 #   It takes a list of module names as arguments.
+#   If no modules are provided, it generates a comment but no load commands.
 add_module_section() {
     local modules=("$@")
     
@@ -241,6 +257,11 @@ add_module_section() {
     echo 'module purge || echo "Module purge failed, proceeding..."'
     echo ""
     
+    if [ ${#modules[@]} -eq 0 ]; then
+        echo "# No specific modules requested."
+        return 0
+    fi
+
     for module in "${modules[@]}"; do
         cat <<EOF
 if module avail "$module" 2>&1 | grep -q "$module"; then
