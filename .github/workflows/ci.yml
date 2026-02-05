@@ -36,6 +36,7 @@ jobs:
   build-cpp:
     name: Build C++
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

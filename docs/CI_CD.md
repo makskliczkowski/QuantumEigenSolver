@@ -16,15 +16,16 @@ The CI pipeline is defined in `.github/workflows/ci.yml` and consists of two mai
 ### 1. Sanity Check (Required)
 *   **Runs on**: `ubuntu-latest`
 *   **Description**: A lightweight check that verifies submodules are present and runs the Python smoke test (`test_import.py`).
-*   **Requirements**: Python 3.10, `numpy`, `scipy`.
+*   **Requirements**: Python 3.10, `numpy`, `scipy`, `numba`.
 
-### 2. Build C++ (Required)
+### 2. Build C++ (Non-Blocking)
 *   **Runs on**: `ubuntu-latest`
 *   **Description**: Configures and compiles the C++ library using CMake.
+*   **Status**: **Non-blocking**. This job is allowed to fail without blocking the PR merge, primarily to handle cases where heavy dependencies (like Intel MKL) might not be available or installable on the runner.
 *   **Dependencies**:
-    *   `libhdf5-dev` (HDF5)
-    *   `libarmadillo-dev` (Armadillo)
-    *   `libmkl-dev` (Intel MKL) - *Note: This is a heavy dependency. The CI installs it to ensure a successful build. On systems without MKL, the build might fail if CMake cannot find alternative BLAS/LAPACK libraries.*
+    *   `libhdf5-dev` (HDF5) - *Required*
+    *   `libarmadillo-dev` (Armadillo) - *Required*
+    *   `libmkl-dev` (Intel MKL) - *Optional/Heavy*. The CI attempts to install this. If missing, the build might fail or fall back, but the job is configured to not block the pipeline.
     *   `cmake`
     *   `g++` (C++20 support)
 
