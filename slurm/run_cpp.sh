@@ -3,7 +3,14 @@
 
 # Get the directory of this script
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-source "$SCRIPT_DIR/utils/slurm_utils.sh"
+UTILS_SCRIPT="$SCRIPT_DIR/utils/slurm_utils.sh"
+
+if [[ ! -f "$UTILS_SCRIPT" ]]; then
+    echo "Error: Utilities script not found at $UTILS_SCRIPT" >&2
+    exit 1
+fi
+
+source "$UTILS_SCRIPT"
 
 # Default values
 JOB_NAME="qes_cpp_job"
@@ -19,8 +26,8 @@ OUTPUT_DIR="./logs"
 usage() {
     show_usage_template "$0" "argument_string"
     echo "    --exe=PATH              Path to the executable (required)"
-    echo "    --job-name=NAME         Job name (default: qes_cpp_job)"
-    echo "    --output-dir=DIR        Directory for logs (default: ./logs)"
+    echo "    --job-name=NAME         Job name (default: $JOB_NAME)"
+    echo "    --output-dir=DIR        Directory for logs (default: $OUTPUT_DIR)"
     echo ""
     echo "Example: $0 --time=2:00:00 --exe=./build/qsolver -- \"d=1 lx=10\""
     exit 1
@@ -84,6 +91,9 @@ if [[ -z "$EXE_PATH" ]]; then
 fi
 
 validate_file_exists "$EXE_PATH" "Executable" || exit 1
+
+# Convert EXE_PATH to absolute path to avoid issues if running from different directory
+EXE_PATH=$(realpath "$EXE_PATH")
 
 # Generate Script
 SCRIPT_FILE="${OUTPUT_DIR}/submit_${JOB_NAME}_$(date +%s).sh"
