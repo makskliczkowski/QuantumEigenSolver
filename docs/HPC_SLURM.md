@@ -116,9 +116,8 @@ Use `slurm/run_py.sh` to submit Python scripts.
     --job-name=py_bench \
     --time=02:00:00 \
     --mem=16 \
-    --script=pyqusolver/examples/benchmark.py \
-    --venv=./venv \
-    -- "--system_size 20 --iterations 100"
+    --script=pyqusolver/examples/example_exact_diagonalization.py \
+    --venv=./venv
 ```
 
 ## 3. Manual Submission

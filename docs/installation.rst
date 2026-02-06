@@ -11,7 +11,7 @@ Ensure the following tools and libraries are installed:
 - **Build Tools:**
     - CMake (minimum version 3.23.0)
     - A C++20-compliant compiler (Intel icpx, GCC, or MSVC)
-    - Python 3.8+
+    - Python 3.10+
 
 - **Libraries:**
     - Intel MKL
@@ -48,7 +48,7 @@ C++ Library Installation
 
    .. code-block:: bash
 
-       cd cpp
+       cd cpp/library
        mkdir build
        cd build
        cmake .. -DCMAKE_BUILD_TYPE=Release

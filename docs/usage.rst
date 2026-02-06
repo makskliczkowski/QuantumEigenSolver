@@ -14,8 +14,8 @@ Import the main QES package and start working with quantum systems:
 .. code-block:: python
 
     import QES
-    from QES.Algebra import HilbertSpace, Hamiltonian
-    from QES.general_python.lattices import square
+    from QES.Algebra import HilbertSpace
+    from QES.general_python.lattices import SquareLattice
     import numpy as np
 
 Basic Hilbert Space Construction
@@ -25,33 +25,32 @@ Create a Hilbert space for a spin-1/2 system:
 
 .. code-block:: python
 
-    # Create a 4x4 square lattice
-    lattice = square.SquareLattice(4, 4)
+    # Create a 1D lattice with 4 sites
+    lattice = SquareLattice(lx=4, dim=1)
     
     # Create Hilbert space for spin-1/2 particles
-    hilbert = HilbertSpace(lattice, particle_type='spin', local_dim=2)
+    hilbert = HilbertSpace(lattice=lattice, local_space="spin-1/2")
     
-    print(f"Hilbert space dimension: {hilbert.get_dim()}")
+    print(f"Hilbert space dimension: {hilbert.dim}")
 
 Hamiltonian Construction
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Build a Heisenberg model Hamiltonian:
+Build a transverse-field Ising model Hamiltonian:
 
 .. code-block:: python
 
-    from QES.Algebra.Model.Interacting.Spin import heisenberg_kitaev as hk
+    from QES.Algebra.Model.Interacting.Spin.transverse_ising import TransverseFieldIsing
     
-    # Create Heisenberg model parameters
-    params = {
-        'J': 1.0,      # Exchange coupling
-        'h': 0.1,      # Magnetic field
-        'bc': 'pbc'    # Boundary conditions
-    }
-    
-    # Build the Hamiltonian
-    H = hk.HeisenbergModel(hilbert, **params)
-    hamiltonian = H.build()
+    # Create model parameters
+    H = TransverseFieldIsing(
+        lattice=lattice,
+        hilbert_space=hilbert,
+        j=1.0,
+        hx=0.3,
+        hz=0.0,
+    )
+    H.build()
 
 Exact Diagonalization
 ~~~~~~~~~~~~~~~~~~~~~
@@ -60,14 +59,12 @@ Solve small systems exactly:
 
 .. code-block:: python
 
-    from QES.Solver import Solver
+    # Diagonalize the Hamiltonian
+    H.diagonalize(method="exact")
     
-    # Create exact diagonalization solver
-    solver = Solver.ExactSolver(hamiltonian)
-    
-    # Find ground state
-    eigenvalues, eigenvectors = solver.solve(k=1)  # k=1 for ground state only
-    
+    # Access ground state
+    eigenvalues = H.eigenvalues
+    eigenvectors = H.eigenvectors
     ground_energy = eigenvalues[0]
     ground_state = eigenvectors[:, 0]
     
@@ -80,28 +77,10 @@ Use neural networks for larger systems:
 
 .. code-block:: python
 
-    from QES.NQS import NeuralQuantumState
-    from QES.Solver import VariationalMonteCarlo
+    from QES.NQS import quick_start
     
-    # Create neural quantum state ansatz
-    nqs = NeuralQuantumState(
-        hilbert=hilbert,
-        hidden_units=32,
-        activation='tanh'
-    )
-    
-    # Set up variational Monte Carlo solver
-    vmc = VariationalMonteCarlo(
-        hamiltonian=hamiltonian,
-        ansatz=nqs,
-        optimizer='adam',
-        learning_rate=0.001
-    )
-    
-    # Optimize the neural network
-    energies = vmc.optimize(n_steps=1000, n_samples=1000)
-    
-    print(f"Final energy: {energies[-1]}")
+    # Print a runnable boilerplate script for NQS workflows
+    quick_start(mode="ground")
 
 Entanglement Analysis
 ~~~~~~~~~~~~~~~~~~~~~
@@ -110,14 +89,17 @@ Calculate entanglement entropy:
 
 .. code-block:: python
 
-    from QES.general_python.physics.entropy import EntropyPredictions
+    from QES.general_python.physics.eigenlevels import reduced_density_matrix
+    from QES.general_python.physics.entropy import vn_entropy
     
     # Reduced density matrix for subsystem A
-    rho_A = hilbert.reduced_density_matrix(ground_state, subsystem='A')
+    L = lattice.ns
+    La = L // 2
+    rho_A = reduced_density_matrix(ground_state, La, L)
     
     # Calculate von Neumann entropy
     eigenvals = np.linalg.eigvals(rho_A)
-    entropy = EntropyPredictions.vn_entropy(eigenvals)
+    entropy = vn_entropy(eigenvals)
     
     print(f"Entanglement entropy: {entropy}")
 
@@ -128,7 +110,7 @@ Evolve quantum states in time:
 
 .. code-block:: python
 
-    from QES.Algebra.Properties import time_evo
+    from QES.Algebra.Properties.time_evo import TimeEvolutionModule
     
     # Define time evolution parameters
     dt = 0.1
@@ -136,17 +118,12 @@ Evolve quantum states in time:
     times = np.arange(0, t_max, dt)
     
     # Evolve the ground state
-    evolved_states = time_evo.evolve_state(
-        initial_state=ground_state,
-        hamiltonian=hamiltonian,
-        times=times
-    )
+    H.diagonalize(method="exact")
+    evolver = TimeEvolutionModule(H)
+    evolved_states = evolver.evolve_batch(ground_state, times)
     
-    # Calculate expectation values during evolution
-    magnetization = []
-    for state in evolved_states:
-        mag = hilbert.expectation_value(state, 'Sz_total')
-        magnetization.append(mag)
+    # Example: check normalization over time
+    norms = np.sum(np.abs(evolved_states) ** 2, axis=0)
 
 Monte Carlo Sampling
 ~~~~~~~~~~~~~~~~~~~~
@@ -155,25 +132,23 @@ Perform statistical sampling:
 
 .. code-block:: python
 
-    from QES.Solver.MonteCarlo import MetropolisSampler
+    from QES.NQS import NetworkFactory
+    from QES.Solver.MonteCarlo.vmc import VMCSampler
     
-    # Set up Monte Carlo sampler
-    sampler = MetropolisSampler(
-        hilbert=hilbert,
-        hamiltonian=hamiltonian,
-        beta=1.0,  # Inverse temperature
-        n_samples=10000
+    # JAX-based VMC sampling (requires JAX/Flax extras)
+    net = NetworkFactory.create("rbm", input_shape=(lattice.ns,), alpha=1.0)
+    sampler = VMCSampler(
+        net=net,
+        shape=(lattice.ns,),
+        numsamples=1000,
+        numchains=4,
+        therm_steps=100,
+        sweep_steps=10,
+        backend="jax",
     )
     
     # Generate samples
-    samples = sampler.sample()
-    
-    # Calculate thermal averages
-    energy_avg = sampler.estimate_energy(samples)
-    specific_heat = sampler.estimate_specific_heat(samples)
-    
-    print(f"Thermal energy: {energy_avg}")
-    print(f"Specific heat: {specific_heat}")
+    final_state, samples, probs = sampler.sample()
 
 Visualization
 ~~~~~~~~~~~~~
@@ -182,21 +157,20 @@ Plot results using built-in utilities:
 
 .. code-block:: python
 
-    from QES.general_python.common.plot import Plot
+    from QES.general_python.common.plot import Plotter
     import matplotlib.pyplot as plt
-    
-    # Plot energy convergence
-    Plot.energy_convergence(energies)
     
     # Plot entanglement entropy scaling
     system_sizes = [4, 6, 8, 10, 12]
+    def calculate_entropy(L):
+        return 0.1 * L
     entropies = [calculate_entropy(L) for L in system_sizes]
     
-    plt.figure()
-    plt.plot(system_sizes, entropies, 'o-')
-    plt.xlabel('System Size')
-    plt.ylabel('Entanglement Entropy')
-    plt.title('Entropy Scaling')
+    fig, ax = plt.subplots()
+    Plotter.plot(ax, system_sizes, entropies, marker='o')
+    ax.set_xlabel('System Size')
+    ax.set_ylabel('Entanglement Entropy')
+    ax.set_title('Entropy Scaling')
     plt.show()
 
 Advanced Features
@@ -209,10 +183,11 @@ Enable GPU support for large-scale calculations:
 
 .. code-block:: python
 
-    # Set JAX backend for GPU acceleration
-    from QES.general_python.algebra.utils import set_global_backend
+    # Set JAX backend for GPU acceleration (if available)
+    from QES.general_python.algebra.utils import backend_mgr
     
-    set_global_backend('jax')
+    if backend_mgr.is_jax_available:
+        backend_mgr.set_active_backend("jax")
     
     # Now all computations will use JAX/GPU when available
 
@@ -223,13 +198,11 @@ Use quantum symmetries to reduce computational cost:
 
 .. code-block:: python
 
-    from QES.Algebra.symmetries import TranslationSymmetry
+    # Add translation symmetry (1D momentum sector k=0)
+    sym_gen = {"translation": 0}
+    hilbert_sym = HilbertSpace(lattice=lattice, local_space="spin-1/2", sym_gen=sym_gen)
     
-    # Add translation symmetry
-    symmetry = TranslationSymmetry(lattice)
-    hilbert_sym = HilbertSpace(lattice, symmetries=[symmetry])
-    
-    print(f"Reduced Hilbert space dimension: {hilbert_sym.get_dim()}")
+    print(f"Reduced Hilbert space dimension: {hilbert_sym.dim}")
 
 Custom Models
 ^^^^^^^^^^^^^
@@ -258,8 +231,8 @@ To use the C++ executable after building:
 
 .. code-block:: bash
 
-    ./build/QES_Main
+    ./build/qsolver
 
-Input files can be configured in `cpp/library/inputs`.
+Input files can be configured in `cpp/library/INPUTS`.
 
 See the :doc:`cpp_api` for detailed C++ class documentation.

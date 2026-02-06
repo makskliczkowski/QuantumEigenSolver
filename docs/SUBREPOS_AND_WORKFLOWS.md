@@ -18,7 +18,7 @@ The Python framework is the primary entry point for most users. It provides a fl
     Navigate to the `pyqusolver` directory and install in editable mode:
     ```bash
     cd pyqusolver
-    pip install -e "Python/[all,dev]"
+    pip install -e "Python[all,dev]"
     ```
     *Note: This installation automatically handles the internal dependency on `general_python`.*
 
@@ -69,7 +69,7 @@ The build process uses CMake and is located in `cpp/library`.
 
 ### Running
 
-Input files are expected to be in `cpp/library/inputs`. Ensure your configuration files are placed there before running the executable produced in the `build/` directory.
+Input files are expected to be in `cpp/library/INPUTS`. Ensure your configuration files are placed there before running the executable produced in the `build/` directory.
 
 ## 3. HPC Workflow
 
