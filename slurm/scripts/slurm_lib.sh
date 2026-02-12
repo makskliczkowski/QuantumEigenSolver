@@ -5,6 +5,13 @@
 #
 # Provides:
 #   - All functions from slurm_utils.sh (create_slurm_header, add_module_section, etc.)
+#   - INI file parsing:
+#       parse_ini_file()    — read [section]/key=value into INI_DATA[]
+#       ini_get()           — lookup with fallback default
+#       parse_range()       — expand "start:end:step" to values
+#       parse_csv()         — split comma-separated values
+#       parse_ini_sizes()   — parse semicolon-separated "lx,ly" pairs
+#       split_size()        — split a single "lx,ly" token into variables
 #   - setup_qes_environment()  — concurrent-safe venv setup with flock
 #   - submit_job_array()       — SLURM array-job helper
 #
@@ -22,6 +29,138 @@ else
     echo "Error: slurm_utils.sh not found at $_SLURM_UTILS" >&2
     exit 1
 fi
+
+# =============================================================================
+# INI File Parsing — Generic .ini reader for SLURM submission scripts
+# =============================================================================
+#
+# Provides:
+#   parse_ini_file FILE             — reads [section] / key=value pairs into INI_DATA[]
+#   ini_get SECTION KEY [DEFAULT]   — lookup with fallback
+#   parse_range "start:end:step"    — expand range to one-value-per-line
+#   parse_csv "a,b,c"               — split CSV to one-value-per-line
+#
+# IMPORTANT: The caller must declare the associative array BEFORE calling
+#   parse_ini_file:
+#     declare -A INI_DATA
+#     parse_ini_file "my_config.ini"
+#
+# After parsing, SECTIONS[] holds section names in order, and
+# INI_DATA["section::key"] holds values.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# parse_ini_file — Read a standard .ini file into INI_DATA[section::key]=val
+# -----------------------------------------------------------------------------
+#   - Lines starting with # or ; are comments (also inline # comments)
+#   - Sections are [name]
+#   - Key/value separated by first '='
+#   - Leading/trailing whitespace is stripped from keys and values
+#   - Populates global arrays: SECTIONS=() and INI_DATA[section::key]=value
+# -----------------------------------------------------------------------------
+parse_ini_file() {
+    local ini_file="$1"
+    local current_section=""
+
+    # Reset the section list (caller owns INI_DATA)
+    SECTIONS=()
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Strip comments and leading/trailing whitespace
+        line="${line%%#*}"
+        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -z "$line" ]] && continue
+
+        # Section header
+        if [[ "$line" =~ ^\[([^]]+)\]$ ]]; then
+            current_section="${BASH_REMATCH[1]}"
+            SECTIONS+=("$current_section")
+            continue
+        fi
+
+        # Key = value (split only on first '=')
+        if [[ "$line" =~ ^([^=]+)=(.*)$ && -n "$current_section" ]]; then
+            local key val
+            key="$(echo "${BASH_REMATCH[1]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            val="$(echo "${BASH_REMATCH[2]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            INI_DATA["${current_section}::${key}"]="$val"
+        fi
+    done < "$ini_file"
+}
+
+# -----------------------------------------------------------------------------
+# ini_get SECTION KEY [DEFAULT] — Retrieve a value with optional fallback
+# -----------------------------------------------------------------------------
+ini_get() {
+    local section="$1"
+    local key="$2"
+    local default="${3:-}"
+    local lookup="${section}::${key}"
+    if [[ -v "INI_DATA[$lookup]" ]]; then
+        echo "${INI_DATA[$lookup]}"
+    else
+        echo "$default"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# parse_range "start:end:step" — Expand to one value per line (or echo scalar)
+# -----------------------------------------------------------------------------
+#   "0.0:2.0:0.5" → 0.000000\n0.500000\n1.000000\n1.500000\n2.000000
+#   "1.5"          → 1.5
+# -----------------------------------------------------------------------------
+parse_range() {
+    local range_str="$1"
+    if [[ "$range_str" == *":"* ]]; then
+        local start end step
+        IFS=':' read -r start end step <<< "$range_str"
+        seq -f "%.6f" "$start" "$step" "$end" 2>/dev/null || echo "$start"
+    else
+        echo "$range_str"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# parse_csv "a,b,c" — Split comma-separated values to one per line
+# -----------------------------------------------------------------------------
+parse_csv() {
+    local csv_str="$1"
+    echo "$csv_str" | tr ',' '\n' | sed 's/^ *//;s/ *$//'
+}
+
+# =============================================================================
+# parse_ini_sizes — Parse semicolon-separated "lx,ly" size pairs
+# =============================================================================
+#   "2,2;3,3;4,3" → array of "2,2" "3,3" "4,3"
+#   Stores result in the nameref array passed as $2.
+# =============================================================================
+parse_ini_sizes() {
+    local sizes_str="$1"
+    local -n _out_sizes="$2"
+    _out_sizes=()
+    IFS=';' read -ra _raw_sizes <<< "$sizes_str"
+    for _s in "${_raw_sizes[@]}"; do
+        _s="$(echo "$_s" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [[ -n "$_s" ]] && _out_sizes+=("$_s")
+    done
+}
+
+# =============================================================================
+# split_size "lx,ly" — Read a single size token into lx/ly variables
+# =============================================================================
+#   Handles both "lx,ly" and "lx ly" formats.
+#   Usage: local lx ly; split_size "$size" lx ly
+# =============================================================================
+split_size() {
+    local size="$1"
+    local -n _lx="$2"
+    local -n _ly="$3"
+    if [[ "$size" == *","* ]]; then
+        IFS=',' read -r _lx _ly <<< "$size"
+    else
+        read -r _lx _ly <<< "$size"
+    fi
+}
 
 # =============================================================================
 # setup_qes_environment — Emit concurrent-safe venv setup code
