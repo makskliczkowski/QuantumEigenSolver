@@ -219,7 +219,8 @@ _qes_clean_corrupted() {
     for sp in "\${sp_dirs[@]}"; do
         [[ -d "\$sp" ]] || continue
         local bad
-        bad=\$(find "\$sp" -maxdepth 1 -name '~*' -type d 2>/dev/null || true)
+        # Remove pip-temp leftovers recursively (e.g. jax_plugins/~la_cuda12).
+        bad=\$(find "\$sp" -type d -name '~*' 2>/dev/null || true)
         if [[ -n "\$bad" ]]; then
             echo "[venv] Cleaning corrupted packages in \$sp ..."
             echo "\$bad" | while IFS= read -r d; do
