@@ -203,6 +203,7 @@ _QES_REQ="${requirements_file}"
 _QES_LOCK="\${_QES_VENV}.lock"
 _QES_STAMP="\${_QES_VENV}/.install_stamp"
 _QES_PKG="${package_dir}"
+_QES_READONLY="\${QES_VENV_READONLY:-0}"
 
 # ---------- helper: does the env need (re-)installation? ----------
 _qes_needs_install() {
@@ -253,48 +254,61 @@ _qes_do_install() {
 }
 
 # ---------- main logic ----------
-if _qes_needs_install; then
-    echo "[venv] Environment needs install/update — acquiring lock ..."
-    mkdir -p "\$(dirname "\$_QES_LOCK")"
-    exec 9>"\$_QES_LOCK"
-
-    # wait up to 15 min for lock (another job may be installing)
-    if flock -w 900 9; then
-        # double-check under lock (another job may have finished)
-        if _qes_needs_install; then
-            _qes_do_install || { flock -u 9; exec 9>&-; exit 1; }
-        else
-            echo "[venv] Another job completed installation while we waited."
-        fi
-        flock -u 9
-    else
-        echo "[venv] WARNING: Could not acquire lock after 900 s — using existing env" >&2
+if [[ "\$_QES_READONLY" == "1" ]]; then
+    # Read-only mode: never mutate shared env inside array tasks.
+    if [[ ! -d "\$_QES_VENV" ]]; then
+        echo "Error: QES_VENV_READONLY=1 but venv not found at \$_QES_VENV" >&2
+        exit 1
     fi
-    exec 9>&-
-else
-    echo "[venv] QES environment is up to date (stamp found)."
-fi
-
-# Synchronize with potential concurrent installer before activation/cleanup.
-exec 9>"\$_QES_LOCK"
-if flock -w 900 9; then
-    # Always activate (may have skipped install branch)
     source "\${_QES_VENV}/bin/activate" || {
         echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
-        flock -u 9
-        exec 9>&-
         exit 1
     }
-
-    # Final paranoia: clean corrupted dirs (harmless if none).
-    # Keep it under lock to avoid racing against another job installing packages.
-    _qes_clean_corrupted
-    flock -u 9
-    exec 9>&-
+    echo "[venv] Read-only mode enabled; skipping runtime install/update."
 else
-    echo "Error: Could not acquire venv lock for activation: \$_QES_LOCK" >&2
-    exec 9>&-
-    exit 1
+    if _qes_needs_install; then
+        echo "[venv] Environment needs install/update — acquiring lock ..."
+        mkdir -p "\$(dirname "\$_QES_LOCK")"
+        exec 9>"\$_QES_LOCK"
+
+        # wait up to 15 min for lock (another job may be installing)
+        if flock -w 900 9; then
+            # double-check under lock (another job may have finished)
+            if _qes_needs_install; then
+                _qes_do_install || { flock -u 9; exec 9>&-; exit 1; }
+            else
+                echo "[venv] Another job completed installation while we waited."
+            fi
+            flock -u 9
+        else
+            echo "[venv] WARNING: Could not acquire lock after 900 s — using existing env" >&2
+        fi
+        exec 9>&-
+    else
+        echo "[venv] QES environment is up to date (stamp found)."
+    fi
+
+    # Synchronize with potential concurrent installer before activation/cleanup.
+    exec 9>"\$_QES_LOCK"
+    if flock -w 900 9; then
+        # Always activate (may have skipped install branch)
+        source "\${_QES_VENV}/bin/activate" || {
+            echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
+            flock -u 9
+            exec 9>&-
+            exit 1
+        }
+
+        # Final paranoia: clean corrupted dirs (harmless if none).
+        # Keep it under lock to avoid racing against another job installing packages.
+        _qes_clean_corrupted
+        flock -u 9
+        exec 9>&-
+    else
+        echo "Error: Could not acquire venv lock for activation: \$_QES_LOCK" >&2
+        exec 9>&-
+        exit 1
+    fi
 fi
 
 echo "[venv] Python: \$(python3 --version), venv: \$_QES_VENV"
