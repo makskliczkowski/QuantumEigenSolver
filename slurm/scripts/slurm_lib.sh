@@ -261,10 +261,23 @@ if [[ "\$_QES_READONLY" == "1" ]]; then
         echo "Error: QES_VENV_READONLY=1 but venv not found at \$_QES_VENV" >&2
         exit 1
     fi
-    source "\${_QES_VENV}/bin/activate" || {
-        echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
+    mkdir -p "\$(dirname "\$_QES_LOCK")"
+    exec 9>"\$_QES_LOCK"
+    if flock -w 900 9; then
+        _qes_clean_corrupted
+        source "\${_QES_VENV}/bin/activate" || {
+            echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
+            flock -u 9
+            exec 9>&-
+            exit 1
+        }
+        flock -u 9
+        exec 9>&-
+    else
+        echo "Error: Could not acquire venv lock in read-only mode: \$_QES_LOCK" >&2
+        exec 9>&-
         exit 1
-    }
+    fi
     echo "[venv] Read-only mode enabled; skipping runtime install/update."
 else
     if _qes_needs_install; then
