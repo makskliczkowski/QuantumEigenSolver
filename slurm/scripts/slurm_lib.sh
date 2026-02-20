@@ -96,7 +96,7 @@ ini_get() {
     local key="$2"
     local default="${3:-}"
     local lookup="${section}::${key}"
-    if [[ -v "INI_DATA[$lookup]" ]]; then
+    if [[ ${INI_DATA[$lookup]+_} ]]; then
         echo "${INI_DATA[$lookup]}"
     else
         echo "$default"
@@ -275,14 +275,27 @@ else
     echo "[venv] QES environment is up to date (stamp found)."
 fi
 
-# Always activate (may have skipped install branch)
-source "\${_QES_VENV}/bin/activate" || {
-    echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
-    exit 1
-}
+# Synchronize with potential concurrent installer before activation/cleanup.
+exec 9>"\$_QES_LOCK"
+if flock -w 900 9; then
+    # Always activate (may have skipped install branch)
+    source "\${_QES_VENV}/bin/activate" || {
+        echo "Error: Failed to activate QES venv at \$_QES_VENV" >&2
+        flock -u 9
+        exec 9>&-
+        exit 1
+    }
 
-# Final paranoia: clean corrupted dirs (harmless if none)
-_qes_clean_corrupted
+    # Final paranoia: clean corrupted dirs (harmless if none).
+    # Keep it under lock to avoid racing against another job installing packages.
+    _qes_clean_corrupted
+    flock -u 9
+    exec 9>&-
+else
+    echo "Error: Could not acquire venv lock for activation: \$_QES_LOCK" >&2
+    exec 9>&-
+    exit 1
+fi
 
 echo "[venv] Python: \$(python3 --version), venv: \$_QES_VENV"
 # ===========================================================================
@@ -349,7 +362,11 @@ submit_job_array() {
 
     mkdir -p "$log_dir"
 
-    local array_script="${log_dir}/${job_name}_array.sh"
+    local array_script
+    array_script=$(mktemp "${log_dir}/${job_name}_array.XXXXXX.sh") || {
+        echo "Error: Failed to create temporary array script in ${log_dir}" >&2
+        return 1
+    }
 
     cat > "$array_script" <<ARRAY_EOF
 #!/bin/bash
