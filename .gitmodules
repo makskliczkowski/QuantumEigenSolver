@@ -4,3 +4,6 @@
 [submodule "pyqusolver"]
 	path = pyqusolver
 	url = https://github.com/makskliczkowski/pyqusolver
+[submodule "juqusolver"]
+	path = juqusolver
+	url = git@github.com:makskliczkowski/juqusolver.git
