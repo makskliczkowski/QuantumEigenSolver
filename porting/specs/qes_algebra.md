@@ -1,0 +1,144 @@
+A) Public API inventory (Python)
+- Source module: `pyqusolver/Python/QES/Algebra/__init__.py`.
+- Public exports declared in `__all__`:
+- `HilbertSpace`:
+- signature: `HilbertSpace(ns=None, lattice=None, nh=None; is_manybody=true, part_conserv=true, sym_gen=nothing, global_syms=nothing, gen_mapping=true, gen_basis=true, local_space=nothing, state_type=INTEGER, backend="default", dtype=np.float64, basis=nothing, boundary_flux=nothing, state_filter=nothing, logger=nothing, verbose=false, kwargs...)`.
+- inputs/outputs: constructs Hilbert-space object; output object has size/basis metadata and optional symmetry mapping.
+- side effects: may build mapping/basis eagerly based on flags.
+- errors: invalid size arguments, invalid local-space or symmetry specs.
+- `HilbertConfig`:
+- dataclass-like configuration blueprint for `HilbertSpace`.
+- methods: `with_override(**updates)`, `sym_tuple()`, `to_kwargs()`.
+- side effects: none.
+- `SymmetrySpec`:
+- dataclass-like pair `(generator, sector)` with `as_tuple()`.
+- `Hamiltonian`:
+- high-level Hamiltonian object type with classmethod `from_config(config, **overrides)`.
+- `HamiltonianConfig`:
+- dataclass-like configuration blueprint for Hamiltonian registry builders.
+- methods: `with_override(**updates)`, `resolve_hilbert()`, `to_builder_kwargs(extra=nothing)`.
+- `HAMILTONIAN_REGISTRY`:
+- singleton registry with methods:
+- `register(key, builder; description, tags=(), default_kwargs=nothing, overwrite=false)`.
+- `get(key)`.
+- `available()`.
+- `describe(key)`.
+- `instantiate(config, **overrides)`.
+- `register_hamiltonian(...)`:
+- wrapper around singleton registry registration.
+- Backend helper reexports imported by users:
+- `identity`, `inner`, `kron`, `outer`, `overlap`, `trace`.
+- Package-level module aliases:
+- `Symmetries`, `Operator`, `Hilbert`, `Hamil`.
+- Internal-but-imported compatibility behavior:
+- Python dynamic fallback from `QES.Algebra.Symmetries` for missing top-level names via `__getattr__`.
+
+B) Julia API mapping
+- Module target: `juqusolver/src/Algebra/`.
+- Add compatibility modules/files:
+- `juqusolver/src/Algebra/QESSymmetries.jl`:
+- export `CompactSymmetryData`, `SymmetryContainer`, compact lookup helpers, and symmetry operator labels.
+- include compact arrays mirroring Python `CompactSymmetryData` intent:
+- `repr_map`, `phase_idx`, `phase_table`, `normalization`, `representative_list`.
+- include O(1)-style helper overloads for both:
+- data-wrapper calls (`_compact_get_repr_idx(data, idx)` style), and
+- low-level array-form calls (`_compact_get_repr_idx(state, repr_map)` style).
+- `juqusolver/src/Algebra/QESHilbertConfig.jl`:
+- export `HilbertConfig`, `with_override`, `sym_tuple`, `to_kwargs`.
+- `juqusolver/src/Algebra/QESHilbert.jl`:
+- export `HilbertSpace`, `from_config`, plus Hilbert-space symmetry transform helpers needed for parity with Python Hilbert object methods.
+- implement deterministic compact mapping generation for supported symmetry specs used in current parity scope:
+- no symmetry (identity mapping),
+- one-generator reduction (`Translation_x`, `Reflection`, `Inversion`, `Parity`) for spin-1/2 integer basis.
+- unsupported multi-generator combinations must fail clearly or fall back deterministically per spec, never silently produce nondeterministic mappings.
+- `juqusolver/src/Algebra/QESHamiltonianConfig.jl`:
+- export `HamiltonianConfig`, `HamiltonianSpec`, `HamiltonianRegistry`, `HAMILTONIAN_REGISTRY`, `register_hamiltonian`, `with_override`, `resolve_hilbert`, `to_builder_kwargs`.
+- `juqusolver/src/Algebra/QESHamiltonian.jl`:
+- export `Hamiltonian`, `from_config`.
+- `juqusolver/src/Algebra/QESBackends.jl`:
+- export backend helper wrappers `identity`, `inner`, `kron`, `outer`, `overlap`, `trace`.
+- Umbrella integration in `juqusolver/src/Algebra.jl`:
+- reexport `HilbertSpace`, `HilbertConfig`, `SymmetrySpec`, `Hamiltonian`, `HamiltonianConfig`, `HAMILTONIAN_REGISTRY`, `register_hamiltonian`.
+- expose module aliases `Symmetries`, `Operator`, `Hilbert`, `Hamil`.
+- Type constraints:
+- concrete structs with concrete field types (`Int`, `Bool`, `String`, concrete dictionaries and vectors).
+- avoid `Any` in hot paths (`from_config`, registry `instantiate`, backend helper wrappers).
+- use function-typed fields only where required (`builder::Function`) and keep non-hot metadata separate.
+
+C) Behavior spec
+- Determinism:
+- `HilbertSpace.from_config` must be deterministic for same config and overrides.
+- compact symmetry mapping (`representative_list`, `repr_map`, `phase_idx`, `phase_table`, `normalization`) must be deterministic for same `(ns, sym_gen, global_syms, gen_mapping)`.
+- `HamiltonianRegistry.instantiate` merge order must be deterministic:
+- `default_kwargs` <- `config.parameters` <- `overrides`.
+- `HilbertConfig.to_kwargs` semantics:
+- explicit fields copied first.
+- keys in `extra_kwargs` only fill missing keys or keys currently set to `nothing`.
+- `with_override` methods return new config object and do not mutate original.
+- `SymmetrySpec.as_tuple` returns `(generator, sector)` in original order.
+- Hilbert symmetry semantics:
+- `has_sym_generators` true when at least one symmetry generator is present.
+- `has_sym_reduction` true only when reduced size `nh` is smaller than `nhfull`.
+- `compact_symmetry_data` is `nothing` when mapping is not generated.
+- `transform_to_reduced_space` uses compact mapping and phases; shape parity with Python:
+- vector input `(nhfull,)` -> `(nh,)`,
+- batched input `(nhfull, nbatch)` -> `(nh, nbatch)`.
+- `transform_to_full_space` maps reduced vectors back to full basis using compact phases and normalizations.
+- `resolve_hilbert` behavior:
+- if `hilbert` is `nothing`, return `nothing`.
+- if already `HilbertSpace`, return as-is.
+- if `HilbertConfig`, materialize via `HilbertSpace.from_config`.
+- otherwise throw `ArgumentError`.
+- Backend helpers:
+- `identity`, `inner`, `kron`, `outer`, `overlap`, `trace` must delegate to existing Julia algebra linalg implementations and keep numeric semantics.
+- Backend-split naming is not kept in Julia-facing API.
+- Module alias behavior:
+- `Symmetries`, `Operator`, `Hilbert`, `Hamil` are stable module constants for import parity.
+
+D) Test plan
+- `test/qes_algebra_test.jl`:
+- export presence tests for all mapped top-level names.
+- `SymmetrySpec` tuple conversion test.
+- `HilbertConfig`:
+- `with_override` immutability.
+- `sym_tuple` conversion from vector of specs.
+- `to_kwargs` merge rules for `extra_kwargs`.
+- `HilbertSpace`:
+- direct constructor with `ns`.
+- `from_config` construction and override behavior.
+- deterministic basis-size metadata checks.
+- compact mapping checks:
+- `repr_map` validity mask equals sector membership.
+- `representative_list` sorted and unique.
+- normalization entries are positive for kept representatives.
+- symmetry reduction checks:
+- translation `k=0` on `ns=4` gives deterministic reduced dimension and nontrivial orbit reduction.
+- parity sector filtering excludes incompatible fixed-point states in odd sectors.
+- round-trip checks:
+- `transform_to_reduced_space` and `transform_to_full_space` are deterministic and preserve norms on states inside the reduced manifold.
+- `HamiltonianRegistry`:
+- register/get/available/describe success path.
+- duplicate register failure when `overwrite=false`.
+- instantiate merge-order test using builder fixture.
+- `HamiltonianConfig`:
+- `resolve_hilbert` for `nothing`, `HilbertSpace`, and `HilbertConfig`.
+- invalid type failure.
+- `register_hamiltonian` and singleton registry integration.
+- `Hamiltonian.from_config` wrapper path.
+- backend helper wrappers against known fixtures (`identity`, `trace`, `inner`, `overlap`).
+- module alias existence tests: `Symmetries`, `Operator`, `Hilbert`, `Hamil`.
+- regression:
+- run `qes_algebra_test.jl` plus existing module suite.
+
+E) Performance and typing gate
+- Hot entrypoint 1:
+- `Algebra.from_config(::Type{HilbertSpace}, ::HilbertConfig; overrides...)` (or mapped callable) returns concrete `HilbertSpace` without `Any` body returns.
+- Hot entrypoint 1a:
+- `QESHilbert.transform_to_reduced_space(hs, vec)` returns concrete vector/matrix types for concrete input element types.
+- Hot entrypoint 2:
+- `instantiate(::HamiltonianRegistry, ::HamiltonianConfig; overrides...)` returns concrete `Hamiltonian` (or builder return type) with stable merge path.
+- Hot entrypoint 3:
+- backend wrapper `Algebra.inner(a, b)` returns concrete scalar type for concrete vector inputs.
+- Verification:
+- `@code_warntype` on 1-3 above must show concrete return bodies (no `Any` return).
+- one `@btime` for registry instantiate path and one for backend `inner`.

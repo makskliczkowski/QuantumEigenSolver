@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Repository-local generated artifacts
+/tmp/
+/mcdata/
+/analysis_results.json
+/src
+
 # C extensions
 *.so
 

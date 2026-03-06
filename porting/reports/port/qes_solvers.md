@@ -1,0 +1,81 @@
+1) Files changed/added
+- Spec:
+- `porting/specs/qes_solvers.md`
+- Julia implementation:
+- `juqusolver/src/Solvers.jl`
+- `juqusolver/src/Solvers/SolverBase.jl`
+- `juqusolver/src/Solvers/MonteCarlo.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Initialization.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Diagnostics.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Updates.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Samplers.jl`
+- `juqusolver/src/Solvers/MonteCarlo/VMC.jl`
+- `juqusolver/src/Solvers/MonteCarlo/MonteCarloCore.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Parallel.jl`
+- Package integration:
+- `juqusolver/src/QuantumEigenSolver.jl`
+- `juqusolver/src/Common/Registry.jl`
+- Module artifacts:
+- `juqusolver/test/qes_solvers_test.jl`
+- `juqusolver/examples/qes_solvers_example.jl`
+- `juqusolver/docs/src/qes_solvers.md`
+- README update:
+- `README.md`
+- Follow-up optimization pass:
+- `juqusolver/src/Solvers/MonteCarlo/VMC.jl`
+- `juqusolver/docs/src/qes_solvers.md`
+- Additional memory polish:
+- `juqusolver/src/Solvers/MonteCarlo/Updates.jl`
+
+2) Test summary
+- Module command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("test/qes_solvers_test.jl")'`
+- Result:
+- `QES Solvers Surface`: 9/9 pass
+- `QES Solvers Initialization`: 9/9 pass
+- `QES Solvers Updates and Neighbor Table`: 11/11 pass
+- `QES Solvers Sampler Factory and VMCSampler`: 16/16 pass
+- `QES Solvers Diagnostics`: 6/6 pass
+- `QES Solvers MonteCarloSolver and ParallelTempering`: 10/10 pass
+- Follow-up optimization validation:
+- `~/.juliaup/bin/julia --project=juqusolver -e 'include("juqusolver/test/qes_solvers_test.jl")'`
+- Result:
+- same six `qes_solvers` testsets pass after inner-loop allocation optimizations.
+- Full regression command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("test/common_test.jl"); include("test/general_maths_test.jl"); include("test/general_lattices_test.jl"); include("test/general_physics_test.jl"); include("test/general_algebra_test.jl"); include("test/qes_algebra_test.jl"); include("test/qes_models_test.jl"); include("test/general_python_init_test.jl"); include("test/qes_core_test.jl"); include("test/qes_solvers_test.jl")'`
+- Result:
+- full suite passes, including `qes_solvers`.
+- Example command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("examples/qes_solvers_example.jl")'`
+- Result:
+- example runs successfully and writes weights to `juqusolver/tmp/weights/qes_solvers_example_weights.bin`.
+- Full examples command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("examples/common_example.jl"); include("examples/general_maths_example.jl"); include("examples/general_lattices_example.jl"); include("examples/general_python_init_example.jl"); include("examples/general_physics_example.jl"); include("examples/general_algebra_example.jl"); include("examples/qes_algebra_example.jl"); include("examples/qes_models_example.jl"); include("examples/qes_core_example.jl"); include("examples/qes_solvers_example.jl")'`
+- Result:
+- all examples pass.
+- Package load command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'using QuantumEigenSolver; println(QuantumEigenSolver.list_available_modules()); println(isdefined(QuantumEigenSolver, :Solvers)); println(QuantumEigenSolver.Solvers.MODULE_DESCRIPTION);'`
+- Result:
+- package precompiles and loads; `Solvers` is available; module list includes `"solvers"`.
+
+3) Type stability summary
+- Command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("src/QuantumEigenSolver.jl"); using .QuantumEigenSolver; using InteractiveUtils; using Random; const MC = QuantumEigenSolver.Solvers.MonteCarlo; rng = MersenneTwister(1); st = fill(0.5, 16); @code_warntype MC.propose_multi_flip(st, rng; n_flip=4); chains = randn(4, 128); @code_warntype MC.compute_rhat(chains); net(params, x) = -sum(abs2, x); s = MC.VMCSampler(net, (8,); seed=5, numsamples=4, numchains=2, initstate="rnd"); @code_warntype MC.sample(s; num_samples=4, num_chains=2);'`
+- Result:
+- `propose_multi_flip` return body type: `Vector{Float64}`.
+- `compute_rhat` return body type: `Float64`.
+- `sample(::VMCSampler; ...)` return body type: `Tuple{Tuple{Matrix{Float64},Vector{Float64}},Tuple{Matrix{Float64},Vector{Float64}},Vector{Float64}}`.
+- `_update_chain!(::VMCSampler, ...)` body type: `Nothing` with concrete local variables and no `Any`.
+
+4) Benchmark summary
+- Command:
+- `cd juqusolver && ~/.juliaup/bin/julia --project -e 'include("src/QuantumEigenSolver.jl"); using .QuantumEigenSolver; using Random; using BenchmarkTools; const MC = QuantumEigenSolver.Solvers.MonteCarlo; rng = MersenneTwister(7); st = fill(0.5, 32); @btime MC.propose_multi_flip($st, $rng; n_flip=4); net(params, x) = -sum(abs2, x); s = MC.VMCSampler(net, (16,); seed=7, numsamples=8, numchains=4, initstate="rnd"); @btime MC.sample($s; num_samples=8, num_chains=4);'`
+- Result:
+- `propose_multi_flip`: `192.577 ns (6 allocations: 736 bytes)`.
+- `VMCSampler.sample`: `701.042 us (32270 allocations: 1.55 MiB)`.
+- Follow-up benchmark command:
+- `~/.juliaup/bin/julia --project=juqusolver -e 'include("juqusolver/src/QuantumEigenSolver.jl"); using .QuantumEigenSolver; using BenchmarkTools; using Random; const MC = QuantumEigenSolver.Solvers.MonteCarlo; net(params, x) = -sum(abs2, x); s = MC.VMCSampler(net, (32,); seed=33, numsamples=16, numchains=8, initstate="rnd", upd_fun="multi_flip", n_flip=4); @btime MC.sample($s; num_samples=8, num_chains=8);'`
+- Follow-up result:
+- `VMCSampler.sample`: `618.000 us (14 allocations: 19.97 KiB)`.
+- Post-polish update benchmark:
+- `propose_multi_flip`: `36.473 ns (3 allocations: 608 bytes)`.

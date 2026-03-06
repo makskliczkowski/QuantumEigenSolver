@@ -1,0 +1,105 @@
+A) Public API inventory (Python)
+- Package entry and lazy loading helpers from `general_python/maths/__init__.py`.
+- `__getattr__(name: str) -> Any`: resolves names via `_LAZY_IMPORTS`, imports module, caches in `_LAZY_CACHE`, raises `AttributeError` for unknown names.
+- `__dir__() -> List[str]`: returns globals plus lazy names.
+- `get_module_description(module_name: str) -> str`: description for `math_utils`, `random`, `statistics`; returns `"Module not found."` otherwise.
+- `list_available_modules() -> List[str]`: sorted list of modules excluding alias names ending with `Mod`.
+- Package exports (`__all__`): `math_utils`, `random`, `statistics`, `MathMod`, `RandomMod`, `StatisticsMod`, `get_module_description`, `list_available_modules`.
+- `random.py` public callable.
+- `CUE_QR(n: int, simple=True, rng=None) -> np.ndarray[complex]`: generates CUE matrix by QR factorization, optional Haar phase fix when `simple=False`.
+- `math_utils.py` public utilities used by downstream modules.
+- `find_maximum_idx(x)`.
+- `find_nearest_val(x, val, col)`.
+- `find_nearest_idx(x, val, **kwargs)`.
+- `next_power(x: float, base: int=2)`.
+- `prev_power(x: float, base: int=2)`.
+- `mod_euc(a: int, b: int) -> int`.
+- `mod_floor(a: int, b: int) -> int`.
+- `mod_ceil(a: int, b: int) -> int`.
+- `mod_trunc(a: int, b: int) -> int`.
+- `mod_round(a: int, b: int) -> int`.
+- `FitterParams` and `Fitter` classes in `math_utils.py` expose fitting APIs (scipy-dependent).
+- `statistics.py` public utilities/classes.
+- `Statistics.bin_avg(data, x, centers, delta=0.05, typical=False, cutoffNum=10, func=..., verbose=False)`.
+- `Statistics.rebin(arr, av_num: int, d: int, rng=None)`.
+- `Statistics.permute(*args, rng=None)`.
+- Free functions: `avgBin`, `moveAverage`, `fluctAboveAverage`, `removeMean`, `gauss`.
+- Classes: `Histogram`, `HistogramAverage`, `Fraction`.
+
+B) Julia API mapping
+- Target module path for this pass.
+- `juqusolver/src/Maths.jl` umbrella module.
+- `juqusolver/src/Maths/MathUtils.jl` numeric utilities.
+- `juqusolver/src/Maths/Random.jl` random matrix utilities.
+- `juqusolver/src/Maths/Statistics.jl` statistics core utilities.
+- Umbrella exports matching Python package-level public names.
+- `math_utils`, `random`, `statistics` as module aliases.
+- `MathMod`, `RandomMod`, `StatisticsMod` as compatibility aliases.
+- `get_module_description(module_name::AbstractString) -> String`.
+- `list_available_modules() -> Vector{String}`.
+- Mapped implementation scope in this pass.
+- `Random.CUE_QR(n::Integer; simple::Bool=true, rng::AbstractRNG=Random.default_rng())::Matrix{ComplexF64}`.
+- `MathUtils.find_maximum_idx(x::AbstractMatrix)`.
+- `MathUtils.find_nearest_val(x::AbstractArray, val::Real)`.
+- `MathUtils.find_nearest_idx(x::AbstractArray, val::Real)`.
+- `MathUtils.next_power(x::Real; base::Integer=2)`.
+- `MathUtils.prev_power(x::Real; base::Integer=2)`.
+- `MathUtils.mod_euc/mod_floor/mod_ceil/mod_trunc/mod_round` for integer pairs.
+- `Statistics.bin_avg(data::AbstractMatrix, x::AbstractMatrix, centers::AbstractVector; delta::Real=0.05, typical::Bool=false, cutoff_num::Integer=10)`.
+- `Statistics.rebin(arr::AbstractArray, av_num::Integer, d::Integer; rng::AbstractRNG=Random.default_rng())`.
+- `Statistics.permute(arrs::AbstractArray...; rng::AbstractRNG=Random.default_rng())`.
+- Type constraints for performance.
+- hot numeric paths restricted to concrete numeric array element types (`<:Real`) where required.
+- avoid `Any` in loop state and return types for mapped hot functions.
+- Deferred APIs in this pass (documented, not exported as functional replacements).
+- `FitterParams`, `Fitter` and scipy-fit wrappers.
+- `Statistics` heavy histogram classes (`Histogram`, `HistogramAverage`, `Fraction`) and large smoothing/fitting helpers.
+
+C) Behavior spec
+- `list_available_modules` returns deterministic sorted module list: `math_utils`, `random`, `statistics`.
+- `get_module_description` returns exact mapped strings and exact fallback `"Module not found."`.
+- `CUE_QR` behavior.
+- output shape is `(n, n)` complex matrix.
+- matrix is unitary within floating tolerance (`Q'Q ≈ I`, `I` size `n`).
+- deterministic for fixed RNG stream and fixed `simple` flag.
+- nearest/index helpers.
+- nearest index is based on minimum absolute distance over flattened array semantics for arrays.
+- nearest value returns element at nearest index.
+- modular helpers.
+- raise `ArgumentError` when divisor/base invalid (`b==0` or non-positive base where applicable).
+- deterministic integer arithmetic semantics preserved.
+- `bin_avg` semantics.
+- operates on 2D realizations; each center aggregates per-realization local window.
+- `typical=true` applies log-domain averaging and exponentiation.
+- bins with no usable samples are omitted from output, matching Python valid-mask behavior.
+- `rebin` semantics.
+- `av_num==1` or insufficient rows returns input unchanged.
+- shuffle step uses provided RNG for reproducibility.
+- supports `d in {1,2,3}`.
+
+D) Test plan
+- Unit tests for umbrella API.
+- `list_available_modules` exact sorted output.
+- `get_module_description` known and unknown names.
+- alias consistency (`math_utils === MathMod`, `random === RandomMod`, `statistics === StatisticsMod`).
+- Unit tests for mapped numeric/random/stat utilities.
+- `CUE_QR` shape and unitarity for small `n`.
+- deterministic `CUE_QR` with seeded RNG.
+- nearest/index helpers on 1D and 2D arrays.
+- power/mod helpers including error on division by zero.
+- `bin_avg` simple deterministic fixture with known center outputs.
+- `rebin` for 1D and 2D shape/value sanity.
+- `permute` applies identical permutation across arrays.
+- Deferred API guard tests.
+- verify deferred symbols (`Fitter`, `Histogram`, `Fraction`) are not exported from umbrella in this pass.
+
+E) Performance and typing gate
+- Hot entrypoint 1.
+- `Random.CUE_QR` must be type-stable with concrete `Matrix{ComplexF64}` output.
+- Hot entrypoint 2.
+- `Statistics.bin_avg` must avoid `Any` in inner loops and allocate only output/work arrays.
+- Hot entrypoint 3.
+- `MathUtils.find_nearest_idx` must be type-stable for `Vector{Float64}` input with scalar integer output.
+- Verification requirements.
+- `@code_warntype` for the three hot entrypoints has no `Any`.
+- one `@btime` benchmark reported with allocations for at least one hot numeric utility.

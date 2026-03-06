@@ -1,0 +1,15 @@
+passes gate
+- API drift evidence:
+- `juqusolver/src/Maths.jl` exports match mapped package-level API: `math_utils`, `random`, `statistics`, `MathMod`, `RandomMod`, `StatisticsMod`, metadata helpers.
+- deferred symbols in spec (`Fitter`, `Histogram`, `Fraction`) remain excluded from umbrella exports and are explicitly guarded by tests.
+- Behavior evidence:
+- deterministic module list/fallback description validated.
+- `CUE_QR` size, seeded reproducibility, and unitarity validated.
+- nearest/power/mod semantics and zero-divisor error behavior validated.
+- `bin_avg`, `rebin`, and `permute` core semantics validated on deterministic fixtures.
+- Type stability evidence:
+- `@code_warntype` for `CUE_QR`, `bin_avg`, and `find_nearest_idx` shows concrete return bodies and no `Any`.
+- Allocation evidence:
+- `@btime Maths.math_utils.find_nearest_idx($x, 0.2)` reports `1.083 μs (0 allocations: 0 bytes)`.
+- Risk note:
+- scipy-dependent fit stack and histogram-class stack remain out of scope for this mapped pass and are still TODO for full Python parity.

@@ -1,0 +1,103 @@
+A) Public API inventory (Python)
+- Package entry helpers.
+- `__getattr__(name: str) -> Any`: lazy-load dispatch for names in `_LAZY_IMPORTS`; side effect: imports submodule and caches in `_LOADED`; raises `AttributeError` for unknown names.
+- `__dir__() -> list[str]`: autocompletion helper; returns lazy names plus helper functions; no side effects.
+- `get_module_description(module_name: str) -> str`: returns static text for known module names; returns `"Module not found."` for unknown names.
+- `list_available_modules() -> list[str]`: returns static list of module names.
+- Public classes and callables exposed through `common.__all__` from submodules.
+- `Directories` (class): constructor `Directories(*parts: PathLike)`; returns path wrapper with filesystem operations; side effects on methods like `mkdir`, `copy_files`, `transfer_files`, `clear_empty`; errors for bad paths/IO failures.
+- `Plotter` (class): constructor `Plotter(default_cmap='viridis', font_size=12, dpi=200)`; plotting utilities over matplotlib axes; side effects: figure and axis mutation, file writes via save helpers; raises `ValueError` for invalid options and backend errors.
+- `PlotterSave` (class): static save/load helpers for json/npy/txt/dat and dataframe/array append; side effects: filesystem writes/reads; raises `Exception`/`IOError` on invalid shapes or file errors.
+- `MatrixPrinter` (class): matrix/vector display helpers; side effects: stdout or IPython display.
+- `colorsCycle`, `colorsCycleBright`, `colorsCycleDark` (iterators), `colorsList` (list), `linestylesCycle`, `linestylesCycleExtended`, `linestylesList`, `markersCycle`, `markersList`: global plotting style state containers.
+- `DataHandler` (class): static array combiners/filters/interpolation (`concat_and_average`, `concat_and_fill`, matrix cut helpers); returns numpy arrays/tuples; raises `ValueError` on invalid shapes/types.
+- `ctz64(x: np.uint64) -> np.int64`: trailing-zero count with `64` for `0`; deterministic.
+- `popcount64(x: np.uint64) -> np.int64`: bit population count; deterministic.
+- `mask_from_indices(idxs: np.ndarray[int]) -> np.uint64`: builds bitmask from 0-based bit positions.
+- `indices_from_mask(mask: np.uint64) -> np.ndarray[int64]`: returns sorted set-bit indices.
+- `complement_mask(mask: np.uint64, ns: int) -> np.uint64`: flips bits in `[0, ns)`.
+- `complement_indices(n: int, indices: np.ndarray[int]) -> np.ndarray[int64]`: returns sorted complement indices in `[0, n)`.
+- `HDF5Manager` (class): static HDF5 IO/merge/clean/process routines over files and folders; side effects: heavy filesystem IO and HDF5 dataset creation/update; raises file/key/type errors.
+- `LazyDataEntry(filepath: str, params: dict)`: base lazy cache entry with dict-like access (`__getitem__`, `keys`, `load`, `to_dict`, `as_array`); may raise `KeyError`, `ValueError`, `NotImplementedError`.
+- `LazyHDF5Entry`, `LazyNpzEntry`, `LazyPickleEntry`, `LazyJsonEntry`: file-format-specific lazy loaders; side effects: deferred file reads and cache updates; raise `KeyError`/file-format errors.
+- `load_results(data_dir: str, ..., filters=..., logger=..., recursive=True, sort_files=True, **kwargs) -> ResultSet`: scans supported files, extracts params, creates lazy entries, applies filters.
+- `filter_results(results, filters=None, get_params_fun=None, tol=1e-9) -> ResultSet`: predicate/condition filtering over result entries.
+- `ResultSet(list subclass)`: convenience query/sort/show container for result entries; `filtered`, `where`, `param_values`, `unique`, `sort_by`, `show`.
+- `PlotData` (class): static constructors to build plot-ready `ResultSet` from directory payloads or in-memory arrays/dicts.
+- `Logger` (class): constructor `Logger(name='Global', logfile=None, lvl=logging.INFO, append_ts=False, use_ts_in_cmd=False)`; console/file logging with levels and color; side effects: stdout/file IO, env-var controlled behavior, singleton state for handler dedup.
+- `get_global_logger(**kwargs) -> Logger`: process-global singleton logger initializer; side effects: global mutable singleton and environment flags.
+- `log_memory_status(context='', logger=None, lvl=0, verbose=True, **kwargs) -> None`: logging-only side effects.
+- `check_memory_for_operation(required_gb: float, operation_name: str, safety_factor=0.8, logger=None) -> bool`: deterministic threshold check, logging side effects.
+- `Timer` (class): constructor `Timer(name=None, logger=None, logger_args=None, verbose=False, unit='auto', deadline_s=None, synchronizer=None)`; methods `start/pause/resume/stop/reset/lap/mark/since/elapsed_*`; side effects: optional logging and context-manager emission; raises `KeyError`/`ValueError` for invalid mark usage.
+- Internal-but-imported helpers used cross-module.
+- `_LAZY_IMPORTS` registry and `_LOADED` cache are package-level lazy import state.
+- Plot-loader internals used by public calls: `parse_filename`, `prepare_results_for_plotting`, `ResultProxy`.
+
+B) Julia API mapping
+- Module path basis for this pass: `juqusolver/src/Common.jl` umbrella plus `juqusolver/src/Common/*.jl` submodules.
+- `get_module_description(module_name::AbstractString) -> String` mapped in `Common` umbrella.
+- `list_available_modules() -> Vector{String}` mapped in `Common` umbrella.
+- `Directories` mapped to `DirsModule.Directories` (`const Directories = Dir`) from `Common/Directories.jl`; constructor signatures: `Directories(parts::Union{String,AbstractString}...)`.
+- `ctz64`, `popcount64`, `mask_from_indices`, `indices_from_mask`, `complement_mask`, `complement_indices` mapped to `Common/Binary.jl` with integer-specialized signatures:
+- `ctz64(x::UInt64)::Int64`
+- `popcount64(x::UInt64)::Int64`
+- `mask_from_indices(idxs::AbstractVector{<:Integer})::UInt64`
+- `indices_from_mask(mask::UInt64)::Vector{Int64}`
+- `complement_mask(mask::UInt64, ns::Integer)::UInt64`
+- `complement_indices(n::Integer, indices::AbstractVector{<:Integer})::Vector{Int64}`
+- `Logger`, `get_global_logger` mapped to `Common/Flog.jl`:
+- `Logger(; name::String="Global", lvl::Int=LOG_INFO, use_ts_in_cmd::Bool=false, has_colors::Bool=true, logfile::Union{Nothing,String}=nothing, append_ts::Bool=false)`
+- `get_global_logger(; kwargs...)`
+- `check_memory_for_operation`, `log_memory_status` mapped to `Common/Memory.jl`:
+- `check_memory_for_operation(required_gb::Float64, operation_name::String; safety_factor::Float64=0.8, logger::Union{Nothing,Function}=nothing)::Bool`
+- `log_memory_status(context::String=""; logger::Union{Nothing,Function}=nothing, verbose::Bool=true)`
+- `Timer` mapped to `Common/Timer.jl` as `TimerModule.Timer` with keyword constructor and mutating API (`start!`, `pause!`, `resume!`, `stop!`, `reset!`, `lap!`, `mark!`, `since`, `elapsed_*`, `remaining_s`, `overtime`, `report`).
+- Type constraints for mapped hot paths.
+- Integer bit paths use concrete `UInt64` and `Int64` returns.
+- Timer internal counters remain `UInt64` to avoid widening and boxing.
+- Logger struct fields remain concrete (`String`, `Int`, `Bool`, `Union{Nothing,IOStream}`).
+- Deferred API mapping in this pass (documented, not exported from umbrella yet): `Plotter`, `PlotterSave`, `MatrixPrinter`, plotting style globals, `DataHandler`, `HDF5Manager`, `Lazy*Entry`, `load_results`, `filter_results`, `ResultSet`, `PlotData`.
+
+C) Behavior spec
+- Bit operations must be deterministic and endian-consistent with Python semantics:
+- bit index origin is 0 at LSB for mask/index conversion.
+- `ctz64(0)` must return `64`.
+- `indices_from_mask` order must be ascending.
+- `complement_mask(mask, ns)` flips only first `ns` bits and leaves higher bits zeroed.
+- `complement_indices(n, idxs)` returns sorted complement in `[0, n)`.
+- `get_module_description` must return exact known descriptions and exact fallback string `"Module not found."`.
+- `list_available_modules` must return deterministic stable order.
+- Logger singleton behavior:
+- first `get_global_logger` call creates singleton.
+- subsequent calls return same object unless explicitly replaced.
+- Timer behavior:
+- monotonic elapsed accumulation across pause/resume cycles.
+- `since` must error on unknown mark when `name` is given.
+- no randomness introduced in module-level utilities.
+- Deferred APIs are explicitly excluded from pass gate and must not be silently stubbed with changed semantics.
+
+D) Test plan
+- Unit tests for umbrella `Common` module.
+- import/include umbrella module and validate exported mapped names resolve.
+- `list_available_modules` exact contents and stable order.
+- `get_module_description` known key and unknown key.
+- delegated behavior smoke tests through umbrella exports:
+- `ctz64(UInt64(8)) == 3`, `ctz64(UInt64(0)) == 64`.
+- `mask_from_indices([0,2,3]) == UInt64(13)` and roundtrip via `indices_from_mask`.
+- `complement_mask(UInt64(5), 4) == UInt64(10)`.
+- `Timer` construction and simple `start!/pause!/elapsed_ms` flow.
+- `get_global_logger` singleton identity check.
+- `check_memory_for_operation` deterministic true/false branch using large/small requirements without external dependencies.
+- Edge cases.
+- unknown module description fallback.
+- empty bit mask conversion (`indices_from_mask(UInt64(0)) -> Int64[]`).
+- Deferred API guard.
+- verify deferred symbols are not exported by umbrella in this pass to prevent accidental partial semantics.
+
+E) Performance and typing gate
+- Hot entrypoint 1: `mask_from_indices(idxs::AbstractVector{<:Integer})`.
+- Gate: `@code_warntype` has no `Any`; `@btime` shows zero heap allocations for `Vector{Int}` input.
+- Hot entrypoint 2: `indices_from_mask(mask::UInt64)`.
+- Gate: `@code_warntype` has no `Any`; allocations limited to one output vector sized by popcount.
+- Hot entrypoint 3: `int2base(n::Integer, size::Integer; spin::Bool, spin_value::AbstractFloat)` from `Binary`.
+- Gate: `@code_warntype` has no `Any`; exactly one output vector allocation, no temporary heap allocations in loop.

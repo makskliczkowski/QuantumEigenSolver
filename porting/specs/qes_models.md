@@ -1,0 +1,128 @@
+A) Public API inventory (Python)
+- Source module tree:
+- `pyqusolver/Python/QES/Algebra/Model/__init__.py`
+- `pyqusolver/Python/QES/Algebra/Model/Interacting/__init__.py`
+- `pyqusolver/Python/QES/Algebra/Model/Interacting/Spin/__init__.py`
+- `pyqusolver/Python/QES/Algebra/Model/Interacting/Fermionic/__init__.py`
+- `pyqusolver/Python/QES/Algebra/Model/Noninteracting/__init__.py`
+- `pyqusolver/Python/QES/Algebra/Model/Noninteracting/conserving/__init__.py`
+- Top-level API:
+- `intr` module alias.
+- `nintr` module alias.
+- `choose_model(model_name, **kwargs)`.
+- dispatch order: interacting -> non-interacting -> dummy.
+- raises `ValueError` for unknown model name.
+- Interacting family API:
+- `Interacting.choose_model(model_name, **kwargs)`.
+- dispatch order: spin -> fermionic.
+- Spin API:
+- `HamiltonianSpin`.
+- `TransverseFieldIsing` aliases: `tfim`, `tfi`, `transverse_ising`, `transverse_field_ising`.
+- `XXZ` alias: `xxz`.
+- `J1J2Model` aliases: `j1j2`, `j1_j2`.
+- `HeisenbergKitaev` aliases: `heisenberg_kitaev`, `kitaev`, `heisenberg`.
+- `UltrametricModel` alias: `ultrametric`.
+- `QSM` alias: `qsm`.
+- Spin class-name direct lookups accepted by factory: `TransverseFieldIsing`, `XXZ`, `J1J2Model`, `HeisenbergKitaev`, `UltrametricModel`, `QSM`.
+- Fermionic API:
+- `ManyBodyFreeFermions` aliases: `manybody_free_fermions`, `free_fermions_manybody`, `free_fermion_manybody`.
+- `HubbardModel` aliases: `hubbard`, `spinless_hubbard`, `hubbard_spinless`.
+- Fermionic class-name direct lookups accepted by factory: `ManyBodyFreeFermions`, `HubbardModel`.
+- Non-interacting API:
+- `FreeFermions` alias: `free_fermions`.
+- `AubryAndre` alias: `aubry_andre`.
+- `SYK2` aliases: `syk2`, `syk`.
+- `PowerLawRandomBanded` aliases: `plrb`, `power_law_random_banded`.
+- `RosenzweigPorter` aliases: `rpm`, `rosenzweig_porter`.
+- Non-interacting class-name direct lookups accepted by factory: `FreeFermions`, `AubryAndre`, `SYK2`, `PowerLawRandomBanded`, `RosenzweigPorter`.
+- Dummy fallback API:
+- `DummyHamiltonian` via top-level `choose_model` for `dummy` and `dummy_hamiltonian`.
+- Constructor/API semantics expected by users:
+- Spin models accept lattice/ns and scalar-or-site arrays for couplings.
+- `HeisenbergKitaev` accepts Python-style keys: `K`, `J`, `Gamma`, `dlt`, `hx`, `hy`, `hz`.
+- `J1J2Model` accepts `J1`, `J2`, `hx`, `hy`, `hz`.
+- `HubbardModel` accepts `U`.
+- `ManyBodyFreeFermions` accepts optional `t2`.
+- `FreeFermions` accepts `t`, `t2`, `e1`, `e2`, optional `bc`.
+- `AubryAndre` accepts `J` and `lambda`/`lmbd` style potential strength.
+- `UltrametricModel` accepts `ns`, `n`, `J`, `alphas`, `gamma`, `seed`.
+- `QSM` accepts `ns`, `n`, `gamma`, `g0`, `a`, `h`, `xi`, `seed`.
+- `PowerLawRandomBanded` and `RosenzweigPorter` accept `many_body` toggle.
+
+B) Julia API mapping
+- Target module path:
+- `juqusolver/src/PhysicsModels.jl`
+- `juqusolver/src/PhysicsModels/Common.jl`
+- `juqusolver/src/PhysicsModels/Interacting.jl`
+- `juqusolver/src/PhysicsModels/InteractingSpin.jl`
+- `juqusolver/src/PhysicsModels/InteractingFermionic.jl`
+- `juqusolver/src/PhysicsModels/Noninteracting.jl`
+- Public exports from `PhysicsModels`:
+- `intr`, `nintr`, `choose_model`, `DummyHamiltonian`, `Interacting`, `Noninteracting`.
+- Public exports from `PhysicsModels.intr.Spin`:
+- `HamiltonianSpin`, `TransverseFieldIsing`, `XXZ`, `J1J2Model`, `HeisenbergKitaev`, `UltrametricModel`, `QSM`, `choose_model`, `set_couplings`.
+- Public exports from `PhysicsModels.intr.Fermionic`:
+- `ManyBodyFreeFermions`, `HubbardModel`, `choose_model`, `set_couplings`.
+- Public exports from `PhysicsModels.nintr`:
+- `FreeFermions`, `AubryAndre`, `SYK2`, `PowerLawRandomBanded`, `RosenzweigPorter`, `choose_model`, `set_couplings`.
+- Mapping constraints:
+- Preserve existing exported type names.
+- Add Python-compatible keyword aliases at constructors and `set_couplings`.
+- Accept alias and class-name strings in each `choose_model`.
+- Keep structs concrete and typed.
+- Avoid `Any` fields in hot model structs.
+- Use deterministic `MersenneTwister(seed)` in random models.
+- Lattice-aware neighbor extraction when lattice object is provided.
+- Ring fallback when lattice is not provided.
+
+C) Behavior spec
+- Determinism:
+- fixed inputs + fixed seed produce identical matrices.
+- different seeds in randomized models produce different matrices with high probability.
+- Dispatch semantics:
+- factories accept normalized aliases and class-name spellings.
+- top-level order remains interacting -> non-interacting -> dummy.
+- unknown names throw `ArgumentError` with family-specific wording.
+- Matrix invariants:
+- all model matrices are Hermitian within floating tolerance.
+- interacting many-body models produce `2^ns x 2^ns` matrices.
+- non-interacting quadratic models produce `N x N` where:
+- `N = ns` for `FreeFermions`, `AubryAndre`, `SYK2`.
+- `N = 2^ns` when `many_body=true` for `PowerLawRandomBanded`, `RosenzweigPorter`.
+- `N = ns` when `many_body=false` for `PowerLawRandomBanded`, `RosenzweigPorter`.
+- Coupling semantics:
+- scalar couplings are broadcast to site vectors.
+- vector couplings must match required size or throw `ArgumentError`.
+- `set_couplings` updates matrix deterministically.
+- Physics content to preserve:
+- TFIM/XXZ/J1J2 include expected nearest-neighbor exchange and local fields.
+- HeisenbergKitaev includes Heisenberg, Kitaev directional components, Gamma mixed components, and local fields.
+- ManyBodyFreeFermions includes NN hopping, optional NNN hopping, and chemical potential.
+- HubbardModel includes NN hopping, NN density-density interaction, and chemical potential.
+- FreeFermions includes NN/NNN hopping plus boundary on-site shifts `e1`, `e2`, with `bc` handling.
+- AubryAndre includes quasiperiodic onsite potential and nearest-neighbor hopping.
+- UltrametricModel uses hierarchical block random construction controlled by `n`, `J`, `alphas`, `gamma`.
+- QSM surrogate must depend on `n`, `gamma`, `g0`, `a`, `h`, `xi` and be deterministic with `seed`.
+
+D) Test plan
+- `juqusolver/test/qes_models_test.jl` additions:
+- alias dispatch tests for string aliases and class-name strings.
+- keyword alias tests:
+- `J1/J2`, `K/J/Gamma/dlt`, `U`, `lambda/lmbd` paths.
+- Hermiticity tests across representative spin, fermionic, and random models.
+- shape tests for many-body versus single-particle outputs.
+- deterministic seed tests for `SYK2`, `UltrametricModel`, `QSM`, `PowerLawRandomBanded`, `RosenzweigPorter`.
+- lattice integration tests with `Lattices.choose_lattice` for at least one spin and one fermionic model.
+- `set_couplings` update tests for one representative in each family.
+- error-path tests for invalid model names and invalid coupling lengths.
+- retain existing integration tests that package loads and module aliases are present.
+
+E) Performance and typing gate
+- Hot entrypoints:
+- `PhysicsModels.choose_model("tfim"; ns=8, j=1.0, hx=0.5, hz=0.1)`.
+- `PhysicsModels.intr.Spin.HeisenbergKitaev(ns=8; K=1.0, J=0.5, Gamma=0.2)`.
+- `PhysicsModels.nintr.SYK2(ns=128; seed=13)`.
+- Expectations:
+- `@code_warntype` reports no `Any` in return/body for hot constructors.
+- matrix build loops avoid avoidable temporary allocations.
+- `@btime` includes allocation counts for one interacting and one non-interacting constructor.

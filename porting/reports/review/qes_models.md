@@ -1,0 +1,35 @@
+passes gate
+- API drift evidence:
+- `PhysicsModels` exposes `intr`, `nintr`, `choose_model`, `DummyHamiltonian`.
+- `PhysicsModels.intr.Spin` exposes `HamiltonianSpin`, `TransverseFieldIsing`, `XXZ`, `J1J2Model`, `HeisenbergKitaev`, `UltrametricModel`, `QSM`, `choose_model`, `set_couplings`.
+- `PhysicsModels.intr.Fermionic` exposes `ManyBodyFreeFermions`, `HubbardModel`, `choose_model`, `set_couplings`.
+- `PhysicsModels.nintr` exposes `FreeFermions`, `AubryAndre`, `SYK2`, `PowerLawRandomBanded`, `RosenzweigPorter`, `choose_model`, `set_couplings`.
+- Factories accept aliases and class-like names in tests (`TransverseFieldIsing`, `J1J2Model`, `HeisenbergKitaev`, `HubbardModel`, `ManyBodyFreeFermions`, `FreeFermions`, `AubryAndre`, `SYK2`, `PowerLawRandomBanded`, `RosenzweigPorter`).
+- Dispatch order remains interacting -> non-interacting -> dummy, verified by `QES Models Dispatch Errors and Validation` and dummy test.
+- Behavior and invariants evidence:
+- Hermiticity covered across spin, fermionic, and non-interacting families.
+- Deterministic seeded behavior covered for `SYK2`, `UltrametricModel`, `QSM`, `PLRB`, and `RPM`.
+- Coupling update semantics covered through `set_couplings` tests in each family.
+- Shape rules covered:
+- interacting families produce `2^ns x 2^ns`.
+- `FreeFermions`, `AubryAndre`, `SYK2` produce `ns x ns`.
+- `PLRB` and `RPM` cover both `many_body=true` and `many_body=false` shapes.
+- Lattice-aware paths covered for both spin and fermionic models using `Lattices.choose_lattice`.
+- Honeycomb Heisenberg-Kitaev exact-diagonalization path covered with `Hermitian` spectral checks (`issorted(eigvals)`, trace consistency).
+- Type stability evidence:
+- `@code_warntype` for hot entrypoints shows no `Any` return/body for:
+- `PhysicsModels.choose_model("tfim"; ...)`.
+- `PhysicsModels.intr.Spin.HeisenbergKitaev(...)`.
+- `PhysicsModels.nintr.SYK2(...)`.
+- Allocation evidence:
+- `choose_model("tfim"; ns=8, ...)`: `94.041 us (24 allocations: 2.00 MiB)`.
+- `SYK2(ns=128, seed=13)`: `83.917 us (35 allocations: 660.62 KiB)`.
+- Follow-up optimization evidence:
+- Aubry-Andre fallback forward-neighbor hopping path now avoids per-site neighbor vector allocations (`_aa_add_forward_neighbors!`).
+- benchmark: `choose_model("aubry_andre"; ns=32, lx=8, ly=4, ...)`: `196.875 us (68 allocations: 67.14 KiB)`.
+- Integration evidence:
+- Module tests pass (`83/83` across all `qes_models` testsets).
+- Full regression suite passes.
+- `qes_models` example and full examples suite pass.
+- additional exact-diagonalization example on honeycomb lattice passes and writes spectrum to `juqusolver/tmp/data_loader`.
+- `using QuantumEigenSolver` loads and `PhysicsModels` is defined.

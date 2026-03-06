@@ -1,0 +1,12 @@
+passes gate
+- API drift evidence:
+- all Python `general_python/lattices/__all__` symbols are available from `juqusolver/src/Lattices.jl` (core enums/types, concrete lattices, factory/registry, symmetry, visualization, regions, and `run_lattice_tests`).
+- `juqusolver/test/general_lattices_test.jl` validates full surface export presence.
+- Behavior evidence:
+- boundary parsing, dimension handling, registry aliasing, and factory behavior are covered by deterministic tests.
+- geometry invariants (`ns`, neighbor cardinality, adjacency shape/content) are validated across square/triangular/honeycomb/hexagonal/graph cases.
+- symmetry path and region/predefined-region behavior is validated by direct tests.
+- Type stability evidence:
+- `@code_warntype` confirms concrete outputs for `site_index`, `get_nei`, and `bz_path_data`.
+- Allocation evidence:
+- `site_index` and `get_nei` benchmarks are zero-allocation hot calls (`2.125 ns`, `2.083 ns`).

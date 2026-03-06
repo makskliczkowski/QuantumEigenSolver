@@ -1,0 +1,100 @@
+A) Public API inventory (Python)
+- Package entry (`general_python/physics/__init__.py`) lazy exports:
+- `density_matrix`, `eigenlevels`, `entropy`, `operators`, `statistical`, `thermal`, `spectral`, `response`, `single_particle`, `sp`.
+- package helper: `list_capabilities()`.
+- `density_matrix.py` public API:
+- `mask_subsystem`, `psi_numpy`, `rho_numpy`, `rho`, `schmidt`, `rho_spectrum`, `rho_single_site`, `rho_two_sites`.
+- `operators.py` public API:
+- `Spectral.diagonal_cutoff`, `Spectral.take_fraction`, `Spectral.take_fraction_arr`, `Spectral.mean_fraction`.
+- `Operators.resolve_hilbert`, `Operators.resolveSite`, `Operators.resolve_operator`, `Operators.name2title` and constants.
+- `entropy.py` public API:
+- `vn_entropy`, `renyi_entropy`, `tsallis_entropy`, `sp_correlation_entropy`, `information_entropy`, `participation_entropy`, `purity`.
+- wrappers: `entropy`, `mutual_information`, `topological_entropy`.
+- enum-like `Entanglement`, `Fractal.fractal_dim_s_info`, `Fractal.fractal_dim_s_info_mean`, `Fractal.fractal_dim_pr`.
+- `thermal.py` public API:
+- `partition_function`, `boltzmann_weights`, `thermal_average_diagonal`, `thermal_average_general`, `free_energy`, `internal_energy`, `heat_capacity`, `entropy_thermal`, `magnetic_susceptibility`, `charge_susceptibility`, `specific_heat_from_moments`, `susceptibility_from_moments`, `thermal_scan`.
+- `statistical.py` public API:
+- `moving_average`, `windowed_variance`, `exponential_moving_average`, `centered_window`, `window_mask`, `fractional_window`, `extract_indices_window`, `ldos`, `create_bins`.
+- `eigenlevels.py` public API:
+- `reduced_density_matrix`, `reduced_density_matrix_schmidt`, `entropy_vonNeuman`, `gap_ratio`, `mean_entropy`, `info_entropy`.
+- classes: `HamiltonianProperties.hilbert_schmidt_norm`, `StatMeasures.moments`, `StatMeasures.gaussianity`, `StatMeasures.binder_cumulant`, `StatMeasures.modulus_fidelity`.
+- `spectral` subpackage public API:
+- core kernels: `greens_function_diagonal`, `greens_function_quadratic`, `greens_function_quadratic_finite_T`, `greens_function_manybody`, `greens_function_manybody_finite_T`, `greens_function_lanczos`, `greens_function_lanczos_finite_T`, `spectral_function`, `spectral_function_k_resolved`, `integrated_spectral_weight`, `find_spectral_peaks`, `thermal_weights`, `operator_spectral_function_lehmann`, `operator_spectral_function_multi_omega`, `susceptibility_bubble`, `susceptibility_bubble_multi_omega`, `conductivity_kubo_bubble`, `kramers_kronig_transform`.
+- utility wrappers from `greens_function.py`: `fourier_transform_matrix`, `fourier_transform_with_dft`, `fourier_transform_diagonal`, `fourier_transform_lattice`, `fourier_transform_lattice_translational`, `local_dos_from_greens`, `trace_greens`.
+- DOS helpers from `dos.py`: `dos_histogram`, `dos_gaussian`, `dos_gaussian_fast`, `integrated_dos`, `idos_curve`, `dos_from_spectral`.
+- `response` subpackage public API:
+- structure factor: `structure_factor_spin`, `structure_factor_multi_q`, `structure_factor_sum_rule`, `structure_factor_first_moment`, `create_spin_q_operator_1d`.
+- susceptibility: `susceptibility_lehmann`, `susceptibility_multi_omega`, `static_susceptibility`, `magnetic_susceptibility`, `charge_susceptibility`, `susceptibility_to_structure_factor`, `structure_factor_to_susceptibility`, `susceptibility_sum_rule_check`.
+- unified interface: `UnifiedResponseFunction`, `compute_response`, `compute_dos_direct`.
+- `sp/correlation_matrix.py` public API:
+- `corr_single`, `corr_full`, `wick_distances`, `wick_2body_scalar`, `wick_2body`, `corr_4_from_wick`, `corr_superposition`, `corr_from_slater`, `corr_from_bdg`, `corr_4_from_slater`, `corr_from_statevector`.
+- Internal-but-imported behavior:
+- package alias `single_particle = sp`.
+- deterministic capability listing keys and content.
+
+B) Julia API mapping
+- Target umbrella: `juqusolver/src/Physics.jl`.
+- Submodules under `juqusolver/src/Physics/`:
+- `DensityMatrix.jl`, `Operators.jl`, `Entropy.jl`, `Thermal.jl`, `Statistical.jl`.
+- `Eigenlevels.jl`.
+- `SP.jl` (contains `CorrelationMatrix` namespace and exported function aliases).
+- `Spectral.jl` with one Julia implementation and convenience submodules (`GreensFunction`, `SpectralFunction`, `DOS`).
+- `Response.jl` (submodules `StructureFactor`, `Susceptibility`, `UnifiedResponse`).
+- Package exports in `Physics`:
+- aliases: `density_matrix`, `eigenlevels`, `entropy`, `operators`, `statistical`, `thermal`, `spectral`, `response`, `sp`, `single_particle`.
+- helper: `list_capabilities`.
+- Type constraints:
+- vectors and matrices typed as `AbstractVector`/`AbstractMatrix` inputs with concrete `Vector{Float64}`, `Vector{ComplexF64}`, `Matrix{ComplexF64}`, `Dict{String,...}` outputs where deterministic.
+- avoid `Any` in hot kernels (`rho_numpy`, spectral summations, response loops, SP correlators).
+- no abstract-typed fields in structs used on hot paths.
+
+C) Behavior spec
+- Preserve Python user-facing semantics and names for all listed APIs.
+- Determinism:
+- deterministic sort order for spectra/eigenvalue-derived results.
+- deterministic defaults for random draws in superposition helper via explicit seedable RNG path.
+- Numerical stability:
+- entropy and thermal routines must avoid `log(0)`/overflow via clipping and shifted energies.
+- spectral and response functions use finite `eta` Lorentzian broadening convention.
+- Physics invariants:
+- reduced density matrices are Hermitian with unit trace for normalized pure states.
+- thermal weights sum to one when normalized.
+- susceptibilities/structure-factor transforms respect sign conventions used in Python formulas.
+- SP correlator conventions:
+- keep spin-unpolarized factor-of-two behavior and optional identity subtraction.
+- Package parity:
+- `single_particle` alias resolves to `sp`.
+- `list_capabilities` contains module names and spectral/response groups.
+
+D) Test plan
+- Umbrella parity tests:
+- all package-level aliases exist and `single_particle === sp`.
+- `list_capabilities` keys and values match expected deterministic content.
+- Eigenlevels tests:
+- reduced density matrix dimensions and entropy on Bell-like state.
+- gap-ratio output keys and finite values.
+- spectral tests:
+- diagonal Green's function analytic value check.
+- spectral function non-negativity for Lorentzian form.
+- DOS histogram/gaussian/integrated outputs shape and monotonicity checks.
+- response tests:
+- `susceptibility_multi_omega` length and finite complex outputs.
+- fluctuation-dissipation transform roundtrip (`chi` -> `S` -> `Im chi`) within tolerance.
+- structure-factor sum rule and first-moment finite checks.
+- SP tests:
+- `corr_single` Hermiticity and shape checks.
+- `corr_from_statevector` second-order output matches symmetry/shape expectations.
+- wick helper outputs deterministic keys and non-negative metric values.
+- invariants:
+- Hermiticity, normalization, and symmetry checks for selected operator/state outputs.
+
+E) Performance and typing gate
+- Hot entrypoint 1:
+- `Physics.density_matrix.rho_numpy` returns `Matrix{ComplexF64}` without `Any` in `@code_warntype`.
+- Hot entrypoint 2:
+- `Physics.spectral.Core.greens_function_diagonal` returns concrete complex vector/matrix depending on `omega` shape.
+- Hot entrypoint 3:
+- `Physics.sp.correlation_matrix.corr_from_statevector` returns concrete `Matrix{ComplexF64}` and avoids avoidable allocations in inner loops.
+- Verification:
+- `@code_warntype` for the above entrypoints shows concrete body return types.
+- one `@btime` for spectral diagonal GF and one `@btime` for SP correlator with allocations reported.

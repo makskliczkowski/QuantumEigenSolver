@@ -1,0 +1,34 @@
+passes gate
+- API drift evidence:
+- `QuantumEigenSolver.Solvers` exposes `Solver`, `SolverState`, `SolverLastLoss`, and `MonteCarlo`.
+- `QuantumEigenSolver.Solvers.MonteCarlo` exposes:
+- `MonteCarloSolver`, `McsTrain`, `McsReturn`.
+- `Sampler`, `VMCSampler`, `SamplerType`, `UpdateRule`, `get_sampler`, `get_update_function`.
+- `SolverInitState`, `initialize_state`.
+- `parallel`, `montecarlo`, `sampler`, `vmc`, `diagnostics`, `updates` module aliases.
+- diagnostics and updates APIs required by spec are present and exercised in tests.
+- Behavior and invariants evidence:
+- initialization aliases (`rnd`, `f_up`, `f_dn`, `af`, `random_fixed`) pass deterministic and shape tests.
+- update-rule invariants and neighbor-table generation pass for lattice and explicit tables.
+- VMCSampler output shape/weight normalization and deterministic seed parity pass.
+- diagnostics invariants pass (`r_hat`, ESS, autocorrelation, constant-series tau=1.0).
+- `ParallelTempering` beta generation and train/swap loops pass non-throw and best-index tracking tests.
+- save/load writes to `juqusolver/tmp/weights` and reload restores serialized solver state.
+- Type stability evidence:
+- `@code_warntype` confirms concrete return body types for hot entrypoints:
+- `propose_multi_flip`: `Vector{Float64}`.
+- `compute_rhat`: `Float64`.
+- `sample(::VMCSampler; ...)`: concrete tuple type of matrices/vectors.
+- Allocation evidence:
+- `propose_multi_flip`: `192.577 ns (6 allocations: 736 bytes)`.
+- `VMCSampler.sample`: `701.042 us (32270 allocations: 1.55 MiB)`.
+- Follow-up optimization review:
+- in-place proposal path and reusable buffers added in `VMCSampler` inner loop (`VMC.jl`).
+- post-fix benchmark: `VMCSampler.sample`: `618.000 us (14 allocations: 19.97 KiB)`.
+- post-fix update kernel benchmark: `propose_multi_flip`: `36.473 ns (3 allocations: 608 bytes)`.
+- `@code_warntype _update_chain!(...)` remains concrete with no `Any`.
+- Integration evidence:
+- module tests pass (`61/61` checks across `qes_solvers` testsets).
+- full Julia regression suite passes with `qes_solvers` included.
+- package loads with `Solvers` exported and listed in module discovery.
+- `qes_solvers` example and full examples suite pass.

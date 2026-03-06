@@ -1,0 +1,22 @@
+passes gate
+- API drift evidence:
+- `juqusolver/src/Algebra.jl` exposes mapped umbrella parity names from `general_python/algebra/__init__.py`: backend globals (`backend_mgr`, `get_backend`, `ACTIVE_*`), factories (`choose_solver`, `choose_precond`, `get_backend_ops`), and module aliases (`LinalgModule`, `backend_linalg`, `solvers`, `preconditioners`, `ode`, `ran_wrapper`, `ran_matrices`, `eigen`, `utilities`, `utils`).
+- missing phase artifacts from the initial partial pass were completed: `RanMatrices.jl`, `Ode.jl`, `Eigen.jl`, `Utilities.jl`, test/example/docs, and README docs link.
+- Behavior and invariants evidence:
+- deterministic seed behavior validated for random wrappers (`uniform`, `normal`, `randint`).
+- random matrix invariants validated (`GOE` symmetry, `GUE` Hermiticity, `CUE_QR` unitarity).
+- solver behavior validated on SPD fixture (`CG` and direct solve residual checks).
+- ODE steppers validated on `dy/dt = -y` one-step fixtures.
+- Pfaffian/Hafnian fixtures validated on 2x2 and 4x4 reference cases.
+- Type stability evidence:
+- `@code_warntype` shows concrete body returns for hot entrypoints:
+- `backend_linalg.inner` -> `ComplexF64`
+- `solvers.cg_solve` -> `SolverResult{Vector{Float64}}`
+- `ran_matrices.CUE_QR` -> `Matrix{ComplexF64}`
+- Allocation evidence:
+- benchmark captures are bounded and deterministic for current correctness pass:
+- `cg_solve`: `160.375 ns (20 allocations: 832 bytes)`
+- `CUE_QR`: `3.724 μs (25 allocations: 11.45 KiB)`
+- Cross-module integration evidence:
+- full regression run including common/maths/lattices/general init/physics/algebra passes.
+- `using QuantumEigenSolver` now exposes `algebra` in `list_available_modules()`.

@@ -1,0 +1,127 @@
+A) Public API inventory (Python)
+- Source modules:
+- `pyqusolver/Python/QES/Algebra/Operator/__init__.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/operator.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/phase_utils.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/sign.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/operator_loader.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/impl/operators_spin.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/impl/operators_spin_1.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/impl/operators_spinless_fermions.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/impl/operators_hardcore.py`.
+- `pyqusolver/Python/QES/Algebra/Operator/impl/operators_anyon.py`.
+- Top-level public module surface:
+- `Operator` class.
+- enums: `SymmetryGenerators`, `GlobalSymmetries`.
+- helpers: `help`, `list_submodules`, `list_operators`.
+- lazy submodule accessors: `operator`, `operators_spin`, `operators_spin_1`, `operators_spinless_fermions`, `operators_hardcore`, `operators_anyon`, `phase_utils`, `catalog`, `special_operator`, `matrix`.
+- Core operator construction helpers (public in `operator.py` and imported in userspace):
+- `operator_identity(backend="default")`.
+- `create_operator(name; lattice, ns, type_act, sites, backend, op_fun, fun_int, fun_np, fun_jax, kwargs...)`.
+- `create_add_operator(operator, multiplier; sites=nothing)`.
+- `ensure_operator_output_shape_numba(state_out, coeff_out)`.
+- `test_operator_on_state(...)`, `test_operators(...)` (diagnostic utilities).
+- Phase/sign helpers used by fermionic and anyonic operators:
+- `bit_popcount_mask`, `bit_popcount`, `fermionic_parity_int`, `fermionic_parity_array`.
+- `count_left_int`, `count_left_array`, `jordan_wigner_parity_int`, `jordan_wigner_parity_array`, `fractional_statistics_phase`, `anyon_phase_int`, `anyon_phase_array`, `occupation_number_from_bits`, `ensure_sorted_sites`.
+- Spin-1/2 operator factories and mixed correlators:
+- `sig_x`, `sig_y`, `sig_z`, `sig_p`, `sig_m`, `sig_pm`, `sig_mp`, `sig_k`, `sig_z_total`.
+- `sig_xy`, `sig_yx`, `sig_yz`, `sig_zy`, `sig_zx`, `sig_xz`, `sig_xyz`.
+- factories/helpers: `make_sigma_mixed`, `make_nsite_correlator`, `pauli_string`.
+- Spin-1 operator factories:
+- `s1_x`, `s1_y`, `s1_z`, `s1_z2`, `s1_plus`, `s1_minus`, `s1_pm`, `s1_mp`.
+- Spinless fermion factories:
+- `c`, `cdag`, `ck`, `ckdag`, `n`.
+- `make_fermionic_mixed`.
+- Hardcore and anyon kernels:
+- `hardcore_create_int`, `hardcore_annihilate_int`, `hardcore_number_int`.
+- `hardcore_create_np`, `hardcore_annihilate_np`, `hardcore_number_np`.
+- Anyon public effect is registration and the use of hardcore kernels with nontrivial statistics angle.
+- Loader helpers:
+- `OperatorModule(local_space_type)` with `__getattr__` dispatch.
+- `get_operator_module(local_space_type=nothing)`.
+- Side effects:
+- Python anyon module registers entries in global catalog at import time.
+- Errors:
+- out-of-range site indices.
+- invalid operator type/arity.
+- missing system size for global operators.
+
+B) Julia API mapping
+- Module target:
+- `juqusolver/src/Algebra/QESOperator.jl` as umbrella module.
+- New Julia internal files under `juqusolver/src/Algebra/Operator/`:
+- `Core.jl`, `PhaseUtils.jl`, `Sign.jl`, `Catalog.jl`, `Loader.jl`.
+- `SpinHalf.jl`, `SpinOne.jl`, `SpinlessFermions.jl`, `Hardcore.jl`, `Anyon.jl`.
+- Public exports from `QESOperator`:
+- keep existing: `SymmetryGenerators`, `GlobalSymmetries`, `operator_identity`.
+- add compatibility enums/types: `OperatorTypeActing`, `LocalSpaceTypes`.
+- add operator object: `Operator`.
+- add top-level helpers: `help`, `list_submodules`, `list_operators`, `create_operator`, `create_add_operator`, `ensure_operator_output_shape_numba`.
+- add submodule aliases/exports:
+- `operators_spin`, `operators_spin_1`, `operators_spinless_fermions`, `operators_hardcore`, `operators_anyon`, `phase_utils`, `sign`, `catalog`, `operator_loader`.
+- map spin-1/2 factories: `sig_x`, `sig_y`, `sig_z`, `sig_p`, `sig_m`, `sig_pm`, `sig_mp`, `sig_k`, `sig_z_total`, `sig_xy`, `sig_yx`, `sig_yz`, `sig_zy`, `sig_zx`, `sig_xz`, `sig_xyz`.
+- map spin-1 factories: `s1_x`, `s1_y`, `s1_z`, `s1_z2`, `s1_plus`, `s1_minus`, `s1_pm`, `s1_mp`.
+- map fermion factories: `c`, `cdag`, `ck`, `ckdag`, `n`.
+- map hardcore kernels: `hardcore_create_int`, `hardcore_annihilate_int`, `hardcore_number_int`, `hardcore_create_np`, `hardcore_annihilate_np`, `hardcore_number_np`.
+- map loader helper: `get_operator_module`.
+- Type constraints:
+- concrete parametric operator struct with concrete function type params.
+- integer-state kernels typed as `state::UInt64` or `state::Integer` with explicit returns.
+- no `Any` in hot state-transition loops.
+
+C) Behavior spec
+- Determinism:
+- all operator kernels must be deterministic for fixed inputs.
+- sorted-site behavior in hardcore/fermion kernels must match Python (`ensure_sorted_sites`).
+- Spin-1/2 integer basis convention:
+- site index is zero-based for user API.
+- bit position mapping: `pos = ns - 1 - site` for fermionic/hardcore kernels (Python parity).
+- `resolve` style behavior for operator actions:
+- all kernels return `(states, coeffs)` arrays/vectors with matching lengths.
+- annihilation/creation on forbidden occupancy returns zero coefficient and unchanged basis state parity with Python kernel policy.
+- Fermionic sign:
+- Jordan-Wigner parity computed from occupied sites to the left.
+- `fractional_statistics_phase` used for anyonic/hardcore generalized statistics.
+- `OperatorTypeActing` semantics:
+- `Local`: act on provided `sites`.
+- `Global`: sum over all sites in `[0, ns-1]`.
+- `Correlation`: act on 2-site tuples.
+- `operator_identity`:
+- return dense identity matrix with requested dtype.
+- Backend policy:
+- no JAX backend in Julia.
+- single Julia execution path; API names preserved where needed.
+
+D) Test plan
+- Add `juqusolver/test/qes_operator_test.jl`:
+- surface checks for exported names and submodule aliases.
+- phase/sign helper checks against known values.
+- spin-1/2 kernel invariants on small `ns`:
+- involution of `sig_x` on same site.
+- anti-Hermitian phase structure consistency for `sig_y` coefficients.
+- diagonal sign behavior for `sig_z`.
+- mixed correlator consistency: `sig_xy` equals sequential local applications on selected sites.
+- spin-1 kernels:
+- valid transitions and zero on forbidden raises/lower actions.
+- fermion kernels:
+- `cdag` then `c` round-trip on occupied/empty sites with JW sign.
+- `n` returns occupancy.
+- hardcore/anyon kernels:
+- occupancy constraints and phase behavior for nonzero statistics angle.
+- loader behavior:
+- `get_operator_module(:spin_half)` returns functions for `sig_x`/`sig_z`.
+- `get_operator_module(:spinless_fermions)` returns `c`/`cdag`/`n`.
+- Add example `juqusolver/examples/qes_operator_example.jl`:
+- construct representative operators and print small action examples.
+- Add docs page `juqusolver/docs/src/qes_operator.md` with bullet summary.
+
+E) Performance and typing gate
+- Hot entrypoints:
+- `operators_spin.sigma_x_int(state, ns, sites)`.
+- `operators_spinless_fermions.c_dag_int_np(state, ns, sites)`.
+- `operators_hardcore.hardcore_create_int(state, ns, sites, statistics_angle)`.
+- Expectations:
+- `@code_warntype` shows concrete return tuples/vectors, no `Any` body returns.
+- tight loops in integer kernels allocate minimally.
+- One benchmark each for spin and fermion integer kernels via `@btime`, report allocations.

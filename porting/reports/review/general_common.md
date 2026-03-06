@@ -1,0 +1,14 @@
+passes gate
+- API drift evidence:
+- `juqusolver/src/Common.jl` export surface matches Python lazy-import surface in `common.__all__`, including plotting/data/lazy-entry symbols plus module metadata helpers.
+- tests verify high-level export presence and smoke behavior across binary, logger, memory, timer, plotting, data loading, and HDF5-availability paths.
+- Behavior evidence:
+- deterministic module list and fallback description string validated in `juqusolver/test/common_test.jl`.
+- bit utility semantics validated for ctz/popcount/mask roundtrip/complements.
+- singleton logger semantics and timer elapsed flow validated.
+- Type stability evidence:
+- `@code_warntype` for `mask_from_indices`, `indices_from_mask`, and `int2base` returns concrete body types with no `Any`.
+- Allocation evidence:
+- `@btime Common.mask_from_indices($x)` reports `11.512 ns (0 allocations: 0 bytes)`.
+- Package loading evidence:
+- `using QuantumEigenSolver` now succeeds after stdlib dependency fix in `juqusolver/Project.toml`.

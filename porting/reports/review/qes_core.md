@@ -1,0 +1,24 @@
+passes gate
+- API drift evidence:
+- `juqusolver/src/Common/Globals.jl` exposes mapped qes-core globals (`get_logger`, `get_backend_manager`, `get_numpy_rng`, `reseed_all`, `qes_reseed`, `qes_next_key`, `qes_split_keys`, `qes_seed_scope`).
+- `juqusolver/src/Common/Registry.jl` exposes mapped registry APIs (`list_modules`, `describe_module`) and deterministic sorted metadata rows.
+- `juqusolver/src/Common/Session.jl` exposes mapped session APIs (`QESSession`, `run`, `start!`, `stop!`) with object-returning and do-block forms.
+- `juqusolver/src/Common.jl` and `juqusolver/src/QuantumEigenSolver.jl` reexport qes-core API at module and package level.
+- Behavior evidence:
+- deterministic reseed parity verified by `qes_core_test` (`QES Globals API`, `QES Seed Scope`).
+- `qes_seed_scope` restores prior seed state after scoped execution.
+- `run(do ... end)` always stops session and preserves expected manager seed behavior.
+- Type stability evidence:
+- `@code_warntype` body returns are concrete for hot entrypoints:
+- `qes_next_key` -> `UInt64`
+- `list_modules` -> `Vector{Dict{String,String}}`
+- `run` keyword path -> `QESSession`
+- Allocation evidence:
+- `qes_next_key`: `3.000 ns (0 allocations: 0 bytes)` for hot RNG key path.
+- `list_modules`: `1.554 us (50 allocations: 5.42 KiB)`; accepted because API intentionally returns fresh `Dict` rows for metadata.
+- Physics/integration evidence:
+- full regression suite across common/maths/lattices/physics/algebra/general init/qes-core passes.
+- full examples suite including `qes_core_example.jl` passes and writes artifacts to `juqusolver/tmp/<type>`.
+- Constraint cleanup evidence:
+- removed Julia-side JAX naming from `juqusolver/src/Algebra*` and tests.
+- removed spectral-backend wording in `juqusolver/src/Physics/Spectral.jl` to keep one Julia backend path.

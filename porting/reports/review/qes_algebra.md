@@ -1,0 +1,29 @@
+passes gate
+- API drift evidence:
+- top-level exports and aliases in `juqusolver/src/Algebra.jl` remain consistent with mapped `QES/Algebra/__init__.py` parity surface:
+- `HilbertSpace`, `HilbertConfig`, `SymmetrySpec`
+- `Hamiltonian`, `HamiltonianConfig`, `HAMILTONIAN_REGISTRY`, `register_hamiltonian`
+- backend helpers: `identity`, `inner`, `kron`, `outer`, `overlap`, `trace`
+- module aliases: `Symmetries`, `Operator`, `Hilbert`, `Hamil`.
+- Behavior evidence:
+- `QESSymmetries.CompactSymmetryData` now carries compact arrays matching Python intent (`repr_map`, `phase_idx`, `phase_table`, `normalization`, `representative_list`) and preserves legacy helper accessors.
+- `QESHilbert.HilbertSpace` now materializes deterministic compact mappings for:
+- identity/no-symmetry,
+- one-generator sectors (`Translation_x`, `Reflection`, `Inversion`, `Parity`),
+- multi-generator sectors with deterministic group closure and character checks.
+- `transform_to_reduced_space` and `transform_to_full_space` are implemented and tested for deterministic reduced/full roundtrip behavior.
+- sector filtering invariants are covered (`Reflection` odd sector excludes reflection-fixed states).
+- mixed-sector tests are covered (`Translation_x + Reflection` works; incompatible mixed sector raises deterministic `ArgumentError`).
+- merge-order and registry semantics remain correct (`default_kwargs` <- `parameters` <- runtime overrides).
+- Type stability evidence:
+- `@code_warntype` shows concrete body returns for:
+- `from_config(::Type{HilbertSpace}, cfg)` -> `HilbertSpace`
+- `transform_to_reduced_space(hs, vfull)` -> `Vector{ComplexF64}`
+- `instantiate(::HamiltonianRegistry{Hamiltonian}, cfg)` -> `Hamiltonian`.
+- Allocation evidence:
+- `from_config(HilbertSpace, cfgm)`: `13.708 us (317 allocations: 21.08 KiB)`.
+- `transform_to_reduced_space(hsm, vm)`: `39.609 ns (2 allocations: 160 bytes)`.
+- Integration evidence:
+- `juqusolver/test/qes_algebra_test.jl` passes with expanded symmetry/Hilbert invariants.
+- full regression suite across current Julia modules passes.
+- full examples suite passes and keeps artifacts under `juqusolver/tmp/<type>`.

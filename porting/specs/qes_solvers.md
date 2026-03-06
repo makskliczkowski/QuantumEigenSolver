@@ -1,0 +1,171 @@
+A) Public API inventory (Python)
+- Source module tree:
+- `pyqusolver/Python/QES/Solver/__init__.py`
+- `pyqusolver/Python/QES/Solver/solver.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/__init__.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/montecarlo.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/sampler.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/vmc.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/vmc_numpy.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/parallel.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/diagnostics.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/initialization/states.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/updates/__init__.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/updates/utils.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/updates/spin_numpy.py`
+- `pyqusolver/Python/QES/Solver/MonteCarlo/updates/spin_jax.py`
+- Top-level `QES.Solver` API:
+- `Solver` abstract base class (shape/size/modes/hilbert/backend/rng/session-like state).
+- `MonteCarlo` module alias.
+- `MODULE_DESCRIPTION` string in `QES.Solver`.
+- `Solver` class public behavior:
+- constructor accepts `shape`, `modes`, `seed`, `hilbert`, `directory`, `nthreads`, `backend`, and optional optimizer/preconditioner/scheduler/solver fields.
+- properties: `size`, `modes`, `hilbert`, loss-tracking accessors, `replica_idx`, `backend`, `backend_sp`, `rng`, `rng_k`, `random`.
+- mutators: `reset_backend`, `set_replica_idx`, `set_early_stopping`, `set_optimizer`, `set_preconditioner`, `set_scheduler`, `set_solver`.
+- static backend resolver: `obtain_backend`.
+- abstract methods: `clone`, `swap`.
+- `QES.Solver.MonteCarlo` public API (from `__all__`):
+- classes: `MonteCarloSolver`, `McsTrain`, `McsReturn`, `Sampler`, `SolverInitState`.
+- factories/functions: `get_sampler`.
+- module aliases: `parallel`, `montecarlo`, `sampler`, `vmc`, `diagnostics`, `updates`.
+- `McsTrain` dataclass public fields:
+- `epochs`, `mcsam`, `mcth`, `bsize`, `mc_corr`, `mcchain`, `direct`, `nflip`, `nrepl`, `accepted`, `total`, `acc_rate`.
+- helper method `hi(prefix="Train: ")` prints configuration.
+- `McsReturn` dataclass public fields:
+- `losses`, `losses_mean`, `losses_std`, `finished`.
+- `MonteCarloSolver` class public behavior:
+- constructor parameters include `seed`, `beta`, `mu`, `replica`, `shape`, `hilbert`, `modes`, `directory`, `nthreads`, `backend`, `logger`, and MC params via kwargs.
+- sampler lifecycle: `set_sampler`, `init`, `reset`, `_update_mcparams`.
+- scalar helpers/properties: `beta`, `replica`, `acc_rate`, `accepted`, `total`, `losses`, `losses_mean`, `losses_std`, `shape`, `isjax`, `info`.
+- estimator helper: `est(loss, last_el)`.
+- abstract persistence hooks: `save_weights`, `load_weights`.
+- `Sampler` API:
+- constructor handles `shape`, `upd_fun`, `rng`, `rng_k`, `seed`, `hilbert`, `numsamples`, `numchains`, `initstate`, `backend`, `statetype`, `makediffer`.
+- counters/properties: state arrays, proposed/accepted/rejected, acceptance ratio.
+- state management: `set_initstate`, `set_chains`, `set_numsamples`, `set_numchains`, `reset`.
+- abstract sampling methods: `sample`, `_get_sampler_jax`, `_get_sampler_np`, `get_sampler`.
+- backend helper: `obtain_backend`.
+- factory enums and functions:
+- `SamplerType` and `get_sampler(typek, *args, **kwargs)` with aliases: `"vmc"`, `"mc"`, `"default"`, `"ar"`, `"exact"`.
+- `UpdateRule` and `get_update_function(rule, backend, **kwargs)`.
+- Initialization API:
+- `InitStateErrors`, `SolverInitState`, `initialize_state(...)` and integer/string/enum/callable resolution.
+- Diagnostics API:
+- `autocorr_func_1d`, `compute_autocorr_time`, `compute_ess`, `compute_rhat`.
+- Updates API expected by users/importers:
+- `propose_local_flip`, `propose_multi_flip`, `propose_exchange`, `propose_bond_flip`, `propose_global_flip`, `propose_worm_flip`.
+- numpy compatibility names: `propose_local_flip_np`, `propose_multi_flip_np`.
+- helper utilities: `get_neighbor_table`, `make_hybrid_proposer`.
+- Parallel tempering API:
+- `BetaSpacing` enum and `ParallelTempering` class.
+- methods: `generate_betas`, `replicate`, `train_step`, `swap`, `swaps`, `train_single`, `train`, `shutdown`.
+- properties: `solvers`, `betas`, `nsolvers`, `finished`.
+
+B) Julia API mapping
+- Target module path:
+- `juqusolver/src/Solvers.jl`
+- `juqusolver/src/Solvers/SolverBase.jl`
+- `juqusolver/src/Solvers/MonteCarlo.jl`
+- `juqusolver/src/Solvers/MonteCarlo/MonteCarloCore.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Initialization.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Diagnostics.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Updates.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Samplers.jl`
+- `juqusolver/src/Solvers/MonteCarlo/VMC.jl`
+- `juqusolver/src/Solvers/MonteCarlo/Parallel.jl`
+- Public exports from `QuantumEigenSolver.Solvers`:
+- `Solver`, `SolverLastLoss`, `SolverState`.
+- `MonteCarlo` submodule alias.
+- `MODULE_DESCRIPTION`.
+- Public exports from `QuantumEigenSolver.Solvers.MonteCarlo`:
+- `McsTrain`, `McsReturn`, `MonteCarloSolver`.
+- `Sampler`, `VMCSampler`, `SamplerType`, `UpdateRule`.
+- `SolverInitState`, `initialize_state`, `get_sampler`, `get_update_function`.
+- `BetaSpacing`, `ParallelTempering`.
+- diagnostics exports: `autocorr_func_1d`, `compute_autocorr_time`, `compute_ess`, `compute_rhat`.
+- updates exports: `propose_local_flip`, `propose_multi_flip`, `propose_exchange`, `propose_bond_flip`, `propose_global_flip`, `propose_worm_flip`, `propose_local_flip_np`, `propose_multi_flip_np`, `get_neighbor_table`, `make_hybrid_proposer`.
+- Julia module aliases for parity:
+- `parallel`, `montecarlo`, `sampler`, `vmc`, `diagnostics`, `updates` constants inside `MonteCarlo`.
+- Type constraints and performance mapping:
+- use `MersenneTwister` for deterministic RNG.
+- use concrete `Vector{Int}` and `Matrix{Float64}` in update neighbor tables.
+- sampler counters typed as `Vector{Int}` or `Matrix{Int}` depending on PT usage.
+- avoid `Any` in hot update and diagnostics loops.
+- no Julia-side JAX or backend split modules.
+
+C) Behavior spec
+- Determinism rules:
+- fixed seed and fixed inputs must produce deterministic initial states and update trajectories.
+- `set_replica_idx`, `set_beta`, `set_mu`, `set_numchains`, and `set_numsamples` must update solver/sampler state deterministically.
+- `ParallelTempering.generate_betas` deterministic for each spacing mode.
+- Backend semantics:
+- single Julia backend only.
+- backend string accepted for compatibility but mapped to one implementation.
+- no JAX-only wrappers or names in exported API.
+- Initial-state semantics:
+- `SolverInitState` aliases map to Python-compatible behaviors:
+- `RND`, `F_UP`, `F_DN`, `AF`, `RND_FIXED`.
+- integer initialization must map to spin/binary basis consistently with `Common.Binary.int2base` semantics.
+- Update-rule semantics:
+- `LOCAL`: flip one site.
+- `MULTI_FLIP`: flip `n_flip` distinct sites when feasible.
+- `EXCHANGE`: swap one site with one valid neighbor.
+- `BOND_FLIP`: flip one site and one neighbor.
+- `GLOBAL`: flip one selected pattern.
+- `WORM`: random-walk string update of requested length.
+- acceptance bookkeeping:
+- every MCMC proposal increments proposal count; accepted moves increment accepted count.
+- `accepted_ratio` defined as accepted/proposed with zero-safe fallback.
+- Sampling semantics (`VMCSampler`):
+- Metropolis-Hastings with log-amplitude callback `net(params, state)`.
+- returned tuple shape parity:
+- `((final_states, final_logpsi), (configs_flat, logpsi_flat), probs)`.
+- weights normalization convention follows Python: `sum(probs) == number_of_samples` within float tolerance.
+- diagnostics semantics:
+- autocorrelation via FFT-style correlation.
+- `compute_rhat` returns `NaN` for invalid chain shapes (`m<2` or `n<2`).
+- `compute_autocorr_time` returns `1.0` for constant chains.
+- file output semantics:
+- persistence helpers write under `juqusolver/tmp/<type>`.
+- solver save/load paths default to `juqusolver/tmp/weights` when no directory provided.
+
+D) Test plan
+- Module test file:
+- `juqusolver/test/qes_solvers_test.jl`.
+- Unit coverage:
+- top-level `QuantumEigenSolver.Solvers` load and alias presence.
+- `SolverState` deterministic RNG reseed path and property accessors.
+- `McsTrain` defaults and `hi` output call (non-throw).
+- `initialize_state` for all enum/string aliases, integer path, and shape validation errors.
+- update-rule invariants:
+- local/multi updates preserve state alphabet.
+- exchange and bond updates preserve vector length and valid index range.
+- global and worm updates operate deterministically for fixed RNG.
+- neighbor-table generation for square lattice and order 1/2 paths.
+- sampler factory:
+- string aliases map to `VMCSampler`.
+- passing sampler instance returns same object.
+- invalid sampler string raises `ArgumentError`.
+- VMCSampler behavior:
+- sample output shapes for `numchains>1`, `numsamples>1`.
+- acceptance ratio in `[0, 1]`.
+- deterministic outputs for identical seeds.
+- probability vector normalization to sample count.
+- diagnostics:
+- `compute_ess`, `compute_rhat`, and `compute_autocorr_time` edge cases.
+- parallel tempering:
+- beta generation for linear/logarithmic/geometric.
+- replica cloning count and deterministic `swap` acceptance path with seeded RNG.
+- minimal `train` loop non-throw with mock MonteCarlo solvers.
+- integration:
+- include test in full regression command with existing module tests.
+
+E) Performance and typing gate
+- Hot entrypoints:
+- `MonteCarlo.propose_multi_flip(state, rng; n_flip=4)`.
+- `VMCSampler.sample(params; num_samples=32, num_chains=8)`.
+- `compute_rhat(chains)`.
+- Expectations:
+- `@code_warntype` for hot entrypoints has concrete return bodies and no `Any` in inner loops.
+- update kernels should avoid per-step heap allocations where feasible for fixed-size state vectors.
+- one `@btime` with allocation report for `propose_multi_flip` and one for `VMCSampler.sample` on a small system.
