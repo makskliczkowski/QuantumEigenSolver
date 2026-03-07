@@ -1,0 +1,20 @@
+[
+  {
+    "name": "binary_int2base",
+    "python_s": 21.020082208007807,
+    "julia_s": 7.957475000002887,
+    "py_over_jl": 2.6415517746521577
+  },
+  {
+    "name": "physics_gap_ratio",
+    "python_s": 20.871518416010076,
+    "julia_s": 8.39822908298811,
+    "py_over_jl": 2.485228517794128
+  },
+  {
+    "name": "algebra_exact_eigen",
+    "python_s": 21.728635667008348,
+    "julia_s": 9.637939374981215,
+    "py_over_jl": 2.254489764006292
+  }
+]
