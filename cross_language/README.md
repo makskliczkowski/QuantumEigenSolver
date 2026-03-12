@@ -12,6 +12,7 @@ Location is intentionally at repository root level for shared validation.
 - `tests/test_python_julia_parity.py`
   - API inventory checks for key mapped modules.
   - Numerical parity checks for core methods.
+  - Includes quadratic occupation helpers, quadratic thermal scans, and BdG transform outputs.
 - `benchmarks/run_python_julia_benchmarks.py`
   - Cross-language benchmark snapshots for representative operations.
   - Writes reports to `cross_language/reports/`.

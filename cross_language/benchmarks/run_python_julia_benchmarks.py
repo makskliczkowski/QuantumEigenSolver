@@ -104,6 +104,21 @@ def main():
                 + "res=QuantumEigenSolver.Algebra.EigenModule.choose_eigensolver(QuantumEigenSolver.Algebra.EigenModule.ExactEigensolver; A=A, hermitian=true); println(real(res.eigenvalues[1]));"
             ),
         },
+        {
+            "name": "quadratic_thermal_scan",
+            "python": (
+                "import numpy as np; "
+                "from QES.Algebra.Properties.quadratic_thermal import quadratic_thermal_scan; "
+                "eps=np.linspace(-2.0, 2.0, 64); T=np.linspace(0.25, 2.0, 24); "
+                "scan=quadratic_thermal_scan(eps, T, particle_type='fermion', particle_number=32.0); "
+                "print(float(scan['C_V'][0]))"
+            ),
+            "julia": (
+                julia_import
+                + "eps=collect(range(-2.0, 2.0; length=64)); T=collect(range(0.25, 2.0; length=24)); "
+                + "scan=QuantumEigenSolver.Physics.thermal.quadratic_thermal_scan(eps, T; particle_type=\"fermion\", particle_number=32.0); println(scan[\"C_V\"][1]);"
+            ),
+        },
     ]
 
     rows = []

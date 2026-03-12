@@ -19,10 +19,47 @@ git clone --recursive https://github.com/makskliczkowski/QuantumEigenSolver.git
 - Julia package guide: `juqusolver/README.md`
 - Python package guide: `pyqusolver/README.md`
 - Julia quadratic builder notes: `juqusolver/docs/src/quadratic_hamiltonians.md`
+- Julia quadratic utility notes: `juqusolver/docs/src/quadratic_utilities.md`
+- Julia quadratic transform notes: `juqusolver/docs/src/quadratic_transforms.md`
+- Julia physics-model notes: `juqusolver/docs/src/physics_models.md`
+- Julia time-evolution notes: `juqusolver/docs/src/time_evolution.md`
+- Julia entanglement and MES notes: `juqusolver/docs/src/entanglement_mes.md`
+- Feature gap analysis: `docs/FEATURE_GAP_ANALYSIS.md`
+- Development roadmap: `docs/DEVELOPMENT_ROADMAP.md`
 - Julia testing guide: `juqusolver/docs/src/testing.md`
 - Python testing guide: `pyqusolver/Python/docs/testing.md`
 - Cross-language parity suite: `cross_language/README.md`
 - Top-level workflow docs: `docs/REPO_OVERVIEW.md`, `docs/SUBREPOS_AND_WORKFLOWS.md`
+
+## Model Coverage and Tested Physics Invariants
+
+- Spin models covered in maintained tests:
+  - Heisenberg-Kitaev
+  - QSM
+  - Ultrametric
+  - Julia-only maintained interacting spin family coverage also includes TFIM, XXZ, and J1-J2
+- Fermionic models covered in maintained tests:
+  - ManyBodyFreeFermions
+  - HubbardModel
+- Noninteracting models covered in maintained tests:
+  - FreeFermions
+  - AubryAndre
+  - SYK2
+  - PowerLawRandomBanded
+  - RosenzweigPorter
+- Physics invariants enforced by the maintained suites:
+  - Hermiticity
+  - deterministic seeded behavior for random ensembles
+  - coupling-update rebuild paths
+  - total-particle-number conservation for spinless many-body fermion models
+  - analytic free-fermion cosine-band reproduction
+  - Aubry-Andre localization increase through inverse participation ratio
+  - middle-spectrum gap statistics for random ensembles
+  - random-spin middle-spectrum entropy, ETH-style local-observable behavior, and finite spectral diagnostics
+- Maintained test locations:
+  - Julia: `juqusolver/test/models/physics_models_test.jl`
+  - Python: `pyqusolver/Python/tests/models/test_random_spin_models.py`
+  - Python: `pyqusolver/Python/tests/models/test_fermionic_and_noninteracting_models.py`
 
 ## Python vs Julia: Practical Interface Mapping
 
@@ -102,7 +139,7 @@ python cross_language/run_all.py
 ```bash
 cd pyqusolver
 pip install -e "Python/[all,dev]"
-pytest Python/test/
+PYTHONPATH=Python pytest Python/tests -q
 ```
 
 ### Julia
