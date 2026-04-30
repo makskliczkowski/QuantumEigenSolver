@@ -217,14 +217,14 @@ namespace NQS_NS
 	void NQS<_spinModes, _Ht, _T, _stateType>::evolveSet(const MonteCarlo::MCS_train_t& _par, const bool quiet, const bool randomStart)
 	{
 		// without the final update
-		this->evolveFunc_ = [this, &_par, quiet, randomStart](double t, double dt, const NQSB& y) -> NQSB
+		this->evolveFunc_ = [this, _par, quiet, randomStart](double t, double dt, const NQSB& y) -> NQSB
 		{   
 			this->setWeights(y);
 			this->evolveStep(t / dt, dt, _par, quiet, randomStart, false);
 			return this->dF_;
 		};
 		// with the final update
-		this->evolveFuncR_ = [this, &_par, quiet, randomStart](double t, double dt, const NQSB& y, NQSB* _dF) -> void
+		this->evolveFuncR_ = [this, _par, quiet, randomStart](double t, double dt, const NQSB& y, NQSB* _dF) -> void
 		{   
 			this->setWeights(y);
 			this->evolveStep(t / dt, dt, _par, quiet, randomStart, false, _dF);

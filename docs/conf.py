@@ -1,19 +1,28 @@
 # Configuration file for the Sphinx documentation builder.
 
-import os
 import sys
+from pathlib import Path
 
-# Add the project root directory and Python package to sys.path
-sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('../pyqusolver/Python'))
-sys.path.insert(0, os.path.abspath('../pyqusolver/Python/QES'))
+ROOT = Path(__file__).resolve().parents[1]
+PYTHON_PACKAGE = ROOT / "pyqusolver" / "Python"
+
+# Add the repository root and installable Python package to sys.path. The
+# package root is enough for ``import QES``; adding ``QES/`` itself would make
+# submodules importable as top-level modules and can hide broken absolute paths.
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(PYTHON_PACKAGE))
+
+try:
+    import QES
+except Exception:
+    QES = None
 
 # -- Project information -----------------------------------------------------
 
 project     = 'QES - Quantum EigenSolver'
 copyright   = '2025, Maksymilian Kliczkowski'
 author      = 'Maksymilian Kliczkowski'
-release     = '0.1.0'
+release     = getattr(QES, "__version__", "0.1.0")
 
 # -- General configuration ---------------------------------------------------
 
@@ -69,7 +78,7 @@ html_theme_options  = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 # -- Options for autodoc ----------------------------------------------------
 
@@ -81,6 +90,7 @@ autodoc_default_options = {
     'undoc-members'         : True,
     'exclude-members'       : '__weakref__'
 }
+autodoc_typehints = 'description'
 
 # Generate autosummary automatically
 # autosummary_generate                = True

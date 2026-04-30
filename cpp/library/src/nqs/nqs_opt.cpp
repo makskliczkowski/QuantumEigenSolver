@@ -259,7 +259,7 @@ namespace NQS_NS
 	bool NQS<_spinModes, _Ht, _T, _stateType>::trainStop(size_t i, const MonteCarlo::MCS_train_t& _par, _T _currLoss, _T _currstd, bool _quiet)
 	{
 		const double best		= this->info_p_.best(algebra::real(_currLoss));
-		const double acceptance = (double)this->accepted_ / this->total_ * 100.0;
+		const double acceptance = this->total_ > 0 ? (double)this->accepted_ / this->total_ * 100.0 : 0.0;
 		// ---------------------------------
 		this->lastLoss_ 		= _currLoss;
 		this->lastStdLoss_ 		= _currstd;
