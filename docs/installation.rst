@@ -1,71 +1,90 @@
 Installation
 ============
 
-Quantum EigenSolver (QES) consists of a C++ core library and a Python interface.
-
-Prerequisites
--------------
-
-Ensure the following tools and libraries are installed:
-
-- **Build Tools:**
-    - CMake (minimum version 3.23.0)
-    - A C++20-compliant compiler (Intel icpx, GCC, or MSVC)
-    - Python 3.10+
-
-- **Libraries:**
-    - Intel MKL
-    - Armadillo
-    - HDF5
-
-- **Optional:**
-    - OpenMP (for parallel processing)
-
-Clone the Repository
---------------------
+Clone with all submodules first:
 
 .. code-block:: bash
 
-    git clone https://github.com/makskliczkowski/QuantumEigenSolver.git
+    git clone --recursive https://github.com/makskliczkowski/QuantumEigenSolver.git
     cd QuantumEigenSolver
 
-C++ Library Installation
+C++ library (cpqusolver)
 ------------------------
 
-1. **Set Environment Variables:**
+**Prerequisites**
 
-   Set the paths to your installed libraries. For example:
+- CMake >= 3.23
+- C++20 compiler (GCC 12+, Clang 16+, Apple Clang 15+)
+- `Armadillo <https://arma.sourceforge.net/>`_ source tree (header-only; no
+  installed library needed). On macOS the BLAS/LAPACK backend is
+  ``Accelerate``; on Linux link against OpenBLAS or MKL.
+- HDF5 (optional; required only for ``qes-kitaev`` HDF5 output and
+  ``qes-disorder`` spectrum dumps)
 
-   .. code-block:: bash
+MKL is **not** required. The default backend is Accelerate (macOS) or
+OpenBLAS (Linux).
 
-       export MKL_INCL_DIR=/path/to/mkl/include
-       export MKL_LIB_DIR=/path/to/mkl/lib
-       export HDF5_INCL_DIR=/path/to/hdf5/include
-       export HDF5_LIB_DIR=/path/to/hdf5/lib
-       export ARMADILLO_INCL_DIR=/path/to/armadillo/include
+**Build**
 
-2. **Configure and Build:**
+.. code-block:: bash
 
-   .. code-block:: bash
+    export ARMADILLO_INCL_DIR=/path/to/armadillo-15.x.x   # source tree
 
-       cd cpp/library
-       mkdir build
-       cd build
-       cmake .. -DCMAKE_BUILD_TYPE=Release
-       make -j$(nproc)
+    cd cpqusolver
+    cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+    cmake --build build-release -j$(nproc)
+    ctest --test-dir build-release                         # 35/35 expected
 
-Python Package Installation
+To build without Armadillo (core only, no dense/sparse linalg):
+
+.. code-block:: bash
+
+    cmake -S . -B build-noarma -DGENUTILS_USE_ARMADILLO=OFF
+    cmake --build build-noarma -j$(nproc)
+
+**Environment variables recognised by CMake**
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Variable
+     - Purpose
+   * - ``ARMADILLO_INCL_DIR``
+     - Path to Armadillo source tree (``include/`` dir or root)
+   * - ``HDF5_INCL_DIR`` / ``HDF5_LIB_DIR``
+     - HDF5 headers / libraries (optional)
+   * - ``MKL_INCL_DIR`` / ``MKL_LIB_DIR``
+     - Intel MKL (optional; overrides Accelerate/OpenBLAS)
+
+Python package (pyqusolver)
 ---------------------------
-
-To install the Python interface:
 
 .. code-block:: bash
 
     cd pyqusolver/Python
     pip install -e .
 
-To install with all optional dependencies (including JAX, ML tools, etc.):
+With optional JAX / ML dependencies:
 
 .. code-block:: bash
 
     pip install -e .[all]
+
+Requires Python 3.10+. Core dependencies: NumPy, SciPy, h5py.
+JAX is optional and pulled in only by ``pip install -e .[jax]``.
+
+Julia package (juqusolver)
+--------------------------
+
+.. code-block:: bash
+
+    julia --project=juqusolver -e "using Pkg; Pkg.instantiate()"
+
+Or from the Julia REPL:
+
+.. code-block:: julia
+
+    ] add /path/to/QuantumEigenSolver/juqusolver
+
+Requires Julia 1.9+.

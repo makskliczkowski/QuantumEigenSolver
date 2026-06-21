@@ -1,84 +1,65 @@
 Introduction
 ============
 
-**Quantum EigenSolver (QES)** is a comprehensive computational framework designed for solving quantum many-body problems using classical and quantum-inspired algorithms. The project provides a unified platform for researchers and practitioners working with quantum systems, offering both traditional methods and cutting-edge neural quantum state approaches.
+**Quantum EigenSolver (QES)** is a multi-language toolkit for quantum
+many-body physics. It targets exact and near-exact methods for spin,
+fermionic, and bosonic lattice models at zero and finite temperature.
 
-Overview
---------
+Scope
+-----
 
-Quantum many-body systems present some of the most challenging computational problems in physics. The exponential scaling of the Hilbert space dimension with system size makes exact solutions intractable for large systems. QES addresses this challenge by providing:
+The three packages share a common physics scope and cross-validated
+reference values, but have independent builds and APIs:
 
-🔬 **Multiple Solution Approaches**
-   - Exact diagonalization for small systems
-   - Variational methods with neural quantum states
-   - Quantum Monte Carlo techniques
-   - Matrix product state methods
+**cpqusolver** (C++20)
+   - Term-list Hamiltonian over arbitrary binary bases (spin-1/2, spinless
+     fermions, spinful fermions).
+   - Symmetry-reduced bases: translation, reflection, parity, inversion,
+     arbitrary abelian groups with fermionic JW signs.
+   - Matrix-free ``matvec`` + Krylov (Lanczos, Krylov time evolution
+     ``exp(-iHdt)``), dense and sparse materialization via Armadillo.
+   - Spectral functions (T=0 Lehmann, finite-T FTLM, Krylov continued
+     fraction), entanglement entropies, level statistics, thermodynamics.
+   - Free-fermion (quadratic) solver: correlation matrix, BdG, Aubry-Andre,
+     SYK2, power-law random banded.
+   - Nine ``qes-*`` command-line apps (diagonalize, entropy, evolve,
+     measure, disorder, SQD, Kitaev, quadratic, properties).
 
-⚡ **Performance Optimization**
-   - JIT compilation for CPU acceleration
-   - GPU support through JAX backend
-   - Parallel computing capabilities
-   - Memory-efficient algorithms
+**pyqusolver** (Python)
+   - ``QES`` package: Hamiltonians, exact diagonalization, NQS/TDVP,
+     variational Monte Carlo, Numba/JAX backends.
+   - Spin models (Ising, XXZ, Heisenberg-Kitaev, XYZ, J1-J2), fermionic
+     (Hubbard, t-J), quadratic (free-fermion, Aubry-Andre, SYK2, PLRB,
+     Rosenzweig-Porter).
+   - Quantities: entropy, RDM, spectral functions, thermodynamics,
+     time evolution, DSF (Lehmann + Krylov + FTLM).
 
-🎯 **Target Applications**
-   - Condensed matter physics simulations
-   - Quantum chemistry calculations
-   - Statistical mechanics studies
-   - Quantum information research
+**juqusolver** (Julia)
+   - ``QuantumEigenSolver`` package: high-throughput ED, quadratic
+     Hamiltonians (BdG, correlation matrix, Aubry-Andre localization),
+     Krylov time evolution, entanglement / MES, level statistics.
+   - Strong cross-validation suite against pyqusolver.
 
-Key Features
-------------
+What is not here
+----------------
 
-Flexible Model Construction
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **Neural Quantum States (NQS)**: Python only (``pyqusolver``); not in C++
+  or Julia. The C++ legacy NQS code has been retired.
+- **DMRG / MPS**: not implemented in any package.
+- **Quantum chemistry integrals**: not in scope.
 
-QES provides tools for constructing various quantum many-body models:
+Cross-language validation
+-------------------------
 
-- **Spin Systems**: Heisenberg, Ising, XY models with arbitrary interactions
-- **Fermionic Systems**: Hubbard, t-J models with hopping and interactions  
-- **Bosonic Systems**: Bose-Hubbard and related models
-- **Custom Models**: User-defined Hamiltonians with flexible operator algebra
-
-Advanced Solver Methods
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-The framework implements multiple solution strategies:
-
-- **Exact Methods**: Full diagonalization for small systems
-- **Neural Quantum States**: Variational optimization with neural networks
-- **Monte Carlo**: Statistical sampling for finite-temperature properties
-- **Time Evolution**: Real and imaginary time dynamics
-
-Comprehensive Analysis Tools
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Built-in analysis capabilities include:
-
-- **Entanglement Measures**: Von Neumann, Rényi, and participation entropies
-- **Correlation Functions**: Spatial and temporal correlations
-- **Thermodynamic Properties**: Specific heat, susceptibility, phase transitions
-- **Visualization**: Plotting and data export utilities
-
-Scientific Background
----------------------
-
-The methods implemented in QES are based on established theoretical frameworks:
-
-**Neural Quantum States**
-   Neural quantum states, introduced by Carleo and Troyer [1]_, represent quantum many-body wavefunctions using artificial neural networks. This approach has shown remarkable success in capturing complex quantum correlations and ground state properties.
-
-**Variational Monte Carlo**
-   The variational principle combined with Monte Carlo sampling provides a powerful framework for approximating ground states and computing expectation values of quantum observables.
-
-**Symmetry Integration**
-   QES incorporates quantum symmetries (translational, point group, particle number conservation) to reduce computational complexity and improve accuracy.
+Shared benchmark suites live in ``cross_language/``. Ground-state energies,
+symmetry sector spectra, and free-fermion dispersion are validated between
+all three packages to at least 1e-10 relative error. See
+``cross_language/README.md`` for the test matrix.
 
 References
 ----------
 
-.. [1] G. Carleo and M. Troyer, "Solving the quantum many-body problem with artificial neural networks," Science 355, 602-606 (2017).
-
-Getting Started
----------------
-
-To begin using QES, see the :doc:`installation` guide for setup instructions and the :doc:`usage` section for examples and tutorials.
+.. [1] G. Carleo and M. Troyer, *Science* 355, 602-606 (2017). -- NQS
+       method used in pyqusolver.
+.. [2] A. Jaklic and P. Prelovsek, *Phys. Rev. B* 49, 5065 (1994). -- FTLM
+       finite-temperature Lanczos used in cpqusolver and pyqusolver.

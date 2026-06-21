@@ -1,41 +1,53 @@
 Welcome to Quantum EigenSolver's Documentation
 ==============================================
 
-**Quantum EigenSolver (QES)** is a comprehensive framework for solving quantum eigenvalue problems and performing quantum many-body simulations. It provides a unified interface for various computational methods including exact diagonalization, Neural Quantum States (NQS), and Monte Carlo techniques.
+**Quantum EigenSolver (QES)** is a multi-language framework for quantum
+many-body physics: exact diagonalization, symmetry-reduced bases,
+free-fermion solvers, spectral functions, time evolution, and thermodynamics.
 
-Key Features
-------------
+The repository contains three independent, interoperable packages:
 
-🔬 **Quantum Many-Body Systems**
-   - Support for spin systems, fermionic models, and bosonic systems
-   - Flexible Hilbert space construction with symmetry handling
-   - Efficient operator representations
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
 
-⚡ **High-Performance Computing**
-   - JIT compilation with Numba for CPU acceleration
-   - Optional JAX backend for GPU/TPU support
-   - Parallel Monte Carlo implementations
-   - C++ Core for critical performance paths
+   * - Package
+     - Description
+   * - ``cpqusolver/``
+     - C++20 static library + ``qes-*`` apps. Header-only core, Armadillo
+       backend for dense/sparse linalg, matrix-free Lanczos/Krylov.
+       Build: ``cmake -S cpqusolver -B cpqusolver/build-release -DCMAKE_BUILD_TYPE=Release``.
+   * - ``pyqusolver/``
+     - Python package ``QES``. Spin/fermionic/quadratic models, NQS/TDVP,
+       Monte Carlo, Numba/JAX backends. Install: ``pip install -e pyqusolver/Python``.
+   * - ``juqusolver/``
+     - Julia package ``QuantumEigenSolver``. High-performance ED, quadratic
+       solvers, time evolution, entanglement. ``] add juqusolver/``.
 
-🧠 **Neural Quantum States**
-   - Variational quantum Monte Carlo with neural networks
-   - Time-dependent variational principle (TDVP)
-   - Modern machine learning integration
+Capabilities by package
+-----------------------
 
-📊 **Comprehensive Analysis Tools**
-   - Entanglement entropy calculations
-   - Statistical mechanics utilities
-   - Visualization and data management
-
-Package Structure
------------------
-
-The QES package is organized into several main modules:
-
-- **QES.Algebra**: Core algebraic operations, Hilbert spaces, and Hamiltonians
-- **QES.Solver**: Eigenvalue solvers and computational methods  
-- **QES.NQS**: Neural Quantum State implementations
-- **QES.general_python**: Utilities for scientific computing
++------------------------------------+----------+-----------+------------+
+| Feature                            | C++ (cpq)| Python    | Julia      |
++====================================+==========+===========+============+
+| Exact diagonalization              | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| Symmetry-reduced basis             | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| Free-fermion / quadratic           | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| Krylov / Lanczos (matrix-free)     | yes      | partial   | yes        |
++------------------------------------+----------+-----------+------------+
+| Spectral functions / DSF           | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| Time evolution                     | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| Thermodynamics                     | yes      | yes       | yes        |
++------------------------------------+----------+-----------+------------+
+| NQS / variational Monte Carlo      | —        | yes       | —          |
++------------------------------------+----------+-----------+------------+
+| GPU (JAX)                          | —        | yes       | —          |
++------------------------------------+----------+-----------+------------+
 
 .. toctree::
    :maxdepth: 2

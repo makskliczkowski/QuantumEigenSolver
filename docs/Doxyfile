@@ -1,6 +1,6 @@
 PROJECT_NAME           = "Quantum EigenSolver"
 PROJECT_NUMBER         = 0.1.0
-INPUT                  = ../cpp/library/
+INPUT                  = ../cpqusolver/
 OUTPUT_DIRECTORY       = _build/doxygen
 RECURSIVE              = YES
 GENERATE_XML           = YES

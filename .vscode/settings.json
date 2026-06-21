@@ -152,5 +152,6 @@
     "python.analysis.autoImportCompletions" : true,
     
     "vscodeTodo.enableWideView": false,
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "workbench.colorTheme": "VS Code Dark"
 }

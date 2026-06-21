@@ -1,10 +1,9 @@
 API Reference
 =============
 
-The documented Python API is the installable ``QES`` package under
-``pyqusolver/Python``. The root package is intentionally lazy: ``import QES``
-sets global backend defaults and exposes stable entry points without importing
-the full JAX/NQS stack.
+Python package (``QES``) — auto-generated from docstrings under
+``pyqusolver/Python``. The root ``import QES`` is lazy: backends
+and NQS submodules are imported on first use, not at import time.
 
 Top-Level Package
 -----------------
@@ -61,6 +60,8 @@ Solvers
 Neural Quantum States
 ---------------------
 
+Optional; requires ``pip install -e .[jax]`` or ``.[all]``.
+
 .. automodule:: QES.NQS
    :members:
    :undoc-members:
@@ -95,6 +96,16 @@ Shared Utilities
    :show-inheritance:
 
 .. automodule:: QES.general_python.physics.spectral.spectral_backend
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: QES.general_python.physics.entropy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: QES.general_python.physics.density_matrix
    :members:
    :undoc-members:
    :show-inheritance:

@@ -1,35 +1,44 @@
 {
-    "version"           : 4,
-    "configurations"    : [
+    "version": 4,
+    "configurations": [
         {
-            "name"              : "Debug Program",
-            "type"              : "cppdbg",
-            "request"           : "launch",
-            "program"           : "${workspaceFolder}/build/program.o",
-            "args"              : [],
-            "stopAtEntry"       : false,
-            "cwd"               : "${workspaceFolder}",
-            "environment"       : [],
-            "externalConsole"   : false,
-            "preLaunchTask"     : "build",
-            "MIMode"            : "gdb",
-            "setupCommands"     : [
-                {
-                    "description"       : "Enable pretty-printing for gdb",
-                    "text"              : "-enable-pretty-printing",
-                    "ignoreFailures"    : true
-                }
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/cpqusolver/include",
+                "${workspaceFolder}/cpqusolver/source/src",
+                "${workspaceFolder}/cpqusolver/source",
+                "${workspaceFolder}/cpqusolver",
+                "${env:ARMADILLO_INCL_DIR}",
+                "${env:MKL_INCL_DIR}",
+                "/opt/homebrew/include",
+                "/opt/homebrew/opt/hdf5/include",
+                "/usr/local/include"
             ],
-            "miDebuggerPath"     : "/usr/bin/gdb",
-            "logging"           : {
-                "engineLogging"      : true
-            },
-            "includePath"        : [
-                "${workspaceFolder}",
-                "${ARMADILLO_INCL_DIR}",
-                "${MKL_INCL_DIR}"
+            "defines": [],
+            "compilerPath": "/usr/bin/clang++",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compileCommands": "${workspaceFolder}/cpqusolver/build/compile_commands.json"
+        },
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/cpqusolver/include",
+                "${workspaceFolder}/cpqusolver/source/src",
+                "${workspaceFolder}/cpqusolver/source",
+                "${workspaceFolder}/cpqusolver",
+                "${env:ARMADILLO_INCL_DIR}",
+                "${env:MKL_INCL_DIR}",
+                "/usr/include",
+                "/usr/local/include"
             ],
-            "cppStandard"        : "c++20" // Add or update this line for the new C++ standard
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c17",
+            "cppStandard": "c++20",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compileCommands": "${workspaceFolder}/cpqusolver/build/compile_commands.json"
         }
     ]
 }

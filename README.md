@@ -1,6 +1,6 @@
 # QuantumEigenSolver
 
-Main repository containing Python (`pyqusolver`), Julia (`juqusolver`), and C++ components.
+Main repository containing Python (`pyqusolver`), Julia (`juqusolver`), and C++ implementations.
 
 Clone with submodules:
 
@@ -12,12 +12,15 @@ git clone --recursive https://github.com/makskliczkowski/QuantumEigenSolver.git
 
 - `pyqusolver/`: Python framework (`QES`) for many-body and variational workflows.
 - `juqusolver/`: Julia package (`QuantumEigenSolver`) focused on high-performance computation paths.
-- `cpp/`: C++ implementation components - the oldest but potentially the fastest (legacy).
+- `cpqusolver/`: C++20 library and compatibility executable.
 
 ## Documentation Entry Points
 
 - Julia package guide: `juqusolver/README.md`
 - Python package guide: `pyqusolver/README.md`
+- C++ package guide: `cpqusolver/README.md`
+- C++ architecture notes: `cpqusolver/docs/architecture.md`
+- C++ Hamiltonian notes: `cpqusolver/docs/modules/hamiltonian.md`
 - Julia quadratic builder notes: `juqusolver/docs/src/quadratic_hamiltonians.md`
 - Julia quadratic utility notes: `juqusolver/docs/src/quadratic_utilities.md`
 - Julia quadratic transform notes: `juqusolver/docs/src/quadratic_transforms.md`
@@ -154,8 +157,8 @@ cd juqusolver
 ### C++
 
 ```bash
-cd cpp/library
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+cd cpqusolver
+cmake -S . -B build -DCPQUSOLVER_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```

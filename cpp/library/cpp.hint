@@ -1,3 +1,0 @@
-#define RETURNS(__VA_ARGS__) -> decltype((__VA_ARGS__)) { return (__VA_ARGS__); }
-#define ULLPOW(k)
-#define END_ENUM(ENUM_NAME) ; const char* geSTR##ENUM_NAME(enum e##ENUM_NAME index) { return eSTR##ENUM_NAME [index]; };

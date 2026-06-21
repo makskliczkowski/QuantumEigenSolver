@@ -1,6 +1,6 @@
-[submodule "cpp/library/source"]
-	path = cpp/library/source
-	url = https://github.com/makskliczkowski/general_cpp
+[submodule "cpqusolver"]
+	path = cpqusolver
+	url = git@github.com:makskliczkowski/cpqusolver.git
 [submodule "pyqusolver"]
 	path = pyqusolver
 	url = https://github.com/makskliczkowski/pyqusolver

@@ -5,19 +5,20 @@ set -e
 
 echo "Running validation script..."
 
+check_path() {
+    local type=$1 path=$2 label=$3
+    if ! test "$type" "$path"; then
+        echo "Error: $label not initialized or empty."
+        echo "Please run: git submodule update --init --recursive"
+        exit 1
+    fi
+}
+
 # 1. Check Submodules
 echo "Checking submodules..."
-if [ ! -f "cpp/library/source/README.md" ]; then
-    echo "Error: Submodule 'cpp/library/source' not initialized or empty."
-    echo "Please run: git submodule update --init --recursive"
-    exit 1
-fi
-
-if [ ! -d "pyqusolver/Python" ]; then
-    echo "Error: Submodule 'pyqusolver' not initialized or empty."
-    echo "Please run: git submodule update --init --recursive"
-    exit 1
-fi
+check_path -f "cpqusolver/README.md"        "Submodule 'cpqusolver'"
+check_path -f "cpqusolver/source/README.md" "Nested submodule 'cpqusolver/source'"
+check_path -d "pyqusolver/Python"           "Submodule 'pyqusolver'"
 echo "✓ Submodules appear present."
 
 # 2. Run Python Smoke Tests
@@ -52,12 +53,15 @@ if [[ "$1" == "--build" ]]; then
 
     # Configure CMake
     echo "Configuring CMake..."
-    # We use -S cpp/library as the source directory
-    cmake -S cpp/library -B build -DCMAKE_BUILD_TYPE=Release
+    cmake -S cpqusolver -B build -DCMAKE_BUILD_TYPE=Release
 
     # Build
     echo "Compiling..."
     cmake --build build -j$(nproc)
+
+    # Run tests
+    echo "Running C++ tests..."
+    ctest --test-dir build --output-on-failure
 
     echo "✓ C++ build completed."
 else
