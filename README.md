@@ -1,6 +1,6 @@
 # QuantumEigenSolver
 
-Main repository containing Python (`pyqusolver`), Julia (`juqusolver`), and C++ components.
+Main repository containing Python (`pyqusolver`), and C++ components.
 
 Clone with submodules:
 
@@ -11,68 +11,31 @@ git clone --recursive https://github.com/makskliczkowski/QuantumEigenSolver.git
 ## Implementations
 
 - `pyqusolver/`: Python framework (`QES`) for many-body and variational workflows.
-- `juqusolver/`: Julia package (`QuantumEigenSolver`) focused on high-performance computation paths.
+- `juqusolver/`: Julia package (`QuantumEigenSolver`) focused on high-performance computation paths (currently developed)
 - `cpp/`: C++ implementation components - the oldest but potentially the fastest (legacy).
 
-## Documentation Entry Points
-
-- Julia package guide: `juqusolver/README.md`
-- Python package guide: `pyqusolver/README.md`
-- Julia quadratic builder notes: `juqusolver/docs/src/quadratic_hamiltonians.md`
-- Julia quadratic utility notes: `juqusolver/docs/src/quadratic_utilities.md`
-- Julia quadratic transform notes: `juqusolver/docs/src/quadratic_transforms.md`
-- Julia physics-model notes: `juqusolver/docs/src/physics_models.md`
-- Julia time-evolution notes: `juqusolver/docs/src/time_evolution.md`
-- Julia entanglement and MES notes: `juqusolver/docs/src/entanglement_mes.md`
-- Feature gap analysis: `docs/FEATURE_GAP_ANALYSIS.md`
-- Development roadmap: `docs/DEVELOPMENT_ROADMAP.md`
-- Julia testing guide: `juqusolver/docs/src/testing.md`
-- Python testing guide: `pyqusolver/Python/docs/testing.md`
-- Cross-language parity suite: `cross_language/README.md`
-- Top-level workflow docs: `docs/REPO_OVERVIEW.md`, `docs/SUBREPOS_AND_WORKFLOWS.md`
-
-## Model Coverage and Tested Physics Invariants
-
-- Spin models covered in maintained tests:
+## Model Coverage
+- Spin models covered:
   - Heisenberg-Kitaev
   - QSM
   - Ultrametric
-  - Julia-only maintained interacting spin family coverage also includes TFIM, XXZ, and J1-J2
-- Fermionic models covered in maintained tests:
+  - ...and others
+- Fermionic models covered:
   - ManyBodyFreeFermions
   - HubbardModel
-- Noninteracting models covered in maintained tests:
+- Noninteracting models covered:
   - FreeFermions
   - AubryAndre
   - SYK2
   - PowerLawRandomBanded
   - RosenzweigPorter
-- Physics invariants enforced by the maintained suites:
-  - Hermiticity
-  - deterministic seeded behavior for random ensembles
-  - coupling-update rebuild paths
-  - total-particle-number conservation for spinless many-body fermion models
-  - analytic free-fermion cosine-band reproduction
-  - Aubry-Andre localization increase through inverse participation ratio
-  - middle-spectrum gap statistics for random ensembles
-  - random-spin middle-spectrum entropy, ETH-style local-observable behavior, and finite spectral diagnostics
-- Maintained test locations:
-  - Julia: `juqusolver/test/models/physics_models_test.jl`
-  - Python: `pyqusolver/Python/tests/models/test_random_spin_models.py`
-  - Python: `pyqusolver/Python/tests/models/test_fermionic_and_noninteracting_models.py`
-
-## Python vs Julia: Practical Interface Mapping
-
-This repository keeps module-level capability parity where possible, but APIs follow each language style.
+  - ...user-built quadratic systems
 
 ### Entropy and density-matrix calculations
 
 - Python:
   - `pyqusolver/Python/QES/general_python/physics/entropy.py`
   - `pyqusolver/Python/QES/general_python/physics/density_matrix.py`
-- Julia:
-  - `juqusolver/src/Physics/Entropy.jl`
-  - `juqusolver/src/Physics/DensityMatrix.jl`
 
 ### Hilbert spaces with and without symmetries
 
@@ -110,27 +73,11 @@ This repository keeps module-level capability parity where possible, but APIs fo
 
 - Python:
   - `pyqusolver/Python/QES/Algebra/Properties/time_evo.py`
-  - `pyqusolver/Python/QES/general_python/common/plotters/spectral_utils.py`
   - `pyqusolver/Python/QES/Algebra/Properties/statistical.py`
 - Julia:
   - `juqusolver/src/Algebra/HamiltonianAction.jl`
   - `juqusolver/src/Physics/Spectral.jl`
   - `juqusolver/src/Physics/Statistical.jl`
-
-## Cross-language Validation and Benchmarks
-
-Root-level parity tests and benchmarks are in `cross_language/`.
-
-```bash
-# parity tests
-PYTHONPATH=pyqusolver/Python pytest cross_language/tests/test_python_julia_parity.py -q
-
-# benchmark snapshots
-python cross_language/benchmarks/run_python_julia_benchmarks.py
-
-# full cross-language pipeline
-python cross_language/run_all.py
-```
 
 ## Quick Run Commands
 
@@ -142,15 +89,6 @@ pip install -e "Python/[all,dev]"
 PYTHONPATH=Python pytest Python/tests -q
 ```
 
-### Julia
-
-```bash
-cd juqusolver
-~/.juliaup/bin/julia --project -e 'include("test/runtests_all.jl")'
-~/.juliaup/bin/julia --project -e 'include("examples/run_all_examples.jl")'
-~/.juliaup/bin/julia --project -e 'include("benchmark/run_all_benchmarks.jl")'
-```
-
 ### C++
 
 ```bash
@@ -159,3 +97,5 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make
 ```
+This work was partially supported by the National Science Centre, Poland (Narodowe Centrum Nauki, NCN), grant no. 2024/53/B/ST3/02756.
+
