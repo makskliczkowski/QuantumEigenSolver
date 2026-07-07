@@ -1,0 +1,22 @@
+{
+  "title": "QuantumEigenSolver",
+  "upload_type": "software",
+  "description": "Software developed as part of the NCN-funded project.",
+  "creators": [
+    {
+      "name": "Kliczkowski, Maksymilian",
+      "affiliation": "HZDR (CASUS), Wroclaw University of Science and Technology"
+    }
+  ],
+  "license": "MIT",
+  "grants": [
+    {
+      "id": "2024/53/B/ST3/02756"
+    }
+  ],
+  "keywords": [
+    "quantum many-body systems",
+    "numerical physics",
+    "neural quantum states"
+  ]
+}
